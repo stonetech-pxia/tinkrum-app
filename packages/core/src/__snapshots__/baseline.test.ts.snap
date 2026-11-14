@@ -2642,6 +2642,8 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 0>.when[].value<anyOf 0> string len ..200
 <oneOf 6>.tools[]<anyOf 0>.when[].value<anyOf 1> number
 <oneOf 6>.tools[]<anyOf 0>.when[].value<anyOf 2> boolean
+<oneOf 6>.tools[]<anyOf 0>.when[].value<anyOf 3> array items 2..8
+<oneOf 6>.tools[]<anyOf 0>.when[].value<anyOf 3>[] string len ..200
 <oneOf 6>.tools[]<anyOf 0>.tool
 <oneOf 6>.tools[]<anyOf 0>.tool<anyOf 0> string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 0>.tool<anyOf 1> "$pick.media"|"$pick.files"|"$pick.open"
@@ -3250,6 +3252,8 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .data.tables[].fields[]<oneOf rollup>.filter[].value<anyOf 0> string len ..200
 .data.tables[].fields[]<oneOf rollup>.filter[].value<anyOf 1> number
 .data.tables[].fields[]<oneOf rollup>.filter[].value<anyOf 2> boolean
+.data.tables[].fields[]<oneOf rollup>.filter[].value<anyOf 3> array items 2..8
+.data.tables[].fields[]<oneOf rollup>.filter[].value<anyOf 3>[] string len ..200
 .data.tables[].fields[]<oneOf rollup>.days? object
 .data.tables[].fields[]<oneOf rollup>.days.date? = .data.tables[].fields[]<oneOf rollup>.filter[].field
 .data.tables[].fields[]<oneOf rollup>.days.unit? "day"|"week"|"month"

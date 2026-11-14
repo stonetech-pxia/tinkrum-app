@@ -79,7 +79,15 @@ export type StreakUnit = (typeof STREAK_UNITS)[number];
 export const ConditionSchema = z.strictObject({
   field: FieldRefSchema,
   op: z.enum(['is', 'isNot', 'contains', 'gt', 'lt', 'isEmpty', 'isNotEmpty', 'inPeriod', 'due']),
-  value: z.union([z.string().max(200), z.number().finite(), z.boolean()]).optional(),
+  // is 单选字段可以给 2–8 个选项，是其中一个就算（D-538）。只到这一步：不跨字段「或」，不嵌套。
+  value: z
+    .union([
+      z.string().max(200),
+      z.number().finite(),
+      z.boolean(),
+      z.array(z.string().max(200)).min(2).max(8),
+    ])
+    .optional(),
 });
 export type Condition = z.infer<typeof ConditionSchema>;
 

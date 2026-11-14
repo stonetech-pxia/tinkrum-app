@@ -7529,7 +7529,86 @@ const filteredOn = (c: WorkspaceConfig, table: string, ok: (f: Condition) => boo
     (x.source.filter ?? []).some(ok),
   );
 
+/** 订单表，状态有 5 个选项（「是其中一个」用 isNot 写不出来）。 */
+const ordersEarlier: EvalEarlier = {
+  input: 'Make a table of my orders with a status, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'item', name: 'Item', type: 'text', required: true },
+          {
+            id: 'status',
+            name: 'Status',
+            type: 'choice',
+            options: [
+              { id: 'new', label: 'New' },
+              { id: 'paid', label: 'Paid' },
+              { id: 'shipped', label: 'Shipped' },
+              { id: 'delivered', label: 'Delivered' },
+              { id: 'cancelled', label: 'Cancelled' },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'orders-page',
+        title: 'Orders',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'orders', limit: 50 },
+            show: { title: 'item', subtitles: ['status'] },
+          },
+        ],
+      },
+    },
+  ],
+};
+const anyOf = (f: Condition, ids: string[]) =>
+  f.field === 'status' &&
+  f.op === 'is' &&
+  Array.isArray(f.value) &&
+  [...f.value].sort().join() === [...ids].sort().join();
+
 const KERNEL_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG3',
+    input: 'Make the orders list show only the orders that are paid or shipped',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [ordersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        filteredOn(c, 'orders', (f) => anyOf(f, ['paid', 'shipped']))
+          ? null
+          : 'expected an orders list filtered on status is [paid, shipped]',
+    },
+  },
+  {
+    id: 'KG4',
+    input: '订单页面再加一个列表：新订单和已付款的',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [ordersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        filteredOn(c, 'orders', (f) => anyOf(f, ['new', 'paid']))
+          ? null
+          : 'expected an orders list filtered on status is [new, paid]',
+    },
+  },
   {
     id: 'KG1',
     input: 'Add a list of the contracts that end within the next 30 days',

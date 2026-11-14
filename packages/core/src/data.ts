@@ -406,6 +406,8 @@ export function matchesCondition(
     case 'isNotEmpty':
       return value !== undefined && value !== '';
     case 'is':
+      // 单选「是其中一个」（D-538）。
+      if (Array.isArray(target)) return typeof value === 'string' && target.includes(value);
       return value !== undefined && target !== undefined && value === target;
     case 'isNot':
       return value === undefined || value !== target;

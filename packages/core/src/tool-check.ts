@@ -460,7 +460,9 @@ class Analysis {
     const { source } = c as Extract<KnownComponent, { look: 'list' }>;
     return [
       ...(source.group?.by ? [source.group.by] : []),
-      ...(source.filter ?? []).filter((x) => x.op === 'is').map((x) => x.field),
+      ...(source.filter ?? [])
+        .filter((x) => x.op === 'is' && !Array.isArray(x.value))
+        .map((x) => x.field),
     ];
   }
 

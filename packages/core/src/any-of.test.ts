@@ -1,0 +1,68 @@
+import { describe, expect, it } from 'vitest';
+
+import { conditionProblems } from './conditions';
+import { filterRecords, type DataRecord } from './data';
+import { ConditionSchema, type Collection } from './schema';
+
+// D-538：一个单选字段「是其中一个」（is 给 2–8 个选项）。不跨字段，不嵌套。
+
+const tasks: Collection = {
+  id: 'tasks',
+  name: 'Tasks',
+  fields: [
+    { id: 'title', name: 'Title', type: 'text' },
+    {
+      id: 'status',
+      name: 'Status',
+      type: 'choice',
+      options: [
+        { id: 'todo', label: 'To do' },
+        { id: 'doing', label: 'Doing' },
+        { id: 'done', label: 'Done' },
+      ],
+    },
+    { id: 'tags', name: 'Tags', type: 'tags' },
+    { id: 'n', name: 'N', type: 'number' },
+  ],
+};
+const rec = (id: string, status?: string): DataRecord => ({
+  id,
+  collectionId: 'tasks',
+  values: status ? { status } : {},
+  createdAt: 0,
+  updatedAt: 0,
+});
+
+describe('is any of on a choice field (D-538)', () => {
+  it('matches records whose option is one of the list', () => {
+    const records = [rec('a', 'todo'), rec('b', 'doing'), rec('c', 'done'), rec('d')];
+    const ids = filterRecords(
+      records,
+      tasks,
+      [{ field: 'status', op: 'is', value: ['todo', 'doing'] }],
+      new Date(2026, 10, 14),
+    ).map((r) => r.id);
+    expect(ids).toEqual(['a', 'b']);
+  });
+
+  it('validates: choice field, is only, known options', () => {
+    const p = (field: string, op: 'is' | 'isNot' | 'contains', value: string[]) =>
+      conditionProblems([{ field, op, value }], tasks);
+    expect(p('status', 'is', ['todo', 'doing'])).toEqual([]);
+    expect(p('status', 'is', ['todo', 'nope'])).not.toEqual([]);
+    expect(p('status', 'isNot', ['todo', 'doing'])).not.toEqual([]);
+    expect(p('title', 'is', ['a', 'b'])).not.toEqual([]);
+    expect(p('title', 'contains', ['a', 'b'])).not.toEqual([]);
+    // 标签名是记录内容，AI 不能写（只能 isEmpty / isNotEmpty）。
+    expect(p('tags', 'is', ['a', 'b'])).not.toEqual([]);
+  });
+
+  it('takes 2 to 8 values', () => {
+    const ok = (value: string[]) =>
+      ConditionSchema.safeParse({ field: 'status', op: 'is', value }).success;
+    expect(ok(['a'])).toBe(false);
+    expect(ok(['a', 'b'])).toBe(true);
+    expect(ok(['1', '2', '3', '4', '5', '6', '7', '8'])).toBe(true);
+    expect(ok(['1', '2', '3', '4', '5', '6', '7', '8', '9'])).toBe(false);
+  });
+});

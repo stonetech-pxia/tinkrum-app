@@ -191,7 +191,9 @@ const presetsOf = (w: PlacedWrite): string[] => {
     if (!source) return [];
     return [
       ...(source.group?.by ? [source.group.by] : []),
-      ...(source.filter ?? []).filter((c) => c.op === 'is').map((c) => c.field),
+      ...(source.filter ?? [])
+        .filter((c) => c.op === 'is' && !Array.isArray(c.value))
+        .map((c) => c.field),
     ];
   }
   return Object.keys((values as RecordToolValues | undefined) ?? {});
