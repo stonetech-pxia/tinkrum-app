@@ -4,6 +4,7 @@ import { prepareOps } from './change';
 import { createStarterWorkspace } from './starter';
 import type { Op } from './ops-schema';
 import { draftTable } from './templates';
+import { withCurrency } from './new-table';
 import { draftReceiptSample, SAMPLE_APPS, sampleInfo, sampleOps, type SampleApp } from './samples';
 import {
   HOME_PAGE_ID,
@@ -548,6 +549,17 @@ describe('draftReceiptSample（新建表单页选了购物凭证，D-479）', ()
       expect(quickActionsOf(added).length).toBe(2);
     },
   );
+
+  it('金额的货币跟草稿（按文件上的符号定的，D-548）', () => {
+    const config = workspace('en');
+    const table = withCurrency(draftTable('purchase', config, 'en'), 'MYR');
+    const got = draftReceiptSample(table, 'purchase', config, 'en')!;
+    const added = apply(config, got.ops, 'en');
+    const money = (c: { fields: { type: string; currency?: string | undefined }[] }) =>
+      c.fields.filter((f) => f.type === 'money').map((f) => f.currency);
+    expect(money(added.data.tables[0]!)).toEqual(['MYR']);
+    expect(money(got.table)).toEqual(['MYR']);
+  });
 
   it('已经有一张叫 receipts 的表：新表 ID 换掉，返回的表和建出来的一致', () => {
     const config = workspace('zh');

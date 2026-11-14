@@ -4,8 +4,10 @@ import {
   addDraftField,
   draftEngine,
   fieldTypeFor,
+  fileCurrency,
   removeDraftField,
   renameDraftField,
+  withCurrency,
 } from './new-table';
 import { applyOps } from './ops';
 import { createDefaultWorkspace } from './defaults';
@@ -175,5 +177,39 @@ describe('隐藏的预设', () => {
   it('不在用户平时看到的预设里', () => {
     for (const p of HIDDEN_RECORD_PRESETS)
       expect(FILE_RECORD_PRESETS as readonly string[]).not.toContain(p);
+  });
+});
+
+// 金额的货币跟着文件（D-548）：用文件建表时，金额字段用小票上的货币，认不出才按界面语言。
+describe('fileCurrency', () => {
+  const page = (...texts: string[]): TextPage[] => [
+    {
+      width: 600,
+      height: 800,
+      lines: texts.map((text, i) => ({ text, x: 20, y: 20 + i * 40, width: 300, height: 16 })),
+    },
+  ];
+  it('reads the sign or code on the money lines, Western receipts first', () => {
+    expect(fileCurrency(page('Corner Deli', 'TOTAL $18.40'), 'en')).toBe('USD');
+    expect(fileCurrency(page('Boulangerie', 'Total 12,50 €'), 'fr')).toBe('EUR');
+    expect(fileCurrency(page('Panadería', 'TOTAL 7,80 EUR'), 'en')).toBe('EUR');
+    expect(fileCurrency(page('Tesco', 'Total £4.20'), 'en')).toBe('GBP');
+  });
+  it('a Malaysian receipt in RM is MYR (user tests 2026-11-09, 2026-11-10)', () => {
+    expect(fileCurrency(page('KEDAI PAPAN YEW CHUAN', 'TOTAL RM 121.90'), 'en')).toBe('MYR');
+    expect(fileCurrency(page('Restoran Ali', 'Jumlah RM 33.90'), 'en')).toBe('MYR');
+    expect(fileCurrency(page('Kedai', 'TOTAL 9.00 MYR'), 'en')).toBe('MYR');
+  });
+  it('without a sign it says nothing, so the table keeps the language default', () => {
+    expect(fileCurrency(page('Maple Corner', 'Total 178.23'), 'en')).toBeNull();
+    expect(fileCurrency(page('Platform rm 33.90'), 'en')).toBeNull();
+    expect(fileCurrency([], 'en')).toBeNull();
+  });
+  it('withCurrency sets the money fields and leaves the others', () => {
+    const table = withCurrency(draftTable('purchase', createDefaultWorkspace('en'), 'en'), 'MYR');
+    expect(table.fields.filter((f) => f.type === 'money').map((f) => f.currency)).toEqual(['MYR']);
+    expect(table.fields.length).toBe(
+      draftTable('purchase', createDefaultWorkspace('en'), 'en').fields.length,
+    );
   });
 });
