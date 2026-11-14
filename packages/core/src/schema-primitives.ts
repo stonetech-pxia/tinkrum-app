@@ -36,6 +36,7 @@ export const FieldRefSchema = z.union([IdSchema, z.enum(SYSTEM_FIELDS)]);
 /**
  * 时间段（筛选、in.records、file.filter 共用）。最近几天是固定几档（D-285）；thisTwoWeeks 从「设置 → 日期」的
  * 锚定日起每 14 天一段，thisHalfMonth 是 1–15 号或 16 号到月底。按「今天」算，今天从几点开始见 calendar.ts。
+ * 往后几天（D-537）：今天到今天 + N − 1，和最近 N 天一样含今天（快到期的合同、证件）。
  */
 export const PERIODS = [
   'today',
@@ -49,6 +50,9 @@ export const PERIODS = [
   'last365days',
   'thisTwoWeeks',
   'thisHalfMonth',
+  'next7days',
+  'next30days',
+  'next90days',
 ] as const;
 export type Period = (typeof PERIODS)[number];
 

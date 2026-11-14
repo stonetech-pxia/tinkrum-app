@@ -804,6 +804,9 @@ export const CAPABILITIES: readonly Capability[] = [
   periodCap('last365days'),
   periodCap('thisTwoWeeks'),
   periodCap('thisHalfMonth'),
+  periodCap('next7days'),
+  periodCap('next30days'),
+  periodCap('next90days'),
   cap('read.show.color', 'read', (v) => recordBlocks(v).some((b) => b.show.color !== undefined)),
   cap('read.format.elapsed', 'read', (v) =>
     recordBlocks(v).some((b) => b.show.format?.kind === 'elapsed'),

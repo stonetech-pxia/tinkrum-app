@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { splitOps } from './ai/kinds';
 import { calendarOf, DEFAULT_CALENDAR, type Calendar } from './calendar';
 import { prepareOps } from './change';
+import { conditionProblems } from './conditions';
 import { chartSeries } from './chart';
 import { filterRecords, periodRange, prepareRecordValues, type DataRecord } from './data';
 import { describeChange } from './describe';
@@ -14,6 +15,57 @@ import { registry, v33Fixture, workspace } from './test-helpers';
 const thursday = new Date(2026, 9, 22, 9, 0);
 const sunday: Calendar = { ...DEFAULT_CALENDAR, weekStart: 'sunday' };
 const twoAm: Calendar = { ...DEFAULT_CALENDAR, dayStartHour: 2 };
+
+describe('future periods and "today" in comparisons (D-537)', () => {
+  const c: Collection = {
+    id: 'docs',
+    name: 'Docs',
+    fields: [
+      { id: 'due', name: 'Due', type: 'date' },
+      { id: 'at', name: 'At', type: 'datetime' },
+    ],
+  };
+  const rec = (id: string, values: Record<string, unknown>): DataRecord => ({
+    id,
+    collectionId: 'docs',
+    values,
+    createdAt: 0,
+    updatedAt: 0,
+  });
+
+  it('next 7 / 30 / 90 days start today', () => {
+    expect(periodRange('next7days', thursday)).toEqual(['2026-10-22', '2026-10-28']);
+    expect(periodRange('next30days', thursday)).toEqual(['2026-10-22', '2026-11-20']);
+    expect(periodRange('next90days', thursday)).toEqual(['2026-10-22', '2027-01-19']);
+    // 一天从 2 点开始时，1 点半还算昨天。
+    expect(periodRange('next7days', new Date(2026, 9, 23, 1, 30), twoAm)).toEqual([
+      '2026-10-22',
+      '2026-10-28',
+    ]);
+  });
+
+  it('gt / lt "today" compare with the logical today', () => {
+    const records = [
+      rec('past', { due: '2026-10-21', at: '2026-10-21T23:00' }),
+      rec('today', { due: '2026-10-22', at: '2026-10-22T08:00' }),
+      rec('future', { due: '2026-10-23', at: '2026-10-23T00:30' }),
+      rec('empty', {}),
+    ];
+    const ids = (cond: { field: string; op: 'gt' | 'lt' }, now = thursday, cal?: Calendar) =>
+      filterRecords(records, c, [{ ...cond, value: 'today' }], now, cal).map((r) => r.id);
+    expect(ids({ field: 'due', op: 'lt' })).toEqual(['past']);
+    expect(ids({ field: 'due', op: 'gt' })).toEqual(['future']);
+    expect(ids({ field: 'at', op: 'lt' })).toEqual(['past']);
+    // 2 点开始的一天：10-23 01:00 的「今天」是 10-22，10-23 00:30 算 10-22。
+    expect(ids({ field: 'at', op: 'gt' }, new Date(2026, 9, 23, 1), twoAm)).toEqual([]);
+  });
+
+  it('validation accepts "today" on date fields only', () => {
+    const cond = (field: string, op: 'gt' | 'lt', value: string | number) => [{ field, op, value }];
+    expect(conditionProblems(cond('due', 'lt', 'today'), c)).toEqual([]);
+    expect(conditionProblems(cond('createdAt', 'gt', 'today'), c)).toEqual([]);
+  });
+});
 
 describe('new periods (D-285)', () => {
   it('last 14 / 90 / 365 days end today', () => {

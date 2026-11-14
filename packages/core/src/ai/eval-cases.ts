@@ -7492,6 +7492,84 @@ const FIX_CASES: EvalCase[] = [
   },
 ];
 
+/** 内核补缺（2026-11-14）：先有一张合同表（名称、结束日期），用例在它上面改。 */
+const contractsEarlier: EvalEarlier = {
+  input: 'Make a table of my contracts with a name and an end date, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'contracts',
+        name: 'Contracts',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'ends', name: 'End date', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'contracts-page',
+        title: 'Contracts',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'contracts', sort: { field: 'ends', direction: 'asc' }, limit: 50 },
+            show: { title: 'name', subtitles: ['ends'] },
+          },
+        ],
+      },
+    },
+  ],
+};
+const filteredOn = (c: WorkspaceConfig, table: string, ok: (f: Condition) => boolean) =>
+  [...recordBlocksOf(c, table), ...numbersOf(c, table)].some((x) =>
+    (x.source.filter ?? []).some(ok),
+  );
+
+const KERNEL_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG1',
+    input: 'Add a list of the contracts that end within the next 30 days',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [contractsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        filteredOn(
+          c,
+          'contracts',
+          (f) => f.field === 'ends' && f.op === 'inPeriod' && f.value === 'next30days',
+        )
+          ? null
+          : 'expected a contracts list filtered on ends inPeriod next30days',
+    },
+  },
+  {
+    id: 'KG2',
+    input: '合同页面加一个列表，只显示结束日期已经过了的合同',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [contractsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        filteredOn(
+          c,
+          'contracts',
+          (f) => f.field === 'ends' && f.op === 'lt' && f.value === 'today',
+        )
+          ? null
+          : 'expected a contracts list filtered on ends lt "today"',
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -7543,6 +7621,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...RECORD_EVAL_CASES,
   ...DRAFT_CHAT_EVAL_CASES,
   ...MODULE_EVAL_CASES,
+  ...KERNEL_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

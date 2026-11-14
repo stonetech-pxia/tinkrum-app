@@ -184,6 +184,9 @@ function everything() {
     'last365days',
     'thisTwoWeeks',
     'thisHalfMonth',
+    'next7days',
+    'next30days',
+    'next90days',
   ];
   return buildConfig([
     addTable('groups', [text('name', { required: true })]),

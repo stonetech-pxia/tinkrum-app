@@ -118,6 +118,12 @@ export function periodRange(
       return span(today - 89, 90);
     case 'last365days':
       return span(today - 364, 365);
+    case 'next7days':
+      return span(today, 7);
+    case 'next30days':
+      return span(today, 30);
+    case 'next90days':
+      return span(today, 90);
   }
 }
 
@@ -364,7 +370,11 @@ export function matchesCondition(
   cal: Calendar = DEFAULT_CALENDAR,
 ): boolean {
   const field = fieldOf(collection, condition.field);
-  const target = condition.value;
+  // gt / lt 日期可以写 "today"（D-537）：按逻辑上的今天（一天从几点开始按 cal）。
+  const target =
+    (condition.op === 'gt' || condition.op === 'lt') && condition.value === 'today'
+      ? dateOfDayNumber(todayNumber(now, cal))
+      : condition.value;
   // 日期时间（D-279）按它那一天筛选：时间段、日期比较，以及 is / isNot 一个日期。
   if (condition.op === 'due') {
     const status =

@@ -324,7 +324,10 @@ describe('samples equal the v33 samples, migrated', () => {
   // 名片样板（D-423）、收据样板（D-437）是 v34 以后加的，没有 v33 的样子。
   // 报销助手（D-425、D-427）多了打印带附件、导出 Excel，下面单独查。
   it.each(
-    SAMPLE_APPS.filter((s) => s !== 'business-cards' && s !== 'expense-helper' && s !== 'receipts'),
+    SAMPLE_APPS.filter(
+      (s) =>
+        s !== 'business-cards' && s !== 'expense-helper' && s !== 'receipts' && s !== 'visa-docs',
+    ),
   )('%s in zh', (sample) => {
     const before = fresh('zh');
     expect(apply(before, ops(sample, before, 'zh'), 'zh')).toEqual(
@@ -332,6 +335,25 @@ describe('samples equal the v33 samples, migrated', () => {
       JSON.parse(
         JSON.stringify(
           withStarterTheme(withScanKeep(fromV33(v33Fixture(`sample-${sample}-zh`)))),
+        ).replaceAll('Morph', 'Tinkrum'),
+      ),
+    );
+  });
+
+  it('visa-docs in zh differs only by the "expire within 30 days" count (D-537)', () => {
+    const before = fresh('zh');
+    const config = structuredClone(apply(before, ops('visa-docs', before, 'zh'), 'zh'));
+    const page = config.containers.pages.find((p) => p.id === 'my-ids')!;
+    const expiring = page.blocks.find((b) => b.id === 'expiring');
+    expect(expiring).toMatchObject({ look: 'number' });
+    expect((expiring as { source?: unknown }).source).toMatchObject({
+      filter: [{ field: 'expires', op: 'inPeriod', value: 'next30days' }],
+    });
+    page.blocks = page.blocks.filter((b) => b.id !== 'expiring');
+    expect(config).toEqual(
+      JSON.parse(
+        JSON.stringify(
+          withStarterTheme(withScanKeep(fromV33(v33Fixture('sample-visa-docs-zh')))),
         ).replaceAll('Morph', 'Tinkrum'),
       ),
     );

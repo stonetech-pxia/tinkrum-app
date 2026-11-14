@@ -90,6 +90,16 @@ const RECORD_PERIOD_OPTIONS = [
     value: 'thisHalfMonth',
     label: { en: 'This half-month', zh: '这半个月', fr: 'Cette quinzaine' },
   },
+  // D-537：往后几天，含今天。
+  { value: 'next7days', label: { en: 'Next 7 days', zh: '往后 7 天', fr: '7 prochains jours' } },
+  {
+    value: 'next30days',
+    label: { en: 'Next 30 days', zh: '往后 30 天', fr: '30 prochains jours' },
+  },
+  {
+    value: 'next90days',
+    label: { en: 'Next 90 days', zh: '往后 90 天', fr: '90 prochains jours' },
+  },
 ];
 
 export const MAX_PICK = 50;
