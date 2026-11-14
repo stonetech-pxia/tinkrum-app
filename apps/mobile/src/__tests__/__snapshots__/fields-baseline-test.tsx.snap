@@ -11,6 +11,7 @@ form form-form-num <TextInput>: [Weight]
 form form-form-m <TextInput>: [Price (EUR)]
 form form-form-cb <RCTSwitch>: [off]
 form form-form-d <TextInput>: [YYYY-MM-DD]
+form form-form-d-pick <View>: [Pick from a calendar]
 form form-form-ch-a <View>: Alpha
 form form-form-ch-b <View>: Beta
 form form-form-r-1 <View>: ★
@@ -57,6 +58,7 @@ form form-form-num <TextInput>: [Weight]
 form form-form-m <TextInput>: [Price (EUR)]
 form form-form-cb <RCTSwitch>: [off]
 form form-form-d <TextInput>: [YYYY-MM-DD]
+form form-form-d-pick <View>: [Choisir dans un calendrier]
 form form-form-ch-a <View>: Alpha
 form form-form-ch-b <View>: Beta
 form form-form-r-1 <View>: ★
@@ -103,6 +105,7 @@ form form-form-num <TextInput>: [Weight]
 form form-form-m <TextInput>: [Price (EUR)]
 form form-form-cb <RCTSwitch>: [off]
 form form-form-d <TextInput>: [YYYY-MM-DD]
+form form-form-d-pick <View>: [从日历里选]
 form form-form-ch-a <View>: Alpha
 form form-form-ch-b <View>: Beta
 form form-form-r-1 <View>: ★

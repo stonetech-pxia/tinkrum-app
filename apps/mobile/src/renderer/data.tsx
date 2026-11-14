@@ -115,6 +115,7 @@ import { ProgressBar, ProgressRing } from './Progress';
 import { useTicker } from './ticker';
 import { cardColors, onPage, type Palette } from './theme';
 import { ColorDot, recordMarks } from './record-marks';
+import { DayGrid, PickButton, TimeChips } from './DatePicker';
 import { RecordGallery } from './RecordGallery';
 import { RecordTable } from './RecordTable';
 import { Button, Card } from './ui';
@@ -334,37 +335,62 @@ function DateInput({
   chip,
 }: FieldInputContext<FieldOf<'date'>>) {
   const cal = useCalendar();
+  const [picking, setPicking] = useState(false);
   const today = todayNumber(new Date(), cal);
   const recognise = () => {
     if (typeof value !== 'string' || /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return;
     const found = findDatePhrase(value, today, cal)?.value;
     if (found?.kind === 'date') onChange(found.date);
   };
+  const text = typeof value === 'string' ? value : '';
   return (
-    <View style={styles.dateRow}>
-      <TextInput
-        testID={testID}
-        editable={!disabled}
-        value={typeof value === 'string' ? value : ''}
-        onChangeText={onChange}
-        onEndEditing={recognise}
-        placeholder="YYYY-MM-DD"
-        placeholderTextColor={palette.caption}
-        style={[input, styles.flex]}
-      />
-      {[
-        [dateOfDayNumber(today), t(locale, 'today')],
-        [dateOfDayNumber(today + 1), t(locale, 'scheduleTomorrow')],
-        [dateOfDayNumber(today - 1), t(locale, 'yesterday')],
-      ].map(([date, label]) => (
-        <Pressable
-          key={label}
+    <View style={styles.datePicker}>
+      <View style={styles.dateRow}>
+        <TextInput
+          testID={testID}
+          editable={!disabled}
+          value={typeof value === 'string' ? value : ''}
+          onChangeText={onChange}
+          onEndEditing={recognise}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={palette.caption}
+          style={[input, styles.flex]}
+        />
+        {[
+          [dateOfDayNumber(today), t(locale, 'today')],
+          [dateOfDayNumber(today + 1), t(locale, 'scheduleTomorrow')],
+          [dateOfDayNumber(today - 1), t(locale, 'yesterday')],
+        ].map(([date, label]) => (
+          <Pressable
+            key={label}
+            disabled={disabled}
+            onPress={() => onChange(date)}
+            style={chip(value === date)}>
+            <Text style={[palette.font('bodyBold', 13), { color: palette.text }]}>{label}</Text>
+          </Pressable>
+        ))}
+        <PickButton
+          open={picking}
+          onPress={() => setPicking(!picking)}
+          palette={palette}
+          locale={locale}
           disabled={disabled}
-          onPress={() => onChange(date)}
-          style={chip(value === date)}>
-          <Text style={[palette.font('bodyBold', 13), { color: palette.text }]}>{label}</Text>
-        </Pressable>
-      ))}
+          testID={`${testID}-pick`}
+        />
+      </View>
+      {picking ? (
+        <DayGrid
+          value={/^\d{4}-\d{2}-\d{2}$/.test(text) ? text : undefined}
+          onPick={(date) => {
+            onChange(date);
+            setPicking(false);
+          }}
+          palette={palette}
+          locale={locale}
+          cal={cal}
+          testID={testID ?? 'date'}
+        />
+      ) : null}
     </View>
   );
 }
@@ -377,12 +403,20 @@ export const FIELD_EDITORS: { [T in FieldType]: FieldEditor<FieldOf<T>> } = {
   date: { input: (ctx) => <DateInput {...ctx} /> },
   // D-279：几点几分，「现在」填上当前时间。
   time: {
-    input: (ctx) => withNowChip(ctx, 'HH:MM', (now) => localDateTime(now).slice(11)),
+    input: (ctx) => (
+      <TimeInput ctx={ctx} placeholder="HH:MM" nowValue={(now) => localDateTime(now).slice(11)} />
+    ),
   },
   // D-279：日期加时间，编辑时写成「2026-10-29 08:30」。
   datetime: {
-    input: (ctx) =>
-      withNowChip(ctx, 'YYYY-MM-DD HH:MM', (now) => localDateTime(now).replace('T', ' ')),
+    input: (ctx) => (
+      <TimeInput
+        ctx={ctx}
+        placeholder="YYYY-MM-DD HH:MM"
+        nowValue={(now) => localDateTime(now).replace('T', ' ')}
+        withDate
+      />
+    ),
     toForm: (v) => String(v).replace('T', ' '),
   },
   // D-279：时长，小时和分钟两个框，表单里的值是「h:mm」（一边空着算 0）。
@@ -638,33 +672,84 @@ function TagsInput({
 }
 
 /** 时间、日期时间：一个输入框，旁边的「现在」填上当前时间（D-279）。 */
-function withNowChip<F extends Field>(
-  { field, value, onChange, palette, locale, disabled, testID, input, chip }: FieldInputContext<F>,
-  placeholder: string,
-  nowValue: (now: Date) => string,
-) {
+/**
+ * 时间、日期时间（D-279）：打字、「现在」，或者从选择器里点（D-543）。日期时间先点一天再点几点几分，
+ * 没有的那一半用现在的。
+ */
+function TimeInput<F extends Field>({
+  ctx,
+  placeholder,
+  nowValue,
+  withDate,
+}: {
+  ctx: FieldInputContext<F>;
+  placeholder: string;
+  nowValue: (now: Date) => string;
+  withDate?: boolean;
+}) {
+  const { field, value, onChange, palette, locale, disabled, testID, input, chip } = ctx;
+  const cal = useCalendar();
+  const [picking, setPicking] = useState(false);
+  const text = typeof value === 'string' ? value.trim() : '';
+  const now = nowValue(new Date());
+  const m = /^(?:(\d{4}-\d{2}-\d{2})[ T])?(\d{1,2}:\d{2})$/.exec(text);
+  const date = withDate
+    ? (m?.[1] ?? (/^\d{4}-\d{2}-\d{2}$/.test(text) ? text : undefined))
+    : undefined;
+  const time = m?.[2];
+  const put = (d: string | undefined, hm: string | undefined) =>
+    onChange(withDate ? `${d ?? now.slice(0, 10)} ${hm ?? now.slice(11)}` : (hm ?? now));
   return (
-    <View style={styles.dateRow}>
-      <TextInput
-        testID={testID}
-        editable={!disabled}
-        value={typeof value === 'string' ? value : ''}
-        onChangeText={onChange}
-        // 快速添加表单里没有标签：占位文字写字段名和格式（和金额的「时薪 (CNY)」一样）。
-        placeholder={`${field.name} (${placeholder})`}
-        placeholderTextColor={palette.caption}
-        keyboardType="numbers-and-punctuation"
-        style={[input, styles.flex]}
-      />
-      <Pressable
-        testID={`${testID}-now`}
-        disabled={disabled}
-        onPress={() => onChange(nowValue(new Date()))}
-        style={chip(false)}>
-        <Text style={[palette.font('bodyBold', 13), { color: palette.text }]}>
-          {t(locale, 'now')}
-        </Text>
-      </Pressable>
+    <View style={styles.datePicker}>
+      <View style={styles.dateRow}>
+        <TextInput
+          testID={testID}
+          editable={!disabled}
+          value={typeof value === 'string' ? value : ''}
+          onChangeText={onChange}
+          // 快速添加表单里没有标签：占位文字写字段名和格式（和金额的「时薪 (CNY)」一样）。
+          placeholder={`${field.name} (${placeholder})`}
+          placeholderTextColor={palette.caption}
+          keyboardType="numbers-and-punctuation"
+          style={[input, styles.flex]}
+        />
+        <Pressable
+          testID={`${testID}-now`}
+          disabled={disabled}
+          onPress={() => onChange(nowValue(new Date()))}
+          style={chip(false)}>
+          <Text style={[palette.font('bodyBold', 13), { color: palette.text }]}>
+            {t(locale, 'now')}
+          </Text>
+        </Pressable>
+        <PickButton
+          open={picking}
+          onPress={() => setPicking(!picking)}
+          palette={palette}
+          locale={locale}
+          disabled={disabled}
+          testID={`${testID}-pick`}
+        />
+      </View>
+      {picking && withDate ? (
+        <DayGrid
+          value={date}
+          onPick={(d) => put(d, time)}
+          palette={palette}
+          locale={locale}
+          cal={cal}
+          testID={testID ?? 'datetime'}
+        />
+      ) : null}
+      {picking ? (
+        <TimeChips
+          value={time}
+          onPick={(hm) => put(date, hm)}
+          palette={palette}
+          locale={locale}
+          testID={testID ?? 'time'}
+        />
+      ) : null}
     </View>
   );
 }
@@ -2418,6 +2503,7 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
   note: { minHeight: 110, textAlignVertical: 'top' },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  datePicker: { gap: 8 },
   smartDate: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   groupHeader: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   browseRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },

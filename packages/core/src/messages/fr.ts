@@ -1766,6 +1766,9 @@ export const fr: MessageTable = {
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: 'Mois précédent',
   calendarNextMonth: 'Mois suivant',
+  datePickerOpen: 'Choisir dans un calendrier',
+  datePickerHour: 'Heure',
+  datePickerMinute: 'Minute',
   calendarToday: 'Aujourd’hui',
   calendarDayLabel: '{date}, {n} entrées',
   calendarDayEmpty: 'Aucune entrée ce jour-là.',

@@ -1691,6 +1691,9 @@ export const en = {
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: 'Previous month',
   calendarNextMonth: 'Next month',
+  datePickerOpen: 'Pick from a calendar',
+  datePickerHour: 'Hour',
+  datePickerMinute: 'Minute',
   calendarToday: 'Today',
   calendarDayLabel: '{date}, {n} entries',
   calendarDayEmpty: 'No entries on this day.',

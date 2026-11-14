@@ -1600,6 +1600,9 @@ export const zh: MessageTable = {
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: '上个月',
   calendarNextMonth: '下个月',
+  datePickerOpen: '从日历里选',
+  datePickerHour: '时',
+  datePickerMinute: '分',
   calendarToday: '今天',
   calendarDayLabel: '{date}，{n} 条记录',
   calendarDayEmpty: '这一天没有记录。',
