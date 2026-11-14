@@ -93,6 +93,20 @@ describe('table look (D-539)', () => {
     await waitFor(() => expect(router.getPathname()).toBe('/record/people'));
   });
 
+  it('the fixed first column and the scrolling cells of a row are the same height', async () => {
+    const repo = new MemoryWorkspaceRepo();
+    const ada = await put(repo, { name: 'Ada', company: 'Acme', age: 36 });
+    await renderToolsApp(repo, undefined, { seed: seedWith(table), locale: 'en' });
+    const heightOf = (testID: string) =>
+      (StyleSheet.flatten(screen.getByTestId(testID).props.style as never) as { height?: number })
+        .height;
+    await screen.findByTestId(`record-${ada.id}`);
+    const fixed = heightOf(`record-${ada.id}`);
+    // 两边的行都带上边线：只有一边写了高度的话，每行差一条线，行多了左右对不齐。
+    expect(fixed).toBeGreaterThan(0);
+    expect(heightOf(`record-${ada.id}-cells`)).toBe(fixed);
+  });
+
   it('a new user sees the empty text, not an empty grid', async () => {
     const repo = new MemoryWorkspaceRepo();
     await renderToolsApp(repo, undefined, {

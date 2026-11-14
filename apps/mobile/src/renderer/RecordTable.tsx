@@ -94,12 +94,12 @@ export function RecordTable({
                 onPress={press(r)}
                 onLongPress={env.onLongPress}
                 disabled={!open}
-                style={[styles.row, line]}>
+                style={[styles.row, styles.tall, line]}>
                 {columns.map((id) => (
                   <View
                     key={id}
                     testID={`table-${blockId}-${r.id}-${id}`}
-                    style={[styles.cell, { width: COLUMN_WIDTH }]}>
+                    style={[styles.body, { width: COLUMN_WIDTH }]}>
                     <Text
                       numberOfLines={1}
                       style={[
@@ -128,4 +128,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   fixed: { borderRightWidth: StyleSheet.hairlineWidth },
   cell: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 12 },
+  // 右边每一行和左边那一格一样高（都含上边线）：不写的话每行多出一条线，行多了左右对不齐。
+  tall: { height: ROW_HEIGHT },
+  body: { justifyContent: 'center', paddingHorizontal: 12 },
 });
