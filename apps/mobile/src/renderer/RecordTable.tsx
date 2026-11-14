@@ -2,6 +2,7 @@ import { t, type Collection, type DataRecord } from '@morph/core';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { RenderEnv } from './components';
+import { ColorDot, type RecordMarks } from './record-marks';
 import { Card } from './ui';
 
 // 表格外观（D-539）：表头是字段名，每条一行；第一列（title）固定在左边，其余的列左右滑动。
@@ -21,6 +22,8 @@ export function RecordTable({
   background,
   titleOf,
   cellOf,
+  marks,
+  warnColumn,
   open,
 }: {
   blockId: string;
@@ -32,6 +35,9 @@ export function RecordTable({
   background: string;
   titleOf: (r: DataRecord) => string;
   cellOf: (r: DataRecord, field: string) => string;
+  marks: RecordMarks;
+  /** 警示色画在哪一列（右侧字段在列里时）；null 时画在标题上（D-541）。 */
+  warnColumn: string | null;
   open: ((r: DataRecord) => void) | undefined;
 }) {
   const { palette, locale } = env;
@@ -63,9 +69,16 @@ export function RecordTable({
               onLongPress={env.onLongPress}
               disabled={!open}
               style={[styles.cell, styles.row, { width: TITLE_WIDTH }, line]}>
+              <ColorDot color={marks.colorOf(r)} recordId={r.id} />
               <Text
                 numberOfLines={1}
-                style={[styles.flex, palette.font('title', 14), { color: palette.text }]}>
+                style={[
+                  styles.flex,
+                  palette.font('title', 14),
+                  {
+                    color: warnColumn === null && marks.warns(r) ? palette.danger : palette.text,
+                  },
+                ]}>
                 {titleOf(r)}
               </Text>
             </Pressable>
@@ -89,7 +102,13 @@ export function RecordTable({
                     style={[styles.cell, { width: COLUMN_WIDTH }]}>
                     <Text
                       numberOfLines={1}
-                      style={[palette.font('body', 14), { color: palette.text }]}>
+                      style={[
+                        palette.font('body', 14),
+                        {
+                          color:
+                            id === warnColumn && marks.warns(r) ? palette.danger : palette.text,
+                        },
+                      ]}>
                       {cellOf(r, id)}
                     </Text>
                   </View>

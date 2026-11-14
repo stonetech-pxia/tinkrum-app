@@ -9,11 +9,12 @@ import {
 } from '@morph/core';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { screen } from 'expo-router/testing-library';
+import { StyleSheet } from 'react-native';
 
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 新的记录外观：表格（D-539）、图片墙（D-540）。看只读，什么都不写（底线 15）。
+// 新的记录外观：表格（D-539）、图片墙（D-540）；按值上色和警示色（D-541）。看只读，什么都不写（底线 15）。
 
 const people: Collection = {
   id: 'people',
@@ -23,6 +24,15 @@ const people: Collection = {
     { id: 'company', name: 'Company', type: 'text' },
     { id: 'age', name: 'Age', type: 'number' },
     { id: 'photo', name: 'Photo', type: 'file' },
+    {
+      id: 'team',
+      name: 'Team',
+      type: 'choice',
+      options: [
+        { id: 'red', label: 'Red' },
+        { id: 'blue', label: 'Blue' },
+      ],
+    },
   ],
 };
 
@@ -137,5 +147,91 @@ describe('gallery look (D-540)', () => {
     expect(writes).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId(`record-${bob.id}`));
     await waitFor(() => expect(router.getPathname()).toBe('/record/people'));
+  });
+});
+
+describe('colour by value and warning colour (D-541)', () => {
+  const colorOf = (node: { props: { style?: unknown } }) =>
+    StyleSheet.flatten(node.props.style as never) as { color?: string; backgroundColor?: string };
+
+  it.each(['list', 'cards', 'table', 'gallery', 'tiles', 'board'] as const)(
+    'a %s draws a dot in the colour of the option, none when unset',
+    async (look) => {
+      const repo = new MemoryWorkspaceRepo();
+      const ada = await put(repo, { name: 'Ada', team: 'red' });
+      const bob = await put(repo, { name: 'Bob', team: 'blue' });
+      const cy = await put(repo, { name: 'Cy' });
+      await renderToolsApp(repo, undefined, {
+        seed: seedWith({
+          id: 'v',
+          look,
+          source: {
+            table: 'people',
+            limit: 30,
+            ...(look === 'board' ? { group: { by: 'team' } } : {}),
+          },
+          show: { title: 'name', color: 'team' },
+        } as NewComponent),
+        locale: 'en',
+      });
+      if (look === 'gallery')
+        await act(async () => {
+          fireEvent(await screen.findByTestId('gallery-v'), 'layout', {
+            nativeEvent: { layout: { width: 320, height: 0 } },
+          });
+        });
+      const red = colorOf(await screen.findByTestId(`color-dot-${ada.id}`)).backgroundColor;
+      const blue = colorOf(screen.getByTestId(`color-dot-${bob.id}`)).backgroundColor;
+      expect(red).toBeTruthy();
+      expect(blue).toBeTruthy();
+      expect(red).not.toBe(blue);
+      expect(screen.queryByTestId(`color-dot-${cy.id}`)).toBeNull();
+    },
+  );
+
+  it('entries matching show.highlight show their trailing value in the warning colour', async () => {
+    const repo = new MemoryWorkspaceRepo();
+    await put(repo, { name: 'Ada', age: 70 });
+    await put(repo, { name: 'Bob', age: 30 });
+    await renderToolsApp(repo, undefined, {
+      seed: seedWith({
+        id: 'v',
+        look: 'list',
+        source: { table: 'people', limit: 30 },
+        show: {
+          title: 'name',
+          trailing: 'age',
+          highlight: [{ field: 'age', op: 'gt', value: 60 }],
+        },
+      } as NewComponent),
+      locale: 'en',
+    });
+    const warn = colorOf(await screen.findByText('70')).color;
+    const plain = colorOf(screen.getByText('30')).color;
+    expect(warn).not.toBe(plain);
+    // 没有右侧字段时是标题。
+    expect(colorOf(screen.getByText('Ada')).color).toBe(colorOf(screen.getByText('Bob')).color);
+  });
+
+  it('without trailing, the title of a matching entry is in the warning colour', async () => {
+    const repo = new MemoryWorkspaceRepo();
+    await put(repo, { name: 'Ada', age: 70 });
+    await put(repo, { name: 'Bob', age: 30 });
+    await renderToolsApp(repo, undefined, {
+      seed: seedWith({
+        id: 'v',
+        look: 'table',
+        source: { table: 'people', limit: 30 },
+        show: {
+          title: 'name',
+          columns: ['age'],
+          highlight: [{ field: 'age', op: 'gt', value: 60 }],
+        },
+      } as NewComponent),
+      locale: 'en',
+    });
+    expect(colorOf(await screen.findByText('Ada')).color).not.toBe(
+      colorOf(screen.getByText('Bob')).color,
+    );
   });
 });

@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AssetRecord } from '../storage/types';
 import { AttachmentThumb, firstImage } from './Attachments';
 import type { RenderEnv } from './components';
+import { ColorDot, type RecordMarks } from './record-marks';
 
 // 图片墙（D-540）：每条记录附件里的第一张图片（和列表的缩略图同一个规则），标题在下面；
 // 没有图片的画一块占位，写着标题。点一张打开这一条。看什么都不写（底线 15）。
@@ -18,6 +19,7 @@ export function RecordGallery({
   env,
   assets,
   titleOf,
+  marks,
   open,
 }: {
   blockId: string;
@@ -26,6 +28,7 @@ export function RecordGallery({
   env: RenderEnv;
   assets: ReadonlyMap<string, AssetRecord> | null;
   titleOf: (r: DataRecord) => string;
+  marks: RecordMarks;
   open: ((r: DataRecord) => void) | undefined;
 }) {
   const { palette } = env;
@@ -80,11 +83,18 @@ export function RecordGallery({
                     </Text>
                   </View>
                 )}
-                <Text
-                  numberOfLines={1}
-                  style={[palette.font('title', 14), { color: palette.text }]}>
-                  {title}
-                </Text>
+                <View style={styles.titleRow}>
+                  <ColorDot color={marks.colorOf(r)} recordId={r.id} />
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.flex,
+                      palette.font('title', 14),
+                      { color: marks.warns(r) ? palette.danger : palette.text },
+                    ]}>
+                    {title}
+                  </Text>
+                </View>
               </Pressable>
             );
           })}
@@ -101,4 +111,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   center: { textAlign: 'center' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  flex: { flex: 1 },
 });

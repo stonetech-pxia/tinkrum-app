@@ -96,3 +96,63 @@ describe('gallery look (D-540)', () => {
     expect(issues(gallery({ tools: [button] }))).not.toEqual([]);
   });
 });
+
+describe('colour by value on every record look (D-541)', () => {
+  const T: Collection = {
+    ...TABLE,
+    fields: [
+      ...TABLE.fields,
+      {
+        id: 'kind',
+        name: 'Kind',
+        type: 'choice',
+        options: [
+          { id: 'a', label: 'A' },
+          { id: 'b', label: 'B' },
+        ],
+      },
+    ],
+  };
+  const prep = (...blocks: object[]) =>
+    prepareOps(
+      workspace('en'),
+      [
+        { op: 'addData', table: T },
+        { op: 'addContainer', page: { id: 'p', title: 'P', blocks } } as unknown as Op,
+      ],
+      ctx,
+    );
+  const problems = (...blocks: object[]) => {
+    const r = prep(...blocks);
+    return r.ok ? [] : r.issues;
+  };
+  const look = (l: string, show: object) => ({ ...table(show), look: l });
+
+  it('show.color takes a choice field on list, cards, table and gallery', () => {
+    for (const l of ['list', 'cards', 'table', 'gallery', 'tiles'])
+      expect(problems(look(l, { color: 'kind' }))).toEqual([]);
+    expect(problems(look('list', { color: 'age' })).join()).toMatch(/colorField age/);
+  });
+
+  it('show.highlight is 1-3 conditions checked like a filter', () => {
+    const over = [{ field: 'age', op: 'gt', value: 60 }];
+    expect(problems(look('list', { trailing: 'age', highlight: over }))).toEqual([]);
+    expect(
+      problems(look('list', { highlight: [{ field: 'nope', op: 'isEmpty' }] })).join(),
+    ).toMatch(/show.highlight/);
+    expect(
+      problems(look('list', { highlight: [{ field: 'age', op: 'gt', value: 'x' }] })),
+    ).not.toEqual([]);
+    expect(problems(look('list', { highlight: [...over, ...over, ...over, ...over] }))).not.toEqual(
+      [],
+    );
+  });
+
+  it('removing a field the highlight reads removes the highlight; the list stays', () => {
+    const r = prep(look('list', { highlight: [{ field: 'age', op: 'gt', value: 60 }] }));
+    if (!r.ok) throw new Error(r.issues.join());
+    const a = prepareOps(r.after, [{ op: 'removeData', table: 'people', field: 'age' }], ctx);
+    if (!a.ok) throw new Error(a.issues.join());
+    expect(blockOf(a.after).show).toEqual({ title: 'name' });
+  });
+});

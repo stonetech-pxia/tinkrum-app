@@ -608,6 +608,7 @@ function pruneBrowseFields(
       c as {
         show?: {
           columns?: string[];
+          highlight?: { field: string }[];
           browse?: {
             search?: true;
             sort?: string[];
@@ -624,6 +625,11 @@ function pruneBrowseFields(
       const left = without(show.columns);
       if (left.length > 0) show.columns = left;
       else delete show.columns;
+    }
+    // 警示色的条件读这个字段（D-541）：整个去掉（只去一条会让更多条变成警示色）。
+    if (show?.highlight?.some((x) => x.field === gone.field)) {
+      count++;
+      delete show.highlight;
     }
     const browse = show?.browse;
     if (!show || !browse) continue;

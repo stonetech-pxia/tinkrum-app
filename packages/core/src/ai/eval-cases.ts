@@ -7752,6 +7752,42 @@ const GALLERY_CASES: readonly EvalCase[] = [
   },
 ];
 
+const MARK_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG9',
+    input: 'Colour each order in the list by its status',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [ordersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'orders').some((x) => x.look !== 'calendar' && x.show.color === 'status')
+          ? null
+          : 'expected an orders list with show.color status',
+    },
+  },
+  {
+    id: 'KG10',
+    input: '支出列表里超过 100 的金额标成红色',
+    locale: 'zh',
+    setup: 'budget',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'expenses').some((x) =>
+          (x.show.highlight ?? []).some(
+            (f) => f.field === 'amount' && f.op === 'gt' && f.value === 100,
+          ),
+        )
+          ? null
+          : 'expected an expenses list with show.highlight amount gt 100',
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -7806,6 +7842,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...KERNEL_CASES,
   ...TABLE_LOOK_CASES,
   ...GALLERY_CASES,
+  ...MARK_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

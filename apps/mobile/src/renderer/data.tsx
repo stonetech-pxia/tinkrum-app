@@ -114,6 +114,7 @@ import { Icon, UiIcon } from './Icon';
 import { ProgressBar, ProgressRing } from './Progress';
 import { useTicker } from './ticker';
 import { cardColors, onPage, type Palette } from './theme';
+import { ColorDot, recordMarks } from './record-marks';
 import { RecordGallery } from './RecordGallery';
 import { RecordTable } from './RecordTable';
 import { Button, Card } from './ui';
@@ -1711,6 +1712,7 @@ export function useRecordRows(
   const { show } = block;
   const check = checkOf(block);
   const now = new Date();
+  const marks = recordMarks(show, view, env, now);
 
   const row = (r: DataRecord, index: number) => {
     const title =
@@ -1724,6 +1726,8 @@ export function useRecordRows(
     const thumb = hasFiles && assetIndex ? firstImage(r, collection, assetIndex) : null;
     // 一键记录工具（D-300）：第一个条件满足的按钮。
     const rowAction = rowToolOf(block, r, view, now, cal);
+    // 警示色（D-541）：右侧的值，没有右侧字段时是标题。
+    const warn = marks.warns(r);
     const body = (
       <View style={styles.row}>
         {check ? (
@@ -1753,12 +1757,20 @@ export function useRecordRows(
             testID={`record-thumb-${r.id}`}
           />
         ) : null}
+        <ColorDot color={marks.colorOf(r)} recordId={r.id} />
         <View style={styles.flex}>
           <Text
             numberOfLines={cards ? 2 : 1}
             style={[
               palette.font('title', 15),
-              { color: checked ? palette.caption : palette.text },
+              {
+                color:
+                  warn && !show.trailing
+                    ? palette.danger
+                    : checked
+                      ? palette.caption
+                      : palette.text,
+              },
               checked && styles.done,
             ]}>
             {title}
@@ -1778,6 +1790,7 @@ export function useRecordRows(
             show={show}
             env={env}
             text={formatRef(r, view, show.trailing, locale, links, now, cal)}
+            warn={warn}
           />
         ) : null}
         {rowAction ? (
@@ -1837,6 +1850,7 @@ export function useRecordRows(
         env={env}
         assets={assetIndex}
         titleOf={titleOf}
+        marks={marks}
         open={openRecord}
       />
     ) : block.look === 'table' ? (
@@ -1850,6 +1864,10 @@ export function useRecordRows(
         background={background}
         titleOf={titleOf}
         cellOf={(r, id) => formatRef(r, view, id, locale, links, now, cal)}
+        marks={marks}
+        warnColumn={
+          show.trailing !== undefined && columns.includes(show.trailing) ? show.trailing : null
+        }
         open={openRecord}
       />
     ) : cards ? (
@@ -1872,16 +1890,19 @@ export function Trailing({
   show,
   env,
   text,
+  warn,
 }: {
   record: DataRecord;
   view: Collection;
   show: RecordBlock['show'];
   env: RenderEnv;
   text: string;
+  /** 满足 show.highlight（D-541）：用警示色。 */
+  warn?: boolean;
 }) {
   const { palette, locale } = env;
   const format = show.format;
-  const style = [palette.font('title', 15), { color: palette.text }];
+  const style = [palette.font('title', 15), { color: warn ? palette.danger : palette.text }];
   const elapsedFormat = format?.kind === 'elapsed' ? format : undefined;
   const first = elapsedFormat
     ? elapsedOf(record, view, show.trailing!, elapsedFormat.until, new Date())
@@ -1936,7 +1957,13 @@ export function Trailing({
     <Text
       numberOfLines={tagged ? 1 : undefined}
       style={
-        tagged ? [palette.font('body', 13), styles.trailingTags, { color: palette.muted }] : style
+        tagged
+          ? [
+              palette.font('body', 13),
+              styles.trailingTags,
+              { color: warn ? palette.danger : palette.muted },
+            ]
+          : style
       }>
       {text}
     </Text>

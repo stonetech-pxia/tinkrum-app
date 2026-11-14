@@ -6,6 +6,7 @@ import { t } from '../messages';
 import { ToolUseSchema } from '../record-ops-schema';
 import {
   boundedText,
+  ConditionSchema,
   FieldRefSchema,
   filterSchema,
   GroupingSchema,
@@ -55,8 +56,10 @@ const SlotsSchema = z.strictObject({
   /** 显示在右侧的字段，例如金额。 */
   trailing: FieldRefSchema.optional(),
   format: TrailingFormatSchema.optional(),
-  /** 月历按这个单选字段给每天上色（这一天最后一条的选项）。 */
+  /** 按这个单选字段上色：月历给每天上色（这一天最后一条的选项），别的外观在标题前画一个小圆点（D-541）。 */
   color: IdSchema.optional(),
+  /** 满足这些条件（并且，≤3）的那几条，右侧的值（没有右侧字段时是标题）用警示色（D-541）。 */
+  highlight: z.array(ConditionSchema).min(1).max(3).optional(),
   /** 表格（D-539）第一列 title 之后的列；不写时是副标题和右侧字段。 */
   columns: z.array(FieldRefSchema).min(1).max(7).optional(),
   emptyText: boundedText(1, 80).optional(),
@@ -136,8 +139,6 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
   }
   const field = (id: string) => collection!.fields.find((f) => f.id === id);
   const typeOf = (id: string) => (isSystemField(id) ? 'datetime' : field(id)?.type);
-  if (c.look !== 'calendar' && c.show.color !== undefined)
-    problems.push('show.color only applies to look "calendar"');
   if (c.look !== 'table' && c.show.columns !== undefined)
     problems.push('show.columns only applies to look "table"');
   const browse = c.show.browse;
@@ -252,7 +253,7 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
  * limit 是每段 / 每栏 / 每天最多几条。
  */
 export const RECORD_LOOK_DOC =
-  'source {table, filter?, sort? {field, direction: "asc"|"desc"}, limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (calendar only), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools?, opens? (a page for one entry, rule 48)';
+  'source {table, filter?, sort? {field, direction: "asc"|"desc"}, limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (a choice field: a dot in the colour of its option; on a calendar the day colour), highlight? (1-3 conditions like filter: matching entries show trailing, or the title, in the warning colour, e.g. over budget), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools?, opens? (a page for one entry, rule 48)';
 
 const DOCS: Record<RecordLook, string> = {
   list: 'rows; tapping a row opens the built-in editor (or the page in opens)',

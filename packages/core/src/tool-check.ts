@@ -363,6 +363,7 @@ class Analysis {
         if (format?.kind === 'progress' && typeof format.goal === 'string')
           use.read.add(format.goal);
         this.readFilter(use, source.filter);
+        this.readFilter(use, show.highlight);
         if (source.sort) use.read.add(source.sort.field);
         if (source.group?.by) use.read.add(source.group.by);
         const tapped = block.tools?.some((u) => u.as === 'tap');

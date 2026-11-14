@@ -48,6 +48,7 @@ import {
   type RecordBlock,
   type Tone,
 } from './data';
+import { ColorDot, recordMarks } from './record-marks';
 import { openRow } from './open-row';
 import { cardColors, type Palette } from './theme';
 
@@ -130,6 +131,7 @@ export function Board({ block, env, tone }: { block: RecordBlock; env: RenderEnv
   const background = cardColors(palette, tone).background;
   const cal = calendarOf(env.config);
   const now = new Date();
+  const marks = recordMarks(block.show, view, env, now);
   const columnLabel = (c: BoardColumn) => c.label ?? t(locale, 'boardNotSet');
   // 单组件编辑选中了某个组件时不能拖（那时长按拖的是组件本身）。
   const canDrag = env.interactive && !env.focus?.selectedId && drag !== undefined;
@@ -302,6 +304,8 @@ export function Board({ block, env, tone }: { block: RecordBlock; env: RenderEnv
                       formatRef(r, view, block.show.title, locale, links, now, cal) ||
                       untitledRecordTitle(r, collection, locale, now, cal)
                     }
+                    color={marks.colorOf(r)}
+                    warn={marks.warns(r)}
                     subtitle={(block.show.subtitles ?? [])
                       .map((f) => formatRef(r, view, f, locale, links, now, cal))
                       .filter(Boolean)
@@ -382,6 +386,8 @@ export function Board({ block, env, tone }: { block: RecordBlock; env: RenderEnv
 function BoardCard({
   record,
   title,
+  color,
+  warn,
   subtitle,
   env,
   dragging,
@@ -396,6 +402,9 @@ function BoardCard({
 }: {
   record: DataRecord;
   title: string;
+  /** 按值上色和警示色（D-541）。 */
+  color: string | undefined;
+  warn: boolean;
   subtitle: string;
   env: RenderEnv;
   dragging: boolean;
@@ -477,9 +486,18 @@ function BoardCard({
               opacity: pressed ? 0.8 : 1,
             },
           ]}>
-          <Text numberOfLines={2} style={[palette.font('title', 15), { color: palette.text }]}>
-            {title}
-          </Text>
+          <View style={styles.titleRow}>
+            <ColorDot color={color} recordId={record.id} />
+            <Text
+              numberOfLines={2}
+              style={[
+                styles.flex,
+                palette.font('title', 15),
+                { color: warn ? palette.danger : palette.text },
+              ]}>
+              {title}
+            </Text>
+          </View>
           {subtitle ? (
             <Text numberOfLines={2} style={[palette.font('body', 13), { color: palette.muted }]}>
               {subtitle}
@@ -569,6 +587,7 @@ function MoveMenu({
 }
 
 const styles = StyleSheet.create({
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   scroll: { marginBottom: -12 },
   column: { width: COLUMN_WIDTH, gap: 8, alignSelf: 'flex-start' },
   header: {
