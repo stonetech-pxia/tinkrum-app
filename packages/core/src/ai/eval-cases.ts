@@ -7848,6 +7848,67 @@ const DATE_OFFSET_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 合同表上已经有算出来的到期日（D-542）。 */
+const endsEarlier: EvalEarlier = {
+  input: 'Add an end date that is the start date plus the term',
+  ops: [
+    {
+      op: 'addData',
+      table: 'contracts',
+      field: {
+        id: 'ends',
+        name: 'End date',
+        type: 'dateOffset',
+        from: 'start',
+        add: 'term',
+        unit: 'months',
+      },
+    },
+  ],
+};
+
+// 算出来的日期能放进月历、当到期前提醒的日期（D-550）。
+const DATE_OFFSET_USE_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG13',
+    input: 'Remind me 30 days before each contract ends',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [termsEarlier, endsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        remindersOf(c).some(
+          (r) =>
+            'before' in r.when &&
+            r.when.before.table === 'contracts' &&
+            r.when.before.field === 'ends' &&
+            r.when.days === 30,
+        )
+          ? null
+          : 'expected a reminder 30 days before contracts.ends',
+    },
+  },
+  {
+    id: 'KG14',
+    input: 'Montre mes contrats dans un calendrier, à leur date de fin',
+    locale: 'fr',
+    setup: 'default',
+    mock: false,
+    earlier: [termsEarlier, endsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'contracts').some(
+          (x) => x.look === 'calendar' && x.source.group?.by === 'ends',
+        )
+          ? null
+          : 'expected a contracts calendar grouped by ends',
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -7904,6 +7965,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...GALLERY_CASES,
   ...MARK_CASES,
   ...DATE_OFFSET_CASES,
+  ...DATE_OFFSET_USE_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

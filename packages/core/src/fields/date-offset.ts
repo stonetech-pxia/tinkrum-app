@@ -20,7 +20,7 @@ const SYSTEM = ['createdAt', 'updatedAt'];
 
 /**
  * D-542：算出来的日期 = from 那天加 add 天或 add 个月（月份加完超过那个月的最后一天时取最后一天）。
- * 不存进记录、不能填（底线 14），值在 data.ts 的 recordValue 里算；按日期显示、筛选、排序。
+ * 不存进记录、不能填（底线 14），值在 data.ts 的 recordValue 里算；按日期显示、筛选、排序，也能当月历的日子和到期前提醒的日期（D-550）。
  */
 export const dateOffsetField: FieldDefinitionOf<'dateOffset', typeof schema> = defineField({
   type: 'dateOffset',
@@ -51,7 +51,7 @@ export const dateOffsetField: FieldDefinitionOf<'dateOffset', typeof schema> = d
     }));
   },
   ai: {
-    doc: '{from: a date or datetime field (or createdAt), add: a whole number or a number field id, unit: "days"|"months"} (computed, never typed in: from + add days or months, a month end clamps, e.g. an expiry date = start + term in months; shown, filtered (inPeriod, gt / lt, isEmpty) and sorted like a date)',
+    doc: '{from: a date or datetime field (or createdAt), add: a whole number or a number field id, unit: "days"|"months"} (computed, never typed in: from + add days or months, a month end clamps, e.g. an expiry date = start + term in months; shown, filtered (inPeriod, gt / lt, isEmpty), sorted, put on a calendar and watched by when.before like a date)',
   },
   example: { id: 'ends', name: 'Ends', type: 'dateOffset', from: 'date', add: 30, unit: 'days' },
 });

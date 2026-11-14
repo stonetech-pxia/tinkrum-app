@@ -209,9 +209,13 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
   if (c.look === 'calendar') {
     if (group?.unit !== 'day')
       problems.push('a calendar needs source.group {unit: "day", by?: a date field}');
-    else if (by !== undefined && byType && !['date', 'datetime', 'schedule'].includes(byType))
+    else if (
+      by !== undefined &&
+      byType &&
+      !['date', 'datetime', 'schedule', 'dateOffset'].includes(byType)
+    )
       problems.push(
-        `source.group.by ${by} must be a date or datetime or schedule field of ${collection!.id}`,
+        `source.group.by ${by} must be a date or datetime or schedule field (or a dateOffset) of ${collection!.id}`,
       );
     if (group?.showEmpty || group?.filter)
       problems.push('a calendar groups by day only: no showEmpty or filter');
@@ -265,7 +269,7 @@ const DOCS: Record<RecordLook, string> = {
   board:
     'a board with one column per option of source.group.by (a choice or link field; link: rule 45) plus "not set"; dragging a card needs {as: "drag", do: "set", table, field: <the same field>, value: "$group"}, without it the board is read-only (rule 45)',
   calendar:
-    'a month calendar: source.group {unit: "day", by?: a date, datetime or schedule field}, show.color? a choice field (rule 45)',
+    'a month calendar: source.group {unit: "day", by?: a date, datetime, dateOffset or schedule field}, show.color? a choice field (rule 45)',
   table:
     'a spreadsheet-like table, one row per entry under a header of field names: show.title is the first column (kept in view), show.columns? (1-7 fields) the others (default: subtitles and trailing); scrolls sideways; read-only cells, tapping a row opens the entry',
   gallery:
