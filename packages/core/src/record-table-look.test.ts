@@ -83,3 +83,16 @@ describe('table look (D-539)', () => {
     expect(blockOf(b.after).show).toEqual({ title: 'name' });
   });
 });
+
+describe('gallery look (D-540)', () => {
+  const gallery = (extra: object = {}) => ({ ...table(), id: 'g', look: 'gallery', ...extra });
+
+  it('uses the title slot; no columns, no row buttons', () => {
+    expect(issues(gallery())).toEqual([]);
+    expect(issues(gallery({ show: { title: 'name', columns: ['age'] } })).join()).toMatch(
+      /show.columns only applies/,
+    );
+    const button = { as: 'button', label: 'Older', do: 'increment', table: 'people', field: 'age' };
+    expect(issues(gallery({ tools: [button] }))).not.toEqual([]);
+  });
+});

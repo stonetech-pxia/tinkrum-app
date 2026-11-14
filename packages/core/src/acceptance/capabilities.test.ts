@@ -380,6 +380,7 @@ function everything() {
         show: { color: 'status' },
       }),
       records('table', 'grid', 'items', 'title', { show: { columns: ['qty', 'status'] } }),
+      records('gallery', 'pics', 'items', 'title'),
       records('list', 'by-week', 'items', 'title', {
         source: {
           group: { unit: 'week' },

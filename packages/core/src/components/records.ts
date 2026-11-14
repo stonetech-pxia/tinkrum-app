@@ -96,6 +96,7 @@ export const RECORD_LOOKS = [
   'board',
   'calendar',
   'table',
+  'gallery',
 ] as const;
 export type RecordLook = (typeof RECORD_LOOKS)[number];
 
@@ -266,6 +267,8 @@ const DOCS: Record<RecordLook, string> = {
     'a month calendar: source.group {unit: "day", by?: a date, datetime or schedule field}, show.color? a choice field (rule 45)',
   table:
     'a spreadsheet-like table, one row per entry under a header of field names: show.title is the first column (kept in view), show.columns? (1-7 fields) the others (default: subtitles and trailing); scrolls sideways; read-only cells, tapping a row opens the entry',
+  gallery:
+    "a grid of pictures, 2 per row: the first image in each entry's attachments with show.title under it (no image: a placeholder with the title); tapping one opens the entry",
 };
 
 const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
@@ -305,6 +308,8 @@ const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
   },
   // 表格的格子只读（D-539）：没有每行的按钮。
   table: { as: ['addHere', 'list'], do: ['create'], ref: ['quickAction'], open: true, max: 4 },
+  // 图片墙（D-540）只有图片和标题：没有每张的按钮。
+  gallery: { as: ['addHere', 'list'], do: ['create'], ref: ['quickAction'], open: true, max: 4 },
 };
 
 function recordLook<L extends RecordLook>(look: L): LookDefinitionOf<L, typeof shape> {
@@ -371,3 +376,4 @@ export const tilesComponent = recordLook('tiles');
 export const boardComponent = recordLook('board');
 export const calendarComponent = recordLook('calendar');
 export const tableComponent = recordLook('table');
+export const galleryComponent = recordLook('gallery');

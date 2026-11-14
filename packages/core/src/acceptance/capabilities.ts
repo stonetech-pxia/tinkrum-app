@@ -705,6 +705,7 @@ export const CAPABILITIES: readonly Capability[] = [
   lookCap('board'),
   lookCap('calendar'),
   lookCap('table'),
+  lookCap('gallery'),
   lookCap('number'),
   lookCap('chart'),
   lookCap('single'),

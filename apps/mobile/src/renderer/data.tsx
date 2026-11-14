@@ -114,6 +114,7 @@ import { Icon, UiIcon } from './Icon';
 import { ProgressBar, ProgressRing } from './Progress';
 import { useTicker } from './ticker';
 import { cardColors, onPage, type Palette } from './theme';
+import { RecordGallery } from './RecordGallery';
 import { RecordTable } from './RecordTable';
 import { Button, Card } from './ui';
 
@@ -1817,10 +1818,28 @@ export function useRecordRows(
   };
 
   // 表格（D-539）：不写 columns 时是副标题和右侧字段。
-  const columns =
-    show.columns ?? [...(show.subtitles ?? []), ...(show.trailing ? [show.trailing] : [])];
+  const columns = show.columns ?? [
+    ...(show.subtitles ?? []),
+    ...(show.trailing ? [show.trailing] : []),
+  ];
+  const openRecord = env.interactive
+    ? (env.locked ?? ((r: DataRecord) => openRow(router, block.opens, collection.id, r.id)))
+    : undefined;
+  const titleOf = (r: DataRecord) =>
+    formatRef(r, view, show.title, locale, links, now, cal) ||
+    untitledRecordTitle(r, collection, locale, now, cal);
   const list = (shown: DataRecord[]) =>
-    block.look === 'table' ? (
+    block.look === 'gallery' ? (
+      <RecordGallery
+        blockId={block.id}
+        collection={collection}
+        records={shown}
+        env={env}
+        assets={assetIndex}
+        titleOf={titleOf}
+        open={openRecord}
+      />
+    ) : block.look === 'table' ? (
       <RecordTable
         blockId={block.id}
         view={view}
@@ -1829,16 +1848,9 @@ export function useRecordRows(
         records={shown}
         env={env}
         background={background}
-        titleOf={(r) =>
-          formatRef(r, view, show.title, locale, links, now, cal) ||
-          untitledRecordTitle(r, collection, locale, now, cal)
-        }
+        titleOf={titleOf}
         cellOf={(r, id) => formatRef(r, view, id, locale, links, now, cal)}
-        open={
-          env.interactive
-            ? (env.locked ?? ((r) => openRow(router, block.opens, collection.id, r.id)))
-            : undefined
-        }
+        open={openRecord}
       />
     ) : cards ? (
       <View style={{ gap: palette.gap - 4 }}>{shown.map(row)}</View>

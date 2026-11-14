@@ -7686,6 +7686,72 @@ const TABLE_LOOK_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 植物表，有照片（附件）字段。 */
+const plantsEarlier: EvalEarlier = {
+  input: 'Make a table of my plants with a name and photos, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'plants',
+        name: 'Plants',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'photos', name: 'Photos', type: 'file' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'plants-page',
+        title: 'Plants',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'plants', limit: 50 },
+            show: { title: 'name' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+const GALLERY_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG7',
+    input: 'Show my plants as a grid of their photos',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [plantsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'plants').some((x) => x.look === 'gallery')
+          ? null
+          : 'expected a gallery look on plants',
+    },
+  },
+  {
+    id: 'KG8',
+    input: '植物页面改成照片墙',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [plantsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'plants').some((x) => x.look === 'gallery')
+          ? null
+          : 'expected a gallery look on plants',
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -7739,6 +7805,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...MODULE_EVAL_CASES,
   ...KERNEL_CASES,
   ...TABLE_LOOK_CASES,
+  ...GALLERY_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

@@ -248,6 +248,7 @@ export const RENDERERS: { [T in ComponentType]: Renderer<T> } = {
   cards: (c, env) => <ToolList block={c} env={env} />,
   checklist: (c, env) => <ToolList block={c} env={env} />,
   table: (c, env) => <ToolList block={c} env={env} />,
+  gallery: (c, env) => <ToolList block={c} env={env} />,
   calendar: (c, env) => (
     <MonthCalendar block={c} env={env} tone={c.style?.tone} componentId={c.id} />
   ),
