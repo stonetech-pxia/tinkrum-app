@@ -352,6 +352,7 @@ class Analysis {
           ...(show.subtitles ?? []),
           show.trailing,
           show.color,
+          ...(show.columns ?? []),
           ...(show.browse?.sort ?? []),
           ...(show.browse?.group ?? []),
           ...(show.browse?.filter ?? []),

@@ -421,6 +421,8 @@ export const fr: MessageTable = {
   browseGroupNone: 'Aucun',
   browseCreatedAt: 'Ajouts récents',
   browseUpdatedAt: 'Modifications récentes',
+  tableCreatedAt: 'Ajouté le',
+  tableUpdatedAt: 'Modifié le',
   browseShowing: 'Affichage : {shown} sur {total}. Faites défiler pour voir la suite.',
   browseShowingMatches:
     'Affichage : {shown} sur {total} résultats. Faites défiler pour voir la suite.',

@@ -114,6 +114,7 @@ import { Icon, UiIcon } from './Icon';
 import { ProgressBar, ProgressRing } from './Progress';
 import { useTicker } from './ticker';
 import { cardColors, onPage, type Palette } from './theme';
+import { RecordTable } from './RecordTable';
 import { Button, Card } from './ui';
 
 // 数据组件（docs/DATA_DESIGN.md）：记录列表、快速添加表单、统计。
@@ -1815,8 +1816,31 @@ export function useRecordRows(
     );
   };
 
+  // 表格（D-539）：不写 columns 时是副标题和右侧字段。
+  const columns =
+    show.columns ?? [...(show.subtitles ?? []), ...(show.trailing ? [show.trailing] : [])];
   const list = (shown: DataRecord[]) =>
-    cards ? (
+    block.look === 'table' ? (
+      <RecordTable
+        blockId={block.id}
+        view={view}
+        title={show.title}
+        columns={columns}
+        records={shown}
+        env={env}
+        background={background}
+        titleOf={(r) =>
+          formatRef(r, view, show.title, locale, links, now, cal) ||
+          untitledRecordTitle(r, collection, locale, now, cal)
+        }
+        cellOf={(r, id) => formatRef(r, view, id, locale, links, now, cal)}
+        open={
+          env.interactive
+            ? (env.locked ?? ((r) => openRow(router, block.opens, collection.id, r.id)))
+            : undefined
+        }
+      />
+    ) : cards ? (
       <View style={{ gap: palette.gap - 4 }}>{shown.map(row)}</View>
     ) : (
       <Card palette={palette} background={background} style={styles.listCard}>

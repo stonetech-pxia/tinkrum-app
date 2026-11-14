@@ -379,6 +379,7 @@ function everything() {
         source: { group: { unit: 'day' } },
         show: { color: 'status' },
       }),
+      records('table', 'grid', 'items', 'title', { show: { columns: ['qty', 'status'] } }),
       records('list', 'by-week', 'items', 'title', {
         source: {
           group: { unit: 'week' },

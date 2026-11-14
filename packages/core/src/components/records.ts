@@ -57,6 +57,8 @@ const SlotsSchema = z.strictObject({
   format: TrailingFormatSchema.optional(),
   /** 月历按这个单选字段给每天上色（这一天最后一条的选项）。 */
   color: IdSchema.optional(),
+  /** 表格（D-539）第一列 title 之后的列；不写时是副标题和右侧字段。 */
+  columns: z.array(FieldRefSchema).min(1).max(7).optional(),
   emptyText: boundedText(1, 80).optional(),
   /**
    * 用户在列表上临时找、换着看（D-424，只有 list、cards、checklist）：search 有搜索框，sort、group 是能换的字段。
@@ -86,7 +88,15 @@ const shape = {
   opens: IdSchema.optional(),
 };
 
-export const RECORD_LOOKS = ['list', 'cards', 'checklist', 'tiles', 'board', 'calendar'] as const;
+export const RECORD_LOOKS = [
+  'list',
+  'cards',
+  'checklist',
+  'tiles',
+  'board',
+  'calendar',
+  'table',
+] as const;
 export type RecordLook = (typeof RECORD_LOOKS)[number];
 
 type RecordBlock = z.infer<z.ZodObject<typeof shape>> & {
@@ -101,6 +111,7 @@ const refs = {
   'show.subtitles': { to: 'field', role: 'subtitleField' },
   'show.trailing': { to: 'field', role: 'trailingField' },
   'show.color': { to: 'field', role: 'colorField', types: ['choice'] },
+  'show.columns': { to: 'field', role: 'show.columns' },
   'show.browse.sort': { to: 'field', role: 'show.browse.sort' },
   'show.browse.group': { to: 'field', role: 'show.browse.group' },
   'show.browse.period': { to: 'field', role: 'show.browse.period', types: ['date', 'datetime'] },
@@ -126,6 +137,8 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
   const typeOf = (id: string) => (isSystemField(id) ? 'datetime' : field(id)?.type);
   if (c.look !== 'calendar' && c.show.color !== undefined)
     problems.push('show.color only applies to look "calendar"');
+  if (c.look !== 'table' && c.show.columns !== undefined)
+    problems.push('show.columns only applies to look "table"');
   const browse = c.show.browse;
   if (browse) {
     if (c.look !== 'list' && c.look !== 'cards' && c.look !== 'checklist')
@@ -251,6 +264,8 @@ const DOCS: Record<RecordLook, string> = {
     'a board with one column per option of source.group.by (a choice or link field; link: rule 45) plus "not set"; dragging a card needs {as: "drag", do: "set", table, field: <the same field>, value: "$group"}, without it the board is read-only (rule 45)',
   calendar:
     'a month calendar: source.group {unit: "day", by?: a date, datetime or schedule field}, show.color? a choice field (rule 45)',
+  table:
+    'a spreadsheet-like table, one row per entry under a header of field names: show.title is the first column (kept in view), show.columns? (1-7 fields) the others (default: subtitles and trailing); scrolls sideways; read-only cells, tapping a row opens the entry',
 };
 
 const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
@@ -288,6 +303,8 @@ const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
     open: true,
     max: 4,
   },
+  // 表格的格子只读（D-539）：没有每行的按钮。
+  table: { as: ['addHere', 'list'], do: ['create'], ref: ['quickAction'], open: true, max: 4 },
 };
 
 function recordLook<L extends RecordLook>(look: L): LookDefinitionOf<L, typeof shape> {
@@ -318,7 +335,12 @@ function recordLook<L extends RecordLook>(look: L): LookDefinitionOf<L, typeof s
             ? { group: { by: 'category' } }
             : {}),
       },
-      show: { title: 'category', subtitles: ['note', 'date'], trailing: 'amount' },
+      show: {
+        title: 'category',
+        ...(look === 'table'
+          ? { columns: ['date', 'amount', 'note'] }
+          : { subtitles: ['note', 'date'], trailing: 'amount' }),
+      },
       ...(look === 'checklist'
         ? {
             tools: [
@@ -348,3 +370,4 @@ export const checklistComponent = recordLook('checklist');
 export const tilesComponent = recordLook('tiles');
 export const boardComponent = recordLook('board');
 export const calendarComponent = recordLook('calendar');
+export const tableComponent = recordLook('table');

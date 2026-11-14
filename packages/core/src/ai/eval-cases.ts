@@ -7649,6 +7649,43 @@ const KERNEL_CASES: readonly EvalCase[] = [
   },
 ];
 
+const TABLE_LOOK_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG5',
+    input: 'Show my orders like a spreadsheet, with the item and status as columns',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [ordersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'orders').some(
+          (x) =>
+            x.look === 'table' &&
+            [x.show.title, ...(x.show.columns ?? x.show.subtitles ?? [])].includes('status'),
+        )
+          ? null
+          : 'expected a table look on orders showing status',
+    },
+  },
+  {
+    id: 'KG6',
+    input: 'Affiche mes contrats sous forme de tableau',
+    locale: 'fr',
+    setup: 'default',
+    mock: false,
+    earlier: [contractsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'contracts').some((x) => x.look === 'table')
+          ? null
+          : 'expected a table look on contracts',
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -7701,6 +7738,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...DRAFT_CHAT_EVAL_CASES,
   ...MODULE_EVAL_CASES,
   ...KERNEL_CASES,
+  ...TABLE_LOOK_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

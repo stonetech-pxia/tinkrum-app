@@ -385,6 +385,8 @@ export const zh: MessageTable = {
   browseGroupNone: '不分组',
   browseCreatedAt: '最近添加',
   browseUpdatedAt: '最近修改',
+  tableCreatedAt: '添加时间',
+  tableUpdatedAt: '修改时间',
   browseShowing: '显示 {shown} / {total} 条，往下滚动看更多。',
   browseShowingMatches: '找到 {total} 条，显示 {shown} 条，往下滚动看更多。',
   singleTooMuch: '内容太多，放不进二维码。',

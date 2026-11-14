@@ -401,6 +401,8 @@ export const en = {
   browseGroupNone: 'None',
   browseCreatedAt: 'Recently added',
   browseUpdatedAt: 'Recently changed',
+  tableCreatedAt: 'Added',
+  tableUpdatedAt: 'Changed',
   browseShowing: 'Showing {shown} of {total}. Scroll down for more.',
   browseShowingMatches: 'Showing {shown} of {total} matches. Scroll down for more.',
   singleTooMuch: 'Too much here to fit in a QR code.',
