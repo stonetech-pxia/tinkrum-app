@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_CALENDAR } from './calendar';
 import { prepareOps } from './change';
-import { filterRecords, formatRef, recordValue, sortRecords, type DataRecord } from './data';
+import {
+  filterRecords,
+  formatRef,
+  recordDay,
+  recordValue,
+  sortRecords,
+  type DataRecord,
+} from './data';
 import { dayNumber } from './formula';
 import type { Op } from './ops';
 import { planNotifications } from './reminders';
@@ -191,5 +199,22 @@ describe('a computed date drives calendars and "before" reminders (D-550)', () =
     expect(plan(longer.after, [rec('b', { start: '2026-01-15', term: 11 })])).toEqual([
       ['expiring-b', new Date(2026, 11, 16, 9, 0).toString()],
     ]);
+  });
+
+  it('falls on the same day whatever hour the day starts at (设置 → 日期, D-286)', () => {
+    // 算出来的日期没有钟点：一天从 4 点开始时不该往前挪一天，不然筛选漏掉、月历放错格、提醒早一天。
+    const late = { ...DEFAULT_CALENDAR, dayStartHour: 4 };
+    const b = rec('b', { name: 'Phone', start: '2026-01-15', term: 11 });
+    expect(recordDay(b, contracts, 'ends', now, late)).toBe('2026-12-15');
+    expect(
+      filterRecords([b], contracts, [{ field: 'ends', op: 'is', value: '2026-12-15' }], now, late),
+    ).toHaveLength(1);
+    const config = setup([{ op: 'addTool', tool: expiring }]);
+    const lateConfig = { ...config, data: { ...config.data, calendar: { dayStartHour: 4 } } };
+    expect(
+      planNotifications(lateConfig, new Map([['contracts', [b]]]), now, 'en').map((n) =>
+        new Date((n.trigger as { at: number }).at).toString(),
+      ),
+    ).toEqual([new Date(2026, 10, 15, 9, 0).toString()]);
   });
 });

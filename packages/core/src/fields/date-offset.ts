@@ -33,8 +33,8 @@ export const dateOffsetField: FieldDefinitionOf<'dateOffset', typeof schema> = d
       ? new Intl.DateTimeFormat(localeTag(locale)).format(new Date(`${v}T12:00:00`))
       : String(v),
   inForm: false,
+  // 没有 day：它和日期字段一样没有钟点。写了的话 recordDay 会按「一天从几点开始」把它往前挪一天。
   filter: { is: isText, compare: 'date', period: true },
-  day: (_f, v) => String(v),
   check: (f, { collection }) => {
     const problems: string[] = [];
     const from = collection.fields.find((x) => x.id === f.from);
