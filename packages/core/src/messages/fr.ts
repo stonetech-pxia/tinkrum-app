@@ -550,6 +550,9 @@ export const fr: MessageTable = {
   importHomeConfirm:
     'Importer « {name} » dans votre page d’accueil ? Le style de l’accueil devient le sien et ses pages rejoignent la barre de navigation. Vos pages et entrées restent. Vous pourrez annuler dans l’historique des modifications.',
   importHomeSummary: 'Importer « {name} » dans la page d’accueil',
+  shareAppItem: 'Partager cette app',
+  importAppMaybeNewer:
+    'S’il a été créé avec une version plus récente de Tinkrum, mettez Tinkrum à jour et réessayez.',
   appResetItem: 'Rétablir l’aspect d’origine',
   appResetConfirm:
     'Rétablir « {name} » tel qu’il était à l’import ? Les pages et actions rapides que vous y avez ajoutées disparaissent, son style et ses pages reviennent. Les tableaux que vous avez créés et toutes vos entrées restent. Vous pourrez annuler dans l’historique des modifications.',

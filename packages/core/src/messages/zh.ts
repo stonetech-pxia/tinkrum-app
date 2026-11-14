@@ -498,6 +498,8 @@ export const zh: MessageTable = {
   importHomeConfirm:
     '把「{name}」导入主页？主页会换成它的风格，它的页面加进导航栏。你现有的页面和记录都留着，之后可以在改动记录里撤销。',
   importHomeSummary: '把「{name}」导入主页',
+  shareAppItem: '分享这个 App',
+  importAppMaybeNewer: '如果它是新版本的 Tinkrum 做的，先更新 Tinkrum 再试。',
   appResetItem: '恢复初始样子',
   appResetConfirm:
     '把「{name}」恢复成刚导入时的样子？你在里面加的页面和快捷操作会去掉，风格和页面恢复成原来的；你自己建的表和所有记录都留着。之后可以在改动记录里撤销。',

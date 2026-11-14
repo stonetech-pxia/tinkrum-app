@@ -1,3 +1,4 @@
+import { clearFileRefs } from './file-refs';
 import { homeScreenOp } from './home-screen';
 import { applyOps, type Op } from './ops';
 import { migrateWorkspace } from './migrate';
@@ -39,6 +40,40 @@ export function appFileText(file: Omit<AppFile, 'format' | 'version' | 'exported
     null,
     2,
   );
+}
+
+/**
+ * 把装好的一个 App 做成 App 文件（D-545，「分享这个 App」）：它的页面、表、快捷操作、提醒，加上名字、图标、
+ * 底栏和风格。只有结构：记录本来就不在配置里（底线 14）；指向用户文件的地方（文件位、图片、图片背景）
+ * 先清空（底线 3），导入后由用户自己选。没有这个 App 返回 null。
+ */
+export function appFileOfApp(
+  config: WorkspaceConfig,
+  appId: string,
+): Omit<AppFile, 'format' | 'version' | 'exportedAt'> | null {
+  const app = (config.nav.apps ?? []).find((a) => a.id === appId);
+  if (!app) return null;
+  const clean = clearFileRefs(config);
+  const own = <T extends { app?: string | undefined }>(items: T[]): T[] =>
+    items
+      .filter((item) => item.app === appId)
+      .map((item) => {
+        const { app: _app, ...rest } = item;
+        return rest as T;
+      });
+  return {
+    schemaVersion: config.schemaVersion,
+    app: {
+      id: app.id,
+      name: app.name,
+      ...(app.icon !== undefined ? { icon: app.icon } : {}),
+      bar: app.bar,
+      theme: app.theme,
+    },
+    pages: own(clean.containers.pages),
+    tables: own(clean.data.tables),
+    tools: own(clean.tools),
+  };
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> =>

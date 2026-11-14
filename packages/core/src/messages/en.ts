@@ -519,6 +519,9 @@ export const en = {
   importHomeConfirm:
     'Import “{name}” into your home page? The home style changes to its style and its pages join the navigation bar. Your pages and entries stay. You can undo it in the change log.',
   importHomeSummary: 'Import “{name}” into the home page',
+  shareAppItem: 'Share this app',
+  importAppMaybeNewer:
+    'If it was made with a newer version of Tinkrum, update Tinkrum and try again.',
   appResetItem: 'Restore its original look',
   appResetConfirm:
     'Restore “{name}” to how it was when you imported it? Pages and quick actions you added to it go away, and its style and pages come back. Tables you made and all your entries stay. You can undo it in the change log.',

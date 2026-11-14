@@ -134,11 +134,20 @@ export default function PresetsRoute() {
       plan.ops,
       t(locale, mode === 'home' ? 'importHomeSummary' : 'importAppSummary', { name: plan.name }),
     );
-    if (result.kind !== 'preview') {
+    if (result.kind === 'invalid') {
+      // 新版本加的样子、字段类型版本号可能没变（D-545）：这里读得出文件但用不了，整份不导入，说清楚。
       Alert.alert(
-        t(locale, 'invalidPlan'),
-        result.kind === 'invalid' ? result.issues.join('\n') : result.message,
+        title,
+        [
+          t(locale, 'importAppConfigBroken'),
+          ...result.issues.slice(0, 3),
+          t(locale, 'importAppMaybeNewer'),
+        ].join('\n'),
       );
+      return;
+    }
+    if (result.kind !== 'preview') {
+      Alert.alert(t(locale, 'invalidPlan'), result.message);
       return;
     }
     Alert.alert(
