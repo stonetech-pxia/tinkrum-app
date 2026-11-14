@@ -83,7 +83,7 @@ import {
   minusValue,
 } from '@morph/core';
 import { useRouter } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -806,6 +806,12 @@ function DurationInput({
 const LINK_LIST_LIMIT = 30;
 
 /**
+ * 输入框是不是画在底部弹出的添加框里（D-352 的 Modal）。弹框盖在页面上面，从里面打开的新页面会被它挡住，
+ * 所以那里的引用字段没有「新加一条」（D-546）。
+ */
+const InSheet = createContext(false);
+
+/**
  * 引用字段（D-250）：显示选中的那条记录的标题；点开后列出被引用的表里的记录（可以搜索标题），点一条选它。
  * 被引用的记录删掉了显示「已删除的记录」，可以换一条或不选。
  */
@@ -836,6 +842,7 @@ function LinkInput({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const router = useRouter();
+  const inSheet = useContext(InSheet);
   // 「新加一条」（D-546）：新记录页存好以后交回记录 ID，这里选上它。
   const [token] = useState(() => Math.random().toString(36).slice(2, 10));
   useEffect(
@@ -946,22 +953,24 @@ function LinkInput({
               </Text>
             </Pressable>
           ))}
-          <Pressable
-            testID={`${testID}-new`}
-            accessibilityRole="button"
-            onPress={() =>
-              router.push({
-                pathname: '/record/[collectionId]',
-                params: { collectionId: target.id, pickFor: token },
-              })
-            }
-            style={[styles.chip, { borderColor: palette.border, borderStyle: 'dashed' }]}>
-            <Text
-              numberOfLines={1}
-              style={[palette.font('bodyMedium', 14), { color: palette.primaryText }]}>
-              {t(locale, 'linkNew', { name: target.name })}
-            </Text>
-          </Pressable>
+          {inSheet ? null : (
+            <Pressable
+              testID={`${testID}-new`}
+              accessibilityRole="button"
+              onPress={() =>
+                router.push({
+                  pathname: '/record/[collectionId]',
+                  params: { collectionId: target.id, pickFor: token },
+                })
+              }
+              style={[styles.chip, { borderColor: palette.border, borderStyle: 'dashed' }]}>
+              <Text
+                numberOfLines={1}
+                style={[palette.font('bodyMedium', 14), { color: palette.primaryText }]}>
+                {t(locale, 'linkNew', { name: target.name })}
+              </Text>
+            </Pressable>
+          )}
           {chosen ? (
             <Pressable
               testID={`${testID}-clear`}
@@ -2274,7 +2283,7 @@ export function RecordForm({
                 gap: palette.gap - 4,
               },
             ]}>
-            {body}
+            <InSheet.Provider value>{body}</InSheet.Provider>
           </View>
         </KeyboardAvoidingView>
       </Modal>
