@@ -43,13 +43,11 @@ export function fileCurrency(pages: readonly TextPage[], locale: Locale): string
   return null;
 }
 
-/** 表里每个金额字段（每一笔单独选货币的除外，D-429）都用这个货币。 */
+/** 表里每个金额字段都用这个货币；每一笔单独选货币的（D-429、D-549），这一笔没选时用它。 */
 export function withCurrency(table: Collection, currency: string): Collection {
   return {
     ...table,
-    fields: table.fields.map((f) =>
-      f.type === 'money' && f.currencyField === undefined ? { ...f, currency } : f,
-    ),
+    fields: table.fields.map((f) => (f.type === 'money' ? { ...f, currency } : f)),
   };
 }
 
@@ -136,7 +134,16 @@ export function renameDraftField(table: Collection, id: string, name: string): C
   return { ...table, fields: fields.map((f) => (f.id === id ? { ...f, name: trimmed } : f)) };
 }
 
-/** 去掉字段。附件字段留着：文件要放在那里。 */
+/** 去掉字段。附件字段留着：文件要放在那里。去掉的是金额的货币（D-549）：金额改回整张表一个货币。 */
 export function removeDraftField(table: Collection, id: string): Collection {
-  return { ...table, fields: table.fields.filter((f) => f.id !== id || f.type === 'file') };
+  return {
+    ...table,
+    fields: table.fields
+      .filter((f) => f.id !== id || f.type === 'file')
+      .map((f) => {
+        if (f.type !== 'money' || f.currencyField !== id) return f;
+        const { currencyField: _, ...rest } = f;
+        return rest;
+      }),
+  };
 }

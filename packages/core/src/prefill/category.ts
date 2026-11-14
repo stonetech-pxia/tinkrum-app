@@ -214,6 +214,8 @@ const CURRENCY_MARKS: readonly (readonly [RegExp, readonly string[]])[] = [
   [/£/g, ['gbp']],
   [/₩/g, ['krw']],
   [/₹/g, ['inr']],
+  // 马币（D-549）：RM 后面紧跟数字，大写（RMB 是人民币）。
+  [/\bRM(?=\s?\d)/g, ['myr']],
   [/円/g, ['jpy']],
   [/元|人民币|\bRMB\b/gi, ['cny']],
   [/[¥￥]/g, ['cny', 'jpy']],

@@ -252,8 +252,11 @@ function datesInLine(
 
 // ---- 金额 ----
 
-const CURRENCY_BEFORE = /(?:[$€£¥￥]|rmb|cny|eur|usd|gbp|us\$)\s*$/i;
-const CURRENCY_AFTER = /^\s*(?:[€$£¥￥元]|eur|euros?|rmb|cny|usd|gbp)/i;
+const CURRENCY_BEFORE = /(?:[$€£¥￥]|rmb|cny|eur|usd|gbp|myr|us\$)\s*$/i;
+// 马币写成 RM33.90（D-549）：RM 只认大写、前面不连着字母，不然整段当成了编号。
+const RM_BEFORE = /(?:^|[^A-Za-z])RM\s?$/;
+const currencyBefore = (s: string) => CURRENCY_BEFORE.test(s) || RM_BEFORE.test(s);
+const CURRENCY_AFTER = /^\s*(?:[€$£¥￥元]|eur|euros?|rmb|cny|usd|gbp|myr)/i;
 // 数字（千位分隔可以是逗号、点、空格），后面可以有一位或两位小数。
 const NUMBER = /-?\d{1,3}(?:[,.   ]\d{3})+(?:[.,]\d{1,2})?|-?\d+(?:[.,]\d{1,2})?/g;
 // 数量、重量、百分比、时间后面跟的东西：不是金额。
@@ -279,7 +282,7 @@ function amountsInLine(
     const v = normalizeNumber(m[2]!.replace(/ /g, ''));
     // 货币符号在后面（1 819,68 €；法语、德语票据用空格做千位分隔）。
     const spacedHere = CURRENCY_AFTER.test(line.slice(end));
-    if (!(CURRENCY_BEFORE.test(line.slice(0, start)) || many || spacedHere || docAdds(Number(v))))
+    if (!(currencyBefore(line.slice(0, start)) || many || spacedHere || docAdds(Number(v))))
       continue;
     spaced.push({ start, end, raw: m[2]!, value: v });
   }
@@ -295,9 +298,9 @@ function amountsInLine(
     if (/[\d.,]$/.test(before) || /^[\d]/.test(after)) continue;
     if (NOT_MONEY_AFTER.test(after)) continue;
     // 前面紧挨着字母或横线的是单号的一部分（INV-2026-0042、A12）。
-    if (/[A-Za-z\-/#]$/.test(before) && !CURRENCY_BEFORE.test(before)) continue;
+    if (/[A-Za-z\-/#]$/.test(before) && !currencyBefore(before)) continue;
     const decimals = /[.,]\d{2}$/.test(raw);
-    const currency = CURRENCY_BEFORE.test(before) || CURRENCY_AFTER.test(after);
+    const currency = currencyBefore(before) || CURRENCY_AFTER.test(after);
     if (!decimals && !currency) continue;
     // 英文、法文的四位以上整数金额会写千位分隔（1,234 / 1 234）：连着写又没有小数的（5256 €），
     // 多半是小数点没认出来，不当金额。中文常常不写千位分隔，不受这条限制。

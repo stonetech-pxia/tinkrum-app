@@ -39,11 +39,47 @@
           "fr": "Montant"
         },
         "type": "money",
+        "currencyField": "currency",
         "currency": {
           "en": "USD",
           "zh": "CNY",
           "fr": "EUR"
         }
+      },
+      {
+        "id": "currency",
+        "name": {
+          "en": "Currency",
+          "zh": "货币",
+          "fr": "Devise"
+        },
+        "type": "choice",
+        "options": [
+          {
+            "id": "usd",
+            "label": "USD"
+          },
+          {
+            "id": "eur",
+            "label": "EUR"
+          },
+          {
+            "id": "gbp",
+            "label": "GBP"
+          },
+          {
+            "id": "cny",
+            "label": "CNY"
+          },
+          {
+            "id": "jpy",
+            "label": "JPY"
+          },
+          {
+            "id": "myr",
+            "label": "MYR"
+          }
+        ]
       },
       {
         "id": "paid",

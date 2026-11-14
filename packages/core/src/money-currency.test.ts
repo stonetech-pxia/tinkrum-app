@@ -132,5 +132,10 @@ describe('each entry has its own currency (D-429)', () => {
       // CA$ 不算美元。
       expect(currencyInText(choice, ['Total CA$5'])).toBeNull();
     });
+    it('RM before an amount is ringgit when the field offers it (D-549)', () => {
+      const withMyr = { ...choice, options: [...choice.options, { id: 'myr', label: 'MYR' }] };
+      expect(currencyInText(withMyr, ['TOTAL RM33.90'])).toBe('myr');
+      expect(currencyInText(withMyr, ['RMB 33.90'])).not.toBe('myr');
+    });
   });
 });
