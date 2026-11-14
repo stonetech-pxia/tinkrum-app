@@ -635,6 +635,7 @@ export const CAPABILITIES: readonly Capability[] = [
   fieldCap('previous'),
   fieldCap('schedule'),
   fieldCap('tags'),
+  fieldCap('dateOffset'),
   cap('field.schedule.lastDone', 'field', (v) =>
     allFields(v).some((x) => x.field.type === 'schedule' && x.field.lastDone !== undefined),
   ),

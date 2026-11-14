@@ -287,7 +287,36 @@ export function recordValue(
   if (isSystemField(ref)) return dayOf(new Date(record[ref]), cal);
   const field = fieldOf(collection, ref);
   if (field?.type === 'formula') return formulaValue(field, record, collection, now, cal);
+  if (field?.type === 'dateOffset') return dateOffsetValue(field, record, collection, now, cal);
   return field ? readValue(field, record.values[ref]) : undefined;
+}
+
+/**
+ * 算出来的日期（D-542）：from 那天（日期时间按它那一天，D-286）加 add 天或 add 个月；月份加完超过那个月的
+ * 最后一天时取最后一天（1 月 31 日加一个月是 2 月 28 日）。from 或 add 没有值时没有值。
+ */
+function dateOffsetValue(
+  field: Extract<Field, { type: 'dateOffset' }>,
+  record: DataRecord,
+  collection: Collection,
+  now: Date,
+  cal: Calendar,
+): string | undefined {
+  const start = recordDay(record, collection, field.from, now, cal);
+  const n =
+    typeof field.add === 'number'
+      ? field.add
+      : recordValue(record, collection, field.add, now, cal);
+  const day = start === undefined ? undefined : dayNumber(start);
+  if (day === undefined || typeof n !== 'number' || !Number.isFinite(n)) return undefined;
+  const add = Math.round(n);
+  if (field.unit === 'days') return dateOfDayNumber(day + add);
+  const [y, m, d] = start!.split('-').map(Number) as [number, number, number];
+  const months = y * 12 + (m - 1) + add;
+  const year = Math.floor(months / 12);
+  const month = months - year * 12 + 1;
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
 }
 
 // ---- 写入 ----
@@ -733,7 +762,7 @@ export function formatRef(
 ): string {
   if (isSystemField(ref)) return formatTimestamp(record[ref], locale);
   const field = fieldOf(collection, ref);
-  if (field?.type === 'formula')
+  if (field?.type === 'formula' || field?.type === 'dateOffset')
     return formatValue(field, recordValue(record, collection, ref, now, cal), locale);
   // 日程（D-292）：规则 · 下一次（今天、明天、过期几天或日期）。
   if (field?.type === 'schedule') {

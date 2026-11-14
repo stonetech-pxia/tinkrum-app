@@ -216,6 +216,7 @@ function everything() {
         countEarly: true,
       },
       { id: 'labels', name: 'labels', type: 'tags' },
+      { id: 'ends', name: 'ends', type: 'dateOffset', from: 'date', add: 'qty', unit: 'months' },
     ]),
     {
       op: 'updateData',

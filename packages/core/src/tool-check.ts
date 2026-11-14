@@ -561,6 +561,9 @@ class Analysis {
       if (f.type === 'formula') {
         const parsed = parseFormula(f.expression);
         if (parsed.ok) for (const id of parsed.refs) use.read.add(id);
+      } else if (f.type === 'dateOffset') {
+        use.read.add(f.from);
+        if (typeof f.add === 'string') use.read.add(f.add);
       } else if (f.type === 'rollup') {
         const other = this.uses.get(f.table);
         if (other) {
@@ -852,6 +855,10 @@ function computedInputs(a: Analysis, table: Collection, f: Field) {
     return parsed.ok ? parsed.refs.map(here) : [];
   }
   if (f.type === 'previous') return [here(f.field)];
+  if (f.type === 'dateOffset')
+    return [f.from, ...(typeof f.add === 'string' ? [f.add] : [])]
+      .filter((id) => id !== 'createdAt' && id !== 'updatedAt')
+      .map(here);
   if (f.type === 'lookup') {
     const via = table.fields.find((x) => x.id === f.via);
     return [here(f.via), ...(via?.type === 'link' ? [{ table: via.table, field: f.field }] : [])];

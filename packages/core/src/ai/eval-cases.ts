@@ -7788,6 +7788,66 @@ const MARK_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 合同表：开始日期和期限（月）。 */
+const termsEarlier: EvalEarlier = {
+  input: 'Make a table of my contracts with a name, a start date and a term in months',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'contracts',
+        name: 'Contracts',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'start', name: 'Start date', type: 'date' },
+          { id: 'term', name: 'Term (months)', type: 'number' },
+        ],
+      },
+    },
+  ],
+};
+const offsetOf = (c: WorkspaceConfig) =>
+  c.data.tables
+    .find((t) => t.id === 'contracts')
+    ?.fields.find((f): f is Extract<Field, { type: 'dateOffset' }> => f.type === 'dateOffset');
+
+const DATE_OFFSET_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG11',
+    input: 'Add an end date that is worked out from the start date plus the term',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [termsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const f = offsetOf(c);
+        return f?.from === 'start' && f.add === 'term' && f.unit === 'months'
+          ? null
+          : `expected a dateOffset from start + term months, got ${JSON.stringify(f)}`;
+      },
+    },
+  },
+  {
+    id: 'KG12',
+    input: 'Ajoute une date de rappel calculée : 30 jours après la date de début',
+    locale: 'fr',
+    setup: 'default',
+    mock: false,
+    earlier: [termsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const f = offsetOf(c);
+        return f?.from === 'start' && f.add === 30 && f.unit === 'days'
+          ? null
+          : `expected a dateOffset from start + 30 days, got ${JSON.stringify(f)}`;
+      },
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -7843,6 +7903,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...TABLE_LOOK_CASES,
   ...GALLERY_CASES,
   ...MARK_CASES,
+  ...DATE_OFFSET_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

@@ -84,6 +84,11 @@ function depsOf(
       const parsed = parseFormula(field.expression);
       return { refs: parsed.ok ? parsed.refs.map(here) : [], hop: false };
     }
+    case 'dateOffset':
+      return {
+        refs: [field.from, ...(typeof field.add === 'string' ? [field.add] : [])].map(here),
+        hop: false,
+      };
     case 'lookup': {
       const target = linkTarget(collections, collection, field.via);
       const refs = [here(field.via)];
@@ -142,6 +147,8 @@ function renamed(src: Field, as: Field): Field {
 
 /** 公式存不了，取到的是它算出来的数字：换成数字或金额字段。 */
 function asStored(f: Field): Field {
+  // 算出来的日期（D-542）取到的是日期。
+  if (f.type === 'dateOffset') return { id: f.id, name: f.name, type: 'date' };
   if (f.type !== 'formula') return f;
   return f.currency
     ? { id: f.id, name: f.name, type: 'money', currency: f.currency }
@@ -239,7 +246,8 @@ export function relatedCollectionIds(
     for (const dep of depsOf(collections, at.collection, at.field).refs) walk(dep);
   };
   for (const f of collection.fields)
-    if (isComputed(f) || f.type === 'formula') walk({ collectionId: collection.id, fieldId: f.id });
+    if (isComputed(f) || f.type === 'formula' || f.type === 'dateOffset')
+      walk({ collectionId: collection.id, fieldId: f.id });
   return [...tables];
 }
 

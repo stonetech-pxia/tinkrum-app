@@ -438,6 +438,8 @@ export const FIELD_EDITORS: { [T in FieldType]: FieldEditor<FieldOf<T>> } = {
   lookup: { computed: true, input: () => null },
   rollup: { computed: true, input: () => null },
   previous: { computed: true, input: () => null },
+  // 算出来的日期（D-542）。
+  dateOffset: { computed: true, input: () => null },
   link: {
     input: ({ field, value, onChange, palette, locale, disabled, testID }) => (
       <LinkInput
