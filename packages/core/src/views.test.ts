@@ -396,7 +396,8 @@ describe('block checks (D-305–D-308)', () => {
     const text = (c: NewComponent) => problems(c).join(' | ');
     expect(text(calendar({ color: 'note' }))).toMatch(/color.*note.*choice/);
     expect(text(calendar({}, 'cups'))).toMatch(/source.group.by cups must be a date or datetime/);
-    expect(text(list({ color: 'feel' }))).toMatch(/show.color only applies to look "calendar"/);
+    // D-541：每种记录外观都能按单选字段上色。
+    expect(text(list({ color: 'feel' }))).toBe('');
     expect(text(list({ format: { kind: 'elapsed' } }))).toMatch(/needs show.trailing/);
     expect(text(list({ trailing: 'cups', format: { kind: 'elapsed' } }))).toMatch(
       /elapsed needs show.trailing set to a datetime field/,

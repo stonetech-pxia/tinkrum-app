@@ -352,6 +352,7 @@ class Analysis {
           ...(show.subtitles ?? []),
           show.trailing,
           show.color,
+          ...(show.columns ?? []),
           ...(show.browse?.sort ?? []),
           ...(show.browse?.group ?? []),
           ...(show.browse?.filter ?? []),
@@ -362,6 +363,7 @@ class Analysis {
         if (format?.kind === 'progress' && typeof format.goal === 'string')
           use.read.add(format.goal);
         this.readFilter(use, source.filter);
+        this.readFilter(use, show.highlight);
         if (source.sort) use.read.add(source.sort.field);
         if (source.group?.by) use.read.add(source.group.by);
         const tapped = block.tools?.some((u) => u.as === 'tap');
@@ -460,7 +462,9 @@ class Analysis {
     const { source } = c as Extract<KnownComponent, { look: 'list' }>;
     return [
       ...(source.group?.by ? [source.group.by] : []),
-      ...(source.filter ?? []).filter((x) => x.op === 'is').map((x) => x.field),
+      ...(source.filter ?? [])
+        .filter((x) => x.op === 'is' && !Array.isArray(x.value))
+        .map((x) => x.field),
     ];
   }
 
@@ -557,6 +561,9 @@ class Analysis {
       if (f.type === 'formula') {
         const parsed = parseFormula(f.expression);
         if (parsed.ok) for (const id of parsed.refs) use.read.add(id);
+      } else if (f.type === 'dateOffset') {
+        use.read.add(f.from);
+        if (typeof f.add === 'string') use.read.add(f.add);
       } else if (f.type === 'rollup') {
         const other = this.uses.get(f.table);
         if (other) {
@@ -848,6 +855,10 @@ function computedInputs(a: Analysis, table: Collection, f: Field) {
     return parsed.ok ? parsed.refs.map(here) : [];
   }
   if (f.type === 'previous') return [here(f.field)];
+  if (f.type === 'dateOffset')
+    return [f.from, ...(typeof f.add === 'string' ? [f.add] : [])]
+      .filter((id) => id !== 'createdAt' && id !== 'updatedAt')
+      .map(here);
   if (f.type === 'lookup') {
     const via = table.fields.find((x) => x.id === f.via);
     return [here(f.via), ...(via?.type === 'link' ? [{ table: via.table, field: f.field }] : [])];

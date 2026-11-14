@@ -19,6 +19,7 @@ export const FRENCH_PAIRS: Readonly<Record<string, string>> = {
   'value from a linked entry': 'valeur d’une entrée liée',
   'summary of linked entries': 'synthèse des entrées liées',
   'value of the previous entry': 'valeur de l’entrée précédente',
+  'computed date': 'date calculée',
   'the default fonts (Sora + Karla)': 'la police par défaut (Sora + Karla)',
   'the system font': 'la police du système',
   'a serif font': 'une police avec empattements',

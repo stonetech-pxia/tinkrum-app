@@ -4,8 +4,10 @@ import {
   addDraftField,
   draftEngine,
   fieldTypeFor,
+  fileCurrency,
   removeDraftField,
   renameDraftField,
+  withCurrency,
 } from './new-table';
 import { applyOps } from './ops';
 import { createDefaultWorkspace } from './defaults';
@@ -175,5 +177,148 @@ describe('隐藏的预设', () => {
   it('不在用户平时看到的预设里', () => {
     for (const p of HIDDEN_RECORD_PRESETS)
       expect(FILE_RECORD_PRESETS as readonly string[]).not.toContain(p);
+  });
+});
+
+// 金额的货币跟着文件（D-548）：用文件建表时，金额字段用小票上的货币，认不出才按界面语言。
+describe('fileCurrency', () => {
+  const page = (...texts: string[]): TextPage[] => [
+    {
+      width: 600,
+      height: 800,
+      lines: texts.map((text, i) => ({ text, x: 20, y: 20 + i * 40, width: 300, height: 16 })),
+    },
+  ];
+  it('reads the sign or code on the money lines, Western receipts first', () => {
+    expect(fileCurrency(page('Corner Deli', 'TOTAL $18.40'), 'en')).toBe('USD');
+    expect(fileCurrency(page('Boulangerie', 'Total 12,50 €'), 'fr')).toBe('EUR');
+    expect(fileCurrency(page('Panadería', 'TOTAL 7,80 EUR'), 'en')).toBe('EUR');
+    expect(fileCurrency(page('Tesco', 'Total £4.20'), 'en')).toBe('GBP');
+  });
+  it('a Malaysian receipt in RM is MYR (user tests 2026-11-09, 2026-11-10)', () => {
+    expect(fileCurrency(page('KEDAI PAPAN YEW CHUAN', 'TOTAL RM 121.90'), 'en')).toBe('MYR');
+    expect(fileCurrency(page('Restoran Ali', 'Jumlah RM 33.90'), 'en')).toBe('MYR');
+    expect(fileCurrency(page('Kedai', 'TOTAL 9.00 MYR'), 'en')).toBe('MYR');
+  });
+  it('without a sign it says nothing, so the table keeps the language default', () => {
+    expect(fileCurrency(page('Maple Corner', 'Total 178.23'), 'en')).toBeNull();
+    expect(fileCurrency(page('Platform rm 33.90'), 'en')).toBeNull();
+    expect(fileCurrency([], 'en')).toBeNull();
+  });
+  it('withCurrency sets the money fields and leaves the others', () => {
+    const table = withCurrency(draftTable('purchase', createDefaultWorkspace('en'), 'en'), 'MYR');
+    expect(table.fields.filter((f) => f.type === 'money').map((f) => f.currency)).toEqual(['MYR']);
+    expect(table.fields.length).toBe(
+      draftTable('purchase', createDefaultWorkspace('en'), 'en').fields.length,
+    );
+  });
+});
+
+// 收据类的表每一笔自己带货币，预填从小票上给候选（D-549）。
+describe('receipt tables: each entry carries its own currency (D-549)', () => {
+  // 购物凭证和样板「收据」还没改：它们的开销图表要把金额加起来（等创始人定）。
+  const RECEIPT_TABLES = ['bill', 'reimbursement'] as const;
+  const page = (...texts: string[]): TextPage[] => [
+    {
+      width: 600,
+      height: 800,
+      lines: texts.map((text, i) => ({ text, x: 20, y: 20 + i * 40, width: 300, height: 16 })),
+    },
+  ];
+  const currencyChoice = (table: Collection) => {
+    const money = table.fields.find((f) => f.type === 'money');
+    const id = money?.type === 'money' ? money.currencyField : undefined;
+    return table.fields.find((f) => f.id === id && f.type === 'choice') as
+      Extract<Collection['fields'][number], { type: 'choice' }> | undefined;
+  };
+  const receipts = [
+    ['Corner Deli', 'TOTAL $18.40'],
+    ['Boulangerie', 'Total 12,50 €'],
+    ['Tesco', 'Total £4.20'],
+    ['超市', '合计 ￥12.00'],
+    ['Restoran Ali', 'Jumlah RM33.90'],
+  ];
+
+  it.each(RECEIPT_TABLES)(
+    '%s: the money field points at a currency choice, nothing picked',
+    (p) => {
+      for (const locale of ['en', 'zh', 'fr'] as const) {
+        const table = draftTable(p, createDefaultWorkspace(locale), locale);
+        const choice = currencyChoice(table);
+        expect(choice).toBeDefined();
+        expect(choice!.default).toBeUndefined();
+        // 文件上认得出的货币都在选项里。
+        for (const texts of receipts) {
+          const code = fileCurrency(page(...texts), locale)!;
+          expect(choice!.options.map((o) => o.id)).toContain(code.toLowerCase());
+        }
+      }
+    },
+  );
+
+  it.each(RECEIPT_TABLES)(
+    '%s: a ringgit receipt offers MYR as the currency candidate',
+    async (p) => {
+      const table = draftTable(p, createDefaultWorkspace('en'), 'en');
+      const out = await draftEngine({
+        rules: 'receipt',
+        fields: table.fields,
+        pages: page('Restoran Ali', '14/11/2026', 'TOTAL RM33.90'),
+        locale: 'en',
+        now: new Date('2026-11-14T00:00:00Z'),
+      });
+      expect(out[currencyChoice(table)!.id]?.[0]?.value).toBe('myr');
+      expect(Number(out.amount?.[0]?.value)).toBe(33.9);
+    },
+  );
+
+  it('no currency on the receipt: no currency candidate', async () => {
+    const table = draftTable('bill', createDefaultWorkspace('en'), 'en');
+    const out = await draftEngine({
+      rules: 'receipt',
+      fields: table.fields,
+      pages: page('Maple Corner', 'Total 178.23'),
+      locale: 'en',
+    });
+    expect(out[currencyChoice(table)!.id]).toBeUndefined();
+  });
+
+  it('works on any table whose money field points at a currency choice, whatever the names', async () => {
+    const fields = [
+      { id: 'x1', name: 'Paid', type: 'money', currency: 'EUR', currencyField: 'x2' },
+      {
+        id: 'x2',
+        name: 'Kind',
+        type: 'choice',
+        options: [
+          { id: 'eur', label: 'EUR' },
+          { id: 'myr', label: 'MYR' },
+        ],
+      },
+    ] as Collection['fields'];
+    const out = await draftEngine({
+      fields,
+      pages: page('Kedai', 'TOTAL RM 9.00'),
+      locale: 'en',
+    });
+    expect(out.x2?.[0]?.value).toBe('myr');
+  });
+
+  it('a table made from a file falls back to the file currency', () => {
+    const table = withCurrency(draftTable('bill', createDefaultWorkspace('fr'), 'fr'), 'MYR');
+    expect(table.fields.find((f) => f.type === 'money')).toMatchObject({ currency: 'MYR' });
+  });
+
+  it('removing the currency field from the draft keeps the table valid', () => {
+    const config = createDefaultWorkspace('en');
+    const table = draftTable('reimbursement', config, 'en');
+    const smaller = removeDraftField(table, currencyChoice(table)!.id);
+    const money = smaller.fields.find((f) => f.type === 'money');
+    expect(money?.type === 'money' && money.currencyField).toBeFalsy();
+    const made = applyOps(config, draftTableOps(smaller, 'reimbursement', config, 'en'), {
+      registry,
+      locale: 'en',
+    });
+    expect(made.ok).toBe(true);
   });
 });

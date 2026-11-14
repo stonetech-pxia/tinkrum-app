@@ -9,7 +9,8 @@ import {
   type Locale,
   type Registry,
 } from '@morph/core';
-import { fireEvent } from '@testing-library/react-native';
+import { act, fireEvent } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
 
 import { statText } from '../renderer/data';
@@ -305,6 +306,138 @@ describe('link to another table (D-250)', () => {
     await renderToolsApp(new MemoryWorkspaceRepo(), undefined, { seed });
     await fireEvent.press(await screen.findByTestId('form-add-order-client'));
     expect(await screen.findByText('「客户」里还没有记录。')).toBeTruthy();
+  });
+});
+
+// 关联字段里「新加一条」（D-546）：打开那张表的新记录页，存好以后回来就选上它；取消什么都不变。
+describe('a new linked record from the picker', () => {
+  const clients: Collection = {
+    id: 'clients',
+    name: '客户',
+    fields: [{ id: 'name', name: '名字', type: 'text' }],
+  };
+  const orders: Collection = {
+    id: 'orders',
+    name: '订单',
+    fields: [
+      { id: 'item', name: '商品', type: 'text' },
+      { id: 'client', name: '客户', type: 'link', table: 'clients' },
+    ],
+  };
+  const seed = (locale: Locale, registry: Registry) => {
+    const result = applyOps(
+      createDefaultWorkspace(locale),
+      [
+        { op: 'addData', table: clients },
+        { op: 'addData', table: orders },
+        {
+          op: 'addContainer',
+          page: 'home',
+          block: {
+            id: 'add-order',
+            look: 'form',
+            show: { mode: 'inline' },
+            tools: [
+              {
+                as: 'submit',
+                label: '记下',
+                do: 'create',
+                table: 'orders',
+                ask: ['item', 'client'],
+              },
+            ],
+          },
+        },
+      ],
+      { registry, locale },
+    );
+    if (!result.ok) throw new Error(result.error);
+    return result.config;
+  };
+
+  async function addClientThroughPicker(name: string) {
+    await fireEvent.press(await screen.findByTestId('form-add-order-client'));
+    await fireEvent.press(await screen.findByTestId('form-add-order-client-new'));
+    await fireEvent.changeText(await screen.findByTestId('editor-name'), name);
+    await fireEvent.press(screen.getByTestId('editor-save'));
+  }
+
+  it('a new user adds the first client from the order form; it is selected and the order keeps its id', async () => {
+    const repo = new MemoryWorkspaceRepo();
+    await renderToolsApp(repo, undefined, { seed });
+    await fireEvent.press(await screen.findByTestId('form-add-order-client'));
+    expect(await screen.findByTestId('form-add-order-client-new')).toHaveTextContent(
+      '在「客户」里新加一条',
+    );
+    await fireEvent.press(screen.getByTestId('form-add-order-client'));
+    await addClientThroughPicker('赵六');
+    const [client] = await repo.listRecords('clients');
+    expect(client!.values).toEqual({ name: '赵六' });
+    // 回到订单表单：选上了新客户，订单还没有存（存订单是另一次点击）。
+    expect(await screen.findByTestId('form-add-order-client')).toHaveTextContent(/赵六/);
+    expect(await repo.listRecords('orders')).toEqual([]);
+    await fireEvent.changeText(screen.getByTestId('form-add-order-item'), '茶叶');
+    await fireEvent.press(screen.getByTestId('form-add-order-submit'));
+    expect((await repo.listRecords('orders')).map((r) => r.values)).toEqual([
+      { item: '茶叶', client: client!.id },
+    ]);
+  });
+
+  it('with clients already there, the new one replaces the earlier choice', async () => {
+    const repo = new MemoryWorkspaceRepo();
+    await repo.insertRecord({
+      id: 'c1',
+      collectionId: 'clients',
+      values: { name: '王小明' },
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    await renderToolsApp(repo, undefined, { seed });
+    await fireEvent.press(await screen.findByTestId('form-add-order-client'));
+    await fireEvent.press(await screen.findByTestId('form-add-order-client-option-c1'));
+    expect(screen.getByTestId('form-add-order-client')).toHaveTextContent(/王小明/);
+    await addClientThroughPicker('李华');
+    expect(await screen.findByTestId('form-add-order-client')).toHaveTextContent(/李华/);
+    expect(await repo.listRecords('clients')).toHaveLength(2);
+  });
+
+  it('works from the full new-record page too: two forms stacked, the first gets the new client', async () => {
+    const repo = new MemoryWorkspaceRepo();
+    await renderToolsApp(repo, undefined, { seed });
+    await screen.findByTestId('form-add-order-client');
+    await act(async () => {
+      jest.advanceTimersByTime(200);
+      await Promise.resolve();
+    });
+    await act(() =>
+      router.push({ pathname: '/record/[collectionId]', params: { collectionId: 'orders' } }),
+    );
+    await screen.findByTestId('editor-save');
+    await fireEvent.changeText(await screen.findByTestId('editor-item'), '书');
+    await fireEvent.press(screen.getByTestId('editor-client'));
+    await fireEvent.press(await screen.findByTestId('editor-client-new'));
+    await fireEvent.changeText(await screen.findByTestId('editor-name'), '周七');
+    await fireEvent.press(screen.getByTestId('editor-save'));
+    expect(await screen.findByTestId('editor-client')).toHaveTextContent(/周七/);
+    expect(screen.getByTestId('editor-item').props.value).toBe('书');
+    const [client] = await repo.listRecords('clients');
+    expect(await repo.listRecords('orders')).toEqual([]);
+    await fireEvent.press(screen.getByTestId('editor-save'));
+    expect((await repo.listRecords('orders')).map((r) => r.values)).toEqual([
+      { item: '书', client: client!.id },
+    ]);
+  });
+
+  it('leaving the new record form without saving changes nothing', async () => {
+    const repo = new MemoryWorkspaceRepo();
+    await renderToolsApp(repo, undefined, { seed });
+    await fireEvent.press(await screen.findByTestId('form-add-order-client'));
+    await fireEvent.press(await screen.findByTestId('form-add-order-client-new'));
+    await screen.findByTestId('editor-save');
+    await act(() => router.back());
+    expect(await screen.findByTestId('form-add-order-client')).toHaveTextContent(/没有选/);
+    expect(await repo.listRecords('clients')).toEqual([]);
+    expect(await repo.listRecords('orders')).toEqual([]);
   });
 });
 

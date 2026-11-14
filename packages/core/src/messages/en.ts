@@ -401,6 +401,8 @@ export const en = {
   browseGroupNone: 'None',
   browseCreatedAt: 'Recently added',
   browseUpdatedAt: 'Recently changed',
+  tableCreatedAt: 'Added',
+  tableUpdatedAt: 'Changed',
   browseShowing: 'Showing {shown} of {total}. Scroll down for more.',
   browseShowingMatches: 'Showing {shown} of {total} matches. Scroll down for more.',
   singleTooMuch: 'Too much here to fit in a QR code.',
@@ -420,6 +422,13 @@ export const en = {
   tableFull: 'This table is full (10,000 entries).',
   useFullForm: 'Some required fields aren’t in this form. Open the full form to add.',
   recordDeleted: 'Entry deleted',
+  bulkSelectTitle: 'Select to delete',
+  bulkSelectAll: 'Select all',
+  bulkSelectNone: 'Select none',
+  bulkSelectEmpty: 'This table has no entries.',
+  bulkDeleteButton: 'Delete {n} entries',
+  bulkDeleteConfirm: 'Delete {n} entries from “{name}”?',
+  bulkDeleted: '{n} entries deleted',
   newRecord: 'New entry',
   editRecord: 'Edit entry',
   save: 'Save',
@@ -442,6 +451,9 @@ export const en = {
   presetsImportHint:
     'Have a file, for example one downloaded from the Tinkrum website? An app file is added as a new app next to yours. A whole-app preset file only joins this list; your app changes when you apply it.',
   presetImported: 'Added the preset “{name}”. Tap Apply when you want to use it.',
+  presetsSamplesTitle: 'Sample apps',
+  presetsSamplesHint:
+    'Pick one to look at: it goes into a draft first and is only added when you tap Apply. You can undo it in Change history. Your entries stay as they are.',
   presetApply: 'Apply',
   presetRename: 'Rename',
   presetDeleted: 'Preset “{name}” deleted',
@@ -514,6 +526,9 @@ export const en = {
   importHomeConfirm:
     'Import “{name}” into your home page? The home style changes to its style and its pages join the navigation bar. Your pages and entries stay. You can undo it in the change log.',
   importHomeSummary: 'Import “{name}” into the home page',
+  shareAppItem: 'Share this app',
+  importAppMaybeNewer:
+    'If it was made with a newer version of Tinkrum, update Tinkrum and try again.',
   appResetItem: 'Restore its original look',
   appResetConfirm:
     'Restore “{name}” to how it was when you imported it? Pages and quick actions you added to it go away, and its style and pages come back. Tables you made and all your entries stay. You can undo it in the change log.',
@@ -1010,6 +1025,7 @@ export const en = {
   linkNone: 'Not linked',
   linkChoose: 'Choose…',
   linkSearch: 'Search',
+  linkNew: 'Add a new one to “{name}”',
   linkClear: 'Remove link',
   linkEmptyTable: '“{name}” has no entries yet.',
   // 提醒（D-251）
@@ -1689,6 +1705,9 @@ export const en = {
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: 'Previous month',
   calendarNextMonth: 'Next month',
+  datePickerOpen: 'Pick from a calendar',
+  datePickerHour: 'Hour',
+  datePickerMinute: 'Minute',
   calendarToday: 'Today',
   calendarDayLabel: '{date}, {n} entries',
   calendarDayEmpty: 'No entries on this day.',
@@ -1834,6 +1853,9 @@ export type MessageTable = Record<StringKey, string>;
 
 /** 单数写法（isSingular 为真时用），只放带数量的文案；哪个参数决定单复数见 messages.ts 的 PLURAL_COUNT_VARIABLE。 */
 export const enSingular = {
+  bulkDeleteButton: 'Delete {n} entry',
+  bulkDeleteConfirm: 'Delete {n} entry from “{name}”?',
+  bulkDeleted: '{n} entry deleted',
   wordSwapOriginalLines: 'Use original ({n} line)',
   describeSourceLimit: 'shows up to {n} entry',
   buildStoppedHint: 'Stopped. What’s done stays. {n} step left.',

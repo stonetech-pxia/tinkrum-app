@@ -191,7 +191,9 @@ const presetsOf = (w: PlacedWrite): string[] => {
     if (!source) return [];
     return [
       ...(source.group?.by ? [source.group.by] : []),
-      ...(source.filter ?? []).filter((c) => c.op === 'is').map((c) => c.field),
+      ...(source.filter ?? [])
+        .filter((c) => c.op === 'is' && !Array.isArray(c.value))
+        .map((c) => c.field),
     ];
   }
   return Object.keys((values as RecordToolValues | undefined) ?? {});
@@ -633,6 +635,7 @@ export const CAPABILITIES: readonly Capability[] = [
   fieldCap('previous'),
   fieldCap('schedule'),
   fieldCap('tags'),
+  fieldCap('dateOffset'),
   cap('field.schedule.lastDone', 'field', (v) =>
     allFields(v).some((x) => x.field.type === 'schedule' && x.field.lastDone !== undefined),
   ),
@@ -702,6 +705,8 @@ export const CAPABILITIES: readonly Capability[] = [
   lookCap('tiles'),
   lookCap('board'),
   lookCap('calendar'),
+  lookCap('table'),
+  lookCap('gallery'),
   lookCap('number'),
   lookCap('chart'),
   lookCap('single'),
@@ -804,6 +809,9 @@ export const CAPABILITIES: readonly Capability[] = [
   periodCap('last365days'),
   periodCap('thisTwoWeeks'),
   periodCap('thisHalfMonth'),
+  periodCap('next7days'),
+  periodCap('next30days'),
+  periodCap('next90days'),
   cap('read.show.color', 'read', (v) => recordBlocks(v).some((b) => b.show.color !== undefined)),
   cap('read.format.elapsed', 'read', (v) =>
     recordBlocks(v).some((b) => b.show.format?.kind === 'elapsed'),

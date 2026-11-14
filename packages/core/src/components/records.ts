@@ -6,6 +6,7 @@ import { t } from '../messages';
 import { ToolUseSchema } from '../record-ops-schema';
 import {
   boundedText,
+  ConditionSchema,
   FieldRefSchema,
   filterSchema,
   GroupingSchema,
@@ -55,8 +56,12 @@ const SlotsSchema = z.strictObject({
   /** 显示在右侧的字段，例如金额。 */
   trailing: FieldRefSchema.optional(),
   format: TrailingFormatSchema.optional(),
-  /** 月历按这个单选字段给每天上色（这一天最后一条的选项）。 */
+  /** 按这个单选字段上色：月历给每天上色（这一天最后一条的选项），别的外观在标题前画一个小圆点（D-541）。 */
   color: IdSchema.optional(),
+  /** 满足这些条件（并且，≤3）的那几条，右侧的值（没有右侧字段时是标题）用警示色（D-541）。 */
+  highlight: z.array(ConditionSchema).min(1).max(3).optional(),
+  /** 表格（D-539）第一列 title 之后的列；不写时是副标题和右侧字段。 */
+  columns: z.array(FieldRefSchema).min(1).max(7).optional(),
   emptyText: boundedText(1, 80).optional(),
   /**
    * 用户在列表上临时找、换着看（D-424，只有 list、cards、checklist）：search 有搜索框，sort、group 是能换的字段。
@@ -86,7 +91,16 @@ const shape = {
   opens: IdSchema.optional(),
 };
 
-export const RECORD_LOOKS = ['list', 'cards', 'checklist', 'tiles', 'board', 'calendar'] as const;
+export const RECORD_LOOKS = [
+  'list',
+  'cards',
+  'checklist',
+  'tiles',
+  'board',
+  'calendar',
+  'table',
+  'gallery',
+] as const;
 export type RecordLook = (typeof RECORD_LOOKS)[number];
 
 type RecordBlock = z.infer<z.ZodObject<typeof shape>> & {
@@ -101,6 +115,7 @@ const refs = {
   'show.subtitles': { to: 'field', role: 'subtitleField' },
   'show.trailing': { to: 'field', role: 'trailingField' },
   'show.color': { to: 'field', role: 'colorField', types: ['choice'] },
+  'show.columns': { to: 'field', role: 'show.columns' },
   'show.browse.sort': { to: 'field', role: 'show.browse.sort' },
   'show.browse.group': { to: 'field', role: 'show.browse.group' },
   'show.browse.period': { to: 'field', role: 'show.browse.period', types: ['date', 'datetime'] },
@@ -124,8 +139,8 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
   }
   const field = (id: string) => collection!.fields.find((f) => f.id === id);
   const typeOf = (id: string) => (isSystemField(id) ? 'datetime' : field(id)?.type);
-  if (c.look !== 'calendar' && c.show.color !== undefined)
-    problems.push('show.color only applies to look "calendar"');
+  if (c.look !== 'table' && c.show.columns !== undefined)
+    problems.push('show.columns only applies to look "table"');
   const browse = c.show.browse;
   if (browse) {
     if (c.look !== 'list' && c.look !== 'cards' && c.look !== 'checklist')
@@ -194,9 +209,13 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
   if (c.look === 'calendar') {
     if (group?.unit !== 'day')
       problems.push('a calendar needs source.group {unit: "day", by?: a date field}');
-    else if (by !== undefined && byType && !['date', 'datetime', 'schedule'].includes(byType))
+    else if (
+      by !== undefined &&
+      byType &&
+      !['date', 'datetime', 'schedule', 'dateOffset'].includes(byType)
+    )
       problems.push(
-        `source.group.by ${by} must be a date or datetime or schedule field of ${collection!.id}`,
+        `source.group.by ${by} must be a date or datetime or schedule field (or a dateOffset) of ${collection!.id}`,
       );
     if (group?.showEmpty || group?.filter)
       problems.push('a calendar groups by day only: no showEmpty or filter');
@@ -238,7 +257,7 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
  * limit 是每段 / 每栏 / 每天最多几条。
  */
 export const RECORD_LOOK_DOC =
-  'source {table, filter?, sort? {field, direction: "asc"|"desc"}, limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (calendar only), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools?, opens? (a page for one entry, rule 48)';
+  'source {table, filter?, sort? {field, direction: "asc"|"desc"}, limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (a choice field: a dot in the colour of its option; on a calendar the day colour), highlight? (1-3 conditions like filter: matching entries show trailing, or the title, in the warning colour, e.g. over budget), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools?, opens? (a page for one entry, rule 48)';
 
 const DOCS: Record<RecordLook, string> = {
   list: 'rows; tapping a row opens the built-in editor (or the page in opens)',
@@ -250,7 +269,11 @@ const DOCS: Record<RecordLook, string> = {
   board:
     'a board with one column per option of source.group.by (a choice or link field; link: rule 45) plus "not set"; dragging a card needs {as: "drag", do: "set", table, field: <the same field>, value: "$group"}, without it the board is read-only (rule 45)',
   calendar:
-    'a month calendar: source.group {unit: "day", by?: a date, datetime or schedule field}, show.color? a choice field (rule 45)',
+    'a month calendar: source.group {unit: "day", by?: a date, datetime, dateOffset or schedule field}, show.color? a choice field (rule 45)',
+  table:
+    'a spreadsheet-like table, one row per entry under a header of field names: show.title is the first column (kept in view), show.columns? (1-7 fields) the others (default: subtitles and trailing); scrolls sideways; read-only cells, tapping a row opens the entry',
+  gallery:
+    "a grid of pictures, 2 per row: the first image in each entry's attachments with show.title under it (no image: a placeholder with the title); tapping one opens the entry",
 };
 
 const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
@@ -288,6 +311,10 @@ const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
     open: true,
     max: 4,
   },
+  // 表格的格子只读（D-539）：没有每行的按钮。
+  table: { as: ['addHere', 'list'], do: ['create'], ref: ['quickAction'], open: true, max: 4 },
+  // 图片墙（D-540）只有图片和标题：没有每张的按钮。
+  gallery: { as: ['addHere', 'list'], do: ['create'], ref: ['quickAction'], open: true, max: 4 },
 };
 
 function recordLook<L extends RecordLook>(look: L): LookDefinitionOf<L, typeof shape> {
@@ -318,7 +345,12 @@ function recordLook<L extends RecordLook>(look: L): LookDefinitionOf<L, typeof s
             ? { group: { by: 'category' } }
             : {}),
       },
-      show: { title: 'category', subtitles: ['note', 'date'], trailing: 'amount' },
+      show: {
+        title: 'category',
+        ...(look === 'table'
+          ? { columns: ['date', 'amount', 'note'] }
+          : { subtitles: ['note', 'date'], trailing: 'amount' }),
+      },
       ...(look === 'checklist'
         ? {
             tools: [
@@ -348,3 +380,5 @@ export const checklistComponent = recordLook('checklist');
 export const tilesComponent = recordLook('tiles');
 export const boardComponent = recordLook('board');
 export const calendarComponent = recordLook('calendar');
+export const tableComponent = recordLook('table');
+export const galleryComponent = recordLook('gallery');

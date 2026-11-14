@@ -83,7 +83,7 @@ import {
   minusValue,
 } from '@morph/core';
 import { useRouter } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -100,6 +100,7 @@ import {
   Keyboard,
 } from 'react-native';
 
+import { useLinkPick } from '../data/link-pick';
 import { useComputedRecords, useLinkResolver, useRecordActions, useRecords } from '../data/records';
 import { useSimilarCheck } from '../data/similar-records';
 import { useCalendar, useWorkspace } from '../workspace/context';
@@ -114,6 +115,10 @@ import { Icon, UiIcon } from './Icon';
 import { ProgressBar, ProgressRing } from './Progress';
 import { useTicker } from './ticker';
 import { cardColors, onPage, type Palette } from './theme';
+import { ColorDot, recordMarks } from './record-marks';
+import { DayGrid, PickButton, TimeChips } from './DatePicker';
+import { RecordGallery } from './RecordGallery';
+import { RecordTable } from './RecordTable';
 import { Button, Card } from './ui';
 
 // 数据组件（docs/DATA_DESIGN.md）：记录列表、快速添加表单、统计。
@@ -331,37 +336,62 @@ function DateInput({
   chip,
 }: FieldInputContext<FieldOf<'date'>>) {
   const cal = useCalendar();
+  const [picking, setPicking] = useState(false);
   const today = todayNumber(new Date(), cal);
   const recognise = () => {
     if (typeof value !== 'string' || /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return;
     const found = findDatePhrase(value, today, cal)?.value;
     if (found?.kind === 'date') onChange(found.date);
   };
+  const text = typeof value === 'string' ? value : '';
   return (
-    <View style={styles.dateRow}>
-      <TextInput
-        testID={testID}
-        editable={!disabled}
-        value={typeof value === 'string' ? value : ''}
-        onChangeText={onChange}
-        onEndEditing={recognise}
-        placeholder="YYYY-MM-DD"
-        placeholderTextColor={palette.caption}
-        style={[input, styles.flex]}
-      />
-      {[
-        [dateOfDayNumber(today), t(locale, 'today')],
-        [dateOfDayNumber(today + 1), t(locale, 'scheduleTomorrow')],
-        [dateOfDayNumber(today - 1), t(locale, 'yesterday')],
-      ].map(([date, label]) => (
-        <Pressable
-          key={label}
+    <View style={styles.datePicker}>
+      <View style={styles.dateRow}>
+        <TextInput
+          testID={testID}
+          editable={!disabled}
+          value={typeof value === 'string' ? value : ''}
+          onChangeText={onChange}
+          onEndEditing={recognise}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={palette.caption}
+          style={[input, styles.flex]}
+        />
+        {[
+          [dateOfDayNumber(today), t(locale, 'today')],
+          [dateOfDayNumber(today + 1), t(locale, 'scheduleTomorrow')],
+          [dateOfDayNumber(today - 1), t(locale, 'yesterday')],
+        ].map(([date, label]) => (
+          <Pressable
+            key={label}
+            disabled={disabled}
+            onPress={() => onChange(date)}
+            style={chip(value === date)}>
+            <Text style={[palette.font('bodyBold', 13), { color: palette.text }]}>{label}</Text>
+          </Pressable>
+        ))}
+        <PickButton
+          open={picking}
+          onPress={() => setPicking(!picking)}
+          palette={palette}
+          locale={locale}
           disabled={disabled}
-          onPress={() => onChange(date)}
-          style={chip(value === date)}>
-          <Text style={[palette.font('bodyBold', 13), { color: palette.text }]}>{label}</Text>
-        </Pressable>
-      ))}
+          testID={`${testID}-pick`}
+        />
+      </View>
+      {picking ? (
+        <DayGrid
+          value={/^\d{4}-\d{2}-\d{2}$/.test(text) ? text : undefined}
+          onPick={(date) => {
+            onChange(date);
+            setPicking(false);
+          }}
+          palette={palette}
+          locale={locale}
+          cal={cal}
+          testID={testID ?? 'date'}
+        />
+      ) : null}
     </View>
   );
 }
@@ -374,12 +404,20 @@ export const FIELD_EDITORS: { [T in FieldType]: FieldEditor<FieldOf<T>> } = {
   date: { input: (ctx) => <DateInput {...ctx} /> },
   // D-279：几点几分，「现在」填上当前时间。
   time: {
-    input: (ctx) => withNowChip(ctx, 'HH:MM', (now) => localDateTime(now).slice(11)),
+    input: (ctx) => (
+      <TimeInput ctx={ctx} placeholder="HH:MM" nowValue={(now) => localDateTime(now).slice(11)} />
+    ),
   },
   // D-279：日期加时间，编辑时写成「2026-10-29 08:30」。
   datetime: {
-    input: (ctx) =>
-      withNowChip(ctx, 'YYYY-MM-DD HH:MM', (now) => localDateTime(now).replace('T', ' ')),
+    input: (ctx) => (
+      <TimeInput
+        ctx={ctx}
+        placeholder="YYYY-MM-DD HH:MM"
+        nowValue={(now) => localDateTime(now).replace('T', ' ')}
+        withDate
+      />
+    ),
     toForm: (v) => String(v).replace('T', ' '),
   },
   // D-279：时长，小时和分钟两个框，表单里的值是「h:mm」（一边空着算 0）。
@@ -435,6 +473,8 @@ export const FIELD_EDITORS: { [T in FieldType]: FieldEditor<FieldOf<T>> } = {
   lookup: { computed: true, input: () => null },
   rollup: { computed: true, input: () => null },
   previous: { computed: true, input: () => null },
+  // 算出来的日期（D-542）。
+  dateOffset: { computed: true, input: () => null },
   link: {
     input: ({ field, value, onChange, palette, locale, disabled, testID }) => (
       <LinkInput
@@ -633,33 +673,84 @@ function TagsInput({
 }
 
 /** 时间、日期时间：一个输入框，旁边的「现在」填上当前时间（D-279）。 */
-function withNowChip<F extends Field>(
-  { field, value, onChange, palette, locale, disabled, testID, input, chip }: FieldInputContext<F>,
-  placeholder: string,
-  nowValue: (now: Date) => string,
-) {
+/**
+ * 时间、日期时间（D-279）：打字、「现在」，或者从选择器里点（D-543）。日期时间先点一天再点几点几分，
+ * 没有的那一半用现在的。
+ */
+function TimeInput<F extends Field>({
+  ctx,
+  placeholder,
+  nowValue,
+  withDate,
+}: {
+  ctx: FieldInputContext<F>;
+  placeholder: string;
+  nowValue: (now: Date) => string;
+  withDate?: boolean;
+}) {
+  const { field, value, onChange, palette, locale, disabled, testID, input, chip } = ctx;
+  const cal = useCalendar();
+  const [picking, setPicking] = useState(false);
+  const text = typeof value === 'string' ? value.trim() : '';
+  const now = nowValue(new Date());
+  const m = /^(?:(\d{4}-\d{2}-\d{2})[ T])?(\d{1,2}:\d{2})$/.exec(text);
+  const date = withDate
+    ? (m?.[1] ?? (/^\d{4}-\d{2}-\d{2}$/.test(text) ? text : undefined))
+    : undefined;
+  const time = m?.[2];
+  const put = (d: string | undefined, hm: string | undefined) =>
+    onChange(withDate ? `${d ?? now.slice(0, 10)} ${hm ?? now.slice(11)}` : (hm ?? now));
   return (
-    <View style={styles.dateRow}>
-      <TextInput
-        testID={testID}
-        editable={!disabled}
-        value={typeof value === 'string' ? value : ''}
-        onChangeText={onChange}
-        // 快速添加表单里没有标签：占位文字写字段名和格式（和金额的「时薪 (CNY)」一样）。
-        placeholder={`${field.name} (${placeholder})`}
-        placeholderTextColor={palette.caption}
-        keyboardType="numbers-and-punctuation"
-        style={[input, styles.flex]}
-      />
-      <Pressable
-        testID={`${testID}-now`}
-        disabled={disabled}
-        onPress={() => onChange(nowValue(new Date()))}
-        style={chip(false)}>
-        <Text style={[palette.font('bodyBold', 13), { color: palette.text }]}>
-          {t(locale, 'now')}
-        </Text>
-      </Pressable>
+    <View style={styles.datePicker}>
+      <View style={styles.dateRow}>
+        <TextInput
+          testID={testID}
+          editable={!disabled}
+          value={typeof value === 'string' ? value : ''}
+          onChangeText={onChange}
+          // 快速添加表单里没有标签：占位文字写字段名和格式（和金额的「时薪 (CNY)」一样）。
+          placeholder={`${field.name} (${placeholder})`}
+          placeholderTextColor={palette.caption}
+          keyboardType="numbers-and-punctuation"
+          style={[input, styles.flex]}
+        />
+        <Pressable
+          testID={`${testID}-now`}
+          disabled={disabled}
+          onPress={() => onChange(nowValue(new Date()))}
+          style={chip(false)}>
+          <Text style={[palette.font('bodyBold', 13), { color: palette.text }]}>
+            {t(locale, 'now')}
+          </Text>
+        </Pressable>
+        <PickButton
+          open={picking}
+          onPress={() => setPicking(!picking)}
+          palette={palette}
+          locale={locale}
+          disabled={disabled}
+          testID={`${testID}-pick`}
+        />
+      </View>
+      {picking && withDate ? (
+        <DayGrid
+          value={date}
+          onPick={(d) => put(d, time)}
+          palette={palette}
+          locale={locale}
+          cal={cal}
+          testID={testID ?? 'datetime'}
+        />
+      ) : null}
+      {picking ? (
+        <TimeChips
+          value={time}
+          onPick={(hm) => put(date, hm)}
+          palette={palette}
+          locale={locale}
+          testID={testID ?? 'time'}
+        />
+      ) : null}
     </View>
   );
 }
@@ -715,6 +806,12 @@ function DurationInput({
 const LINK_LIST_LIMIT = 30;
 
 /**
+ * 输入框是不是画在底部弹出的添加框里（D-352 的 Modal）。弹框盖在页面上面，从里面打开的新页面会被它挡住，
+ * 所以那里的引用字段没有「新加一条」（D-546）。
+ */
+const InSheet = createContext(false);
+
+/**
  * 引用字段（D-250）：显示选中的那条记录的标题；点开后列出被引用的表里的记录（可以搜索标题），点一条选它。
  * 被引用的记录删掉了显示「已删除的记录」，可以换一条或不选。
  */
@@ -744,6 +841,20 @@ function LinkInput({
   const links = useLinkResolver(view);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const router = useRouter();
+  const inSheet = useContext(InSheet);
+  // 「新加一条」（D-546）：新记录页存好以后交回记录 ID，这里选上它。
+  const [token] = useState(() => Math.random().toString(36).slice(2, 10));
+  useEffect(
+    () =>
+      useLinkPick.subscribe(({ picked }) => {
+        if (picked?.token !== token) return;
+        useLinkPick.setState({ picked: null });
+        onChange(picked.id);
+        setOpen(false);
+      }),
+    [token, onChange],
+  );
   if (!target) return null;
   const chosen = typeof value === 'string' && value ? value : null;
   const chosenRecord = chosen ? records?.find((r) => r.id === chosen) : undefined;
@@ -842,6 +953,24 @@ function LinkInput({
               </Text>
             </Pressable>
           ))}
+          {inSheet ? null : (
+            <Pressable
+              testID={`${testID}-new`}
+              accessibilityRole="button"
+              onPress={() =>
+                router.push({
+                  pathname: '/record/[collectionId]',
+                  params: { collectionId: target.id, pickFor: token },
+                })
+              }
+              style={[styles.chip, { borderColor: palette.border, borderStyle: 'dashed' }]}>
+              <Text
+                numberOfLines={1}
+                style={[palette.font('bodyMedium', 14), { color: palette.primaryText }]}>
+                {t(locale, 'linkNew', { name: target.name })}
+              </Text>
+            </Pressable>
+          )}
           {chosen ? (
             <Pressable
               testID={`${testID}-clear`}
@@ -1709,6 +1838,7 @@ export function useRecordRows(
   const { show } = block;
   const check = checkOf(block);
   const now = new Date();
+  const marks = recordMarks(show, view, env, now);
 
   const row = (r: DataRecord, index: number) => {
     const title =
@@ -1722,6 +1852,8 @@ export function useRecordRows(
     const thumb = hasFiles && assetIndex ? firstImage(r, collection, assetIndex) : null;
     // 一键记录工具（D-300）：第一个条件满足的按钮。
     const rowAction = rowToolOf(block, r, view, now, cal);
+    // 警示色（D-541）：右侧的值，没有右侧字段时是标题。
+    const warn = marks.warns(r);
     const body = (
       <View style={styles.row}>
         {check ? (
@@ -1751,12 +1883,20 @@ export function useRecordRows(
             testID={`record-thumb-${r.id}`}
           />
         ) : null}
+        <ColorDot color={marks.colorOf(r)} recordId={r.id} />
         <View style={styles.flex}>
           <Text
             numberOfLines={cards ? 2 : 1}
             style={[
               palette.font('title', 15),
-              { color: checked ? palette.caption : palette.text },
+              {
+                color:
+                  warn && !show.trailing
+                    ? palette.danger
+                    : checked
+                      ? palette.caption
+                      : palette.text,
+              },
               checked && styles.done,
             ]}>
             {title}
@@ -1776,6 +1916,7 @@ export function useRecordRows(
             show={show}
             env={env}
             text={formatRef(r, view, show.trailing, locale, links, now, cal)}
+            warn={warn}
           />
         ) : null}
         {rowAction ? (
@@ -1815,8 +1956,47 @@ export function useRecordRows(
     );
   };
 
+  // 表格（D-539）：不写 columns 时是副标题和右侧字段。
+  const columns = show.columns ?? [
+    ...(show.subtitles ?? []),
+    ...(show.trailing ? [show.trailing] : []),
+  ];
+  const openRecord = env.interactive
+    ? (env.locked ?? ((r: DataRecord) => openRow(router, block.opens, collection.id, r.id)))
+    : undefined;
+  const titleOf = (r: DataRecord) =>
+    formatRef(r, view, show.title, locale, links, now, cal) ||
+    untitledRecordTitle(r, collection, locale, now, cal);
   const list = (shown: DataRecord[]) =>
-    cards ? (
+    block.look === 'gallery' ? (
+      <RecordGallery
+        blockId={block.id}
+        collection={collection}
+        records={shown}
+        env={env}
+        assets={assetIndex}
+        titleOf={titleOf}
+        marks={marks}
+        open={openRecord}
+      />
+    ) : block.look === 'table' ? (
+      <RecordTable
+        blockId={block.id}
+        view={view}
+        title={show.title}
+        columns={columns}
+        records={shown}
+        env={env}
+        background={background}
+        titleOf={titleOf}
+        cellOf={(r, id) => formatRef(r, view, id, locale, links, now, cal)}
+        marks={marks}
+        warnColumn={
+          show.trailing !== undefined && columns.includes(show.trailing) ? show.trailing : null
+        }
+        open={openRecord}
+      />
+    ) : cards ? (
       <View style={{ gap: palette.gap - 4 }}>{shown.map(row)}</View>
     ) : (
       <Card palette={palette} background={background} style={styles.listCard}>
@@ -1836,16 +2016,19 @@ export function Trailing({
   show,
   env,
   text,
+  warn,
 }: {
   record: DataRecord;
   view: Collection;
   show: RecordBlock['show'];
   env: RenderEnv;
   text: string;
+  /** 满足 show.highlight（D-541）：用警示色。 */
+  warn?: boolean;
 }) {
   const { palette, locale } = env;
   const format = show.format;
-  const style = [palette.font('title', 15), { color: palette.text }];
+  const style = [palette.font('title', 15), { color: warn ? palette.danger : palette.text }];
   const elapsedFormat = format?.kind === 'elapsed' ? format : undefined;
   const first = elapsedFormat
     ? elapsedOf(record, view, show.trailing!, elapsedFormat.until, new Date())
@@ -1900,7 +2083,13 @@ export function Trailing({
     <Text
       numberOfLines={tagged ? 1 : undefined}
       style={
-        tagged ? [palette.font('body', 13), styles.trailingTags, { color: palette.muted }] : style
+        tagged
+          ? [
+              palette.font('body', 13),
+              styles.trailingTags,
+              { color: warn ? palette.danger : palette.muted },
+            ]
+          : style
       }>
       {text}
     </Text>
@@ -2094,7 +2283,7 @@ export function RecordForm({
                 gap: palette.gap - 4,
               },
             ]}>
-            {body}
+            <InSheet.Provider value>{body}</InSheet.Provider>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -2353,6 +2542,7 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
   note: { minHeight: 110, textAlignVertical: 'top' },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  datePicker: { gap: 8 },
   smartDate: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   groupHeader: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   browseRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },

@@ -6,6 +6,7 @@ import type { Locale } from '../schema-primitives';
 import { checkboxField } from './checkbox';
 import { choiceField } from './choice';
 import { dateField } from './date';
+import { dateOffsetField } from './date-offset';
 import { datetimeField } from './datetime';
 import type { Coerced, FieldCheckContext } from './define';
 import { durationField } from './duration';
@@ -51,6 +52,7 @@ export const FIELDS = [
   previousField,
   scheduleField,
   tagsField,
+  dateOffsetField,
 ] as const;
 
 type Schemas<D extends readonly { schema: unknown }[]> = {

@@ -10,6 +10,7 @@ import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, ScrollView, Text, View } from 'react-native';
 
+import { deliverLinkPick } from '@/data/link-pick';
 import { useComputedRecords, useRecordActions, type SaveResult } from '@/data/records';
 import { useSimilarCheck } from '@/data/similar-records';
 import { t } from '@/i18n';
@@ -29,13 +30,15 @@ import { useCalendar, useWorkspace, useWorkspaceContext } from '@/workspace/cont
 
 /** 记录编辑页：由内核按数据表的字段自动生成，不可配置（docs/DATA_DESIGN.md §5）。 */
 export default function RecordRoute() {
-  const { collectionId, recordId, prefill, copies } = useLocalSearchParams<{
+  const { collectionId, recordId, prefill, copies, pickFor } = useLocalSearchParams<{
     collectionId: string;
     recordId?: string;
     /** 一键操作打开的新记录表单（D-338）：预设的值，JSON。 */
     prefill?: string;
     /** 收件页面「存成记录」（D-392）：为这张表单复制出来的用户文件的键（share/save-as-record.ts）。 */
     copies?: string;
+    /** 从关联字段「新加一条」打开的（D-546）：存好以后把记录 ID 交回那个输入框。 */
+    pickFor?: string;
   }>();
   const { repo, files, locale, registry } = useWorkspaceContext();
   const bumpAssets = useWorkspace((s) => s.bumpAssets);
@@ -116,6 +119,7 @@ export default function RecordRoute() {
       kept.current = new Set(
         collection.fields.flatMap((f) => (f.type === 'file' ? attachmentIds(values[f.id]) : [])),
       );
+      if (!record && pickFor && 'id' in result) deliverLinkPick(pickFor, result.id);
       leave();
       // 新记录回去看不到（这张表还没有页面读）：说一句，能接着改。
       if (!record && !tableIsShown(config, collection.id, registry))

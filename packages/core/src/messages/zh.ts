@@ -385,6 +385,8 @@ export const zh: MessageTable = {
   browseGroupNone: '不分组',
   browseCreatedAt: '最近添加',
   browseUpdatedAt: '最近修改',
+  tableCreatedAt: '添加时间',
+  tableUpdatedAt: '修改时间',
   browseShowing: '显示 {shown} / {total} 条，往下滚动看更多。',
   browseShowingMatches: '找到 {total} 条，显示 {shown} 条，往下滚动看更多。',
   singleTooMuch: '内容太多，放不进二维码。',
@@ -404,6 +406,13 @@ export const zh: MessageTable = {
   tableFull: '这张表已满（1 万条）。',
   useFullForm: '有必填项不在这个表单里，请用完整表单添加。',
   recordDeleted: '已删除一条记录',
+  bulkSelectTitle: '选几条删除',
+  bulkSelectAll: '全选',
+  bulkSelectNone: '全不选',
+  bulkSelectEmpty: '这张表里没有记录。',
+  bulkDeleteButton: '删除 {n} 条',
+  bulkDeleteConfirm: '从「{name}」里删除 {n} 条记录？',
+  bulkDeleted: '已删除 {n} 条记录',
   newRecord: '新记录',
   editRecord: '编辑记录',
   save: '保存',
@@ -424,6 +433,9 @@ export const zh: MessageTable = {
   presetsImportHint:
     '有文件（比如从 Tinkrum 网站下载的）？App 文件会加成一个新的 App，原来的不动；整份预设文件存在这个列表里，点「应用」才会换成它。',
   presetImported: '已添加预设「{name}」，要用时点「应用」。',
+  presetsSamplesTitle: '样板 App',
+  presetsSamplesHint:
+    '选一个看看：先放进草稿，点「应用」才加上，也能在改动记录里撤销。你的记录不动。',
   presetApply: '应用',
   presetRename: '改名',
   presetDeleted: '已删除预设「{name}」',
@@ -493,6 +505,8 @@ export const zh: MessageTable = {
   importHomeConfirm:
     '把「{name}」导入主页？主页会换成它的风格，它的页面加进导航栏。你现有的页面和记录都留着，之后可以在改动记录里撤销。',
   importHomeSummary: '把「{name}」导入主页',
+  shareAppItem: '分享这个 App',
+  importAppMaybeNewer: '如果它是新版本的 Tinkrum 做的，先更新 Tinkrum 再试。',
   appResetItem: '恢复初始样子',
   appResetConfirm:
     '把「{name}」恢复成刚导入时的样子？你在里面加的页面和快捷操作会去掉，风格和页面恢复成原来的；你自己建的表和所有记录都留着。之后可以在改动记录里撤销。',
@@ -951,6 +965,7 @@ export const zh: MessageTable = {
   linkNone: '没有选',
   linkChoose: '选一条…',
   linkSearch: '搜索',
+  linkNew: '在「{name}」里新加一条',
   linkClear: '不选了',
   linkEmptyTable: '「{name}」里还没有记录。',
   // 提醒（D-251）
@@ -1598,6 +1613,9 @@ export const zh: MessageTable = {
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: '上个月',
   calendarNextMonth: '下个月',
+  datePickerOpen: '从日历里选',
+  datePickerHour: '时',
+  datePickerMinute: '分',
   calendarToday: '今天',
   calendarDayLabel: '{date}，{n} 条记录',
   calendarDayEmpty: '这一天没有记录。',

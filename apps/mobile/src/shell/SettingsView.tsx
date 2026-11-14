@@ -1,5 +1,7 @@
 import {
   CURRENT_SCHEMA_VERSION,
+  appFileOfApp,
+  appFileText,
   appResetOps,
   appTarget,
   homeScreenFull,
@@ -49,7 +51,7 @@ export function SettingsView({ env }: { env: RenderEnv }) {
   // 长按一个 App：放到手机桌面的菜单里，或拿掉；Android 上放进去以后还能单独放一个图标（D-271、D-485）。
   const change = useWorkflowChange();
   const homeScreen = useHomeScreenPlatform();
-  const { repo, registry } = useWorkspaceContext();
+  const { repo, registry, files } = useWorkspaceContext();
   const proposeOps = useWorkspace((s) => s.proposeOps);
   const confirm = useWorkspace((s) => s.confirm);
   const cancel = useWorkspace((s) => s.cancel);
@@ -98,9 +100,20 @@ export function SettingsView({ env }: { env: RenderEnv }) {
         t(locale, onHome ? 'homeScreenRemoved' : 'homeScreenAdded', { name }),
       );
     };
+    // 分享这个 App（D-545）：只有结构，用户文件的引用清空；用户自己点了才发出去（底线 3、10、14）。
+    const share = () => {
+      const file = appFileOfApp(env.config, appId);
+      if (file)
+        void files.shareText(
+          `tinkrum-app-${appId}.json`,
+          appFileText(file, new Date()),
+          'application/json',
+        );
+    };
     const symbol = icon ? iosSymbolName(icon) : undefined;
     Alert.alert(name, undefined, [
       { text: t(locale, onHome ? 'homeScreenRemove' : 'homeScreenAdd'), onPress: toggle },
+      { text: t(locale, 'shareAppItem'), onPress: share },
       ...(origin
         ? [{ text: t(locale, 'appResetItem'), onPress: () => void restoreApp(appId, name, origin) }]
         : []),

@@ -473,6 +473,28 @@
           ]
         },
         {
+          "id": "expiring",
+          "look": "number",
+          "show": {
+            "label": {
+              "en": "Expire within 30 days",
+              "zh": "30 天内到期",
+              "fr": "Expirent dans les 30 jours"
+            }
+          },
+          "source": {
+            "table": "$table.documents",
+            "aggregate": "count",
+            "filter": [
+              {
+                "field": "expires",
+                "op": "inPeriod",
+                "value": "next30days"
+              }
+            ]
+          }
+        },
+        {
           "id": "documents",
           "look": "list",
           "source": {

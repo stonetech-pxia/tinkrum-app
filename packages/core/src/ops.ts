@@ -587,7 +587,7 @@ function pruneRecordRow(table: Collection, field: string, notes: ApplyNote[]): v
 }
 
 /**
- * 删字段后，列表能换的字段、单条记录显示的字段跟着去掉（底线 18，D-424）。单条记录一个字段都不剩时块也移除。
+ * 删字段后，列表能换的字段、表格的列、单条记录显示的字段跟着去掉（底线 18，D-424）。单条记录一个字段都不剩时块也移除。
  */
 function pruneBrowseFields(
   config: WorkspaceConfig,
@@ -607,6 +607,8 @@ function pruneBrowseFields(
     const show = (
       c as {
         show?: {
+          columns?: string[];
+          highlight?: { field: string }[];
           browse?: {
             search?: true;
             sort?: string[];
@@ -617,6 +619,18 @@ function pruneBrowseFields(
         };
       }
     ).show;
+    // 表格的列（D-539）：最后一列也去掉时回到副标题和右侧字段。
+    if (show?.columns?.includes(gone.field)) {
+      count++;
+      const left = without(show.columns);
+      if (left.length > 0) show.columns = left;
+      else delete show.columns;
+    }
+    // 警示色的条件读这个字段（D-541）：整个去掉（只去一条会让更多条变成警示色）。
+    if (show?.highlight?.some((x) => x.field === gone.field)) {
+      count++;
+      delete show.highlight;
+    }
     const browse = show?.browse;
     if (!show || !browse) continue;
     for (const key of ['sort', 'group', 'filter'] as const) {

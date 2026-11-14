@@ -1,4 +1,4 @@
-import { THEME_PRESETS, applyOps, type AIProvider, type Op } from '@morph/core';
+import { THEME_PRESETS, applyOps, readAppFile, type AIProvider, type Op } from '@morph/core';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
@@ -371,5 +371,81 @@ describe('apps (UI)', () => {
     await leaveAndReturn();
     expect(store.getState().appId).toBeNull();
     expect(store.getState().head!.id).toBe(1);
+  });
+});
+
+// 分享一个 App（D-545）：设置 → 我的 App 里长按，「分享这个 App」；分享出去的是 App 文件，只有结构。
+describe('share an app', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  /** 长按 App，点菜单里的这一项；返回菜单上的字。 */
+  async function longPressAndPick(id: string, item: string) {
+    let menu: string[] = [];
+    jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
+      menu = (buttons ?? []).map((b) => b.text ?? '');
+      void buttons?.find((b) => b.text === item)?.onPress?.();
+    });
+    await fireEvent(await screen.findByTestId(`settings-app-${id}`), 'longPress');
+    await waitFor(() => expect(menu.length).toBeGreaterThan(0));
+    return menu;
+  }
+
+  it('a new user has no app of their own, so there is nothing to share', async () => {
+    const files = new FakeFiles();
+    await renderToolsApp(new MemoryWorkspaceRepo(), files, { seed: starterAfterGuide });
+    await fireEvent.press(await screen.findByTestId('nav-settings'));
+    await screen.findByTestId('settings-ai');
+    expect(screen.queryByTestId(/^settings-app-/)).toBeNull();
+    expect(files.sharedTexts.size).toBe(0);
+  });
+
+  it('shares the app as an app file that reads back, and changes nothing', async () => {
+    const files = new FakeFiles();
+    const { store } = await renderToolsApp(new MemoryWorkspaceRepo(), files, {
+      seed: withFitness,
+    });
+    const head = store.getState().head!.id;
+    await fireEvent.press(await screen.findByTestId('nav-settings'));
+    const menu = await longPressAndPick('fit', '分享这个 App');
+    expect(menu).toContain('分享这个 App');
+    await waitFor(() => expect(files.sharedTexts.size).toBe(1));
+    const [name, text] = [...files.sharedTexts][0]!;
+    expect(name).toBe('tinkrum-app-fit.json');
+    const file = readAppFile(text)!;
+    expect(file.app).toMatchObject({ id: 'fit', name: '健身' });
+    expect(file.pages.map((p) => p.id)).toEqual(['fit-home', 'fit-plan']);
+    expect(store.getState().head!.id).toBe(head);
+  });
+
+  it('leaves out the user’s files: a file slot in the app comes out empty', async () => {
+    const files = new FakeFiles();
+    await renderToolsApp(new MemoryWorkspaceRepo(), files, {
+      seed: (locale, registry) => {
+        const r = applyOps(
+          withFitness(locale, registry),
+          [
+            {
+              op: 'addContainer',
+              page: 'fit-home',
+              block: {
+                id: 'plan-pdf',
+                look: 'entry',
+                show: { title: '计划', icon: 'folder' },
+                opens: { file: 'userfile0009' },
+              } as never,
+            },
+          ],
+          { registry, locale },
+        );
+        if (!r.ok) throw new Error(r.error);
+        return r.config;
+      },
+    });
+    await fireEvent.press(await screen.findByTestId('nav-settings'));
+    await longPressAndPick('fit', '分享这个 App');
+    await waitFor(() => expect(files.sharedTexts.size).toBe(1));
+    const text = [...files.sharedTexts.values()][0]!;
+    expect(text).not.toContain('userfile0009');
+    expect(text).toContain('plan-pdf');
   });
 });

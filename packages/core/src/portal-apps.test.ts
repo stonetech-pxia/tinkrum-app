@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   appFileFromWorkspace,
+  appFileOfApp,
   appFileOps,
+  appFileText,
   appResetOps,
   readAppFile,
   type AppFile,
@@ -13,7 +15,7 @@ import {
 } from './app-file';
 import { homeScreenOp } from './home-screen';
 import { prepareOps } from './change';
-import { newFileRefs } from './file-refs';
+import { countFileRefs, newFileRefs } from './file-refs';
 import { referenceProblems } from './reference-checks';
 import { applyOps } from './ops';
 import {
@@ -371,5 +373,106 @@ describe('接回已有的表和恢复初始样子', () => {
   it('has nothing to restore when the app is not there', () => {
     const plan = appResetOps(file, starter(), registry);
     expect(plan.ok).toBe(false);
+  });
+});
+
+// 分享一个装好的 App（D-545）：做成 App 文件，只有结构；别人（或换一台手机）导入后是一样的 App。
+describe('appFileOfApp', () => {
+  const wallet = readAppFile(text('tinkrum-app-wallet.json'))!;
+  const installed = () => importApp(starter(), wallet);
+  /** 在 App 的第一页上放一张图片、一个文件位，指向用户的文件。 */
+  const withFiles = (config: WorkspaceConfig) => {
+    const page = config.containers.pages.find((p) => p.app === 'wallet')!.id;
+    const r = applyOps(
+      config,
+      [
+        {
+          op: 'addContainer',
+          page,
+          block: {
+            id: 'pic',
+            look: 'image',
+            show: { asset: 'userphoto1', aspect: 'wide', fit: 'cover' },
+          },
+        },
+        {
+          op: 'addContainer',
+          page,
+          block: {
+            id: 'slot',
+            look: 'entry',
+            show: { title: 'Lease' },
+            opens: { file: 'userfile1' },
+          },
+        },
+      ] as never,
+      ctx,
+    );
+    if (!r.ok) throw new Error(r.error);
+    return r.config;
+  };
+
+  it('round trip: export, read, import into a new workspace gives the same app', () => {
+    const config = installed();
+    const out = appFileOfApp(config, 'wallet');
+    expect(out).not.toBeNull();
+    const back = readAppFile(appFileText(out!, NOW));
+    expect(back).not.toBeNull();
+    expect(Object.keys(JSON.parse(appFileText(out!, NOW))).sort()).toEqual(
+      [
+        'app',
+        'exportedAt',
+        'format',
+        'pages',
+        'schemaVersion',
+        'tables',
+        'tools',
+        'version',
+      ].sort(),
+    );
+    const again = importApp(starter(), back!);
+    expect(referenceProblems(again, registry)).toEqual([]);
+    expect(again.nav.apps!.map((a) => a.id)).toEqual(['wallet']);
+    const ids = (c: WorkspaceConfig) => ({
+      pages: c.containers.pages.filter((p) => p.app === 'wallet').map((p) => p.id),
+      tables: c.data.tables.filter((t) => t.app === 'wallet').map((t) => t.id),
+      tools: c.tools.filter((t) => t.app === 'wallet').map((t) => t.id),
+    });
+    expect(ids(again)).toEqual(ids(config));
+    expect(again.nav.apps![0]).toEqual(config.nav.apps![0]);
+  });
+
+  it('carries no references to the user’s files: images and file slots come out empty (底线 3)', () => {
+    const config = withFiles(installed());
+    const text = appFileText(appFileOfApp(config, 'wallet')!, NOW);
+    expect(text).not.toContain('userphoto1');
+    expect(text).not.toContain('userfile1');
+    const again = importApp(starter(), readAppFile(text)!);
+    expect(countFileRefs(again)).toBe(0);
+    expect(again.containers.pages.some((p) => p.blocks.some((b) => b.id === 'slot'))).toBe(true);
+  });
+
+  it('takes only that app: not the home, not other apps', () => {
+    const config = importApp(installed(), readAppFile(text('tinkrum-app-habits.json'))!);
+    const out = appFileOfApp(config, 'wallet')!;
+    expect(out.pages.every((p) => p.id.startsWith('wallet'))).toBe(true);
+    expect(out.tables.every((t) => t.id.startsWith('wallet'))).toBe(true);
+    expect(out.tools.every((t) => t.id.startsWith('wallet'))).toBe(true);
+    expect(JSON.stringify([out.pages, out.tables, out.tools])).not.toContain('"app":');
+  });
+
+  it('has nothing to share when the app is not there', () => {
+    expect(appFileOfApp(starter(), 'wallet')).toBeNull();
+  });
+
+  // 新版本加了形状（新的样子、新的字段类型）但版本号没变：旧版本读得出文件，导入时校验不过，整份不导入（底线 18）。
+  it('a file using something this build does not know is refused as a whole, not half imported', () => {
+    const file = readAppFile(text('tinkrum-app-wallet.json'))!;
+    const odd = JSON.parse(JSON.stringify(file)) as AppFile;
+    (odd.tables[0]!.fields[0] as { type: string }).type = 'fromTheFuture';
+    const plan = appFileOps(odd, starter());
+    expect(plan.ok).toBe(true);
+    const result = prepareOps(starter(), plan.ok ? plan.ops : [], ctx);
+    expect(result.ok).toBe(false);
   });
 });

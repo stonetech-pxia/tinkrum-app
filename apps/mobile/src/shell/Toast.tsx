@@ -23,7 +23,7 @@ export function Toast({ palette, bottom }: { palette: Palette; bottom: number })
   const hasNext = useWorkspace((s) => !!s.next);
   const actions = useRecordActions();
   const router = useRouter();
-  const canUndo = !!(toast?.restoreRecordId || toast?.restorePreset);
+  const canUndo = !!(toast?.restoreRecordId || toast?.restoreRecordIds || toast?.restorePreset);
   const canContinue = !!toast?.continueTable;
   const timed = toast && !toast.held;
   const ms = canUndo || canContinue ? TOAST_UNDO_MS : TOAST_MS;
@@ -74,6 +74,7 @@ export function Toast({ palette, bottom }: { palette: Palette; bottom: number })
           onPressOut={() => hold(false)}
           onPress={() => {
             if (toast.restoreRecordId) void actions.restore(toast.restoreRecordId);
+            if (toast.restoreRecordIds) void actions.restoreMany(toast.restoreRecordIds);
             if (toast.restorePreset) void restorePreset(toast.restorePreset);
             dismiss();
           }}>

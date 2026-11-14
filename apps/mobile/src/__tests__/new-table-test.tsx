@@ -255,6 +255,54 @@ describe('新建表单页', () => {
     expect(screen.queryByTestId('new-table-recommend')).toBeNull();
   });
 
+  // 2026-11-09、11-10 用户测试：马币小票建成「收据」存成了美元（D-548）。
+  it('马币小票选「收据」：金额字段是 MYR；没有符号的小票照旧按界面语言', async () => {
+    const receipt = (texts: string[]): RecognizedLayer => ({
+      width: 600,
+      height: 300,
+      lines: texts.map((text, i) => ({ text, x: 20, y: 20 + i * 40, width: 240, height: 20 })),
+    });
+    const money = (store: Awaited<ReturnType<typeof setup>>['store']) =>
+      store
+        .getState()
+        .config!.data.tables.flatMap((c) => c.fields)
+        .filter((f) => f.type === 'money')
+        .map((f) => (f.type === 'money' ? f.currency : ''));
+    const { store } = await setup(['ppocr'], undefined, [
+      receipt(['KEDAI PAPAN YEW CHUAN', 'Subtotal RM 115.00', 'Tax RM 6.90', 'TOTAL RM 121.90']),
+    ]);
+    await fireEvent.press(await screen.findByTestId('new-table-use'));
+    await fireEvent.press(screen.getByTestId('new-table-save'));
+    await waitFor(() => expect(money(store)).toEqual(['MYR']));
+  });
+
+  it('没有货币符号的小票：金额字段按界面语言（英文是 USD）', async () => {
+    const { store } = await setup(['ppocr'], undefined, [
+      {
+        width: 600,
+        height: 300,
+        lines: ['Maple Corner', 'Subtotal 165.03', 'Tax 13.20', 'Total 178.23'].map((text, i) => ({
+          text,
+          x: 20,
+          y: 20 + i * 40,
+          width: 200,
+          height: 20,
+        })),
+      },
+    ]);
+    await fireEvent.press(await screen.findByTestId('new-table-use'));
+    await fireEvent.press(screen.getByTestId('new-table-save'));
+    await waitFor(() =>
+      expect(
+        store
+          .getState()
+          .config!.data.tables.flatMap((c) => c.fields)
+          .filter((f) => f.type === 'money')
+          .map((f) => (f.type === 'money' ? f.currency : '')),
+      ).toEqual(['USD']),
+    );
+  });
+
   it('模型说都不是：没有推荐，字段名照样能点', async () => {
     mockAnswer.current = 'none';
     await setup(['ppocr', 'prefill-model']);

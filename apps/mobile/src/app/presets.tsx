@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { saveAppOrigin } from '@/apps/origin';
 import { configFileProblemText, pickConfigText } from '@/data/config-file-import';
+import { SampleRows, usePickSample } from '@/guide/GuideCard';
 import { formatWhen, t } from '@/i18n';
 import { usePalette, type Palette } from '@/renderer/theme';
 import { Button, Card, Pill } from '@/renderer/ui';
@@ -31,6 +32,7 @@ import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/cont
  * 「设置 → 我的预设」（D-410）：把整个 App 存起来，以后换回来。系统层的页面，AI 改不了（底线 8）。
  * 应用和恢复历史版本一样先问一句，确认后生成一个版本，能撤销（底线 7）；记录都留着（底线 5）。
  * 「从文件导入」也在这里（D-497）：App 文件加成新 App，整份配置存成预设。
+ * 样板 App 也列在这里（D-544）：和引导第 3 步同一条路，先进草稿，「应用」后能撤销。
  */
 export default function PresetsRoute() {
   const { repo, files, locale, registry } = useWorkspaceContext();
@@ -56,6 +58,7 @@ export default function PresetsRoute() {
   const [presets, setPresets] = useState<SavedPreset[] | null>(null);
   const [name, setName] = useState('');
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  const sample = usePickSample();
 
   useEffect(() => {
     let alive = true;
@@ -131,11 +134,20 @@ export default function PresetsRoute() {
       plan.ops,
       t(locale, mode === 'home' ? 'importHomeSummary' : 'importAppSummary', { name: plan.name }),
     );
-    if (result.kind !== 'preview') {
+    if (result.kind === 'invalid') {
+      // 新版本加的样子、字段类型版本号可能没变（D-545）：这里读得出文件但用不了，整份不导入，说清楚。
       Alert.alert(
-        t(locale, 'invalidPlan'),
-        result.kind === 'invalid' ? result.issues.join('\n') : result.message,
+        title,
+        [
+          t(locale, 'importAppConfigBroken'),
+          ...result.issues.slice(0, 3),
+          t(locale, 'importAppMaybeNewer'),
+        ].join('\n'),
       );
+      return;
+    }
+    if (result.kind !== 'preview') {
+      Alert.alert(t(locale, 'invalidPlan'), result.message);
       return;
     }
     Alert.alert(
@@ -277,6 +289,24 @@ export default function PresetsRoute() {
             variant="outline"
             label={t(locale, 'presetsImport')}
             onPress={() => void importFile()}
+          />
+        </Card>
+        <Card palette={palette} testID="preset-samples">
+          <Text style={[palette.font('title', 16), { color: palette.text }]}>
+            {t(locale, 'presetsSamplesTitle')}
+          </Text>
+          <Text style={caption}>{t(locale, 'presetsSamplesHint')}</Text>
+          <SampleRows
+            palette={palette}
+            testPrefix="preset-sample"
+            busy={sample.busy}
+            onPick={(id) =>
+              void sample.pick(id, () => {
+                // 回到主页看草稿。
+                leaveApp();
+                router.back();
+              })
+            }
           />
         </Card>
         {presets?.length === 0 ? (

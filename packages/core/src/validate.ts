@@ -401,6 +401,12 @@ function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
   }
   problems.push(...(def.check?.(c, { ...ctx, collection }) ?? []));
   problems.push(...conditionProblems(filter, collection, page.of));
+  // 记录块的警示色条件（D-541）和筛选一样检查。
+  const highlight = (c as { show?: { highlight?: Condition[] } }).show?.highlight;
+  if (highlight)
+    problems.push(
+      ...conditionProblems(highlight, collection, page.of).map((p) => `show.highlight: ${p}`),
+    );
   // 看板按引用分栏（D-351）：source.group.filter 筛的是被引用的那张表。
   const group = (c as { source?: { group?: { by?: string; filter?: Condition[] } } }).source?.group;
   if (group?.filter && group.by !== undefined) {

@@ -421,6 +421,8 @@ export const fr: MessageTable = {
   browseGroupNone: 'Aucun',
   browseCreatedAt: 'Ajouts récents',
   browseUpdatedAt: 'Modifications récentes',
+  tableCreatedAt: 'Ajouté le',
+  tableUpdatedAt: 'Modifié le',
   browseShowing: 'Affichage : {shown} sur {total}. Faites défiler pour voir la suite.',
   browseShowingMatches:
     'Affichage : {shown} sur {total} résultats. Faites défiler pour voir la suite.',
@@ -442,6 +444,13 @@ export const fr: MessageTable = {
   useFullForm:
     'Certains champs obligatoires ne figurent pas dans ce formulaire. Ouvrez le formulaire complet pour les ajouter.',
   recordDeleted: 'Entrée supprimée',
+  bulkSelectTitle: 'Choisir et supprimer',
+  bulkSelectAll: 'Tout choisir',
+  bulkSelectNone: 'Ne rien choisir',
+  bulkSelectEmpty: 'Ce tableau n’a aucune entrée.',
+  bulkDeleteButton: 'Supprimer {n} entrées',
+  bulkDeleteConfirm: 'Supprimer {n} entrées de « {name} » ?',
+  bulkDeleted: '{n} entrées supprimées',
   newRecord: 'Nouvelle entrée',
   editRecord: 'Modifier l’entrée',
   save: 'Enregistrer',
@@ -465,6 +474,9 @@ export const fr: MessageTable = {
   presetsImportHint:
     'Vous avez un fichier, par exemple téléchargé sur le site de Tinkrum ? Un fichier d’app est ajouté comme nouvelle app, à côté des vôtres. Un fichier de préréglage complet rejoint seulement cette liste ; votre app ne change que lorsque vous l’appliquez.',
   presetImported: 'Préréglage « {name} » ajouté. Touchez Appliquer pour l’utiliser.',
+  presetsSamplesTitle: 'Apps modèles',
+  presetsSamplesHint:
+    'Choisissez-en une pour la voir : elle va d’abord dans un brouillon et n’est ajoutée que lorsque vous touchez Appliquer. Vous pouvez l’annuler dans l’historique des modifications. Vos entrées ne changent pas.',
   presetApply: 'Appliquer',
   presetRename: 'Renommer',
   presetDeleted: 'Préréglage « {name} » supprimé',
@@ -545,6 +557,9 @@ export const fr: MessageTable = {
   importHomeConfirm:
     'Importer « {name} » dans votre page d’accueil ? Le style de l’accueil devient le sien et ses pages rejoignent la barre de navigation. Vos pages et entrées restent. Vous pourrez annuler dans l’historique des modifications.',
   importHomeSummary: 'Importer « {name} » dans la page d’accueil',
+  shareAppItem: 'Partager cette app',
+  importAppMaybeNewer:
+    'S’il a été créé avec une version plus récente de Tinkrum, mettez Tinkrum à jour et réessayez.',
   appResetItem: 'Rétablir l’aspect d’origine',
   appResetConfirm:
     'Rétablir « {name} » tel qu’il était à l’import ? Les pages et actions rapides que vous y avez ajoutées disparaissent, son style et ses pages reviennent. Les tableaux que vous avez créés et toutes vos entrées restent. Vous pourrez annuler dans l’historique des modifications.',
@@ -1074,6 +1089,7 @@ export const fr: MessageTable = {
   linkNone: 'Aucun lien',
   linkChoose: 'Choisir…',
   linkSearch: 'Rechercher',
+  linkNew: 'Ajouter une entrée dans « {name} »',
   linkClear: 'Retirer le lien',
   linkEmptyTable: '« {name} » ne contient encore aucune entrée.',
   // 提醒（D-251）
@@ -1764,6 +1780,9 @@ export const fr: MessageTable = {
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: 'Mois précédent',
   calendarNextMonth: 'Mois suivant',
+  datePickerOpen: 'Choisir dans un calendrier',
+  datePickerHour: 'Heure',
+  datePickerMinute: 'Minute',
   calendarToday: 'Aujourd’hui',
   calendarDayLabel: '{date}, {n} entrées',
   calendarDayEmpty: 'Aucune entrée ce jour-là.',
@@ -1910,6 +1929,9 @@ export const fr: MessageTable = {
 };
 
 export const frSingular: SingularTable = {
+  bulkDeleteButton: 'Supprimer {n} entrée',
+  bulkDeleteConfirm: 'Supprimer {n} entrée de « {name} » ?',
+  bulkDeleted: '{n} entrée supprimée',
   wordSwapOriginalLines: 'Remettre l’original ({n} ligne)',
   describeSourceLimit: 'affiche jusqu’à {n} entrée',
   buildStoppedHint: 'Arrêté. Ce qui est fait reste. Il reste {n} étape.',

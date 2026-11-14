@@ -620,6 +620,24 @@ describe('import a preset from a file', () => {
       expect(store.getState().head!.id).toBe(head);
     });
 
+    // 新版本加的样子、字段类型（版本号没变，D-545）：这个版本读得出文件，但用不了；说清楚，整份不导入。
+    it('a file using something this build does not know says so and imports nothing', async () => {
+      const { files, store } = await starterApp();
+      const head = store.getState().head!.id;
+      const data = JSON.parse(clay()) as { pages: { blocks: { look: string }[] }[] };
+      data.pages[0]!.blocks[0]!.look = 'fromTheFuture';
+      pickFile(files, JSON.stringify(data), { name: 'tinkrum-app-clay.json' });
+      chooseNewApp();
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      await importThroughScreen();
+      await waitFor(() => expect(alert).toHaveBeenCalledTimes(2));
+      expect(String(alert.mock.calls[1]![1])).toContain('用不了');
+      expect(String(alert.mock.calls[1]![1])).toContain('新版本');
+      expect(store.getState().head!.id).toBe(head);
+      expect(store.getState().config!.nav.apps ?? []).toEqual([]);
+      expect(store.getState().proposal).toBeNull();
+    });
+
     it('with 50 presets an App file is still added', async () => {
       const { repo, files, store } = await starterApp();
       for (let i = 0; i < MAX_SAVED_PRESETS; i++)

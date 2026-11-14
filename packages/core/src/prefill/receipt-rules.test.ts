@@ -69,6 +69,14 @@ describe('合计', () => {
     expect(r.total.map(Number)).toEqual([20]);
   });
 
+  it('马币紧挨着数字（RM33.90）也是金额，不是编号（D-549）', async () => {
+    const r = await run(['RESTORAN ALI', 'TOTAL RM33.90', 'Tunai RM50.00'], { currency: 'MYR' });
+    expect(n(r.total[0])).toBe(33.9);
+    // 前面连着字母的不算（FORM12.00、单号）。
+    const id = await run(['Shop', 'FORM12.00', 'Total 4.50']);
+    expect(id.total.map(Number)).not.toContain(12);
+  });
+
   it('同分的合计候选：能由别的候选加出来的、更大的排前面', async () => {
     const r = await run(['Shop', 'Total 10.00', 'Total 3.00', 'Total 7.00']);
     expect(r.total.map(Number)).toEqual([10, 7, 3]);

@@ -27,6 +27,7 @@ import {
 import { openRow } from './open-row';
 import { ProgressRing } from './Progress';
 import { cardColors } from './theme';
+import { ColorDot, recordMarks } from './record-marks';
 import { Card } from './ui';
 
 // 记录列表的大圆块外观（D-311，Streaks 那种）：每条记录一个大圆，下面是标题；有 progress 时圆外一圈进度环，
@@ -60,8 +61,11 @@ export function Tiles({ block, env, tone }: { block: RecordBlock; env: RenderEnv
   const now = new Date();
   const { show } = block;
   const format = show.format;
+  const marks = recordMarks(show, view, env, now);
 
   const tile = (r: DataRecord) => {
+    // 警示色（D-541）：右侧的值，没有右侧字段时是标题。
+    const warn = marks.warns(r);
     const title =
       formatRef(r, view, show.title, locale, links, now, cal) ||
       untitledRecordTitle(r, collection, locale, now, cal);
@@ -152,7 +156,7 @@ export function Tiles({ block, env, tone }: { block: RecordBlock; env: RenderEnv
                   {inside}
                 </Text>
               ) : show.trailing ? (
-                <Trailing record={r} view={view} show={show} env={env} text={text} />
+                <Trailing record={r} view={view} show={show} env={env} text={text} warn={warn} />
               ) : action ? (
                 <Text
                   numberOfLines={2}
@@ -166,11 +170,18 @@ export function Tiles({ block, env, tone }: { block: RecordBlock; env: RenderEnv
               ) : null}
             </View>
           </View>
-          <Text
-            numberOfLines={2}
-            style={[palette.font('bodyMedium', 14), styles.center, { color: palette.text }]}>
-            {title}
-          </Text>
+          <View style={styles.titleRow}>
+            <ColorDot color={marks.colorOf(r)} recordId={r.id} />
+            <Text
+              numberOfLines={2}
+              style={[
+                palette.font('bodyMedium', 14),
+                styles.center,
+                { color: warn && !show.trailing ? palette.danger : palette.text },
+              ]}>
+              {title}
+            </Text>
+          </View>
         </Pressable>
       </View>
     );
@@ -184,6 +195,7 @@ export function Tiles({ block, env, tone }: { block: RecordBlock; env: RenderEnv
 }
 
 const styles = StyleSheet.create({
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
   cell: { width: '33.333%', alignItems: 'center' },
   tile: { alignItems: 'center', gap: 8, paddingHorizontal: 4, minWidth: 88 },

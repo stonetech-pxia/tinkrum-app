@@ -16,6 +16,9 @@ const CURRENCY_SIGNS: readonly [RegExp, string][] = [
   [/€|\beur\b/i, 'EUR'],
   [/£|\bgbp\b/i, 'GBP'],
   [/[¥￥元]|\bcny\b|\brmb\b/i, 'CNY'],
+  // 马币（D-548）：RM 后面紧跟数字才算，大写（RMB 是人民币）。
+  [/\bRM(?=\s?\d)/, 'MYR'],
+  [/\bmyr\b/i, 'MYR'],
   [/\$|\busd\b/i, 'USD'],
 ];
 
@@ -23,6 +26,29 @@ const CURRENCY_SIGNS: readonly [RegExp, string][] = [
 function currencyOf(raw: string, page: TextPage, locale: Locale): string {
   const line = page.lines.find((l) => l.text.includes(raw))?.text ?? raw;
   return CURRENCY_SIGNS.find(([sign]) => sign.test(line))?.[1] ?? LOCALE_CURRENCY[locale];
+}
+
+/**
+ * 文件上金额的货币（D-548）：第一个金额那一行有符号或代码就是它；都没有返回 null（表照旧按界面语言）。
+ * 用文件建表时金额字段用它，不然马币小票会存成美元（2026-11-09、11-10 用户测试）。
+ */
+export function fileCurrency(pages: readonly TextPage[], locale: Locale): string | null {
+  for (const [i, page] of pages.entries())
+    for (const o of pageOccurrences(page, i, locale).occ) {
+      if (o.kind !== 'money') continue;
+      const line = page.lines.find((l) => l.text.includes(o.raw))?.text ?? o.raw;
+      const hit = CURRENCY_SIGNS.find(([sign]) => sign.test(line));
+      if (hit) return hit[1];
+    }
+  return null;
+}
+
+/** 表里每个金额字段都用这个货币；每一笔单独选货币的（D-429、D-549），这一笔没选时用它。 */
+export function withCurrency(table: Collection, currency: string): Collection {
+  return {
+    ...table,
+    fields: table.fields.map((f) => (f.type === 'money' ? { ...f, currency } : f)),
+  };
 }
 
 /**
@@ -108,7 +134,16 @@ export function renameDraftField(table: Collection, id: string, name: string): C
   return { ...table, fields: fields.map((f) => (f.id === id ? { ...f, name: trimmed } : f)) };
 }
 
-/** 去掉字段。附件字段留着：文件要放在那里。 */
+/** 去掉字段。附件字段留着：文件要放在那里。去掉的是金额的货币（D-549）：金额改回整张表一个货币。 */
 export function removeDraftField(table: Collection, id: string): Collection {
-  return { ...table, fields: table.fields.filter((f) => f.id !== id || f.type === 'file') };
+  return {
+    ...table,
+    fields: table.fields
+      .filter((f) => f.id !== id || f.type === 'file')
+      .map((f) => {
+        if (f.type !== 'money' || f.currencyField !== id) return f;
+        const { currencyField: _, ...rest } = f;
+        return rest;
+      }),
+  };
 }

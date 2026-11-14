@@ -91,9 +91,12 @@ export function compareChange(
 
 /** 上一段的说明和它的值：「上月同期：¥100.00」「再往前 30 天：12」。 */
 export function previousLabel(period: Period, value: string, locale: Locale): string {
-  const days = /^last(\d+)days$/.exec(period);
+  // 往后 N 天（D-537）的上一段也是再往前的 N 天。
+  const days = /^(?:last|next)(\d+)days$/.exec(period);
   if (days) return t(locale, 'compare_lastDays', { n: Number(days[1]), value });
-  return t(locale, `compare_${period as Exclude<Period, `last${string}`>}`, { value });
+  return t(locale, `compare_${period as Exclude<Period, `last${string}` | `next${string}`>}`, {
+    value,
+  });
 }
 
 /** 变化的文字：↑ 12%、↓ 5%、持平；上一段是 0 时只写「↑ 增加」。 */

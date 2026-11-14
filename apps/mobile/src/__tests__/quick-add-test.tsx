@@ -87,6 +87,35 @@ it('the floating add opens a sheet; the keyboard Done adds and the sheet stays f
   await waitFor(() => expect(screen.queryByTestId('form-quick-title')).toBeNull());
 });
 
+it('a link field in the sheet has no "add a new one": the new page would open behind the sheet (D-546)', async () => {
+  const repo = new MemoryWorkspaceRepo();
+  await put(repo, 's1', 'sections', { name: '待办' });
+  await renderToolsApp(repo, undefined, {
+    locale: 'zh',
+    seed: seed([
+      {
+        id: 'quick',
+        look: 'form',
+        show: { mode: 'sheet' },
+        tools: [
+          {
+            as: 'submit',
+            label: '添加任务',
+            do: 'create',
+            table: 'tasks',
+            ask: ['title', 'section'],
+          },
+        ],
+      } as NewComponent,
+    ]),
+  });
+  await fireEvent.press(await screen.findByTestId('form-quick'));
+  await fireEvent.press(await screen.findByTestId('form-quick-section'));
+  // 已有的照样能选。
+  expect(await screen.findByTestId('form-quick-section-option-s1')).toBeTruthy();
+  expect(screen.queryByTestId('form-quick-section-new')).toBeNull();
+});
+
 it('a board by a linked table has a column per section, and adding in a column files the task there', async () => {
   const repo = new MemoryWorkspaceRepo();
   await put(repo, 's1', 'sections', { name: '待办' }, 1);

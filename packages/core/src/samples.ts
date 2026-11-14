@@ -293,7 +293,19 @@ export function draftReceiptSample(
   if (!result.ok) return null;
   const added = result.ops.find((op): op is OpOf<'addData'> => op.op === 'addData');
   if (!added || !('table' in added)) return null;
-  return { ops: result.ops, table: added.table as unknown as Collection };
+  // 金额的货币跟草稿（D-548：用文件建表时按文件上的符号定的）。
+  const currency = new Map(
+    table.fields.flatMap((f) => (f.type === 'money' ? [[f.id, f.currency] as const] : [])),
+  );
+  const sampleTable = added.table as unknown as Collection;
+  const made: Collection = {
+    ...sampleTable,
+    fields: sampleTable.fields.map((f) =>
+      f.type === 'money' && currency.has(f.id) ? { ...f, currency: currency.get(f.id)! } : f,
+    ),
+  };
+  const ops = result.ops.map((op) => (op === added ? ({ ...added, table: made } as Op) : op));
+  return { ops, table: made };
 }
 
 type AddPage = OpOf<'addContainer'> & {

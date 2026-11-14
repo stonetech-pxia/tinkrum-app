@@ -7,6 +7,7 @@ import {
   draftTable,
   draftTableOps,
   extractFieldNames,
+  fileCurrency,
   fieldNameFromText,
   looksLikeValue,
   originalRows,
@@ -19,6 +20,7 @@ import {
   sampleInfo,
   templateTableName,
   templateTableOf,
+  withCurrency,
   type Collection,
   type FieldIssue,
   type NewPreset,
@@ -189,7 +191,10 @@ export function NewTableScreen() {
   ];
 
   function choose(next: NewPreset) {
-    const made = keepFor(draftTable(next, config, locale), draft);
+    // 金额的货币跟文件上的符号（D-548），认不出才按界面语言。
+    const currency = fileCurrency(pages, locale);
+    const base = draftTable(next, config, locale);
+    const made = keepFor(currency ? withCurrency(base, currency) : base, draft);
     // 购物凭证建的是整套「收据」（D-479）：表名先写成「收据」，建出来的就是这个名字。
     const table =
       next === 'purchase' && made.name === templateTableName('purchase', locale)

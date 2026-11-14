@@ -184,6 +184,9 @@ function everything() {
     'last365days',
     'thisTwoWeeks',
     'thisHalfMonth',
+    'next7days',
+    'next30days',
+    'next90days',
   ];
   return buildConfig([
     addTable('groups', [text('name', { required: true })]),
@@ -213,6 +216,7 @@ function everything() {
         countEarly: true,
       },
       { id: 'labels', name: 'labels', type: 'tags' },
+      { id: 'ends', name: 'ends', type: 'dateOffset', from: 'date', add: 'qty', unit: 'months' },
     ]),
     {
       op: 'updateData',
@@ -376,6 +380,8 @@ function everything() {
         source: { group: { unit: 'day' } },
         show: { color: 'status' },
       }),
+      records('table', 'grid', 'items', 'title', { show: { columns: ['qty', 'status'] } }),
+      records('gallery', 'pics', 'items', 'title'),
       records('list', 'by-week', 'items', 'title', {
         source: {
           group: { unit: 'week' },

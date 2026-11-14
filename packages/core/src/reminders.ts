@@ -63,8 +63,14 @@ export function reminderProblems(r: Reminder, config: WorkspaceConfig): string[]
   if ('before' in when) {
     const collection = config.data.tables.find((c) => c.id === when.before.table);
     if (!collection) problems.push(`${where}: data table ${when.before.table} does not exist`);
-    else if (collection.fields.find((f) => f.id === when.before.field)?.type !== 'date')
-      problems.push(`${where}: when.before.field must be a date field of ${collection.id}`);
+    else if (
+      !['date', 'dateOffset'].includes(
+        collection.fields.find((f) => f.id === when.before.field)?.type ?? '',
+      )
+    )
+      problems.push(
+        `${where}: when.before.field must be a date or computed date field of ${collection.id}`,
+      );
   }
   if ('after' in when && !config.data.tables.some((c) => c.id === when.after.table))
     problems.push(`${where}: data table ${when.after.table} does not exist`);
@@ -227,10 +233,10 @@ export function planNotifications(
       }
     } else {
       const collection = config.data.tables.find((c) => c.id === when.before.table)!;
-      const field = collection.fields.find((f) => f.id === when.before.field)!;
       const before = when.days;
       for (const record of records.get(collection.id) ?? []) {
-        const due = readValue(field, record.values[field.id]);
+        // 算出来的日期（D-550）现算，不存。
+        const due = recordDay(record, collection, when.before.field, now, cal);
         if (typeof due !== 'string') continue;
         const [y, m, d] = due.split('-').map(Number) as [number, number, number];
         const at = new Date(y, m - 1, d - before, hour, minute);

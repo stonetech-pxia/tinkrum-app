@@ -4,6 +4,7 @@ import { prepareOps } from './change';
 import { createStarterWorkspace } from './starter';
 import type { Op } from './ops-schema';
 import { draftTable } from './templates';
+import { withCurrency } from './new-table';
 import { draftReceiptSample, SAMPLE_APPS, sampleInfo, sampleOps, type SampleApp } from './samples';
 import {
   HOME_PAGE_ID,
@@ -324,7 +325,10 @@ describe('samples equal the v33 samples, migrated', () => {
   // 名片样板（D-423）、收据样板（D-437）是 v34 以后加的，没有 v33 的样子。
   // 报销助手（D-425、D-427）多了打印带附件、导出 Excel，下面单独查。
   it.each(
-    SAMPLE_APPS.filter((s) => s !== 'business-cards' && s !== 'expense-helper' && s !== 'receipts'),
+    SAMPLE_APPS.filter(
+      (s) =>
+        s !== 'business-cards' && s !== 'expense-helper' && s !== 'receipts' && s !== 'visa-docs',
+    ),
   )('%s in zh', (sample) => {
     const before = fresh('zh');
     expect(apply(before, ops(sample, before, 'zh'), 'zh')).toEqual(
@@ -332,6 +336,25 @@ describe('samples equal the v33 samples, migrated', () => {
       JSON.parse(
         JSON.stringify(
           withStarterTheme(withScanKeep(fromV33(v33Fixture(`sample-${sample}-zh`)))),
+        ).replaceAll('Morph', 'Tinkrum'),
+      ),
+    );
+  });
+
+  it('visa-docs in zh differs only by the "expire within 30 days" count (D-537)', () => {
+    const before = fresh('zh');
+    const config = structuredClone(apply(before, ops('visa-docs', before, 'zh'), 'zh'));
+    const page = config.containers.pages.find((p) => p.id === 'my-ids')!;
+    const expiring = page.blocks.find((b) => b.id === 'expiring');
+    expect(expiring).toMatchObject({ look: 'number' });
+    expect((expiring as { source?: unknown }).source).toMatchObject({
+      filter: [{ field: 'expires', op: 'inPeriod', value: 'next30days' }],
+    });
+    page.blocks = page.blocks.filter((b) => b.id !== 'expiring');
+    expect(config).toEqual(
+      JSON.parse(
+        JSON.stringify(
+          withStarterTheme(withScanKeep(fromV33(v33Fixture('sample-visa-docs-zh')))),
         ).replaceAll('Morph', 'Tinkrum'),
       ),
     );
@@ -526,6 +549,17 @@ describe('draftReceiptSample（新建表单页选了购物凭证，D-479）', ()
       expect(quickActionsOf(added).length).toBe(2);
     },
   );
+
+  it('金额的货币跟草稿（按文件上的符号定的，D-548）', () => {
+    const config = workspace('en');
+    const table = withCurrency(draftTable('purchase', config, 'en'), 'MYR');
+    const got = draftReceiptSample(table, 'purchase', config, 'en')!;
+    const added = apply(config, got.ops, 'en');
+    const money = (c: { fields: { type: string; currency?: string | undefined }[] }) =>
+      c.fields.filter((f) => f.type === 'money').map((f) => f.currency);
+    expect(money(added.data.tables[0]!)).toEqual(['MYR']);
+    expect(money(got.table)).toEqual(['MYR']);
+  });
 
   it('已经有一张叫 receipts 的表：新表 ID 换掉，返回的表和建出来的一致', () => {
     const config = workspace('zh');

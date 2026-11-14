@@ -34,6 +34,14 @@ export function conditionProblems(
       );
       continue;
     }
+    // 「是其中一个」（D-538）：只有单选字段的 is，每个都是它的选项。
+    if (Array.isArray(v)) {
+      if (cond.op !== 'is' || f?.type !== 'choice')
+        problems.push(`${where}: a list of values only works with is on a choice field`);
+      else if (!v.every((x) => filter.is(f, x)))
+        problems.push(`${where}: value does not match the field type`);
+      continue;
+    }
     // 引用字段只能看有没有选（D-250）：记录 ID 对 AI 和用户都没有意义。
     if (filter.emptyOnly && cond.op !== 'isEmpty' && cond.op !== 'isNotEmpty') {
       problems.push(`${where}: a ${type} field can only be filtered with isEmpty or isNotEmpty`);

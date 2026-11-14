@@ -7492,6 +7492,423 @@ const FIX_CASES: EvalCase[] = [
   },
 ];
 
+/** 内核补缺（2026-11-14）：先有一张合同表（名称、结束日期），用例在它上面改。 */
+const contractsEarlier: EvalEarlier = {
+  input: 'Make a table of my contracts with a name and an end date, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'contracts',
+        name: 'Contracts',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'ends', name: 'End date', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'contracts-page',
+        title: 'Contracts',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'contracts', sort: { field: 'ends', direction: 'asc' }, limit: 50 },
+            show: { title: 'name', subtitles: ['ends'] },
+          },
+        ],
+      },
+    },
+  ],
+};
+const filteredOn = (c: WorkspaceConfig, table: string, ok: (f: Condition) => boolean) =>
+  [...recordBlocksOf(c, table), ...numbersOf(c, table)].some((x) =>
+    (x.source.filter ?? []).some(ok),
+  );
+
+/** 订单表，状态有 5 个选项（「是其中一个」用 isNot 写不出来）。 */
+const ordersEarlier: EvalEarlier = {
+  input: 'Make a table of my orders with a status, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'item', name: 'Item', type: 'text', required: true },
+          {
+            id: 'status',
+            name: 'Status',
+            type: 'choice',
+            options: [
+              { id: 'new', label: 'New' },
+              { id: 'paid', label: 'Paid' },
+              { id: 'shipped', label: 'Shipped' },
+              { id: 'delivered', label: 'Delivered' },
+              { id: 'cancelled', label: 'Cancelled' },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'orders-page',
+        title: 'Orders',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'orders', limit: 50 },
+            show: { title: 'item', subtitles: ['status'] },
+          },
+        ],
+      },
+    },
+  ],
+};
+const anyOf = (f: Condition, ids: string[]) =>
+  f.field === 'status' &&
+  f.op === 'is' &&
+  Array.isArray(f.value) &&
+  [...f.value].sort().join() === [...ids].sort().join();
+
+const KERNEL_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG3',
+    input: 'Make the orders list show only the orders that are paid or shipped',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [ordersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        filteredOn(c, 'orders', (f) => anyOf(f, ['paid', 'shipped']))
+          ? null
+          : 'expected an orders list filtered on status is [paid, shipped]',
+    },
+  },
+  {
+    id: 'KG4',
+    input: '订单页面再加一个列表：新订单和已付款的',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [ordersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        filteredOn(c, 'orders', (f) => anyOf(f, ['new', 'paid']))
+          ? null
+          : 'expected an orders list filtered on status is [new, paid]',
+    },
+  },
+  {
+    id: 'KG1',
+    input: 'Add a list of the contracts that end within the next 30 days',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [contractsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        filteredOn(
+          c,
+          'contracts',
+          (f) => f.field === 'ends' && f.op === 'inPeriod' && f.value === 'next30days',
+        )
+          ? null
+          : 'expected a contracts list filtered on ends inPeriod next30days',
+    },
+  },
+  {
+    id: 'KG2',
+    input: '合同页面加一个列表，只显示结束日期已经过了的合同',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [contractsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        filteredOn(
+          c,
+          'contracts',
+          (f) => f.field === 'ends' && f.op === 'lt' && f.value === 'today',
+        )
+          ? null
+          : 'expected a contracts list filtered on ends lt "today"',
+    },
+  },
+];
+
+const TABLE_LOOK_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG5',
+    input: 'Show my orders like a spreadsheet, with the item and status as columns',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [ordersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'orders').some(
+          (x) =>
+            x.look === 'table' &&
+            [x.show.title, ...(x.show.columns ?? x.show.subtitles ?? [])].includes('status'),
+        )
+          ? null
+          : 'expected a table look on orders showing status',
+    },
+  },
+  {
+    id: 'KG6',
+    input: 'Affiche mes contrats sous forme de tableau',
+    locale: 'fr',
+    setup: 'default',
+    mock: false,
+    earlier: [contractsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'contracts').some((x) => x.look === 'table')
+          ? null
+          : 'expected a table look on contracts',
+    },
+  },
+];
+
+/** 植物表，有照片（附件）字段。 */
+const plantsEarlier: EvalEarlier = {
+  input: 'Make a table of my plants with a name and photos, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'plants',
+        name: 'Plants',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'photos', name: 'Photos', type: 'file' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'plants-page',
+        title: 'Plants',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'plants', limit: 50 },
+            show: { title: 'name' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+const GALLERY_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG7',
+    input: 'Show my plants as a grid of their photos',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [plantsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'plants').some((x) => x.look === 'gallery')
+          ? null
+          : 'expected a gallery look on plants',
+    },
+  },
+  {
+    id: 'KG8',
+    input: '植物页面改成照片墙',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [plantsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'plants').some((x) => x.look === 'gallery')
+          ? null
+          : 'expected a gallery look on plants',
+    },
+  },
+];
+
+const MARK_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG9',
+    input: 'Colour each order in the list by its status',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [ordersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'orders').some((x) => x.look !== 'calendar' && x.show.color === 'status')
+          ? null
+          : 'expected an orders list with show.color status',
+    },
+  },
+  {
+    id: 'KG10',
+    input: '支出列表里超过 100 的金额标成红色',
+    locale: 'zh',
+    setup: 'budget',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'expenses').some((x) =>
+          (x.show.highlight ?? []).some(
+            (f) => f.field === 'amount' && f.op === 'gt' && f.value === 100,
+          ),
+        )
+          ? null
+          : 'expected an expenses list with show.highlight amount gt 100',
+    },
+  },
+];
+
+/** 合同表：开始日期和期限（月）。 */
+const termsEarlier: EvalEarlier = {
+  input: 'Make a table of my contracts with a name, a start date and a term in months',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'contracts',
+        name: 'Contracts',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'start', name: 'Start date', type: 'date' },
+          { id: 'term', name: 'Term (months)', type: 'number' },
+        ],
+      },
+    },
+  ],
+};
+const offsetOf = (c: WorkspaceConfig) =>
+  c.data.tables
+    .find((t) => t.id === 'contracts')
+    ?.fields.find((f): f is Extract<Field, { type: 'dateOffset' }> => f.type === 'dateOffset');
+
+const DATE_OFFSET_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG11',
+    input: 'Add an end date that is worked out from the start date plus the term',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [termsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const f = offsetOf(c);
+        return f?.from === 'start' && f.add === 'term' && f.unit === 'months'
+          ? null
+          : `expected a dateOffset from start + term months, got ${JSON.stringify(f)}`;
+      },
+    },
+  },
+  {
+    id: 'KG12',
+    input: 'Ajoute une date de rappel calculée : 30 jours après la date de début',
+    locale: 'fr',
+    setup: 'default',
+    mock: false,
+    earlier: [termsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const f = offsetOf(c);
+        return f?.from === 'start' && f.add === 30 && f.unit === 'days'
+          ? null
+          : `expected a dateOffset from start + 30 days, got ${JSON.stringify(f)}`;
+      },
+    },
+  },
+];
+
+/** 合同表上已经有算出来的到期日（D-542）。 */
+const endsEarlier: EvalEarlier = {
+  input: 'Add an end date that is the start date plus the term',
+  ops: [
+    {
+      op: 'addData',
+      table: 'contracts',
+      field: {
+        id: 'ends',
+        name: 'End date',
+        type: 'dateOffset',
+        from: 'start',
+        add: 'term',
+        unit: 'months',
+      },
+    },
+  ],
+};
+
+// 算出来的日期能放进月历、当到期前提醒的日期（D-550）。
+const DATE_OFFSET_USE_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG13',
+    input: 'Remind me 30 days before each contract ends',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [termsEarlier, endsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        remindersOf(c).some(
+          (r) =>
+            'before' in r.when &&
+            r.when.before.table === 'contracts' &&
+            r.when.before.field === 'ends' &&
+            r.when.days === 30,
+        )
+          ? null
+          : 'expected a reminder 30 days before contracts.ends',
+    },
+  },
+  {
+    id: 'KG14',
+    input: 'Montre mes contrats dans un calendrier, à leur date de fin',
+    locale: 'fr',
+    setup: 'default',
+    mock: false,
+    earlier: [termsEarlier, endsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'contracts').some(
+          (x) => x.look === 'calendar' && x.source.group?.by === 'ends',
+        )
+          ? null
+          : 'expected a contracts calendar grouped by ends',
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -7543,6 +7960,12 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...RECORD_EVAL_CASES,
   ...DRAFT_CHAT_EVAL_CASES,
   ...MODULE_EVAL_CASES,
+  ...KERNEL_CASES,
+  ...TABLE_LOOK_CASES,
+  ...GALLERY_CASES,
+  ...MARK_CASES,
+  ...DATE_OFFSET_CASES,
+  ...DATE_OFFSET_USE_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

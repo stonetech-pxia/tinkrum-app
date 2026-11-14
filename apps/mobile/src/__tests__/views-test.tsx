@@ -162,6 +162,50 @@ it('moves to the previous month and back to today', async () => {
   expect(await screen.findByText(monthTitle(today().slice(0, 7), 'fr'))).toBeTruthy();
 });
 
+// 算出来的日期也能当月历的日子（D-550）：开始日期在上个月，到期日在这个月；看月历什么都不写。
+it('a calendar by a computed date shows each entry on its computed day', async () => {
+  const repo = new MemoryWorkspaceRepo();
+  const contracts: Collection = {
+    id: 'contracts',
+    name: '合同',
+    fields: [
+      { id: 'name', name: '名称', type: 'text' },
+      { id: 'start', name: '开始', type: 'date' },
+      { id: 'ends', name: '到期', type: 'dateOffset', from: 'start', add: 1, unit: 'months' },
+    ],
+  };
+  const byEnd: NewComponent = {
+    id: 'ends',
+    look: 'calendar',
+    source: { table: 'contracts', group: { by: 'ends', unit: 'day' }, limit: 20 },
+    show: { title: 'name' },
+  };
+  const day = otherDay();
+  const started = await put(repo, 'contracts', {
+    name: '健身房',
+    start: `${shiftMonth(day.slice(0, 7), -1)}${day.slice(7)}`,
+  });
+  await renderToolsApp(repo, undefined, {
+    seed: (locale, registry) => {
+      const result = applyOps(
+        createDefaultWorkspace(locale),
+        [
+          { op: 'addData', table: contracts },
+          { op: 'addContainer', page: 'home', block: byEnd },
+        ],
+        { registry, locale },
+      );
+      if (!result.ok) throw new Error(result.error);
+      return result.config;
+    },
+  });
+  const cell = await screen.findByTestId(`calendar-ends-day-${day}`);
+  expect(cell.props.accessibilityLabel).toMatch(/1 条记录/);
+  await fireEvent.press(cell);
+  expect(await screen.findByText('健身房')).toBeTruthy();
+  expect((await repo.listRecords('contracts'))[0]).toEqual(started);
+});
+
 it('a shift with no end is a running timer; a finished one shows its length', async () => {
   jest.useFakeTimers({ now: new Date() });
   try {

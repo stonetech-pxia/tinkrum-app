@@ -1,0 +1,106 @@
+import {
+  applyOps,
+  createDefaultWorkspace,
+  dateOfDayNumber,
+  monthTitle,
+  shiftMonth,
+  todayNumber,
+  DEFAULT_CALENDAR,
+  type Collection,
+  type Locale,
+  type Registry,
+} from '@morph/core';
+import { fireEvent } from '@testing-library/react-native';
+import { screen } from 'expo-router/testing-library';
+
+import { MemoryWorkspaceRepo } from '../storage/memory';
+import { renderToolsApp } from '../test-utils/render-app';
+
+// 日期、时间的选择器（D-543）：JS 写的月历格子和几点几分，不用原生组件；「今天」「现在」照旧。
+
+const events: Collection = {
+  id: 'events',
+  name: 'Events',
+  fields: [
+    { id: 'day', name: 'Day', type: 'date' },
+    { id: 'at', name: 'At', type: 'datetime' },
+    { id: 'clock', name: 'Clock', type: 'time' },
+  ],
+};
+
+const seed = (locale: Locale, registry: Registry) => {
+  const result = applyOps(
+    createDefaultWorkspace(locale),
+    [
+      { op: 'addData', table: events },
+      {
+        op: 'addContainer',
+        page: 'home',
+        block: {
+          id: 'log',
+          look: 'form',
+          show: { mode: 'inline' },
+          tools: [
+            {
+              as: 'submit',
+              label: 'Log',
+              do: 'create',
+              table: 'events',
+              ask: ['day', 'at', 'clock'],
+            },
+          ],
+        },
+      },
+    ],
+    { registry, locale },
+  );
+  if (!result.ok) throw new Error(result.error);
+  return result.config;
+};
+
+const today = () => dateOfDayNumber(todayNumber(new Date(), DEFAULT_CALENDAR));
+
+it('picks a date from a month grid, in the user language, and moves between months', async () => {
+  const repo = new MemoryWorkspaceRepo();
+  await renderToolsApp(repo, undefined, { seed, locale: 'fr' });
+  await fireEvent.press(await screen.findByTestId('form-log-day-pick'));
+  const month = today().slice(0, 7);
+  expect(screen.getByText(monthTitle(month, 'fr'))).toBeTruthy();
+  // 周一开头（设置 → 日期的默认）。
+  expect(screen.getByTestId('form-log-day-weekdays')).toHaveTextContent('LMMJVSD');
+  await fireEvent.press(screen.getByTestId('form-log-day-next'));
+  const next = shiftMonth(month, 1);
+  expect(screen.getByText(monthTitle(next, 'fr'))).toBeTruthy();
+  await fireEvent.press(screen.getByTestId(`form-log-day-day-${next}-15`));
+  expect(screen.getByTestId('form-log-day').props.value).toBe(`${next}-15`);
+});
+
+it('picks a date and a time for a date-and-time field, and a time alone', async () => {
+  const repo = new MemoryWorkspaceRepo();
+  await renderToolsApp(repo, undefined, { seed, locale: 'en' });
+  await fireEvent.press(await screen.findByTestId('form-log-at-pick'));
+  await fireEvent.press(screen.getByTestId(`form-log-at-day-${today()}`));
+  await fireEvent.press(screen.getByTestId('form-log-at-hour-14'));
+  await fireEvent.press(screen.getByTestId('form-log-at-minute-30'));
+  expect(screen.getByTestId('form-log-at').props.value).toBe(`${today()} 14:30`);
+  await fireEvent.press(screen.getByTestId('form-log-clock-pick'));
+  await fireEvent.press(screen.getByTestId('form-log-clock-hour-7'));
+  await fireEvent.press(screen.getByTestId('form-log-clock-minute-5'));
+  expect(screen.getByTestId('form-log-clock').props.value).toBe('07:05');
+  await fireEvent.press(screen.getByTestId('form-log-submit'));
+  const [saved] = await repo.listRecords('events');
+  expect(saved!.values).toEqual({ at: `${today()}T14:30`, clock: '07:05' });
+});
+
+it('the week starts on the day set in Settings → Date', async () => {
+  const repo = new MemoryWorkspaceRepo();
+  await renderToolsApp(repo, undefined, {
+    seed: (locale, registry) => {
+      const config = seed(locale, registry);
+      return { ...config, data: { ...config.data, calendar: { weekStart: 'sunday' } } };
+    },
+    locale: 'en',
+  });
+  await fireEvent.press(await screen.findByTestId('form-log-day-pick'));
+  expect(screen.getByTestId('form-log-day-weekdays')).toHaveTextContent(/^S/);
+});
