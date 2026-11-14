@@ -444,6 +444,9 @@ export const en = {
   presetsImportHint:
     'Have a file, for example one downloaded from the Tinkrum website? An app file is added as a new app next to yours. A whole-app preset file only joins this list; your app changes when you apply it.',
   presetImported: 'Added the preset “{name}”. Tap Apply when you want to use it.',
+  presetsSamplesTitle: 'Sample apps',
+  presetsSamplesHint:
+    'Pick one to look at: it goes into a draft first and is only added when you tap Apply. You can undo it in Change history. Your entries stay as they are.',
   presetApply: 'Apply',
   presetRename: 'Rename',
   presetDeleted: 'Preset “{name}” deleted',

@@ -426,6 +426,9 @@ export const zh: MessageTable = {
   presetsImportHint:
     '有文件（比如从 Tinkrum 网站下载的）？App 文件会加成一个新的 App，原来的不动；整份预设文件存在这个列表里，点「应用」才会换成它。',
   presetImported: '已添加预设「{name}」，要用时点「应用」。',
+  presetsSamplesTitle: '样板 App',
+  presetsSamplesHint:
+    '选一个看看：先放进草稿，点「应用」才加上，也能在改动记录里撤销。你的记录不动。',
   presetApply: '应用',
   presetRename: '改名',
   presetDeleted: '已删除预设「{name}」',

@@ -467,6 +467,9 @@ export const fr: MessageTable = {
   presetsImportHint:
     'Vous avez un fichier, par exemple téléchargé sur le site de Tinkrum ? Un fichier d’app est ajouté comme nouvelle app, à côté des vôtres. Un fichier de préréglage complet rejoint seulement cette liste ; votre app ne change que lorsque vous l’appliquez.',
   presetImported: 'Préréglage « {name} » ajouté. Touchez Appliquer pour l’utiliser.',
+  presetsSamplesTitle: 'Apps modèles',
+  presetsSamplesHint:
+    'Choisissez-en une pour la voir : elle va d’abord dans un brouillon et n’est ajoutée que lorsque vous touchez Appliquer. Vous pouvez l’annuler dans l’historique des modifications. Vos entrées ne changent pas.',
   presetApply: 'Appliquer',
   presetRename: 'Renommer',
   presetDeleted: 'Préréglage « {name} » supprimé',

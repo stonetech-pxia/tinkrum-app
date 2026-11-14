@@ -6,6 +6,7 @@ import {
   type Locale,
   type Op,
   quickActionsOf,
+  SAMPLE_APPS,
   type Registry,
   remindersOf,
   type WorkspaceConfig,
@@ -265,5 +266,70 @@ describe('guide step 3: sample apps', () => {
     expect(store.getState().draft).toBeNull();
     expect(await repo.getMeta('guide')).toBe('samples');
     expect(screen.getByTestId('guide-samples')).toBeTruthy();
+  });
+});
+
+// 样板一直找得到（D-544）：「设置 → 更多 → 我的预设」里列出全部样板，点一个和引导第 3 步走同一条路：
+// 进草稿，「应用」后是一个版本，能撤销。
+describe('sample apps on My presets', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    useGuide.setState({ stage: null, repo: null });
+    useSampleHint.setState({ hint: null });
+  });
+
+  async function openPresets() {
+    await fireEvent.press(await screen.findByTestId('nav-settings'));
+    await fireEvent.press(await screen.findByTestId('settings-more'));
+    await fireEvent.press(await screen.findByTestId('settings-presets'));
+    return screen.findByTestId('presets-screen');
+  }
+
+  it('a new user finds every sample there, and looking changes nothing', async () => {
+    const { store } = await start('done', { seed: createStarterWorkspace });
+    const head = store.getState().head!.id;
+    await openPresets();
+    for (const id of SAMPLE_APPS) expect(screen.getByTestId(`preset-sample-${id}`)).toBeTruthy();
+    expect(screen.getByTestId('preset-sample-receipts')).toHaveTextContent(/收据/);
+    expect(store.getState().head!.id).toBe(head);
+    expect(store.getState().draft).toBeNull();
+  });
+
+  it('with data: picking one drafts it, applying adds one version that undo takes back', async () => {
+    const { store } = await start('done');
+    const before = store.getState().config!;
+    const revisions = (await store.getState().listRevisions(50)).length;
+    await openPresets();
+    await fireEvent.press(screen.getByTestId('preset-sample-shop-orders'));
+    expect(await screen.findByTestId('draft-bar')).toBeTruthy();
+    expect(store.getState().draft!.steps[0]!.input).toBe('套用样板「小店接单」');
+    expect(store.getState().config).toBe(before);
+    await fireEvent.press(screen.getByTestId('draft-apply'));
+    await waitFor(() => expect(store.getState().draft).toBeNull());
+    expect(store.getState().config!.data.tables.length).toBe(before.data.tables.length + 2);
+    expect((await store.getState().listRevisions(50)).length).toBe(revisions + 1);
+    await fireEvent.press(await screen.findByText('撤销'));
+    await waitFor(() => expect(store.getState().config).toEqual(before));
+  });
+
+  it('at the table limit it explains why and stays on the screen without a draft', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const seed = seedWith((config) =>
+      Array.from({ length: 20 - config.data.tables.length }, (_, i) => ({
+        op: 'addData' as const,
+        table: {
+          id: `t${i}`,
+          name: `表${i}`,
+          fields: [{ id: 'n', name: 'N', type: 'text' as const }],
+        },
+      })),
+    );
+    const { store } = await start('done', { seed });
+    await openPresets();
+    await fireEvent.press(screen.getByTestId('preset-sample-expense-helper'));
+    await waitFor(() => expect(alert).toHaveBeenCalled());
+    expect(alert.mock.calls[0]![1]).toMatch(/20 张/);
+    expect(store.getState().draft).toBeNull();
+    expect(screen.getByTestId('presets-screen')).toBeTruthy();
   });
 });
