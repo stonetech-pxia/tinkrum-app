@@ -22,6 +22,7 @@ import {
   recordsToCsv,
   type Collection,
 } from '@morph/core';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
@@ -56,6 +57,7 @@ export default function DataRoute() {
   const palette = usePalette(config.theme);
   const actions = useRecordActions();
   const change = useWorkflowChange();
+  const router = useRouter();
   const [counts, setCounts] = useState<Map<string, number>>(new Map());
   const [orphans, setOrphans] = useState<
     { collection: Collection | null; id: string; count: number }[]
@@ -261,6 +263,16 @@ export default function DataRoute() {
               label={t(locale, 'exportCsv')}
               onPress={() => void exportCsv(c)}
             />
+            {(counts.get(c.id) ?? 0) > 0 ? (
+              <Pill
+                palette={palette}
+                testID={`select-${c.id}`}
+                label={t(locale, 'bulkSelectTitle')}
+                onPress={() =>
+                  router.push({ pathname: '/select-records', params: { table: c.id } })
+                }
+              />
+            ) : null}
           </View>
           {c.fields.some((f) => f.type === 'file') ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>

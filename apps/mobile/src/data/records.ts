@@ -282,5 +282,11 @@ export function useRecordActions() {
       await repo.restoreRecord(id);
       bump();
     },
+
+    /** 一起删的几条一起放回来（D-547）。 */
+    async restoreMany(ids: readonly string[]): Promise<void> {
+      for (const id of ids) await repo.restoreRecord(id);
+      bump();
+    },
   };
 }

@@ -444,6 +444,13 @@ export const fr: MessageTable = {
   useFullForm:
     'Certains champs obligatoires ne figurent pas dans ce formulaire. Ouvrez le formulaire complet pour les ajouter.',
   recordDeleted: 'Entrée supprimée',
+  bulkSelectTitle: 'Choisir et supprimer',
+  bulkSelectAll: 'Tout choisir',
+  bulkSelectNone: 'Ne rien choisir',
+  bulkSelectEmpty: 'Ce tableau n’a aucune entrée.',
+  bulkDeleteButton: 'Supprimer {n} entrées',
+  bulkDeleteConfirm: 'Supprimer {n} entrées de « {name} » ?',
+  bulkDeleted: '{n} entrées supprimées',
   newRecord: 'Nouvelle entrée',
   editRecord: 'Modifier l’entrée',
   save: 'Enregistrer',
@@ -1922,6 +1929,9 @@ export const fr: MessageTable = {
 };
 
 export const frSingular: SingularTable = {
+  bulkDeleteButton: 'Supprimer {n} entrée',
+  bulkDeleteConfirm: 'Supprimer {n} entrée de « {name} » ?',
+  bulkDeleted: '{n} entrée supprimée',
   wordSwapOriginalLines: 'Remettre l’original ({n} ligne)',
   describeSourceLimit: 'affiche jusqu’à {n} entrée',
   buildStoppedHint: 'Arrêté. Ce qui est fait reste. Il reste {n} étape.',

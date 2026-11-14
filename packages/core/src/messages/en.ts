@@ -422,6 +422,13 @@ export const en = {
   tableFull: 'This table is full (10,000 entries).',
   useFullForm: 'Some required fields aren’t in this form. Open the full form to add.',
   recordDeleted: 'Entry deleted',
+  bulkSelectTitle: 'Select to delete',
+  bulkSelectAll: 'Select all',
+  bulkSelectNone: 'Select none',
+  bulkSelectEmpty: 'This table has no entries.',
+  bulkDeleteButton: 'Delete {n} entries',
+  bulkDeleteConfirm: 'Delete {n} entries from “{name}”?',
+  bulkDeleted: '{n} entries deleted',
   newRecord: 'New entry',
   editRecord: 'Edit entry',
   save: 'Save',
@@ -1846,6 +1853,9 @@ export type MessageTable = Record<StringKey, string>;
 
 /** 单数写法（isSingular 为真时用），只放带数量的文案；哪个参数决定单复数见 messages.ts 的 PLURAL_COUNT_VARIABLE。 */
 export const enSingular = {
+  bulkDeleteButton: 'Delete {n} entry',
+  bulkDeleteConfirm: 'Delete {n} entry from “{name}”?',
+  bulkDeleted: '{n} entry deleted',
   wordSwapOriginalLines: 'Use original ({n} line)',
   describeSourceLimit: 'shows up to {n} entry',
   buildStoppedHint: 'Stopped. What’s done stays. {n} step left.',

@@ -213,6 +213,8 @@ export interface Applied {
 export interface RecordToast {
   message: string;
   restoreRecordId?: string;
+  /** 一起删的几条（D-547）：撤销时全部放回来。 */
+  restoreRecordIds?: string[];
   /** 删掉的预设（D-410）：预设是真删，撤销时把这份放回去。 */
   restorePreset?: SavedPreset;
   /** 这张表还没有页面读：提示上有「接着改」，打开 AI 页改这张表。 */
