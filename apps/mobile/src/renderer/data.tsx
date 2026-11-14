@@ -83,7 +83,7 @@ import {
   minusValue,
 } from '@morph/core';
 import { useRouter } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -100,6 +100,7 @@ import {
   Keyboard,
 } from 'react-native';
 
+import { useLinkPick } from '../data/link-pick';
 import { useComputedRecords, useLinkResolver, useRecordActions, useRecords } from '../data/records';
 import { useSimilarCheck } from '../data/similar-records';
 import { useCalendar, useWorkspace } from '../workspace/context';
@@ -834,6 +835,19 @@ function LinkInput({
   const links = useLinkResolver(view);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const router = useRouter();
+  // 「新加一条」（D-546）：新记录页存好以后交回记录 ID，这里选上它。
+  const [token] = useState(() => Math.random().toString(36).slice(2, 10));
+  useEffect(
+    () =>
+      useLinkPick.subscribe(({ picked }) => {
+        if (picked?.token !== token) return;
+        useLinkPick.setState({ picked: null });
+        onChange(picked.id);
+        setOpen(false);
+      }),
+    [token, onChange],
+  );
   if (!target) return null;
   const chosen = typeof value === 'string' && value ? value : null;
   const chosenRecord = chosen ? records?.find((r) => r.id === chosen) : undefined;
@@ -932,6 +946,22 @@ function LinkInput({
               </Text>
             </Pressable>
           ))}
+          <Pressable
+            testID={`${testID}-new`}
+            accessibilityRole="button"
+            onPress={() =>
+              router.push({
+                pathname: '/record/[collectionId]',
+                params: { collectionId: target.id, pickFor: token },
+              })
+            }
+            style={[styles.chip, { borderColor: palette.border, borderStyle: 'dashed' }]}>
+            <Text
+              numberOfLines={1}
+              style={[palette.font('bodyMedium', 14), { color: palette.primaryText }]}>
+              {t(locale, 'linkNew', { name: target.name })}
+            </Text>
+          </Pressable>
           {chosen ? (
             <Pressable
               testID={`${testID}-clear`}

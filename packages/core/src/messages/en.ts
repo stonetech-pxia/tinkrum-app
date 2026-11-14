@@ -1018,6 +1018,7 @@ export const en = {
   linkNone: 'Not linked',
   linkChoose: 'Choose…',
   linkSearch: 'Search',
+  linkNew: 'Add a new one to “{name}”',
   linkClear: 'Remove link',
   linkEmptyTable: '“{name}” has no entries yet.',
   // 提醒（D-251）

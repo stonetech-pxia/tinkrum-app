@@ -1082,6 +1082,7 @@ export const fr: MessageTable = {
   linkNone: 'Aucun lien',
   linkChoose: 'Choisir…',
   linkSearch: 'Rechercher',
+  linkNew: 'Ajouter une entrée dans « {name} »',
   linkClear: 'Retirer le lien',
   linkEmptyTable: '« {name} » ne contient encore aucune entrée.',
   // 提醒（D-251）

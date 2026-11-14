@@ -958,6 +958,7 @@ export const zh: MessageTable = {
   linkNone: '没有选',
   linkChoose: '选一条…',
   linkSearch: '搜索',
+  linkNew: '在「{name}」里新加一条',
   linkClear: '不选了',
   linkEmptyTable: '「{name}」里还没有记录。',
   // 提醒（D-251）
