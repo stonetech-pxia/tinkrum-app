@@ -35,9 +35,20 @@ export const USES_FEATURES = [
   'appOnPhoneHomeScreen',
   /** single 块的 source.record "$record"：给一条记录用的页面上显示打开的那一条（D-558）。 */
   'singleOpenedRecord',
+  /** 时间段 yesterday / lastWeek / lastMonth / lastYear / tomorrow / nextWeek / nextMonth（D-559）。 */
+  'periodNeighbours',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
+const NEIGHBOURS = new Set([
+  'yesterday',
+  'lastWeek',
+  'lastMonth',
+  'lastYear',
+  'tomorrow',
+  'nextWeek',
+  'nextMonth',
+]);
 const RECORD_LOOK_SET = new Set<string>(RECORD_LOOKS);
 const ICON_NAME = /^[a-z][a-z0-9-]*$/;
 
@@ -70,6 +81,14 @@ export function usesOf(content: unknown): FileUses {
       found.looks.add(node.look);
       const show = node.show;
       if (isObject(show)) {
+        // period 块的选项和默认（D-559）。
+        if (
+          node.look === 'period' &&
+          [show.options, show.default]
+            .flat()
+            .some((p) => typeof p === 'string' && NEIGHBOURS.has(p))
+        )
+          found.features.add('periodNeighbours');
         if (show.columns !== undefined) found.features.add('showColumns');
         if (show.highlight !== undefined) found.features.add('showHighlight');
         if (show.color !== undefined && RECORD_LOOK_SET.has(node.look) && node.look !== 'calendar')
@@ -88,9 +107,13 @@ export function usesOf(content: unknown): FileUses {
       if (Array.isArray(node.value)) found.features.add('filterAnyOf');
       if (node.op === 'inPeriod' && typeof node.value === 'string' && NEXT_DAYS.has(node.value))
         found.features.add('periodNextDays');
+      if (node.op === 'inPeriod' && typeof node.value === 'string' && NEIGHBOURS.has(node.value))
+        found.features.add('periodNeighbours');
     }
     if (typeof node.period === 'string' && NEXT_DAYS.has(node.period))
       found.features.add('periodNextDays');
+    if (typeof node.period === 'string' && NEIGHBOURS.has(node.period))
+      found.features.add('periodNeighbours');
     if (node.kind === 'reminder' && node.app !== undefined) found.features.add('reminderInApp');
     for (const [k, v] of Object.entries(node)) {
       // 图标：白名单里的名字（emoji 不算，哪个版本都认）。

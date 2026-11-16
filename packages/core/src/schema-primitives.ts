@@ -53,6 +53,14 @@ export const PERIODS = [
   'next7days',
   'next30days',
   'next90days',
+  // 日历上前后的一整段（D-559）：昨天、上周、上月、去年、明天、下周、下月。
+  'yesterday',
+  'lastWeek',
+  'lastMonth',
+  'lastYear',
+  'tomorrow',
+  'nextWeek',
+  'nextMonth',
 ] as const;
 export type Period = (typeof PERIODS)[number];
 
@@ -66,6 +74,11 @@ export const PAGE_PERIODS = [
   'last30days',
   'last90days',
   'last365days',
+  // 已经过去的一整段（D-559）。往后的不放：页面上的范围是看已经记下的。
+  'yesterday',
+  'lastWeek',
+  'lastMonth',
+  'lastYear',
 ] as const;
 export type PagePeriod = (typeof PAGE_PERIODS)[number];
 

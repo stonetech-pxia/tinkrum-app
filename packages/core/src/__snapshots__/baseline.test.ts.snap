@@ -3008,9 +3008,9 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 24>.pin? "top"|"bottom"
 <oneOf 24>.look "period"
 <oneOf 24>.show object
-<oneOf 24>.show.options array items 1..8
-<oneOf 24>.show.options[] "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"
-<oneOf 24>.show.default? "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"
+<oneOf 24>.show.options array items 1..12
+<oneOf 24>.show.options[] "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"|"yesterday"|"lastWeek"|"lastMonth"|"lastYear"
+<oneOf 24>.show.default? "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"|"yesterday"|"lastWeek"|"lastMonth"|"lastYear"
 <oneOf 24>.show.custom? true
 <oneOf 25> object
 <oneOf 25>.id string /^[a-z][a-z0-9-]{0,47}$/

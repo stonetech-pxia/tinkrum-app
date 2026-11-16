@@ -33,6 +33,10 @@ const LABELS: Record<PagePeriod, Parameters<typeof t>[1]> = {
   last30days: 'periodOpt_last30days',
   last90days: 'periodOpt_last90days',
   last365days: 'periodOpt_last365days',
+  yesterday: 'periodOpt_yesterday',
+  lastWeek: 'periodOpt_lastWeek',
+  lastMonth: 'periodOpt_lastMonth',
+  lastYear: 'periodOpt_lastYear',
 };
 
 export function PeriodBar({ block, env }: { block: BlockOf<'period'>; env: RenderEnv }) {

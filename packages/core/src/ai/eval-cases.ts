@@ -7984,6 +7984,82 @@ const OPENED_RECORD_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 账单表：名字、金额、到期日，一页列出来。 */
+const billsEarlier: EvalEarlier = {
+  input:
+    'Make a table of my bills with a name, an amount and a due date, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'bills',
+        name: 'Bills',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'amount', name: 'Amount', type: 'money', currency: 'USD' },
+          { id: 'due', name: 'Due date', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'bills-page',
+        title: 'Bills',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'bills', limit: 50 },
+            show: { title: 'name' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+// 日历上前后的时间段（D-559）。
+const NEIGHBOUR_PERIOD_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG17',
+    input: "Add a list of last month's bills",
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [billsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'bills').some((x) =>
+          (x.source.filter ?? []).some(
+            (f) => f.field === 'due' && f.op === 'inPeriod' && f.value === 'lastMonth',
+          ),
+        )
+          ? null
+          : 'expected a bills list filtered on due inPeriod lastMonth',
+    },
+  },
+  {
+    id: 'KG18',
+    input: '记账页面加一个数字：上个月一共花了多少',
+    locale: 'zh',
+    setup: 'budget',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        numbersOf(c, 'expenses').some(
+          (x) =>
+            x.source.aggregate === 'sum' &&
+            (x.source.filter ?? []).some((f) => f.op === 'inPeriod' && f.value === 'lastMonth'),
+        )
+          ? null
+          : 'expected a sum number on expenses filtered inPeriod lastMonth',
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8042,6 +8118,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...DATE_OFFSET_CASES,
   ...DATE_OFFSET_USE_CASES,
   ...OPENED_RECORD_CASES,
+  ...NEIGHBOUR_PERIOD_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

@@ -95,6 +95,11 @@ export function periodRange(
   const [y, m, d] = dateOfDayNumber(today).split('-').map(Number) as [number, number, number];
   const monthEnd = localDate(new Date(y, m, 0));
   const ym = `${y}-${String(m).padStart(2, '0')}`;
+  /** 这个月往前（负数）或往后数第几个月的一整个月。 */
+  const month = (by: number): [string, string] => {
+    const first = new Date(y, m - 1 + by, 1);
+    return [localDate(first), localDate(new Date(first.getFullYear(), first.getMonth() + 1, 0))];
+  };
   switch (period) {
     case 'today':
       return span(today, 1);
@@ -124,6 +129,21 @@ export function periodRange(
       return span(today, 30);
     case 'next90days':
       return span(today, 90);
+    // 日历上前后的一整段（D-559）。
+    case 'yesterday':
+      return span(today - 1, 1);
+    case 'tomorrow':
+      return span(today + 1, 1);
+    case 'lastWeek':
+      return span(weekStartOf(today, cal) - 7, 7);
+    case 'nextWeek':
+      return span(weekStartOf(today, cal) + 7, 7);
+    case 'lastMonth':
+      return month(-1);
+    case 'nextMonth':
+      return month(1);
+    case 'lastYear':
+      return [`${y - 1}-01-01`, `${y - 1}-12-31`];
   }
 }
 

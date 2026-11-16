@@ -60,12 +60,14 @@ export function previousFullRange(
       return shift(1, 1);
     case 'thisWeek':
       return shift(7, 7);
-    case 'thisMonth': {
+    case 'thisMonth':
+    case 'lastMonth': {
       const last = new Date(Date.UTC(y, m - 1, 0));
       const prev = `${last.getUTCFullYear()}-${String(last.getUTCMonth() + 1).padStart(2, '0')}`;
       return { start: `${prev}-01`, end: `${prev}-${String(last.getUTCDate()).padStart(2, '0')}` };
     }
     case 'thisYear':
+    case 'lastYear':
       return { start: `${y - 1}-01-01`, end: `${y - 1}-12-31` };
     default:
       return shift(days, days);
