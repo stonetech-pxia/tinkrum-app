@@ -10,6 +10,7 @@ import {
   type StoredRecord,
   type ToolRunRecord,
   type WorkspaceRepo,
+  type RecordImport,
   type RecordRange,
   type RecordWrite,
 } from './types';
@@ -27,6 +28,8 @@ export class MemoryWorkspaceRepo implements WorkspaceRepo {
   private meta = new Map<string, string>();
   /** 记录以 JSON 保存，模拟数据库的写入与读取。 */
   private records = new Map<string, string>();
+  /** 导入的一批批记录（D-574）：一批和它的记录 ID。 */
+  private imports: { batch: Omit<RecordImport, 'present'>; ids: string[] }[] = [];
   /** 预设也以 JSON 保存。 */
   private presets = new Map<string, string>();
   private clock = 0;
@@ -365,5 +368,48 @@ export class MemoryWorkspaceRepo implements WorkspaceRepo {
   async purgeCollection(collectionId: string) {
     for (const r of this.allRecords())
       if (r.collectionId === collectionId) this.records.delete(r.id);
+  }
+
+  async importRecords(
+    batch: Omit<RecordImport, 'count' | 'present'>,
+    records: readonly DataRecord[],
+  ) {
+    // 和 SQLite 的事务一样：先查完，有一条写不进去就一条都不写。
+    if (this.imports.some((i) => i.batch.id === batch.id)) throw new Error('duplicate import');
+    if (
+      records.some(
+        (r, k) => this.records.has(r.id) || records.findIndex((x) => x.id === r.id) !== k,
+      )
+    )
+      throw new Error('duplicate record id');
+    for (const r of records) this.writeRecord({ ...r, deletedAt: null });
+    this.imports.push({
+      batch: { ...batch, count: records.length },
+      ids: records.map((r) => r.id),
+    });
+  }
+
+  async listImports(collectionId: string) {
+    return this.imports
+      .filter((i) => i.batch.collectionId === collectionId)
+      .map((i): RecordImport => ({
+        ...i.batch,
+        present: i.ids.filter((id) => this.readRecord(id)?.deletedAt === null).length,
+      }))
+      .reverse()
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  async deleteImport(id: string, deletedAt: number) {
+    const batch = this.imports.find((i) => i.batch.id === id);
+    let n = 0;
+    for (const rid of batch?.ids ?? []) {
+      const r = this.readRecord(rid);
+      if (r && r.deletedAt === null) {
+        this.writeRecord({ ...r, deletedAt });
+        n++;
+      }
+    }
+    return n;
   }
 }

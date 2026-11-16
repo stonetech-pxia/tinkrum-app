@@ -217,6 +217,35 @@ export interface WorkspaceRepo {
   countRecords(): Promise<{ collectionId: string; count: number }[]>;
   /** 用户确认后永久删除一张表的全部记录。 */
   purgeCollection(collectionId: string): Promise<void>;
+
+  // ---- 从表格文件导入（D-574）：只由用户在「设置 → 数据」里操作 ----
+  /** 这些记录和这一批的记号在同一个事务里写，要么全写、要么全不写。 */
+  importRecords(
+    batch: Omit<RecordImport, 'count' | 'present'>,
+    records: readonly DataRecord[],
+  ): Promise<void>;
+  /** 一张表的导入，最新的在前（present 为 0 的也在，由调用方决定显不显示）。 */
+  listImports(collectionId: string): Promise<RecordImport[]>;
+  /**
+   * 撤销一次导入、删除这次导入：这一批里现在还在的记录软删除（进「最近删除」，30 天，和一条条删一样），
+   * 之后改过的也一起；已经删了的不算。返回删了几条。
+   */
+  deleteImport(id: string, deletedAt: number): Promise<number>;
+}
+
+/**
+ * 一次从表格文件导入的一批记录（D-574）：只在本机的数据库里，不在配置里、不随版本恢复，也不发给 AI（底线 1、2、14）。
+ * 文件名只是给用户看是哪一次。
+ */
+export interface RecordImport {
+  id: string;
+  collectionId: string;
+  fileName: string;
+  /** 导入时写了几条。 */
+  count: number;
+  /** 现在还在的（没删、不在「最近删除」里）几条。 */
+  present: number;
+  createdAt: number;
 }
 
 /** listRecordsInRange 的范围（core 的 monthQueryRange 加上按哪个字段）。 */

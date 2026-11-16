@@ -11,6 +11,7 @@ import {
   type StoredRecord,
   type ToolRunRecord,
   type WorkspaceRepo,
+  type RecordImport,
   type RecordRange,
   type RecordWrite,
 } from './types';
@@ -18,7 +19,7 @@ import { sameValues } from './record-values';
 
 // SQLite 实现。数据库结构用 PRAGMA user_version 管理，每个元素是一次升级。
 
-const DB_MIGRATIONS: string[] = [
+export const DB_MIGRATIONS: string[] = [
   `CREATE TABLE workspace_head (
      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
      revision_id INTEGER NOT NULL REFERENCES revisions(id)
@@ -91,6 +92,22 @@ const DB_MIGRATIONS: string[] = [
      schema_version INTEGER NOT NULL,
      config_json TEXT NOT NULL,
      created_at INTEGER NOT NULL
+   );`,
+  // 从表格文件导入的一批批记录（D-574）：哪一批、什么时候、进了哪张表、几条、文件叫什么（只给用户看），
+  // 以及每一批有哪些记录。只加两张新表，records 和别的表的已有行一行都不动。
+  // record_id 不用外键：清空回收站、永久删除一张表时 records 里的行会真删，这里留下的对不上的行在计数时自然不算。
+  `CREATE TABLE record_imports (
+     id TEXT PRIMARY KEY,
+     collection_id TEXT NOT NULL,
+     file_name TEXT NOT NULL,
+     record_count INTEGER NOT NULL,
+     created_at INTEGER NOT NULL
+   );
+   CREATE INDEX record_imports_by_collection ON record_imports (collection_id, created_at);
+   CREATE TABLE import_items (
+     import_id TEXT NOT NULL REFERENCES record_imports(id),
+     record_id TEXT NOT NULL,
+     PRIMARY KEY (import_id, record_id)
    );`,
 ];
 
@@ -655,6 +672,74 @@ export class SQLiteWorkspaceRepo implements WorkspaceRepo {
   async purgeCollection(collectionId: string) {
     await this.db.runAsync('DELETE FROM records WHERE collection_id = ?', collectionId);
   }
+
+  async importRecords(
+    batch: Omit<RecordImport, 'count' | 'present'>,
+    records: readonly DataRecord[],
+  ) {
+    await this.db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync(
+        'INSERT INTO record_imports (id, collection_id, file_name, record_count, created_at) VALUES (?, ?, ?, ?, ?)',
+        batch.id,
+        batch.collectionId,
+        batch.fileName,
+        records.length,
+        batch.createdAt,
+      );
+      for (const r of records) {
+        await txn.runAsync(
+          'INSERT INTO records (id, collection_id, values_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+          r.id,
+          r.collectionId,
+          JSON.stringify(r.values),
+          r.createdAt,
+          r.updatedAt,
+        );
+        await txn.runAsync(
+          'INSERT INTO import_items (import_id, record_id) VALUES (?, ?)',
+          batch.id,
+          r.id,
+        );
+      }
+    });
+  }
+
+  async listImports(collectionId: string) {
+    const rows = await this.db.getAllAsync<ImportRow>(
+      `SELECT i.id, i.collection_id, i.file_name, i.record_count, i.created_at,
+         (SELECT COUNT(*) FROM import_items m JOIN records r ON r.id = m.record_id
+           WHERE m.import_id = i.id AND r.deleted_at IS NULL) AS present
+       FROM record_imports i WHERE i.collection_id = ? ORDER BY i.created_at DESC, i.rowid DESC`,
+      collectionId,
+    );
+    return rows.map((r): RecordImport => ({
+      id: r.id,
+      collectionId: r.collection_id,
+      fileName: r.file_name,
+      count: r.record_count,
+      present: r.present,
+      createdAt: r.created_at,
+    }));
+  }
+
+  async deleteImport(id: string, deletedAt: number) {
+    const result = await this.db.runAsync(
+      `UPDATE records SET deleted_at = ? WHERE deleted_at IS NULL
+         AND id IN (SELECT record_id FROM import_items WHERE import_id = ?)`,
+      deletedAt,
+      id,
+    );
+    return result.changes;
+  }
+}
+
+interface ImportRow {
+  id: string;
+  collection_id: string;
+  file_name: string;
+  record_count: number;
+  created_at: number;
+  present: number;
 }
 
 interface AssetRow {

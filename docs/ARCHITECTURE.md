@@ -116,6 +116,8 @@ SQLite tables (`PRAGMA user_version` manages database structure upgrades, see `a
 | `asset_grants`    | Tool → file grants                                                                                            |
 | `tool_runs`       | Workflow run records (no file contents)                                                                       |
 | `app_meta`        | Small on-device settings, for example usage statistics (D-127); not in the config, not restored with versions |
+| `record_imports`  | One row per import from a spreadsheet file (D-574): table, file name, count, time; not in the config          |
+| `import_items`    | Which entries came from which import (D-574)                                                                  |
 
 User files are stored in the app document directory at `assets/<id>/<file name>`, separate from revisions; rollback and uninstalling tools never touch them.
 
