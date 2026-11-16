@@ -35,6 +35,32 @@ const seed = (locale: Locale, registry: Registry) => {
     [
       { op: 'addData', table: orders },
       {
+        op: 'addData',
+        table: {
+          id: 'big',
+          name: 'Big',
+          fields: [
+            { id: 'title', name: 'Title', type: 'text' },
+            {
+              id: 'kind',
+              name: 'Kind',
+              type: 'choice',
+              options: Array.from({ length: 12 }, (_, i) => ({ id: `k${i}`, label: `Kind ${i}` })),
+            },
+          ],
+        },
+      },
+      {
+        op: 'addContainer',
+        page: {
+          id: 'many',
+          title: 'Many',
+          blocks: [
+            { id: 'kinds', look: 'choices', show: {}, source: { table: 'big', field: 'kind' } },
+          ],
+        },
+      },
+      {
         op: 'addTool',
         tool: {
           id: 'to-excel',
@@ -125,6 +151,16 @@ describe('a row of choices that the blocks of the page follow (D-573)', () => {
     expect(screen.getByTestId('choices-to-ship')).toHaveTextContent('To ship');
     // 字段里有选项写了颜色：每一项前面一个点。
     expect(screen.getByTestId('choices-dot-shipped')).toBeTruthy();
+  });
+
+  it('a few options wrap; many options sit on one line that scrolls sideways', async () => {
+    await open([]);
+    await screen.findByTestId('choices-all');
+    expect(screen.queryByTestId('choices-scroll')).toBeNull();
+    await act(() => router.push({ pathname: '/page/[pageId]', params: { pageId: 'many' } }));
+    await settle();
+    expect(await screen.findByTestId('choices-scroll')).toBeTruthy();
+    expect(screen.getByTestId('choices-k11')).toHaveTextContent('Kind 11');
   });
 
   it('picking an option narrows the list, the total and the list tool; others keep all', async () => {

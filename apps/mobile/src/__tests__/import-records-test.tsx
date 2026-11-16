@@ -205,6 +205,10 @@ it('a new user with an empty table: map, review, nothing is written until Import
     'Ana',
     'Bo',
   ]);
+  // 撤销以后这一页照实说，不再写着「已导入」。
+  await flush();
+  expect(screen.getByTestId('import-done')).toHaveTextContent(/已放进「最近删除」/);
+  expect(screen.getByTestId('import-done')).not.toHaveTextContent(/已在「订单」导入/);
 });
 
 it('with data: undo removes exactly the batch; the data screen lists it, deleting it asks first and takes edited entries too; restore brings one back', async () => {

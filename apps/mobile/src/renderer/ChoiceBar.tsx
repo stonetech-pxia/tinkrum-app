@@ -1,5 +1,5 @@
 import { choiceRowOptions, optionColor, type BlockOf } from '@morph/core';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { t } from '../i18n';
 import type { RenderEnv } from './components';
@@ -8,6 +8,9 @@ import { onPage } from './theme';
 // 页面上的一排选项（D-573）：一个单选字段的选项排成一排（「全部」在前），点一个，同一页里跟着它的列表、数字和图表
 // 只显示这一项的记录。和时间范围块（PeriodBar）一个样子；选了什么只放在页面的状态里（RenderEnv.pageChoice），
 // 什么都不写（底线 15）。字段里有选项写了颜色（D-568）时，每一项前面一个那个颜色的点（和列表上的点一样）。
+
+/** 最多几项还折行排；再多就排成一行横着滑（50 个选项折行会占掉好几屏）。 */
+const WRAP_UP_TO = 8;
 
 export function ChoiceBar({ block, env }: { block: BlockOf<'choices'>; env: RenderEnv }) {
   const { locale, interactive } = env;
@@ -45,8 +48,9 @@ export function ChoiceBar({ block, env }: { block: BlockOf<'choices'>; env: Rend
       </Text>
     </Pressable>
   );
-  return (
-    <View style={styles.row}>
+  const count = options.length + (block.show.all !== false ? 1 : 0);
+  const chips = (
+    <>
       {block.show.all !== false
         ? chip('all', t(locale, 'choicesAll'), picked === null, () => state?.set(null))
         : null}
@@ -66,12 +70,25 @@ export function ChoiceBar({ block, env }: { block: BlockOf<'choices'>; env: Rend
             : undefined,
         ),
       )}
-    </View>
+    </>
   );
+  if (count > WRAP_UP_TO)
+    return (
+      <ScrollView
+        testID="choices-scroll"
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.line}>
+        {chips}
+      </ScrollView>
+    );
+  return <View style={styles.row}>{chips}</View>;
 }
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  line: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   chip: {
     minHeight: 32,
     maxWidth: '100%',

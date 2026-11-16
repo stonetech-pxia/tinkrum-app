@@ -19,11 +19,12 @@ import {
   type SpreadsheetError,
 } from '@morph/core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { readSpreadsheet, spreadsheetKind } from '@/data/import-file';
+import { tableVersion } from '@/data/records';
 import { t } from '@/i18n';
 import { Button, Card } from '@/renderer/ui';
 import { usePalette, type Palette } from '@/renderer/theme';
@@ -102,6 +103,21 @@ export default function ImportRecordsRoute() {
   const [plan, setPlan] = useState<ImportPlan | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  // 刚导入的那一批：之后在提示条上撤销了（或者在别处整批删了），这一页不能还写着「已导入」。
+  const [batchId, setBatchId] = useState<string | null>(null);
+  const [undone, setUndone] = useState(false);
+  const version = useWorkspace((s) => (table ? tableVersion(s, table) : ''));
+  useEffect(() => {
+    if (!batchId || !table) return;
+    let alive = true;
+    void repo.listImports(table).then((list) => {
+      const batch = list.find((b) => b.id === batchId);
+      if (alive) setUndone(!batch || batch.present === 0);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [repo, table, batchId, version]);
   const targets = useMemo(() => (collection ? importTargets(collection) : []), [collection]);
   if (!collection) return null;
   const name = collection.name;
@@ -189,6 +205,7 @@ export default function ImportRecordsRoute() {
       bump([collection!.id]);
       const message = t(locale, 'importDone', { n: plan.entries.length, table: name });
       showToast({ message, undoImport: { id, table: collection!.id } });
+      setBatchId(id);
       setDone(message);
     } finally {
       setBusy(false);
@@ -204,7 +221,7 @@ export default function ImportRecordsRoute() {
   if (done) {
     content = (
       <Card palette={palette} testID="import-done">
-        <Text style={body}>{done}</Text>
+        <Text style={body}>{undone ? t(locale, 'importUndone') : done}</Text>
         <Button palette={palette} label={t(locale, 'done')} onPress={() => router.back()} />
       </Card>
     );

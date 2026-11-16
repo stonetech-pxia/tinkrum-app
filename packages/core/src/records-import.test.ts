@@ -16,6 +16,7 @@ import {
   sheetColumns,
   type SheetCell,
 } from './records-import';
+import { t } from './messages';
 import type { Collection, Field } from './schema';
 
 // 表格文件的行导进已有的表（D-574）：读 CSV、按名字对列、宽容地读每一格再交给字段自己的 write、汇总导不进去的行。
@@ -293,5 +294,17 @@ describe('planning an import', () => {
   it('the table cap of 10,000 is not passed, and nothing is imported in part', () => {
     expect(importLimitProblem(10, 10, 9990)).toBeNull();
     expect(importLimitProblem(10, 10, 9995)).toEqual({ code: 'tableFull', room: 5 });
+  });
+});
+
+describe('the summary sentence for rows left out', () => {
+  it('says "rows" / "lignes" before several row numbers and "row" / "ligne" before one', () => {
+    const many = { n: 2, field: 'Amount', rows: '2, 4' };
+    const one = { n: 1, field: 'Amount', rows: '5' };
+    expect(t('en', 'importReason_invalid', many)).toContain('(rows 2, 4)');
+    expect(t('en', 'importReason_invalid', one)).toContain('(row 5)');
+    expect(t('fr', 'importReason_required', many)).toContain('(lignes 2, 4)');
+    expect(t('fr', 'importReason_required', one)).toContain('(ligne 5)');
+    expect(t('zh', 'importReason_invalid', many)).toContain('（第 2, 4 行）');
   });
 });
