@@ -129,8 +129,28 @@ const setAll = {
   value: RecordToolValueSchema,
 };
 
-/** 一键记录的 5 种（关系规则 7）。 */
-export const RECORD_TOOL_KINDS = ['create', 'set', 'toggle', 'increment', 'setAll'] as const;
+/**
+ * 批量新建（D-567，创始人 2026-11-16 ④）：from 表里筛出来的每一条，在 table 里新建一条。values 里 "$row" 是来源的那一条
+ * （只给指向 from 的引用字段），抄的也是它的字段（D-565）。先问，最多 MAX_CREATE_ALL 条，引擎一条一条做，
+ * 配置里没有循环（底线 9）；做完提示条能一次撤回这一批（底线 11）。
+ */
+const createAll = {
+  do: z.literal('createAll'),
+  table: IdSchema,
+  from: IdSchema,
+  filter: filterSchema().optional(),
+  values: RecordToolValuesSchema,
+};
+
+/** 一键记录的 6 种（关系规则 7）。 */
+export const RECORD_TOOL_KINDS = [
+  'create',
+  'set',
+  'toggle',
+  'increment',
+  'setAll',
+  'createAll',
+] as const;
 export type RecordToolKind = (typeof RECORD_TOOL_KINDS)[number];
 
 export const RecordToolSchema = z.discriminatedUnion('do', [
@@ -139,11 +159,14 @@ export const RecordToolSchema = z.discriminatedUnion('do', [
   z.strictObject(toggle),
   z.strictObject(increment),
   z.strictObject(setAll),
+  z.strictObject(createAll),
 ]);
 export type RecordTool = z.infer<typeof RecordToolSchema>;
 
 /** setAll 一次最多改几条（D-303）。 */
 export const MAX_SET_ALL = 200;
+/** createAll 一次最多新建几条（D-567，和 setAll 一样）。 */
+export const MAX_CREATE_ALL = 200;
 
 /**
  * 块上的工具出现在哪（关系规则 4）：submit 表单的提交、button 每一条右边的按钮（≤3，显示第一个 when 满足的）、
@@ -179,6 +202,7 @@ export const ToolUseSchema = z.union([
   z.strictObject({ ...useBase, ...toggle, ...also }),
   z.strictObject({ ...useBase, ...increment, ...also }),
   z.strictObject({ ...useBase, ...setAll }),
+  z.strictObject({ ...useBase, ...createAll }),
   z.strictObject({ ...useBase, opens: z.union([z.literal('record'), IdSchema]) }),
 ]);
 export type ToolUse = z.infer<typeof ToolUseSchema>;
@@ -240,6 +264,9 @@ export function toolEntryFields(tool: RecordTool): string[] {
     case 'increment':
       return typeof tool.by === 'string' ? [tool.by] : [];
     case 'toggle':
+      return [];
+    // 批量新建读的是来源表的每一条，不是「这一条」（record-ops.ts 的 createAllInputs 自己算）。
+    case 'createAll':
       return [];
   }
 }

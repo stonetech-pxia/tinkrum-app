@@ -53,6 +53,8 @@ export const USES_FEATURES = [
   'incrementByField',
   /** 点一下改几处：就地工具上的 also（D-566）。 */
   'tapAlso',
+  /** 一键记录工具的第六种：批量新建（D-567）。 */
+  'createAll',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -144,6 +146,7 @@ export function usesOf(content: unknown): FileUses {
       if (node.do === 'increment' && typeof node.by === 'string')
         found.features.add('incrementByField');
       if (Array.isArray(node.also)) found.features.add('tapAlso');
+      if (node.do === 'createAll') found.features.add('createAll');
     }
     if (node.kind === 'reminder' && node.app !== undefined) found.features.add('reminderInApp');
     if (node.kind === 'reminder' && isObject(node.when)) {

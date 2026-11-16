@@ -6,7 +6,7 @@ The full background and examples are in `~/Library/Application Support/Claude/si
 
 ## Invariants (D-375, provisional)
 
-19 rules the founder set in conversation on 2026-10-31 ("Let's go with these rules for now"; the same day 3, 7, 11 and 16 were changed and 19 was added, see D-377–D-381; 11 was changed again that day, see D-385; on 2026-11-06 14 was changed, see D-455; on 2026-11-16 11 was changed, see D-566). **Only the founder can change them**, and every change goes into `docs/DECISIONS.md` (with the date and where it was said). **Every report must say whether this change touched an invariant.** Guard tests: for core, `packages/core/src/invariants.test.ts` (called "core" below); for mobile, `apps/mobile/src/__tests__/invariants-test.tsx` ("mobile") and `invariants-files-test.ts` ("files"). Each invariant has its own `describe`. When a test finds a violation, do not fix it on your own: mark it `it.fails` / `it.failing` with the comment "violates invariant N, awaiting the founder's decision" (D-376).
+19 rules the founder set in conversation on 2026-10-31 ("Let's go with these rules for now"; the same day 3, 7, 11 and 16 were changed and 19 was added, see D-377–D-381; 11 was changed again that day, see D-385; on 2026-11-06 14 was changed, see D-455; on 2026-11-16 11 was changed, see D-566 and D-567). **Only the founder can change them**, and every change goes into `docs/DECISIONS.md` (with the date and where it was said). **Every report must say whether this change touched an invariant.** Guard tests: for core, `packages/core/src/invariants.test.ts` (called "core" below); for mobile, `apps/mobile/src/__tests__/invariants-test.tsx` ("mobile") and `invariants-files-test.ts` ("files"). Each invariant has its own `describe`. When a test finds a violation, do not fix it on your own: mark it `it.fails` / `it.failing` with the comment "violates invariant N, awaiting the founder's decision" (D-376).
 
 Data and privacy
 
@@ -26,7 +26,7 @@ Tools
 
 9. A tool cannot trigger a tool; there are no branches and no loops. (core; `relation-rules.test.ts` rule 13)
 10. Data leaves the app only by the user's own tap, every time; anything scheduled or automatic can never export, share or send over the network. (core; `relation-rules.test.ts` rule 14)
-11. Every action that writes data can be taken back: what is saved and what the user has confirmed shows no undo banner, and the user reverses it with an equally simple action (uncheck, edit again, delete); an undo banner is shown only where one simple action cannot take it back: deletion, a tap that makes several changes at once, and entries created in bulk; a bulk change must always ask first (D-385, D-566). (mobile; `record-actions-test.tsx`, `tiles-board-test.tsx`, `record-tap-also-test.tsx`; core: setAll has no setting that skips the question, and when it asks it does not mention undo; a tap makes at most 3 changes, all to this entry, and a reminder's done stays one change)
+11. Every action that writes data can be taken back: what is saved and what the user has confirmed shows no undo banner, and the user reverses it with an equally simple action (uncheck, edit again, delete); an undo banner is shown only where one simple action cannot take it back: deletion, a tap that makes several changes at once, and entries created in bulk; a bulk change must always ask first (D-385, D-566, D-567). (mobile; `record-actions-test.tsx`, `tiles-board-test.tsx`, `record-tap-also-test.tsx`, `record-create-all-test.tsx`; core: setAll and createAll have no setting that skips the question, and when it asks it does not mention undo; a tap makes at most 3 changes, all to this entry, and a reminder's done stays one change)
 
 Compatibility
 
@@ -45,7 +45,7 @@ What the user wants
 
 19. What the user wants can be done: a quick action processes files and ends by handing over to a page (for example a new-record form or the record page) where the user confirms the save; any two actions whose types match can be chained; the AI cannot refuse a combination that can be done because it is "unreasonable", at most it adds a reminder. It is still a straight chain, and each step only takes the output of the previous one (invariant 9) (D-381). (core: any two actions whose types match can be chained; planner `invariants.test.ts`: the prompt has no rule that refuses a combination that can be done)
 
-The design rules (the one way to write a read, nesting depth, 6 ways of appearing and 5 one-tap records, setAll ≤ 200, containment and references) are not invariants and can be adjusted through DECISIONS.
+The design rules (the one way to write a read, nesting depth, 6 ways of appearing and 6 one-tap records, setAll and createAll ≤ 200, containment and references) are not invariants and can be adjusted through DECISIONS.
 
 ## Product principles
 

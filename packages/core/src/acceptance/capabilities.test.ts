@@ -320,6 +320,13 @@ function everything() {
         values: { at: 'now', status: 'b' },
       }),
       button('bulk', { do: 'setAll', table: 'items', field: 'status', value: 'a' }),
+      button('bulk-create', {
+        do: 'createAll',
+        table: 'items',
+        from: 'groups',
+        filter: [{ field: 'name', op: 'isNotEmpty' }],
+        values: { group: '$row' },
+      }),
       runAction('run-scan', 'scan-item'),
       records('list', 'rows', 'items', 'title', {
         source: { sort: { field: 'date', direction: 'desc' } },

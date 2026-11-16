@@ -8,6 +8,7 @@ import {
   isToolRefUse,
   tapWrites,
   toolEntryFields,
+  valueEntryFields,
   type RecordTool,
   type ToolUse,
 } from './record-ops-schema';
@@ -480,6 +481,16 @@ const hasKey = (o: object | undefined, key: string) =>
 
 /** 就地的一键记录工具用到了被删掉的表或字段。 */
 function recordToolUses(use: RecordTool, gone: Gone): boolean {
+  // 批量新建（D-567）：来源表、它的筛选和值里读来源的字段也算。
+  if (use.do === 'createAll' && use.from === gone.table) {
+    const id = gone.field;
+    if (
+      id === undefined ||
+      (use.filter ?? []).some((c) => c.field === id) ||
+      Object.values(use.values).some((v) => valueEntryFields(v).includes(id))
+    )
+      return true;
+  }
   if (use.table !== gone.table) return false;
   const id = gone.field;
   if (id === undefined) return true;
@@ -493,6 +504,8 @@ function recordToolUses(use: RecordTool, gone: Gone): boolean {
       );
     case 'setAll':
       return use.field === id || (use.filter ?? []).some((c) => c.field === id);
+    case 'createAll':
+      return hasKey(use.values, id);
     default:
       return use.field === id;
   }

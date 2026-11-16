@@ -872,6 +872,30 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     expect((await repo.getRecord('todos-1'))!.values).toEqual(before);
   });
 
+  it('creating entries in bulk asks first and shows undo, which removes the batch', async () => {
+    const config = v34('todo');
+    config.containers.pages
+      .find((p) => p.id === 'todo')!
+      .blocks.push({
+        id: 'copy-all',
+        look: 'button',
+        show: { label: '全部再来一遍', variant: 'filled' },
+        tools: [
+          { do: 'createAll', table: 'todos', from: 'todos', values: { title: { copy: 'title' } } },
+        ],
+      } as never);
+    const { repo } = await openPage(config, 'todo');
+    const before = (await repo.listRecords('todos')).length;
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.text === '新建')?.onPress?.();
+    });
+    await fireEvent.press(await screen.findByText('全部再来一遍'));
+    expect(alert).toHaveBeenCalled();
+    await fireEvent.press(await screen.findByTestId('toast-undo'));
+    await settle();
+    expect(await repo.listRecords('todos')).toHaveLength(before);
+  });
+
   it('a one-tap check-in (tapping a habit tile) shows no undo', async () => {
     const seededRepo = new MemoryWorkspaceRepo();
     await seededRepo.insertRecord({

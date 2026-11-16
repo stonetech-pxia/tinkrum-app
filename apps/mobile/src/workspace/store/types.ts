@@ -220,7 +220,11 @@ export interface RecordToast {
    * 撤销点一下改的几处（D-566）或批量新建的那些（D-567）：在一个事务里写回去，每条都要求还是做完时的样子，
    * 这期间改过就一条也不动。
    */
-  undo?: { writes: RecordWrite[]; tables: string[]; failed: 'recordUndoFailed' };
+  undo?: {
+    writes: RecordWrite[];
+    tables: string[];
+    failed: 'recordUndoFailed' | 'recordUndoBulkFailed';
+  };
   restoreRecordId?: string;
   /** 一起删的几条（D-547）：撤销时全部放回来。 */
   restoreRecordIds?: string[];

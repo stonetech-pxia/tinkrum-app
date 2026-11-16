@@ -2750,9 +2750,21 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 6>.label? string len 1..30
 <oneOf 6>.tools[]<anyOf 6>.when? array items ..3
 <oneOf 6>.tools[]<anyOf 6>.when[] = <oneOf 6>.tools[]<anyOf 0>.when[]
-<oneOf 6>.tools[]<anyOf 6>.opens
-<oneOf 6>.tools[]<anyOf 6>.opens<anyOf 0> "record"
-<oneOf 6>.tools[]<anyOf 6>.opens<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 6>.do "createAll"
+<oneOf 6>.tools[]<anyOf 6>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 6>.from string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 6>.filter? array items ..5
+<oneOf 6>.tools[]<anyOf 6>.filter[] = <oneOf 6>.tools[]<anyOf 0>.when[]
+<oneOf 6>.tools[]<anyOf 6>.values object record
+<oneOf 6>.tools[]<anyOf 6>.values{} = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 6>.tools[]<anyOf 7> object
+<oneOf 6>.tools[]<anyOf 7>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
+<oneOf 6>.tools[]<anyOf 7>.label? string len 1..30
+<oneOf 6>.tools[]<anyOf 7>.when? array items ..3
+<oneOf 6>.tools[]<anyOf 7>.when[] = <oneOf 6>.tools[]<anyOf 0>.when[]
+<oneOf 6>.tools[]<anyOf 7>.opens
+<oneOf 6>.tools[]<anyOf 7>.opens<anyOf 0> "record"
+<oneOf 6>.tools[]<anyOf 7>.opens<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.opens?
 <oneOf 7> object
 <oneOf 7>.id string /^[a-z][a-z0-9-]{0,47}$/
@@ -3561,6 +3573,14 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .tools[]<oneOf 1>.done<oneOf 4>.filter[] = .data.tables[].fields[]<oneOf rollup>.filter[]
 .tools[]<oneOf 1>.done<oneOf 4>.field string /^[a-z][a-z0-9-]{0,47}$/
 .tools[]<oneOf 1>.done<oneOf 4>.value = .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}
+.tools[]<oneOf 1>.done<oneOf 5> object
+.tools[]<oneOf 1>.done<oneOf 5>.do "createAll"
+.tools[]<oneOf 1>.done<oneOf 5>.table string /^[a-z][a-z0-9-]{0,47}$/
+.tools[]<oneOf 1>.done<oneOf 5>.from string /^[a-z][a-z0-9-]{0,47}$/
+.tools[]<oneOf 1>.done<oneOf 5>.filter? array items ..5
+.tools[]<oneOf 1>.done<oneOf 5>.filter[] = .data.tables[].fields[]<oneOf rollup>.filter[]
+.tools[]<oneOf 1>.done<oneOf 5>.values object record
+.tools[]<oneOf 1>.done<oneOf 5>.values{} = .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}
 .tools[]<oneOf 1>.snoozeMinutes? integer 5..240
 .tools[]<oneOf 1>.unless? object
 .tools[]<oneOf 1>.unless.table string /^[a-z][a-z0-9-]{0,47}$/

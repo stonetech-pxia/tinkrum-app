@@ -1796,6 +1796,13 @@ export const fr: MessageTable = {
   recordActionTooMany: 'Au plus {max} entrées peuvent changer à la fois ; cela en modifierait {n}.',
   recordActionGone: 'Cette entrée a été supprimée.',
   recordUndoFailed: 'Cette entrée a été modifiée depuis : rien n’a été annulé.',
+  recordCreateAllConfirm: 'Cela crée {n} entrées dans « {table} ».',
+  recordCreateAllConfirmButton: 'Créer',
+  recordCreateAllNothing: 'Aucune entrée ne correspond : rien n’a été créé.',
+  recordCreateAllTooMany:
+    'Au plus {max} entrées peuvent être créées à la fois ; cela en créerait {n}.',
+  recordCreateAllDone: '{n} entrées créées dans « {table} »',
+  recordUndoBulkFailed: 'Certaines de ces entrées ont été modifiées depuis : rien n’a été annulé.',
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: 'Mois précédent',
   calendarNextMonth: 'Mois suivant',
@@ -2059,6 +2066,10 @@ export const frSingular: SingularTable = {
   recordActionChanged: '{n} entrée modifiée',
   recordActionConfirm: 'Cela modifie {n} entrée.',
   recordActionTooMany: 'Au plus {max} entrées peuvent changer à la fois ; cela en modifierait {n}.',
+  recordCreateAllConfirm: 'Cela crée {n} entrée dans « {table} ».',
+  recordCreateAllTooMany:
+    'Au plus {max} entrées peuvent être créées à la fois ; cela en créerait {n}.',
+  recordCreateAllDone: '{n} entrée créée dans « {table} »',
   calendarDayLabel: '{date}, {n} entrée',
   widgetDone: '{n} appui du widget enregistré',
   widgetSkipped: '{n} appui sur le widget n’a pas été enregistré, car la page a changé',

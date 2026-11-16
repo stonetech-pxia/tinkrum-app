@@ -339,13 +339,15 @@ export function recordToolProblems(
     where = { ...where, entry: expandCollection(config.data.tables, entryTable) } as ValueWhere;
   const scope = scopeProblem(tool, collection, where);
   if (scope) return [scope];
-  if (tool.do !== 'create' && tool.do !== 'setAll' && !where.rowOf)
+  if (tool.do !== 'create' && tool.do !== 'setAll' && tool.do !== 'createAll' && !where.rowOf)
     return [
       `${where.label}: ${tool.do} changes one entry, so it only works on each entry of a list (or a reminder's done)`,
     ];
   switch (tool.do) {
     case 'create':
       return createProblems(tool, collection, where);
+    case 'createAll':
+      return createAllProblems(tool, collection, config, where);
     case 'setAll': {
       if (where.direct)
         return [
@@ -383,6 +385,30 @@ export function recordToolProblems(
         : [`${where.label}: by ${tool.by} must be a number field of ${entry.id} (or a number)`];
     }
   }
+}
+
+/**
+ * 批量新建（D-567）：来源表要在，筛选按来源表检查（可以用 "$record"），值按新建检查，"$row" 和抄的字段都是来源的那一条。
+ * 必填又没有默认值的字段要预设（没有表单可问）。提醒的「完成」不能用（它只改这一条）。
+ */
+function createAllProblems(
+  tool: Extract<RecordTool, { do: 'createAll' }>,
+  collection: Collection,
+  config: WorkspaceConfig,
+  where: ToolWhere,
+): string[] {
+  if (where.direct)
+    return [
+      `${where.label}: done acts on this entry ("${ROW_REF}"); use create, set, toggle or increment, not createAll`,
+    ];
+  const source = config.data.tables.find((c) => c.id === tool.from);
+  if (!source) return [`${where.label}: data table ${tool.from} does not exist`];
+  const view = expandCollection(config.data.tables, source);
+  const at: ValueWhere = { label: where.label, rowOf: source, entry: view };
+  return [
+    ...conditionProblems(tool.filter, view, where.recordOf).map((x) => `${where.label}: ${x}`),
+    ...createProblems({ do: 'create', table: tool.table, values: tool.values }, collection, at),
+  ];
 }
 
 /** 按钮上的字最长几个字（表单的提交 30，其余 20）。 */
@@ -474,7 +500,7 @@ function alsoProblems(use: RecordToolUse, config: WorkspaceConfig, where: ToolWh
     problems.push(
       `${label}: with also, the create must link back to this entry (a link field to ${row.id} set to "${ROW_REF}")`,
     );
-  const fields = tool.do === 'create' ? [] : [tool.field];
+  const fields = tool.do === 'create' || tool.do === 'createAll' ? [] : [tool.field];
   for (const a of also) {
     const at = { ...where, label: `${label} also` };
     if (a.do === 'create') {
@@ -669,6 +695,32 @@ export function setAllChanges(
     changes.push({ id: r.id, before: storedValues(collection, r.values), after: prepared.values });
   }
   return changes;
+}
+
+/**
+ * 批量新建（D-567）：筛出来的每一条来源（算好的记录，筛选可以用查找来的值）各一份新记录的表单输入，按来源的顺序。
+ * "$row" 是这条来源，抄的、日期起点也读它（D-565）。结果再交给 prepareRecordValues。
+ */
+export function createAllInputs(
+  tool: Extract<RecordTool, { do: 'createAll' }>,
+  target: Collection,
+  sourceView: Collection,
+  sources: readonly DataRecord[],
+  ctx: ActionContext,
+): { sourceId: string; input: Record<string, unknown> }[] {
+  const cal = ctx.cal ?? DEFAULT_CALENDAR;
+  return sources
+    .filter((r) =>
+      (tool.filter ?? []).every((c) => matchesCondition(r, sourceView, c, ctx.now, cal)),
+    )
+    .map((r) => ({
+      sourceId: r.id,
+      input: createInput(target, tool.values, {
+        ...ctx,
+        rowId: r.id,
+        entry: { record: r, view: sourceView },
+      }),
+    }));
 }
 
 /** 记录里存着的值（去掉算出来的字段：算好的记录副本里有它们）。 */

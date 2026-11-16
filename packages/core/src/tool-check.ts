@@ -490,6 +490,13 @@ class Analysis {
     const use = this.uses.get(tool.table);
     const table = this.table(tool.table);
     if (!use || !table) return;
+    // 批量新建（D-567）：读来源表的筛选，写的是预设的字段（必填的检查在 record-ops.ts）。
+    if (tool.do === 'createAll') {
+      const from = this.uses.get(tool.from);
+      if (from) this.readFilter(from, tool.filter);
+      for (const id of Object.keys(tool.values)) use.written.add(id);
+      return;
+    }
     if (tool.do !== 'create') {
       use.written.add(tool.field);
       if (tool.do === 'setAll') this.readFilter(use, tool.filter);

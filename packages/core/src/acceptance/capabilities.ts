@@ -257,7 +257,11 @@ export function entryWrites(v: AppView, table: string, field: string): boolean {
   return v.writes.some(
     (w) =>
       w.tool.table === table &&
-      (w.tool.do === 'create' ? createCovers(w, field) : w.tool.field === field),
+      (w.tool.do === 'create'
+        ? createCovers(w, field)
+        : w.tool.do === 'createAll'
+          ? Object.prototype.hasOwnProperty.call(w.tool.values, field)
+          : w.tool.field === field),
   );
 }
 
@@ -558,7 +562,7 @@ const valueUsed = (v: AppView, value: unknown) =>
 /** 所有一键记录工具写的值（D-565 的对象写法用）。 */
 const valuesUsed = (v: AppView): unknown[] =>
   v.writes.flatMap(({ tool }) =>
-    tool.do === 'create'
+    tool.do === 'create' || tool.do === 'createAll'
       ? Object.values(typeof tool.values === 'object' ? tool.values : {})
       : tool.do === 'set' || tool.do === 'setAll'
         ? [tool.value]
@@ -670,6 +674,7 @@ export const CAPABILITIES: readonly Capability[] = [
   doCap('toggle'),
   doCap('increment'),
   doCap('setAll'),
+  doCap('createAll'),
   asCap('submit'),
   asCap('button'),
   asCap('check'),

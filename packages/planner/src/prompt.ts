@@ -10,6 +10,7 @@ import {
   ICON_NAMES,
   MAX_HOME_SCREEN,
   MAX_PAGE_BLOCKS,
+  MAX_CREATE_ALL,
   MAX_SET_ALL,
   MAX_WORKFLOWS,
   MAX_WORKFLOW_STEPS,
@@ -222,7 +223,7 @@ const RELATION_RULES = [
   'when shows a tool only on the entries that match; it only reads data.',
   'opens is navigation; it writes nothing.',
   `Tools are fixed kinds from the catalog plus parameters; record tools are ${RECORD_TOOL_KINDS.length}: ${RECORD_TOOL_KINDS.join(', ')}.`,
-  `setAll changes at most ${MAX_SET_ALL} entries, and the app asks first.`,
+  `setAll changes at most ${MAX_SET_ALL} entries and createAll creates at most ${MAX_CREATE_ALL}; the app asks first.`,
   "Original files are never moved or deleted; the config only refers to the user's files, and you never write, see or choose them.",
   'Computed values are read-only; formulas never refer to themselves in a loop.',
   'You only change the config and never run a tool; every change goes to a draft first and can be undone; removing something also removes what depends on it (the app does that).',
@@ -284,7 +285,8 @@ const GENERAL_RULES = `1. Change only what was asked, and do every part of it: a
 59. Reminders some minutes before an entry's date and time ("remind me 30 minutes before each appointment", "提前一小时提醒我吃药", "rappelle-moi 15 minutes avant chaque rendez-vous") → when {before: {table, field: a datetime field of that table}, minutes} (1 to 10080: an hour = 60, a day = 1440; no at): one notification per entry, that many minutes before its date and time, with only the table name and the time in its text. It needs a datetime field (add one first if the table has only a date); for a date without a time use days and at (rule 35).
 60. A daily or weekly reminder that stays quiet when it is already done ("remind me at 21:00 if I haven't logged anything today", "每周日提醒我记体重，这周记过就不用了", "rappelle-moi seulement si je n'ai pas encore noté ma journée") → when {every: "day" or "week", …} with unless {table, within: "day" | "week" | "month", filter?, date?} (no link: there is no entry here): on a day whose day / week / month already has a matching entry in that table, it does not fire. The device plans the coming week ahead and plans again whenever entries change; nothing runs in the background. done and snoozeMinutes still only go with when.each.
 61. Values a record tool takes from today or from this entry ("snooze a week", "推迟一周", "renew for a year", "next review = today + this card's interval", "log it again", "再记一笔同样的", "order at today's price", "commander au prix du jour") → a date field takes {from: "today" or a date / datetime field of this entry, add: a whole number or a number field of this entry, unit: "days" | "months"} (negative add goes back; a month end clamps); any field may take {copy: a field of this entry}, copied when the user taps (same type, or number / money, or text / note; a link to the same table; formulas, lookups and rollups may be copied from, which freezes e.g. a price at order time, but never into); increment's by may be a number field of this entry. "This entry" is the entry the tool acts on ("$row": a row, tile or card tool, a reminder's done), or on a page for one entry the opened entry ("$record") for a button there. A button elsewhere, setAll and a form have no entry: only {from: "today", add: <number>} works there. Text is still never a constant (rule 44): to repeat a text, copy it. Examples: on the cards list {as: "button", label: "Good", do: "set", table: "cards", field: "due", value: {from: "today", add: "interval", unit: "days"}}; on the products list {as: "button", label: "Order", do: "create", table: "orders", values: {product: "$row", price: {copy: "price"}, qty: {copy: "usualQty"}}}.
-62. One tap that changes two or three things of the same entry ("a Ship button that sets the status to shipped and the ship date to today", "点「完成」同时记下完成日期", "a Done button that also logs a check-in for it", "un bouton Expédier qui met aussi la date d'envoi") → on a row or tile tool (as "button" or "tap" on a record block) add also: 1 or 2 more writes on this entry, [{do: "set", field, value} | {do: "toggle", field} | {do: "increment", field, by}] (no table: it is this entry's table), and at most one {do: "create", table, values} whose link field is "$row". At most 3 writes in all; no ask, no setAll, no conditions inside; each field once. The app saves them together and offers Undo afterwards. Not on a page button, a form, a check or a drag, and never in a reminder's done (one change there). Example: {as: "button", label: "Ship", do: "set", table: "orders", field: "status", value: "shipped", when: [{field: "status", op: "isNot", value: "shipped"}], also: [{do: "set", field: "shippedOn", value: "today"}]}.`;
+62. One tap that changes two or three things of the same entry ("a Ship button that sets the status to shipped and the ship date to today", "点「完成」同时记下完成日期", "a Done button that also logs a check-in for it", "un bouton Expédier qui met aussi la date d'envoi") → on a row or tile tool (as "button" or "tap" on a record block) add also: 1 or 2 more writes on this entry, [{do: "set", field, value} | {do: "toggle", field} | {do: "increment", field, by}] (no table: it is this entry's table), and at most one {do: "create", table, values} whose link field is "$row". At most 3 writes in all; no ask, no setAll, no conditions inside; each field once. The app saves them together and offers Undo afterwards. Not on a page button, a form, a check or a drag, and never in a reminder's done (one change there). Example: {as: "button", label: "Ship", do: "set", table: "orders", field: "status", value: "shipped", when: [{field: "status", op: "isNot", value: "shipped"}], also: [{do: "set", field: "shippedOn", value: "today"}]}.
+63. Creating one entry for each of several entries in one tap ("on the 1st, a button that creates this month's order for each regular customer", "给每个老客户各建一条本月订单", "add a task for every member", "créer une facture pour chaque client actif") → a button block with tools [{do: "createAll", table: <the table to add to>, from: <the table to go through>, filter?: conditions on from, values}]: one new entry in table for every entry of from that matches the filter. In values, a link field pointing at from may be "$row" (that entry), and {copy: field} and {from: field, …} read that entry's fields (rule 61). The app asks first with the count, creates at most ${MAX_CREATE_ALL}, and offers Undo for the whole batch. A required field without a default must be in values. Only on a button block (like setAll), never on a row or in a reminder's done. Example: {do: "createAll", table: "orders", from: "customers", filter: [{field: "regular", op: "is", value: true}], values: {customer: "$row", amount: {copy: "usualAmount"}, date: "today"}}.`;
 
 /**
  * 规则按用途分组，给按需加载（PromptRoute）用：core 每次都发（含办事拒绝 24、记录内容 17、
@@ -296,7 +298,7 @@ export const RULE_GROUPS = {
   look: [7, 8, 12, 13, 37, 52],
   records: [
     18, 19, 32, 33, 34, 35, 38, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 54, 55, 56, 58, 59, 60,
-    61, 62,
+    61, 62, 63,
   ],
   files: [14, 15, 20, 21, 22, 28, 29, 30, 31, 36, 39],
 } as const;
@@ -346,6 +348,7 @@ const RULE_TITLES: Record<number, string> = {
   60: 'daily or weekly reminders that skip a day already done',
   61: 'values from today or from this entry',
   62: 'one tap, several changes to one entry',
+  63: 'one new entry for each matching entry',
   49: 'typing a date in the same line',
   50: 'a time on a schedule',
 };
@@ -551,7 +554,8 @@ type RecordTool =
   | { do: "set"; table: string; field: string; value: Value }
   | { do: "toggle"; table: string; field: string }
   | { do: "increment"; table: string; field: string; by: number | string }   // by: a number, or a number field of this entry (rule 61)
-  | { do: "setAll"; table: string; filter?: Condition[]; field: string; value: Value };
+  | { do: "setAll"; table: string; filter?: Condition[]; field: string; value: Value }
+  | { do: "createAll"; table: string; from: string; filter?: Condition[]; values: { [fieldId: string]: Value } };   // rule 63
 type ToolUse =
   | RecordTool & { as?: ${TOOL_USE_AS.map((a) => `"${a}"`).join(' | ')}; label?: string; when?: Condition[]; also?: object[] }   // rules 44, 45; also: rule 62
   | { tool: string }                                                       // a quick action id or preset id (action block), or ${PICK_TOOLS.map((p) => `"${p}"`).join(' / ')} (picker block)

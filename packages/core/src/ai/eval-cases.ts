@@ -8558,6 +8558,90 @@ const TAP_ALSO_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 客户（老客户、常用金额）和订单（引用客户、金额、日期），一页列出客户（D-567）。 */
+const customersEarlier: EvalEarlier = {
+  input:
+    'Make a table of customers with a name, a regular checkbox and a usual amount, a table of orders linked to a customer with an amount and a date, and a page that lists the customers',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'customers',
+        name: 'Customers',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'regular', name: 'Regular', type: 'checkbox' },
+          { id: 'usual', name: 'Usual amount', type: 'money', currency: 'EUR' },
+        ],
+      },
+    },
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'customer', name: 'Customer', type: 'link', table: 'customers' },
+          { id: 'amount', name: 'Amount', type: 'money', currency: 'EUR' },
+          { id: 'date', name: 'Date', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'customers-page',
+        title: 'Customers',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'customers', limit: 50 },
+            show: { title: 'name' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+/** 一个按钮批量新建订单：每个老客户一条，引用这个客户（D-567）。 */
+const createsMonthlyOrders = (copiesAmount: boolean) =>
+  actionCheck(
+    'buttons',
+    (a) =>
+      a.do === 'createAll' &&
+      a.table === 'orders' &&
+      a.from === 'customers' &&
+      values(a).customer === '$row' &&
+      ((a.filter ?? []) as { field: string }[]).some((f) => f.field === 'regular') &&
+      (!copiesAmount || (values(a).amount as { copy?: string } | undefined)?.copy === 'usual'),
+    `a createAll button from regular customers into orders with customer "$row"${copiesAmount ? ' and amount {copy: "usual"}' : ''}`,
+  );
+
+// 批量新建（D-567）。
+const CREATE_ALL_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG31',
+    input:
+      "Add a button that creates this month's order for every regular customer, with the customer's usual amount",
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [customersEarlier],
+    expect: { kind: 'ops', check: createsMonthlyOrders(true) },
+  },
+  {
+    id: 'KG32',
+    input: '加一个按钮，一点就给每个老客户各新建一条订单',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [customersEarlier],
+    expect: { kind: 'ops', check: createsMonthlyOrders(false) },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8623,6 +8707,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...UNLESS_REPEATING_CASES,
   ...RELATIVE_VALUE_CASES,
   ...TAP_ALSO_CASES,
+  ...CREATE_ALL_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

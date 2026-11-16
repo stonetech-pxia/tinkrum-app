@@ -18,6 +18,7 @@ import { zh } from './messages/zh';
 import { migrateWorkspace } from './migrate';
 import { applyOps, OpSchema, type Op } from './ops';
 import {
+  MAX_CREATE_ALL,
   MAX_SET_ALL,
   MAX_TAP_WRITES,
   PICK_TOOLS,
@@ -940,15 +941,25 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       zh.recordActionConfirm,
       fr.recordActionConfirm,
       frSingular.recordActionConfirm,
+      // 批量新建（D-567）也先问，问的时候也不提撤销。
+      en.recordCreateAllConfirm,
+      enSingular.recordCreateAllConfirm,
+      zh.recordCreateAllConfirm,
+      fr.recordCreateAllConfirm,
+      frSingular.recordCreateAllConfirm,
     ])
       expect(text).not.toMatch(/undo|撤销|annuler/i);
   });
 
   it('a bulk change has no setting that skips asking first', () => {
-    const base = { do: 'setAll', table: 't', field: 'a', value: true };
-    expect(RecordToolSchema.safeParse(base).success).toBe(true);
-    for (const skip of [{ confirm: false }, { ask: false }, { ask: 'none' }, { silent: true }])
-      expect(RecordToolSchema.safeParse({ ...base, ...skip }).success).toBe(false);
+    for (const base of [
+      { do: 'setAll', table: 't', field: 'a', value: true },
+      { do: 'createAll', table: 't', from: 's', values: {} },
+    ]) {
+      expect(RecordToolSchema.safeParse(base).success).toBe(true);
+      for (const skip of [{ confirm: false }, { ask: false }, { ask: 'none' }, { silent: true }])
+        expect(RecordToolSchema.safeParse({ ...base, ...skip }).success).toBe(false);
+    }
   });
 
   it('a tap that makes several changes makes at most 3, all to this entry, and none of them asks or fans out', () => {
@@ -979,9 +990,14 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
   it('setAll is capped at 200 entries', () => {
     const set = (n: number) =>
       RecordToolSchema.safeParse({ do: 'setAll', table: 't', field: 'a', value: true, max: n });
-    // 上限是常量，配置里写不进别的数。
+    // 上限是常量，配置里写不进别的数。批量新建一样（D-567）。
     expect(MAX_SET_ALL).toBe(200);
     expect(set(1000).success).toBe(false);
+    expect(MAX_CREATE_ALL).toBe(200);
+    expect(
+      RecordToolSchema.safeParse({ do: 'createAll', table: 't', from: 's', values: {}, max: 1000 })
+        .success,
+    ).toBe(false);
   });
 });
 

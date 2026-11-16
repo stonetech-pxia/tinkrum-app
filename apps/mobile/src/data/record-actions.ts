@@ -1,6 +1,8 @@
 import {
+  MAX_CREATE_ALL,
   MAX_SET_ALL,
   RECORD_LIMITS,
+  createAllInputs,
   createInput,
   loadComputedRecords,
   prepareRecordValues,
@@ -204,7 +206,7 @@ export function useRecordActionRunner() {
         created = { collection: target, values: prepared.values };
         continue;
       }
-      if (tool.do === 'setAll') continue;
+      if (tool.do === 'setAll' || tool.do === 'createAll') continue;
       const next = rowUpdateInput(tool, row, { ...stored.values, ...input }, ctx);
       if (!next) return;
       input = { ...input, ...next };
@@ -270,6 +272,83 @@ export function useRecordActionRunner() {
     });
   }
 
+  /**
+   * 批量新建（D-567）：筛出来的每一条来源各新建一条（引擎一条一条算，配置里没有循环）。没有就说一声；超过 200 条说上限、
+   * 什么都不做；否则先问「将在 B 新建 N 条」，确认后在一个事务里全部建好。提示条上的「撤销」删掉这一批（每条都要求还是
+   * 建好时的样子，改过就一条也不删）。存不进去的那几条（旧配置里必填项没有值）跳过。
+   */
+  async function createAll(tool: Extract<RecordTool, { do: 'createAll' }>, label: string) {
+    const target = config?.data.tables.find((c) => c.id === tool.table);
+    const source = config?.data.tables.find((c) => c.id === tool.from);
+    if (!config || !target || !source) return;
+    const now = new Date();
+    const { view, records } = await loadComputedRecords(
+      (id) => repo.listRecords(id),
+      config.data.tables,
+      source,
+      now,
+      cal,
+    );
+    const planned = createAllInputs(tool, target, view, records, { now, cal }).flatMap(
+      ({ input }) => {
+        const prepared = prepareRecordValues(target, input, null, now, cal);
+        return prepared.ok ? [prepared.values] : [];
+      },
+    );
+    if (planned.length === 0) {
+      showToast({ message: t(locale, 'recordCreateAllNothing') });
+      return;
+    }
+    if (planned.length > MAX_CREATE_ALL) {
+      Alert.alert(
+        label,
+        t(locale, 'recordCreateAllTooMany', { max: MAX_CREATE_ALL, n: planned.length }),
+      );
+      return;
+    }
+    const confirmed = await new Promise<boolean>((resolve) =>
+      Alert.alert(
+        label,
+        t(locale, 'recordCreateAllConfirm', { n: planned.length, table: target.name }),
+        [
+          { text: t(locale, 'cancel'), style: 'cancel', onPress: () => resolve(false) },
+          { text: t(locale, 'recordCreateAllConfirmButton'), onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) },
+      ),
+    );
+    if (!confirmed) return;
+    const counts = await repo.countRecords();
+    const count = counts.find((c) => c.collectionId === target.id)?.count ?? 0;
+    if (count + planned.length > RECORD_LIMITS.perCollection)
+      return void Alert.alert(t(locale, 'tableFull'));
+    const at = Date.now();
+    const created = planned.map((values) => ({ id: newAssetId(), values }));
+    try {
+      await repo.applyRecordWrites(
+        created.map(({ id, values }) => ({
+          kind: 'insert' as const,
+          record: { id, collectionId: target.id, values, createdAt: at, updatedAt: at },
+        })),
+      );
+    } catch {
+      return void showToast({ message: t(locale, 'recordActionFailed') });
+    }
+    bump([target.id]);
+    showToast({
+      message: t(locale, 'recordCreateAllDone', { n: created.length, table: target.name }),
+      undo: {
+        writes: created.map(({ id, values }) => ({
+          kind: 'remove' as const,
+          id,
+          expected: values,
+        })),
+        tables: [target.id],
+        failed: 'recordUndoBulkFailed',
+      },
+    });
+  }
+
   return {
     /**
      * 块本身的工具（button 的 tools[0]）：不作用在某一条上。recordId 是记录页打开的那一条（"$record"，
@@ -279,6 +358,7 @@ export function useRecordActionRunner() {
       return serial(async () => {
         const tool = recordToolOf(use);
         if (tool.do === 'setAll') return setAll(tool, label);
+        if (tool.do === 'createAll') return createAll(tool, label);
         if (tool.do === 'create') await create(tool, recordId ? { recordId } : {});
       });
     },
@@ -299,6 +379,7 @@ export function useRecordActionRunner() {
         const tool = recordToolOf(use);
         if (tool.do === 'create') return create(tool, { rowId: record.id });
         if (tool.do === 'setAll') return setAll(tool, use.label ?? '');
+        if (tool.do === 'createAll') return createAll(tool, use.label ?? '');
         const collection = config?.data.tables.find((c) => c.id === tool.table);
         if (!collection) return;
         const stored = await repo.getRecord(record.id);
