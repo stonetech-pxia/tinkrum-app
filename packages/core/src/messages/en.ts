@@ -1065,6 +1065,7 @@ export const en = {
   reminderWhenWeekly: 'every {days} at {time}',
   reminderWhenAfterAdd: '{n} minutes after each new entry in “{table}”',
   reminderWhenDate: '{n} days before “{field}” in “{table}”, at {time}',
+  reminderWhenMinutesBefore: '{n} minutes before “{field}” in “{table}”',
   reminderWhenSchedule: 'Each entry in “{table}” on its own “{field}”, at {time}',
   reminderDoneButton: 'Done',
   reminderSnoozeButton: 'Remind me later',
@@ -1079,6 +1080,7 @@ export const en = {
   reminderDueToday: 'An entry in “{table}” is due today',
   reminderAddedAgo: 'An entry was added to “{table}” {n} minutes ago',
   reminderDueIn: 'An entry in “{table}” is due in {n} days ({date})',
+  reminderStartsIn: 'An entry in “{table}” is at {time}, in {n} minutes',
   remindersTitle: 'Reminders',
   remindersHint:
     'Reminders are notifications on this device. Tapping one only opens the page or quick action; nothing runs by itself. To add or change a reminder, ask Tink (for example “remind me every day at 9 to log expenses”).',
@@ -1943,8 +1945,10 @@ export const enSingular = {
   runError_noneMatched: 'The file doesn’t meet the conditions of “Keep only some files”.',
   reminderWhenAfterAdd: '{n} minute after each new entry in “{table}”',
   reminderWhenDate: '{n} day before “{field}” in “{table}”, at {time}',
+  reminderWhenMinutesBefore: '{n} minute before “{field}” in “{table}”',
   reminderAddedAgo: 'An entry was added to “{table}” {n} minute ago',
   reminderDueIn: 'An entry in “{table}” is due in {n} day ({date})',
+  reminderStartsIn: 'An entry in “{table}” is at {time}, in {n} minute',
   remindersRowHint: '{n} reminder',
   resultTablesMissing:
     'No ruled table was found on page {pages}, so everything on it was included.',

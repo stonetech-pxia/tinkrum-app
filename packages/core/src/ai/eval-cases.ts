@@ -5329,7 +5329,10 @@ const MODULE_EVAL_CASES: readonly EvalCase[] = [
     expect: {
       kind: 'ops',
       check: (c) =>
-        remindersOf(c).some((r) => 'before' in r.when && r.when.days === 3 && r.when.at === '08:00')
+        remindersOf(c).some(
+          (r) =>
+            'before' in r.when && 'days' in r.when && r.when.days === 3 && r.when.at === '08:00',
+        )
           ? null
           : `expected a dateField reminder 3 days before at 08:00, got ${JSON.stringify(remindersOf(c))}`,
     },
@@ -7886,6 +7889,7 @@ const DATE_OFFSET_USE_CASES: readonly EvalCase[] = [
         remindersOf(c).some(
           (r) =>
             'before' in r.when &&
+            'days' in r.when &&
             r.when.before.table === 'contracts' &&
             r.when.before.field === 'ends' &&
             r.when.days === 30,
@@ -8213,6 +8217,73 @@ const LIST_PERIOD_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 预约表：做什么、什么时候（日期时间），一页列出来。 */
+const appointmentsEarlier: EvalEarlier = {
+  input:
+    'Make a table of my appointments with what it is and when (date and time), and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'appointments',
+        name: 'Appointments',
+        fields: [
+          { id: 'what', name: 'What', type: 'text', required: true },
+          { id: 'when', name: 'When', type: 'datetime' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'appointments-page',
+        title: 'Appointments',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'appointments', limit: 50 },
+            show: { title: 'what', trailing: 'when' },
+          },
+        ],
+      },
+    },
+  ],
+};
+const minutesBefore = (minutes: number) => (c: WorkspaceConfig) =>
+  remindersOf(c).some(
+    (r) =>
+      'before' in r.when &&
+      'minutes' in r.when &&
+      r.when.before.table === 'appointments' &&
+      r.when.before.field === 'when' &&
+      r.when.minutes === minutes,
+  )
+    ? null
+    : `expected a reminder ${minutes} minutes before appointments.when, got ${JSON.stringify(remindersOf(c).map((r) => r.when))}`;
+
+// 日期时间前几分钟提醒（D-562）。
+const MINUTES_BEFORE_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG23',
+    input: 'Remind me 30 minutes before each appointment',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [appointmentsEarlier],
+    expect: { kind: 'ops', check: minutesBefore(30) },
+  },
+  {
+    id: 'KG24',
+    input: '每个预约提前一小时提醒我',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [appointmentsEarlier],
+    expect: { kind: 'ops', check: minutesBefore(60) },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8274,6 +8345,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...NEIGHBOUR_PERIOD_CASES,
   ...SORT_MANY_CASES,
   ...LIST_PERIOD_CASES,
+  ...MINUTES_BEFORE_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

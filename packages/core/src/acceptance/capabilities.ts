@@ -538,8 +538,7 @@ function groupByType(v: AppView, types: readonly string[]): boolean {
   });
 }
 
-const whenIs = (v: AppView, key: 'before' | 'each' | 'after') =>
-  v.reminders.some((r) => key in r.when);
+const whenIs = (v: AppView, key: 'each' | 'after') => v.reminders.some((r) => key in r.when);
 
 const valueUsed = (v: AppView, value: unknown) =>
   v.writes.some((w) => {
@@ -851,7 +850,12 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('remind.when.everyWeek', 'remind', (v) =>
     v.reminders.some((r) => 'every' in r.when && r.when.every === 'week'),
   ),
-  cap('remind.when.before', 'remind', (v) => whenIs(v, 'before')),
+  cap('remind.when.before', 'remind', (v) =>
+    v.reminders.some((r) => 'before' in r.when && 'days' in r.when),
+  ),
+  cap('remind.when.beforeMinutes', 'remind', (v) =>
+    v.reminders.some((r) => 'before' in r.when && 'minutes' in r.when),
+  ),
   cap('remind.when.each', 'remind', (v) => whenIs(v, 'each')),
   cap('remind.when.after', 'remind', (v) => whenIs(v, 'after')),
   cap('remind.unless', 'remind', (v) => v.reminders.some((r) => r.unless !== undefined)),

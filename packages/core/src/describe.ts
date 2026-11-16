@@ -80,6 +80,16 @@ export function reminderWhen(r: Reminder, config: WorkspaceConfig, locale: Local
       n: when.minutes,
     });
   }
+  if ('minutes' in when) {
+    // 日期时间前几分钟（D-562）。
+    const table = config.data.tables.find((c) => c.id === when.before.table);
+    const field = table?.fields.find((f) => f.id === when.before.field);
+    return t(locale, 'reminderWhenMinutesBefore', {
+      field: field?.name ?? when.before.field,
+      table: table?.name ?? when.before.table,
+      n: when.minutes,
+    });
+  }
   const on = 'each' in when ? when.each : when.before;
   const table = config.data.tables.find((c) => c.id === on.table);
   const field = table?.fields.find((f) => f.id === on.field);

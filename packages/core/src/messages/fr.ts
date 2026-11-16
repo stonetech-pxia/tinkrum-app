@@ -1131,6 +1131,7 @@ export const fr: MessageTable = {
   reminderWhenWeekly: 'chaque {days} à {time}',
   reminderWhenAfterAdd: '{n} minutes après chaque nouvelle entrée de « {table} »',
   reminderWhenDate: '{n} jours avant « {field} » dans « {table} », à {time}',
+  reminderWhenMinutesBefore: '{n} minutes avant « {field} » dans « {table} »',
   reminderWhenSchedule: 'Chaque entrée de « {table} » selon son « {field} », à {time}',
   reminderDoneButton: 'Fait',
   reminderSnoozeButton: 'Me le rappeler plus tard',
@@ -1145,6 +1146,7 @@ export const fr: MessageTable = {
   reminderDueToday: 'Une entrée de « {table} » arrive à échéance aujourd’hui',
   reminderAddedAgo: 'Une entrée a été ajoutée à « {table} » il y a {n} minutes',
   reminderDueIn: 'Une entrée de « {table} » arrive à échéance dans {n} jours ({date})',
+  reminderStartsIn: 'Une entrée de « {table} » est à {time}, dans {n} minutes',
   remindersTitle: 'Rappels',
   remindersHint:
     'Les rappels sont des notifications sur cet appareil. En toucher un ouvre seulement la page ou l’action rapide ; rien ne s’exécute tout seul. Pour ajouter ou modifier un rappel, demandez à Tink (par exemple « rappelle-moi tous les jours à 9 h de noter mes dépenses »).',
@@ -2021,8 +2023,10 @@ export const frSingular: SingularTable = {
   runError_noneMatched: 'Le fichier ne remplit pas les conditions de « Filtrer les fichiers ».',
   reminderWhenAfterAdd: '{n} minute après chaque nouvelle entrée de « {table} »',
   reminderWhenDate: '{n} jour avant « {field} » dans « {table} », à {time}',
+  reminderWhenMinutesBefore: '{n} minute avant « {field} » dans « {table} »',
   reminderAddedAgo: 'Une entrée a été ajoutée à « {table} » il y a {n} minute',
   reminderDueIn: 'Une entrée de « {table} » arrive à échéance dans {n} jour ({date})',
+  reminderStartsIn: 'Une entrée de « {table} » est à {time}, dans {n} minute',
   remindersRowHint: '{n} rappel',
   resultTablesMissing:
     'Aucune grille à lignes n’a été trouvée à la page {pages} : tout son contenu a été inclus.',

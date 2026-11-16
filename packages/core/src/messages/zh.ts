@@ -1001,6 +1001,7 @@ export const zh: MessageTable = {
   reminderWhenWeekly: '每{days} {time}',
   reminderWhenAfterAdd: '「{table}」每加一条，{n} 分钟后提醒',
   reminderWhenDate: '「{table}」的「{field}」前 {n} 天的 {time}',
+  reminderWhenMinutesBefore: '「{table}」的「{field}」前 {n} 分钟',
   reminderWhenSchedule: '「{table}」每条记录按自己的「{field}」，在 {time}',
   reminderDoneButton: '完成',
   reminderSnoozeButton: '稍后提醒',
@@ -1015,6 +1016,7 @@ export const zh: MessageTable = {
   reminderDueToday: '「{table}」里有一条记录今天到期',
   reminderAddedAgo: '「{table}」里 {n} 分钟前加了一条记录',
   reminderDueIn: '「{table}」里有一条记录还有 {n} 天到期（{date}）',
+  reminderStartsIn: '「{table}」里有一条记录在 {time}，还有 {n} 分钟',
   remindersTitle: '提醒',
   remindersHint:
     '提醒是本机的通知。点提醒只打开对应的页面或快捷操作，不会自己运行任何东西。要新建或修改提醒，可以对 Tink 说（例如「每天 9 点提醒我记账」）。',

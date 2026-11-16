@@ -146,9 +146,17 @@ describe('完整性守护：schema 和登记表多一种东西，能力表少一
     const whens = ReminderWhenSchema.options.map((o) => {
       const shape = o.shape as Record<string, { value?: string }>;
       if (shape.every) return shape.every.value === 'day' ? 'everyDay' : 'everyWeek';
+      if (shape.before && shape.minutes) return 'beforeMinutes';
       return Object.keys(shape)[0]!;
     });
-    expect(whens.sort()).toEqual(['after', 'before', 'each', 'everyDay', 'everyWeek']);
+    expect(whens.sort()).toEqual([
+      'after',
+      'before',
+      'beforeMinutes',
+      'each',
+      'everyDay',
+      'everyWeek',
+    ]);
     expect(missing(whens.map((w) => `remind.when.${w}`))).toEqual([]);
     const keys = Object.keys(ReminderSchema.shape).filter((k) => !REMINDER_PLAIN_KEYS.has(k));
     expect(missing(keys.map((k) => `remind.${k}`))).toEqual([]);
@@ -491,6 +499,9 @@ function everything() {
       }),
     ),
     addTool(reminder('r-after', { after: { table: 'items' }, minutes: 5 }, 'page:views')),
+    addTool(
+      reminder('r-minutes', { before: { table: 'items', field: 'at' }, minutes: 30 }, 'page:views'),
+    ),
     navTo('writes', 'views', 'periods'),
     {
       op: 'addContainer',

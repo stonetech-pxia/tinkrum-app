@@ -41,6 +41,8 @@ export const USES_FEATURES = [
   'sortMany',
   /** 记录块的 source.period "page"：跟着页面上的时间范围（D-561）。 */
   'recordsFollowPagePeriod',
+  /** 提醒 when {before, minutes}：日期时间前几分钟（D-562）。 */
+  'reminderMinutesBefore',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -122,6 +124,10 @@ export function usesOf(content: unknown): FileUses {
     if (typeof node.period === 'string' && NEIGHBOURS.has(node.period))
       found.features.add('periodNeighbours');
     if (node.kind === 'reminder' && node.app !== undefined) found.features.add('reminderInApp');
+    if (node.kind === 'reminder' && isObject(node.when)) {
+      if (node.when.before !== undefined && node.when.minutes !== undefined)
+        found.features.add('reminderMinutesBefore');
+    }
     for (const [k, v] of Object.entries(node)) {
       // 图标：白名单里的名字（emoji 不算，哪个版本都认）。
       if (k === 'icon' && typeof v === 'string' && ICON_NAME.test(v)) found.icons.add(v);

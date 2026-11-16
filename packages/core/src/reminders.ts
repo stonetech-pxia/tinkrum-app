@@ -45,7 +45,7 @@ export const RECORD_OCCURRENCES = 7;
 /** 打开快捷操作的提醒目标 tool:<id> → id（只把它摆出来，不运行）；不是时为 null。 */
 export const reminderToolId = (target: ReminderTarget): string | null => toolTargetId(target);
 
-/** 到期提醒（when.before）、按记录的提醒（when.each）、加完提醒（when.after，看创建时间）看的表和字段。 */
+/** 到期提醒（when.before，天数或分钟数）、按记录的提醒（when.each）、加完提醒（when.after，看创建时间）看的表和字段。 */
 export const reminderTable = (r: Reminder): { table: string; field: string } | undefined =>
   'before' in r.when
     ? r.when.before
@@ -60,7 +60,15 @@ export function reminderProblems(r: Reminder, config: WorkspaceConfig): string[]
   const problems: string[] = [];
   const where = `reminder ${r.id}`;
   const when = r.when;
-  if ('before' in when) {
+  if ('before' in when && 'minutes' in when) {
+    // 前几分钟（D-562）要钟点：只能是日期时间字段。
+    const collection = config.data.tables.find((c) => c.id === when.before.table);
+    if (!collection) problems.push(`${where}: data table ${when.before.table} does not exist`);
+    else if (collection.fields.find((f) => f.id === when.before.field)?.type !== 'datetime')
+      problems.push(
+        `${where}: when.before.field must be a datetime field of ${collection.id} when minutes is set (use days and at for a date)`,
+      );
+  } else if ('before' in when) {
     const collection = config.data.tables.find((c) => c.id === when.before.table);
     if (!collection) problems.push(`${where}: data table ${when.before.table} does not exist`);
     else if (
@@ -210,6 +218,30 @@ export function planNotifications(
           ...base,
           id: `${r.id}-${record.id}`,
           body: t(locale, 'reminderAddedAgo', { table: collection.name, n: when.minutes }),
+          trigger: { kind: 'date', at },
+        });
+      }
+      continue;
+    }
+    if ('before' in when && 'minutes' in when) {
+      // 日期时间那一刻之前 minutes 分钟（D-562）；已经过了的不排。正文只写表名和钟点（P-043 ②）。
+      const collection = config.data.tables.find((c) => c.id === when.before.table)!;
+      const field = collection.fields.find((f) => f.id === when.before.field)!;
+      for (const record of records.get(collection.id) ?? []) {
+        const value = readValue(field, record.values[field.id]);
+        if (typeof value !== 'string') continue;
+        const [y, m, d] = value.slice(0, 10).split('-').map(Number) as [number, number, number];
+        const { hour, minute } = hm(value.slice(11, 16));
+        const at = new Date(y, m - 1, d, hour, minute).getTime() - when.minutes * 60_000;
+        if (at <= now.getTime()) continue;
+        dated.push({
+          ...base,
+          id: `${r.id}-${record.id}`,
+          body: t(locale, 'reminderStartsIn', {
+            table: collection.name,
+            time: value.slice(11, 16),
+            n: when.minutes,
+          }),
           trigger: { kind: 'date', at },
         });
       }
