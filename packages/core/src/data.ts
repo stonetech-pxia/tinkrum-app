@@ -201,6 +201,9 @@ function formulaValue(
       // 日程（D-295）在公式里是它的下一次。
       if (ref.type === 'schedule') return scheduleStatusOf(record, collection, ref, now, cal)?.next;
       const v = readValue(ref, record.values[id]);
+      // 勾选框、单选（D-569）按字段定义换成数。
+      const def = fieldDefinition(ref.type);
+      if (def.formulaNumber) return def.formulaNumber(ref, v);
       if (typeof v === 'number') return kind === 'number' ? v : undefined;
       if (typeof v !== 'string') return undefined;
       if (kind === 'date') return dayNumber(v);

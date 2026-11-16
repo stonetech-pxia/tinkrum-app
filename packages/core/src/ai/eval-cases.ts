@@ -21,6 +21,7 @@ import {
   type Reminder,
   type WorkspaceConfig,
 } from '../schema';
+import { recordValue } from '../data';
 import { parseRichText } from '../richtext';
 import { sortList } from '../schema-base';
 import { createStarterWorkspace } from '../starter';
@@ -8670,6 +8671,102 @@ const OPTION_COLOR_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 订阅表：价格和计费周期（选项还没有数）。 */
+const subsEarlier: EvalEarlier = {
+  input: 'Make a table of my subscriptions with a name, a price and a billing cycle',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'subs',
+        name: 'Subscriptions',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'price', name: 'Price', type: 'money', currency: 'USD' },
+          {
+            id: 'cycle',
+            name: 'Billing cycle',
+            type: 'choice',
+            options: [
+              { id: 'monthly', label: 'Monthly' },
+              { id: 'yearly', label: 'Yearly' },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+};
+/** 账单表：金额和「已付」勾选框。 */
+const paidBillsEarlier: EvalEarlier = {
+  input: '做一个账单表：名称、金额、已付',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'bills',
+        name: '账单',
+        fields: [
+          { id: 'name', name: '名称', type: 'text', required: true },
+          { id: 'amount', name: '金额', type: 'money', currency: 'CNY' },
+          { id: 'paid', name: '已付', type: 'checkbox' },
+        ],
+      },
+    },
+  ],
+};
+/** 按一条假想的记录算表里的公式字段，看有没有一个给出 want。 */
+const formulaGives = (
+  c: WorkspaceConfig,
+  table: string,
+  values: Record<string, unknown>,
+  want: number,
+) => {
+  const t = c.data.tables.find((x) => x.id === table);
+  if (!t) return false;
+  const record = { id: 'x', collectionId: table, values, createdAt: 0, updatedAt: 0 };
+  return t.fields.some(
+    (f) => f.type === 'formula' && recordValue(record, t, f.id, new Date()) === want,
+  );
+};
+
+// 公式读勾选框和单选（D-569）。
+const FORMULA_CHOICE_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG34',
+    input:
+      'Add a cost per year to my subscriptions: the price times 12 when billed monthly, times 1 when yearly',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [subsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        formulaGives(c, 'subs', { price: 10, cycle: 'monthly' }, 120) &&
+        formulaGives(c, 'subs', { price: 10, cycle: 'yearly' }, 10)
+          ? null
+          : 'expected a formula giving price × 12 for monthly and price × 1 for yearly',
+    },
+  },
+  {
+    id: 'KG35',
+    input: '账单加一个「未付金额」：勾了已付就是 0，没勾就是金额',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [paidBillsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        formulaGives(c, 'bills', { amount: 30, paid: false }, 30) &&
+        formulaGives(c, 'bills', { amount: 30, paid: true }, 0)
+          ? null
+          : 'expected a formula giving the amount when not paid and 0 when paid',
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8737,6 +8834,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...TAP_ALSO_CASES,
   ...CREATE_ALL_CASES,
   ...OPTION_COLOR_CASES,
+  ...FORMULA_CHOICE_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

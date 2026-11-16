@@ -73,6 +73,13 @@ export interface FieldSpec<T extends string, S extends z.ZodObject> {
   };
   /** 公式里能不能引用它、当作哪一种值（D-188、D-247、D-280）。 */
   formula?: FormulaType;
+  /**
+   * 值不是数字、公式里却当数字读的字段（D-569）：勾选框、单选怎么换成数（没有值时为 undefined）。value 是宽容读取
+   * 的结果，可能是 undefined（没存过）。
+   */
+  formulaNumber?: (field: Instance<S>, value: FieldValue | undefined) => number | undefined;
+  /** 公式引用它时这个字段本身还缺什么（单选一个 value 都没有，D-569）；说给 AI 听的一句话。 */
+  formulaProblem?: (field: Instance<S>) => string | undefined;
   /** 统计和图表能不能求和、平均（stat、chart 的 fieldId）。 */
   numeric?: true;
   /** 记录表单里能不能填（公式是算出来的）。 */

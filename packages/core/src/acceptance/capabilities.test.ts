@@ -228,6 +228,8 @@ function everything() {
       { id: 'photo', name: 'photo', type: 'file' },
       link('group', 'groups'),
       { id: 'twice', name: 'twice', type: 'formula', expression: '{qty} * 2' },
+      // D-569：公式读勾选框和单选。
+      { id: 'flags', name: 'flags', type: 'formula', expression: '{done} + {status}' },
       { id: 'group-name', name: 'group-name', type: 'lookup', via: 'group', field: 'name' },
       { id: 'before', name: 'before', type: 'previous', field: 'qty' },
       {

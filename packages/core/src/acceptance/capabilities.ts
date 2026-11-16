@@ -1,4 +1,5 @@
 import { isSystemField } from '../components/define';
+import { parseFormula } from '../formula';
 import {
   isOpenUse,
   isCopyValue,
@@ -668,6 +669,20 @@ export const CAPABILITIES: readonly Capability[] = [
     allFields(v).some(
       (x) => x.field.type === 'choice' && x.field.options.some((o) => o.color !== undefined),
     ),
+  ),
+  // D-569：公式读勾选框或单选。
+  cap('field.formula.checkboxOrChoice', 'field', (v) =>
+    allFields(v).some(({ table, field }) => {
+      if (field.type !== 'formula') return false;
+      const parsed = parseFormula(field.expression);
+      return (
+        parsed.ok &&
+        parsed.refs.some((id) => {
+          const ref = table.fields.find((f) => f.id === id);
+          return ref?.type === 'checkbox' || ref?.type === 'choice';
+        })
+      );
+    }),
   ),
   cap('field.text.format', 'field', (v) =>
     allFields(v).some((x) => x.field.type === 'text' && x.field.format !== undefined),

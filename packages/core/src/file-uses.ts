@@ -1,5 +1,6 @@
 import { COMPONENTS, RECORD_LOOKS } from './components';
 import { FIELDS } from './fields';
+import { parseFormula } from './formula';
 import type { Registry } from './registry';
 import { ICON_NAMES } from './schema-base';
 
@@ -59,6 +60,8 @@ export const USES_FEATURES = [
   'choiceOptionValue',
   /** 单选选项上的 color（D-568）。 */
   'choiceOptionColor',
+  /** 公式读勾选框或单选（D-569）。 */
+  'formulaReadsCheckboxOrChoice',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -88,6 +91,20 @@ export function usesOf(content: unknown): FileUses {
   };
   const walk = (node: unknown, key: string | null) => {
     if (Array.isArray(node)) {
+      // 公式读同一张表的勾选框或单选（D-569）。
+      if (key === 'fields') {
+        const readable = new Set(
+          node
+            .filter((f) => isObject(f) && (f.type === 'checkbox' || f.type === 'choice'))
+            .map((f) => (f as { id?: unknown }).id),
+        );
+        for (const f of node) {
+          if (!isObject(f) || f.type !== 'formula' || typeof f.expression !== 'string') continue;
+          const parsed = parseFormula(f.expression);
+          if (parsed.ok && parsed.refs.some((id) => readable.has(id)))
+            found.features.add('formulaReadsCheckboxOrChoice');
+        }
+      }
       for (const item of node) {
         if (key === 'fields' && isObject(item) && typeof item.type === 'string') {
           found.fieldTypes.add(item.type);

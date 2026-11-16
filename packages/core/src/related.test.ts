@@ -654,7 +654,7 @@ describe('checks (D-290)', () => {
       expression: '{x} * 2',
     });
     expect(problems([jobs, bad])).toEqual([
-      'shifts.y: formula uses x, which is not a number, money, rating, duration, date, time, datetime or formula field',
+      'shifts.y: formula uses x, which is not a number, money, rating, duration, checkbox, choice, date, time, datetime or formula field',
     ]);
   });
 

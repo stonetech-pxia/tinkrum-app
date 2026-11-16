@@ -35,6 +35,13 @@ export const choiceField: FieldDefinitionOf<'choice', typeof schema> = defineFie
   format: (f, v) => f.options.find((o) => o.id === v)?.label ?? '',
   filter: { is: isOption },
   sort: (f, v) => f.options.findIndex((o) => o.id === v),
+  // D-569：公式里是选中的选项的 value；没选、选的选项没有 value 时没有值（和空着的数字一样）。
+  formula: 'number',
+  formulaNumber: (f, v) => f.options.find((o) => o.id === v)?.value,
+  formulaProblem: (f) =>
+    f.options.some((o) => o.value !== undefined)
+      ? undefined
+      : `a choice field where none of its options has a value; give the options the numbers they stand for, e.g. options: [{id: "monthly", label: "Monthly", value: 12}]`,
   titleRank: 3,
   check: (f, { collection }) => {
     const seen = new Set<string>();
@@ -63,7 +70,7 @@ export const choiceField: FieldDefinitionOf<'choice', typeof schema> = defineFie
     name: 'Category',
     type: 'choice',
     options: [
-      { id: 'food', label: 'Food' },
+      { id: 'food', label: 'Food', value: 1 },
       { id: 'other', label: 'Other' },
     ],
   },
