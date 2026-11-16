@@ -787,6 +787,9 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('read.chart.compare', 'read', (v) =>
     chartBlocks(v).some((b) => b.source.compare !== undefined),
   ),
+  cap('read.records.period', 'read', (v) =>
+    recordBlocks(v).some((b) => b.source.period !== undefined),
+  ),
   cap('read.chart.period', 'read', (v) =>
     chartBlocks(v).some((b) => b.source.period !== undefined),
   ),

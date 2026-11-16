@@ -42,6 +42,7 @@ import {
   previousFilter,
   previousLabel,
   previousToDateRange,
+  recordsFollowingRange,
   recordsInRange,
   progressOf,
   recordProgress,
@@ -1799,9 +1800,13 @@ export function useListRecords(
   // 查找、汇总、上一条（D-291）：显示、筛选、排序用算好的记录和 view；改记录用原来的表。
   const { view, records } = useComputedRecords(env.config.data.tables, collection, cal);
   const now = new Date();
+  // 跟着页面上的时间范围（D-561）：和数字卡一样按选的范围筛；页面没有 period 块时照自己的筛选。
+  const follow = block.source.period === 'page' ? env.pageRange?.choice : undefined;
   const sorted = view
     ? sortRecords(
-        filterRecords(records ?? [], view, block.source.filter, now, cal),
+        follow
+          ? recordsFollowingRange(records ?? [], view, block.source.filter, follow, now, cal)
+          : filterRecords(records ?? [], view, block.source.filter, now, cal),
         view,
         // 用户换的排序在前，配置里的（可以是几个，D-560）排一样的。
         browseSortKeys(sort, block.source.sort),

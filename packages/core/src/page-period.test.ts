@@ -7,6 +7,7 @@ import {
   previousToDateRange,
   rangeStarts,
   rangeUnit,
+  recordsFollowingRange,
   recordsInRange,
   validChoice,
 } from './page-period';
@@ -120,5 +121,72 @@ describe('page period ranges (D-440)', () => {
     expect(validChoice({ start: 'x', end: '2026-01-01' })).toBe(false);
     expect(validChoice({ start: '2020-01-01', end: '2026-01-01' })).toBe(false);
     expect(validChoice({ period: 'thisWeek' })).toBe(true);
+  });
+});
+
+describe('records following the page range (D-561)', () => {
+  const table: Collection = {
+    id: 'bills',
+    name: 'Bills',
+    fields: [
+      { id: 'paid', name: 'Paid', type: 'date' },
+      { id: 'due', name: 'Due', type: 'date' },
+      { id: 'kind', name: 'Kind', type: 'text' },
+    ],
+  };
+  const rec = (id: string, values: Record<string, unknown>, createdAt = 1): DataRecord => ({
+    id,
+    collectionId: 'bills',
+    values,
+    createdAt,
+    updatedAt: createdAt,
+  });
+  const rows = [
+    rec('a', { paid: '2026-11-02', due: '2026-10-01', kind: 'rent' }),
+    rec('b', { paid: '2026-10-15', due: '2026-11-03', kind: 'rent' }),
+    rec('c', { paid: '2026-11-04', kind: 'food' }),
+    rec('d', { due: '2026-11-04', kind: 'rent' }),
+  ];
+  const ids = (list: DataRecord[]) => list.map((r) => r.id);
+
+  it('uses the first date field, keeps the other conditions, and leaves out entries without a date', () => {
+    expect(
+      ids(
+        recordsFollowingRange(
+          rows,
+          table,
+          [{ field: 'kind', op: 'is', value: 'rent' }],
+          {
+            period: 'thisWeek',
+          },
+          now,
+        ),
+      ),
+    ).toEqual(['a']);
+  });
+
+  it('uses the date field of the inPeriod in the filter instead of that inPeriod', () => {
+    expect(
+      ids(
+        recordsFollowingRange(
+          rows,
+          table,
+          [{ field: 'due', op: 'inPeriod', value: 'lastYear' }],
+          { period: 'thisMonth' },
+          now,
+        ),
+      ),
+    ).toEqual(['b', 'd']);
+    expect(
+      ids(
+        recordsFollowingRange(
+          rows,
+          table,
+          undefined,
+          { start: '2026-10-01', end: '2026-10-31' },
+          now,
+        ),
+      ),
+    ).toEqual(['b']);
   });
 });

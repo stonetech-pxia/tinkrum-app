@@ -44,6 +44,11 @@ export const RecordSourceSchema = z.strictObject({
   table: IdSchema,
   filter: filterSchema().optional(),
   sort: SortKeysSchema.optional(),
+  /**
+   * 跟着页面上的时间范围（D-561，和数字卡、图表的一样，D-440）：同一页要有一个 period 块；筛选里的 inPeriod 不再用，
+   * 按选的范围、用那个 inPeriod 的日期字段（没有就是表里第一个日期字段）筛。月历和带 show.browse.period 的列表不行。
+   */
+  period: z.literal('page').optional(),
   // 不写时 30 条（模型偶尔漏写，不该因此拒绝整份修改）。
   limit: z.number().int().min(1).max(100).default(30),
   group: GroupingSchema.optional(),
@@ -243,6 +248,15 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
       problems.push('source.group.showEmpty only applies when grouping by a choice or link field');
     if (group.filter) problems.push('source.group.filter only applies to a board');
   }
+  if (c.source.period !== undefined) {
+    if (!ctx.page.blocks.some((b) => b.look === 'period'))
+      problems.push('source.period "page" needs a period block on the same page');
+    if (c.look === 'calendar') problems.push('a calendar moves by month itself: no source.period');
+    if (c.show.browse?.period !== undefined)
+      problems.push(
+        "this list follows the page's time range: no show.browse.period (keep one of the two)",
+      );
+  }
   const seen = new Set<string>();
   for (const key of sortList(c.source.sort)) {
     const sorted = field(key.field);
@@ -261,7 +275,7 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
  * limit 是每段 / 每栏 / 每天最多几条。
  */
 export const RECORD_LOOK_DOC =
-  'source {table, filter?, sort? {field, direction: "asc"|"desc"} or a list of 1-3 of them (sorted by the first, ties by the next: "by priority, then due date"), limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (a choice field: a dot in the colour of its option; on a calendar the day colour), highlight? (1-3 conditions like filter: matching entries show trailing, or the title, in the warning colour, e.g. over budget), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools?, opens? (a page for one entry, rule 48)';
+  'source {table, filter?, sort? {field, direction: "asc"|"desc"} or a list of 1-3 of them (sorted by the first, ties by the next: "by priority, then due date"), period?: "page" (follows the period block of the page, rule 56; not on a calendar), limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (a choice field: a dot in the colour of its option; on a calendar the day colour), highlight? (1-3 conditions like filter: matching entries show trailing, or the title, in the warning colour, e.g. over budget), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools?, opens? (a page for one entry, rule 48)';
 
 const DOCS: Record<RecordLook, string> = {
   list: 'rows; tapping a row opens the built-in editor (or the page in opens)',

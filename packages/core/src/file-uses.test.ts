@@ -200,4 +200,15 @@ describe('features added in batch 1 (D-557–D-563)', () => {
     ]);
     expect(usesOf(pageWith(single({ table: 't' }))).features).toBeUndefined();
   });
+
+  it('a record block following the page range (D-561), not a number or chart doing so', () => {
+    const block = (look: string) => ({
+      id: look,
+      look,
+      source: { table: 't', period: 'page' },
+      show: { title: 'name' },
+    });
+    expect(usesOf(pageWith(block('cards'))).features).toEqual(['recordsFollowPagePeriod']);
+    expect(usesOf(pageWith(block('number'), block('chart'))).features).toBeUndefined();
+  });
 });

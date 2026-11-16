@@ -8144,6 +8144,75 @@ const SORT_MANY_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 记账页上已经有一个时间范围（本月、本星期）和跟着它的柱状图（D-440）。 */
+const budgetRangeEarlier: EvalEarlier = {
+  input: '记账页面加一个时间范围，可以选本月和本星期，柱状图跟着变',
+  ops: [
+    {
+      op: 'addContainer',
+      page: 'budget',
+      block: { id: 'range', look: 'period', show: { options: ['thisMonth', 'thisWeek'] } },
+    } as Op,
+    {
+      op: 'addContainer',
+      page: 'budget',
+      block: {
+        id: 'by-day',
+        look: 'chart',
+        show: { kind: 'bar', title: 'Spending' },
+        source: {
+          table: 'expenses',
+          aggregate: 'sum',
+          field: 'amount',
+          group: { unit: 'day', by: 'date' },
+          period: 'page',
+        },
+      },
+    } as Op,
+  ],
+};
+/** 记账页上读 expenses 的记录块（月历除外）都跟着时间范围（D-561）。 */
+const expenseListsFollow = (c: WorkspaceConfig) => {
+  const lists = recordBlocksOf(c, 'expenses').filter((x) => x.look !== 'calendar');
+  return lists.length > 0 && lists.every((x) => x.source.period === 'page')
+    ? null
+    : `expected the expenses lists to have source.period "page", got ${JSON.stringify(lists.map((x) => x.source.period))}`;
+};
+
+// 页面上的时间范围也管记录列表（D-561）。
+const LIST_PERIOD_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG21',
+    input: '下面的账目列表也跟着时间范围变',
+    locale: 'zh',
+    setup: 'budget',
+    mock: false,
+    earlier: [budgetRangeEarlier],
+    expect: { kind: 'ops', check: expenseListsFollow },
+  },
+  {
+    id: 'KG22',
+    input:
+      'On the budget page, let me switch between this month and last month, and have everything on the page follow it',
+    locale: 'en',
+    setup: 'budget',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const periods = c.containers.pages
+          .flatMap((p) => allComponents(p))
+          .filter((x): x is ComponentOf<'period'> => x.look === 'period');
+        if (periods.length !== 1) return 'expected one period block';
+        const options = [...periods[0]!.show.options].sort().join();
+        if (options !== 'lastMonth,thisMonth')
+          return `expected this month and last month, got ${options}`;
+        return expenseListsFollow(c);
+      },
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8204,6 +8273,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...OPENED_RECORD_CASES,
   ...NEIGHBOUR_PERIOD_CASES,
   ...SORT_MANY_CASES,
+  ...LIST_PERIOD_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };
