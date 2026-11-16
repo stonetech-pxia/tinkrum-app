@@ -43,6 +43,8 @@ export const USES_FEATURES = [
   'recordsFollowPagePeriod',
   /** 提醒 when {before, minutes}：日期时间前几分钟（D-562）。 */
   'reminderMinutesBefore',
+  /** 每天、每周的提醒带 unless（D-563）。 */
+  'reminderUnlessRepeating',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -127,6 +129,8 @@ export function usesOf(content: unknown): FileUses {
     if (node.kind === 'reminder' && isObject(node.when)) {
       if (node.when.before !== undefined && node.when.minutes !== undefined)
         found.features.add('reminderMinutesBefore');
+      if (node.when.every !== undefined && node.unless !== undefined)
+        found.features.add('reminderUnlessRepeating');
     }
     for (const [k, v] of Object.entries(node)) {
       // 图标：白名单里的名字（emoji 不算，哪个版本都认）。

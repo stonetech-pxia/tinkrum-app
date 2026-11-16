@@ -859,6 +859,9 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('remind.when.each', 'remind', (v) => whenIs(v, 'each')),
   cap('remind.when.after', 'remind', (v) => whenIs(v, 'after')),
   cap('remind.unless', 'remind', (v) => v.reminders.some((r) => r.unless !== undefined)),
+  cap('remind.unless.repeating', 'remind', (v) =>
+    v.reminders.some((r) => r.unless !== undefined && 'every' in r.when),
+  ),
   cap('remind.done', 'remind', (v) => v.reminders.some((r) => r.done !== undefined)),
   cap('remind.snoozeMinutes', 'remind', (v) =>
     v.reminders.some((r) => r.snoozeMinutes !== undefined),

@@ -8284,6 +8284,39 @@ const MINUTES_BEFORE_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 每天 / 每周的提醒，那天（那周）expenses 里已经有记录就不响（D-563）。 */
+const quietWhenLogged = (every: 'day' | 'week', within: 'day' | 'week') => (c: WorkspaceConfig) =>
+  remindersOf(c).some(
+    (r) =>
+      'every' in r.when &&
+      r.when.every === every &&
+      r.unless?.table === 'expenses' &&
+      r.unless.within === within &&
+      r.unless.link === undefined,
+  )
+    ? null
+    : `expected an every ${every} reminder with unless {table: expenses, within: ${within}}, got ${JSON.stringify(remindersOf(c))}`;
+
+// 每天、每周的提醒，已经做了就不响（D-563）。
+const UNLESS_REPEATING_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG25',
+    input: "Remind me at 9 pm to log my expenses, but only if I haven't logged any today",
+    locale: 'en',
+    setup: 'budget',
+    mock: false,
+    expect: { kind: 'ops', check: quietWhenLogged('day', 'day') },
+  },
+  {
+    id: 'KG26',
+    input: '每周日晚上提醒我记账，这周已经记过就不用提醒',
+    locale: 'zh',
+    setup: 'budget',
+    mock: false,
+    expect: { kind: 'ops', check: quietWhenLogged('week', 'week') },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8346,6 +8379,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...SORT_MANY_CASES,
   ...LIST_PERIOD_CASES,
   ...MINUTES_BEFORE_CASES,
+  ...UNLESS_REPEATING_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

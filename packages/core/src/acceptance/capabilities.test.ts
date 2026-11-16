@@ -483,6 +483,11 @@ function everything() {
       }),
     ]),
     addTool(reminder('r-day', { every: 'day', at: '09:00' }, 'page:views')),
+    addTool(
+      reminder('r-day-unless', { every: 'day', at: '21:00' }, 'page:views', {
+        unless: { table: 'items', within: 'day' },
+      }),
+    ),
     addTool(reminder('r-week', { every: 'week', days: [1], at: '09:00' }, 'page:views')),
     addTool(
       reminder(
