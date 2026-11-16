@@ -658,6 +658,17 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('field.schedule.countEarly', 'field', (v) =>
     allFields(v).some((x) => x.field.type === 'schedule' && x.field.countEarly === true),
   ),
+  // D-568：选项代表的数、选项的颜色。
+  cap('field.choice.optionValue', 'field', (v) =>
+    allFields(v).some(
+      (x) => x.field.type === 'choice' && x.field.options.some((o) => o.value !== undefined),
+    ),
+  ),
+  cap('field.choice.optionColor', 'field', (v) =>
+    allFields(v).some(
+      (x) => x.field.type === 'choice' && x.field.options.some((o) => o.color !== undefined),
+    ),
+  ),
   cap('field.text.format', 'field', (v) =>
     allFields(v).some((x) => x.field.type === 'text' && x.field.format !== undefined),
   ),

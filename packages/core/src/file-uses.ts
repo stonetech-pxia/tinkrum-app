@@ -55,6 +55,10 @@ export const USES_FEATURES = [
   'tapAlso',
   /** 一键记录工具的第六种：批量新建（D-567）。 */
   'createAll',
+  /** 单选选项上的 value（D-568）。 */
+  'choiceOptionValue',
+  /** 单选选项上的 color（D-568）。 */
+  'choiceOptionColor',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -85,8 +89,14 @@ export function usesOf(content: unknown): FileUses {
   const walk = (node: unknown, key: string | null) => {
     if (Array.isArray(node)) {
       for (const item of node) {
-        if (key === 'fields' && isObject(item) && typeof item.type === 'string')
+        if (key === 'fields' && isObject(item) && typeof item.type === 'string') {
           found.fieldTypes.add(item.type);
+          // 单选选项上的数和颜色（D-568）。
+          for (const o of Array.isArray(item.options) ? item.options : []) {
+            if (isObject(o) && o.value !== undefined) found.features.add('choiceOptionValue');
+            if (isObject(o) && o.color !== undefined) found.features.add('choiceOptionColor');
+          }
+        }
         if (key === 'phoneHomeScreen' && typeof item === 'string' && item.startsWith('app:'))
           found.features.add('appOnPhoneHomeScreen');
         walk(item, key);

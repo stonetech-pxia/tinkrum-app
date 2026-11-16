@@ -1,5 +1,6 @@
 import {
   CHART_COLORS,
+  optionColor,
   calendarOf,
   chartSeries,
   choiceRange,
@@ -240,10 +241,15 @@ export function Chart({
     );
   } else {
     const total = points.reduce((s, p) => s + p.value, 0);
-    const colors = palette.dark ? CHART_COLORS.dark : CHART_COLORS.light;
-    const other = palette.dark ? CHART_COLORS.other.dark : CHART_COLORS.other.light;
+    // 按单选分组时，写了颜色的选项用它的颜色（D-568）；别的照旧按块的顺序取分类色，「其他」和「未选」是灰。
+    const groupBy = byChoice ? collection.fields.find((f) => f.id === source.group.by) : undefined;
+    const options = groupBy?.type === 'choice' ? groupBy.options : [];
     const colorOf = (p: ChartPoint, i: number) =>
-      p.key === null ? other : colors[i % colors.length]!;
+      optionColor(
+        options.find((o) => o.id === p.key),
+        p.key === null ? -1 : i % CHART_COLORS.light.length,
+        palette.dark,
+      );
     const size = PLOT_HEIGHT;
     const paths = piePaths(
       points.map((p) => p.value),

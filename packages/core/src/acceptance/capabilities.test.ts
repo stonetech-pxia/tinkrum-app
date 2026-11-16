@@ -215,7 +215,15 @@ function everything() {
       { id: 'at', name: 'at', type: 'datetime' },
       { id: 'clock', name: 'clock', type: 'time' },
       { id: 'mins', name: 'mins', type: 'duration' },
-      choice('status', ['a', 'b', 'skip'], { default: 'a' }),
+      {
+        ...choice('status', ['a', 'b', 'skip'], { default: 'a' }),
+        // D-568：选项代表的数和颜色。
+        options: [
+          { id: 'a', label: 'a', value: 1, color: 'green' },
+          { id: 'b', label: 'b' },
+          { id: 'skip', label: 'skip' },
+        ],
+      },
       { id: 'stars', name: 'stars', type: 'rating' },
       { id: 'photo', name: 'photo', type: 'file' },
       link('group', 'groups'),

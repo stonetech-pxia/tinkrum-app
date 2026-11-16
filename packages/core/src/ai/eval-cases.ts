@@ -8642,6 +8642,34 @@ const CREATE_ALL_CASES: readonly EvalCase[] = [
   },
 ];
 
+const statusOptions = (c: WorkspaceConfig) => {
+  const f = c.data.tables.find((t) => t.id === 'orders')?.fields.find((x) => x.id === 'status');
+  return f?.type === 'choice' ? f.options : [];
+};
+
+// 选项的颜色（D-568）。
+const OPTION_COLOR_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG33',
+    input: 'Show cancelled orders in red and delivered ones in green',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [ordersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const color = (id: string) => statusOptions(c).find((o) => o.id === id)?.color;
+        if (color('cancelled') !== 'red' || color('delivered') !== 'green')
+          return `expected status options cancelled red and delivered green, got ${color('cancelled')} / ${color('delivered')}`;
+        return recordBlocksOf(c, 'orders').some((x) => x.show.color === 'status')
+          ? null
+          : 'expected an orders block coloured by status';
+      },
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8708,6 +8736,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...RELATIVE_VALUE_CASES,
   ...TAP_ALSO_CASES,
   ...CREATE_ALL_CASES,
+  ...OPTION_COLOR_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

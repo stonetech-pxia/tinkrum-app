@@ -14,6 +14,7 @@ import {
   type LinkedGroups,
 } from './data';
 import type { ChartSource } from './components/chart';
+import { OPTION_COLORS, type OptionColor } from './option-colors';
 import { rangeStarts, rangeUnit, type DayRange } from './page-period';
 import type { Collection, GroupUnit } from './schema';
 import { dateFieldOf, distinctDays } from './sequence';
@@ -41,6 +42,20 @@ export const CHART_COLORS = {
   other: { light: '#8a8a85', dark: '#9a9a94' },
 } as const;
 export const MAX_PIE_SLICES = 8;
+
+/**
+ * 一个单选选项画成什么颜色（D-568）：写了 color 的用那个有名字的颜色，没写的按 index 取分类色，
+ * index 不在分类色里（第 8 个起、没选、「其他」是 -1）时是中性灰。按值上色、月历、饼图都用它。
+ */
+export function optionColor(
+  option: { color?: OptionColor | undefined } | undefined,
+  index: number,
+  dark: boolean,
+): string {
+  if (option?.color) return OPTION_COLORS[option.color][dark ? 'dark' : 'light'];
+  const scheme = dark ? CHART_COLORS.dark : CHART_COLORS.light;
+  return (index >= 0 ? scheme[index] : undefined) ?? CHART_COLORS.other[dark ? 'dark' : 'light'];
+}
 
 export interface ChartPoint {
   /** 时间段的开始日期（YYYY-MM-DD）或选项 ID；「其他」和「未选」是 null。 */

@@ -3270,6 +3270,8 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .data.tables[].fields[]<oneOf choice>.options[] object
 .data.tables[].fields[]<oneOf choice>.options[].id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf choice>.options[].label string len 1..40
+.data.tables[].fields[]<oneOf choice>.options[].value? number
+.data.tables[].fields[]<oneOf choice>.options[].color? "red"|"orange"|"yellow"|"green"|"blue"|"purple"|"pink"|"grey"
 .data.tables[].fields[]<oneOf choice>.default? string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf rating> object
 .data.tables[].fields[]<oneOf rating>.id string /^[a-z][a-z0-9-]{0,47}$/
