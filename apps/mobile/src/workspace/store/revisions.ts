@@ -92,10 +92,16 @@ export function createRevisions(
     source: RevisionSource,
     summary: string,
     plan?: { homeEntry?: boolean; notes?: string[] },
+    fromAppFile?: boolean,
   ): Promise<ProposeResult> {
     const { config, head } = get();
     if (!config || !head) throw new Error('workspace not loaded');
-    const prepared = prepareOps(config, ops, { registry, locale, now: deps.now() });
+    const prepared = prepareOps(config, ops, {
+      registry,
+      locale,
+      now: deps.now(),
+      ...(fromAppFile ? { fromAppFile } : {}),
+    });
     if (!prepared.ok) {
       await repo.createChangeRequest({
         input,
@@ -333,7 +339,8 @@ export function createRevisions(
 
     proposePreset: presetProposal,
 
-    proposeOps: (ops, summary) => opsProposal(summary, ops, 'user', summary),
+    proposeOps: (ops, summary, options) =>
+      opsProposal(summary, ops, 'user', summary, undefined, options?.fromAppFile),
 
     setHomeEntry(on) {
       const proposal = get().proposal;

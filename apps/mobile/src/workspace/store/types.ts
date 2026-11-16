@@ -302,8 +302,15 @@ export interface WorkspaceState {
   deletePreset(preset: SavedPreset): Promise<void>;
   /** 提示条的撤销：把删掉的预设放回去。 */
   restorePreset(preset: SavedPreset): Promise<void>;
-  /** 来自界面按钮（安装、卸载等）的修改，同样经过校验和版本记录。 */
-  proposeOps(ops: Op[], summary: string): Promise<ProposeResult>;
+  /**
+   * 来自界面按钮（安装、卸载等）的修改，同样经过校验和版本记录。
+   * fromAppFile：导入、恢复一个 App 文件，不受 30 步限制（D-554）。
+   */
+  proposeOps(
+    ops: Op[],
+    summary: string,
+    options?: { fromAppFile?: boolean },
+  ): Promise<ProposeResult>;
   /** 预览里勾选 / 取消「在首页放一个入口」（D-109）。 */
   setHomeEntry(on: boolean): void;
   /** quiet：渲染后顶部不出「已改好 · 撤销」（新手引导里的修改，D-239）。 */

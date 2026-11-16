@@ -63,7 +63,9 @@ export function SettingsView({ env }: { env: RenderEnv }) {
       Alert.alert(t(locale, 'appResetItem'), t(locale, 'importAppClash', { reason: plan.error }));
       return;
     }
-    const result = await proposeOps(plan.ops, t(locale, 'appResetSummary', { name }));
+    const result = await proposeOps(plan.ops, t(locale, 'appResetSummary', { name }), {
+      fromAppFile: true,
+    });
     if (result.kind !== 'preview') {
       Alert.alert(
         t(locale, 'invalidPlan'),

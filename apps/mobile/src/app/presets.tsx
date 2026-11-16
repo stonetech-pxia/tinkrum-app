@@ -133,6 +133,7 @@ export default function PresetsRoute() {
     const result = await proposeOps(
       plan.ops,
       t(locale, mode === 'home' ? 'importHomeSummary' : 'importAppSummary', { name: plan.name }),
+      { fromAppFile: true },
     );
     if (result.kind === 'invalid') {
       // 新版本加的样子、字段类型版本号可能没变（D-545）：这里读得出文件但用不了，整份不导入，说清楚。

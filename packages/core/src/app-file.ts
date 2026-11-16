@@ -12,7 +12,6 @@ import {
   type WorkspaceConfig,
 } from './schema';
 import type { AppBarTarget, IconValue, Theme } from './schema-base';
-import { MAX_OPS_PER_CHANGE } from './ops-schema';
 
 // App 文件（D-485）：一个 App 的全部内容（页面、表、快捷操作、提醒、风格），导入时加到现有的工作区里，
 // 不替换任何东西。和「App 配置」（整份工作区，D-484）不同：这里的 ID 已经带了 App 自己的前缀，不会和别的
@@ -222,8 +221,7 @@ export function appFileOps(
       ops.push({ op: 'updateContainer', nav: { bar } });
     }
   }
-  if (ops.length > MAX_OPS_PER_CHANGE)
-    return { ok: false, error: `too big to import in one go (${ops.length} steps)` };
+  // 步数不设上限（D-554）：大小由配置的上限管，用的时候带 fromAppFile 走 prepareOps。
   return { ok: true, ops, name: file.app.name };
 }
 
@@ -247,8 +245,6 @@ export function appResetOps(file: AppFile, config: WorkspaceConfig, registry: Re
     ...plan.ops,
     ...(onMenu ? [homeScreenOp(mid.config, `app:${id}`, true)] : []),
   ];
-  if (ops.length > MAX_OPS_PER_CHANGE)
-    return { ok: false, error: `too big to restore in one go (${ops.length} steps)` };
   return { ok: true, ops, name: file.app.name };
 }
 
