@@ -211,6 +211,9 @@ export function useRecordActionRunner() {
       if (!next) return;
       input = { ...input, ...next };
     }
+    // 几处要用的值都是空的、也没有新建：什么都不写，也没有可撤销的。
+    if (Object.keys(input).length === 0 && !created)
+      return void showToast({ message: t(locale, 'recordActionNoValue') });
     const prepared = prepareRecordValues(row, input, stored.values, now, cal);
     if (!prepared.ok) return void openRecord(row.id, record.id);
     if (created) {
@@ -397,6 +400,9 @@ export function useRecordActionRunner() {
           entry: await entryOf(tool, record.id, now),
         });
         if (!input) return;
+        // 要用的值是空的（这一条的间隔、日期还没填，D-565）：什么都不写，照实说，不说「已记下」。
+        if (Object.keys(input).length === 0)
+          return void showToast({ message: t(locale, 'recordActionNoValue') });
         const prepared = prepareRecordValues(collection, input, stored.values, now, cal);
         if (!prepared.ok) return void openRecord(collection.id, record.id);
         await repo.updateRecord(record.id, prepared.values, now.getTime());

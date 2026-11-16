@@ -1789,6 +1789,7 @@ export const fr: MessageTable = {
   recordActionConfirm: 'Cela modifie {n} entrées.',
   recordActionConfirmButton: 'Modifier',
   recordActionNothing: 'Aucune entrée à modifier',
+  recordActionNoValue: 'Rien n’a été modifié : une valeur dont ce bouton a besoin est encore vide.',
   recordActionFailed:
     'Rien n’a été modifié : un problème est survenu, aucune entrée n’a été changée.',
   recordActionChangedMeanwhile:

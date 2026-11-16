@@ -143,6 +143,20 @@ it('next review = today + this card’s interval, with no undo', async () => {
   expect(screen.queryByTestId('toast-undo')).toBeNull();
 });
 
+it('a card with no interval: nothing is written and the banner says so, not "done"', async () => {
+  const repo = new MemoryWorkspaceRepo();
+  await put(repo, 'c2', 'cards', { front: 'chien', score: 2 });
+  await renderToolsApp(repo, undefined, { seed });
+  await fireEvent.press(await screen.findByTestId('row-action-c2'));
+  const toast = await screen.findByTestId('toast');
+  expect(toast).toHaveTextContent(/什么都没改/);
+  expect(toast).not.toHaveTextContent(/记住了/);
+  // 没有写：值和修改时间都还是原来的。
+  const stored = await repo.getRecord('c2');
+  expect(stored?.values).toEqual({ front: 'chien', score: 2 });
+  expect(stored?.updatedAt).toBe(1);
+});
+
 it('an order copies the product’s values at the moment of the tap, a computed price included', async () => {
   const repo = new MemoryWorkspaceRepo();
   await put(repo, 'p1', 'products', { name: '咖啡豆', price: 12.5, qty: 2 });

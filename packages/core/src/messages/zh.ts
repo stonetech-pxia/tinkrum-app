@@ -1621,6 +1621,7 @@ export const zh: MessageTable = {
   recordActionConfirm: '将修改 {n} 条记录。',
   recordActionConfirmButton: '修改',
   recordActionNothing: '没有需要修改的记录',
+  recordActionNoValue: '什么都没改：这个按钮要用的值还是空的。',
   recordActionFailed: '没有修改：出了点问题，一条也没改。',
   recordUndoFailed: '这条记录之后又改过，没有撤销。',
   recordCreateAllConfirm: '将在「{table}」新建 {n} 条记录。',

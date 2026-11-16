@@ -1711,6 +1711,7 @@ export const en = {
   recordActionConfirm: 'This changes {n} entries.',
   recordActionConfirmButton: 'Change',
   recordActionNothing: 'Nothing to change',
+  recordActionNoValue: 'Nothing was changed: a value this button uses is still empty.',
   recordActionFailed:
     'Nothing was changed: something went wrong, so not a single entry was edited.',
   recordActionChangedMeanwhile:
