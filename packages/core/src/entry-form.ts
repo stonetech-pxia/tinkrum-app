@@ -83,6 +83,20 @@ export function formInput(
   return Object.fromEntries(Object.entries(formValues).filter(([id]) => !hidden.has(id)));
 }
 
+/**
+ * 表单里改了值以后还留着的错误（D-572）：改了的字段，它的错误去掉（改对了没有，下一次保存再查）；别的字段的照旧。
+ */
+export function issuesLeft<I extends { fieldId: string }>(
+  issues: readonly I[],
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): I[] {
+  const left = issues.filter(
+    (i) => JSON.stringify(before[i.fieldId]) === JSON.stringify(after[i.fieldId]),
+  );
+  return left.length === issues.length ? (issues as I[]) : left;
+}
+
 /** 表单分段的检查（validate.ts）：字段在表里、每个字段只在一段里；条件只看这一条自己填的字段，不看本段的字段。 */
 export function entryFormProblems(collection: Collection): string[] {
   const sections = collection.form?.sections ?? [];

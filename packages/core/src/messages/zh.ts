@@ -405,6 +405,7 @@ export const zh: MessageTable = {
   fieldTooLong: '太长了',
   fieldTooSmall: '不能小于 {limit}。',
   fieldTooLarge: '不能大于 {limit}。',
+  formIssues: '有 {n} 项要改，已在上面标出。',
   tableFull: '这张表已满（1 万条）。',
   useFullForm: '有必填项不在这个表单里，请用完整表单添加。',
   recordDeleted: '已删除一条记录',

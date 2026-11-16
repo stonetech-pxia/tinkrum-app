@@ -2,6 +2,7 @@ import {
   MAX_ATTACHMENTS,
   dayOf,
   formInput,
+  issuesLeft,
   prepareRecordValues,
   type FieldIssue,
 } from '@morph/core';
@@ -113,7 +114,11 @@ export function RecordEntryScreen({
           suggest
           collection={collection}
           values={values}
-          onChange={setValues}
+          onChange={(next) => {
+            // 改了一个字段，它的错误就去掉（D-572）。
+            setIssues((now) => issuesLeft(now, values, next));
+            setValues(next);
+          }}
           issues={issues}
           palette={palette}
           locale={locale}

@@ -442,6 +442,7 @@ export const fr: MessageTable = {
   fieldTooLong: 'Trop long',
   fieldTooSmall: 'Doit être au moins {limit}.',
   fieldTooLarge: 'Doit être au plus {limit}.',
+  formIssues: '{n} champs sont à revoir ; ils sont signalés plus haut.',
   tableFull: 'Ce tableau est plein (10 000 entrées).',
   useFullForm:
     'Certains champs obligatoires ne figurent pas dans ce formulaire. Ouvrez le formulaire complet pour les ajouter.',
@@ -1970,6 +1971,7 @@ export const fr: MessageTable = {
 };
 
 export const frSingular: SingularTable = {
+  formIssues: '{n} champ est à revoir ; il est signalé plus haut.',
   bulkDeleteButton: 'Supprimer {n} entrée',
   bulkDeleteConfirm: 'Supprimer {n} entrée de « {name} » ?',
   bulkDeleted: '{n} entrée supprimée',

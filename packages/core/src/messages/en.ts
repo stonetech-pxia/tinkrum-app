@@ -421,6 +421,7 @@ export const en = {
   fieldTooLong: 'Too long',
   fieldTooSmall: 'Must be at least {limit}.',
   fieldTooLarge: 'Must be at most {limit}.',
+  formIssues: '{n} fields need attention; they are marked above.',
   tableFull: 'This table is full (10,000 entries).',
   useFullForm: 'Some required fields aren’t in this form. Open the full form to add.',
   recordDeleted: 'Entry deleted',
@@ -1890,6 +1891,7 @@ export type MessageTable = Record<StringKey, string>;
 
 /** 单数写法（isSingular 为真时用），只放带数量的文案；哪个参数决定单复数见 messages.ts 的 PLURAL_COUNT_VARIABLE。 */
 export const enSingular = {
+  formIssues: '{n} field needs attention; it is marked above.',
   bulkDeleteButton: 'Delete {n} entry',
   bulkDeleteConfirm: 'Delete {n} entry from “{name}”?',
   bulkDeleted: '{n} entry deleted',

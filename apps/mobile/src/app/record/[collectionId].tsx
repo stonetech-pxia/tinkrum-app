@@ -2,6 +2,7 @@ import {
   appViewOf,
   attachmentIds,
   formInput,
+  issuesLeft,
   tableIsShown,
   type DataRecord,
   type FieldIssue,
@@ -67,6 +68,11 @@ export default function RecordRoute() {
   const [initial, setInitial] = useState(() => JSON.stringify(values));
   const leave = useConfirmLeave(JSON.stringify(values) !== initial, 'formDiscardMessage', locale);
   const [issues, setIssues] = useState<FieldIssue[]>([]);
+  // 改了一个字段，它的错误就去掉（D-572，模拟器检查 P3：改对了红字还挂着，要等下一次保存）。
+  const edit = (next: Record<string, unknown>) => {
+    setIssues((now) => issuesLeft(now, values, next));
+    setValues(next);
+  };
   // 收件页面复制来的文件（D-392）和桌上改好交回来的附件（D-395）：离开这一页时，没存进这条记录的删掉
   // （没保存就离开时全部删掉）。它们是这张表单自己新建的，原件、收件那一批和记录里原来的文件不动。
   const [copied] = useState(() => (recordId ? [] : takeFormCopies(copies)));
@@ -210,7 +216,7 @@ export default function RecordRoute() {
               suggest={!recordId}
               collection={collection}
               values={values}
-              onChange={setValues}
+              onChange={edit}
               issues={issues}
               palette={palette}
               locale={locale}
@@ -223,6 +229,15 @@ export default function RecordRoute() {
               }
             />
           </FormFilesContext.Provider>
+          {/* 保存被拒时（D-572，模拟器检查 P2）：保存按钮在长表单最下面，出错的字段在上面，说一句有几项、标在哪。 */}
+          {issues.length > 0 ? (
+            <Text
+              testID="editor-issues"
+              accessibilityLiveRegion="polite"
+              style={[palette.font('bodyMedium', 14), { color: palette.danger }]}>
+              {t(locale, 'formIssues', { n: new Set(issues.map((i) => i.fieldId)).size })}
+            </Text>
+          ) : null}
           <Button
             palette={palette}
             testID="editor-save"
