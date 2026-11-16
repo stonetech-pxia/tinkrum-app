@@ -61,8 +61,21 @@ export function componentLabel(
   return componentDefinition(c.look).describe(c, config, ctx);
 }
 
-/** 提醒什么时候响（修改说明用）。 */
+/**
+ * 提醒什么时候响（修改说明、「设置 → 提醒」用）。带 unless 时接着说什么时候不响（D-564）：只说表名，
+ * 有筛选或 link 时说「符合条件的记录」，不说筛选的值。
+ */
 export function reminderWhen(r: Reminder, config: WorkspaceConfig, locale: Locale): string {
+  const when = reminderWhenOnly(r, config, locale);
+  const unless = r.unless;
+  if (!unless) return when;
+  const table = config.data.tables.find((c) => c.id === unless.table);
+  const matching = (unless.filter?.length ?? 0) > 0 || unless.link !== undefined;
+  const key = `reminderUnless${unless.within === 'day' ? 'Day' : unless.within === 'week' ? 'Week' : 'Month'}${matching ? 'Matching' : ''}`;
+  return t(locale, key as StringKey, { when, table: table?.name ?? unless.table });
+}
+
+function reminderWhenOnly(r: Reminder, config: WorkspaceConfig, locale: Locale): string {
   const when = r.when;
   if ('every' in when && when.every === 'day')
     return t(locale, 'reminderWhenDaily', { time: when.at });

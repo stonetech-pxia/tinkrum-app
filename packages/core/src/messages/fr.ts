@@ -1133,6 +1133,15 @@ export const fr: MessageTable = {
   reminderWhenDate: '{n} jours avant « {field} » dans « {table} », à {time}',
   reminderWhenMinutesBefore: '{n} minutes avant « {field} » dans « {table} »',
   reminderWhenSchedule: 'Chaque entrée de « {table} » selon son « {field} », à {time}',
+  reminderUnlessDay: '{when}, sauf si « {table} » a déjà une entrée ce jour-là',
+  reminderUnlessWeek: '{when}, sauf si « {table} » a déjà une entrée cette semaine-là',
+  reminderUnlessMonth: '{when}, sauf si « {table} » a déjà une entrée ce mois-là',
+  reminderUnlessDayMatching:
+    '{when}, sauf si « {table} » a déjà une entrée correspondante ce jour-là',
+  reminderUnlessWeekMatching:
+    '{when}, sauf si « {table} » a déjà une entrée correspondante cette semaine-là',
+  reminderUnlessMonthMatching:
+    '{when}, sauf si « {table} » a déjà une entrée correspondante ce mois-là',
   reminderDoneButton: 'Fait',
   reminderSnoozeButton: 'Me le rappeler plus tard',
   reminderDoneToast: 'Enregistré : {title}',
