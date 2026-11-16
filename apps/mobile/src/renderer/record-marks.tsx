@@ -36,7 +36,7 @@ export function recordMarks(
     colorOf: (r) => {
       if (!field || options.length === 0) return undefined;
       const i = options.findIndex((o) => o.id === recordValue(r, view, field.id, now, cal));
-      return i < 0 ? undefined : optionColor(options[i], i, dark);
+      return i < 0 ? undefined : optionColor(options[i], i, dark, options);
     },
     warns: (r) =>
       highlight !== undefined && highlight.every((c) => matchesCondition(r, view, c, now, cal)),

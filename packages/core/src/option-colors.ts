@@ -15,3 +15,17 @@ export const OPTION_COLORS = {
 
 export type OptionColor = keyof typeof OPTION_COLORS;
 export const OPTION_COLOR_NAMES = Object.keys(OPTION_COLORS) as [OptionColor, ...OptionColor[]];
+
+/**
+ * 分类色（chart.ts 的 CHART_COLORS，同一顺序，浅色深色一样）每一色属于哪些色系（D-571）：同一个单选字段里有选项写了
+ * 某个颜色时，没写颜色的选项不拿这个色系的分类色（青绿算绿，橙红也算红，靛蓝也算蓝、紫）。
+ */
+export const CHART_COLOR_FAMILIES: readonly (readonly OptionColor[])[] = [
+  ['blue'],
+  ['orange', 'red'],
+  ['green'],
+  ['yellow', 'orange'],
+  ['pink'],
+  ['green'],
+  ['purple', 'blue'],
+];

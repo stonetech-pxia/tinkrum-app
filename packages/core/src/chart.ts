@@ -14,7 +14,7 @@ import {
   type LinkedGroups,
 } from './data';
 import type { ChartSource } from './components/chart';
-import { OPTION_COLORS, type OptionColor } from './option-colors';
+import { CHART_COLOR_FAMILIES, OPTION_COLORS, type OptionColor } from './option-colors';
 import { rangeStarts, rangeUnit, type DayRange } from './page-period';
 import type { Collection, GroupUnit } from './schema';
 import { dateFieldOf, distinctDays } from './sequence';
@@ -46,15 +46,24 @@ export const MAX_PIE_SLICES = 8;
 /**
  * 一个单选选项画成什么颜色（D-568）：写了 color 的用那个有名字的颜色，没写的按 index 取分类色，
  * index 不在分类色里（第 8 个起、没选、「其他」是 -1）时是中性灰。按值上色、月历、饼图都用它。
+ * options 是这个字段的全部选项（D-571）：其中有写了颜色的时，没写颜色的按它在没写颜色的选项里的顺序，
+ * 取不和那些颜色同一色系的分类色（CHART_COLOR_FAMILIES），在哪里画都是同一个颜色；取完了是中性灰。
+ * 一个都没写颜色（或者不传 options）时和以前完全一样。
  */
 export function optionColor(
-  option: { color?: OptionColor | undefined } | undefined,
+  option: { id?: string; color?: OptionColor | undefined } | undefined,
   index: number,
   dark: boolean,
+  options?: readonly { id: string; color?: OptionColor | undefined }[],
 ): string {
   if (option?.color) return OPTION_COLORS[option.color][dark ? 'dark' : 'light'];
-  const scheme = dark ? CHART_COLORS.dark : CHART_COLORS.light;
-  return (index >= 0 ? scheme[index] : undefined) ?? CHART_COLORS.other[dark ? 'dark' : 'light'];
+  const scheme: readonly string[] = dark ? CHART_COLORS.dark : CHART_COLORS.light;
+  const grey = CHART_COLORS.other[dark ? 'dark' : 'light'];
+  const used = new Set(options?.flatMap((o) => (o.color ? [o.color] : [])) ?? []);
+  if (used.size === 0 || index < 0) return (index >= 0 ? scheme[index] : undefined) ?? grey;
+  const free = scheme.filter((_, i) => !CHART_COLOR_FAMILIES[i]?.some((f) => used.has(f)));
+  const k = options!.filter((o) => !o.color).findIndex((o) => o.id === option?.id);
+  return (k >= 0 ? free[k] : undefined) ?? grey;
 }
 
 export interface ChartPoint {

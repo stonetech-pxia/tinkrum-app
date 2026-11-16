@@ -241,7 +241,8 @@ export function Chart({
     );
   } else {
     const total = points.reduce((s, p) => s + p.value, 0);
-    // 按单选分组时，写了颜色的选项用它的颜色（D-568）；别的照旧按块的顺序取分类色，「其他」和「未选」是灰。
+    // 按单选分组时，写了颜色的选项用它的颜色（D-568）；别的照旧按块的顺序取分类色，「其他」和「未选」是灰；
+    // 有选项写了颜色时，没写的避开那些颜色的色系（D-571）。
     const groupBy = byChoice ? collection.fields.find((f) => f.id === source.group.by) : undefined;
     const options = groupBy?.type === 'choice' ? groupBy.options : [];
     const colorOf = (p: ChartPoint, i: number) =>
@@ -249,6 +250,7 @@ export function Chart({
         options.find((o) => o.id === p.key),
         p.key === null ? -1 : i % CHART_COLORS.light.length,
         palette.dark,
+        options,
       );
     const size = PLOT_HEIGHT;
     const paths = piePaths(

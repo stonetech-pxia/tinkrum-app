@@ -102,7 +102,7 @@ export function MonthCalendar({
   // 选项写了颜色的用它的颜色（D-568），没写的按顺序用分类色（和饼图一样，第 8 个起和「未选」一起用中性灰）。
   const colorOfOption = (id: string | null) => {
     const i = id === null ? -1 : options.findIndex((o) => o.id === id);
-    return optionColor(options[i], i, palette.dark);
+    return optionColor(options[i], i, palette.dark, options);
   };
   const fillOf = (count: number, optionId: string | null) => {
     if (count === 0) return undefined;
