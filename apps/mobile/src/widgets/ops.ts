@@ -7,6 +7,7 @@ import {
   prepareRecordValues,
   recordToolOf,
   rowUpdateInput,
+  toolReadsEntry,
   type Calendar,
   type Collection,
   type Component,
@@ -45,11 +46,15 @@ export function findComponent(config: WorkspaceConfig, id: string): Component | 
   return undefined;
 }
 
-/** 能在小组件上直接执行的工具（打开表单的新建要用户填，setAll 要确认，「打开」要看界面）。 */
+/**
+ * 能在小组件上直接执行的工具（打开表单的新建要用户填，setAll 要确认，「打开」要看界面）。读「这一条」字段的
+ * （抄、从它的日期起算、加它的数字，D-565）也打开 App：小组件那边只有存着的值，没有算好的。
+ */
 function widgetTool(use: ToolUse | undefined): WidgetTool | undefined {
   if (!use || !isRecordToolUse(use)) return undefined;
   const tool = recordToolOf(use);
   if (tool.do === 'setAll' || (tool.do === 'create' && tool.ask !== undefined)) return undefined;
+  if (toolReadsEntry(tool)) return undefined;
   return tool;
 }
 

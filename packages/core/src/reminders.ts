@@ -459,22 +459,30 @@ export function reminderDoneInput(
   collection: Collection,
   record: DataRecord,
   now: Date,
+  /** 算好的这一条（D-565：done 抄它的字段、从它的日期起算时要用；不给时只读存着的值）。 */
+  computed: DataRecord = record,
 ):
   | { kind: 'create'; collection: Collection; input: Record<string, unknown> }
   | { kind: 'update'; input: Record<string, unknown> }
   | null {
   const cal = calendarOf(config);
+  const entry = { record: computed, view: expandCollection(config.data.tables, collection) };
   if (done.do === 'create') {
     const target = config.data.tables.find((c) => c.id === done.table);
     if (!target) return null;
     return {
       kind: 'create',
       collection: target,
-      input: createInput(target, done.values, { now, cal, rowId: record.id }),
+      input: createInput(target, done.values, { now, cal, rowId: record.id, entry }),
     };
   }
   if (done.do === 'setAll') return null;
-  const input = rowUpdateInput(done, collection, record.values, { now, cal, rowId: record.id });
+  const input = rowUpdateInput(done, collection, record.values, {
+    now,
+    cal,
+    rowId: record.id,
+    entry,
+  });
   return input ? { kind: 'update', input } : null;
 }
 

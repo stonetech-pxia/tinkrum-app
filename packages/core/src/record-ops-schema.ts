@@ -2,9 +2,12 @@ import { z } from 'zod';
 
 import {
   ConditionSchema,
+  FieldRefSchema,
   GROUP_REF,
   HERE_REF,
   IdSchema,
+  OffsetAddSchema,
+  OffsetUnitSchema,
   RECORD_REF,
   ROW_REF,
   boundedText,
@@ -16,9 +19,28 @@ import {
 // v34：就地的工具（Q1）写在块的 tools[] 里，跟着块加、改、删；提醒的 done 也是一个一键记录工具。
 
 /**
+ * 写进日期字段的「从哪天起加几天、几个月」（D-565）：from 是 "today" 或「这一条」的一个日期、日期时间字段，
+ * add 是整数或「这一条」的一个数字字段。和算出来的日期字段（D-542）同一种写法，同一段算法（data.ts 的 offsetDay）。
+ */
+export const DateValueSchema = z.strictObject({
+  from: z.union([z.literal('today'), FieldRefSchema]),
+  add: OffsetAddSchema,
+  unit: OffsetUnitSchema,
+});
+export type DateValue = z.infer<typeof DateValueSchema>;
+
+/**
+ * 「这一条」的一个字段的值，在点的那一刻抄过来（D-565）。配置里只有字段 ID，没有内容（底线 14），AI 看不到值（底线 2）。
+ * 「这一条」：工具作用的那一条（"$row"），没有时是记录页打开的那一条（"$record"）；批量新建时是来源表的每一条。
+ */
+export const CopyValueSchema = z.strictObject({ copy: IdSchema });
+export type CopyValue = z.infer<typeof CopyValueSchema>;
+
+/**
  * 工具里能写的值（D-301）：单选项 ID、数字、勾选（true / false）、"today"（日期字段）、"now"（时间、
  * 日期时间字段）、null（清空）；"$row" 是工具作用的那一条，"$record" 是记录页打开的那一条（D-342），
  * 都只给引用字段；"$group" 是拖到的那一栏（只给 drag）。按字段类型解释，不能写文字：文字是用户的内容（D-042）。
+ * D-565 起还有：从今天或这一条的日期起加几天、几个月（DateValueSchema），和抄这一条的一个字段（CopyValueSchema）。
  */
 export const RecordToolValueSchema = z.union([
   IdSchema,
@@ -28,6 +50,8 @@ export const RecordToolValueSchema = z.union([
   z.number().finite(),
   z.boolean(),
   z.null(),
+  DateValueSchema,
+  CopyValueSchema,
 ]);
 export type RecordToolValue = z.infer<typeof RecordToolValueSchema>;
 /** v33 的名字（同一个东西）。 */
@@ -65,10 +89,14 @@ const increment = {
   do: z.literal('increment'),
   table: IdSchema,
   field: IdSchema,
-  by: z
-    .number()
-    .finite()
-    .refine((n) => n !== 0 && Math.abs(n) <= 1e6, 'by must be a non-zero number up to 1000000'),
+  /** 加几：固定的数，或这一条的一个数字字段（D-565）。 */
+  by: z.union([
+    z
+      .number()
+      .finite()
+      .refine((n) => n !== 0 && Math.abs(n) <= 1e6, 'by must be a non-zero number up to 1000000'),
+    IdSchema,
+  ]),
 };
 const setAll = {
   do: z.literal('setAll'),
@@ -145,3 +173,34 @@ export function recordToolOf(use: RecordToolUse): RecordTool {
   const { as: _as, label: _label, when: _when, ...tool } = use;
   return tool as RecordTool;
 }
+
+export const isDateValue = (v: unknown): v is DateValue =>
+  typeof v === 'object' && v !== null && 'unit' in v && 'from' in v;
+export const isCopyValue = (v: unknown): v is CopyValue =>
+  typeof v === 'object' && v !== null && 'copy' in v;
+
+/** 一个值读「这一条」的哪些字段（D-565）：抄的字段、日期的起点和加数。 */
+export function valueEntryFields(v: unknown): string[] {
+  if (isCopyValue(v)) return [v.copy];
+  if (!isDateValue(v)) return [];
+  return [...(v.from === 'today' ? [] : [v.from]), ...(typeof v.add === 'string' ? [v.add] : [])];
+}
+
+/** 一键记录工具读「这一条」的哪些字段（D-565）：App 只在有的时候才先算好这一条。 */
+export function toolEntryFields(tool: RecordTool): string[] {
+  switch (tool.do) {
+    case 'create':
+      return typeof tool.values === 'object'
+        ? Object.values(tool.values).flatMap(valueEntryFields)
+        : [];
+    case 'set':
+    case 'setAll':
+      return valueEntryFields(tool.value);
+    case 'increment':
+      return typeof tool.by === 'string' ? [tool.by] : [];
+    case 'toggle':
+      return [];
+  }
+}
+
+export const toolReadsEntry = (tool: RecordTool) => toolEntryFields(tool).length > 0;

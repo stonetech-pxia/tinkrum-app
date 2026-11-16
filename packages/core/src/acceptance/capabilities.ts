@@ -1,6 +1,8 @@
 import { isSystemField } from '../components/define';
 import {
   isOpenUse,
+  isCopyValue,
+  isDateValue,
   isRecordToolUse,
   type RecordTool,
   type RecordToolValues,
@@ -552,6 +554,16 @@ const valueUsed = (v: AppView, value: unknown) =>
     return (tool.do === 'set' || tool.do === 'setAll') && tool.value === value;
   });
 
+/** 所有一键记录工具写的值（D-565 的对象写法用）。 */
+const valuesUsed = (v: AppView): unknown[] =>
+  v.writes.flatMap(({ tool }) =>
+    tool.do === 'create'
+      ? Object.values(typeof tool.values === 'object' ? tool.values : {})
+      : tool.do === 'set' || tool.do === 'setAll'
+        ? [tool.value]
+        : [],
+  );
+
 const usesOpen = (v: AppView) =>
   v.blocks.some(({ block }) => toolsOf(block).some((u) => isOpenUse(u) && u.opens === 'record'));
 
@@ -688,6 +700,12 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('write.value.record', 'write', (v) => valueUsed(v, RECORD_REF)),
   cap('write.value.group', 'write', (v) => valueUsed(v, GROUP_REF)),
   cap('write.value.here', 'write', (v) => valueUsed(v, HERE_REF)),
+  // D-565：从今天或这一条的日期起算的日期、抄这一条的字段、加这一条的一个数字字段。
+  cap('write.value.dateOffset', 'write', (v) => valuesUsed(v).some(isDateValue)),
+  cap('write.value.copy', 'write', (v) => valuesUsed(v).some(isCopyValue)),
+  cap('write.increment.byField', 'write', (v) =>
+    v.writes.some((w) => w.tool.do === 'increment' && typeof w.tool.by === 'string'),
+  ),
   cap('write.action.out.addRecord', 'write', (v) => v.intakes.length > 0),
   cap('write.fileInForm', 'write', (v) =>
     allFields(v).some(

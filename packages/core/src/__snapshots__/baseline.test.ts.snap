@@ -2664,6 +2664,16 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 4> number
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 5> boolean
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 6> null
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7> object
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from<anyOf 0> "today"
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from<anyOf 1> = <oneOf 6>.tools[]<anyOf 0>.when[].field
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add<anyOf 0> integer -36500..36500
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.unit "days"|"months"
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 8> object
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 8>.copy string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 1> "$here"
 <oneOf 6>.tools[]<anyOf 1>.ask?
 <oneOf 6>.tools[]<anyOf 1>.ask<anyOf 0> "all"
@@ -2697,7 +2707,9 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 4>.do "increment"
 <oneOf 6>.tools[]<anyOf 4>.table string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 4>.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 4>.by number
+<oneOf 6>.tools[]<anyOf 4>.by
+<oneOf 6>.tools[]<anyOf 4>.by<anyOf 0> number
+<oneOf 6>.tools[]<anyOf 4>.by<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 5> object
 <oneOf 6>.tools[]<anyOf 5>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
 <oneOf 6>.tools[]<anyOf 5>.label? string len 1..30
@@ -3486,6 +3498,14 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 4> number
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 5> boolean
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 6> null
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7> object
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7>.from
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7>.from<anyOf 0> "today"
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7>.from<anyOf 1> = .data.tables[].fields[]<oneOf rollup>.filter[].field
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7>.add = .data.tables[].fields[]<oneOf dateOffset>.add
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7>.unit "days"|"months"
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 8> object
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 8>.copy string /^[a-z][a-z0-9-]{0,47}$/
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 1> "$here"
 .tools[]<oneOf 1>.done<oneOf 0>.ask?
 .tools[]<oneOf 1>.done<oneOf 0>.ask<anyOf 0> "all"
@@ -3507,7 +3527,9 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .tools[]<oneOf 1>.done<oneOf 3>.do "increment"
 .tools[]<oneOf 1>.done<oneOf 3>.table string /^[a-z][a-z0-9-]{0,47}$/
 .tools[]<oneOf 1>.done<oneOf 3>.field string /^[a-z][a-z0-9-]{0,47}$/
-.tools[]<oneOf 1>.done<oneOf 3>.by number
+.tools[]<oneOf 1>.done<oneOf 3>.by
+.tools[]<oneOf 1>.done<oneOf 3>.by<anyOf 0> number
+.tools[]<oneOf 1>.done<oneOf 3>.by<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
 .tools[]<oneOf 1>.done<oneOf 4> object
 .tools[]<oneOf 1>.done<oneOf 4>.do "setAll"
 .tools[]<oneOf 1>.done<oneOf 4>.table string /^[a-z][a-z0-9-]{0,47}$/

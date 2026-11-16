@@ -32,7 +32,9 @@ export function ActionButton({
       variant={variant}
       icon={icon}
       onPress={
-        env.interactive ? (env.locked ?? (() => void runner.runButton(action, label))) : undefined
+        env.interactive
+          ? (env.locked ?? (() => void runner.runButton(action, label, env.recordId)))
+          : undefined
       }
       onLongPress={env.onLongPress}
       style={style}

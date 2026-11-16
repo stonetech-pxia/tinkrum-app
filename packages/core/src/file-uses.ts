@@ -45,6 +45,12 @@ export const USES_FEATURES = [
   'reminderMinutesBefore',
   /** 每天、每周的提醒带 unless（D-563）。 */
   'reminderUnlessRepeating',
+  /** 一键记录工具写的值 {from, add, unit}：从今天或这一条的日期起加几天、几个月（D-565）。 */
+  'recordToolDateValue',
+  /** 一键记录工具写的值 {copy}：抄这一条的一个字段（D-565）。 */
+  'recordToolCopyValue',
+  /** increment 的 by 是这一条的一个数字字段（D-565）。 */
+  'incrementByField',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -125,6 +131,17 @@ export function usesOf(content: unknown): FileUses {
       found.features.add('periodNextDays');
     if (typeof node.period === 'string' && NEIGHBOURS.has(node.period))
       found.features.add('periodNeighbours');
+    // 一键记录工具（块上的、提醒的 done）写的值（D-565）。
+    if (typeof node.do === 'string') {
+      const values = [node.value, ...(isObject(node.values) ? Object.values(node.values) : [])];
+      for (const v of values) {
+        if (isObject(v) && v.unit !== undefined && v.from !== undefined)
+          found.features.add('recordToolDateValue');
+        if (isObject(v) && v.copy !== undefined) found.features.add('recordToolCopyValue');
+      }
+      if (node.do === 'increment' && typeof node.by === 'string')
+        found.features.add('incrementByField');
+    }
     if (node.kind === 'reminder' && node.app !== undefined) found.features.add('reminderInApp');
     if (node.kind === 'reminder' && isObject(node.when)) {
       if (node.when.before !== undefined && node.when.minutes !== undefined)

@@ -41,6 +41,7 @@ import {
   type Condition,
   type Field,
   type Locale,
+  type OffsetUnit,
   type Period,
   type SystemField,
 } from './schema';
@@ -327,11 +328,20 @@ function dateOffsetValue(
     typeof field.add === 'number'
       ? field.add
       : recordValue(record, collection, field.add, now, cal);
-  const day = start === undefined ? undefined : dayNumber(start);
-  if (day === undefined || typeof n !== 'number' || !Number.isFinite(n)) return undefined;
+  if (start === undefined || typeof n !== 'number' || !Number.isFinite(n)) return undefined;
+  return offsetDay(start, n, field.unit);
+}
+
+/**
+ * 某一天（YYYY-MM-DD）加 add 天或 add 个月（四舍五入成整数）；月份加完超过那个月的最后一天时取最后一天。
+ * 算出来的日期（D-542）和一键记录工具写的日期（D-565）共用。日子读不出来时没有。
+ */
+export function offsetDay(start: string, n: number, unit: OffsetUnit): string | undefined {
+  const day = dayNumber(start);
+  if (day === undefined || !Number.isFinite(n)) return undefined;
   const add = Math.round(n);
-  if (field.unit === 'days') return dateOfDayNumber(day + add);
-  const [y, m, d] = start!.split('-').map(Number) as [number, number, number];
+  if (unit === 'days') return dateOfDayNumber(day + add);
+  const [y, m, d] = start.split('-').map(Number) as [number, number, number];
   const months = y * 12 + (m - 1) + add;
   const year = Math.floor(months / 12);
   const month = months - year * 12 + 1;

@@ -2,6 +2,7 @@ import {
   RECORD_LIMITS,
   calendarOf,
   linkTitle,
+  loadComputedRecords,
   migrateWorkspace,
   prepareRecordValues,
   reminderButtons,
@@ -9,6 +10,7 @@ import {
   reminderTable,
   remindersOf,
   snoozeId,
+  toolReadsEntry,
   type Locale,
   type WorkspaceConfig,
 } from '@morph/core';
@@ -127,7 +129,19 @@ async function handle(
 
     if (!r.done) return nothing();
     const cal = calendarOf(config);
-    const planned = reminderDoneInput(r.done, config, collection, record, at);
+    // done 读这一条的字段（抄、从它的日期起算，D-565）：先算好这一条（公式、查找、汇总）。
+    const computed = toolReadsEntry(r.done)
+      ? (
+          await loadComputedRecords(
+            (id) => repo.listRecords(id),
+            config.data.tables,
+            collection,
+            at,
+            cal,
+          )
+        ).records.find((x) => x.id === record.id)
+      : undefined;
+    const planned = reminderDoneInput(r.done, config, collection, record, at, computed ?? record);
     if (!planned) return nothing();
     let write: RecordWrite;
     if (planned.kind === 'create') {

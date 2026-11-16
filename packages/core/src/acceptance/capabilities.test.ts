@@ -361,6 +361,33 @@ function everything() {
         look: 'divider',
         showIf: { table: 'items', has: 'none' },
       },
+      records('list', 'relative', 'items', 'title', {
+        tools: [
+          {
+            as: 'button',
+            label: 'Snooze',
+            do: 'set',
+            table: 'items',
+            field: 'date',
+            value: { from: 'today', add: 7, unit: 'days' },
+          },
+          {
+            as: 'button',
+            label: 'Again',
+            do: 'increment',
+            table: 'items',
+            field: 'qty',
+            by: 'qty',
+          },
+          {
+            as: 'button',
+            label: 'Copy',
+            do: 'create',
+            table: 'items',
+            values: { title: { copy: 'title' } },
+          },
+        ],
+      }),
       records('list', 'browsed', 'items', 'title', {
         show: { browse: { search: true, sort: ['title', 'createdAt'], group: ['status'] } },
         tools: [{ as: 'list', tool: 'export-shown-items' }],

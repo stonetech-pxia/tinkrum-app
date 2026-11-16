@@ -6,6 +6,8 @@ import {
   isRecordToolUse,
   isOpenUse,
   isToolRefUse,
+  recordToolOf,
+  toolEntryFields,
   type RecordToolUse,
   type ToolUse,
 } from './record-ops-schema';
@@ -496,15 +498,25 @@ function recordToolUses(use: RecordToolUse, gone: Gone): boolean {
   }
 }
 
-/** 块（读 table 这张表）上的一个工具用到了被删掉的表或字段：工具自己的，或者 when 里的条件（读这一条）。 */
-function toolUses(use: ToolUse, table: string | null, gone: Gone): boolean {
+/**
+ * 块（读 table 这张表）上的一个工具用到了被删掉的表或字段：工具自己的，或者 when 里的条件（读这一条），
+ * 或者值里读「这一条」（entry 这张表，D-565）的字段：抄的字段、日期的起点和加数。
+ */
+function toolUses(use: ToolUse, table: string | null, gone: Gone, entry = table): boolean {
   if (
     gone.field !== undefined &&
     table === gone.table &&
     (use.when ?? []).some((c) => c.field === gone.field)
   )
     return true;
-  return isRecordToolUse(use) && recordToolUses(use, gone);
+  if (!isRecordToolUse(use)) return false;
+  if (
+    gone.field !== undefined &&
+    entry === gone.table &&
+    toolEntryFields(recordToolOf(use)).includes(gone.field)
+  )
+    return true;
+  return recordToolUses(use, gone);
 }
 
 /**
@@ -513,9 +525,13 @@ function toolUses(use: ToolUse, table: string | null, gone: Gone): boolean {
  * 让 AI 一起改（和 v33 一样）。
  */
 function pruneRecordTools(config: WorkspaceConfig, gone: Gone, notes: ApplyNote[]): void {
+  // 按钮在记录页上时，「这一条」是页面的那一条（D-565）。
+  const pageOf = new Map<Component, string>();
+  for (const page of config.containers.pages)
+    if (page.of !== undefined) for (const c of allComponents(page)) pageOf.set(c, page.of);
   let count = removeEverywhere(config, (c) => {
     if (!isKnownComponent(c) || c.look !== 'button' || !c.tools) return false;
-    return c.tools.some((u) => toolUses(u, null, gone));
+    return c.tools.some((u) => toolUses(u, null, gone, pageOf.get(c) ?? null));
   });
   for (const c of everyBlock(config)) {
     if (!isKnownComponent(c) || c.look === 'button' || c.look === 'form') continue;

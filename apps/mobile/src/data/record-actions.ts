@@ -8,6 +8,8 @@ import {
   expandCollection,
   isOpenUse,
   recordToolOf,
+  toolReadsEntry,
+  type ActionContext,
   type DataRecord,
   type OpenUse,
   type RecordTool,
@@ -50,13 +52,40 @@ export function useRecordActionRunner() {
   const openRecord = (collectionId: string, recordId: string) =>
     router.push({ pathname: '/record/[collectionId]', params: { collectionId, recordId } });
 
+  /**
+   * 「这一条」（D-565）：工具读它的字段时（抄、从它的日期起算、加它的数字），在点的那一刻读出来、算好
+   * （公式、查找、汇总都有值）。已经不在了时没有。
+   */
+  async function entryOf(
+    tool: RecordTool,
+    id: string | undefined,
+    now: Date,
+  ): Promise<ActionContext['entry']> {
+    if (!config || !id || !toolReadsEntry(tool)) return undefined;
+    const stored = await repo.getRecord(id);
+    const table = stored && config.data.tables.find((c) => c.id === stored.collectionId);
+    if (!stored || stored.deletedAt !== null || !table) return undefined;
+    const { view, records } = await loadComputedRecords(
+      (cid) => repo.listRecords(cid),
+      config.data.tables,
+      table,
+      now,
+      cal,
+    );
+    const record = records.find((r) => r.id === id);
+    return record ? { record, view } : undefined;
+  }
+
   async function create(
     tool: Extract<RecordTool, { do: 'create' }>,
     ctx: { rowId?: string | undefined; recordId?: string | undefined },
   ) {
     const collection = config?.data.tables.find((c) => c.id === tool.table);
     if (!collection) return;
-    const input = createInput(collection, tool.values, { now: new Date(), cal, ...ctx });
+    const now = new Date();
+    // 「这一条」：工具作用的那一条，没有时是记录页的那一条。
+    const entry = await entryOf(tool, ctx.rowId ?? ctx.recordId, now);
+    const input = createInput(collection, tool.values, { now, cal, ...ctx, entry });
     // D-338：打开新记录的表单，预设的值先填好，用户补完再保存（表单自己保存，不弹提示条）。
     // Q6：按钮模式的「添加」（原 recordForm button）也预填预设值。
     if (tool.ask !== undefined) return void openNew(collection.id, input);
@@ -132,12 +161,15 @@ export function useRecordActionRunner() {
   }
 
   return {
-    /** 块本身的工具（button 的 tools[0]）：不作用在某一条上。 */
-    runButton(use: RecordToolUse, label: string): Promise<void> {
+    /**
+     * 块本身的工具（button 的 tools[0]）：不作用在某一条上。recordId 是记录页打开的那一条（"$record"，
+     * 和抄它的字段，D-342、D-565）。
+     */
+    runButton(use: RecordToolUse, label: string, recordId?: string): Promise<void> {
       return serial(async () => {
         const tool = recordToolOf(use);
         if (tool.do === 'setAll') return setAll(tool, label);
-        if (tool.do === 'create') await create(tool, {});
+        if (tool.do === 'create') await create(tool, recordId ? { recordId } : {});
       });
     },
 
@@ -170,6 +202,7 @@ export function useRecordActionRunner() {
           cal,
           rowId: record.id,
           group: options.group,
+          entry: await entryOf(tool, record.id, now),
         });
         if (!input) return;
         const prepared = prepareRecordValues(collection, input, stored.values, now, cal);

@@ -8317,6 +8317,101 @@ const UNLESS_REPEATING_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 商品表（价格）和订单表（引用商品、价格），一页列出商品（D-565）。 */
+const productsEarlier: EvalEarlier = {
+  input:
+    'Make a table of products with a name and a price, a table of orders linked to a product with a price, and a page that lists the products',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'products',
+        name: 'Products',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'price', name: 'Price', type: 'money', currency: 'EUR' },
+        ],
+      },
+    },
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'product', name: 'Product', type: 'link', table: 'products' },
+          { id: 'price', name: 'Price', type: 'money', currency: 'EUR' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'products-page',
+        title: 'Products',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'products', limit: 50 },
+            show: { title: 'name' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
+
+// 一键记录工具写从今天、从这一条起算的日期，抄这一条的值（D-565）。
+const RELATIVE_VALUE_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG27',
+    input: 'Add a Snooze button on each bill that moves its due date one week later',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [billsEarlier],
+    expect: {
+      kind: 'ops',
+      check: actionCheck(
+        'rows',
+        (a) =>
+          a.do === 'set' &&
+          a.table === 'bills' &&
+          a.field === 'due' &&
+          isObj(a.value) &&
+          (a.value.from === 'due' || a.value.from === 'today') &&
+          a.value.unit === 'days' &&
+          a.value.add === 7,
+        'a row button setting due to {from: due or today, add: 7, unit: days}',
+      ),
+    },
+  },
+  {
+    id: 'KG28',
+    input: '在每个商品旁边加一个「下单」按钮，按商品现在的价格新建一条订单',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [productsEarlier],
+    expect: {
+      kind: 'ops',
+      check: actionCheck(
+        'rows',
+        (a) =>
+          a.do === 'create' &&
+          a.table === 'orders' &&
+          values(a).product === '$row' &&
+          isObj(values(a).price) &&
+          (values(a).price as { copy?: string }).copy === 'price',
+        'a row button creating an order with product "$row" and price {copy: "price"}',
+      ),
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8380,6 +8475,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...LIST_PERIOD_CASES,
   ...MINUTES_BEFORE_CASES,
   ...UNLESS_REPEATING_CASES,
+  ...RELATIVE_VALUE_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };
