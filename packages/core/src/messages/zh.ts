@@ -1150,6 +1150,7 @@ export const zh: MessageTable = {
   describeSourceFilterOff: '显示全部记录',
   describeSourceSortAsc: '按「{field}」从小到大排',
   describeSourceSortDesc: '按「{field}」从大到小排',
+  describeSourceSortMany: '依次按 {fields} 排序',
   describeSourceSortOff: '恢复默认顺序',
   describeSourceLimit: '最多显示 {n} 条',
   describeSourceGroupBy: '按「{field}」分组',

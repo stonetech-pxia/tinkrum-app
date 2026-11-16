@@ -9,6 +9,7 @@ import {
   type ToolUse,
 } from './record-ops-schema';
 import { createRegistry, type Registry } from './registry';
+import { sortList } from './schema-base';
 import { reminderTable } from './reminders';
 import { dateFieldOf } from './sequence';
 import {
@@ -364,7 +365,7 @@ class Analysis {
           use.read.add(format.goal);
         this.readFilter(use, source.filter);
         this.readFilter(use, show.highlight);
-        if (source.sort) use.read.add(source.sort.field);
+        for (const key of sortList(source.sort)) use.read.add(key.field);
         if (source.group?.by) use.read.add(source.group.by);
         const tapped = block.tools?.some((u) => u.as === 'tap');
         if (reachable && block.opens === undefined && !(look === 'tiles' && tapped))

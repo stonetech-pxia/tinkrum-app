@@ -22,6 +22,7 @@ import {
   type WorkspaceConfig,
 } from '../schema';
 import { parseRichText } from '../richtext';
+import { sortList } from '../schema-base';
 import { createStarterWorkspace } from '../starter';
 import { templateOps } from '../templates';
 import { THEME_PRESETS } from '../presets';
@@ -5564,7 +5565,10 @@ function scheduleProblem(
     return `expected a list of ${table.id} filtered with due ${want.due}`;
   if (
     want.sortAsc &&
-    !sources.some((p) => p.sort?.field === field.id && p.sort.direction === 'asc')
+    !sources.some((p) => {
+      const first = sortList(p.sort)[0];
+      return first?.field === field.id && first.direction === 'asc';
+    })
   )
     return `expected a list of ${table.id} sorted by ${field.id} ascending`;
   return null;
@@ -8060,6 +8064,86 @@ const NEIGHBOUR_PERIOD_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 任务表：优先级（高、中、低）和到期日，一页列出来。 */
+const prioritiesEarlier: EvalEarlier = {
+  input:
+    'Make a table of my tasks with a priority (high, medium, low) and a due date, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'tasks',
+        name: 'Tasks',
+        fields: [
+          { id: 'title', name: 'Title', type: 'text', required: true },
+          {
+            id: 'priority',
+            name: 'Priority',
+            type: 'choice',
+            options: [
+              { id: 'high', label: 'High' },
+              { id: 'medium', label: 'Medium' },
+              { id: 'low', label: 'Low' },
+            ],
+          },
+          { id: 'due', name: 'Due date', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'tasks-page',
+        title: 'Tasks',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'tasks', limit: 50 },
+            show: { title: 'title' },
+          },
+        ],
+      },
+    },
+  ],
+};
+/** 任务列表先按优先级（高在前）再按到期日（早的在前）排（D-560）。 */
+const byPriorityThenDue = (c: WorkspaceConfig) =>
+  recordBlocksOf(c, 'tasks').some((x) => {
+    const keys = sortList(x.source.sort);
+    return (
+      keys.length >= 2 &&
+      keys[0]!.field === 'priority' &&
+      keys[0]!.direction === 'asc' &&
+      keys[1]!.field === 'due' &&
+      keys[1]!.direction === 'asc'
+    );
+  })
+    ? null
+    : 'expected a tasks list sorted by [priority asc, due asc]';
+
+// 按几个字段依次排（D-560）。
+const SORT_MANY_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG19',
+    input: 'Sort my tasks by priority, and tasks with the same priority by due date',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [prioritiesEarlier],
+    expect: { kind: 'ops', check: byPriorityThenDue },
+  },
+  {
+    id: 'KG20',
+    input: "Trie mes tâches par priorité, puis par date d'échéance",
+    locale: 'fr',
+    setup: 'default',
+    mock: false,
+    earlier: [prioritiesEarlier],
+    expect: { kind: 'ops', check: byPriorityThenDue },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8119,6 +8203,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...DATE_OFFSET_USE_CASES,
   ...OPENED_RECORD_CASES,
   ...NEIGHBOUR_PERIOD_CASES,
+  ...SORT_MANY_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

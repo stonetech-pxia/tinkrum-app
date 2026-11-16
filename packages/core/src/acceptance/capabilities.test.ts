@@ -402,6 +402,14 @@ function everything() {
         },
       }),
       records('list', 'by-schedule', 'items', 'title', { source: { group: { by: 'plan' } } }),
+      records('list', 'by-two', 'items', 'title', {
+        source: {
+          sort: [
+            { field: 'status', direction: 'asc' },
+            { field: 'date', direction: 'desc' },
+          ],
+        },
+      }),
       number('n-goal', 'items', {
         aggregate: 'count',
         goal: 5,

@@ -11,7 +11,8 @@ import {
   filterSchema,
   GroupingSchema,
   IdSchema,
-  SortSchema,
+  SortKeysSchema,
+  sortList,
 } from '../schema-base';
 import {
   collectionName,
@@ -42,7 +43,7 @@ export const TrailingFormatSchema = z.discriminatedUnion('kind', [
 export const RecordSourceSchema = z.strictObject({
   table: IdSchema,
   filter: filterSchema().optional(),
-  sort: SortSchema.optional(),
+  sort: SortKeysSchema.optional(),
   // 不写时 30 条（模型偶尔漏写，不该因此拒绝整份修改）。
   limit: z.number().int().min(1).max(100).default(30),
   group: GroupingSchema.optional(),
@@ -242,12 +243,15 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
       problems.push('source.group.showEmpty only applies when grouping by a choice or link field');
     if (group.filter) problems.push('source.group.filter only applies to a board');
   }
-  if (c.source.sort) {
-    const sorted = field(c.source.sort.field);
-    if (!isSystemField(c.source.sort.field) && !sorted)
-      problems.push(`sort field ${c.source.sort.field} is not a field of ${table}`);
+  const seen = new Set<string>();
+  for (const key of sortList(c.source.sort)) {
+    const sorted = field(key.field);
+    if (!isSystemField(key.field) && !sorted)
+      problems.push(`sort field ${key.field} is not a field of ${table}`);
     if (sorted && fieldDefinition(sorted.type).sort === false)
-      problems.push(`can't sort by the ${sorted.type} field ${c.source.sort.field}`);
+      problems.push(`can't sort by the ${sorted.type} field ${key.field}`);
+    if (seen.has(key.field)) problems.push(`sort lists ${key.field} more than once`);
+    seen.add(key.field);
   }
   return problems;
 }
@@ -257,7 +261,7 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
  * limit 是每段 / 每栏 / 每天最多几条。
  */
 export const RECORD_LOOK_DOC =
-  'source {table, filter?, sort? {field, direction: "asc"|"desc"}, limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (a choice field: a dot in the colour of its option; on a calendar the day colour), highlight? (1-3 conditions like filter: matching entries show trailing, or the title, in the warning colour, e.g. over budget), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools?, opens? (a page for one entry, rule 48)';
+  'source {table, filter?, sort? {field, direction: "asc"|"desc"} or a list of 1-3 of them (sorted by the first, ties by the next: "by priority, then due date"), limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (a choice field: a dot in the colour of its option; on a calendar the day colour), highlight? (1-3 conditions like filter: matching entries show trailing, or the title, in the warning colour, e.g. over budget), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools?, opens? (a page for one entry, rule 48)';
 
 const DOCS: Record<RecordLook, string> = {
   list: 'rows; tapping a row opens the built-in editor (or the page in opens)',

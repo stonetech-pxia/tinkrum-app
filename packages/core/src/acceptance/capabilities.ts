@@ -748,6 +748,7 @@ export const CAPABILITIES: readonly Capability[] = [
     ),
   ),
   cap('read.sort', 'read', (v) => recordBlocks(v).some((b) => b.source.sort !== undefined)),
+  cap('read.sort.many', 'read', (v) => recordBlocks(v).some((b) => Array.isArray(b.source.sort))),
   cap('read.group.choice', 'read', (v) => groupByType(v, ['choice'])),
   cap('read.group.link', 'read', (v) => groupByType(v, ['link'])),
   cap('read.group.schedule', 'read', (v) => groupByType(v, ['schedule'])),

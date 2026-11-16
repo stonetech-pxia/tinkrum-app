@@ -1,6 +1,6 @@
 import type { EvalSetup } from '../ai/eval-cases';
 import { parseFormula } from '../formula';
-import { tablesOf, type Field, type Locale, type Localized } from '../schema';
+import { sortList, tablesOf, type Field, type Locale, type Localized } from '../schema';
 import {
   aggregatesOn,
   canAdd,
@@ -184,7 +184,7 @@ const hidesDone = (v: AppView, table: string) => {
   const fields = [...(field !== null ? [field] : []), ...fieldsFollowingCompletions(v, table)];
   return recordBlocks(v, table).some(
     (b) =>
-      fields.includes(b.source.sort?.field ?? '') ||
+      sortList(b.source.sort).some((k) => fields.includes(k.field)) ||
       b.source.filter?.some((c) => fields.includes(c.field)),
   );
 };
@@ -207,7 +207,8 @@ const scheduleFields = (v: AppView, table: string) =>
 /** 今天要做的放在前面：只列今天的，或者按日程排、分段（今天的在最前）。 */
 const todayView = (v: AppView, table: string) =>
   recordBlocks(v, table).some((b) => {
-    const { filter, sort, group } = b.source;
+    const { filter, group } = b.source;
+    const sort = sortList(b.source.sort)[0];
     const onSchedule = (id: string | undefined) =>
       scheduleFields(v, table).some((f) => f.id === id);
     return (

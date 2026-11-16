@@ -248,6 +248,15 @@ export const SortSchema = z.strictObject({
   field: FieldRefSchema,
   direction: z.enum(['asc', 'desc']),
 });
+export type Sort = z.infer<typeof SortSchema>;
+
+/** 记录块的排序（D-560）：一个，或 1–3 个依次排（先按第一个，一样的再按下一个）。一个对象和以前一样。 */
+export const SortKeysSchema = z.union([SortSchema, z.array(SortSchema).min(1).max(3)]);
+export type SortKeys = z.infer<typeof SortKeysSchema>;
+
+/** 排序写成的一个或几个，统一成列表。 */
+export const sortList = (sort: Sort | readonly Sort[] | undefined): readonly Sort[] =>
+  sort === undefined ? [] : Array.isArray(sort) ? sort : [sort as Sort];
 
 // ---- 导航 ----
 

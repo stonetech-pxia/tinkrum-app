@@ -1216,6 +1216,7 @@ export const en = {
   describeSourceFilterOff: 'shows all entries',
   describeSourceSortAsc: 'sorted by “{field}”, lowest first',
   describeSourceSortDesc: 'sorted by “{field}”, highest first',
+  describeSourceSortMany: 'sorted by {fields}, in this order',
   describeSourceSortOff: 'default order',
   describeSourceLimit: 'shows up to {n} entries',
   describeSourceGroupBy: 'grouped by “{field}”',

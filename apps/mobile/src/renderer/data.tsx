@@ -9,6 +9,7 @@ import {
   choiceRange,
   dateFieldOf,
   browseSort,
+  browseSortKeys,
   cleanTags,
   recordSearchTexts,
   searchRecords,
@@ -53,6 +54,7 @@ import {
   sequenceText,
   sequenceValue,
   shownRowAction,
+  sortList,
   sortRecords,
   todayNumber,
   type Aggregate,
@@ -64,6 +66,7 @@ import {
   type Calendar,
   type OpenUse,
   type RecordLook,
+  type Sort,
   type RecordToolUse,
   isOpenUse,
   isRecordToolUse,
@@ -1634,7 +1637,7 @@ export function ListBrowseBar({ selection, env }: { selection: BrowseSelection; 
       {chips}
     </View>
   );
-  const sorted = sortBy ?? block.source.sort?.field ?? null;
+  const sorted = sortBy ?? sortList(block.source.sort)[0]?.field ?? null;
   const groupBy = group?.by ?? null;
   return (
     <View style={{ gap: 8 }}>
@@ -1789,7 +1792,7 @@ export function useListRecords(
   block: RecordBlock,
   env: RenderEnv,
   /** 用户临时换的排序（D-424）；不写用配置里的。 */
-  sort?: RecordBlock['source']['sort'],
+  sort?: Sort,
 ) {
   const collection = useCollection(env, block.source.table);
   const cal = calendarOf(env.config);
@@ -1800,7 +1803,8 @@ export function useListRecords(
     ? sortRecords(
         filterRecords(records ?? [], view, block.source.filter, now, cal),
         view,
-        sort ?? block.source.sort,
+        // 用户换的排序在前，配置里的（可以是几个，D-560）排一样的。
+        browseSortKeys(sort, block.source.sort),
         now,
         cal,
       )

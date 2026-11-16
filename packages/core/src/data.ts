@@ -491,16 +491,51 @@ export function filterRecords(
   );
 }
 
-/** 排序：空值总在最后；单选按选项顺序；日程按下一次（D-295）；默认按创建时间从新到旧。 */
+type SortKey = { field: string; direction: 'asc' | 'desc' };
+
+/**
+ * 排序：空值总在最后；单选按选项顺序；日程按下一次（D-295）；默认按创建时间从新到旧。
+ * 可以是 1–3 个依次排（D-560）：第一个一样的按第二个，每一个都是空值在最后；都一样时按创建时间从新到旧。
+ */
 export function sortRecords(
   records: readonly DataRecord[],
   collection: Collection,
-  sort: { field: string; direction: 'asc' | 'desc' } | undefined,
+  sort: SortKey | readonly SortKey[] | undefined,
   now: Date = new Date(),
   cal: Calendar = DEFAULT_CALENDAR,
 ): DataRecord[] {
-  const { field, direction } = sort ?? { field: 'createdAt', direction: 'desc' as const };
-  const sign = direction === 'asc' ? 1 : -1;
+  const list: readonly SortKey[] =
+    sort === undefined ? [] : Array.isArray(sort) ? sort : [sort as SortKey];
+  const keys = (list.length > 0 ? list : [{ field: 'createdAt', direction: 'desc' as const }]).map(
+    ({ field, direction }) => ({
+      sign: direction === 'asc' ? 1 : -1,
+      key: sortKeyOf(collection, field, now, cal),
+    }),
+  );
+  // 每条的键先算一次再排（公式、日程每次现算很贵），比较的规则不变。
+  const keyed = records.map((r) => ({ r, k: keys.map((x) => x.key(r)) }));
+  keyed.sort((a, b) => {
+    for (let i = 0; i < keys.length; i++) {
+      const ka = a.k[i];
+      const kb = b.k[i];
+      if (ka === undefined && kb === undefined) continue;
+      if (ka === undefined) return 1;
+      if (kb === undefined) return -1;
+      const order = keys[i]!.sign * compare(ka, kb);
+      if (order !== 0) return order;
+    }
+    return b.r.createdAt - a.r.createdAt;
+  });
+  return keyed.map((x) => x.r);
+}
+
+/** 一条记录按这个字段排时的键。 */
+function sortKeyOf(
+  collection: Collection,
+  field: string,
+  now: Date,
+  cal: Calendar,
+): (r: DataRecord) => FieldValue | undefined {
   const def = fieldOf(collection, field);
   const sortKey = def && fieldDefinition(def.type).sort;
   const key = (r: DataRecord): FieldValue | undefined => {
@@ -515,15 +550,7 @@ export function sortRecords(
     // 有的字段按自己的顺序排（单选按选项顺序）。
     return def && sortKey && v !== undefined ? sortKey(def, v) : v;
   };
-  // 每条的键先算一次再排（公式、日程每次现算很贵），比较的规则不变。
-  const keyed = records.map((r) => ({ r, k: key(r) }));
-  keyed.sort(({ r: a, k: ka }, { r: b, k: kb }) => {
-    if (ka === undefined && kb === undefined) return b.createdAt - a.createdAt;
-    if (ka === undefined) return 1;
-    if (kb === undefined) return -1;
-    return sign * compare(ka, kb) || b.createdAt - a.createdAt;
-  });
-  return keyed.map((x) => x.r);
+  return key;
 }
 
 export type Aggregate = 'count' | 'sum' | 'avg' | 'min' | 'max';

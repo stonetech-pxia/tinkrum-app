@@ -37,6 +37,8 @@ export const USES_FEATURES = [
   'singleOpenedRecord',
   /** 时间段 yesterday / lastWeek / lastMonth / lastYear / tomorrow / nextWeek / nextMonth（D-559）。 */
   'periodNeighbours',
+  /** 记录块的 source.sort 是几个字段的列表（D-560）。 */
+  'sortMany',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -98,6 +100,7 @@ export function usesOf(content: unknown): FileUses {
       if (isObject(source)) {
         if (node.look === 'single' && source.record !== undefined)
           found.features.add('singleOpenedRecord');
+        if (Array.isArray(source.sort)) found.features.add('sortMany');
       }
     }
     // 快捷操作的步骤、工具栏上的动作。

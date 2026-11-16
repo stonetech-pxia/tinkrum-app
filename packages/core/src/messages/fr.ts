@@ -1284,6 +1284,7 @@ export const fr: MessageTable = {
   describeSourceFilterOff: 'affiche toutes les entrées',
   describeSourceSortAsc: 'trié par « {field} », du plus petit au plus grand',
   describeSourceSortDesc: 'trié par « {field} », du plus grand au plus petit',
+  describeSourceSortMany: 'trié par {fields}, dans cet ordre',
   describeSourceSortOff: 'ordre par défaut',
   describeSourceLimit: 'affiche jusqu’à {n} entrées',
   describeSourceGroupBy: 'regroupé par « {field} »',

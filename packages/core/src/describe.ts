@@ -349,7 +349,12 @@ export function describeChange(
         return t(ctx.locale, off ? 'describeSourceFilterOff' : 'describeSourceFilter');
       case 'sort': {
         if (off) return t(ctx.locale, 'describeSourceSortOff');
-        const sort = v as { field: string; direction: 'asc' | 'desc' };
+        // 几个字段依次排（D-560）。
+        if (Array.isArray(v) && v.length > 1)
+          return t(ctx.locale, 'describeSourceSortMany', {
+            fields: (v as { field: string }[]).map((k) => fieldLabel(table, k.field)).join(' / '),
+          });
+        const sort = (Array.isArray(v) ? v[0] : v) as { field: string; direction: 'asc' | 'desc' };
         return t(
           ctx.locale,
           sort.direction === 'asc' ? 'describeSourceSortAsc' : 'describeSourceSortDesc',

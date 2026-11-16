@@ -210,6 +210,22 @@ export function searchRecords<R>(
   });
 }
 
+/**
+ * 用户临时换的排序放在最前，配置里的排序（D-560，可以是几个）跟在后面排一样的；同一个字段不重复。
+ * 用户没换时就是配置里的。
+ */
+export function browseSortKeys<S extends { field: string; direction: 'asc' | 'desc' }>(
+  picked: S | undefined,
+  configured: S | readonly S[] | undefined,
+): S | readonly S[] | undefined {
+  if (picked === undefined) return configured;
+  const rest = (
+    configured === undefined ? [] : Array.isArray(configured) ? configured : [configured]
+  ) as readonly S[];
+  const after = rest.filter((k) => k.field !== picked.field);
+  return after.length === 0 ? picked : [picked, ...after];
+}
+
 /** 用户点了「按这个字段排」（D-424）：日期、数字新的大的在前，别的从 A 到 Z。 */
 export function browseSort(
   field: string,
