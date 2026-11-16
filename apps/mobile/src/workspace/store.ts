@@ -82,6 +82,8 @@ export function createWorkspaceStore(deps: WorkspaceDeps): WorkspaceStore {
       appId: null,
       appEnters: 0,
       recordsVersion: 0,
+      tableVersions: {},
+      recordsAll: 0,
       presetsVersion: 0,
       toast: null,
       editing: null,

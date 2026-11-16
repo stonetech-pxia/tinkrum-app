@@ -260,8 +260,15 @@ export interface WorkspaceState {
   appId: string | null;
   /** 进入 App 的次数（每次加一）；离开 App 再回来时用它分辨是不是从桌面菜单、深链接直接打开的。 */
   appEnters: number;
-  /** 记录的刷新信号：增删改记录后递增。 */
+  /** 记录的刷新信号：增删改记录后递增（任何一张表）。读所有表的地方（提醒、桌面小组件、数据页）用它。 */
   recordsVersion: number;
+  /**
+   * 按表的刷新信号（D-555）：写了哪张表，那张表加 1。读表的块只看自己读的那几张（tableVersion）。
+   * 没写过的表没有这一项（当 0）。
+   */
+  tableVersions: Readonly<Record<string, number>>;
+  /** 不知道写了哪张表的写入（恢复、撤销删除、批量删除、导入等）加 1：所有表都算变了。 */
+  recordsAll: number;
   /** 预设列表的刷新信号（D-410）。 */
   presetsVersion: number;
   /** 记录操作后的提示（例如删除后可以撤销）。与版本提示条分开：记录不属于任何版本。 */
@@ -333,7 +340,11 @@ export interface WorkspaceState {
   finishEditing(summary: string): Promise<EditResult>;
   /** 「取消」：放弃草稿。 */
   cancelEditing(): void;
-  bumpRecords(): void;
+  /**
+   * 记录写过以后调用。tables：写的是哪几张表（确定知道时才传）；不传 = 不知道，所有表一起重来
+   * （宁可慢，不能旧，D-555）。
+   */
+  bumpRecords(tables?: readonly string[]): void;
   showToast(toast: RecordToast): void;
   dismissToast(): void;
   holdBanner(held: boolean): void;

@@ -58,7 +58,14 @@ export function createUI({
       });
     },
 
-    bumpRecords: () => set((s) => ({ recordsVersion: s.recordsVersion + 1 })),
+    bumpRecords: (tables) =>
+      set((s) => {
+        if (!tables || tables.length === 0)
+          return { recordsVersion: s.recordsVersion + 1, recordsAll: s.recordsAll + 1 };
+        const tableVersions = { ...s.tableVersions };
+        for (const id of tables) tableVersions[id] = (tableVersions[id] ?? 0) + 1;
+        return { recordsVersion: s.recordsVersion + 1, tableVersions };
+      }),
 
     showToast: (toast) => set({ toast }),
 

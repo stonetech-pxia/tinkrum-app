@@ -232,7 +232,7 @@ export default function DataRoute() {
       {
         text: t(locale, 'deleteForever'),
         style: 'destructive',
-        onPress: () => void repo.purgeCollection(id).then(bump),
+        onPress: () => void repo.purgeCollection(id).then(() => bump()),
       },
     ]);
   }

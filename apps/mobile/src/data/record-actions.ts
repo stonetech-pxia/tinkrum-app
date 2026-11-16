@@ -122,7 +122,7 @@ export function useRecordActionRunner() {
       showToast({ message: t(locale, 'recordActionFailed') });
       return;
     }
-    bump();
+    bump([collection.id]);
     showToast({
       message:
         outcome === 'applied'
@@ -175,7 +175,7 @@ export function useRecordActionRunner() {
         const prepared = prepareRecordValues(collection, input, stored.values, now, cal);
         if (!prepared.ok) return void openRecord(collection.id, record.id);
         await repo.updateRecord(record.id, prepared.values, now.getTime());
-        bump();
+        bump([stored.collectionId]);
         showToast({
           message: options.message ?? t(locale, 'recordActionDone', { label: use.label ?? '' }),
         });

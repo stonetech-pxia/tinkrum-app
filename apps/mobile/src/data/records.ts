@@ -6,6 +6,7 @@ import {
   loadLinkResolver,
   monthQueryRange,
   prepareRecordValues,
+  relatedCollectionIds,
   type Calendar,
   type Collection,
   type DataRecord,
@@ -18,12 +19,32 @@ import { t } from '../i18n';
 import { newAssetId } from '../runtime/ids';
 import type { StoredRecord, WorkspaceRepo } from '../storage/types';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '../workspace/context';
+import type { WorkspaceState } from '../workspace/store/types';
 
 // 用户记录的读写。只由用户在页面上的操作触发，直接写数据库，不经过 AI、不生成版本
 // （docs/DATA_DESIGN.md）。AI 拿到的只有 WorkspaceConfig，而记录从不进入配置。
 
 /**
- * 读一张表的记录。同一个版本（recordsVersion）里、同时在读的几个组件共用一次读取，读完就不留（R13）：
+ * 一张表现在的版本（D-555）：「不知道写了哪张表」的次数加上这张表自己写过的次数。只有这张表（或者所有表）
+ * 写过以后才变。
+ */
+export const tableVersion = (s: WorkspaceState, collectionId: string) =>
+  `${s.recordsAll}.${s.tableVersions[collectionId] ?? 0}`;
+
+/**
+ * 读这几张表的组件用：它们的版本连成一串，只有其中一张写过以后才变（别的表写了，组件不重来）。
+ * 返回表 ID → 版本。ids 要稳定（useMemo），顺序和内容一样时结果一样。
+ */
+function useTableVersions(ids: readonly string[]): ReadonlyMap<string, string> {
+  const key = useWorkspace((s) => ids.map((id) => tableVersion(s, id)).join(','));
+  return useMemo(() => {
+    const versions = key.split(',');
+    return new Map(ids.map((id, i) => [id, versions[i] ?? '']));
+  }, [ids, key]);
+}
+
+/**
+ * 读一张表的记录。同一个版本（tableVersion）里、同时在读的几个组件共用一次读取，读完就不留（R13）：
  * 一次写入之后所有显示这张表的组件一起重新读，不再每个组件各读一遍整张表。
  * 只共用「还在读」的那一次：版本不同不共用（写入之后的读一定在写入之后开始），读完的不缓存（别处的写入照样读得到）。
  * 每个组件拿到自己的数组（记录对象共用，只读）。
@@ -32,7 +53,7 @@ const tableReads = new WeakMap<WorkspaceRepo, Map<string, Promise<DataRecord[]>>
 
 export function readTable(
   repo: WorkspaceRepo,
-  version: number,
+  version: number | string,
   collectionId: string,
 ): Promise<DataRecord[]> {
   let reads = tableReads.get(repo);
@@ -51,10 +72,63 @@ export function readTable(
   return read.then((rows) => rows.slice());
 }
 
-/** 某张表未删除的全部记录；增删改后自动刷新。null 表示还在读取。 */
+/** 按各表的版本读（共用还在读的那一次）；不在 versions 里的表直接读，不共用。 */
+const readAt =
+  (repo: WorkspaceRepo, versions: ReadonlyMap<string, string>) =>
+  (id: string): Promise<DataRecord[]> => {
+    const version = versions.get(id);
+    return version === undefined ? repo.listRecords(id) : readTable(repo, version, id);
+  };
+
+/**
+ * 一张表算好的记录（查找、汇总、上一条，D-291），同一页上读这张表的几个块共用一次计算（D-555）。
+ * 和 readTable 一样只共用「还在算」的那一次：要读的每张表的版本都一样、用的是同一份配置（草稿预览时是另一份）
+ * 和同一个日历设置才共用；算完就不留。每个块拿到自己的数组（记录对象共用，只读）。
+ */
+interface Computation {
+  collections: readonly Collection[];
+  collection: Collection;
+  result: Promise<{ view: Collection; records: DataRecord[] }>;
+}
+const computations = new WeakMap<WorkspaceRepo, Map<string, Computation>>();
+
+function computeTable(
+  repo: WorkspaceRepo,
+  versions: ReadonlyMap<string, string>,
+  collections: readonly Collection[],
+  collection: Collection,
+  calKey: string,
+): Promise<{ view: Collection; records: DataRecord[] }> {
+  let running = computations.get(repo);
+  if (!running) computations.set(repo, (running = new Map()));
+  const key = `${collection.id}|${[...versions].join(';')}|${calKey}`;
+  let entry = running.get(key);
+  if (!entry || entry.collections !== collections || entry.collection !== collection) {
+    const started: Computation = {
+      collections,
+      collection,
+      result: loadComputedRecords(
+        readAt(repo, versions),
+        collections,
+        collection,
+        new Date(),
+        JSON.parse(calKey) as Calendar,
+      ),
+    };
+    entry = started;
+    running.set(key, started);
+    const done = () => {
+      if (running.get(key) === started) running.delete(key);
+    };
+    started.result.then(done, done);
+  }
+  return entry.result.then((r) => ({ view: r.view, records: r.records.slice() }));
+}
+
+/** 某张表未删除的全部记录；这张表增删改后自动刷新。null 表示还在读取。 */
 export function useRecords(collectionId: string): DataRecord[] | null {
   const { repo } = useWorkspaceContext();
-  const version = useWorkspace((s) => s.recordsVersion);
+  const version = useWorkspace((s) => tableVersion(s, collectionId));
   const [records, setRecords] = useState<DataRecord[] | null>(null);
   useEffect(() => {
     let alive = true;
@@ -66,10 +140,19 @@ export function useRecords(collectionId: string): DataRecord[] | null {
   return records;
 }
 
+/** 算一张表要读的表（自己，和查找、汇总、上一条、公式要读的表，relatedCollectionIds）。 */
+const NO_TABLES: readonly string[] = [];
+function useRelatedIds(collections: readonly Collection[], collection: Collection | undefined) {
+  return useMemo(
+    () => (collection ? relatedCollectionIds(collections, collection) : NO_TABLES),
+    [collections, collection],
+  );
+}
+
 /**
  * 一张表的记录，连同查找、汇总、上一条算出来的值（D-291，只在本机算，related.ts），和显示用的表（这几种
- * 字段换成它们显示的那种字段）。会读它要用到的别的表的记录；增删改后、表的定义变了重新算。
- * collections、cal 用页面正在显示的那份配置（草稿预览时是草稿）。写记录仍然用原来的表。
+ * 字段换成它们显示的那种字段）。会读它要用到的别的表的记录；这些表增删改后、表的定义变了重新算（D-555：
+ * 别的表写了不重算）。collections、cal 用页面正在显示的那份配置（草稿预览时是草稿）。写记录仍然用原来的表。
  */
 export function useComputedRecords(
   collections: readonly Collection[],
@@ -77,23 +160,19 @@ export function useComputedRecords(
   cal: Calendar,
 ): { view: Collection | undefined; records: DataRecord[] | null } {
   const { repo } = useWorkspaceContext();
-  const version = useWorkspace((s) => s.recordsVersion);
+  const versions = useTableVersions(useRelatedIds(collections, collection));
   const [loaded, setLoaded] = useState<{ view: Collection; records: DataRecord[] } | null>(null);
   const calKey = JSON.stringify(cal);
   useEffect(() => {
     if (!collection) return;
     let alive = true;
-    void loadComputedRecords(
-      (id) => readTable(repo, version, id),
-      collections,
-      collection,
-      new Date(),
-      JSON.parse(calKey) as Calendar,
-    ).then((r) => alive && setLoaded(r));
+    void computeTable(repo, versions, collections, collection, calKey).then(
+      (r) => alive && setLoaded(r),
+    );
     return () => {
       alive = false;
     };
-  }, [repo, collections, collection, calKey, version]);
+  }, [repo, collections, collection, calKey, versions]);
   const view = useMemo(
     () => collection && expandCollection(collections, collection),
     [collections, collection],
@@ -115,7 +194,7 @@ export function useMonthRecords(
   cal: Calendar,
 ): { view: Collection | undefined; records: DataRecord[] | null } {
   const { repo } = useWorkspaceContext();
-  const version = useWorkspace((s) => s.recordsVersion);
+  const version = [...useTableVersions(useRelatedIds(collections, collection)).values()].join(',');
   const [loaded, setLoaded] = useState<{
     key: string;
     view: Collection;
@@ -162,29 +241,30 @@ export function useMonthRecords(
 }
 
 /**
- * 引用字段（D-250）显示被引用记录的标题：读出这张表引用的那些表的记录（没删的），增删改后刷新。
+ * 引用字段（D-250）显示被引用记录的标题：读出这张表引用的那些表的记录（没删的），那些表增删改后刷新（D-555）。
  * 被引用的记录删掉了就查不到，显示「已删除的记录」；恢复后又能查到。
  */
 export function useLinkResolver(collection: Collection | undefined): LinkResolver | undefined {
   const { repo, locale } = useWorkspaceContext();
-  const version = useWorkspace((s) => s.recordsVersion);
   const collections = useWorkspace((s) => s.config?.data.tables);
-  const targets = collection ? linkedCollectionIds(collection).join(',') : '';
+  const linked = useMemo(
+    () => (collection ? linkedCollectionIds(collection) : NO_TABLES),
+    [collection],
+  );
+  const versions = useTableVersions(linked);
+  const targets = linked.join(',');
   // 记下是为哪几张表读的：表换了以后旧的不再用。
   const [loaded, setLoaded] = useState<{ targets: string; resolver: LinkResolver } | null>(null);
   useEffect(() => {
     if (!targets || !collections) return;
     let alive = true;
-    void loadLinkResolver(
-      (id) => repo.listRecords(id),
-      collections,
-      targets.split(','),
-      locale,
-    ).then((resolver) => alive && setLoaded({ targets, resolver }));
+    void loadLinkResolver(readAt(repo, versions), collections, targets.split(','), locale).then(
+      (resolver) => alive && setLoaded({ targets, resolver }),
+    );
     return () => {
       alive = false;
     };
-  }, [repo, collections, targets, locale, version]);
+  }, [repo, collections, targets, locale, versions]);
   return loaded && loaded.targets === targets ? loaded.resolver : undefined;
 }
 
@@ -226,7 +306,7 @@ export function useRecordActions() {
       if (!latest || latest.deletedAt !== null) return { ok: false, gone: true };
       return { ok: false, conflict: latest };
     }
-    bump();
+    bump([record.collectionId]);
     return { ok: true, id: record.id };
   }
 
@@ -246,7 +326,7 @@ export function useRecordActions() {
         createdAt: now.getTime(),
         updatedAt: now.getTime(),
       });
-      bump();
+      bump([collection.id]);
       return { ok: true, id };
     },
 
@@ -274,10 +354,11 @@ export function useRecordActions() {
     /** 软删除，提示条上可以撤销。 */
     async remove(record: DataRecord): Promise<void> {
       await repo.deleteRecord(record.id, Date.now());
-      bump();
+      bump([record.collectionId]);
       showToast({ message: t(locale, 'recordDeleted'), restoreRecordId: record.id });
     },
 
+    // 恢复只知道记录 ID：所有表一起重来（D-555）。
     async restore(id: string): Promise<void> {
       await repo.restoreRecord(id);
       bump();
