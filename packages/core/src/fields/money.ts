@@ -7,6 +7,8 @@ import {
   defineField,
   fieldBase,
   isNumber,
+  rangeKeys,
+  rangeProblems,
   readNumber,
   writeNumber,
   type FieldDefinitionOf,
@@ -19,6 +21,7 @@ const schema = z.strictObject({
   /** 每一笔单独选货币（D-429）：同一张表里的单选字段，选项 ID 是小写的货币代码；没选时用 currency。 */
   currencyField: IdSchema.optional(),
   default: z.number().finite().optional(),
+  ...rangeKeys,
 });
 
 /** 金额：两位小数，按货币显示。 */
@@ -41,11 +44,13 @@ export const moneyField: FieldDefinitionOf<'money', typeof schema> = defineField
   titleRank: 5,
   convertGroup: 'number',
   check: (f, { collection }) => {
-    if (f.currencyField === undefined) return [];
+    const range = rangeProblems(f, collection.id);
+    if (f.currencyField === undefined) return range;
     const at = `${collection.id}.${f.id}`;
     const source = collection.fields.find((x) => x.id === f.currencyField);
     if (source?.type !== 'choice')
       return [
+        ...range,
         {
           code: 'data',
           message: `${at}: currencyField ${f.currencyField} must be a choice field of ${collection.id}`,
@@ -54,15 +59,16 @@ export const moneyField: FieldDefinitionOf<'money', typeof schema> = defineField
     const bad = source.options.filter((o) => !CURRENCY_OPTION.test(o.id)).map((o) => o.id);
     return bad.length > 0
       ? [
+          ...range,
           {
             code: 'data',
             message: `${at}: every option id of ${source.id} must be a lowercase currency code like usd; not ${bad.join(', ')}`,
           },
         ]
-      : [];
+      : range;
   },
   ai: {
-    doc: '{currency: ISO code like "CNY"/"USD", currencyField?: id of a choice field of this table whose option ids are lowercase currency codes (usd, eur), labels the codes in capitals, so each entry picks its own currency; currency is used when none is picked, default?}',
+    doc: '{currency: ISO code like "CNY"/"USD", currencyField?: id of a choice field of this table whose option ids are lowercase currency codes (usd, eur), labels the codes in capitals, so each entry picks its own currency; currency is used when none is picked, default?, min?, max?}',
   },
   example: { id: 'amount', name: 'Amount', type: 'money', currency: 'USD' },
   exampleValue: 12.5,

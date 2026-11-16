@@ -354,7 +354,12 @@ export function offsetDay(start: string, n: number, unit: OffsetUnit): string | 
 
 // ---- 写入 ----
 
-export type FieldIssue = { fieldId: string; code: 'required' | 'invalid' | 'tooLong' };
+/** 写不进去的一个字段。tooSmall / tooLarge（D-570）：超出字段的 min / max，limit 是那个界限。 */
+export type FieldIssue = {
+  fieldId: string;
+  code: 'required' | 'invalid' | 'tooLong' | 'tooSmall' | 'tooLarge';
+  limit?: number;
+};
 
 export type PreparedValues =
   { ok: true; values: Record<string, unknown> } | { ok: false; issues: FieldIssue[] };
@@ -373,8 +378,45 @@ const isBlank = (v: unknown) =>
   (Array.isArray(v) && v.length === 0);
 
 /**
+ * 记录表单里这时藏着的字段（D-570）：所在的段有条件、按 values（存的值）不成立。只看这一条自己的值。
+ */
+export function hiddenFormFields(
+  collection: Collection,
+  values: Record<string, unknown>,
+  now: Date,
+  cal: Calendar = DEFAULT_CALENDAR,
+): Set<string> {
+  const hidden = new Set<string>();
+  const sections = collection.form?.sections ?? [];
+  if (!sections.some((s) => s.when)) return hidden;
+  const at = now.getTime();
+  const record: DataRecord = {
+    id: '',
+    collectionId: collection.id,
+    values,
+    createdAt: at,
+    updatedAt: at,
+  };
+  for (const s of sections)
+    if (s.when && !s.when.every((c) => matchesCondition(record, collection, c, now, cal)))
+      for (const id of s.fields) hidden.add(id);
+  return hidden;
+}
+
+/** 字段的范围（D-570）：数字超出 min / max 时是哪一种问题。 */
+function rangeIssue(field: Field, value: unknown): FieldIssue | undefined {
+  if (typeof value !== 'number') return undefined;
+  const { min, max } = field as { min?: number; max?: number };
+  if (min !== undefined && value < min) return { fieldId: field.id, code: 'tooSmall', limit: min };
+  if (max !== undefined && value > max) return { fieldId: field.id, code: 'tooLarge', limit: max };
+  return undefined;
+}
+
+/**
  * 写入时严格校验：input 只包含要修改的字段（字段 ID → 表单值，空字符串表示清空）。
  * previous 为 null 表示新记录，此时套用默认值（今天按 cal 算）。已删除字段的旧值原样保留。
+ * D-570：数字超出字段的 min / max 不能存，但只查这次改了的值（范围是后加的、存着的旧值照样能存别的字段）；
+ * 记录表单里藏着的段（条件不成立）里的字段不按必填查。
  */
 export function prepareRecordValues(
   collection: Collection,
@@ -407,10 +449,18 @@ export function prepareRecordValues(
       if ('required' in field && field.required)
         issues.push({ fieldId: field.id, code: 'required' });
     } else {
+      const unchanged = previous !== null && previous[field.id] === result.value;
+      const outside = unchanged ? undefined : rangeIssue(field, result.value);
+      if (outside) issues.push(outside);
       values[field.id] = result.value;
     }
   }
-  return issues.length > 0 ? { ok: false, issues } : { ok: true, values };
+  // 藏着的段里的字段不按必填查（D-570）：按写好的值看哪些段藏着。
+  const hidden = issues.some((i) => i.code === 'required')
+    ? hiddenFormFields(collection, values, now, cal)
+    : new Set<string>();
+  const kept = issues.filter((i) => i.code !== 'required' || !hidden.has(i.fieldId));
+  return kept.length > 0 ? { ok: false, issues: kept } : { ok: true, values };
 }
 
 // ---- 筛选、排序、统计 ----

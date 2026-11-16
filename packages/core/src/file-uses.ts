@@ -62,6 +62,12 @@ export const USES_FEATURES = [
   'choiceOptionColor',
   /** 公式读勾选框或单选（D-569）。 */
   'formulaReadsCheckboxOrChoice',
+  /** 表上的 form：记录表单的分段和条件显示（D-570）。 */
+  'entryForm',
+  /** 字段上的 hint：填写提示（D-570）。 */
+  'fieldHint',
+  /** 数字、金额、时长字段上的 min / max（D-570）。 */
+  'fieldRange',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -108,6 +114,9 @@ export function usesOf(content: unknown): FileUses {
       for (const item of node) {
         if (key === 'fields' && isObject(item) && typeof item.type === 'string') {
           found.fieldTypes.add(item.type);
+          // 填写提示、范围（D-570）。
+          if (item.hint !== undefined) found.features.add('fieldHint');
+          if (item.min !== undefined || item.max !== undefined) found.features.add('fieldRange');
           // 单选选项上的数和颜色（D-568）。
           for (const o of Array.isArray(item.options) ? item.options : []) {
             if (isObject(o) && o.value !== undefined) found.features.add('choiceOptionValue');
@@ -175,6 +184,8 @@ export function usesOf(content: unknown): FileUses {
       if (Array.isArray(node.also)) found.features.add('tapAlso');
       if (node.do === 'createAll') found.features.add('createAll');
     }
+    // 表上的 form（D-570）：有 fields 的那一层是表。
+    if (Array.isArray(node.fields) && node.form !== undefined) found.features.add('entryForm');
     if (node.kind === 'reminder' && node.app !== undefined) found.features.add('reminderInApp');
     if (node.kind === 'reminder' && isObject(node.when)) {
       if (node.when.before !== undefined && node.when.minutes !== undefined)

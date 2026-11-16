@@ -13,7 +13,32 @@ export const fieldBase = {
   id: IdSchema,
   name: boundedText(1, 40),
   required: z.boolean().optional(),
+  /** 填写提示（D-570）：记录表单和快速添加里显示在输入框下面的一句短话，和字段名一样是配置里的文字。 */
+  hint: boundedText(1, 80).optional(),
 };
+
+/** 数字类字段可以写的范围（D-570）：写入时检查，存着的超出范围的旧值照样显示。 */
+export const rangeKeys = {
+  min: z.number().finite().optional(),
+  max: z.number().finite().optional(),
+};
+
+/** 范围本身对不对：min 不大于 max，默认值在范围里。 */
+export function rangeProblems(
+  f: { id: string; min?: number | undefined; max?: number | undefined; default?: unknown },
+  table: string,
+): { code: string; message: string }[] {
+  const at = `${table}.${f.id}`;
+  if (f.min !== undefined && f.max !== undefined && f.min > f.max)
+    return [{ code: 'data', message: `${at}: min ${f.min} is larger than max ${f.max}` }];
+  const d = f.default;
+  if (
+    typeof d === 'number' &&
+    ((f.min !== undefined && d < f.min) || (f.max !== undefined && d > f.max))
+  )
+    return [{ code: 'data', message: `${at}: default ${d} is outside min / max` }];
+  return [];
+}
 
 /** 表单输入转换成字段值的结果。 */
 export type Coerced = { value: FieldValue } | { issue: 'invalid' | 'tooLong' };

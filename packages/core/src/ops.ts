@@ -618,6 +618,23 @@ function pruneRecordRow(table: Collection, field: string, notes: ApplyNote[]): v
 }
 
 /**
+ * 删字段后记录表单的分段跟着改（D-570，底线 18）：从段里拿掉，段空了就去掉；看它的条件去掉（段从此一直显示，
+ * 里面的字段和值都在）。分段一段都不剩时去掉 form。
+ */
+function pruneEntryForm(table: Collection, field: string): void {
+  if (!table.form) return;
+  const sections = table.form.sections.flatMap((s) => {
+    const fields = s.fields.filter((id) => id !== field);
+    if (fields.length === 0) return [];
+    const when = s.when?.filter((c) => c.field !== field);
+    const { when: _when, ...rest } = s;
+    return [{ ...rest, fields, ...(when && when.length > 0 ? { when } : {}) }];
+  });
+  if (sections.length > 0) table.form = { sections };
+  else delete table.form;
+}
+
+/**
  * 删字段后，列表能换的字段、表格的列、单条记录显示的字段跟着去掉（底线 18，D-424）。单条记录一个字段都不剩时块也移除。
  */
 function pruneBrowseFields(
@@ -754,7 +771,7 @@ function updateData(config: WorkspaceConfig, op: OpOf<'updateData'>): void {
   if (op.field === undefined) {
     onlyKeys(
       changes,
-      ['name', 'icon', 'readAttachments', 'prefillRules', 'recordRow', 'app'],
+      ['name', 'icon', 'readAttachments', 'prefillRules', 'recordRow', 'app', 'form'],
       `table ${table.id}`,
     );
     if (changes.name === null) throw new OpError(`table ${table.id} needs a name`);
@@ -780,6 +797,7 @@ function updateData(config: WorkspaceConfig, op: OpOf<'updateData'>): void {
       id: old.id,
       name: old.name,
       ...('required' in old && old.required ? { required: true } : {}),
+      ...('hint' in old && old.hint !== undefined ? { hint: old.hint } : {}),
     };
   } else {
     next = { ...old };
@@ -884,6 +902,7 @@ function removeData(
     table.fields.splice(getFieldIndex(table, op.field), 1);
     pruneRecordTools(config, { table: op.table, field: op.field }, notes);
     pruneRecordRow(table, op.field, notes);
+    pruneEntryForm(table, op.field);
     pruneAggregateFields(config, { table: op.table, field: op.field });
     pruneBrowseFields(config, { table: op.table, field: op.field }, notes);
     pruneSteps(config, { table: op.table, field: op.field }, registry, notes);

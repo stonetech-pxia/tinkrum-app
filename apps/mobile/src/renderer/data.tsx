@@ -164,10 +164,19 @@ export function prefillFormValues(collection: Collection, json: string): FormVal
   return values;
 }
 
-function issueText(locale: RenderEnv['locale'], issue: FieldIssue['code']): string {
+function issueText(locale: RenderEnv['locale'], issue: FieldIssue, field: Field): string {
+  // 超出范围（D-570）：说出界限，金额带货币、时长写成 h:mm。
+  if ((issue.code === 'tooSmall' || issue.code === 'tooLarge') && issue.limit !== undefined)
+    return t(locale, issue.code === 'tooSmall' ? 'fieldTooSmall' : 'fieldTooLarge', {
+      limit: formatValue(field, issue.limit, locale),
+    });
   return t(
     locale,
-    issue === 'required' ? 'fieldRequired' : issue === 'tooLong' ? 'fieldTooLong' : 'fieldInvalid',
+    issue.code === 'required'
+      ? 'fieldRequired'
+      : issue.code === 'tooLong'
+        ? 'fieldTooLong'
+        : 'fieldInvalid',
   );
 }
 
@@ -1171,7 +1180,16 @@ export function FieldsForm({
         }
         const issue = issues.find((i) => i.fieldId === id);
         const inline = editor.inline === true;
-        return (
+        // 填写提示（D-570）：输入框下面一句短话，配置里的文字。
+        const hint =
+          'hint' in field && field.hint !== undefined ? (
+            <Text
+              testID={`${testPrefix}-${id}-hint`}
+              style={[palette.font('body', 13), { color: palette.caption }]}>
+              {field.hint}
+            </Text>
+          ) : null;
+        const row = (
           <View key={id} style={inline ? styles.inlineField : styles.field}>
             {showLabels || inline ? (
               <Text
@@ -1212,12 +1230,24 @@ export function FieldsForm({
                 }}
               />
             ) : null}
+            {!inline ? hint : null}
             {issue ? (
-              <Text style={[palette.font('bodyMedium', 13), { color: palette.danger }]}>
-                {issueText(locale, issue.code)}
+              <Text
+                testID={`${testPrefix}-${id}-issue`}
+                style={[palette.font('bodyMedium', 13), { color: palette.danger }]}>
+                {issueText(locale, issue, field)}
               </Text>
             ) : null}
           </View>
+        );
+        // 勾选这样标签和控件在一行的，提示放在这一行下面。
+        return inline && hint ? (
+          <View key={id} style={styles.field}>
+            {row}
+            {hint}
+          </View>
+        ) : (
+          row
         );
       })}
     </View>

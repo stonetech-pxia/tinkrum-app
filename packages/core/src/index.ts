@@ -17,6 +17,7 @@ export * from './page-period';
 export * from './chart';
 export * from './option-colors';
 export * from './data';
+export * from './entry-form';
 export * from './asset-usage';
 export * from './defaults';
 export * from './file-filter';

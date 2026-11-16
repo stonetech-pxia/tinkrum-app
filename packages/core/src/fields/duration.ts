@@ -1,12 +1,15 @@
 import { z } from 'zod';
 
 import { formatDuration } from '../field-values';
-import { defineField, fieldBase, isNumber, type FieldDefinitionOf } from './define';
+import { defineField, fieldBase, isNumber, rangeProblems, type FieldDefinitionOf } from './define';
 
 const schema = z.strictObject({
   ...fieldBase,
   type: z.literal('duration'),
   default: z.number().int().min(0).max(1_000_000).optional(),
+  /** 范围（D-570），分钟数。 */
+  min: z.number().int().min(0).max(1_000_000).optional(),
+  max: z.number().int().min(0).max(1_000_000).optional(),
 });
 
 /** 最长约 1.9 年（分钟数）。 */
@@ -55,8 +58,9 @@ export const durationField: FieldDefinitionOf<'duration', typeof schema> = defin
   formula: 'number',
   numeric: true,
   filter: { is: isNumber, compare: 'number' },
+  check: (f, { collection }) => rangeProblems(f, collection.id),
   ai: {
-    doc: '{default? minutes} (a length of time in minutes, shown as h:mm; rule 40)',
+    doc: '{default? minutes, min? minutes, max? minutes} (a length of time in minutes, shown as h:mm; rule 40)',
   },
   example: { id: 'spent', name: 'Time spent', type: 'duration' },
   exampleValue: 90,

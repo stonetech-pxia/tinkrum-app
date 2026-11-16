@@ -684,6 +684,20 @@ export const CAPABILITIES: readonly Capability[] = [
       );
     }),
   ),
+  // D-570：记录表单的分段、条件显示，字段的填写提示和范围。
+  cap('field.table.form', 'field', (v) => tablesOf(v.config).some((t) => t.form !== undefined)),
+  cap('field.table.form.when', 'field', (v) =>
+    tablesOf(v.config).some((t) => (t.form?.sections ?? []).some((s) => s.when !== undefined)),
+  ),
+  cap('field.hint', 'field', (v) =>
+    allFields(v).some(({ field }) => 'hint' in field && field.hint !== undefined),
+  ),
+  cap('field.range', 'field', (v) =>
+    allFields(v).some(
+      ({ field }) =>
+        ('min' in field && field.min !== undefined) || ('max' in field && field.max !== undefined),
+    ),
+  ),
   cap('field.text.format', 'field', (v) =>
     allFields(v).some((x) => x.field.type === 'text' && x.field.format !== undefined),
   ),

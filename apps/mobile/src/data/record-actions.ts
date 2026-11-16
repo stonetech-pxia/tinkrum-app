@@ -4,6 +4,7 @@ import {
   RECORD_LIMITS,
   createAllInputs,
   createInput,
+  formatValue,
   loadComputedRecords,
   prepareRecordValues,
   rowUpdateInput,
@@ -17,6 +18,8 @@ import {
   type ActionContext,
   type Collection,
   type DataRecord,
+  type FieldIssue,
+  type Locale,
   type OpenUse,
   type RecordTool,
   type RecordToolUse,
@@ -34,6 +37,25 @@ import { useRecordActions } from './records';
 // 一键记录操作（D-300–D-304）：用户点了按钮或列表里的行按钮才执行，直接写数据库（和表单一样不经过 AI、
 // 不生成版本）。提示条只说做了什么，不带撤销：只有删除弹撤销，记下的、改过的用户自己删掉或改回去（底线 11，D-385）。
 // 操作由 AI 配置，值在这里按当时的时间和记录算出来。
+
+/**
+ * 点一下要把数字加出字段的范围（D-570）：说一句「什么都没改：「数量」不能大于 10。」，不打开表单（表单上看不出为什么）。
+ * 有别的问题（必填空着、旧配置）时为 null，照旧打开这一条让用户自己改。
+ */
+function rangeMessage(
+  collection: Collection,
+  issues: readonly FieldIssue[],
+  locale: Locale,
+): string | null {
+  const first = issues[0];
+  if (!first || !issues.every((i) => i.code === 'tooSmall' || i.code === 'tooLarge')) return null;
+  const field = collection.fields.find((f) => f.id === first.fieldId);
+  if (!field || first.limit === undefined) return null;
+  return t(locale, first.code === 'tooSmall' ? 'recordActionTooSmall' : 'recordActionTooLarge', {
+    field: field.name,
+    limit: formatValue(field, first.limit, locale),
+  });
+}
 
 // 一次只执行一个：连点几下 +1 时一个接一个算，不会两次都从同一个旧值加。桌面小组件的点按也排在这里（D-323）。
 let queue: Promise<unknown> = Promise.resolve();
@@ -215,7 +237,10 @@ export function useRecordActionRunner() {
     if (Object.keys(input).length === 0 && !created)
       return void showToast({ message: t(locale, 'recordActionNoValue') });
     const prepared = prepareRecordValues(row, input, stored.values, now, cal);
-    if (!prepared.ok) return void openRecord(row.id, record.id);
+    if (!prepared.ok) {
+      const range = rangeMessage(row, prepared.issues, locale);
+      return void (range ? showToast({ message: range }) : openRecord(row.id, record.id));
+    }
     if (created) {
       const counts = await repo.countRecords();
       const count = counts.find((c) => c.collectionId === created!.collection.id)?.count ?? 0;
@@ -404,7 +429,12 @@ export function useRecordActionRunner() {
         if (Object.keys(input).length === 0)
           return void showToast({ message: t(locale, 'recordActionNoValue') });
         const prepared = prepareRecordValues(collection, input, stored.values, now, cal);
-        if (!prepared.ok) return void openRecord(collection.id, record.id);
+        if (!prepared.ok) {
+          const range = rangeMessage(collection, prepared.issues, locale);
+          return void (range
+            ? showToast({ message: range })
+            : openRecord(collection.id, record.id));
+        }
         await repo.updateRecord(record.id, prepared.values, now.getTime());
         bump([stored.collectionId]);
         showToast({

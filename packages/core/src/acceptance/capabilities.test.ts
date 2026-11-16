@@ -87,7 +87,7 @@ const NUMBER_SOURCE_PLAIN_KEYS = new Set([
   'days',
   'group',
 ]);
-const SCHEDULE_PLAIN_KEYS = new Set(['id', 'name', 'required', 'type', 'default']);
+const SCHEDULE_PLAIN_KEYS = new Set(['id', 'name', 'required', 'hint', 'type', 'default']);
 
 describe('完整性守护：schema 和登记表多一种东西，能力表少一个就失败', () => {
   const missing = (expected: string[]) => expected.filter((id) => !IDS.has(id));
@@ -208,7 +208,8 @@ function everything() {
     addTable('items', [
       text('title'),
       { id: 'body', name: 'body', type: 'note' },
-      { id: 'qty', name: 'qty', type: 'number' },
+      // D-570：填写提示和范围。
+      { id: 'qty', name: 'qty', type: 'number', min: 0, hint: 'How many' },
       money(),
       { id: 'done', name: 'done', type: 'checkbox' },
       date(),
@@ -250,6 +251,13 @@ function everything() {
         readAttachments: true,
         prefillRules: 'receipt',
         recordRow: [{ tool: 'record-vcard' }],
+        // D-570：记录表单分两段，第二段勾了 done 才显示。
+        form: {
+          sections: [
+            { title: 'Main', fields: ['title', 'done'] },
+            { title: 'More', fields: ['body'], when: [{ field: 'done', op: 'is', value: true }] },
+          ],
+        },
       },
     },
     addField('items', { id: 'contact', name: 'contact', type: 'text', format: 'phone' }),

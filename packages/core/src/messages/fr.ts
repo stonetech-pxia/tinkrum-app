@@ -440,6 +440,8 @@ export const fr: MessageTable = {
   fieldRequired: 'Obligatoire',
   fieldInvalid: 'Format incorrect',
   fieldTooLong: 'Trop long',
+  fieldTooSmall: 'Doit être au moins {limit}.',
+  fieldTooLarge: 'Doit être au plus {limit}.',
   tableFull: 'Ce tableau est plein (10 000 entrées).',
   useFullForm:
     'Certains champs obligatoires ne figurent pas dans ce formulaire. Ouvrez le formulaire complet pour les ajouter.',
@@ -1240,6 +1242,8 @@ export const fr: MessageTable = {
   describeFieldFormatEmail: 'format → e-mail',
   describeFieldFormatUrl: 'format → site web',
   describeFieldFormatNone: 'format retiré',
+  describeFieldHint: 'indication sous le champ modifiée',
+  describeFieldRange: 'plage autorisée modifiée',
   describe_options_64e79: 'options → {v0}',
   describe_update_settings_2aaf6: 'Modifier les réglages',
   describe_Move_field_of_to_position_aa798:
@@ -1646,6 +1650,7 @@ export const fr: MessageTable = {
   // 一天、一周从什么时候开始（D-286）
   describeDayStart: 'Une journée commence à {hour} h',
   describeRecordRow: '« {name} » : modifier les boutons en haut de la page de l’entrée',
+  describeEntryForm: '« {name} » : modifier les sections du formulaire de l’entrée',
   describeReadAttachmentsOn:
     '« {name} » : lire les pièces jointes et proposer des valeurs dans les nouvelles entrées',
   describeReadAttachmentsOff:
@@ -1790,6 +1795,8 @@ export const fr: MessageTable = {
   recordActionConfirmButton: 'Modifier',
   recordActionNothing: 'Aucune entrée à modifier',
   recordActionNoValue: 'Rien n’a été modifié : une valeur dont ce bouton a besoin est encore vide.',
+  recordActionTooSmall: 'Rien n’a été modifié : « {field} » ne peut pas descendre sous {limit}.',
+  recordActionTooLarge: 'Rien n’a été modifié : « {field} » ne peut pas dépasser {limit}.',
   recordActionFailed:
     'Rien n’a été modifié : un problème est survenu, aucune entrée n’a été changée.',
   recordActionChangedMeanwhile:

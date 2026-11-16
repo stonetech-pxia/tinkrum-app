@@ -8767,6 +8767,77 @@ const FORMULA_CHOICE_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 订单表：有「要发票」和发票的几项。 */
+const invoiceOrdersEarlier: EvalEarlier = {
+  input: 'Make a table of my orders: item, quantity, needs invoice, tax number, company name',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'item', name: 'Item', type: 'text', required: true },
+          { id: 'qty', name: 'Quantity', type: 'number' },
+          { id: 'invoice', name: 'Needs invoice', type: 'checkbox' },
+          { id: 'tax-no', name: 'Tax number', type: 'text' },
+          { id: 'company', name: 'Company name', type: 'text' },
+        ],
+      },
+    },
+  ],
+};
+const ordersTable = (c: WorkspaceConfig) => c.data.tables.find((t) => t.id === 'orders');
+
+// 记录表单的分段、条件、提示和范围（D-570）。
+const ENTRY_FORM_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG36',
+    input:
+      'In the order form, put the tax number and company name in an Invoice section that only shows when Needs invoice is ticked',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [invoiceOrdersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const sections = ordersTable(c)?.form?.sections ?? [];
+        const invoice = sections.find(
+          (s) => s.fields.includes('tax-no') && s.fields.includes('company'),
+        );
+        if (!invoice) return 'expected a form section holding tax-no and company';
+        return (invoice.when ?? []).some(
+          (w) => w.field === 'invoice' && w.op === 'is' && w.value === true,
+        )
+          ? null
+          : 'expected that section to show when invoice is true';
+      },
+    },
+  },
+  {
+    id: 'KG37',
+    input: '数量至少是 1；税号下面提示一句「15 或 18 位」',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [invoiceOrdersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const fields = ordersTable(c)?.fields ?? [];
+        const qty = fields.find((f) => f.id === 'qty');
+        const tax = fields.find((f) => f.id === 'tax-no');
+        if (qty?.type !== 'number' || qty.min !== 1)
+          return `expected qty min 1, got ${JSON.stringify(qty)}`;
+        return tax && 'hint' in tax && /15/.test(tax.hint ?? '') && /18/.test(tax.hint ?? '')
+          ? null
+          : 'expected a hint on tax-no mentioning 15 and 18';
+      },
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8835,6 +8906,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...CREATE_ALL_CASES,
   ...OPTION_COLOR_CASES,
   ...FORMULA_CHOICE_CASES,
+  ...ENTRY_FORM_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

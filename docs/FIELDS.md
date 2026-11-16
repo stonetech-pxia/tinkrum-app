@@ -26,7 +26,7 @@ export const linkField: FieldDefinitionOf<'link', typeof schema> = defineField({
 
 What each entry means (types and comments are in `fields/define.ts`):
 
-- **schema**: the structure of the field definition, including `...fieldBase` (id, name, required). Only allowlisted values.
+- **schema**: the structure of the field definition, including `...fieldBase` (id, name, required, hint: the short text under the input, D-570). Only allowlisted values. Numeric fields that take a range spread `...rangeKeys` (`min`, `max`) and check them with `rangeProblems`; `prepareRecordValues` refuses a changed value outside them (D-570).
 - **label**: the type name used in change descriptions, as `[Chinese, English]` (here the Chinese is `'引用'`, "link"); French uses the mapping of the English one in `french-pairs.ts` (add an entry if there is none).
 - **read**: tolerant reading. If the value does not match the current definition (the type changed after restoring an old version, an option was deleted), return `undefined`; it is simply not shown and must never raise an error.
 - **write**: form input → stored value, strictly validated, returning `{ value }` or `{ issue: 'invalid' | 'tooLong' }`. If absent, no value is stored (formula). **initial**: the default value of a new record (if absent, the `default` in the definition is used). **emptyNew**: what to store when a new record has no value (for a checkbox it is `false`).

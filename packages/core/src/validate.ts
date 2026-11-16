@@ -7,6 +7,7 @@ import {
   type CheckProblem,
 } from './components/define';
 import { conditionProblems } from './conditions';
+import { entryFormProblems } from './entry-form';
 import { FILES_COLLECTION, FILES_TABLE } from './files-table';
 import { attachmentField, fieldHandsTo } from './handed';
 import { pageBrowseLists } from './page-zones';
@@ -238,6 +239,8 @@ export function validateWorkspace(
         issue(problem.code, problem.message);
     }
     for (const message of recordRowProblems(collection, config, registry)) issue('data', message);
+    // 记录表单的分段和条件（D-570）。
+    for (const message of entryFormProblems(collection)) issue('data', message);
   }
 
   // ---- 手机桌面（D-271）：长按 Morph 图标的菜单最多放 MAX_HOME_SCREEN 个快捷操作 ----

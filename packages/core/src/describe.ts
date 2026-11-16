@@ -649,6 +649,9 @@ export function describeChange(
             );
           if (changes.recordRow !== undefined)
             lines.push(t(ctx.locale, 'describeRecordRow', { name: collName(table) }));
+          // D-570：记录表单的分段和条件显示。
+          if (changes.form !== undefined)
+            lines.push(t(ctx.locale, 'describeEntryForm', { name: collName(table) }));
           if (changes.prefillRules !== undefined)
             lines.push(
               t(
@@ -686,6 +689,10 @@ export function describeChange(
                     : 'describeFieldFormatNone',
             ),
           );
+        // D-570：填写提示、范围。
+        if (changes.hint !== undefined) parts.push(t(ctx.locale, 'describeFieldHint'));
+        if (changes.min !== undefined || changes.max !== undefined)
+          parts.push(t(ctx.locale, 'describeFieldRange'));
         if (parts.length === 0) parts.push(t(ctx.locale, 'describe_update_settings_2aaf6'));
         lines.push(
           t(ctx.locale, 'describeFieldChange', {

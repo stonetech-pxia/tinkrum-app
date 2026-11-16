@@ -1,6 +1,7 @@
 import {
   appViewOf,
   attachmentIds,
+  formInput,
   tableIsShown,
   type DataRecord,
   type FieldIssue,
@@ -28,7 +29,10 @@ import type { StoredRecord } from '@/storage/types';
 import { deleteUserFiles } from '@/storage/user-files';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '@/workspace/context';
 
-/** 记录编辑页：由内核按数据表的字段自动生成，不可配置（docs/DATA_DESIGN.md §5）。 */
+/**
+ * 记录编辑页（docs/DATA_DESIGN.md §5）：由内核按数据表的字段生成。D-570 起表单怎么排归配置：表上的 form（分段、
+ * 只看这一条自己字段的条件显示）、字段上的 hint 和 min / max；保存、删除、附件、候选值和这一页别的部分仍归内核。
+ */
 export default function RecordRoute() {
   const { collectionId, recordId, prefill, copies, pickFor } = useLocalSearchParams<{
     collectionId: string;
@@ -49,11 +53,12 @@ export default function RecordRoute() {
     appViewOf(config, config.data.tables.find((c) => c.id === collectionId)?.app ?? null).theme,
   );
   const actions = useRecordActions();
+  const cal = useCalendar();
   const mayProceed = useSimilarCheck();
   const headerHeight = useHeaderHeight();
   const collection = config.data.tables.find((c) => c.id === collectionId);
   // 查找、汇总、上一条（D-291）：显示这条记录存好以后算出来的值。
-  const computed = useComputedRecords(config.data.tables, collection, useCalendar());
+  const computed = useComputedRecords(config.data.tables, collection, cal);
   const [record, setRecord] = useState<DataRecord | null | undefined>(recordId ? undefined : null);
   const [values, setValues] = useState<Record<string, unknown>>(() =>
     !recordId && prefill && collection ? prefillFormValues(collection, prefill) : {},
@@ -104,11 +109,13 @@ export default function RecordRoute() {
 
   async function save() {
     if (!collection) return;
+    // D-570：藏着的段里的字段不交（存着的值不动），看不见的错误不会挡住保存。
+    const input = formInput(collection, values, new Date(), cal);
     // D-426：只有新记录问一句，用户总能选「仍然保存」。
-    if (!record && !(await mayProceed(collection, values))) return;
+    if (!record && !(await mayProceed(collection, input))) return;
     const result = record
-      ? await actions.update(collection, record, values)
-      : await actions.add(collection, values);
+      ? await actions.update(collection, record, input)
+      : await actions.add(collection, input);
     finish(result);
   }
 
@@ -149,7 +156,7 @@ export default function RecordRoute() {
     if (!collection) return;
     const opened = JSON.parse(initial) as Record<string, unknown>;
     const mine = Object.fromEntries(
-      Object.entries(values).filter(
+      Object.entries(formInput(collection, values, new Date(), cal)).filter(
         ([key, v]) => JSON.stringify(v) !== JSON.stringify(opened[key]),
       ),
     );
