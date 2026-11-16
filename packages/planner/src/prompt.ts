@@ -290,7 +290,7 @@ export const RULE_GROUPS = {
   core: [1, 2, 3, 4, 5, 6, 16, 17, 23, 24, 25, 26, 27, 51, 53, 57],
   style: [9, 10, 11],
   look: [7, 8, 12, 13, 37, 52],
-  records: [18, 19, 32, 33, 34, 35, 38, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 54, 55, 56],
+  records: [18, 19, 32, 33, 34, 35, 38, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 54, 55, 56, 58],
   files: [14, 15, 20, 21, 22, 28, 29, 30, 31, 36, 39],
 } as const;
 export type RuleGroup = keyof typeof RULE_GROUPS;
@@ -334,6 +334,7 @@ const RULE_TITLES: Record<number, string> = {
   46: 'show.format',
   47: 'to-dos',
   48: 'a page for one entry',
+  58: "the entry's own fields on its page",
   49: 'typing a date in the same line',
   50: 'a time on a schedule',
 };

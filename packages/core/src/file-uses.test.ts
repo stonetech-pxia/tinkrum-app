@@ -183,3 +183,21 @@ describe('what a file uses (D-556)', () => {
     expect(missingUses('not json', registry)).toEqual([]);
   });
 });
+
+/** 一页上的几个块（不用是有效的配置：usesOf 只看形状）。 */
+const pageWith = (...blocks: object[]) => ({ containers: { pages: [{ id: 'p', blocks }] } });
+
+describe('features added in batch 1 (D-557–D-563)', () => {
+  it('a single block showing the opened entry (D-558)', () => {
+    const single = (source: object) => ({
+      id: 's',
+      look: 'single',
+      source,
+      show: { fields: ['name'] },
+    });
+    expect(usesOf(pageWith(single({ table: 't', record: '$record' }))).features).toEqual([
+      'singleOpenedRecord',
+    ]);
+    expect(usesOf(pageWith(single({ table: 't' }))).features).toBeUndefined();
+  });
+});

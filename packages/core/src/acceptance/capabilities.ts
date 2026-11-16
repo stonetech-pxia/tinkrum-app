@@ -710,6 +710,9 @@ export const CAPABILITIES: readonly Capability[] = [
   lookCap('number'),
   lookCap('chart'),
   lookCap('single'),
+  cap('read.single.record', 'read', (v) =>
+    v.blocks.some((x) => x.block.look === 'single' && x.block.source.record !== undefined),
+  ),
   cap('read.single.qr', 'read', (v) =>
     v.blocks.some((x) => x.block.look === 'single' && x.block.show.qr === true),
   ),

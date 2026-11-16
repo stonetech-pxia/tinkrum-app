@@ -277,3 +277,60 @@ describe('a floating add', () => {
     ).toMatch(/not in a group/);
   });
 });
+
+describe('the opened entry in a single block (D-558)', () => {
+  const single = (id: string, table: string, record?: string) => ({
+    id,
+    look: 'single',
+    source: { table, ...(record !== undefined ? { record } : {}) },
+    show: { fields: [table === 'tasks' ? 'title' : 'name'] },
+  });
+
+  it('a page for one project can show that project itself', () => {
+    expect(
+      problems([
+        projectPage([
+          single('me', 'projects', '$record'),
+          list('its-tasks', 'tasks', {
+            filter: [{ field: 'project', op: 'is', value: '$record' }],
+          }),
+        ]),
+        addHome(list('all', 'projects', { opens: 'project' })),
+      ]),
+    ).toEqual([]);
+    // 分组里的也一样。
+    expect(
+      problems([
+        projectPage([
+          {
+            id: 'g',
+            look: 'group',
+            show: { layout: 'stack' },
+            children: [single('me', 'projects', '$record')],
+          },
+        ]),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('is refused on a page for another table, or on a page for no entry', () => {
+    expect(problems([projectPage([single('me', 'tasks', '$record')])]).join()).toMatch(
+      /source.record "\$record" only works on a page for one entry of tasks/,
+    );
+    expect(problems([addHome(single('me', 'projects', '$record'))]).join()).toMatch(
+      /source.record "\$record" only works on a page for one entry of projects/,
+    );
+  });
+
+  it('only "$record" can be written, never an entry id', () => {
+    expect(problems([projectPage([single('me', 'projects', 'p1')])]).join()).toMatch(
+      /source.record/,
+    );
+  });
+
+  it('the id is put in only while drawing; the config keeps the placeholder', () => {
+    const block = single('me', 'projects', '$record') as unknown as BlockOf<'single'>;
+    expect(bindRecord(block, 'p1').source).toEqual({ table: 'projects', record: 'p1' });
+    expect(block.source.record).toBe('$record');
+  });
+});

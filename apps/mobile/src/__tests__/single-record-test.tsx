@@ -19,6 +19,7 @@ const FIELDS: Field[] = [
   { id: 'name', name: '姓名', type: 'text' },
   { id: 'phone', name: '电话', type: 'text', format: 'phone' },
   { id: 'addr', name: '地址', type: 'text' },
+  { id: 'photo', name: '照片', type: 'file' },
 ];
 
 const seed = (locale: Locale, registry: Registry) => {
@@ -50,6 +51,23 @@ const seed = (locale: Locale, registry: Registry) => {
         },
       },
       {
+        // 给一条记录用的页面（D-342）上显示打开的那一条（D-558）。
+        op: 'addContainer',
+        page: {
+          id: 'one-page',
+          title: '一张名片',
+          of: 'mine',
+          blocks: [
+            {
+              id: 'me',
+              look: 'single',
+              source: { table: 'mine', record: '$record' },
+              show: { fields: ['name', 'photo'] },
+            },
+          ],
+        },
+      },
+      {
         op: 'addContainer',
         page: {
           id: 'plain-page',
@@ -77,7 +95,12 @@ const settle = () =>
     await Promise.resolve();
   });
 
-async function open(records: Record<string, unknown>[] = [], pageId = 'mine-page') {
+async function open(
+  records: Record<string, unknown>[] = [],
+  pageId = 'mine-page',
+  record?: string,
+  before?: (repo: MemoryWorkspaceRepo) => Promise<void>,
+) {
   const repo = new MemoryWorkspaceRepo();
   await repo.setMeta('guide', 'done');
   await act(() => useGuide.getState().load(repo));
@@ -89,9 +112,12 @@ async function open(records: Record<string, unknown>[] = [], pageId = 'mine-page
       createdAt: 100 + i,
       updatedAt: 100 + i,
     });
+  await before?.(repo);
   const app = await renderToolsApp(repo, undefined, { locale: 'zh', seed });
   await settle();
-  await act(() => router.push({ pathname: '/page/[pageId]', params: { pageId } }));
+  await act(() =>
+    router.push({ pathname: '/page/[pageId]', params: { pageId, ...(record ? { record } : {}) } }),
+  );
   await settle();
   return { ...app, repo };
 }
@@ -174,5 +200,48 @@ describe('edge cases', () => {
     expect(await screen.findByText('张三')).toBeTruthy();
     expect(screen.queryByText('还没有名片')).toBeNull();
     expect(screen.getByText('一直都在')).toBeTruthy();
+  });
+});
+
+describe('on a page for one entry (D-558)', () => {
+  const asset = (id: string, name: string, mimeType: string) => ({
+    id,
+    name,
+    mimeType,
+    size: 1000,
+    path: `assets/${id}/${name}`,
+    source: 'picked' as const,
+    createdAt: 1,
+  });
+
+  it('shows the opened entry, not the oldest', async () => {
+    await open([{ name: '先加的' }, { name: '后加的' }], 'one-page', 'r1');
+    expect(await screen.findByTestId('single-r1')).toBeTruthy();
+    expect(screen.getAllByText('后加的').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('single-r0')).toBeNull();
+  });
+
+  it('edit edits the opened entry', async () => {
+    await open([{ name: '先加的' }, { name: '后加的' }], 'one-page', 'r1');
+    await fireEvent.press(await screen.findByTestId('single-edit'));
+    await waitFor(() => expect(screen.getByTestId('editor-name').props.value).toBe('后加的'));
+  });
+
+  it('pictures in a file field are drawn; other files stay a line of text', async () => {
+    await open([{ name: '张三', photo: ['face', 'cv'] }], 'one-page', 'r0', async (repo) => {
+      await repo.addAsset(asset('face', 'me.jpg', 'image/jpeg'));
+      await repo.addAsset(asset('cv', 'cv.pdf', 'application/pdf'));
+    });
+    expect(await screen.findByTestId('single-image-face')).toBeTruthy();
+    expect(screen.queryByTestId('single-image-cv')).toBeNull();
+  });
+
+  it('a file field without pictures still shows its text', async () => {
+    await open([{ name: '张三', photo: ['cv'] }], 'one-page', 'r0', async (repo) => {
+      await repo.addAsset(asset('cv', 'cv.pdf', 'application/pdf'));
+    });
+    await screen.findByTestId('single-r0');
+    expect(screen.queryByTestId('single-image-cv')).toBeNull();
+    expect(screen.getByText('照片')).toBeTruthy();
   });
 });

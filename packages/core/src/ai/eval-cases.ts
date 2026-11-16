@@ -7909,6 +7909,81 @@ const DATE_OFFSET_USE_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 植物有自己的页面（page.of），上面列出它的浇水记录（D-342）。 */
+const plantPageEarlier: EvalEarlier = {
+  input: 'Log waterings for each plant, and open a plant to see its waterings',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'waterings',
+        name: 'Waterings',
+        fields: [
+          { id: 'date', name: 'Date', type: 'date', default: 'today' },
+          { id: 'plant', name: 'Plant', type: 'link', table: 'plants' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'plant',
+        title: 'Plant',
+        of: 'plants',
+        blocks: [
+          {
+            id: 'its-waterings',
+            look: 'list',
+            source: {
+              table: 'waterings',
+              limit: 30,
+              filter: [{ field: 'plant', op: 'is', value: '$record' }],
+            },
+            show: { title: 'date' },
+          },
+        ],
+      },
+    },
+    { op: 'updateContainer', page: 'plants-page', block: 'all', changes: { opens: 'plant' } },
+  ],
+};
+/** 给一条植物用的页面上显示打开的那一条（D-558）。 */
+const showsOpenedPlant = (c: WorkspaceConfig) =>
+  c.containers.pages
+    .filter((p) => p.of === 'plants')
+    .flatMap((p) => allComponents(p))
+    .some(
+      (x) =>
+        x.look === 'single' &&
+        x.source.table === 'plants' &&
+        x.source.record === '$record' &&
+        x.show.fields.includes('photos'),
+    )
+    ? null
+    : 'expected a single block on the plant page with source.record "$record" showing photos';
+
+// 记录页上显示这一条自己的字段（D-558）。
+const OPENED_RECORD_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG15',
+    input: "On the plant page, show the plant's photo and name at the top",
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [plantsEarlier, plantPageEarlier],
+    expect: { kind: 'ops', check: showsOpenedPlant },
+  },
+  {
+    id: 'KG16',
+    input: '植物页最上面显示这株植物的照片和名字',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [plantsEarlier, plantPageEarlier],
+    expect: { kind: 'ops', check: showsOpenedPlant },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -7966,6 +8041,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...MARK_CASES,
   ...DATE_OFFSET_CASES,
   ...DATE_OFFSET_USE_CASES,
+  ...OPENED_RECORD_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

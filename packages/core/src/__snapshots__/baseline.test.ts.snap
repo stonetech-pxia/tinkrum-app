@@ -2984,6 +2984,7 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 22>.look "single"
 <oneOf 22>.source object
 <oneOf 22>.source.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 22>.source.record? "$record"
 <oneOf 22>.show object
 <oneOf 22>.show.fields array items 1..8
 <oneOf 22>.show.fields[] = <oneOf 6>.tools[]<anyOf 0>.when[].field

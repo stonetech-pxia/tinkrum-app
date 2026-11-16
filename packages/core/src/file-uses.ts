@@ -33,6 +33,8 @@ export const USES_FEATURES = [
   'reminderInApp',
   /** 手机桌面菜单里放 App（app:<id>，D-485 补充）。 */
   'appOnPhoneHomeScreen',
+  /** single 块的 source.record "$record"：给一条记录用的页面上显示打开的那一条（D-558）。 */
+  'singleOpenedRecord',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -72,6 +74,11 @@ export function usesOf(content: unknown): FileUses {
         if (show.highlight !== undefined) found.features.add('showHighlight');
         if (show.color !== undefined && RECORD_LOOK_SET.has(node.look) && node.look !== 'calendar')
           found.features.add('showColorAnyLook');
+      }
+      const source = node.source;
+      if (isObject(source)) {
+        if (node.look === 'single' && source.record !== undefined)
+          found.features.add('singleOpenedRecord');
       }
     }
     // 快捷操作的步骤、工具栏上的动作。

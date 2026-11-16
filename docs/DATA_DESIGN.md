@@ -324,3 +324,9 @@ Formula fields (D-188) are still just a fixed syntax that is parsed into a small
 - **Add in place** (D-349): `recordList.addHere` opens the form for a new record, preset with the values of this segment and the "equals" conditions in the list filter.
 - **Board columns by reference** (D-351, schemaVersion 32): `groupField` can be a reference field, and `groupFilter` selects which columns to show.
 - **Quick add as a bottom sheet** (D-352): `recordForm.mode: "sheet"`, the "+" at the bottom right of the page.
+
+## 23. Detail pages, more periods, sort keys, reminders (since D-557)
+
+All additive and optional: no schema version bump, no migration; an exported file lists each one in `uses.features` (D-556).
+
+- **The opened entry in a `single` block** (D-558): on a page for one entry (`page.of`), a `single` block of the same table may write `source.record: "$record"` and then shows the opened entry, and its Edit button edits it. As with filters, the config holds only the placeholder; the id is put in on the device while drawing (`bindRecord`). Pictures in a file field listed in `show.fields` are drawn as pictures in every `single` block; other files stay a line of text.

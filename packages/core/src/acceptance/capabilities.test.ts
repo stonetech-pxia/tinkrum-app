@@ -284,6 +284,12 @@ function everything() {
       [
         form('add-in-item', 'groups', ['name']),
         form('link-in-item', 'items', ['title'], { values: { group: '$record' } }),
+        {
+          id: 'this-group',
+          look: 'single',
+          source: { table: 'groups', record: '$record' },
+          show: { fields: ['name'] },
+        },
       ],
       { of: 'groups' },
     ),
