@@ -495,14 +495,15 @@ export function sortRecords(
     // 有的字段按自己的顺序排（单选按选项顺序）。
     return def && sortKey && v !== undefined ? sortKey(def, v) : v;
   };
-  return [...records].sort((a, b) => {
-    const ka = key(a);
-    const kb = key(b);
+  // 每条的键先算一次再排（公式、日程每次现算很贵），比较的规则不变。
+  const keyed = records.map((r) => ({ r, k: key(r) }));
+  keyed.sort(({ r: a, k: ka }, { r: b, k: kb }) => {
     if (ka === undefined && kb === undefined) return b.createdAt - a.createdAt;
     if (ka === undefined) return 1;
     if (kb === undefined) return -1;
     return sign * compare(ka, kb) || b.createdAt - a.createdAt;
   });
+  return keyed.map((x) => x.r);
 }
 
 export type Aggregate = 'count' | 'sum' | 'avg' | 'min' | 'max';
