@@ -1795,6 +1795,7 @@ export const fr: MessageTable = {
     'Des entrées ont changé avant votre confirmation : rien n’a été modifié. Appuyez de nouveau pour utiliser les dernières données.',
   recordActionTooMany: 'Au plus {max} entrées peuvent changer à la fois ; cela en modifierait {n}.',
   recordActionGone: 'Cette entrée a été supprimée.',
+  recordUndoFailed: 'Cette entrée a été modifiée depuis : rien n’a été annulé.',
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: 'Mois précédent',
   calendarNextMonth: 'Mois suivant',

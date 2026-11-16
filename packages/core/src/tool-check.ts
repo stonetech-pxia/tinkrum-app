@@ -4,6 +4,7 @@ import { workflowKinds } from './quick-actions';
 import {
   isOpenUse,
   isRecordToolUse,
+  tapWrites,
   isToolRefUse,
   type RecordTool,
   type ToolUse,
@@ -423,14 +424,17 @@ class Analysis {
         if (wf) for (const ref of stepRefs(wf, this.registry)) tables.add(ref.table);
       }
       if (!isRecordToolUse(u)) continue;
-      tables.add(u.table);
-      this.readTool(u, {
-        via: u.as ? `${u.as} tool of ${where}` : where,
-        reachable,
-        target: `block:${page.id}/${c.id}`,
-        ...(sourceTable !== null && u.as !== 'addHere' ? { needsRowOf: sourceTable } : {}),
-        herePresets: this.herePresets(c),
-      });
+      // 点一下的几处（D-566）都算写。
+      for (const tool of tapWrites(u, sourceTable ?? u.table)) {
+        tables.add(tool.table);
+        this.readTool(tool, {
+          via: u.as ? `${u.as} tool of ${where}` : where,
+          reachable,
+          target: `block:${page.id}/${c.id}`,
+          ...(sourceTable !== null && u.as !== 'addHere' ? { needsRowOf: sourceTable } : {}),
+          herePresets: this.herePresets(c),
+        });
+      }
     }
   }
 

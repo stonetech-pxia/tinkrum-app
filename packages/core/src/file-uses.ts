@@ -51,6 +51,8 @@ export const USES_FEATURES = [
   'recordToolCopyValue',
   /** increment 的 by 是这一条的一个数字字段（D-565）。 */
   'incrementByField',
+  /** 点一下改几处：就地工具上的 also（D-566）。 */
+  'tapAlso',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -141,6 +143,7 @@ export function usesOf(content: unknown): FileUses {
       }
       if (node.do === 'increment' && typeof node.by === 'string')
         found.features.add('incrementByField');
+      if (Array.isArray(node.also)) found.features.add('tapAlso');
     }
     if (node.kind === 'reminder' && node.app !== undefined) found.features.add('reminderInApp');
     if (node.kind === 'reminder' && isObject(node.when)) {

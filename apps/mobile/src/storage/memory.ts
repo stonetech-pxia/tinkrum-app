@@ -290,6 +290,13 @@ export class MemoryWorkspaceRepo implements WorkspaceRepo {
       for (const w of writes) {
         if (w.kind === 'insert') {
           await this.insertRecord(w.record);
+        } else if (w.kind === 'remove') {
+          const r = this.readRecord(w.id);
+          if (!r || r.deletedAt !== null || !sameValues(r.values, w.expected)) {
+            result = 'conflict';
+            break;
+          }
+          this.records.delete(w.id);
         } else {
           const r = this.readRecord(w.id);
           if (w.expected && (!r || r.deletedAt !== null || !sameValues(r.values, w.expected))) {

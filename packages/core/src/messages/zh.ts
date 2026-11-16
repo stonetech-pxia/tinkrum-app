@@ -1622,6 +1622,7 @@ export const zh: MessageTable = {
   recordActionConfirmButton: '修改',
   recordActionNothing: '没有需要修改的记录',
   recordActionFailed: '没有修改：出了点问题，一条也没改。',
+  recordUndoFailed: '这条记录之后又改过，没有撤销。',
   recordActionChangedMeanwhile: '有记录在你确认前被改过，这次一条也没改。再点一次就按最新的来。',
   recordActionTooMany: '一次最多修改 {max} 条，这次会修改 {n} 条。',
   recordActionGone: '这条记录已经删除。',

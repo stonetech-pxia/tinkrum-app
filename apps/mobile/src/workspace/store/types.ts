@@ -17,6 +17,7 @@ import type {
 import type { StoreApi } from 'zustand/vanilla';
 
 import type {
+  RecordWrite,
   RevisionRecord,
   RevisionSource,
   SavedPreset,
@@ -209,9 +210,17 @@ export interface Applied {
   notes?: string[];
 }
 
-/** 记录提示条。只有删除带撤销（restoreRecordId、restorePreset，底线 11，D-385）。 */
+/**
+ * 记录提示条。一个简单操作改不回来的才带撤销（底线 11，D-385、D-566）：删除（restoreRecordId、restorePreset）、
+ * 点一下改几处和批量新建（undo）。
+ */
 export interface RecordToast {
   message: string;
+  /**
+   * 撤销点一下改的几处（D-566）或批量新建的那些（D-567）：在一个事务里写回去，每条都要求还是做完时的样子，
+   * 这期间改过就一条也不动。
+   */
+  undo?: { writes: RecordWrite[]; tables: string[]; failed: 'recordUndoFailed' };
   restoreRecordId?: string;
   /** 一起删的几条（D-547）：撤销时全部放回来。 */
   restoreRecordIds?: string[];

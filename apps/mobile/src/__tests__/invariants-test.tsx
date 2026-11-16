@@ -787,10 +787,11 @@ describe('底线 15 / 16：看永远不会改；每次写入都来自用户的�
   });
 });
 
-describe('底线 11：写数据的操作都能挽回；只有删除弹撤销提示', () => {
+describe('底线 11：写数据的操作都能挽回；一个简单操作改不回来的才弹撤销（删除、点一下改几处、批量新建）', () => {
   // 创始人 2026-10-31（对话）：「存储东西或者是经过用户确认的操作，就不要撤销了，除了删除操作」。存下的和用户确认过的
   // （表单保存、打勾、一键新建、+1、拖看板、点圆块、批量修改、桌面小组件）不弹撤销，用户用同样简单的操作改回去；
-  // 批量修改一定先问（record-actions-test.tsx）。
+  // 批量修改一定先问（record-actions-test.tsx）。创始人 2026-11-16（对话，决定 ③④）：删除、点一下改几处（D-566）
+  // 和批量新建（D-567）弹撤销（record-tap-also-test.tsx）。
   afterEach(() => {
     jest.restoreAllMocks();
     useGuide.setState({ stage: null, repo: null });
@@ -840,6 +841,35 @@ describe('底线 11：写数据的操作都能挽回；只有删除弹撤销提�
     await fireEvent.press(await screen.findByTestId('check-todos-1'));
     await settle();
     expect((await repo.getRecord('todos-1'))!.values.done ?? false).toBe(before);
+  });
+
+  it('a tap that makes several changes shows undo, which puts the entry back', async () => {
+    const config = v34('todo');
+    config.containers.pages
+      .find((p) => p.id === 'todo')!
+      .blocks.push({
+        id: 'later',
+        look: 'list',
+        source: { table: 'todos', limit: 10 },
+        show: { title: 'title' },
+        tools: [
+          {
+            as: 'button',
+            label: '明天再做',
+            do: 'set',
+            table: 'todos',
+            field: 'done',
+            value: false,
+            also: [{ do: 'set', field: 'due', value: { from: 'today', add: 1, unit: 'days' } }],
+          },
+        ],
+      } as never);
+    const { repo } = await openPage(config, 'todo');
+    const before = (await repo.getRecord('todos-1'))!.values;
+    await fireEvent.press(await screen.findByTestId('row-action-todos-1'));
+    await fireEvent.press(await screen.findByTestId('toast-undo'));
+    await settle();
+    expect((await repo.getRecord('todos-1'))!.values).toEqual(before);
   });
 
   it('a one-tap check-in (tapping a habit tile) shows no undo', async () => {

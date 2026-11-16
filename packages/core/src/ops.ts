@@ -6,9 +6,9 @@ import {
   isRecordToolUse,
   isOpenUse,
   isToolRefUse,
-  recordToolOf,
+  tapWrites,
   toolEntryFields,
-  type RecordToolUse,
+  type RecordTool,
   type ToolUse,
 } from './record-ops-schema';
 import type { Registry } from './registry';
@@ -479,7 +479,7 @@ const hasKey = (o: object | undefined, key: string) =>
   o !== undefined && Object.prototype.hasOwnProperty.call(o, key);
 
 /** 就地的一键记录工具用到了被删掉的表或字段。 */
-function recordToolUses(use: RecordToolUse, gone: Gone): boolean {
+function recordToolUses(use: RecordTool, gone: Gone): boolean {
   if (use.table !== gone.table) return false;
   const id = gone.field;
   if (id === undefined) return true;
@@ -510,13 +510,14 @@ function toolUses(use: ToolUse, table: string | null, gone: Gone, entry = table)
   )
     return true;
   if (!isRecordToolUse(use)) return false;
-  if (
-    gone.field !== undefined &&
-    entry === gone.table &&
-    toolEntryFields(recordToolOf(use)).includes(gone.field)
-  )
-    return true;
-  return recordToolUses(use, gone);
+  // 点一下的几处（D-566）每一处都看。
+  return tapWrites(use, table ?? use.table).some(
+    (tool) =>
+      (gone.field !== undefined &&
+        entry === gone.table &&
+        toolEntryFields(tool).includes(gone.field)) ||
+      recordToolUses(tool, gone),
+  );
 }
 
 /**

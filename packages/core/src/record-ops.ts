@@ -16,6 +16,7 @@ import {
   isCopyValue,
   isDateValue,
   recordToolOf,
+  tapAlsoOf,
   type CopyValue,
   type DateValue,
   type RecordTool,
@@ -433,7 +434,63 @@ export function recordToolUseProblems(
         );
     }
   }
+  if (tapAlsoOf(use).length > 0) problems.push(...alsoProblems(use, config, where));
   return [...problems, ...recordToolProblems(tool, config, where)];
+}
+
+/**
+ * 点一下改几处（D-566）：只给每一条上的按钮和点一下（as button、tap）；顺带的改动改这一条，或者新建一条连回这一条；
+ * 最多一条新建；同一个字段不改两次；不打开表单（几处一起成功或一起不做）。
+ */
+function alsoProblems(use: RecordToolUse, config: WorkspaceConfig, where: ToolWhere): string[] {
+  const row = where.rowOf;
+  const label = where.label;
+  if ((use.as !== 'button' && use.as !== 'tap') || !row)
+    return [
+      `${label}: also only works on a button or tap on each entry (one tap, several changes to that entry)`,
+    ];
+  const tool = recordToolOf(use);
+  const problems: string[] = [];
+  if (tool.do === 'create' && tool.ask !== undefined)
+    problems.push(
+      `${label}: also can't open a form (all changes of one tap are saved together); leave ask out`,
+    );
+  const linksBack = (table: string, values: unknown) => {
+    const target = config.data.tables.find((c) => c.id === table);
+    return Object.entries(typeof values === 'object' && values !== null ? values : {}).some(
+      ([id, v]) =>
+        v === ROW_REF &&
+        target?.fields.some((f) => f.id === id && f.type === 'link' && f.table === row.id),
+    );
+  };
+  const also = tapAlsoOf(use);
+  const creates = [
+    ...(tool.do === 'create' ? [tool] : []),
+    ...also.filter((a) => a.do === 'create'),
+  ];
+  if (creates.length > 1)
+    problems.push(`${label}: one tap can make at most one create (it links back to this entry)`);
+  if (tool.do === 'create' && !linksBack(tool.table, tool.values))
+    problems.push(
+      `${label}: with also, the create must link back to this entry (a link field to ${row.id} set to "${ROW_REF}")`,
+    );
+  const fields = tool.do === 'create' ? [] : [tool.field];
+  for (const a of also) {
+    const at = { ...where, label: `${label} also` };
+    if (a.do === 'create') {
+      if (!linksBack(a.table, a.values))
+        problems.push(
+          `${label} also: a create must link back to this entry (a link field to ${row.id} set to "${ROW_REF}")`,
+        );
+      problems.push(...recordToolProblems(a, config, at));
+      continue;
+    }
+    if (fields.includes(a.field))
+      problems.push(`${label}: changes ${a.field} twice in one tap; write each field once`);
+    fields.push(a.field);
+    problems.push(...recordToolProblems({ ...a, table: row.id } as RecordTool, config, at));
+  }
+  return problems;
 }
 
 // ---- 执行（App 在用户点了以后调）----

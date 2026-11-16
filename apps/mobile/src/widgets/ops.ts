@@ -7,6 +7,7 @@ import {
   prepareRecordValues,
   recordToolOf,
   rowUpdateInput,
+  tapAlsoOf,
   toolReadsEntry,
   type Calendar,
   type Collection,
@@ -55,6 +56,8 @@ function widgetTool(use: ToolUse | undefined): WidgetTool | undefined {
   const tool = recordToolOf(use);
   if (tool.do === 'setAll' || (tool.do === 'create' && tool.ask !== undefined)) return undefined;
   if (toolReadsEntry(tool)) return undefined;
+  // 点一下改几处（D-566）之后要出撤销提示条，小组件上没有：打开 App。
+  if (tapAlsoOf(use).length > 0) return undefined;
   return tool;
 }
 

@@ -19,7 +19,7 @@ import { t } from '../i18n';
 import { newAssetId } from '../runtime/ids';
 import type { StoredRecord, WorkspaceRepo } from '../storage/types';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '../workspace/context';
-import type { WorkspaceState } from '../workspace/store/types';
+import type { RecordToast, WorkspaceState } from '../workspace/store/types';
 
 // 用户记录的读写。只由用户在页面上的操作触发，直接写数据库，不经过 AI、不生成版本
 // （docs/DATA_DESIGN.md）。AI 拿到的只有 WorkspaceConfig，而记录从不进入配置。
@@ -362,6 +362,20 @@ export function useRecordActions() {
     async restore(id: string): Promise<void> {
       await repo.restoreRecord(id);
       bump();
+    },
+
+    /**
+     * 撤销点一下改的几处、批量新建的那些（D-566、D-567）：一个事务，要求每条还是做完时的样子；改过就不覆盖，说一声。
+     */
+    async undo(undo: NonNullable<RecordToast['undo']>): Promise<void> {
+      let outcome: 'applied' | 'conflict';
+      try {
+        outcome = await repo.applyRecordWrites(undo.writes);
+      } catch {
+        outcome = 'conflict';
+      }
+      if (outcome === 'conflict') showToast({ message: t(locale, undo.failed) });
+      else bump(undo.tables);
     },
 
     /** 一起删的几条一起放回来（D-547）。 */

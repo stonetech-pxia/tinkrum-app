@@ -1717,6 +1717,7 @@ export const en = {
     'Some entries changed before you confirmed, so nothing was changed. Tap again to use the latest.',
   recordActionTooMany: 'At most {max} entries can change at once; this would change {n}.',
   recordActionGone: 'This entry was deleted.',
+  recordUndoFailed: 'This entry has changed since: nothing was undone.',
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: 'Previous month',
   calendarNextMonth: 'Next month',

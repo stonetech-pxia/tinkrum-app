@@ -8412,6 +8412,152 @@ const RELATIVE_VALUE_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 发货：订单有状态和发货日期（D-566）。 */
+const shippingEarlier: EvalEarlier = {
+  input:
+    'Make a table of orders with an item, a status and a ship date, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'item', name: 'Item', type: 'text', required: true },
+          {
+            id: 'status',
+            name: 'Status',
+            type: 'choice',
+            options: [
+              { id: 'new', label: 'New' },
+              { id: 'shipped', label: 'Shipped' },
+            ],
+          },
+          { id: 'shipped-on', name: 'Ship date', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'orders-page',
+        title: 'Orders',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'orders', limit: 50 },
+            show: { title: 'item' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+/** 习惯（上次完成）和打卡（引用习惯）（D-566）。 */
+const habitLogEarlier: EvalEarlier = {
+  input: '建一个习惯表（名字、上次完成）和打卡表（习惯、日期），再做一页列出习惯',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'habits',
+        name: '习惯',
+        fields: [
+          { id: 'name', name: '名字', type: 'text', required: true },
+          { id: 'last', name: '上次完成', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addData',
+      table: {
+        id: 'checkins',
+        name: '打卡',
+        fields: [
+          { id: 'habit', name: '习惯', type: 'link', table: 'habits' },
+          { id: 'day', name: '日期', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'habits-page',
+        title: '习惯',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'habits', limit: 50 },
+            show: { title: 'name' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+/** 一个工具点一下要做的几处（工具本身加 also）。 */
+const writesOf = (a: AnyAction): AnyAction[] => [
+  a,
+  ...((Array.isArray(a.also) ? a.also : []) as AnyAction[]),
+];
+
+// 点一下改这一条的几处（D-566）。
+const TAP_ALSO_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG29',
+    input:
+      'Add a Ship button on each order that marks it shipped and sets the ship date to today in one tap',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [shippingEarlier],
+    expect: {
+      kind: 'ops',
+      check: actionCheck(
+        'rows',
+        (a) => {
+          const w = writesOf(a);
+          return (
+            Array.isArray(a.also) &&
+            w.some((x) => x.do === 'set' && x.field === 'status' && x.value === 'shipped') &&
+            w.some((x) => x.do === 'set' && x.field === 'shipped-on' && x.value === 'today')
+          );
+        },
+        'one row tool setting status shipped with also setting shipped-on today',
+      ),
+    },
+  },
+  {
+    id: 'KG30',
+    input: '每个习惯旁边放一个「完成」，点一下记一条打卡，同时把这个习惯的上次完成改成今天',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [habitLogEarlier],
+    expect: {
+      kind: 'ops',
+      check: actionCheck(
+        'rows',
+        (a) => {
+          const w = writesOf(a);
+          return (
+            Array.isArray(a.also) &&
+            w.some(
+              (x) => x.do === 'create' && x.table === 'checkins' && values(x).habit === '$row',
+            ) &&
+            w.some((x) => x.do === 'set' && x.field === 'last' && x.value === 'today')
+          );
+        },
+        'one row tool creating a check-in for "$row" with also setting last to today',
+      ),
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8476,6 +8622,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...MINUTES_BEFORE_CASES,
   ...UNLESS_REPEATING_CASES,
   ...RELATIVE_VALUE_CASES,
+  ...TAP_ALSO_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

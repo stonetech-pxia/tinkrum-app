@@ -378,6 +378,7 @@ function everything() {
             table: 'items',
             field: 'qty',
             by: 'qty',
+            also: [{ do: 'set', field: 'date', value: 'today' }],
           },
           {
             as: 'button',

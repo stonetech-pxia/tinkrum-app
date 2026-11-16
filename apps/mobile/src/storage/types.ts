@@ -13,7 +13,12 @@ export type RecordWrite =
       updatedAt: number;
       /** 给了就要求现在存的还是这份，否则整批不做。 */
       expected?: Record<string, unknown>;
-    };
+    }
+  /**
+   * 撤销点一下新建的那条（D-566、D-567）：真删，不进「最近删除」（是工具写的值，不是用户输入的内容，D-303）。
+   * 要求现在存的还是 expected（新建时的样子），否则整批不做。
+   */
+  | { kind: 'remove'; id: string; expected: Record<string, unknown> };
 
 export type RevisionSource = 'seed' | 'ai' | 'user' | 'restore' | 'rollback' | 'recovery';
 

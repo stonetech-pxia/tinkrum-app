@@ -551,6 +551,20 @@ export class SQLiteWorkspaceRepo implements WorkspaceRepo {
             );
             continue;
           }
+          if (w.kind === 'remove') {
+            const row = await txn.getFirstAsync<RecordRow>(
+              'SELECT * FROM records WHERE id = ?',
+              w.id,
+            );
+            if (
+              !row ||
+              row.deleted_at !== null ||
+              !sameValues(toStoredRecord(row).values, w.expected)
+            )
+              throw new BatchConflict();
+            await txn.runAsync('DELETE FROM records WHERE id = ?', w.id);
+            continue;
+          }
           if (w.expected) {
             const row = await txn.getFirstAsync<RecordRow>(
               'SELECT * FROM records WHERE id = ?',

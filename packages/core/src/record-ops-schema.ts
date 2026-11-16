@@ -85,18 +85,41 @@ const set = {
   value: RecordToolValueSchema,
 };
 const toggle = { do: z.literal('toggle'), table: IdSchema, field: IdSchema };
+/** 加几：固定的数，或这一条的一个数字字段（D-565）。 */
+const IncrementBySchema = z.union([
+  z
+    .number()
+    .finite()
+    .refine((n) => n !== 0 && Math.abs(n) <= 1e6, 'by must be a non-zero number up to 1000000'),
+  IdSchema,
+]);
 const increment = {
   do: z.literal('increment'),
   table: IdSchema,
   field: IdSchema,
-  /** 加几：固定的数，或这一条的一个数字字段（D-565）。 */
-  by: z.union([
-    z
-      .number()
-      .finite()
-      .refine((n) => n !== 0 && Math.abs(n) <= 1e6, 'by must be a non-zero number up to 1000000'),
-    IdSchema,
-  ]),
+  by: IncrementBySchema,
+};
+
+/** 点一下最多改几处（D-566，创始人 2026-11-16 ③）：工具本身加 also 里的。 */
+export const MAX_TAP_WRITES = 3;
+
+/**
+ * 点一下顺带的改动（D-566）：改这一条（set、toggle、increment，表就是这一条的表，不用写），或者新建一条、
+ * 用引用字段连回这一条（"$row"）。没有 ask、没有 setAll、没有嵌套，也不能引用别的工具（底线 9）。
+ */
+export const TapAlsoSchema = z.discriminatedUnion('do', [
+  z.strictObject({ do: z.literal('set'), field: IdSchema, value: RecordToolValueSchema }),
+  z.strictObject({ do: z.literal('toggle'), field: IdSchema }),
+  z.strictObject({ do: z.literal('increment'), field: IdSchema, by: IncrementBySchema }),
+  z.strictObject({ do: z.literal('create'), table: IdSchema, values: RecordToolValuesSchema }),
+]);
+export type TapAlso = z.infer<typeof TapAlsoSchema>;
+const also = {
+  also: z
+    .array(TapAlsoSchema)
+    .min(1)
+    .max(MAX_TAP_WRITES - 1)
+    .optional(),
 };
 const setAll = {
   do: z.literal('setAll'),
@@ -151,10 +174,10 @@ const useBase = {
  */
 export const ToolUseSchema = z.union([
   z.strictObject({ ...useBase, tool: z.union([IdSchema, z.enum(PICK_TOOLS)]) }),
-  z.strictObject({ ...useBase, ...create }),
-  z.strictObject({ ...useBase, ...set }),
-  z.strictObject({ ...useBase, ...toggle }),
-  z.strictObject({ ...useBase, ...increment }),
+  z.strictObject({ ...useBase, ...create, ...also }),
+  z.strictObject({ ...useBase, ...set, ...also }),
+  z.strictObject({ ...useBase, ...toggle, ...also }),
+  z.strictObject({ ...useBase, ...increment, ...also }),
   z.strictObject({ ...useBase, ...setAll }),
   z.strictObject({ ...useBase, opens: z.union([z.literal('record'), IdSchema]) }),
 ]);
@@ -170,8 +193,26 @@ export const isOpenUse = (u: ToolUse): u is OpenUse => 'opens' in u;
 
 /** 一个就地工具去掉出现方式，剩下的一键记录工具本身。 */
 export function recordToolOf(use: RecordToolUse): RecordTool {
-  const { as: _as, label: _label, when: _when, ...tool } = use;
+  const { as: _as, label: _label, when: _when, ...rest } = use;
+  const { also: _also, ...tool } = rest as typeof rest & { also?: unknown };
   return tool as RecordTool;
+}
+
+/** 一个就地工具顺带的改动（D-566）；没有时是空的。 */
+export const tapAlsoOf = (use: RecordToolUse): readonly TapAlso[] =>
+  ('also' in use ? use.also : undefined) ?? [];
+
+/**
+ * 点一下要做的几处，按顺序，工具本身在最前（D-566）。also 里改这一条的写成这一条那张表（工具本身的表；
+ * 工具本身是新建时，是它连回的那张表，由检查保证），新建的照原样。
+ */
+export function tapWrites(use: RecordToolUse, rowTable: string = use.table): RecordTool[] {
+  return [
+    recordToolOf(use),
+    ...tapAlsoOf(use).map((a) =>
+      a.do === 'create' ? (a as RecordTool) : ({ ...a, table: rowTable } as RecordTool),
+    ),
+  ];
 }
 
 export const isDateValue = (v: unknown): v is DateValue =>

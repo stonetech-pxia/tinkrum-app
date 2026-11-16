@@ -2682,6 +2682,26 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 1>.smartDate? object
 <oneOf 6>.tools[]<anyOf 1>.smartDate.from string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 1>.smartDate.to string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also? array items 1..2
+<oneOf 6>.tools[]<anyOf 1>.also[]
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0> object
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0>.do "set"
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0>.value = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 1> object
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 1>.do "toggle"
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 1>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2> object
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.do "increment"
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by<anyOf 0> number
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3> object
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.do "create"
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.values object record
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.values{} = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
 <oneOf 6>.tools[]<anyOf 2> object
 <oneOf 6>.tools[]<anyOf 2>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
 <oneOf 6>.tools[]<anyOf 2>.label? string len 1..30
@@ -2691,6 +2711,8 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 2>.table string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 2>.field string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 2>.value = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 6>.tools[]<anyOf 2>.also? array items 1..2
+<oneOf 6>.tools[]<anyOf 2>.also[] = <oneOf 6>.tools[]<anyOf 1>.also[]
 <oneOf 6>.tools[]<anyOf 3> object
 <oneOf 6>.tools[]<anyOf 3>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
 <oneOf 6>.tools[]<anyOf 3>.label? string len 1..30
@@ -2699,6 +2721,8 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 3>.do "toggle"
 <oneOf 6>.tools[]<anyOf 3>.table string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 3>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 3>.also? array items 1..2
+<oneOf 6>.tools[]<anyOf 3>.also[] = <oneOf 6>.tools[]<anyOf 1>.also[]
 <oneOf 6>.tools[]<anyOf 4> object
 <oneOf 6>.tools[]<anyOf 4>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
 <oneOf 6>.tools[]<anyOf 4>.label? string len 1..30
@@ -2707,9 +2731,9 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 4>.do "increment"
 <oneOf 6>.tools[]<anyOf 4>.table string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 4>.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 4>.by
-<oneOf 6>.tools[]<anyOf 4>.by<anyOf 0> number
-<oneOf 6>.tools[]<anyOf 4>.by<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 4>.by = <oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by
+<oneOf 6>.tools[]<anyOf 4>.also? array items 1..2
+<oneOf 6>.tools[]<anyOf 4>.also[] = <oneOf 6>.tools[]<anyOf 1>.also[]
 <oneOf 6>.tools[]<anyOf 5> object
 <oneOf 6>.tools[]<anyOf 5>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
 <oneOf 6>.tools[]<anyOf 5>.label? string len 1..30

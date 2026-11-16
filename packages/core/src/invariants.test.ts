@@ -17,7 +17,13 @@ import { fr, frSingular } from './messages/fr';
 import { zh } from './messages/zh';
 import { migrateWorkspace } from './migrate';
 import { applyOps, OpSchema, type Op } from './ops';
-import { MAX_SET_ALL, PICK_TOOLS, RecordToolSchema, ToolUseSchema } from './record-ops-schema';
+import {
+  MAX_SET_ALL,
+  MAX_TAP_WRITES,
+  PICK_TOOLS,
+  RecordToolSchema,
+  ToolUseSchema,
+} from './record-ops-schema';
 import {
   allComponents,
   CollectionSchema,
@@ -923,9 +929,10 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
   });
 });
 
-describe('底线 11：写数据的操作都能挽回；只有删除弹撤销提示；批量修改一定先问', () => {
-  // 删除弹撤销、其余写入（表单、打勾、一键新建、+1、点圆块）不弹：mobile 的 invariants-test.tsx；setAll 先问、
-  // 改完不弹撤销：mobile 的 record-actions-test.tsx；拖看板：tiles-board-test.tsx；桌面小组件：widgets-journeys-test.tsx。
+describe('底线 11：写数据的操作都能挽回；一个简单操作改不回来的才弹撤销（删除、点一下改几处、批量新建）；批量修改一定先问', () => {
+  // 删除弹撤销、点一下改几处弹撤销（D-566）、其余写入（表单、打勾、一键新建、+1、点圆块）不弹：mobile 的 invariants-test.tsx；
+  // setAll 先问、改完不弹撤销：mobile 的 record-actions-test.tsx；点一下改几处：record-tap-also-test.tsx；
+  // 拖看板：tiles-board-test.tsx；桌面小组件：widgets-journeys-test.tsx。
   it('asking before a bulk change does not promise an undo', () => {
     for (const text of [
       en.recordActionConfirm,
@@ -942,6 +949,31 @@ describe('底线 11：写数据的操作都能挽回；只有删除弹撤销提�
     expect(RecordToolSchema.safeParse(base).success).toBe(true);
     for (const skip of [{ confirm: false }, { ask: false }, { ask: 'none' }, { silent: true }])
       expect(RecordToolSchema.safeParse({ ...base, ...skip }).success).toBe(false);
+  });
+
+  it('a tap that makes several changes makes at most 3, all to this entry, and none of them asks or fans out', () => {
+    const tap = {
+      as: 'button',
+      label: 'Ship',
+      do: 'set',
+      table: 't',
+      field: 'a',
+      value: true,
+      also: [{ do: 'set', field: 'b', value: 'today' }],
+    };
+    expect(MAX_TAP_WRITES).toBe(3);
+    expect(ToolUseSchema.safeParse(tap).success).toBe(true);
+    for (const also of [
+      [...tap.also, { do: 'toggle', field: 'c' }, { do: 'toggle', field: 'd' }],
+      [{ do: 'setAll', field: 'b', value: true }],
+      [{ do: 'set', table: 'other', field: 'b', value: true }],
+      [{ do: 'create', table: 'x', values: {}, ask: 'all' }],
+    ])
+      expect(ToolUseSchema.safeParse({ ...tap, also }).success, JSON.stringify(also)).toBe(false);
+    // 提醒通知上的「完成」没有地方弹撤销：只能改一处。
+    const { as: _as, label: _label, also, ...done } = tap;
+    expect(RecordToolSchema.safeParse(done).success).toBe(true);
+    expect(RecordToolSchema.safeParse({ ...done, also }).success).toBe(false);
   });
 
   it('setAll is capped at 200 entries', () => {

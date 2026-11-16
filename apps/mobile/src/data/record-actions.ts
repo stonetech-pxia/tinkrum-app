@@ -1,5 +1,6 @@
 import {
   MAX_SET_ALL,
+  RECORD_LIMITS,
   createInput,
   loadComputedRecords,
   prepareRecordValues,
@@ -8,8 +9,11 @@ import {
   expandCollection,
   isOpenUse,
   recordToolOf,
+  tapAlsoOf,
+  tapWrites,
   toolReadsEntry,
   type ActionContext,
+  type Collection,
   type DataRecord,
   type OpenUse,
   type RecordTool,
@@ -19,6 +23,8 @@ import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 
 import { t } from '../i18n';
+import { newAssetId } from '../runtime/ids';
+import type { RecordWrite } from '../storage/types';
 import { openRow } from '../renderer/open-row';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { useRecordActions } from './records';
@@ -160,6 +166,110 @@ export function useRecordActionRunner() {
     });
   }
 
+  /**
+   * 点一下改这一条的几处（D-566）：先按现在存的这一条算出全部改动，在一个事务里一起写（要求这一条还是读到的样子），
+   * 一处写不了就一处也不写。之后提示条上有「撤销」：放回这一条原来的样子、删掉新建的那条（都要求还是做完时的样子）。
+   */
+  async function tapMany(use: RecordToolUse, record: DataRecord) {
+    const row = config?.data.tables.find((c) => c.id === record.collectionId);
+    if (!config || !row) return;
+    const stored = await repo.getRecord(record.id);
+    if (!stored || stored.deletedAt !== null) {
+      showToast({ message: t(locale, 'recordActionGone') });
+      bump();
+      return;
+    }
+    const now = new Date();
+    const tools = tapWrites(use, row.id);
+    const readsEntry = tools.some(toolReadsEntry);
+    const entry = readsEntry
+      ? await entryOf(tools.find(toolReadsEntry)!, record.id, now)
+      : undefined;
+    const ctx = { now, cal, rowId: record.id, entry };
+    // 改这一条的几处按顺序合在一起（各改各的字段）。
+    let input: Record<string, unknown> = {};
+    let created: { collection: Collection; values: Record<string, unknown> } | undefined;
+    for (const tool of tools) {
+      if (tool.do === 'create') {
+        const target = config.data.tables.find((c) => c.id === tool.table);
+        if (!target) return;
+        const prepared = prepareRecordValues(
+          target,
+          createInput(target, tool.values, ctx),
+          null,
+          now,
+          cal,
+        );
+        if (!prepared.ok) return void showToast({ message: t(locale, 'recordActionFailed') });
+        created = { collection: target, values: prepared.values };
+        continue;
+      }
+      if (tool.do === 'setAll') continue;
+      const next = rowUpdateInput(tool, row, { ...stored.values, ...input }, ctx);
+      if (!next) return;
+      input = { ...input, ...next };
+    }
+    const prepared = prepareRecordValues(row, input, stored.values, now, cal);
+    if (!prepared.ok) return void openRecord(row.id, record.id);
+    if (created) {
+      const counts = await repo.countRecords();
+      const count = counts.find((c) => c.collectionId === created!.collection.id)?.count ?? 0;
+      if (count >= RECORD_LIMITS.perCollection) return void Alert.alert(t(locale, 'tableFull'));
+    }
+    const at = now.getTime();
+    const newId = newAssetId();
+    const writes: RecordWrite[] = [
+      {
+        kind: 'update',
+        id: record.id,
+        values: prepared.values,
+        updatedAt: at,
+        expected: stored.values,
+      },
+      ...(created
+        ? [
+            {
+              kind: 'insert' as const,
+              record: {
+                id: newId,
+                collectionId: created.collection.id,
+                values: created.values,
+                createdAt: at,
+                updatedAt: at,
+              },
+            },
+          ]
+        : []),
+    ];
+    let outcome: 'applied' | 'conflict';
+    try {
+      outcome = await repo.applyRecordWrites(writes);
+    } catch {
+      return void showToast({ message: t(locale, 'recordActionFailed') });
+    }
+    if (outcome === 'conflict')
+      return void showToast({ message: t(locale, 'recordActionChangedMeanwhile') });
+    const tables = [row.id, ...(created ? [created.collection.id] : [])];
+    bump(tables);
+    showToast({
+      message: t(locale, 'recordActionDone', { label: use.label ?? '' }),
+      undo: {
+        writes: [
+          {
+            kind: 'update',
+            id: record.id,
+            values: stored.values,
+            updatedAt: Date.now(),
+            expected: prepared.values,
+          },
+          ...(created ? [{ kind: 'remove' as const, id: newId, expected: created.values }] : []),
+        ],
+        tables,
+        failed: 'recordUndoFailed',
+      },
+    });
+  }
+
   return {
     /**
      * 块本身的工具（button 的 tools[0]）：不作用在某一条上。recordId 是记录页打开的那一条（"$record"，
@@ -185,6 +295,7 @@ export function useRecordActionRunner() {
     ): Promise<void> {
       return serial(async () => {
         if (isOpenUse(use)) return void openRow(router, use.opens, record.collectionId, record.id);
+        if (tapAlsoOf(use).length > 0) return tapMany(use, record);
         const tool = recordToolOf(use);
         if (tool.do === 'create') return create(tool, { rowId: record.id });
         if (tool.do === 'setAll') return setAll(tool, use.label ?? '');
