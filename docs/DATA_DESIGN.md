@@ -207,6 +207,7 @@ The **mock AI** gains several built-in templates, such as "create a bookkeeping 
 - **New components and version numbers** (D-254): adding only a new kind of page component does not raise schemaVersion. When reading a stored config, components this version does not recognize are kept as they are (the original JSON is written back on save), and the page shows a "needs a newer app" placeholder that can only be moved and deleted; the AI cannot add or change them. Changing an existing structure (adding a property to an existing component, adding a field type, changing the range of values) still requires raising the version number and writing a migration. Apps installed before this version still reject configs that contain the new component.
 - **Cloud** (addition to CLOUD_DESIGN.md): a new `records` table (with `workspace_id`, protected by RLS). Versions are immutable and records are mutable, so the sync differs: each record is "last writer wins" by `updated_at`, and deletes use tombstone records. When two devices change the same record at the same time, the later change wins (field-level merge comes later).
 - **Export**: each table can be exported as CSV and sent out through the system share sheet ("data over UI", §12).
+- **Import** (D-574): Settings → Data → a table → "Import entries from a file" brings the rows of an .xlsx or .csv file into that existing table, on the device only. Columns are matched to fields by equal names (case, full-width and spaces ignored) and the user confirms or changes every column, with samples read the way they will be written; each cell is read leniently for a spreadsheet and then goes through the field's own `write`. Rows that cannot be written are left out and listed by reason in a summary the user confirms; at most 2,000 rows per import and never past the table's 10,000. All entries of an import are written in one transaction and kept as a batch in the database (`record_imports`, `import_items`), not in the config. The undo banner and "Delete this import" move the batch's entries still present to Recently deleted for 30 days (invariant 11). The logic is in `packages/core/src/records-import.ts`, the xlsx reading in `packages/tool-office/src/xlsx-import.ts` (`readXlsxRows`).
 
 ## 8. Not in this version
 
@@ -219,6 +220,7 @@ The **mock AI** gains several built-in templates, such as "create a bookkeeping 
 | Attachment field (referencing user files)   | Done in D-187 / D-263; searching by file content and multi-select filtering are not done                                               |
 | The AI writing records                      | See Q1                                                                                                                                 |
 | Sharing among several people                | Depends on accounts and the cloud                                                                                                      |
+| Import of link fields, other encodings      | D-574 imports typed-in fields from UTF-8 / UTF-16; matching a link by its title and GBK / Latin-1 CSV are not done                     |
 
 ## 9. The founder's decisions (2026-10-22)
 

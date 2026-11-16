@@ -36,6 +36,7 @@ import {
   type WorkspaceConfig,
 } from './schema';
 import { planDocument } from './prefill/code-rules';
+import { IMPORT_LIMITS, importLimitProblem } from './records-import';
 import { sampleOps } from './samples';
 import { createStarterWorkspace } from './starter';
 import { fromV33, registry, v33Fixture } from './test-helpers';
@@ -930,7 +931,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
   });
 });
 
-describe('底线 11：写数据的操作都能挽回；一个简单操作改不回来的才弹撤销（删除、点一下改几处、批量新建）；批量修改一定先问', () => {
+describe('底线 11：写数据的操作都能挽回；一个简单操作改不回来的才弹撤销（删除、点一下改几处、批量新建、导入的一批）；批量修改一定先问', () => {
   // 删除弹撤销、点一下改几处弹撤销（D-566）、其余写入（表单、打勾、一键新建、+1、点圆块）不弹：mobile 的 invariants-test.tsx；
   // setAll 先问、改完不弹撤销：mobile 的 record-actions-test.tsx；点一下改几处：record-tap-also-test.tsx；
   // 拖看板：tiles-board-test.tsx；桌面小组件：widgets-journeys-test.tsx。
@@ -985,6 +986,30 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     const { as: _as, label: _label, also, ...done } = tap;
     expect(RecordToolSchema.safeParse(done).success).toBe(true);
     expect(RecordToolSchema.safeParse({ ...done, also }).success).toBe(false);
+  });
+
+  // 从表格文件导入（D-574，创始人 2026-11-16 决定 ⑦）：系统层，先给汇总、用户点「导入」才写，导完弹撤销
+  // （mobile 的 import-records-test.tsx、invariants-test.tsx）。
+  it('asking before an import does not promise an undo, and the import has fixed caps it never passes in part', () => {
+    for (const text of [
+      en.importSummary,
+      enSingular.importSummary,
+      zh.importSummary,
+      fr.importSummary,
+      frSingular.importSummary,
+      en.importConfirm,
+      zh.importConfirm,
+      fr.importConfirm,
+    ])
+      expect(text).not.toMatch(/undo|撤销|annuler/i);
+    expect(IMPORT_LIMITS.maxRows).toBe(2000);
+    expect(importLimitProblem(2001, 1, 0)).not.toBeNull();
+    expect(importLimitProblem(10, 10, 9995)).not.toBeNull();
+  });
+
+  it('importing is not something a tool or the AI can do: no record tool imports a file', () => {
+    for (const kind of ['import', 'importFile', 'importRows'])
+      expect(RecordToolSchema.safeParse({ do: kind, table: 't' }).success).toBe(false);
   });
 
   it('setAll is capped at 200 entries', () => {

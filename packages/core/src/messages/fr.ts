@@ -1970,6 +1970,55 @@ export const fr: MessageTable = {
     'Tink ne voit pas le fichier, seulement les champs de ce tableau. Le tableau est créé d’abord.',
   shareRecordTooMany: 'Une entrée contient au plus {n} fichiers : seuls les {n} premiers y vont.',
   shareRecordNewTable: 'Ajouter le tableau « {name} »',
+  // 表格文件的行导进表（D-574）：「设置 → 数据」，系统层。
+  importEntries: 'Importer des entrées depuis un fichier',
+  importTitle: 'Importer des entrées',
+  importIntro:
+    'Choisissez un fichier .xlsx ou .csv : chaque ligne devient une entrée dans « {table} ». Le fichier est lu sur ce téléphone uniquement, et l’original n’est pas modifié.',
+  importChooseFile: 'Choisir un fichier',
+  importReading: 'Lecture du fichier…',
+  importErrorUnsupported:
+    'Seuls les fichiers .xlsx et .csv peuvent être importés. Enregistrez d’abord le fichier dans l’un de ces formats.',
+  importErrorNotSpreadsheet:
+    'Ce fichier ne peut pas être lu comme un tableur. Il est peut-être endommagé, ou d’un autre type.',
+  importErrorEncoding:
+    'Ce fichier CSV n’est pas en UTF-8. Enregistrez-le de nouveau au format « CSV UTF-8 » et importez ce fichier.',
+  importErrorTooLarge:
+    'Ce fichier est trop volumineux pour être importé. Importez-en une partie plus petite.',
+  importErrorEmpty: 'Ce fichier ne contient aucune ligne à importer.',
+  importErrorNoFields: '« {table} » n’a aucun champ qui puisse être rempli depuis un fichier.',
+  importErrorTooManyRows:
+    'Ce fichier contient {n} lignes, et {max} au plus peuvent être importées en une fois. Divisez le fichier et importez les parties l’une après l’autre.',
+  importErrorTableFull:
+    'Cela ajouterait {n} entrées à « {table} », qui n’a de place que pour {room} de plus. Rien n’a été importé.',
+  importSheet: 'Feuille',
+  importHeaderRow: 'La première ligne contient les noms des colonnes',
+  importColumn: 'Colonne {col}',
+  importColumnsHint:
+    'Chaque colonne va dans le champ indiqué, ou est ignorée. Les colonnes sont associées aux champs de même nom ; vous pouvez changer chacune.',
+  importSkip: 'Ignorer',
+  importSampleUnreadable: '« {value} » ne peut pas être lu',
+  importDayFirst: 'Jour d’abord (31/12)',
+  importMonthFirst: 'Mois d’abord (12/31)',
+  importChangeColumns: 'Modifier les colonnes',
+  importContinue: 'Continuer',
+  importSummary: '{n} entrées seront ajoutées à « {table} ».',
+  importSummaryNone: 'Avec ces colonnes, aucune ligne de ce fichier ne peut être importée.',
+  importLeftOut: '{n} lignes seront laissées de côté :',
+  importReason_invalid: '{n} lignes où « {field} » ne peut pas être lu (ligne {rows})',
+  importReason_required:
+    '{n} lignes où « {field} » est vide alors qu’il est obligatoire (ligne {rows})',
+  importReason_tooLong: '{n} lignes où « {field} » est trop long (ligne {rows})',
+  importReason_tooSmall: '{n} lignes où « {field} » est inférieur à {limit} (ligne {rows})',
+  importReason_tooLarge: '{n} lignes où « {field} » est supérieur à {limit} (ligne {rows})',
+  importConfirm: 'Importer {n} entrées',
+  importDone: '{n} entrées importées dans « {table} »',
+  importUndone: 'Les entrées importées sont dans Supprimés récemment pendant 30 jours.',
+  importBatches: 'Importées depuis des fichiers',
+  importBatch: '{date} · {file} · {n} entrées',
+  importDeleteBatch: 'Supprimer cette importation',
+  importDeleteBatchConfirm:
+    'Les {n} entrées de « {file} » vont dans Supprimés récemment pendant 30 jours, y compris celles modifiées depuis.',
 };
 
 export const frSingular: SingularTable = {
@@ -2097,4 +2146,21 @@ export const frSingular: SingularTable = {
   filesDeleteTitle: 'Supprimer ce fichier ?',
   filesDeleteUsed:
     '{n} d’entre eux est utilisé dans une entrée ou une page et n’y apparaîtra plus. Cette action est irréversible.',
+  importErrorTooManyRows:
+    'Ce fichier contient {n} ligne, et {max} au plus peuvent être importées en une fois. Divisez le fichier et importez les parties l’une après l’autre.',
+  importErrorTableFull:
+    'Cela ajouterait {n} entrée à « {table} », qui n’a de place que pour {room} de plus. Rien n’a été importé.',
+  importSummary: '{n} entrée sera ajoutée à « {table} ».',
+  importLeftOut: '{n} ligne sera laissée de côté :',
+  importReason_invalid: '{n} ligne où « {field} » ne peut pas être lu (ligne {rows})',
+  importReason_required:
+    '{n} ligne où « {field} » est vide alors qu’il est obligatoire (ligne {rows})',
+  importReason_tooLong: '{n} ligne où « {field} » est trop long (ligne {rows})',
+  importReason_tooSmall: '{n} ligne où « {field} » est inférieur à {limit} (ligne {rows})',
+  importReason_tooLarge: '{n} ligne où « {field} » est supérieur à {limit} (ligne {rows})',
+  importConfirm: 'Importer {n} entrée',
+  importDone: '{n} entrée importée dans « {table} »',
+  importBatch: '{date} · {file} · {n} entrée',
+  importDeleteBatchConfirm:
+    '{n} entrée de « {file} » va dans Supprimés récemment pendant 30 jours, même si elle a été modifiée depuis.',
 };

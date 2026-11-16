@@ -787,11 +787,12 @@ describe('底线 15 / 16：看永远不会改；每次写入都来自用户的�
   });
 });
 
-describe('底线 11：写数据的操作都能挽回；一个简单操作改不回来的才弹撤销（删除、点一下改几处、批量新建）', () => {
+describe('底线 11：写数据的操作都能挽回；一个简单操作改不回来的才弹撤销（删除、点一下改几处、批量新建、导入的一批）', () => {
   // 创始人 2026-10-31（对话）：「存储东西或者是经过用户确认的操作，就不要撤销了，除了删除操作」。存下的和用户确认过的
   // （表单保存、打勾、一键新建、+1、拖看板、点圆块、批量修改、桌面小组件）不弹撤销，用户用同样简单的操作改回去；
   // 批量修改一定先问（record-actions-test.tsx）。创始人 2026-11-16（对话，决定 ③④）：删除、点一下改几处（D-566）
-  // 和批量新建（D-567）弹撤销（record-tap-also-test.tsx）。
+  // 和批量新建（D-567）弹撤销（record-tap-also-test.tsx）；同一天（决定 ⑦）：导入的一批也弹撤销（D-574，
+  // import-records-test.tsx）。
   afterEach(() => {
     jest.restoreAllMocks();
     useGuide.setState({ stage: null, repo: null });
@@ -894,6 +895,41 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     await fireEvent.press(await screen.findByTestId('toast-undo'));
     await settle();
     expect(await repo.listRecords('todos')).toHaveLength(before);
+  });
+
+  it('importing entries from a file asks first and shows undo, which removes exactly that batch (D-574)', async () => {
+    const config = v34('todo');
+    const repo = new MemoryWorkspaceRepo();
+    await repo.setMeta('guide', 'done');
+    await act(() => useGuide.getState().load(repo));
+    await fillRecords(repo, config.data.tables);
+    const files = new FakeFiles();
+    await renderToolsApp(repo, files, { seed: () => config, locale: 'zh' });
+    const ids = async () => (await repo.listRecords('todos')).map((r) => r.id).sort();
+    const before = await ids();
+    await act(() =>
+      router.push({ pathname: '/import-records', params: { table: 'todos', visit: ++visit } }),
+    );
+    files.nextPick = [
+      files.offer('todos.csv', new TextEncoder().encode('事项\n买牛奶\n交房租\n'), 'text/csv'),
+    ];
+    await fireEvent.press(await screen.findByTestId('import-choose'));
+    await settle();
+    await fireEvent.press(await screen.findByTestId('import-continue'));
+    await settle();
+    // 先问：汇总出来了，什么都没写。
+    expect(screen.getByTestId('import-summary')).toHaveTextContent(/加入 2 条记录。/);
+    expect(await ids()).toEqual(before);
+    await fireEvent.press(screen.getByTestId('import-confirm'));
+    await settle();
+    expect(await ids()).toHaveLength(before.length + 2);
+    await fireEvent.press(await screen.findByTestId('toast-undo'));
+    await settle();
+    expect(await ids()).toEqual(before);
+    // 撤销的是用户自己的内容：进「最近删除」，能放回来。
+    expect((await repo.listDeletedRecords()).map((r) => r.values.title).sort()).toEqual(
+      ['买牛奶', '交房租'].sort(),
+    );
   });
 
   it('a one-tap check-in (tapping a habit tile) shows no undo', async () => {

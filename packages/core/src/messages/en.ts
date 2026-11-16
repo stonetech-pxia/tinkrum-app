@@ -1885,6 +1885,53 @@ export const en = {
     'Tink can’t see the file, only the fields of this table. The table is created first.',
   shareRecordTooMany: 'An entry holds at most {n} files: only the first {n} go in.',
   shareRecordNewTable: 'Add the table “{name}”',
+  // 表格文件的行导进表（D-574）：「设置 → 数据」，系统层。
+  importEntries: 'Import entries from a file',
+  importTitle: 'Import entries',
+  importIntro:
+    'Choose an .xlsx or .csv file: each row becomes an entry in “{table}”. The file is read on this phone only, and the original is not changed.',
+  importChooseFile: 'Choose a file',
+  importReading: 'Reading the file…',
+  importErrorUnsupported:
+    'Only .xlsx and .csv files can be imported. Save the file in one of these formats first.',
+  importErrorNotSpreadsheet:
+    'This file could not be read as a spreadsheet. It may be damaged, or be another kind of file.',
+  importErrorEncoding:
+    'This CSV file is not in UTF-8. Save it again as “CSV UTF-8” and import that file.',
+  importErrorTooLarge: 'This file is too large to import. Import a smaller part of it.',
+  importErrorEmpty: 'This file has no rows to import.',
+  importErrorNoFields: '“{table}” has no fields that can be filled from a file.',
+  importErrorTooManyRows:
+    'This file has {n} rows, and at most {max} can be imported at once. Split the file and import the parts one after the other.',
+  importErrorTableFull:
+    'This would add {n} entries to “{table}”, which has room for only {room} more. Nothing was imported.',
+  importSheet: 'Sheet',
+  importHeaderRow: 'The first row holds the column names',
+  importColumn: 'Column {col}',
+  importColumnsHint:
+    'Each column goes into the field shown, or is skipped. Columns are matched to fields with the same name; change any of them.',
+  importSkip: 'Skip',
+  importSampleUnreadable: '“{value}” cannot be read',
+  importDayFirst: 'Day first (31/12)',
+  importMonthFirst: 'Month first (12/31)',
+  importChangeColumns: 'Change the columns',
+  importContinue: 'Continue',
+  importSummary: '{n} entries will be added to “{table}”.',
+  importSummaryNone: 'No row of this file can be imported with these columns.',
+  importLeftOut: '{n} rows will be left out:',
+  importReason_invalid: '{n} rows where “{field}” cannot be read (row {rows})',
+  importReason_required: '{n} rows where “{field}” is empty but required (row {rows})',
+  importReason_tooLong: '{n} rows where “{field}” is too long (row {rows})',
+  importReason_tooSmall: '{n} rows where “{field}” is below {limit} (row {rows})',
+  importReason_tooLarge: '{n} rows where “{field}” is above {limit} (row {rows})',
+  importConfirm: 'Import {n} entries',
+  importDone: 'Imported {n} entries into “{table}”',
+  importUndone: 'The imported entries are in Recently deleted for 30 days.',
+  importBatches: 'Imported from files',
+  importBatch: '{date} · {file} · {n} entries',
+  importDeleteBatch: 'Delete this import',
+  importDeleteBatchConfirm:
+    '{n} entries from “{file}” go to Recently deleted for 30 days, including any you edited since.',
 };
 
 export type StringKey = keyof typeof en;
@@ -2014,6 +2061,22 @@ export const enSingular = {
   filesDeleteTitle: 'Delete this file?',
   filesDeleteUsed:
     '{n} of them is used in an entry or a page and will no longer show there. This can’t be undone.',
+  importErrorTooManyRows:
+    'This file has {n} row, and at most {max} can be imported at once. Split the file and import the parts one after the other.',
+  importErrorTableFull:
+    'This would add {n} entry to “{table}”, which has room for only {room} more. Nothing was imported.',
+  importSummary: '{n} entry will be added to “{table}”.',
+  importLeftOut: '{n} row will be left out:',
+  importReason_invalid: '{n} row where “{field}” cannot be read (row {rows})',
+  importReason_required: '{n} row where “{field}” is empty but required (row {rows})',
+  importReason_tooLong: '{n} row where “{field}” is too long (row {rows})',
+  importReason_tooSmall: '{n} row where “{field}” is below {limit} (row {rows})',
+  importReason_tooLarge: '{n} row where “{field}” is above {limit} (row {rows})',
+  importConfirm: 'Import {n} entry',
+  importDone: 'Imported {n} entry into “{table}”',
+  importBatch: '{date} · {file} · {n} entry',
+  importDeleteBatchConfirm:
+    '{n} entry from “{file}” goes to Recently deleted for 30 days, even if you edited it since.',
 } satisfies Partial<MessageTable>;
 
 /** 单数表：键必须和 enSingular 完全一致。 */

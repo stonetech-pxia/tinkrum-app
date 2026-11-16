@@ -378,6 +378,15 @@ export function useRecordActions() {
       else bump(undo.tables);
     },
 
+    /**
+     * 撤销一次导入（D-574）：这一批还在的记录软删除，进「最近删除」30 天（导入的是用户自己的内容，不像批量新建那样真删）。
+     */
+    async undoImport(batch: NonNullable<RecordToast['undoImport']>): Promise<void> {
+      await repo.deleteImport(batch.id, Date.now());
+      bump([batch.table]);
+      showToast({ message: t(locale, 'importUndone') });
+    },
+
     /** 一起删的几条一起放回来（D-547）。 */
     async restoreMany(ids: readonly string[]): Promise<void> {
       for (const id of ids) await repo.restoreRecord(id);

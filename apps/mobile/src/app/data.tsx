@@ -16,6 +16,7 @@ import {
   formatRef,
   formatTimestamp,
   calendarOf,
+  importTargets,
   linkedCollectionIds,
   loadComputedRecords,
   loadLinkResolver,
@@ -33,14 +34,14 @@ import { Card, PageTitle, Pill, SectionLabel } from '@/renderer/ui';
 import { usePalette } from '@/renderer/theme';
 import { useWorkflowChange } from '@/run/workflow-change';
 import { findRevisionTables } from '@/storage/revision-pages';
-import type { StoredRecord } from '@/storage/types';
+import type { RecordImport, StoredRecord } from '@/storage/types';
 import { useWorkspace, useWorkspaceContext } from '@/workspace/context';
 
 /**
  * 「设置 → 数据」：用户记录的管理页，由内核提供，AI 不能修改。
  * 导出 CSV、查看已移出界面的数据表、恢复最近删除的记录（D-037、D-038、D-041）；
  * 导出 App 配置；预填记忆的导出（也是备份）、从文件恢复、一键清空（D-244）；每张表的「自动读取附件」（D-397）；
- * 本机模型的下载和删除（D-396）。
+ * 本机模型的下载和删除（D-396）；从表格文件导入记录、每张表导入过的批次和整批删除（D-574）。
  */
 /** 表上的「附件是」的选项（D-421）。 */
 const PREFILL_RULES = [
@@ -63,6 +64,8 @@ export default function DataRoute() {
     { collection: Collection | null; id: string; count: number }[]
   >([]);
   const [deleted, setDeleted] = useState<StoredRecord[]>([]);
+  // 每张表从文件导入的批次（D-574），只留还有记录在的。
+  const [imports, setImports] = useState<Map<string, RecordImport[]>>(new Map());
   const [known, setKnown] = useState<Map<string, Collection>>(new Map());
   const [layouts, setLayouts] = useState(0);
   // 新记录表单里点过的候选（D-394）：一个字段算一个。
@@ -80,7 +83,14 @@ export default function DataRoute() {
         ),
       );
       const found = await findRevisionTables(repo, missing);
+      const batches = new Map<string, RecordImport[]>();
+      for (const c of config.data.tables)
+        batches.set(
+          c.id,
+          (await repo.listImports(c.id)).filter((b) => b.present > 0),
+        );
       if (!alive) return;
+      setImports(batches);
       setCounts(new Map(rows.map((r) => [r.collectionId, r.count])));
       setOrphans(
         rows
@@ -226,6 +236,22 @@ export default function DataRoute() {
     ]);
   }
 
+  /** 删除一次导入（D-574）：先问；这一批还在的记录进「最近删除」30 天，之后改过的也一起。 */
+  function deleteImport(c: Collection, batch: RecordImport) {
+    Alert.alert(
+      t(locale, 'importDeleteBatch'),
+      t(locale, 'importDeleteBatchConfirm', { n: batch.present, file: batch.fileName }),
+      [
+        { text: t(locale, 'cancel'), style: 'cancel' },
+        {
+          text: t(locale, 'delete'),
+          style: 'destructive',
+          onPress: () => void repo.deleteImport(batch.id, Date.now()).then(() => bump([c.id])),
+        },
+      ],
+    );
+  }
+
   function deleteForever(id: string, name: string, count: number) {
     Alert.alert(t(locale, 'deleteForever'), t(locale, 'deleteForeverConfirm', { name, count }), [
       { text: t(locale, 'cancel'), style: 'cancel' },
@@ -274,6 +300,45 @@ export default function DataRoute() {
               />
             ) : null}
           </View>
+          {importTargets(c).length > 0 ? (
+            <View style={{ flexDirection: 'row' }}>
+              <Pill
+                palette={palette}
+                testID={`import-${c.id}`}
+                label={t(locale, 'importEntries')}
+                onPress={() =>
+                  router.push({ pathname: '/import-records', params: { table: c.id } })
+                }
+              />
+            </View>
+          ) : null}
+          {(imports.get(c.id) ?? []).length > 0 ? (
+            <View style={{ gap: 6 }}>
+              <Text style={[palette.font('bodyMedium', 14), { color: palette.text }]}>
+                {t(locale, 'importBatches')}
+              </Text>
+              {imports.get(c.id)!.map((b) => (
+                <View key={b.id} testID={`import-batch-${b.id}`} style={{ gap: 4 }}>
+                  <Text style={caption}>
+                    {t(locale, 'importBatch', {
+                      date: formatTimestamp(b.createdAt, locale),
+                      file: b.fileName,
+                      n: b.present,
+                    })}
+                  </Text>
+                  <View style={{ flexDirection: 'row' }}>
+                    <Pill
+                      palette={palette}
+                      danger
+                      testID={`import-delete-${b.id}`}
+                      label={t(locale, 'importDeleteBatch')}
+                      onPress={() => deleteImport(c, b)}
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
           {c.fields.some((f) => f.type === 'file') ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <View style={{ flex: 1 }}>

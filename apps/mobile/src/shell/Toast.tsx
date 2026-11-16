@@ -27,7 +27,8 @@ export function Toast({ palette, bottom }: { palette: Palette; bottom: number })
     toast?.restoreRecordId ||
     toast?.restoreRecordIds ||
     toast?.restorePreset ||
-    toast?.undo
+    toast?.undo ||
+    toast?.undoImport
   );
   const canContinue = !!toast?.continueTable;
   const timed = toast && !toast.held;
@@ -84,6 +85,7 @@ export function Toast({ palette, bottom }: { palette: Palette; bottom: number })
             dismiss();
             // 撤销失败时会换一条提示，所以先关掉这一条。
             if (toast.undo) void actions.undo(toast.undo);
+            if (toast.undoImport) void actions.undoImport(toast.undoImport);
           }}>
           <Text style={[palette.font('bodyBold', 14), { color: palette.surface }]}>
             {t(locale, 'undo')}
