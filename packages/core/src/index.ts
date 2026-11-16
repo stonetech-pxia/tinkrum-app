@@ -64,6 +64,7 @@ export * from './record-append';
 export * from './record-row';
 export * from './money-currency';
 export * from './records-sheet';
+export * from './records-import';
 export * from './similar-records';
 export * from './richtext';
 export * from './schema';

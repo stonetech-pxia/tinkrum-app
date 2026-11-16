@@ -9,8 +9,8 @@ import { setCellText } from './edit';
 import { formatNumber, generalNumber } from './number-format';
 import { importOffice } from './office-import';
 import type { TableBlock, TableDoc } from './types';
-import { writeXlsx } from './xlsx';
-import { importXlsx, MAX_IMPORT_CELLS } from './xlsx-import';
+import { writeRowsXlsx, writeXlsx } from './xlsx';
+import { importXlsx, MAX_IMPORT_CELLS, readXlsxRows } from './xlsx-import';
 
 // 读外来的 xlsx（D-509）：用 jszip 按 Excel 的写法拼的工作簿测（共享字符串、行内字符串、合并格子、公式、
 // 数字格式、列宽、几张工作表），再看写回去的 xlsx。
@@ -262,5 +262,62 @@ describe('formatNumber', () => {
     expect(formatNumber(OCT_1 + 0.75, 'h:mm AM/PM')).toBe('6:00 PM');
     expect(formatNumber(1.5, '[h]:mm')).toBe('36:00');
     expect(formatNumber(OCT_1 + 0.5, 'yyyy"年"m"月"d"日" hh:mm')).toBe('2026年10月1日 12:00');
+  });
+});
+
+describe('rows of a sheet for importing entries (D-574)', () => {
+  it('keeps text, real numbers and real dates, with a gap for an empty cell', () => {
+    const data = writeRowsXlsx('Orders', [
+      [
+        { kind: 'text', text: 'Customer' },
+        { kind: 'text', text: 'Amount' },
+        { kind: 'text', text: 'Date' },
+      ],
+      [
+        { kind: 'text', text: 'Ana' },
+        { kind: 'number', value: 1234.5, format: '#,##0.00', text: '1,234.50' },
+        { kind: 'number', value: OCT_1, format: 'yyyy-mm-dd', text: '2026-10-01' },
+      ],
+      [
+        { kind: 'text', text: '' },
+        { kind: 'text', text: '' },
+        {
+          kind: 'number',
+          value: OCT_1 + 0.5,
+          format: 'yyyy-mm-dd hh:mm',
+          text: '2026-10-01 12:00',
+        },
+      ],
+    ]);
+    const [sheet] = readXlsxRows(data, 1000);
+    expect(sheet!.name).toBe('Orders');
+    expect(sheet!.rows[0]!.map((c) => c.text)).toEqual(['Customer', 'Amount', 'Date']);
+    expect(sheet!.rows[1]).toEqual([
+      { text: 'Ana' },
+      { text: '1,234.50', number: 1234.5 },
+      { text: '2026-10-01', number: OCT_1, date: true },
+    ]);
+    // 空的格子不写进文件：这一行前两格是空的。
+    expect(sheet!.rows[2]![0]).toEqual({ text: '' });
+    expect(sheet!.rows[2]![2]).toMatchObject({ number: OCT_1 + 0.5, date: true });
+  });
+
+  it('every sheet, a 1904 workbook moved to 1900 serials, and booleans as TRUE / FALSE', async () => {
+    const sheets = readXlsxRows(
+      await workbook([EXPENSES, { ...EXPENSES, name: 'November' }], STRINGS, { date1904: true }),
+      1000,
+    );
+    expect(sheets.map((s) => s.name)).toEqual(['October', 'November']);
+    expect(sheets[0]!.rows[2]![0]).toMatchObject({ number: OCT_1 + 1462, date: true });
+    expect(sheets[0]!.rows[2]![3]).toEqual({ text: 'TRUE' });
+  });
+
+  it('too many cells, or a file that is not a workbook, is refused', () => {
+    const big = writeRowsXlsx(
+      'Big',
+      Array.from({ length: 30 }, () => [{ kind: 'text' as const, text: 'x' }]),
+    );
+    expect(() => readXlsxRows(big, 20)).toThrow(/tooLarge|too/i);
+    expect(() => readXlsxRows(new TextEncoder().encode('a,b\n1,2'), 1000)).toThrow();
   });
 });
