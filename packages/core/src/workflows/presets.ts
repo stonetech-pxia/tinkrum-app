@@ -243,7 +243,8 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
       zh: '扫描纸质表格（自动拉正，或确认四个角）→ 变清楚 → 转成 Excel，每页一张工作表 → 在结果页核对和修改。带线的表格效果最好。',
       fr: 'Numérisez une grille imprimée (redressement automatique, ou vérifiez les coins) → améliorez la lisibilité → classeur Excel, une feuille par page → vérifiez-le et modifiez-le sur la page de résultat. Les grilles à lignes donnent les meilleurs résultats.',
     },
-    icon: 'scan',
+    // D-552：首页宫格里三个扫描的图标分开：PDF = scan，Word = text，Excel = table。
+    icon: 'table',
     packs: ['scan'],
     steps: () => [
       photos(1, 20, 'scanner'),
@@ -279,7 +280,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
       zh: '扫描纸质文档（自动拉正，或确认四个角）→ 变清楚 → 转成一个 Word 文件，有标题、段落、列表、带线的表格和图片 → 在结果页核对和修改。',
       fr: 'Numérisez des pages imprimées (redressement automatique, ou vérifiez les coins) → améliorez la lisibilité → un document Word avec titres, paragraphes, listes, grilles à lignes et images → vérifiez-le et modifiez-le sur la page de résultat.',
     },
-    icon: 'scan',
+    icon: 'text',
     packs: ['scan'],
     steps: () => [
       photos(1, 20, 'scanner'),

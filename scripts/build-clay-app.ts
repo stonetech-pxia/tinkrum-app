@@ -58,6 +58,8 @@ config.containers.pages.push({
     shelf('shelf-image', 'Pictures', 'image'),
   ],
 } as never);
+// D-552：预设的页面背景用纯沙色，不用 STARTER_THEME 的渐变（下半屏的鼠尾草绿发灰，像一层色雾）。
+config.theme.backdrop = 'plain';
 // 整份配置的底栏必须有设置；转成 App 文件时设置会被去掉（App 的底栏只有页面和 Tink）。
 config.nav.bar = ['page:home', 'page:files', 'page:toolbox', 'ai', 'settings'];
 

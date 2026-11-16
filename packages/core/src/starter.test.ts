@@ -86,6 +86,17 @@ describe('createStarterWorkspace', () => {
         'tool' in use && findWorkflowTarget(quickActionsOf(result.config), use.tool, 'en'),
       ).toBeTruthy();
     }
+    // D-552：四个宫格的图标各不相同（PDF、Word、Excel、合并），一眼能分开；图标取法和宫格渲染一样。
+    const icons = (home.blocks[1] as ComponentOf<'group'>).children.map((c) => {
+      const use = (c as ComponentOf<'action'>).tools[0]!;
+      const wf = findWorkflowTarget(
+        quickActionsOf(result.config),
+        (use as { tool: string }).tool,
+        'en',
+      )!;
+      return wf.icon ?? (wf.package && registry.tools.get(wf.package)?.icon);
+    });
+    expect(new Set(icons).size).toBe(4);
     expect(home.blocks[2]).toMatchObject({ look: 'picker', tools: [{ tool: '$pick.open' }] });
     // 没写 shape：主色的整行按钮，不是只有图标的小块。
     expect((home.blocks[2] as ComponentOf<'picker'>).show).toBeUndefined();

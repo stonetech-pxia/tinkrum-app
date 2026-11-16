@@ -48,7 +48,8 @@ export const DEFAULT_THEME: Theme = {
 /**
  * 新用户第一次打开时的风格（D-487）：在 Clay 的基础上再做细——卡片是黏土感（内高光 + 柔和阴影），页面背景有一层
  * 淡淡的暖色渐变，图标浅底彩色，圆角再大一点。主色、字体、配色都不变。
- * DEFAULT_THEME 仍是「基准」：测试、评测、旧配置和「重置主题」都回到它；只有起始配置和 Clay 预设用这个。
+ * DEFAULT_THEME 仍是「基准」：测试、评测、旧配置和「重置主题」都回到它；只有起始配置和 Clay 预设用这个
+ * （Clay 预设的页面背景是纯色，D-552）。
  */
 export const STARTER_THEME: Theme = {
   ...DEFAULT_THEME,

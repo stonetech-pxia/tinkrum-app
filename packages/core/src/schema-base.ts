@@ -55,6 +55,8 @@ export const ICON_NAMES = [
   'mail',
   'globe',
   'share',
+  // D-552：「拍表格转 Excel」用，和扫成 PDF / Word 的图标分开。
+  'table',
   // 自带的图形图标（D-485，按预设画的）：渲染时用图片，不是系统图标。
   'wallet',
   'rings',

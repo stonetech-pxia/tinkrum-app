@@ -22,7 +22,7 @@
       "radius": 26,
       "density": "comfortable",
       "cardStyle": "puffy",
-      "backdrop": "gradient",
+      "backdrop": "plain",
       "navStyle": "iconLabel",
       "iconStyle": "tint"
     }

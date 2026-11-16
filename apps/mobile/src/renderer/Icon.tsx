@@ -46,6 +46,7 @@ const SYMBOLS: Record<Exclude<IconName, CustomIconName>, SymbolName> = {
   mail: { ios: 'envelope.fill', android: 'mail' },
   globe: { ios: 'globe', android: 'language' },
   share: { ios: 'square.and.arrow.up', android: 'share' },
+  table: { ios: 'tablecells', android: 'table_chart' },
 };
 
 /**
