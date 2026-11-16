@@ -1,4 +1,5 @@
 import { clearFileRefs } from './file-refs';
+import { usesOf } from './file-uses';
 import { homeScreenOp } from './home-screen';
 import { applyOps, type Op } from './ops';
 import { migrateWorkspace } from './migrate';
@@ -33,9 +34,16 @@ export interface AppFile {
   tools: Tool[];
 }
 
+/** 写 App 文件。外层带「用到了什么」（D-556），读的版本能说出自己缺什么；它不是 App 的一部分，导入时不读进配置。 */
 export function appFileText(file: Omit<AppFile, 'format' | 'version' | 'exportedAt'>, now: Date) {
   return JSON.stringify(
-    { format: APP_FILE_FORMAT, version: FILE_VERSION, exportedAt: now.toISOString(), ...file },
+    {
+      format: APP_FILE_FORMAT,
+      version: FILE_VERSION,
+      exportedAt: now.toISOString(),
+      uses: usesOf(file),
+      ...file,
+    },
     null,
     2,
   );

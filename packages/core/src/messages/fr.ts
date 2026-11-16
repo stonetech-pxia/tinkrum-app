@@ -560,6 +560,8 @@ export const fr: MessageTable = {
   shareAppItem: 'Partager cette app',
   importAppMaybeNewer:
     'S’il a été créé avec une version plus récente de Tinkrum, mettez Tinkrum à jour et réessayez.',
+  importNeedsUpdate:
+    'Ce fichier a été créé avec une version plus récente de Tinkrum et utilise des éléments que cette version n’a pas encore : {missing}. Mettez Tinkrum à jour, puis importez-le à nouveau. Rien n’a été importé.',
   appResetItem: 'Rétablir l’aspect d’origine',
   appResetConfirm:
     'Rétablir « {name} » tel qu’il était à l’import ? Les pages et actions rapides que vous y avez ajoutées disparaissent, son style et ses pages reviennent. Les tableaux que vous avez créés et toutes vos entrées restent. Vous pourrez annuler dans l’historique des modifications.',

@@ -507,6 +507,8 @@ export const zh: MessageTable = {
   importHomeSummary: '把「{name}」导入主页',
   shareAppItem: '分享这个 App',
   importAppMaybeNewer: '如果它是新版本的 Tinkrum 做的，先更新 Tinkrum 再试。',
+  importNeedsUpdate:
+    '这个文件是新版本的 Tinkrum 做的，用到了这个版本还没有的：{missing}。先更新 Tinkrum 再导入，这次没有导入。',
   appResetItem: '恢复初始样子',
   appResetConfirm:
     '把「{name}」恢复成刚导入时的样子？你在里面加的页面和快捷操作会去掉，风格和页面恢复成原来的；你自己建的表和所有记录都留着。之后可以在改动记录里撤销。',

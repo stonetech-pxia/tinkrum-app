@@ -529,6 +529,8 @@ export const en = {
   shareAppItem: 'Share this app',
   importAppMaybeNewer:
     'If it was made with a newer version of Tinkrum, update Tinkrum and try again.',
+  importNeedsUpdate:
+    'This file was made with a newer version of Tinkrum and uses things this version doesn’t have yet: {missing}. Update Tinkrum, then import it again. Nothing was imported.',
   appResetItem: 'Restore its original look',
   appResetConfirm:
     'Restore “{name}” to how it was when you imported it? Pages and quick actions you added to it go away, and its style and pages come back. Tables you made and all your entries stay. You can undo it in the change log.',

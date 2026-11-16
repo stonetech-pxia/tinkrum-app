@@ -87,6 +87,7 @@ export * from './text-ops';
 export * from './text-rules';
 export * from './prefill';
 export * from './config-file';
+export * from './file-uses';
 export * from './saved-presets';
 export * from './theme';
 export * from './tools';
