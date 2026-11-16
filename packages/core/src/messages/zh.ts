@@ -949,6 +949,8 @@ export const zh: MessageTable = {
   chartPoint: '{label}：{value}',
   chartPointCompare: '{label}：{value}（上一期：{previous}）',
   describe_period: '时间范围：{n} 个选项',
+  describe_choices: '按「{v0}」切换',
+  choicesAll: '全部',
   periodOpt_today: '今天',
   periodOpt_thisWeek: '本周',
   periodOpt_thisMonth: '本月',

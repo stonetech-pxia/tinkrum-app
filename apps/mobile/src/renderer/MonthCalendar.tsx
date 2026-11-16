@@ -7,6 +7,7 @@ import {
   dateOfDayNumber,
   dayTitle,
   filterRecords,
+  followedFilter,
   heatLevel,
   mix,
   monthDays,
@@ -88,7 +89,9 @@ export function MonthCalendar({
     return {};
   };
 
-  const matched = filterRecords(records ?? [], view, block.source.filter, now, cal);
+  // 跟着页面上的一排选项（D-573）：只显示选中那一项的记录，在某天添加时也预设成它。
+  const filter = followedFilter(block.source, env.pageChoice);
+  const matched = filterRecords(records ?? [], view, filter, now, cal);
   const { days, max } = monthDays(
     matched,
     view,
@@ -268,8 +271,7 @@ export function MonthCalendar({
               onPress={
                 env.interactive
                   ? (env.locked ??
-                    (() =>
-                      openAddHere(router, collection, view, block.source, dayPreset(selected))))
+                    (() => openAddHere(router, collection, view, { filter }, dayPreset(selected))))
                   : undefined
               }
             />

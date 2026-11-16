@@ -516,6 +516,17 @@ function everything() {
         period: 'page',
       }),
     ]),
+    addPage('tabs', [
+      { id: 'tabs', look: 'choices', show: {}, source: { table: 'items', field: 'status' } },
+      { id: 'range-2', look: 'period', show: { options: ['thisMonth'] } },
+      number('n-choice', 'items', { aggregate: 'count', choice: 'page', period: 'page' }),
+      records('list', 'l-choice', 'items', 'title', { source: { choice: 'page' } }),
+      chart('c-choice', 'items', 'line', {
+        aggregate: 'count',
+        group: { unit: 'day' },
+        choice: 'page',
+      }),
+    ]),
     addPage(
       'periods',
       periods.map((value) =>

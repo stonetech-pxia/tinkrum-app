@@ -8838,6 +8838,132 @@ const ENTRY_FORM_CASES: readonly EvalCase[] = [
   },
 ];
 
+/** 销售页：订单表（状态：待发货、已发货、完成），页上有列表、合计和按月的柱状图。 */
+const salesEarlier: EvalEarlier = {
+  input:
+    'Make an orders table (item, amount, date, status: To ship / Shipped / Done) and a Sales page with the list, the total and a monthly chart',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'item', name: 'Item', type: 'text', required: true },
+          { id: 'amount', name: 'Amount', type: 'money', currency: 'USD' },
+          { id: 'date', name: 'Date', type: 'date', default: 'today' },
+          {
+            id: 'status',
+            name: 'Status',
+            type: 'choice',
+            options: [
+              { id: 'to-ship', label: 'To ship' },
+              { id: 'shipped', label: 'Shipped' },
+              { id: 'done', label: 'Done' },
+            ],
+          },
+        ],
+      },
+    } as Op,
+    {
+      op: 'addContainer',
+      page: {
+        id: 'sales',
+        title: 'Sales',
+        blocks: [
+          {
+            id: 'order-list',
+            look: 'list',
+            source: { table: 'orders', sort: { field: 'date', direction: 'desc' }, limit: 30 },
+            show: { title: 'item', subtitles: ['status'], trailing: 'amount' },
+          },
+          {
+            id: 'order-total',
+            look: 'number',
+            show: { label: 'Total' },
+            source: { table: 'orders', aggregate: 'sum', field: 'amount' },
+          },
+          {
+            id: 'by-month',
+            look: 'chart',
+            show: { kind: 'bar', title: 'Sales by month' },
+            source: {
+              table: 'orders',
+              aggregate: 'sum',
+              field: 'amount',
+              group: { unit: 'month', by: 'date' },
+            },
+          },
+        ],
+      },
+    } as Op,
+  ],
+};
+/** 销售页上已经有一个时间范围（本月、今年），三个块都跟着它（D-440、D-561）。 */
+const salesRangeEarlier: EvalEarlier = {
+  input: '销售页加一个时间范围，本月和今年，列表、合计和图表都跟着变',
+  ops: [
+    {
+      op: 'addContainer',
+      page: 'sales',
+      block: { id: 'range', look: 'period', show: { options: ['thisMonth', 'thisYear'] } },
+    } as Op,
+    ...['order-list', 'order-total', 'by-month'].map(
+      (block) =>
+        ({
+          op: 'updateContainer',
+          page: 'sales',
+          block,
+          changes: { source: { period: 'page' } },
+        }) as Op,
+    ),
+  ],
+};
+/** 销售页上有一排按状态切换的选项，列表、合计和图表都跟着它（D-573）。 */
+const salesFollowChoices = (c: WorkspaceConfig, period: boolean) => {
+  const page = c.containers.pages.find((p) => p.id === 'sales');
+  if (!page) return 'expected the sales page';
+  const rows = page.blocks.filter((b): b is ComponentOf<'choices'> => b.look === 'choices');
+  if (rows.length !== 1) return `expected one choices block, got ${rows.length}`;
+  const row = rows[0]!;
+  if (row.source.table !== 'orders' || row.source.field !== 'status')
+    return `expected the row on orders.status, got ${JSON.stringify(row.source)}`;
+  const followers = allComponents(page).filter(
+    (b) => (b.look === 'list' || b.look === 'number' || b.look === 'chart') && 'source' in b,
+  ) as { id: string; source: { choice?: string; period?: string } }[];
+  const off = followers.filter((b) => b.source.choice !== 'page').map((b) => b.id);
+  if (followers.length < 3 || off.length > 0)
+    return `expected the list, the total and the chart to have source.choice "page"; not: ${off.join()}`;
+  if (period) {
+    if (!page.blocks.some((b) => b.look === 'period')) return 'expected the period block kept';
+    const lost = followers.filter((b) => b.source.period !== 'page').map((b) => b.id);
+    if (lost.length > 0) return `expected the blocks to keep source.period "page": ${lost.join()}`;
+  }
+  return null;
+};
+
+// 页面上的一排选项，页上的块跟着它（D-573）。
+const PAGE_CHOICE_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG38',
+    input: 'Add tabs at the top of the Sales page to switch between To ship, Shipped and Done',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [salesEarlier],
+    expect: { kind: 'ops', check: (c) => salesFollowChoices(c, false) },
+  },
+  {
+    id: 'KG39',
+    input: '销售页上再加一排按状态切换，只看待发货或者已发货',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [salesEarlier, salesRangeEarlier],
+    expect: { kind: 'ops', check: (c) => salesFollowChoices(c, true) },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
   ...PAGE_ENTRY_CASES,
@@ -8907,6 +9033,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...OPTION_COLOR_CASES,
   ...FORMULA_CHOICE_CASES,
   ...ENTRY_FORM_CASES,
+  ...PAGE_CHOICE_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

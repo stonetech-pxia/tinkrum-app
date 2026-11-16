@@ -586,6 +586,7 @@ function pruneDials(config: WorkspaceConfig, notes: ApplyNote[]): void {
     (c) => isKnownComponent(c) && c.look === 'dial' && !c.tools?.length,
   );
   count += prunePagePeriod(config);
+  count += prunePageChoice(config);
   if (count > 0) notes.push({ kind: 'clearedBlockRefs', count });
 }
 
@@ -606,6 +607,55 @@ function prunePagePeriod(config: WorkspaceConfig): number {
     }
   }
   return count;
+}
+
+/**
+ * 页面上没有一排选项了（删了、或者页面本来就没有），跟着它的块的 source.choice 去掉，回到自己的筛选（底线 18，D-573）。
+ * 隐藏的那一排还算有（校验也这么看）。
+ */
+function prunePageChoice(config: WorkspaceConfig): number {
+  let count = 0;
+  for (const page of config.containers.pages) {
+    if (page.blocks.some((b) => b.look === 'choices')) continue;
+    for (const c of allComponents(page)) {
+      if (!isKnownComponent(c) || !('source' in c)) continue;
+      const source = c.source as { choice?: string } | undefined;
+      if (source?.choice === undefined) continue;
+      delete source.choice;
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * 一排选项跟着它的单选字段（底线 18，D-573）：字段删了，这一排去掉（跟着它的块随后由 prunePageChoice 清理）；
+ * 选项删了，这一排列出的选项和默认的那一项里去掉它（一个都不剩时回到显示全部选项）。
+ */
+function pruneChoiceRows(config: WorkspaceConfig, gone: Gone, notes: ApplyNote[]): void {
+  const rows = (c: Component) =>
+    isKnownComponent(c) && c.look === 'choices' && c.source.table === gone.table;
+  if (gone.field !== undefined) {
+    const count = removeEverywhere(
+      config,
+      (c) => rows(c) && (c as { source: { field: string } }).source.field === gone.field,
+    );
+    if (count > 0) notes.push({ kind: 'clearedBlockRefs', count });
+    return;
+  }
+  const table = config.data.tables.find((x) => x.id === gone.table);
+  for (const c of everyBlock(config)) {
+    if (!rows(c)) continue;
+    const row = c as Extract<KnownComponent, { look: 'choices' }>;
+    const field = table?.fields.find((f) => f.id === row.source.field);
+    if (field?.type !== 'choice') continue;
+    const ids = field.options.map((o) => o.id);
+    const left = row.show.options?.filter((id) => ids.includes(id));
+    if (left && left.length > 0) row.show.options = left;
+    else delete row.show.options;
+    if (row.show.default !== undefined && !(row.show.options ?? ids).includes(row.show.default))
+      delete row.show.default;
+  }
 }
 
 /** 删字段后，记录页顶部交这个字段的按钮跟着去掉（底线 18，D-428）。 */
@@ -804,6 +854,8 @@ function updateData(config: WorkspaceConfig, op: OpOf<'updateData'>): void {
   }
   // 合法性（例如选项 ID 唯一、默认值存在）由 validateWorkspace 检查。
   table.fields[index] = merge(next, changes) as never;
+  // 删掉的选项从页面上的一排选项里去掉（D-573）。
+  pruneChoiceRows(config, { table: table.id }, []);
 }
 
 /**
@@ -905,6 +957,7 @@ function removeData(
     pruneEntryForm(table, op.field);
     pruneAggregateFields(config, { table: op.table, field: op.field });
     pruneBrowseFields(config, { table: op.table, field: op.field }, notes);
+    pruneChoiceRows(config, { table: op.table, field: op.field }, notes);
     pruneSteps(config, { table: op.table, field: op.field }, registry, notes);
     pruneDials(config, notes);
     return;

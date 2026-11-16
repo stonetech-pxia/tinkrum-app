@@ -1073,6 +1073,8 @@ export const fr: MessageTable = {
   chartPoint: '{label} : {value}',
   chartPointCompare: '{label} : {value} (période précédente : {previous})',
   describe_period: 'Période : {n} choix',
+  describe_choices: 'Onglets par « {v0} »',
+  choicesAll: 'Tout',
   periodOpt_today: 'Aujourd’hui',
   periodOpt_thisWeek: 'Cette semaine',
   periodOpt_thisMonth: 'Ce mois-ci',

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { t } from '../messages';
 import { hasRecordCurrency } from '../money-currency';
 import { boundedText, DaysSchema, filterSchema, GroupingSchema, IdSchema } from '../schema-base';
+import { followChoiceProblems } from './choices';
 import { type LookDefinitionOf, defineLook, isSystemField, NUMERIC_FIELD_TYPES } from './define';
 
 /** 图表读什么：一张表，按时间段或单选 / 引用字段分组（group 必填），每组一个数。 */
@@ -19,6 +20,11 @@ export const ChartSourceSchema = z.strictObject({
   compare: z.literal('previous').optional(),
   /** 跟着页面上的时间范围（D-440）：同一页要有一个 period 块；按选的范围画，group.unit 和 last 不再用（按范围长短自己选按天、周、月）。 */
   period: z.literal('page').optional(),
+  /**
+   * 跟着页面上的一排选项（D-573）：同一页要有一个 choices 块，读的是同一张表；只算这个字段是选中那一项的记录
+   * （「全部」不加条件）。按同一个字段分组的不行。
+   */
+  choice: z.literal('page').optional(),
 });
 export type ChartSource = z.infer<typeof ChartSourceSchema>;
 
@@ -42,7 +48,7 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
   refs: { 'source.table': { to: 'table' }, 'source.filter': { to: 'filter' } },
   // D-249：求和、平均要数字字段；按单选分时要单选字段；按时间分时用日期字段；饼图只能按单选分。
   check: (c, { collection, page }) => {
-    const problems: string[] = [];
+    const problems: string[] = [...followChoiceProblems(c.source, page)];
     if (c.source.period !== undefined && !page.blocks.some((b) => b.look === 'period'))
       problems.push('source.period "page" needs a period block on the same page');
     const field = (id: string) => collection!.fields.find((f) => f.id === id);
@@ -100,7 +106,7 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
   describe: (c, _config, ctx) => t(ctx.locale, 'describeChart', { v0: c.show.title }),
   edit: { text: [{ prop: 'title', max: 60 }], style: ['tone'] },
   ai: {
-    doc: 'show {kind: "bar"|"line"|"pie", title}, source {table, aggregate: "count"|"sum"|"avg"|"distinctDays" (days with at least one entry), field? (number, money, rating, duration or formula; only for sum and avg), filter?, group: {unit: "day"|"week"|"month", by? (a date or datetime field or "createdAt"; default: the first date field), last? (2-31; default 7 days, 8 weeks, 6 months)} or {by: a choice field, or a link field for one point per entry of the linked table}}: a pie chart needs group {by: a choice or link field} (rule 33); compare?: "previous" (only with a time group, bar or line, and no inPeriod filter) also draws the period before, shifted onto the same positions: a dashed line, or pale bars behind ("compared with last month", "和上个月比"); period?: "page" follows the time range picked in the period block on the same page (the chart then covers that range, by day, week or month depending on its length; group.unit and last are ignored; a pie follows it too)',
+    doc: 'show {kind: "bar"|"line"|"pie", title}, source {table, aggregate: "count"|"sum"|"avg"|"distinctDays" (days with at least one entry), field? (number, money, rating, duration or formula; only for sum and avg), filter?, group: {unit: "day"|"week"|"month", by? (a date or datetime field or "createdAt"; default: the first date field), last? (2-31; default 7 days, 8 weeks, 6 months)} or {by: a choice field, or a link field for one point per entry of the linked table}}: a pie chart needs group {by: a choice or link field} (rule 33); compare?: "previous" (only with a time group, bar or line, and no inPeriod filter) also draws the period before, shifted onto the same positions: a dashed line, or pale bars behind ("compared with last month", "和上个月比"); period?: "page" follows the time range picked in the period block on the same page (the chart then covers that range, by day, week or month depending on its length; group.unit and last are ignored; a pie follows it too); choice?: "page" draws only the entries with the option picked in the choices block on the same page (rule 65)',
   },
   example: {
     show: { kind: 'bar', title: 'Spending by month' },

@@ -35,6 +35,7 @@ import { LONG_PRESS_MS } from '../editing/entry';
 import { t } from '../i18n';
 import { FocusItem } from '../editing/FocusItem';
 import { Chart } from './Chart';
+import { ChoiceBar } from './ChoiceBar';
 import type { RenderEnv } from './components';
 import { RecordForm, RecordList, Stat, type RecordBlock } from './data';
 import { BottomPill, DialButton } from './Dial';
@@ -275,6 +276,7 @@ export const RENDERERS: { [T in ComponentType]: Renderer<T> } = {
   single: (c, env) => <SingleRecord block={c} env={env} tone={c.style?.tone} />,
   dial: (c, env) => <DialButton block={c} env={env} />,
   period: (c, env) => <PeriodBar block={c} env={env} />,
+  choices: (c, env) => <ChoiceBar block={c} env={env} />,
 };
 
 /** 打开相册还是打开文件（picker 的 tools[0]）。 */

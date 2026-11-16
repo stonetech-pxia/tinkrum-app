@@ -1,8 +1,10 @@
 import {
   bindRecord,
   pageBrowseHost,
+  pageChoices,
   pageDial,
   pagePeriod,
+  resolvePageChoice,
   pageZones,
   type BlockOf,
   type Component,
@@ -10,6 +12,7 @@ import {
   type OpenTarget,
   type Page,
   type PageChoice,
+  type PageChoiceState,
   type Registry,
   type WorkspaceConfig,
 } from '@morph/core';
@@ -54,6 +57,11 @@ export interface RenderEnv {
   inBottomZone?: boolean;
   /** 页面上选的时间范围（D-440）：页面有 period 块时才有；图表和数字卡的 source.period 是 "page" 时按它画。状态只在页面上，什么都不写。 */
   pageRange?: { choice: PageChoice; set: (choice: PageChoice) => void };
+  /**
+   * 页面上的一排选项（D-573）：页面有 choices 块时才有；读同一张表、source.choice 是 "page" 的块只显示 option 那一项
+   * 的记录（null = 全部）。状态只在页面上，什么都不写。
+   */
+  pageChoice?: PageChoiceState & { set: (option: string | null) => void };
   /** 正在渲染的页面（图片组件更换照片时要用）。 */
   pageId?: string;
   /** 可以直接编辑的页面：长按组件时打开它的操作面板（D-052）。预览和系统页面没有。 */
@@ -129,12 +137,28 @@ function PageBody({ page, env, bottomInset = 0, zoneInset, scroll }: PageViewPro
   const pageRange = periodBlock
     ? { choice: resolveChoice(periodBlock, pickedRange), set: setPickedRange }
     : undefined;
+  // 页面上的一排选项（D-573）：用户点的在这里（undefined = 还没点过，null = 全部）；选项被改掉了就回到默认的。
+  const choicesBlock = pageChoices(page);
+  const [pickedOption, setPickedOption] = useState<string | null | undefined>(undefined);
+  const pageChoice = choicesBlock
+    ? {
+        table: choicesBlock.source.table,
+        field: choicesBlock.source.field,
+        option: resolvePageChoice(
+          choicesBlock,
+          env.config.data.tables.find((x) => x.id === choicesBlock.source.table),
+          pickedOption,
+        ),
+        set: setPickedOption,
+      }
+    : undefined;
   const pageEnv: RenderEnv = {
     ...env,
     palette,
     pageId: page.id,
     pageEnd,
     ...(pageRange ? { pageRange } : {}),
+    ...(pageChoice ? { pageChoice } : {}),
   };
   // 单组件编辑时固定区照常排在内容里（拖动、工具栏都在滚动的内容上），位置和配置里的顺序一样。
   const editing = !!env.focus?.selectedId;

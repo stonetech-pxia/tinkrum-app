@@ -299,7 +299,7 @@ export const RULE_GROUPS = {
   look: [7, 8, 12, 13, 37, 52],
   records: [
     18, 19, 32, 33, 34, 35, 38, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 54, 55, 56, 58, 59, 60,
-    61, 62, 63, 64,
+    61, 62, 63, 64, 65,
   ],
   files: [14, 15, 20, 21, 22, 28, 29, 30, 31, 36, 39],
 } as const;
@@ -351,6 +351,7 @@ const RULE_TITLES: Record<number, string> = {
   62: 'one tap, several changes to one entry',
   63: 'one new entry for each matching entry',
   64: 'the layout of the entry form',
+  65: 'tabs by a choice field on a page',
   49: 'typing a date in the same line',
   50: 'a time on a schedule',
 };

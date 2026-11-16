@@ -1009,6 +1009,8 @@ export const en = {
   chartPoint: '{label}: {value}',
   chartPointCompare: '{label}: {value} (previous period: {previous})',
   describe_period: 'Time range: {n} choices',
+  describe_choices: 'Tabs by “{v0}”',
+  choicesAll: 'All',
   periodOpt_today: 'Today',
   periodOpt_thisWeek: 'This week',
   periodOpt_thisMonth: 'This month',

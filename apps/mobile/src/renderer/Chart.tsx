@@ -6,6 +6,7 @@ import {
   choiceRange,
   dateFieldOf,
   filterRecords,
+  followedFilter,
   lineScale,
   piePaths,
   pieSlices,
@@ -61,7 +62,10 @@ export function Chart({
   const matched = filterRecords(
     records ?? [],
     collection,
-    choice ? (source.filter ?? []).filter((c) => c.op !== 'inPeriod') : source.filter,
+    // 跟着页面上的一排选项（D-573）：只画选中那一项的记录。
+    choice
+      ? (followedFilter(source, env.pageChoice) ?? []).filter((c) => c.op !== 'inPeriod')
+      : followedFilter(source, env.pageChoice),
     now,
     cal,
   );

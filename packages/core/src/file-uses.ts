@@ -68,6 +68,8 @@ export const USES_FEATURES = [
   'fieldHint',
   /** 数字、金额、时长字段上的 min / max（D-570）。 */
   'fieldRange',
+  /** 记录块、数字、图表的 source.choice "page"：跟着页面上的一排选项（D-573）。 */
+  'blocksFollowPageChoice',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -155,6 +157,7 @@ export function usesOf(content: unknown): FileUses {
         if (Array.isArray(source.sort)) found.features.add('sortMany');
         if (RECORD_LOOK_SET.has(node.look) && source.period !== undefined)
           found.features.add('recordsFollowPagePeriod');
+        if (source.choice !== undefined) found.features.add('blocksFollowPageChoice');
       }
     }
     // 快捷操作的步骤、工具栏上的动作。

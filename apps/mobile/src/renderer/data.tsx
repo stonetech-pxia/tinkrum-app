@@ -28,6 +28,7 @@ import {
   calendarOf,
   dateOfDayNumber,
   filterRecords,
+  followedFilter,
   fieldDefinition,
   formatDuration,
   formatNumber,
@@ -1479,7 +1480,16 @@ function RecordListBody({
   const bar = browse && !selection.pinned && <ListBrowseBar selection={selection} env={env} />;
   const add = (preset?: Record<string, unknown>) =>
     env.interactive
-      ? (env.locked ?? (() => openAddHere(router, collection, view, block.source, preset)))
+      ? (env.locked ??
+        (() =>
+          // 跟着一排选项时（D-573），新的一条预设成选中的那一项。
+          openAddHere(
+            router,
+            collection,
+            view,
+            { filter: followedFilter(block.source, env.pageChoice) },
+            preset,
+          )))
       : undefined;
   if (narrowed && found.length === 0)
     return (
@@ -1832,11 +1842,13 @@ export function useListRecords(
   const now = new Date();
   // 跟着页面上的时间范围（D-561）：和数字卡一样按选的范围筛；页面没有 period 块时照自己的筛选。
   const follow = block.source.period === 'page' ? env.pageRange?.choice : undefined;
+  // 跟着页面上的一排选项（D-573）：多一个「这个字段是选中那一项」的条件；全部时不加。
+  const filter = followedFilter(block.source, env.pageChoice);
   const sorted = view
     ? sortRecords(
         follow
-          ? recordsFollowingRange(records ?? [], view, block.source.filter, follow, now, cal)
-          : filterRecords(records ?? [], view, block.source.filter, now, cal),
+          ? recordsFollowingRange(records ?? [], view, filter, follow, now, cal)
+          : filterRecords(records ?? [], view, filter, now, cal),
         view,
         // 用户换的排序在前，配置里的（可以是几个，D-560）排一样的。
         browseSortKeys(sort, block.source.sort),
@@ -2381,10 +2393,12 @@ export function Stat({
   // 页面上选的时间范围（D-440）：source.period 是 "page" 且页面有 period 块时，筛选里的 inPeriod 不再用，按选的范围算；
   // 用哪个日期：原来 inPeriod 用的那个字段，没有就用表里第一个日期字段（和图表一样）。
   const follow = src.period === 'page' ? env.pageRange?.choice : undefined;
+  // 跟着页面上的一排选项（D-573）：只算选中那一项的记录（minus 不跟）。
+  const filter = followedFilter(src, env.pageChoice);
   const based = filterRecords(
     records ?? [],
     collection,
-    follow ? (src.filter ?? []).filter((c) => c.op !== 'inPeriod') : src.filter,
+    follow ? (filter ?? []).filter((c) => c.op !== 'inPeriod') : filter,
     now,
     cal,
   );
@@ -2444,7 +2458,7 @@ export function Stat({
           period: null,
         }
       : (() => {
-          const before = previousFilter(src.filter, now, cal);
+          const before = previousFilter(filter, now, cal);
           return (
             before && {
               records: filterRecords(records ?? [], collection, before.filter, now, cal),
