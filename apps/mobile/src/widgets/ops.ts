@@ -7,6 +7,8 @@ import {
   prepareRecordValues,
   recordToolOf,
   rowUpdateInput,
+  tapAlsoOf,
+  toolReadsEntry,
   type Calendar,
   type Collection,
   type Component,
@@ -27,7 +29,7 @@ import type { WidgetOpRef } from './types';
 export type RecordsByTable = ReadonlyMap<string, readonly DataRecord[]>;
 
 /** 小组件上能直接执行的一键记录工具：直接存的新建、设值、勾选、加减。 */
-type WidgetTool = Exclude<RecordTool, { do: 'setAll' }>;
+type WidgetTool = Exclude<RecordTool, { do: 'setAll' | 'createAll' }>;
 
 /** 工具定义的指纹：页面改过（工具换了）以后，之前点的不再执行。 */
 export function actionHash(action: ToolUse): string {
@@ -45,11 +47,22 @@ export function findComponent(config: WorkspaceConfig, id: string): Component | 
   return undefined;
 }
 
-/** 能在小组件上直接执行的工具（打开表单的新建要用户填，setAll 要确认，「打开」要看界面）。 */
+/**
+ * 能在小组件上直接执行的工具（打开表单的新建要用户填，setAll 要确认，「打开」要看界面）。读「这一条」字段的
+ * （抄、从它的日期起算、加它的数字，D-565）也打开 App：小组件那边只有存着的值，没有算好的。
+ */
 function widgetTool(use: ToolUse | undefined): WidgetTool | undefined {
   if (!use || !isRecordToolUse(use)) return undefined;
   const tool = recordToolOf(use);
-  if (tool.do === 'setAll' || (tool.do === 'create' && tool.ask !== undefined)) return undefined;
+  if (
+    tool.do === 'setAll' ||
+    tool.do === 'createAll' ||
+    (tool.do === 'create' && tool.ask !== undefined)
+  )
+    return undefined;
+  if (toolReadsEntry(tool)) return undefined;
+  // 点一下改几处（D-566）之后要出撤销提示条，小组件上没有：打开 App。
+  if (tapAlsoOf(use).length > 0) return undefined;
   return tool;
 }
 

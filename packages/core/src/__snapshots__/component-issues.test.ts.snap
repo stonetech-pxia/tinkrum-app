@@ -210,7 +210,7 @@ exports[`component issues > lists every reference problem in a stable order and 
   },
   {
     "code": "data",
-    "message": "st1: filter on day: period must be one of today, thisWeek, thisMonth, thisYear, last7days, last30days, last14days, last90days, last365days, thisTwoWeeks, thisHalfMonth, next7days, next30days, next90days",
+    "message": "st1: filter on day: period must be one of today, thisWeek, thisMonth, thisYear, last7days, last30days, last14days, last90days, last365days, thisTwoWeeks, thisHalfMonth, next7days, next30days, next90days, yesterday, lastWeek, lastMonth, lastYear, tomorrow, nextWeek, nextMonth",
   },
   {
     "code": "data",

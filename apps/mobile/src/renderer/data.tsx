@@ -9,6 +9,7 @@ import {
   choiceRange,
   dateFieldOf,
   browseSort,
+  browseSortKeys,
   cleanTags,
   recordSearchTexts,
   searchRecords,
@@ -27,6 +28,7 @@ import {
   calendarOf,
   dateOfDayNumber,
   filterRecords,
+  followedFilter,
   fieldDefinition,
   formatDuration,
   formatNumber,
@@ -41,6 +43,7 @@ import {
   previousFilter,
   previousLabel,
   previousToDateRange,
+  recordsFollowingRange,
   recordsInRange,
   progressOf,
   recordProgress,
@@ -53,6 +56,7 @@ import {
   sequenceText,
   sequenceValue,
   shownRowAction,
+  sortList,
   sortRecords,
   todayNumber,
   type Aggregate,
@@ -64,6 +68,7 @@ import {
   type Calendar,
   type OpenUse,
   type RecordLook,
+  type Sort,
   type RecordToolUse,
   isOpenUse,
   isRecordToolUse,
@@ -160,10 +165,19 @@ export function prefillFormValues(collection: Collection, json: string): FormVal
   return values;
 }
 
-function issueText(locale: RenderEnv['locale'], issue: FieldIssue['code']): string {
+function issueText(locale: RenderEnv['locale'], issue: FieldIssue, field: Field): string {
+  // 超出范围（D-570）：说出界限，金额带货币、时长写成 h:mm。
+  if ((issue.code === 'tooSmall' || issue.code === 'tooLarge') && issue.limit !== undefined)
+    return t(locale, issue.code === 'tooSmall' ? 'fieldTooSmall' : 'fieldTooLarge', {
+      limit: formatValue(field, issue.limit, locale),
+    });
   return t(
     locale,
-    issue === 'required' ? 'fieldRequired' : issue === 'tooLong' ? 'fieldTooLong' : 'fieldInvalid',
+    issue.code === 'required'
+      ? 'fieldRequired'
+      : issue.code === 'tooLong'
+        ? 'fieldTooLong'
+        : 'fieldInvalid',
   );
 }
 
@@ -1004,6 +1018,10 @@ function suggestionDate(iso: string, locale: RenderEnv['locale']): string {
   }).format(at);
 }
 
+/** 候选的值 → 表单里的写法（D-575）：评分是数，别的（金额、数字、日期、时间、时长 h:mm、选项 ID）就是这段文字。 */
+export const suggestionFormValue = (field: Pick<Field, 'type'>, value: string): unknown =>
+  field.type === 'rating' ? Number(value) : value;
+
 /**
  * 字段下面的候选值（D-394）：安静的小按钮，显示整理过的值（金额带货币、日期写出月份），
  * 太长时截断；点了才填，从不自动填。点了以后候选留在原地（下面的字段不往上跳），和字段里的值
@@ -1033,12 +1051,18 @@ function SuggestionChips({
   const shown = (s: ValueSuggestion) =>
     field.type === 'date'
       ? suggestionDate(s.value, locale)
-      : hasRecordCurrency(field)
-        ? formatNumber(Number(s.value), undefined, locale) // D-429：货币还要用户选，先不写。
-        : formatValue(field, numeric ? Number(s.value) : s.value, locale) || s.value;
+      : field.type === 'duration' || field.type === 'time'
+        ? s.value
+        : field.type === 'rating'
+          ? formatValue(field, Number(s.value), locale)
+          : hasRecordCurrency(field)
+            ? formatNumber(Number(s.value), undefined, locale) // D-429：货币还要用户选，先不写。
+            : formatValue(field, numeric ? Number(s.value) : s.value, locale) || s.value;
   const isCurrent = (s: ValueSuggestion) =>
     !isEmptyValue(current) &&
-    (numeric ? Number(current) === Number(s.value) : String(current) === s.value);
+    (numeric || field.type === 'rating'
+      ? Number(current) === Number(s.value)
+      : String(current) === s.value);
   return (
     <View testID={testID} style={styles.suggestions}>
       {list.map((s, i) => {
@@ -1093,6 +1117,7 @@ export function FieldsForm({
   autoFocus,
   suggestions,
   onSuggestion,
+  heard,
 }: {
   collection: Collection;
   fieldIds: readonly string[];
@@ -1117,6 +1142,8 @@ export function FieldsForm({
   suggestions?: Readonly<Record<string, readonly ValueSuggestion[]>> | undefined;
   /** 用户点了一个候选（已经填进字段）。 */
   onSuggestion?: ((fieldId: string, suggestion: ValueSuggestion) => void) | undefined;
+  /** 按用户说的话直接填的字段（D-575）：下面写一行「按你说的填的」，用户改了就不写了。 */
+  heard?: ReadonlySet<string> | undefined;
 }) {
   const cal = useCalendar();
   const firstText = fieldIds.find(
@@ -1167,7 +1194,16 @@ export function FieldsForm({
         }
         const issue = issues.find((i) => i.fieldId === id);
         const inline = editor.inline === true;
-        return (
+        // 填写提示（D-570）：输入框下面一句短话，配置里的文字。
+        const hint =
+          'hint' in field && field.hint !== undefined ? (
+            <Text
+              testID={`${testPrefix}-${id}-hint`}
+              style={[palette.font('body', 13), { color: palette.caption }]}>
+              {field.hint}
+            </Text>
+          ) : null;
+        const row = (
           <View key={id} style={inline ? styles.inlineField : styles.field}>
             {showLabels || inline ? (
               <Text
@@ -1203,17 +1239,36 @@ export function FieldsForm({
                 disabled={disabled}
                 testID={`${testPrefix}-${id}-suggestion`}
                 onPick={(s) => {
-                  onChange({ ...values, [id]: s.value });
+                  onChange({ ...values, [id]: suggestionFormValue(field, s.value) });
                   onSuggestion?.(id, s);
                 }}
               />
             ) : null}
+            {heard?.has(id) ? (
+              <Text
+                testID={`${testPrefix}-${id}-heard`}
+                style={[palette.font('body', 13), { color: palette.caption }]}>
+                {t(locale, 'heardFilled')}
+              </Text>
+            ) : null}
+            {!inline ? hint : null}
             {issue ? (
-              <Text style={[palette.font('bodyMedium', 13), { color: palette.danger }]}>
-                {issueText(locale, issue.code)}
+              <Text
+                testID={`${testPrefix}-${id}-issue`}
+                style={[palette.font('bodyMedium', 13), { color: palette.danger }]}>
+                {issueText(locale, issue, field)}
               </Text>
             ) : null}
           </View>
+        );
+        // 勾选这样标签和控件在一行的，提示放在这一行下面。
+        return inline && hint ? (
+          <View key={id} style={styles.field}>
+            {row}
+            {hint}
+          </View>
+        ) : (
+          row
         );
       })}
     </View>
@@ -1445,7 +1500,16 @@ function RecordListBody({
   const bar = browse && !selection.pinned && <ListBrowseBar selection={selection} env={env} />;
   const add = (preset?: Record<string, unknown>) =>
     env.interactive
-      ? (env.locked ?? (() => openAddHere(router, collection, view, block.source, preset)))
+      ? (env.locked ??
+        (() =>
+          // 跟着一排选项时（D-573），新的一条预设成选中的那一项。
+          openAddHere(
+            router,
+            collection,
+            view,
+            { filter: followedFilter(block.source, env.pageChoice) },
+            preset,
+          )))
       : undefined;
   if (narrowed && found.length === 0)
     return (
@@ -1634,7 +1698,7 @@ export function ListBrowseBar({ selection, env }: { selection: BrowseSelection; 
       {chips}
     </View>
   );
-  const sorted = sortBy ?? block.source.sort?.field ?? null;
+  const sorted = sortBy ?? sortList(block.source.sort)[0]?.field ?? null;
   const groupBy = group?.by ?? null;
   return (
     <View style={{ gap: 8 }}>
@@ -1789,18 +1853,25 @@ export function useListRecords(
   block: RecordBlock,
   env: RenderEnv,
   /** 用户临时换的排序（D-424）；不写用配置里的。 */
-  sort?: RecordBlock['source']['sort'],
+  sort?: Sort,
 ) {
   const collection = useCollection(env, block.source.table);
   const cal = calendarOf(env.config);
   // 查找、汇总、上一条（D-291）：显示、筛选、排序用算好的记录和 view；改记录用原来的表。
   const { view, records } = useComputedRecords(env.config.data.tables, collection, cal);
   const now = new Date();
+  // 跟着页面上的时间范围（D-561）：和数字卡一样按选的范围筛；页面没有 period 块时照自己的筛选。
+  const follow = block.source.period === 'page' ? env.pageRange?.choice : undefined;
+  // 跟着页面上的一排选项（D-573）：多一个「这个字段是选中那一项」的条件；全部时不加。
+  const filter = followedFilter(block.source, env.pageChoice);
   const sorted = view
     ? sortRecords(
-        filterRecords(records ?? [], view, block.source.filter, now, cal),
+        follow
+          ? recordsFollowingRange(records ?? [], view, filter, follow, now, cal)
+          : filterRecords(records ?? [], view, filter, now, cal),
         view,
-        sort ?? block.source.sort,
+        // 用户换的排序在前，配置里的（可以是几个，D-560）排一样的。
+        browseSortKeys(sort, block.source.sort),
         now,
         cal,
       )
@@ -2342,10 +2413,12 @@ export function Stat({
   // 页面上选的时间范围（D-440）：source.period 是 "page" 且页面有 period 块时，筛选里的 inPeriod 不再用，按选的范围算；
   // 用哪个日期：原来 inPeriod 用的那个字段，没有就用表里第一个日期字段（和图表一样）。
   const follow = src.period === 'page' ? env.pageRange?.choice : undefined;
+  // 跟着页面上的一排选项（D-573）：只算选中那一项的记录（minus 不跟）。
+  const filter = followedFilter(src, env.pageChoice);
   const based = filterRecords(
     records ?? [],
     collection,
-    follow ? (src.filter ?? []).filter((c) => c.op !== 'inPeriod') : src.filter,
+    follow ? (filter ?? []).filter((c) => c.op !== 'inPeriod') : filter,
     now,
     cal,
   );
@@ -2405,7 +2478,7 @@ export function Stat({
           period: null,
         }
       : (() => {
-          const before = previousFilter(src.filter, now, cal);
+          const before = previousFilter(filter, now, cal);
           return (
             before && {
               records: filterRecords(records ?? [], collection, before.filter, now, cal),

@@ -5,11 +5,12 @@ import {
   type Calendar,
   DEFAULT_CALENDAR,
 } from './calendar';
-import { periodRange, recordDay, type DataRecord } from './data';
+import { filterRecords, periodRange, recordDay, type DataRecord } from './data';
 import { dayNumber } from './formula';
 import { previousPeriodRange } from './compare';
 import { PAGE_PERIODS, type PagePeriod } from './schema-primitives';
-import type { Collection, GroupUnit } from './schema';
+import type { Collection, Condition, GroupUnit } from './schema';
+import { dateFieldOf } from './sequence';
 
 // 页面上的时间范围（D-440，创始人 2026-11-05 定）：页面上放一个 period 块，用户在几个选项里选一个（或自定义起止日期），
 // 同一页里 source.period 是 "page" 的图表和数字卡都按它画。选了什么只在页面画着的时候有，什么都不写（底线 15）。
@@ -60,12 +61,14 @@ export function previousFullRange(
       return shift(1, 1);
     case 'thisWeek':
       return shift(7, 7);
-    case 'thisMonth': {
+    case 'thisMonth':
+    case 'lastMonth': {
       const last = new Date(Date.UTC(y, m - 1, 0));
       const prev = `${last.getUTCFullYear()}-${String(last.getUTCMonth() + 1).padStart(2, '0')}`;
       return { start: `${prev}-01`, end: `${prev}-${String(last.getUTCDate()).padStart(2, '0')}` };
     }
     case 'thisYear':
+    case 'lastYear':
       return { start: `${y - 1}-01-01`, end: `${y - 1}-12-31` };
     default:
       return shift(days, days);
@@ -124,6 +127,25 @@ export function recordsInRange(
     const day = recordDay(r, collection, ref, now, cal);
     return day !== undefined && day >= range.start && day <= range.end;
   });
+}
+
+/**
+ * 跟着页面时间范围的记录块（D-561）：和数字卡一样，筛选里的 inPeriod 不再用，其余条件照旧；
+ * 按选的范围留下日期落在里面的，日期用原来 inPeriod 的那个字段，没有就用表里第一个日期字段（再没有是创建时间）。
+ */
+export function recordsFollowingRange(
+  records: readonly DataRecord[],
+  collection: Collection,
+  filter: readonly Condition[] | undefined,
+  choice: PageChoice,
+  now: Date,
+  cal: Calendar = DEFAULT_CALENDAR,
+): DataRecord[] {
+  const rest = (filter ?? []).filter((c) => c.op !== 'inPeriod');
+  const ref =
+    (filter ?? []).find((c) => c.op === 'inPeriod')?.field ?? dateFieldOf(collection, undefined);
+  const based = filterRecords(records, collection, rest, now, cal);
+  return recordsInRange(based, collection, ref, choiceRange(choice, now, cal), now, cal);
 }
 
 /** 选的是不是一个合法的范围：自定义的两端是日期、开始不晚于结束，最长五年。 */

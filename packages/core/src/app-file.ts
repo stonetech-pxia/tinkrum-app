@@ -1,4 +1,5 @@
 import { clearFileRefs } from './file-refs';
+import { usesOf } from './file-uses';
 import { homeScreenOp } from './home-screen';
 import { applyOps, type Op } from './ops';
 import { migrateWorkspace } from './migrate';
@@ -12,7 +13,6 @@ import {
   type WorkspaceConfig,
 } from './schema';
 import type { AppBarTarget, IconValue, Theme } from './schema-base';
-import { MAX_OPS_PER_CHANGE } from './ops-schema';
 
 // App 文件（D-485）：一个 App 的全部内容（页面、表、快捷操作、提醒、风格），导入时加到现有的工作区里，
 // 不替换任何东西。和「App 配置」（整份工作区，D-484）不同：这里的 ID 已经带了 App 自己的前缀，不会和别的
@@ -34,9 +34,16 @@ export interface AppFile {
   tools: Tool[];
 }
 
+/** 写 App 文件。外层带「用到了什么」（D-556），读的版本能说出自己缺什么；它不是 App 的一部分，导入时不读进配置。 */
 export function appFileText(file: Omit<AppFile, 'format' | 'version' | 'exportedAt'>, now: Date) {
   return JSON.stringify(
-    { format: APP_FILE_FORMAT, version: FILE_VERSION, exportedAt: now.toISOString(), ...file },
+    {
+      format: APP_FILE_FORMAT,
+      version: FILE_VERSION,
+      exportedAt: now.toISOString(),
+      uses: usesOf(file),
+      ...file,
+    },
     null,
     2,
   );
@@ -222,8 +229,7 @@ export function appFileOps(
       ops.push({ op: 'updateContainer', nav: { bar } });
     }
   }
-  if (ops.length > MAX_OPS_PER_CHANGE)
-    return { ok: false, error: `too big to import in one go (${ops.length} steps)` };
+  // 步数不设上限（D-554）：大小由配置的上限管，用的时候带 fromAppFile 走 prepareOps。
   return { ok: true, ops, name: file.app.name };
 }
 
@@ -247,8 +253,6 @@ export function appResetOps(file: AppFile, config: WorkspaceConfig, registry: Re
     ...plan.ops,
     ...(onMenu ? [homeScreenOp(mid.config, `app:${id}`, true)] : []),
   ];
-  if (ops.length > MAX_OPS_PER_CHANGE)
-    return { ok: false, error: `too big to restore in one go (${ops.length} steps)` };
   return { ok: true, ops, name: file.app.name };
 }
 

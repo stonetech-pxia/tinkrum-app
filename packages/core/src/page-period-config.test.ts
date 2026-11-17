@@ -149,3 +149,57 @@ describe('removing the period block', () => {
     expect(sources(r.after)).toEqual(['page', 'page']);
   });
 });
+
+describe('record lists that follow the period block (D-561)', () => {
+  const list = (source: object = {}, extra: object = {}, look = 'list') => ({
+    id: 'l',
+    look,
+    source: { table: 'expenses', period: 'page', ...source },
+    show: { title: 'amount' },
+    ...extra,
+  });
+
+  it('a record block may follow the page range when the page has a period block', () => {
+    expect(issues([period(), list()])).toEqual([]);
+    for (const look of ['cards', 'checklist', 'tiles', 'board', 'table', 'gallery'])
+      expect(
+        issues([
+          period(),
+          list(look === 'board' ? { group: { by: 'amount' } } : {}, {}, look),
+        ]).join(),
+      ).not.toMatch(/period/);
+  });
+
+  it('needs a period block on the same page', () => {
+    expect(issues([list()]).join()).toMatch(
+      /source.period "page" needs a period block on the same page/,
+    );
+  });
+
+  it("is refused on a calendar and next to the list's own period row", () => {
+    expect(issues([period(), list({ group: { unit: 'day' } }, {}, 'calendar')]).join()).toMatch(
+      /a calendar moves by month itself: no source.period/,
+    );
+    expect(
+      issues([
+        period(),
+        list({}, { show: { title: 'amount', browse: { period: 'date' } } }),
+      ]).join(),
+    ).toMatch(/follows the page's time range: no show.browse.period/);
+  });
+
+  it('removing the period block takes source.period off the lists too', () => {
+    const r = build([period(), list()]);
+    if (!r.ok) throw new Error(r.issues.join());
+    const removed = prepareOps(
+      r.after,
+      [{ op: 'removeContainer', page: 'p', block: 'range' }],
+      ctx,
+    );
+    if (!removed.ok) throw new Error(removed.issues.join());
+    const l = removed.after.containers.pages
+      .find((p) => p.id === 'p')!
+      .blocks.find((b) => b.id === 'l') as unknown as { source: { period?: string } };
+    expect(l.source.period).toBeUndefined();
+  });
+});

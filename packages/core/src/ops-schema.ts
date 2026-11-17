@@ -317,6 +317,11 @@ export type OpOf<K extends Op['op']> = Extract<Op, { op: K }>;
 /** 一次修改（一个版本）最多包含的操作数。 */
 export const MAX_OPS_PER_CHANGE = 30;
 export const OpListSchema = z.array(OpSchema).min(1).max(MAX_OPS_PER_CHANGE);
+/**
+ * 导入、恢复一个 App 文件的操作（D-554）：不限步数，大小由配置本身的上限管（表、页面、快捷操作、提醒的条数），
+ * 照样是一个版本，整份校验。只给 App 文件用；AI 的计划和别的修改还是 OpListSchema。
+ */
+export const AppFileOpListSchema = z.array(OpSchema).min(1);
 
 /** 功能（数据、独立工具、工具包、手机桌面）和外观（容器、就地工具、主题、导航栏）分两轮（规则 26）。 */
 export function isFunctionOp(op: Op): boolean {

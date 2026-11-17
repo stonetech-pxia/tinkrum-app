@@ -98,7 +98,7 @@ export function DialHost({
         void run(workflow, recordsValue(selection.collection, [...selection.found]));
       else router.push({ pathname: '/run/[workflowId]', params: { workflowId: workflow.id } });
     } else if (isOpenUse(use)) env.navigate(pageTarget(use.opens));
-    else if (isRecordToolUse(use)) void runner.runButton(use, item.label);
+    else if (isRecordToolUse(use)) void runner.runButton(use, item.label, env.recordId);
   };
   const toggle = () => {
     if (!env.interactive) return;

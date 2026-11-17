@@ -41,6 +41,7 @@ import {
   type Condition,
   type Field,
   type Locale,
+  type OffsetUnit,
   type Period,
   type SystemField,
 } from './schema';
@@ -95,6 +96,11 @@ export function periodRange(
   const [y, m, d] = dateOfDayNumber(today).split('-').map(Number) as [number, number, number];
   const monthEnd = localDate(new Date(y, m, 0));
   const ym = `${y}-${String(m).padStart(2, '0')}`;
+  /** 这个月往前（负数）或往后数第几个月的一整个月。 */
+  const month = (by: number): [string, string] => {
+    const first = new Date(y, m - 1 + by, 1);
+    return [localDate(first), localDate(new Date(first.getFullYear(), first.getMonth() + 1, 0))];
+  };
   switch (period) {
     case 'today':
       return span(today, 1);
@@ -124,6 +130,21 @@ export function periodRange(
       return span(today, 30);
     case 'next90days':
       return span(today, 90);
+    // 日历上前后的一整段（D-559）。
+    case 'yesterday':
+      return span(today - 1, 1);
+    case 'tomorrow':
+      return span(today + 1, 1);
+    case 'lastWeek':
+      return span(weekStartOf(today, cal) - 7, 7);
+    case 'nextWeek':
+      return span(weekStartOf(today, cal) + 7, 7);
+    case 'lastMonth':
+      return month(-1);
+    case 'nextMonth':
+      return month(1);
+    case 'lastYear':
+      return [`${y - 1}-01-01`, `${y - 1}-12-31`];
   }
 }
 
@@ -180,6 +201,9 @@ function formulaValue(
       // 日程（D-295）在公式里是它的下一次。
       if (ref.type === 'schedule') return scheduleStatusOf(record, collection, ref, now, cal)?.next;
       const v = readValue(ref, record.values[id]);
+      // 勾选框、单选（D-569）按字段定义换成数。
+      const def = fieldDefinition(ref.type);
+      if (def.formulaNumber) return def.formulaNumber(ref, v);
       if (typeof v === 'number') return kind === 'number' ? v : undefined;
       if (typeof v !== 'string') return undefined;
       if (kind === 'date') return dayNumber(v);
@@ -307,11 +331,20 @@ function dateOffsetValue(
     typeof field.add === 'number'
       ? field.add
       : recordValue(record, collection, field.add, now, cal);
-  const day = start === undefined ? undefined : dayNumber(start);
-  if (day === undefined || typeof n !== 'number' || !Number.isFinite(n)) return undefined;
+  if (start === undefined || typeof n !== 'number' || !Number.isFinite(n)) return undefined;
+  return offsetDay(start, n, field.unit);
+}
+
+/**
+ * 某一天（YYYY-MM-DD）加 add 天或 add 个月（四舍五入成整数）；月份加完超过那个月的最后一天时取最后一天。
+ * 算出来的日期（D-542）和一键记录工具写的日期（D-565）共用。日子读不出来时没有。
+ */
+export function offsetDay(start: string, n: number, unit: OffsetUnit): string | undefined {
+  const day = dayNumber(start);
+  if (day === undefined || !Number.isFinite(n)) return undefined;
   const add = Math.round(n);
-  if (field.unit === 'days') return dateOfDayNumber(day + add);
-  const [y, m, d] = start!.split('-').map(Number) as [number, number, number];
+  if (unit === 'days') return dateOfDayNumber(day + add);
+  const [y, m, d] = start.split('-').map(Number) as [number, number, number];
   const months = y * 12 + (m - 1) + add;
   const year = Math.floor(months / 12);
   const month = months - year * 12 + 1;
@@ -321,7 +354,12 @@ function dateOffsetValue(
 
 // ---- 写入 ----
 
-export type FieldIssue = { fieldId: string; code: 'required' | 'invalid' | 'tooLong' };
+/** 写不进去的一个字段。tooSmall / tooLarge（D-570）：超出字段的 min / max，limit 是那个界限。 */
+export type FieldIssue = {
+  fieldId: string;
+  code: 'required' | 'invalid' | 'tooLong' | 'tooSmall' | 'tooLarge';
+  limit?: number;
+};
 
 export type PreparedValues =
   { ok: true; values: Record<string, unknown> } | { ok: false; issues: FieldIssue[] };
@@ -340,8 +378,45 @@ const isBlank = (v: unknown) =>
   (Array.isArray(v) && v.length === 0);
 
 /**
+ * 记录表单里这时藏着的字段（D-570）：所在的段有条件、按 values（存的值）不成立。只看这一条自己的值。
+ */
+export function hiddenFormFields(
+  collection: Collection,
+  values: Record<string, unknown>,
+  now: Date,
+  cal: Calendar = DEFAULT_CALENDAR,
+): Set<string> {
+  const hidden = new Set<string>();
+  const sections = collection.form?.sections ?? [];
+  if (!sections.some((s) => s.when)) return hidden;
+  const at = now.getTime();
+  const record: DataRecord = {
+    id: '',
+    collectionId: collection.id,
+    values,
+    createdAt: at,
+    updatedAt: at,
+  };
+  for (const s of sections)
+    if (s.when && !s.when.every((c) => matchesCondition(record, collection, c, now, cal)))
+      for (const id of s.fields) hidden.add(id);
+  return hidden;
+}
+
+/** 字段的范围（D-570）：数字超出 min / max 时是哪一种问题。 */
+function rangeIssue(field: Field, value: unknown): FieldIssue | undefined {
+  if (typeof value !== 'number') return undefined;
+  const { min, max } = field as { min?: number; max?: number };
+  if (min !== undefined && value < min) return { fieldId: field.id, code: 'tooSmall', limit: min };
+  if (max !== undefined && value > max) return { fieldId: field.id, code: 'tooLarge', limit: max };
+  return undefined;
+}
+
+/**
  * 写入时严格校验：input 只包含要修改的字段（字段 ID → 表单值，空字符串表示清空）。
  * previous 为 null 表示新记录，此时套用默认值（今天按 cal 算）。已删除字段的旧值原样保留。
+ * D-570：数字超出字段的 min / max 不能存，但只查这次改了的值（范围是后加的、存着的旧值照样能存别的字段）；
+ * 记录表单里藏着的段（条件不成立）里的字段不按必填查。
  */
 export function prepareRecordValues(
   collection: Collection,
@@ -374,10 +449,18 @@ export function prepareRecordValues(
       if ('required' in field && field.required)
         issues.push({ fieldId: field.id, code: 'required' });
     } else {
+      const unchanged = previous !== null && previous[field.id] === result.value;
+      const outside = unchanged ? undefined : rangeIssue(field, result.value);
+      if (outside) issues.push(outside);
       values[field.id] = result.value;
     }
   }
-  return issues.length > 0 ? { ok: false, issues } : { ok: true, values };
+  // 藏着的段里的字段不按必填查（D-570）：按写好的值看哪些段藏着。
+  const hidden = issues.some((i) => i.code === 'required')
+    ? hiddenFormFields(collection, values, now, cal)
+    : new Set<string>();
+  const kept = issues.filter((i) => i.code !== 'required' || !hidden.has(i.fieldId));
+  return kept.length > 0 ? { ok: false, issues: kept } : { ok: true, values };
 }
 
 // ---- 筛选、排序、统计 ----
@@ -471,16 +554,51 @@ export function filterRecords(
   );
 }
 
-/** 排序：空值总在最后；单选按选项顺序；日程按下一次（D-295）；默认按创建时间从新到旧。 */
+type SortKey = { field: string; direction: 'asc' | 'desc' };
+
+/**
+ * 排序：空值总在最后；单选按选项顺序；日程按下一次（D-295）；默认按创建时间从新到旧。
+ * 可以是 1–3 个依次排（D-560）：第一个一样的按第二个，每一个都是空值在最后；都一样时按创建时间从新到旧。
+ */
 export function sortRecords(
   records: readonly DataRecord[],
   collection: Collection,
-  sort: { field: string; direction: 'asc' | 'desc' } | undefined,
+  sort: SortKey | readonly SortKey[] | undefined,
   now: Date = new Date(),
   cal: Calendar = DEFAULT_CALENDAR,
 ): DataRecord[] {
-  const { field, direction } = sort ?? { field: 'createdAt', direction: 'desc' as const };
-  const sign = direction === 'asc' ? 1 : -1;
+  const list: readonly SortKey[] =
+    sort === undefined ? [] : Array.isArray(sort) ? sort : [sort as SortKey];
+  const keys = (list.length > 0 ? list : [{ field: 'createdAt', direction: 'desc' as const }]).map(
+    ({ field, direction }) => ({
+      sign: direction === 'asc' ? 1 : -1,
+      key: sortKeyOf(collection, field, now, cal),
+    }),
+  );
+  // 每条的键先算一次再排（公式、日程每次现算很贵），比较的规则不变。
+  const keyed = records.map((r) => ({ r, k: keys.map((x) => x.key(r)) }));
+  keyed.sort((a, b) => {
+    for (let i = 0; i < keys.length; i++) {
+      const ka = a.k[i];
+      const kb = b.k[i];
+      if (ka === undefined && kb === undefined) continue;
+      if (ka === undefined) return 1;
+      if (kb === undefined) return -1;
+      const order = keys[i]!.sign * compare(ka, kb);
+      if (order !== 0) return order;
+    }
+    return b.r.createdAt - a.r.createdAt;
+  });
+  return keyed.map((x) => x.r);
+}
+
+/** 一条记录按这个字段排时的键。 */
+function sortKeyOf(
+  collection: Collection,
+  field: string,
+  now: Date,
+  cal: Calendar,
+): (r: DataRecord) => FieldValue | undefined {
   const def = fieldOf(collection, field);
   const sortKey = def && fieldDefinition(def.type).sort;
   const key = (r: DataRecord): FieldValue | undefined => {
@@ -495,14 +613,7 @@ export function sortRecords(
     // 有的字段按自己的顺序排（单选按选项顺序）。
     return def && sortKey && v !== undefined ? sortKey(def, v) : v;
   };
-  return [...records].sort((a, b) => {
-    const ka = key(a);
-    const kb = key(b);
-    if (ka === undefined && kb === undefined) return b.createdAt - a.createdAt;
-    if (ka === undefined) return 1;
-    if (kb === undefined) return -1;
-    return sign * compare(ka, kb) || b.createdAt - a.createdAt;
-  });
+  return key;
 }
 
 export type Aggregate = 'count' | 'sum' | 'avg' | 'min' | 'max';

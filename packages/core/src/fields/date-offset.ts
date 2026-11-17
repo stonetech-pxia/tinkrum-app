@@ -2,7 +2,13 @@ import { z } from 'zod';
 
 import { isValidDate } from '../field-values';
 import { localeTag } from '../localization';
-import { FieldRefSchema, IdSchema, boundedText } from '../schema-primitives';
+import {
+  FieldRefSchema,
+  IdSchema,
+  OffsetAddSchema,
+  OffsetUnitSchema,
+  boundedText,
+} from '../schema-primitives';
 import { defineField, isText, type FieldDefinitionOf } from './define';
 
 const schema = z.strictObject({
@@ -12,8 +18,8 @@ const schema = z.strictObject({
   /** 从哪个日期算：这张表的日期、日期时间字段，或 createdAt / updatedAt。 */
   from: FieldRefSchema,
   /** 加几（负数是往前）：固定的整数，或这条记录的一个数字字段。 */
-  add: z.union([z.number().int().min(-36_500).max(36_500), IdSchema]),
-  unit: z.enum(['days', 'months']),
+  add: OffsetAddSchema,
+  unit: OffsetUnitSchema,
 });
 
 const SYSTEM = ['createdAt', 'updatedAt'];

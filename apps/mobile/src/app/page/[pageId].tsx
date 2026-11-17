@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { tableVersion } from '@/data/records';
 import { EditablePage } from '@/editing/EditablePage';
 import { t } from '@/i18n';
 import { ErrorBoundary } from '@/renderer/ErrorBoundary';
@@ -47,7 +48,7 @@ export default function PageRoute() {
   const recordOf = page?.of;
   const collection = recordOf ? config.data.tables.find((c) => c.id === recordOf) : undefined;
   // 这条记录：标题写在页面顶部；改了、删了以后重新读（undefined = 还在读）。
-  const version = useWorkspace((s) => s.recordsVersion);
+  const version = useWorkspace((s) => (recordOf ? tableVersion(s, recordOf) : ''));
   const [record, setRecord] = useState<DataRecord | null | undefined>(undefined);
   useEffect(() => {
     if (!recordOf || !recordId) return;

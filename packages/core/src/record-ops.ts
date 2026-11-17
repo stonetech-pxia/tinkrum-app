@@ -3,14 +3,22 @@ import { SMART_DATE_TYPES } from './components/form';
 import { conditionProblems } from './conditions';
 import {
   matchesCondition,
+  offsetDay,
   prepareRecordValues,
+  recordDay,
+  recordValue,
   type DataRecord,
   type PreparedValues,
 } from './data';
 import { localDateTime, round } from './field-values';
 import { expandCollection } from './related';
 import {
+  isCopyValue,
+  isDateValue,
   recordToolOf,
+  tapAlsoOf,
+  type CopyValue,
+  type DateValue,
   type RecordTool,
   type RecordToolUse,
   type RecordToolValue,
@@ -22,6 +30,7 @@ import {
   HERE_REF,
   RECORD_REF,
   ROW_REF,
+  SYSTEM_FIELDS,
   fieldDefinition,
   type Collection,
   type Field,
@@ -80,6 +89,85 @@ export interface ToolWhere {
 interface ValueWhere extends ToolWhere {
   /** 是新建（create）：null 没有意义。 */
   creating?: boolean;
+  /**
+   * 「这一条」（D-565，换过的表：查找、汇总换成它们显示的那种字段）：抄的字段、日期的起点和加数从它读。
+   * 工具作用的那一条（rowOf），没有时是记录页的那一条（recordOf）；setAll、表单和不在记录页上的按钮没有。
+   */
+  entry?: Collection;
+}
+
+const NEEDS_ENTRY =
+  "needs this entry: it only works in a tool on each entry of a list, a reminder's done, or a button on a page for one entry";
+
+/** 抄过来时字段的值是哪一种（换过的表里）：公式是数字，算出来的日期是日期，计数、连续这些汇总是数字。 */
+function valueKind(f: Field): FieldType | undefined {
+  if (f.type === 'formula' || f.type === 'rollup') return 'number';
+  if (f.type === 'dateOffset') return 'date';
+  if (f.type === 'lookup' || f.type === 'previous') return undefined;
+  return f.type;
+}
+
+/** 不能用「抄」写进去的字段：文件归用户自己选（底线 3），日程是一整套规则。算出来的字段本来就写不进去。 */
+const NO_COPY_INTO: readonly FieldType[] = ['file', 'schedule'];
+
+function copyProblem(
+  target: Field,
+  name: string,
+  value: CopyValue,
+  where: ValueWhere,
+): string | null {
+  const entry = where.entry;
+  if (!entry) return `${where.label}: {copy} reads a field of this entry, so it ${NEEDS_ENTRY}`;
+  const source = entry.fields.find((f) => f.id === value.copy);
+  if (!source)
+    return `${where.label}: copy ${value.copy} is not a field of ${entry.id} (fields: ${entry.fields.map((f) => f.id).join(', ')})`;
+  if (!fieldDefinition(target.type).write || NO_COPY_INTO.includes(target.type))
+    return `${where.label}: ${name} is a ${target.type} field and can't be written by a tool`;
+  const kind = valueKind(source);
+  const group = (t: FieldType) => fieldDefinition(t).convertGroup;
+  const sameKind =
+    kind !== undefined &&
+    (kind === target.type || (group(kind) !== undefined && group(kind) === group(target.type)));
+  const fits =
+    sameKind &&
+    (target.type !== 'link' || (source.type === 'link' && source.table === target.table)) &&
+    (target.type !== 'choice' ||
+      (source.type === 'choice' &&
+        source.options.every((o) => target.options.some((x) => x.id === o.id))));
+  return fits
+    ? null
+    : `${where.label}: can't copy ${entry.id}.${source.id} (${kind ?? source.type}) into ${name} (${target.type}); copy a field of the same type (number and money mix, text and note mix; a link to the same table; a choice whose options the target has)`;
+}
+
+function dateValueProblem(
+  target: Field,
+  name: string,
+  value: DateValue,
+  where: ValueWhere,
+): string | null {
+  if (target.type !== 'date')
+    return `${where.label}: ${name} is a ${target.type} field; {from, add, unit} only fills a date field`;
+  const entry = where.entry;
+  if (value.from !== 'today') {
+    if (!entry)
+      return `${where.label}: from ${value.from} reads a date of this entry, so it ${NEEDS_ENTRY}; use from "today" here`;
+    const from = entry.fields.find((f) => f.id === value.from);
+    const kind = from && valueKind(from);
+    if (
+      !(SYSTEM_FIELDS as readonly string[]).includes(value.from) &&
+      kind !== 'date' &&
+      kind !== 'datetime'
+    )
+      return `${where.label}: from ${value.from} must be "today" or a date or datetime field of this entry (${entry.id})`;
+  }
+  if (typeof value.add === 'string') {
+    if (!entry)
+      return `${where.label}: add ${value.add} reads a number of this entry, so it ${NEEDS_ENTRY}; use a whole number here`;
+    const add = entry.fields.find((f) => f.id === value.add);
+    if (!add || valueKind(add) !== 'number')
+      return `${where.label}: add ${value.add} must be a whole number or a number field of this entry (${entry.id})`;
+  }
+  return null;
 }
 
 function valueProblem(
@@ -93,6 +181,9 @@ function valueProblem(
     return `${where.label}: ${fieldId} is not a field of ${collection.id} (fields: ${collection.fields.map((f) => f.id).join(', ')})`;
   }
   const name = `${collection.id}.${fieldId}`;
+  // 从今天或这一条起算的日期、抄这一条的字段（D-565）。
+  if (isCopyValue(value)) return copyProblem(field, name, value, where);
+  if (isDateValue(value)) return dateValueProblem(field, name, value, where);
   // 拖到的那一栏（看板）：只给拖动，写进分栏的字段。
   if (value === GROUP_REF)
     return where.dragField === fieldId
@@ -240,20 +331,29 @@ export function recordToolProblems(
 ): string[] {
   const collection = config.data.tables.find((c) => c.id === tool.table);
   if (!collection) return [`${where.label}: data table ${tool.table} does not exist`];
+  // 「这一条」（D-565）：工具作用的那一条，没有时是记录页的那一条；表单没有。
+  const entryTable = where.form
+    ? undefined
+    : (where.rowOf ?? config.data.tables.find((c) => c.id === where.recordOf));
+  if (entryTable)
+    where = { ...where, entry: expandCollection(config.data.tables, entryTable) } as ValueWhere;
   const scope = scopeProblem(tool, collection, where);
   if (scope) return [scope];
-  if (tool.do !== 'create' && tool.do !== 'setAll' && !where.rowOf)
+  if (tool.do !== 'create' && tool.do !== 'setAll' && tool.do !== 'createAll' && !where.rowOf)
     return [
       `${where.label}: ${tool.do} changes one entry, so it only works on each entry of a list (or a reminder's done)`,
     ];
   switch (tool.do) {
     case 'create':
       return createProblems(tool, collection, where);
+    case 'createAll':
+      return createAllProblems(tool, collection, config, where);
     case 'setAll': {
       if (where.direct)
         return [
           `${where.label}: done acts on this entry ("${ROW_REF}"); use create, set, toggle or increment, not setAll`,
         ];
+      // 一次改很多条，没有「这一条」：日期只能从今天算。
       const p = valueProblem(collection, tool.field, tool.value, { label: where.label });
       return [
         ...(p ? [p] : []),
@@ -274,9 +374,41 @@ export function recordToolProblems(
     }
     case 'increment': {
       const p = fieldProblem(collection, tool.field, where, INCREMENT_FIELD_TYPES, 'increment');
-      return p ? [p] : [];
+      if (p) return [p];
+      // 加这一条的一个数字字段（D-565）。
+      const entry = (where as ValueWhere).entry;
+      if (typeof tool.by !== 'string' || !entry) return [];
+      const by = entry.fields.find((f) => f.id === tool.by);
+      const kind = by && valueKind(by);
+      return kind && INCREMENT_FIELD_TYPES.includes(kind)
+        ? []
+        : [`${where.label}: by ${tool.by} must be a number field of ${entry.id} (or a number)`];
     }
   }
+}
+
+/**
+ * 批量新建（D-567）：来源表要在，筛选按来源表检查（可以用 "$record"），值按新建检查，"$row" 和抄的字段都是来源的那一条。
+ * 必填又没有默认值的字段要预设（没有表单可问）。提醒的「完成」不能用（它只改这一条）。
+ */
+function createAllProblems(
+  tool: Extract<RecordTool, { do: 'createAll' }>,
+  collection: Collection,
+  config: WorkspaceConfig,
+  where: ToolWhere,
+): string[] {
+  if (where.direct)
+    return [
+      `${where.label}: done acts on this entry ("${ROW_REF}"); use create, set, toggle or increment, not createAll`,
+    ];
+  const source = config.data.tables.find((c) => c.id === tool.from);
+  if (!source) return [`${where.label}: data table ${tool.from} does not exist`];
+  const view = expandCollection(config.data.tables, source);
+  const at: ValueWhere = { label: where.label, rowOf: source, entry: view };
+  return [
+    ...conditionProblems(tool.filter, view, where.recordOf).map((x) => `${where.label}: ${x}`),
+    ...createProblems({ do: 'create', table: tool.table, values: tool.values }, collection, at),
+  ];
 }
 
 /** 按钮上的字最长几个字（表单的提交 30，其余 20）。 */
@@ -328,7 +460,63 @@ export function recordToolUseProblems(
         );
     }
   }
+  if (tapAlsoOf(use).length > 0) problems.push(...alsoProblems(use, config, where));
   return [...problems, ...recordToolProblems(tool, config, where)];
+}
+
+/**
+ * 点一下改几处（D-566）：只给每一条上的按钮和点一下（as button、tap）；顺带的改动改这一条，或者新建一条连回这一条；
+ * 最多一条新建；同一个字段不改两次；不打开表单（几处一起成功或一起不做）。
+ */
+function alsoProblems(use: RecordToolUse, config: WorkspaceConfig, where: ToolWhere): string[] {
+  const row = where.rowOf;
+  const label = where.label;
+  if ((use.as !== 'button' && use.as !== 'tap') || !row)
+    return [
+      `${label}: also only works on a button or tap on each entry (one tap, several changes to that entry)`,
+    ];
+  const tool = recordToolOf(use);
+  const problems: string[] = [];
+  if (tool.do === 'create' && tool.ask !== undefined)
+    problems.push(
+      `${label}: also can't open a form (all changes of one tap are saved together); leave ask out`,
+    );
+  const linksBack = (table: string, values: unknown) => {
+    const target = config.data.tables.find((c) => c.id === table);
+    return Object.entries(typeof values === 'object' && values !== null ? values : {}).some(
+      ([id, v]) =>
+        v === ROW_REF &&
+        target?.fields.some((f) => f.id === id && f.type === 'link' && f.table === row.id),
+    );
+  };
+  const also = tapAlsoOf(use);
+  const creates = [
+    ...(tool.do === 'create' ? [tool] : []),
+    ...also.filter((a) => a.do === 'create'),
+  ];
+  if (creates.length > 1)
+    problems.push(`${label}: one tap can make at most one create (it links back to this entry)`);
+  if (tool.do === 'create' && !linksBack(tool.table, tool.values))
+    problems.push(
+      `${label}: with also, the create must link back to this entry (a link field to ${row.id} set to "${ROW_REF}")`,
+    );
+  const fields = tool.do === 'create' || tool.do === 'createAll' ? [] : [tool.field];
+  for (const a of also) {
+    const at = { ...where, label: `${label} also` };
+    if (a.do === 'create') {
+      if (!linksBack(a.table, a.values))
+        problems.push(
+          `${label} also: a create must link back to this entry (a link field to ${row.id} set to "${ROW_REF}")`,
+        );
+      problems.push(...recordToolProblems(a, config, at));
+      continue;
+    }
+    if (fields.includes(a.field))
+      problems.push(`${label}: changes ${a.field} twice in one tap; write each field once`);
+    fields.push(a.field);
+    problems.push(...recordToolProblems({ ...a, table: row.id } as RecordTool, config, at));
+  }
+  return problems;
 }
 
 // ---- 执行（App 在用户点了以后调）----
@@ -342,12 +530,26 @@ export interface ActionContext {
   recordId?: string;
   /** 拖到的那一栏（"$group"）：选项 ID、被引用的那条的 ID，null 是「未分」。 */
   group?: string | null;
+  /**
+   * 「这一条」（D-565）：算好的记录（公式、查找、汇总都有值）和换过的表。抄的字段、日期的起点和加数从它读；
+   * 没有时这些值不写。
+   */
+  entry?: { record: DataRecord; view: Collection };
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** 工具里的值 → 表单输入（prepareRecordValues 再按字段严格检查）。null = 清空（勾选框是不勾）。 */
+/**
+ * 工具里的值 → 表单输入（prepareRecordValues 再按字段严格检查）。null = 清空（勾选框是不勾）。
+ * undefined = 这一项不写（D-565：读「这一条」的值，但没有这一条，或者日期的起点、加数没有值）。
+ */
 export function actionInput(field: Field, value: RecordToolValue, ctx: ActionContext): unknown {
+  if (isCopyValue(value)) {
+    if (!ctx.entry) return undefined;
+    const v = entryValue(ctx, value.copy);
+    return v === undefined || v === null ? '' : v;
+  }
+  if (isDateValue(value)) return dateInput(value, ctx);
   if (value === null) return field.type === 'checkbox' ? false : '';
   if (value === 'today' && field.type === 'date')
     return dayOf(ctx.now, ctx.cal ?? DEFAULT_CALENDAR);
@@ -358,6 +560,25 @@ export function actionInput(field: Field, value: RecordToolValue, ctx: ActionCon
   if (value === RECORD_REF && field.type === 'link') return ctx.recordId ?? '';
   if (value === GROUP_REF) return ctx.group ?? (field.type === 'checkbox' ? false : '');
   return value;
+}
+
+function entryValue(ctx: ActionContext, fieldId: string) {
+  const entry = ctx.entry;
+  return entry
+    ? recordValue(entry.record, entry.view, fieldId, ctx.now, ctx.cal ?? DEFAULT_CALENDAR)
+    : undefined;
+}
+
+/** {from, add, unit}（D-565）：从今天或这一条的日期起，加几天或几个月（和算出来的日期同一段算法）。 */
+function dateInput(value: DateValue, ctx: ActionContext): string | undefined {
+  const cal = ctx.cal ?? DEFAULT_CALENDAR;
+  const start =
+    value.from === 'today'
+      ? dayOf(ctx.now, cal)
+      : ctx.entry && recordDay(ctx.entry.record, ctx.entry.view, value.from, ctx.now, cal);
+  const add = typeof value.add === 'number' ? value.add : entryValue(ctx, value.add);
+  if (start === undefined || typeof add !== 'number') return undefined;
+  return offsetDay(start, add, value.unit);
 }
 
 /**
@@ -373,7 +594,8 @@ export function createInput(
   if (typeof values !== 'object') return input;
   for (const [id, v] of Object.entries(values)) {
     const field = collection.fields.find((f) => f.id === id);
-    if (field) input[id] = actionInput(field, v, ctx);
+    const value = field && actionInput(field, v, ctx);
+    if (value !== undefined) input[id] = value;
   }
   return input;
 }
@@ -403,12 +625,19 @@ export function rowUpdateInput(
 ): Record<string, unknown> | null {
   const field = collection.fields.find((f) => f.id === tool.field);
   if (!field) return null;
-  if (tool.do === 'set') return { [field.id]: actionInput(field, tool.value, ctx) };
+  if (tool.do === 'set') {
+    const value = actionInput(field, tool.value, ctx);
+    return value === undefined ? {} : { [field.id]: value };
+  }
   if (tool.do === 'toggle') return { [field.id]: values[field.id] !== true };
   const raw = values[field.id];
   const current = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
+  // 加这一条的一个数字字段（D-565）：没有值时什么都不改。
+  const by =
+    typeof tool.by === 'number' ? tool.by : ctx.entry ? entryValue(ctx, tool.by) : values[tool.by];
+  if (typeof by !== 'number' || !Number.isFinite(by)) return {};
   const decimals = field.type === 'money' ? 2 : field.type === 'number' ? (field.decimals ?? 4) : 0;
-  let next = round(current + tool.by, decimals);
+  let next = round(current + by, decimals);
   // 时长不能是负数：减到 0 为止。
   if (field.type === 'duration') next = Math.max(0, next);
   return { [field.id]: next };
@@ -452,7 +681,9 @@ export function setAllChanges(
   const field = collection.fields.find((f) => f.id === tool.field);
   if (!field) return [];
   const cal = ctx.cal ?? DEFAULT_CALENDAR;
-  const input = { [field.id]: actionInput(field, tool.value, ctx) };
+  const value = actionInput(field, tool.value, ctx);
+  if (value === undefined) return [];
+  const input = { [field.id]: value };
   const same = (a: unknown, b: unknown) =>
     JSON.stringify(a ?? (field.type === 'checkbox' ? false : null)) ===
     JSON.stringify(b ?? (field.type === 'checkbox' ? false : null));
@@ -464,6 +695,32 @@ export function setAllChanges(
     changes.push({ id: r.id, before: storedValues(collection, r.values), after: prepared.values });
   }
   return changes;
+}
+
+/**
+ * 批量新建（D-567）：筛出来的每一条来源（算好的记录，筛选可以用查找来的值）各一份新记录的表单输入，按来源的顺序。
+ * "$row" 是这条来源，抄的、日期起点也读它（D-565）。结果再交给 prepareRecordValues。
+ */
+export function createAllInputs(
+  tool: Extract<RecordTool, { do: 'createAll' }>,
+  target: Collection,
+  sourceView: Collection,
+  sources: readonly DataRecord[],
+  ctx: ActionContext,
+): { sourceId: string; input: Record<string, unknown> }[] {
+  const cal = ctx.cal ?? DEFAULT_CALENDAR;
+  return sources
+    .filter((r) =>
+      (tool.filter ?? []).every((c) => matchesCondition(r, sourceView, c, ctx.now, cal)),
+    )
+    .map((r) => ({
+      sourceId: r.id,
+      input: createInput(target, tool.values, {
+        ...ctx,
+        rowId: r.id,
+        entry: { record: r, view: sourceView },
+      }),
+    }));
 }
 
 /** 记录里存着的值（去掉算出来的字段：算好的记录副本里有它们）。 */

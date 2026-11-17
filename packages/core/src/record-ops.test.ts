@@ -420,7 +420,7 @@ describe('checking record tools', () => {
   it('each look takes only its own kinds of tools, and how many (registry metadata)', () => {
     // 按钮上不能 toggle（没有「这一条」），列表上不能 setAll。
     expect(problems([button({ do: 'toggle', table: 'packing', field: 'packed' })])).toMatch(
-      /a button block can't have a toggle tool \(allowed: create, setAll\)/,
+      /a button block can't have a toggle tool \(allowed: create, setAll, createAll\)/,
     );
     expect(
       problems([

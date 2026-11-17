@@ -1,3 +1,4 @@
+import { usesOf } from './file-uses';
 import { CURRENT_SCHEMA_VERSION, type WorkspaceConfig } from './schema';
 
 // 「设置 → 数据 → 导出 App 配置」：把 App 的设计（页面、数据表的结构、快捷操作、提醒、主题）存成一个文件。
@@ -6,12 +7,14 @@ import { CURRENT_SCHEMA_VERSION, type WorkspaceConfig } from './schema';
 export const APP_CONFIG_FILE_FORMAT = 'morph-app-config';
 const FILE_VERSION = 1;
 
+/** 外层带「用到了什么」（D-556）：读的版本能说出自己缺什么；不在 config 里面，不存进本机的配置。 */
 export function appConfigFile(config: WorkspaceConfig, now: Date): string {
   return JSON.stringify(
     {
       format: APP_CONFIG_FILE_FORMAT,
       version: FILE_VERSION,
       exportedAt: now.toISOString(),
+      uses: usesOf(config),
       config,
     },
     null,

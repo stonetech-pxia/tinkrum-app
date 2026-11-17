@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { isValidDate } from './field-values';
 import { FieldSchema } from './fields';
 import { isEmoji, unsafeLinks } from './richtext';
-import { FieldRefSchema, IdSchema, boundedText } from './schema-primitives';
+import { ConditionSchema, FieldRefSchema, IdSchema, boundedText } from './schema-primitives';
 
 // 配置结构里组件以外的部分（图标、主题、数据表、筛选、导航）。组件定义（components/）要用到这些，
 // 所以单独放一个文件，避免 schema.ts 和组件定义互相引用。对外仍从 schema.ts 导出。
@@ -208,6 +208,29 @@ export type RecordRowItem = z.infer<typeof RecordRowItemSchema>;
 /** 记录页顶部最多几个按钮。 */
 export const MAX_RECORD_ROW = 10;
 
+/** 记录表单最多分几段（D-570）。 */
+export const MAX_FORM_SECTIONS = 10;
+
+/**
+ * 记录表单的一段（D-570）：标题、放哪几个字段，可以带 1–3 个条件（并且），只看这一条自己填的字段，而且不看这一段里的
+ * 字段。条件不成立时这一段不显示：里面的字段存着的值不动，藏着时也不按必填检查。
+ */
+export const FormSectionSchema = z.strictObject({
+  title: boundedText(1, 40).optional(),
+  fields: z.array(IdSchema).min(1).max(30),
+  when: z.array(ConditionSchema).min(1).max(3).optional(),
+});
+export type FormSection = z.infer<typeof FormSectionSchema>;
+
+/**
+ * 记录表单怎么排（D-570，创始人 2026-11-16 决定 ①）：只有分段和条件显示；提示和范围在字段上。保存、删除、附件、候选值
+ * 仍归内核。没写进任何一段的字段排在所有段后面（按表里的顺序），加字段不会找不到。
+ */
+export const EntryFormSchema = z.strictObject({
+  sections: z.array(FormSectionSchema).min(1).max(MAX_FORM_SECTIONS),
+});
+export type EntryForm = z.infer<typeof EntryFormSchema>;
+
 /** 数据表（v34 data.tables，原 collections）。 */
 export const CollectionSchema = z.strictObject({
   id: IdSchema,
@@ -221,10 +244,12 @@ export const CollectionSchema = z.strictObject({
   /** 读附件给候选时，通用规则之外再用哪组规则（D-421）。不写就只有通用规则。 */
   prefillRules: z.enum(['receipt', 'card']).optional(),
   /**
-   * 已有记录的记录页顶部的一排按钮（D-428）。记录页是系统层、一张表一页，所以放在表上（和 readAttachments 一样）。
+   * 已有记录的记录页顶部的一排按钮（D-428）。记录页由内核提供、一张表一页，所以放在表上（和 readAttachments 一样）。
    * 不写就没有这一排。
    */
   recordRow: z.array(RecordRowItemSchema).max(MAX_RECORD_ROW).optional(),
+  /** 记录表单的分段和条件显示（D-570）。不写就是一段，按字段的顺序。 */
+  form: EntryFormSchema.optional(),
 });
 export type Collection = z.infer<typeof CollectionSchema>;
 export const TableSchema = CollectionSchema;
@@ -248,6 +273,15 @@ export const SortSchema = z.strictObject({
   field: FieldRefSchema,
   direction: z.enum(['asc', 'desc']),
 });
+export type Sort = z.infer<typeof SortSchema>;
+
+/** 记录块的排序（D-560）：一个，或 1–3 个依次排（先按第一个，一样的再按下一个）。一个对象和以前一样。 */
+export const SortKeysSchema = z.union([SortSchema, z.array(SortSchema).min(1).max(3)]);
+export type SortKeys = z.infer<typeof SortKeysSchema>;
+
+/** 排序写成的一个或几个，统一成列表。 */
+export const sortList = (sort: Sort | readonly Sort[] | undefined): readonly Sort[] =>
+  sort === undefined ? [] : Array.isArray(sort) ? sort : [sort as Sort];
 
 // ---- 导航 ----
 

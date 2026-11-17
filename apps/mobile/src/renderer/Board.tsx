@@ -6,6 +6,7 @@ import {
   boardTargets,
   calendarOf,
   filterRecords,
+  followedFilter,
   formatRef,
   untitledRecordTitle,
   type BoardColumn,
@@ -343,7 +344,7 @@ export function Board({ block, env, tone }: { block: RecordBlock; env: RenderEnv
                             router,
                             collection,
                             view,
-                            block.source,
+                            { filter: followedFilter(block.source, env.pageChoice) },
                             column.option === null ? {} : { [field.id]: column.option },
                           )))
                       : undefined

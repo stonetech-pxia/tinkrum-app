@@ -104,6 +104,8 @@ export interface ValueSuggestion {
   pick?: FieldPick;
   /** 这个值是靠哪些学过的标签排到前面的。 */
   learned?: readonly string[];
+  /** 有把握（只有说出来的话才有，D-575）：表单直接填进去，不等用户点。 */
+  sure?: boolean;
 }
 
 export interface SuggestInput {
@@ -111,6 +113,8 @@ export interface SuggestInput {
   /** 这张表的 prefillRules：通用规则之外再用哪组规则（D-421）。 */
   rules?: 'receipt' | 'card';
   pages: readonly TextPage[];
+  /** 文字是用户为这一笔说的话（语音转的文字，D-575），不是从文件读出来的：按字段类型读口语里的值，不看版面。 */
+  spoken?: boolean;
   /** 识别用的语言（日月分不清时只影响先后，两种都给）。 */
   locale: Locale;
   /** 这张表各字段上次点的（字段 ID → FieldPick）。 */

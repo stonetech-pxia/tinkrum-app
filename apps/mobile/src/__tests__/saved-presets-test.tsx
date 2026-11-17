@@ -638,6 +638,29 @@ describe('import a preset from a file', () => {
       expect(store.getState().proposal).toBeNull();
     });
 
+    // 文件外层带了「用到了什么」（D-556）：缺的东西准确地说出来，不再是笼统的「用不了」。
+    it('a file that lists what it uses names what this build is missing', async () => {
+      const { files, store } = await starterApp();
+      const head = store.getState().head!.id;
+      const data = JSON.parse(clay()) as {
+        uses?: unknown;
+        pages: { blocks: { look: string }[] }[];
+      };
+      data.pages[0]!.blocks[0]!.look = 'fromTheFuture';
+      data.uses = { looks: ['fromTheFuture', 'group'], features: ['sparkles'] };
+      pickFile(files, JSON.stringify(data), { name: 'tinkrum-app-clay.json' });
+      chooseNewApp();
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      await importThroughScreen();
+      await waitFor(() => expect(alert).toHaveBeenCalledTimes(2));
+      const said = String(alert.mock.calls[1]![1]);
+      expect(said).toContain('还没有的：fromTheFuture、sparkles。');
+      expect(said).not.toContain('group');
+      expect(store.getState().head!.id).toBe(head);
+      expect(store.getState().config!.nav.apps ?? []).toEqual([]);
+      expect(store.getState().proposal).toBeNull();
+    });
+
     it('with 50 presets an App file is still added', async () => {
       const { repo, files, store } = await starterApp();
       for (let i = 0; i < MAX_SAVED_PRESETS; i++)
@@ -649,6 +672,39 @@ describe('import a preset from a file', () => {
       await waitFor(() => expect(store.getState().config!.nav.apps?.[0]?.id).toBe('clay'));
       expect(await repo.listPresets()).toHaveLength(MAX_SAVED_PRESETS);
     });
+  });
+
+  it('a whole configuration from a newer build names the field type it is missing (D-556)', async () => {
+    const { repo, files } = await app();
+    const config = JSON.parse(JSON.stringify(seed())) as WorkspaceConfig;
+    (config.data.tables[0]!.fields as unknown[]).push({ id: 'm', name: 'Mood', type: 'mood' });
+    const text = JSON.parse(exported(config)) as { uses: { fieldTypes: string[] } };
+    expect(text.uses.fieldTypes).toEqual(['mood', 'text']);
+    pickFile(files, JSON.stringify(text));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    await importThroughScreen();
+    await waitFor(() => expect(alert).toHaveBeenCalled());
+    expect(String(alert.mock.calls[0]![1])).toContain('还没有的：mood。');
+    expect(await repo.listPresets()).toEqual([]);
+  });
+
+  it('French: what is missing is said in French too (D-556)', async () => {
+    const repo = new MemoryWorkspaceRepo();
+    const { files } = await renderToolsApp(repo, undefined, { locale: 'fr' });
+    pickFile(
+      files,
+      JSON.stringify({
+        format: 'morph-app-config',
+        version: 1,
+        uses: { looks: ['hologram'] },
+        config: { schemaVersion: CURRENT_SCHEMA_VERSION + 1 },
+      }),
+    );
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    await openScreen();
+    await fireEvent.press(screen.getByTestId('preset-import'));
+    await waitFor(() => expect(alert).toHaveBeenCalled());
+    expect(String(alert.mock.calls[0]![1])).toContain('pas encore : hologram.');
   });
 
   it('French: the button, the hint and the refusal are in French', async () => {

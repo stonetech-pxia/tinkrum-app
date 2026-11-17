@@ -427,6 +427,8 @@ describe('appFileOfApp', () => {
         'schemaVersion',
         'tables',
         'tools',
+        // 用到了什么（D-556）：给读的版本看，不是 App 的一部分。
+        'uses',
         'version',
       ].sort(),
     );

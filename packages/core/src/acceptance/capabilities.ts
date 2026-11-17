@@ -1,7 +1,11 @@
 import { isSystemField } from '../components/define';
+import { parseFormula } from '../formula';
 import {
   isOpenUse,
+  isCopyValue,
+  isDateValue,
   isRecordToolUse,
+  tapAlsoOf,
   type RecordTool,
   type RecordToolValues,
   type ToolUse,
@@ -254,7 +258,11 @@ export function entryWrites(v: AppView, table: string, field: string): boolean {
   return v.writes.some(
     (w) =>
       w.tool.table === table &&
-      (w.tool.do === 'create' ? createCovers(w, field) : w.tool.field === field),
+      (w.tool.do === 'create'
+        ? createCovers(w, field)
+        : w.tool.do === 'createAll'
+          ? Object.prototype.hasOwnProperty.call(w.tool.values, field)
+          : w.tool.field === field),
   );
 }
 
@@ -538,8 +546,7 @@ function groupByType(v: AppView, types: readonly string[]): boolean {
   });
 }
 
-const whenIs = (v: AppView, key: 'before' | 'each' | 'after') =>
-  v.reminders.some((r) => key in r.when);
+const whenIs = (v: AppView, key: 'each' | 'after') => v.reminders.some((r) => key in r.when);
 
 const valueUsed = (v: AppView, value: unknown) =>
   v.writes.some((w) => {
@@ -552,6 +559,16 @@ const valueUsed = (v: AppView, value: unknown) =>
     }
     return (tool.do === 'set' || tool.do === 'setAll') && tool.value === value;
   });
+
+/** 所有一键记录工具写的值（D-565 的对象写法用）。 */
+const valuesUsed = (v: AppView): unknown[] =>
+  v.writes.flatMap(({ tool }) =>
+    tool.do === 'create' || tool.do === 'createAll'
+      ? Object.values(typeof tool.values === 'object' ? tool.values : {})
+      : tool.do === 'set' || tool.do === 'setAll'
+        ? [tool.value]
+        : [],
+  );
 
 const usesOpen = (v: AppView) =>
   v.blocks.some(({ block }) => toolsOf(block).some((u) => isOpenUse(u) && u.opens === 'record'));
@@ -642,6 +659,45 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('field.schedule.countEarly', 'field', (v) =>
     allFields(v).some((x) => x.field.type === 'schedule' && x.field.countEarly === true),
   ),
+  // D-568：选项代表的数、选项的颜色。
+  cap('field.choice.optionValue', 'field', (v) =>
+    allFields(v).some(
+      (x) => x.field.type === 'choice' && x.field.options.some((o) => o.value !== undefined),
+    ),
+  ),
+  cap('field.choice.optionColor', 'field', (v) =>
+    allFields(v).some(
+      (x) => x.field.type === 'choice' && x.field.options.some((o) => o.color !== undefined),
+    ),
+  ),
+  // D-569：公式读勾选框或单选。
+  cap('field.formula.checkboxOrChoice', 'field', (v) =>
+    allFields(v).some(({ table, field }) => {
+      if (field.type !== 'formula') return false;
+      const parsed = parseFormula(field.expression);
+      return (
+        parsed.ok &&
+        parsed.refs.some((id) => {
+          const ref = table.fields.find((f) => f.id === id);
+          return ref?.type === 'checkbox' || ref?.type === 'choice';
+        })
+      );
+    }),
+  ),
+  // D-570：记录表单的分段、条件显示，字段的填写提示和范围。
+  cap('field.table.form', 'field', (v) => tablesOf(v.config).some((t) => t.form !== undefined)),
+  cap('field.table.form.when', 'field', (v) =>
+    tablesOf(v.config).some((t) => (t.form?.sections ?? []).some((s) => s.when !== undefined)),
+  ),
+  cap('field.hint', 'field', (v) =>
+    allFields(v).some(({ field }) => 'hint' in field && field.hint !== undefined),
+  ),
+  cap('field.range', 'field', (v) =>
+    allFields(v).some(
+      ({ field }) =>
+        ('min' in field && field.min !== undefined) || ('max' in field && field.max !== undefined),
+    ),
+  ),
   cap('field.text.format', 'field', (v) =>
     allFields(v).some((x) => x.field.type === 'text' && x.field.format !== undefined),
   ),
@@ -658,6 +714,7 @@ export const CAPABILITIES: readonly Capability[] = [
   doCap('toggle'),
   doCap('increment'),
   doCap('setAll'),
+  doCap('createAll'),
   asCap('submit'),
   asCap('button'),
   asCap('check'),
@@ -689,6 +746,17 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('write.value.record', 'write', (v) => valueUsed(v, RECORD_REF)),
   cap('write.value.group', 'write', (v) => valueUsed(v, GROUP_REF)),
   cap('write.value.here', 'write', (v) => valueUsed(v, HERE_REF)),
+  // D-565：从今天或这一条的日期起算的日期、抄这一条的字段、加这一条的一个数字字段。
+  cap('write.value.dateOffset', 'write', (v) => valuesUsed(v).some(isDateValue)),
+  cap('write.value.copy', 'write', (v) => valuesUsed(v).some(isCopyValue)),
+  cap('write.also', 'write', (v) =>
+    v.blocks.some(({ block }) =>
+      toolsOf(block).some((u) => isRecordToolUse(u) && tapAlsoOf(u).length > 0),
+    ),
+  ),
+  cap('write.increment.byField', 'write', (v) =>
+    v.writes.some((w) => w.tool.do === 'increment' && typeof w.tool.by === 'string'),
+  ),
   cap('write.action.out.addRecord', 'write', (v) => v.intakes.length > 0),
   cap('write.fileInForm', 'write', (v) =>
     allFields(v).some(
@@ -699,6 +767,7 @@ export const CAPABILITIES: readonly Capability[] = [
   // 读
   lookCap('dial'),
   lookCap('period'),
+  lookCap('choices'),
   lookCap('list'),
   lookCap('cards'),
   lookCap('checklist'),
@@ -710,6 +779,9 @@ export const CAPABILITIES: readonly Capability[] = [
   lookCap('number'),
   lookCap('chart'),
   lookCap('single'),
+  cap('read.single.record', 'read', (v) =>
+    v.blocks.some((x) => x.block.look === 'single' && x.block.source.record !== undefined),
+  ),
   cap('read.single.qr', 'read', (v) =>
     v.blocks.some((x) => x.block.look === 'single' && x.block.show.qr === true),
   ),
@@ -745,6 +817,7 @@ export const CAPABILITIES: readonly Capability[] = [
     ),
   ),
   cap('read.sort', 'read', (v) => recordBlocks(v).some((b) => b.source.sort !== undefined)),
+  cap('read.sort.many', 'read', (v) => recordBlocks(v).some((b) => Array.isArray(b.source.sort))),
   cap('read.group.choice', 'read', (v) => groupByType(v, ['choice'])),
   cap('read.group.link', 'read', (v) => groupByType(v, ['link'])),
   cap('read.group.schedule', 'read', (v) => groupByType(v, ['schedule'])),
@@ -783,8 +856,20 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('read.chart.compare', 'read', (v) =>
     chartBlocks(v).some((b) => b.source.compare !== undefined),
   ),
+  cap('read.records.period', 'read', (v) =>
+    recordBlocks(v).some((b) => b.source.period !== undefined),
+  ),
   cap('read.chart.period', 'read', (v) =>
     chartBlocks(v).some((b) => b.source.period !== undefined),
+  ),
+  cap('read.records.choice', 'read', (v) =>
+    recordBlocks(v).some((b) => b.source.choice !== undefined),
+  ),
+  cap('read.number.choice', 'read', (v) =>
+    numberBlocks(v).some((b) => b.source.choice !== undefined),
+  ),
+  cap('read.chart.choice', 'read', (v) =>
+    chartBlocks(v).some((b) => b.source.choice !== undefined),
   ),
   cap('read.number.minus', 'read', (v) =>
     numberBlocks(v).some((b) => b.source.minus !== undefined),
@@ -812,6 +897,13 @@ export const CAPABILITIES: readonly Capability[] = [
   periodCap('next7days'),
   periodCap('next30days'),
   periodCap('next90days'),
+  periodCap('yesterday'),
+  periodCap('lastWeek'),
+  periodCap('lastMonth'),
+  periodCap('lastYear'),
+  periodCap('tomorrow'),
+  periodCap('nextWeek'),
+  periodCap('nextMonth'),
   cap('read.show.color', 'read', (v) => recordBlocks(v).some((b) => b.show.color !== undefined)),
   cap('read.format.elapsed', 'read', (v) =>
     recordBlocks(v).some((b) => b.show.format?.kind === 'elapsed'),
@@ -837,10 +929,18 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('remind.when.everyWeek', 'remind', (v) =>
     v.reminders.some((r) => 'every' in r.when && r.when.every === 'week'),
   ),
-  cap('remind.when.before', 'remind', (v) => whenIs(v, 'before')),
+  cap('remind.when.before', 'remind', (v) =>
+    v.reminders.some((r) => 'before' in r.when && 'days' in r.when),
+  ),
+  cap('remind.when.beforeMinutes', 'remind', (v) =>
+    v.reminders.some((r) => 'before' in r.when && 'minutes' in r.when),
+  ),
   cap('remind.when.each', 'remind', (v) => whenIs(v, 'each')),
   cap('remind.when.after', 'remind', (v) => whenIs(v, 'after')),
   cap('remind.unless', 'remind', (v) => v.reminders.some((r) => r.unless !== undefined)),
+  cap('remind.unless.repeating', 'remind', (v) =>
+    v.reminders.some((r) => r.unless !== undefined && 'every' in r.when),
+  ),
   cap('remind.done', 'remind', (v) => v.reminders.some((r) => r.done !== undefined)),
   cap('remind.snoozeMinutes', 'remind', (v) =>
     v.reminders.some((r) => r.snoozeMinutes !== undefined),

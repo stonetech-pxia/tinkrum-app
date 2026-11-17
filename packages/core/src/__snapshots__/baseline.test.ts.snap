@@ -2664,6 +2664,16 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 4> number
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 5> boolean
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 6> null
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7> object
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from<anyOf 0> "today"
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from<anyOf 1> = <oneOf 6>.tools[]<anyOf 0>.when[].field
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add<anyOf 0> integer -36500..36500
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.unit "days"|"months"
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 8> object
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 8>.copy string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 1> "$here"
 <oneOf 6>.tools[]<anyOf 1>.ask?
 <oneOf 6>.tools[]<anyOf 1>.ask<anyOf 0> "all"
@@ -2672,6 +2682,26 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 1>.smartDate? object
 <oneOf 6>.tools[]<anyOf 1>.smartDate.from string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 1>.smartDate.to string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also? array items 1..2
+<oneOf 6>.tools[]<anyOf 1>.also[]
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0> object
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0>.do "set"
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0>.value = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 1> object
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 1>.do "toggle"
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 1>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2> object
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.do "increment"
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by<anyOf 0> number
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3> object
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.do "create"
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.values object record
+<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.values{} = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
 <oneOf 6>.tools[]<anyOf 2> object
 <oneOf 6>.tools[]<anyOf 2>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
 <oneOf 6>.tools[]<anyOf 2>.label? string len 1..30
@@ -2681,6 +2711,8 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 2>.table string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 2>.field string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 2>.value = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 6>.tools[]<anyOf 2>.also? array items 1..2
+<oneOf 6>.tools[]<anyOf 2>.also[] = <oneOf 6>.tools[]<anyOf 1>.also[]
 <oneOf 6>.tools[]<anyOf 3> object
 <oneOf 6>.tools[]<anyOf 3>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
 <oneOf 6>.tools[]<anyOf 3>.label? string len 1..30
@@ -2689,6 +2721,8 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 3>.do "toggle"
 <oneOf 6>.tools[]<anyOf 3>.table string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 3>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 3>.also? array items 1..2
+<oneOf 6>.tools[]<anyOf 3>.also[] = <oneOf 6>.tools[]<anyOf 1>.also[]
 <oneOf 6>.tools[]<anyOf 4> object
 <oneOf 6>.tools[]<anyOf 4>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
 <oneOf 6>.tools[]<anyOf 4>.label? string len 1..30
@@ -2697,7 +2731,9 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 4>.do "increment"
 <oneOf 6>.tools[]<anyOf 4>.table string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 4>.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 4>.by number
+<oneOf 6>.tools[]<anyOf 4>.by = <oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by
+<oneOf 6>.tools[]<anyOf 4>.also? array items 1..2
+<oneOf 6>.tools[]<anyOf 4>.also[] = <oneOf 6>.tools[]<anyOf 1>.also[]
 <oneOf 6>.tools[]<anyOf 5> object
 <oneOf 6>.tools[]<anyOf 5>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
 <oneOf 6>.tools[]<anyOf 5>.label? string len 1..30
@@ -2714,9 +2750,21 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 6>.label? string len 1..30
 <oneOf 6>.tools[]<anyOf 6>.when? array items ..3
 <oneOf 6>.tools[]<anyOf 6>.when[] = <oneOf 6>.tools[]<anyOf 0>.when[]
-<oneOf 6>.tools[]<anyOf 6>.opens
-<oneOf 6>.tools[]<anyOf 6>.opens<anyOf 0> "record"
-<oneOf 6>.tools[]<anyOf 6>.opens<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 6>.do "createAll"
+<oneOf 6>.tools[]<anyOf 6>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 6>.from string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 6>.filter? array items ..5
+<oneOf 6>.tools[]<anyOf 6>.filter[] = <oneOf 6>.tools[]<anyOf 0>.when[]
+<oneOf 6>.tools[]<anyOf 6>.values object record
+<oneOf 6>.tools[]<anyOf 6>.values{} = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 6>.tools[]<anyOf 7> object
+<oneOf 6>.tools[]<anyOf 7>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
+<oneOf 6>.tools[]<anyOf 7>.label? string len 1..30
+<oneOf 6>.tools[]<anyOf 7>.when? array items ..3
+<oneOf 6>.tools[]<anyOf 7>.when[] = <oneOf 6>.tools[]<anyOf 0>.when[]
+<oneOf 6>.tools[]<anyOf 7>.opens
+<oneOf 6>.tools[]<anyOf 7>.opens<anyOf 0> "record"
+<oneOf 6>.tools[]<anyOf 7>.opens<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.opens?
 <oneOf 7> object
 <oneOf 7>.id string /^[a-z][a-z0-9-]{0,47}$/
@@ -2766,9 +2814,14 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 10>.source.table string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 10>.source.filter? array items ..5
 <oneOf 10>.source.filter[] = <oneOf 6>.tools[]<anyOf 0>.when[]
-<oneOf 10>.source.sort? object
-<oneOf 10>.source.sort.field = <oneOf 6>.tools[]<anyOf 0>.when[].field
-<oneOf 10>.source.sort.direction "asc"|"desc"
+<oneOf 10>.source.sort?
+<oneOf 10>.source.sort<anyOf 0> object
+<oneOf 10>.source.sort<anyOf 0>.field = <oneOf 6>.tools[]<anyOf 0>.when[].field
+<oneOf 10>.source.sort<anyOf 0>.direction "asc"|"desc"
+<oneOf 10>.source.sort<anyOf 1> array items 1..3
+<oneOf 10>.source.sort<anyOf 1>[] = <oneOf 10>.source.sort<anyOf 0>
+<oneOf 10>.source.period? "page"
+<oneOf 10>.source.choice? "page"
 <oneOf 10>.source.limit integer 1..100 default 30
 <oneOf 10>.source.group? object
 <oneOf 10>.source.group.by? = <oneOf 6>.tools[]<anyOf 0>.when[].field
@@ -2897,6 +2950,7 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 16>.source.goal? number ..1000000000 >0
 <oneOf 16>.source.compare? "previous"
 <oneOf 16>.source.period? "page"
+<oneOf 16>.source.choice? "page"
 <oneOf 16>.source.minus? object
 <oneOf 16>.source.minus.table string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 16>.source.minus.aggregate "count"|"sum"
@@ -2924,6 +2978,7 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 17>.source.group = <oneOf 10>.source.group
 <oneOf 17>.source.compare? "previous"
 <oneOf 17>.source.period? "page"
+<oneOf 17>.source.choice? "page"
 <oneOf 18> object
 <oneOf 18>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 18>.hidden? boolean
@@ -2948,7 +3003,7 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 19>.source.table "$files"
 <oneOf 19>.source.filter? array items ..5
 <oneOf 19>.source.filter[] = <oneOf 6>.tools[]<anyOf 0>.when[]
-<oneOf 19>.source.sort? = <oneOf 10>.source.sort
+<oneOf 19>.source.sort? = <oneOf 10>.source.sort<anyOf 0>
 <oneOf 19>.source.limit integer 1..50
 <oneOf 20> object
 <oneOf 20>.id string /^[a-z][a-z0-9-]{0,47}$/
@@ -2984,6 +3039,7 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 22>.look "single"
 <oneOf 22>.source object
 <oneOf 22>.source.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 22>.source.record? "$record"
 <oneOf 22>.show object
 <oneOf 22>.show.fields array items 1..8
 <oneOf 22>.show.fields[] = <oneOf 6>.tools[]<anyOf 0>.when[].field
@@ -3007,9 +3063,9 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 24>.pin? "top"|"bottom"
 <oneOf 24>.look "period"
 <oneOf 24>.show object
-<oneOf 24>.show.options array items 1..8
-<oneOf 24>.show.options[] "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"
-<oneOf 24>.show.default? "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"
+<oneOf 24>.show.options array items 1..12
+<oneOf 24>.show.options[] "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"|"yesterday"|"lastWeek"|"lastMonth"|"lastYear"
+<oneOf 24>.show.default? "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"|"yesterday"|"lastWeek"|"lastMonth"|"lastYear"
 <oneOf 24>.show.custom? true
 <oneOf 25> object
 <oneOf 25>.id string /^[a-z][a-z0-9-]{0,47}$/
@@ -3041,79 +3097,96 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 27>.style? = <oneOf 0>.style
 <oneOf 27>.showIf? = <oneOf 0>.showIf
 <oneOf 27>.pin? "top"|"bottom"
-<oneOf 27>.look "group"
+<oneOf 27>.look "choices"
 <oneOf 27>.show object
-<oneOf 27>.show.title? string len 1..60
-<oneOf 27>.show.layout "stack"|"row"|"grid"
-<oneOf 27>.show.columns?
-<oneOf 27>.show.columns<anyOf 0> 2
-<oneOf 27>.show.columns<anyOf 1> 3
-<oneOf 27>.children array items ..12
-<oneOf 27>.children[]
-<oneOf 27>.children[]<oneOf 0> = <oneOf 0>
-<oneOf 27>.children[]<oneOf 1> = <oneOf 1>
-<oneOf 27>.children[]<oneOf 2> = <oneOf 2>
-<oneOf 27>.children[]<oneOf 3> = <oneOf 3>
-<oneOf 27>.children[]<oneOf 4> = <oneOf 4>
-<oneOf 27>.children[]<oneOf 5> = <oneOf 5>
-<oneOf 27>.children[]<oneOf 6> = <oneOf 6>
-<oneOf 27>.children[]<oneOf 7> = <oneOf 7>
-<oneOf 27>.children[]<oneOf 8> = <oneOf 8>
-<oneOf 27>.children[]<oneOf 9> = <oneOf 9>
-<oneOf 27>.children[]<oneOf 10> = <oneOf 10>
-<oneOf 27>.children[]<oneOf 11> = <oneOf 11>
-<oneOf 27>.children[]<oneOf 12> = <oneOf 12>
-<oneOf 27>.children[]<oneOf 13> = <oneOf 13>
-<oneOf 27>.children[]<oneOf 14> = <oneOf 14>
-<oneOf 27>.children[]<oneOf 15> = <oneOf 15>
-<oneOf 27>.children[]<oneOf 16> = <oneOf 16>
-<oneOf 27>.children[]<oneOf 17> = <oneOf 17>
-<oneOf 27>.children[]<oneOf 18> = <oneOf 18>
-<oneOf 27>.children[]<oneOf 19> = <oneOf 19>
-<oneOf 27>.children[]<oneOf 20> = <oneOf 20>
-<oneOf 27>.children[]<oneOf 21> = <oneOf 21>
-<oneOf 27>.children[]<oneOf 22> = <oneOf 22>
-<oneOf 27>.children[]<oneOf 23> = <oneOf 23>
-<oneOf 27>.children[]<oneOf 24> = <oneOf 24>
-<oneOf 27>.children[]<oneOf 25> = <oneOf 25>
-<oneOf 27>.children[]<oneOf 26> = <oneOf 26>
-<oneOf 27>.children[]<oneOf 27> object
-<oneOf 27>.children[]<oneOf 27>.id string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 27>.children[]<oneOf 27>.hidden? boolean
-<oneOf 27>.children[]<oneOf 27>.style? = <oneOf 0>.style
-<oneOf 27>.children[]<oneOf 27>.showIf? = <oneOf 0>.showIf
-<oneOf 27>.children[]<oneOf 27>.pin? "top"|"bottom"
-<oneOf 27>.children[]<oneOf 27>.look "group"
-<oneOf 27>.children[]<oneOf 27>.show = <oneOf 27>.show
-<oneOf 27>.children[]<oneOf 27>.children array items ..12
-<oneOf 27>.children[]<oneOf 27>.children[]
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 0> = <oneOf 0>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 1> = <oneOf 1>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 2> = <oneOf 2>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 3> = <oneOf 3>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 4> = <oneOf 4>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 5> = <oneOf 5>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 6> = <oneOf 6>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 7> = <oneOf 7>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 8> = <oneOf 8>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 9> = <oneOf 9>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 10> = <oneOf 10>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 11> = <oneOf 11>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 12> = <oneOf 12>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 13> = <oneOf 13>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 14> = <oneOf 14>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 15> = <oneOf 15>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 16> = <oneOf 16>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 17> = <oneOf 17>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 18> = <oneOf 18>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 19> = <oneOf 19>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 20> = <oneOf 20>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 21> = <oneOf 21>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 22> = <oneOf 22>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 23> = <oneOf 23>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 24> = <oneOf 24>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 25> = <oneOf 25>
-<oneOf 27>.children[]<oneOf 27>.children[]<oneOf 26> = <oneOf 26>
+<oneOf 27>.show.options? array items 1..50
+<oneOf 27>.show.options[] string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 27>.show.all? false
+<oneOf 27>.show.default? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 27>.source object
+<oneOf 27>.source.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 27>.source.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 28> object
+<oneOf 28>.id string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 28>.hidden? boolean
+<oneOf 28>.style? = <oneOf 0>.style
+<oneOf 28>.showIf? = <oneOf 0>.showIf
+<oneOf 28>.pin? "top"|"bottom"
+<oneOf 28>.look "group"
+<oneOf 28>.show object
+<oneOf 28>.show.title? string len 1..60
+<oneOf 28>.show.layout "stack"|"row"|"grid"
+<oneOf 28>.show.columns?
+<oneOf 28>.show.columns<anyOf 0> 2
+<oneOf 28>.show.columns<anyOf 1> 3
+<oneOf 28>.children array items ..12
+<oneOf 28>.children[]
+<oneOf 28>.children[]<oneOf 0> = <oneOf 0>
+<oneOf 28>.children[]<oneOf 1> = <oneOf 1>
+<oneOf 28>.children[]<oneOf 2> = <oneOf 2>
+<oneOf 28>.children[]<oneOf 3> = <oneOf 3>
+<oneOf 28>.children[]<oneOf 4> = <oneOf 4>
+<oneOf 28>.children[]<oneOf 5> = <oneOf 5>
+<oneOf 28>.children[]<oneOf 6> = <oneOf 6>
+<oneOf 28>.children[]<oneOf 7> = <oneOf 7>
+<oneOf 28>.children[]<oneOf 8> = <oneOf 8>
+<oneOf 28>.children[]<oneOf 9> = <oneOf 9>
+<oneOf 28>.children[]<oneOf 10> = <oneOf 10>
+<oneOf 28>.children[]<oneOf 11> = <oneOf 11>
+<oneOf 28>.children[]<oneOf 12> = <oneOf 12>
+<oneOf 28>.children[]<oneOf 13> = <oneOf 13>
+<oneOf 28>.children[]<oneOf 14> = <oneOf 14>
+<oneOf 28>.children[]<oneOf 15> = <oneOf 15>
+<oneOf 28>.children[]<oneOf 16> = <oneOf 16>
+<oneOf 28>.children[]<oneOf 17> = <oneOf 17>
+<oneOf 28>.children[]<oneOf 18> = <oneOf 18>
+<oneOf 28>.children[]<oneOf 19> = <oneOf 19>
+<oneOf 28>.children[]<oneOf 20> = <oneOf 20>
+<oneOf 28>.children[]<oneOf 21> = <oneOf 21>
+<oneOf 28>.children[]<oneOf 22> = <oneOf 22>
+<oneOf 28>.children[]<oneOf 23> = <oneOf 23>
+<oneOf 28>.children[]<oneOf 24> = <oneOf 24>
+<oneOf 28>.children[]<oneOf 25> = <oneOf 25>
+<oneOf 28>.children[]<oneOf 26> = <oneOf 26>
+<oneOf 28>.children[]<oneOf 27> = <oneOf 27>
+<oneOf 28>.children[]<oneOf 28> object
+<oneOf 28>.children[]<oneOf 28>.id string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 28>.children[]<oneOf 28>.hidden? boolean
+<oneOf 28>.children[]<oneOf 28>.style? = <oneOf 0>.style
+<oneOf 28>.children[]<oneOf 28>.showIf? = <oneOf 0>.showIf
+<oneOf 28>.children[]<oneOf 28>.pin? "top"|"bottom"
+<oneOf 28>.children[]<oneOf 28>.look "group"
+<oneOf 28>.children[]<oneOf 28>.show = <oneOf 28>.show
+<oneOf 28>.children[]<oneOf 28>.children array items ..12
+<oneOf 28>.children[]<oneOf 28>.children[]
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 0> = <oneOf 0>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 1> = <oneOf 1>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 2> = <oneOf 2>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 3> = <oneOf 3>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 4> = <oneOf 4>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 5> = <oneOf 5>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 6> = <oneOf 6>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 7> = <oneOf 7>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 8> = <oneOf 8>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 9> = <oneOf 9>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 10> = <oneOf 10>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 11> = <oneOf 11>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 12> = <oneOf 12>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 13> = <oneOf 13>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 14> = <oneOf 14>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 15> = <oneOf 15>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 16> = <oneOf 16>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 17> = <oneOf 17>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 18> = <oneOf 18>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 19> = <oneOf 19>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 20> = <oneOf 20>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 21> = <oneOf 21>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 22> = <oneOf 22>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 23> = <oneOf 23>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 24> = <oneOf 24>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 25> = <oneOf 25>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 26> = <oneOf 26>
+<oneOf 28>.children[]<oneOf 28>.children[]<oneOf 27> = <oneOf 27>
 "
 `;
 
@@ -3172,6 +3245,7 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .data.tables[].fields[]<oneOf text>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf text>.name string len 1..40
 .data.tables[].fields[]<oneOf text>.required? boolean
+.data.tables[].fields[]<oneOf text>.hint? string len 1..80
 .data.tables[].fields[]<oneOf text>.type "text"
 .data.tables[].fields[]<oneOf text>.default? string len 1..200
 .data.tables[].fields[]<oneOf text>.format? "phone"|"email"|"url"
@@ -3179,60 +3253,75 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .data.tables[].fields[]<oneOf note>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf note>.name string len 1..40
 .data.tables[].fields[]<oneOf note>.required? boolean
+.data.tables[].fields[]<oneOf note>.hint? string len 1..80
 .data.tables[].fields[]<oneOf note>.type "note"
 .data.tables[].fields[]<oneOf number> object
 .data.tables[].fields[]<oneOf number>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf number>.name string len 1..40
 .data.tables[].fields[]<oneOf number>.required? boolean
+.data.tables[].fields[]<oneOf number>.hint? string len 1..80
 .data.tables[].fields[]<oneOf number>.type "number"
 .data.tables[].fields[]<oneOf number>.decimals? integer 0..4
 .data.tables[].fields[]<oneOf number>.unit? string len 1..10
 .data.tables[].fields[]<oneOf number>.default? number
+.data.tables[].fields[]<oneOf number>.min? number
+.data.tables[].fields[]<oneOf number>.max? number
 .data.tables[].fields[]<oneOf money> object
 .data.tables[].fields[]<oneOf money>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf money>.name string len 1..40
 .data.tables[].fields[]<oneOf money>.required? boolean
+.data.tables[].fields[]<oneOf money>.hint? string len 1..80
 .data.tables[].fields[]<oneOf money>.type "money"
 .data.tables[].fields[]<oneOf money>.currency string /^[A-Z]{3}$/
 .data.tables[].fields[]<oneOf money>.currencyField? string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf money>.default? number
+.data.tables[].fields[]<oneOf money>.min? number
+.data.tables[].fields[]<oneOf money>.max? number
 .data.tables[].fields[]<oneOf checkbox> object
 .data.tables[].fields[]<oneOf checkbox>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf checkbox>.name string len 1..40
 .data.tables[].fields[]<oneOf checkbox>.required? boolean
+.data.tables[].fields[]<oneOf checkbox>.hint? string len 1..80
 .data.tables[].fields[]<oneOf checkbox>.type "checkbox"
 .data.tables[].fields[]<oneOf checkbox>.default? boolean
 .data.tables[].fields[]<oneOf date> object
 .data.tables[].fields[]<oneOf date>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf date>.name string len 1..40
 .data.tables[].fields[]<oneOf date>.required? boolean
+.data.tables[].fields[]<oneOf date>.hint? string len 1..80
 .data.tables[].fields[]<oneOf date>.type "date"
 .data.tables[].fields[]<oneOf date>.default? "today"
 .data.tables[].fields[]<oneOf choice> object
 .data.tables[].fields[]<oneOf choice>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf choice>.name string len 1..40
 .data.tables[].fields[]<oneOf choice>.required? boolean
+.data.tables[].fields[]<oneOf choice>.hint? string len 1..80
 .data.tables[].fields[]<oneOf choice>.type "choice"
 .data.tables[].fields[]<oneOf choice>.options array items 1..50
 .data.tables[].fields[]<oneOf choice>.options[] object
 .data.tables[].fields[]<oneOf choice>.options[].id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf choice>.options[].label string len 1..40
+.data.tables[].fields[]<oneOf choice>.options[].value? number
+.data.tables[].fields[]<oneOf choice>.options[].color? "red"|"orange"|"yellow"|"green"|"blue"|"purple"|"pink"|"grey"
 .data.tables[].fields[]<oneOf choice>.default? string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf rating> object
 .data.tables[].fields[]<oneOf rating>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf rating>.name string len 1..40
 .data.tables[].fields[]<oneOf rating>.required? boolean
+.data.tables[].fields[]<oneOf rating>.hint? string len 1..80
 .data.tables[].fields[]<oneOf rating>.type "rating"
 .data.tables[].fields[]<oneOf rating>.default? integer 1..5
 .data.tables[].fields[]<oneOf file> object
 .data.tables[].fields[]<oneOf file>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf file>.name string len 1..40
 .data.tables[].fields[]<oneOf file>.required? boolean
+.data.tables[].fields[]<oneOf file>.hint? string len 1..80
 .data.tables[].fields[]<oneOf file>.type "file"
 .data.tables[].fields[]<oneOf link> object
 .data.tables[].fields[]<oneOf link>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf link>.name string len 1..40
 .data.tables[].fields[]<oneOf link>.required? boolean
+.data.tables[].fields[]<oneOf link>.hint? string len 1..80
 .data.tables[].fields[]<oneOf link>.type "link"
 .data.tables[].fields[]<oneOf link>.table string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf formula> object
@@ -3247,19 +3336,24 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .data.tables[].fields[]<oneOf time>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf time>.name string len 1..40
 .data.tables[].fields[]<oneOf time>.required? boolean
+.data.tables[].fields[]<oneOf time>.hint? string len 1..80
 .data.tables[].fields[]<oneOf time>.type "time"
 .data.tables[].fields[]<oneOf datetime> object
 .data.tables[].fields[]<oneOf datetime>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf datetime>.name string len 1..40
 .data.tables[].fields[]<oneOf datetime>.required? boolean
+.data.tables[].fields[]<oneOf datetime>.hint? string len 1..80
 .data.tables[].fields[]<oneOf datetime>.type "datetime"
 .data.tables[].fields[]<oneOf datetime>.default? "now"
 .data.tables[].fields[]<oneOf duration> object
 .data.tables[].fields[]<oneOf duration>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf duration>.name string len 1..40
 .data.tables[].fields[]<oneOf duration>.required? boolean
+.data.tables[].fields[]<oneOf duration>.hint? string len 1..80
 .data.tables[].fields[]<oneOf duration>.type "duration"
 .data.tables[].fields[]<oneOf duration>.default? integer 0..1000000
+.data.tables[].fields[]<oneOf duration>.min? integer 0..1000000
+.data.tables[].fields[]<oneOf duration>.max? integer 0..1000000
 .data.tables[].fields[]<oneOf lookup> object
 .data.tables[].fields[]<oneOf lookup>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf lookup>.name string len 1..40
@@ -3304,6 +3398,7 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .data.tables[].fields[]<oneOf schedule>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf schedule>.name string len 1..40
 .data.tables[].fields[]<oneOf schedule>.required? boolean
+.data.tables[].fields[]<oneOf schedule>.hint? string len 1..80
 .data.tables[].fields[]<oneOf schedule>.type "schedule"
 .data.tables[].fields[]<oneOf schedule>.default?
 .data.tables[].fields[]<oneOf schedule>.default<oneOf 0> object
@@ -3351,6 +3446,7 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .data.tables[].fields[]<oneOf tags>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf tags>.name string len 1..40
 .data.tables[].fields[]<oneOf tags>.required? boolean
+.data.tables[].fields[]<oneOf tags>.hint? string len 1..80
 .data.tables[].fields[]<oneOf tags>.type "tags"
 .data.tables[].fields[]<oneOf dateOffset> object
 .data.tables[].fields[]<oneOf dateOffset>.id string /^[a-z][a-z0-9-]{0,47}$/
@@ -3367,6 +3463,14 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .data.tables[].recordRow[] object
 .data.tables[].recordRow[].tool string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].recordRow[].field? string /^[a-z][a-z0-9-]{0,47}$/
+.data.tables[].form? object
+.data.tables[].form.sections array items 1..10
+.data.tables[].form.sections[] object
+.data.tables[].form.sections[].title? string len 1..40
+.data.tables[].form.sections[].fields array items 1..30
+.data.tables[].form.sections[].fields[] string /^[a-z][a-z0-9-]{0,47}$/
+.data.tables[].form.sections[].when? array items 1..3
+.data.tables[].form.sections[].when[] = .data.tables[].fields[]<oneOf rollup>.filter[]
 .data.calendar? object
 .data.calendar.dayStartHour? integer 0..6
 .data.calendar.weekStart? "monday"|"sunday"
@@ -3463,6 +3567,9 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .tools[]<oneOf 1>.when<anyOf 4>.after object
 .tools[]<oneOf 1>.when<anyOf 4>.after.table string /^[a-z][a-z0-9-]{0,47}$/
 .tools[]<oneOf 1>.when<anyOf 4>.minutes integer 1..1440
+.tools[]<oneOf 1>.when<anyOf 5> object
+.tools[]<oneOf 1>.when<anyOf 5>.before = .tools[]<oneOf 1>.when<anyOf 2>.before
+.tools[]<oneOf 1>.when<anyOf 5>.minutes integer 1..10080
 .tools[]<oneOf 1>.opens
 .tools[]<oneOf 1>.done?
 .tools[]<oneOf 1>.done<oneOf 0> object
@@ -3478,6 +3585,14 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 4> number
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 5> boolean
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 6> null
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7> object
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7>.from
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7>.from<anyOf 0> "today"
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7>.from<anyOf 1> = .data.tables[].fields[]<oneOf rollup>.filter[].field
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7>.add = .data.tables[].fields[]<oneOf dateOffset>.add
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7>.unit "days"|"months"
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 8> object
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 8>.copy string /^[a-z][a-z0-9-]{0,47}$/
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 1> "$here"
 .tools[]<oneOf 1>.done<oneOf 0>.ask?
 .tools[]<oneOf 1>.done<oneOf 0>.ask<anyOf 0> "all"
@@ -3499,7 +3614,9 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .tools[]<oneOf 1>.done<oneOf 3>.do "increment"
 .tools[]<oneOf 1>.done<oneOf 3>.table string /^[a-z][a-z0-9-]{0,47}$/
 .tools[]<oneOf 1>.done<oneOf 3>.field string /^[a-z][a-z0-9-]{0,47}$/
-.tools[]<oneOf 1>.done<oneOf 3>.by number
+.tools[]<oneOf 1>.done<oneOf 3>.by
+.tools[]<oneOf 1>.done<oneOf 3>.by<anyOf 0> number
+.tools[]<oneOf 1>.done<oneOf 3>.by<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
 .tools[]<oneOf 1>.done<oneOf 4> object
 .tools[]<oneOf 1>.done<oneOf 4>.do "setAll"
 .tools[]<oneOf 1>.done<oneOf 4>.table string /^[a-z][a-z0-9-]{0,47}$/
@@ -3507,6 +3624,14 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .tools[]<oneOf 1>.done<oneOf 4>.filter[] = .data.tables[].fields[]<oneOf rollup>.filter[]
 .tools[]<oneOf 1>.done<oneOf 4>.field string /^[a-z][a-z0-9-]{0,47}$/
 .tools[]<oneOf 1>.done<oneOf 4>.value = .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}
+.tools[]<oneOf 1>.done<oneOf 5> object
+.tools[]<oneOf 1>.done<oneOf 5>.do "createAll"
+.tools[]<oneOf 1>.done<oneOf 5>.table string /^[a-z][a-z0-9-]{0,47}$/
+.tools[]<oneOf 1>.done<oneOf 5>.from string /^[a-z][a-z0-9-]{0,47}$/
+.tools[]<oneOf 1>.done<oneOf 5>.filter? array items ..5
+.tools[]<oneOf 1>.done<oneOf 5>.filter[] = .data.tables[].fields[]<oneOf rollup>.filter[]
+.tools[]<oneOf 1>.done<oneOf 5>.values object record
+.tools[]<oneOf 1>.done<oneOf 5>.values{} = .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}
 .tools[]<oneOf 1>.snoozeMinutes? integer 5..240
 .tools[]<oneOf 1>.unless? object
 .tools[]<oneOf 1>.unless.table string /^[a-z][a-z0-9-]{0,47}$/

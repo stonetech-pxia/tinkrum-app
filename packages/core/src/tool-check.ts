@@ -4,11 +4,13 @@ import { workflowKinds } from './quick-actions';
 import {
   isOpenUse,
   isRecordToolUse,
+  tapWrites,
   isToolRefUse,
   type RecordTool,
   type ToolUse,
 } from './record-ops-schema';
 import { createRegistry, type Registry } from './registry';
+import { sortList } from './schema-base';
 import { reminderTable } from './reminders';
 import { dateFieldOf } from './sequence';
 import {
@@ -364,7 +366,7 @@ class Analysis {
           use.read.add(format.goal);
         this.readFilter(use, source.filter);
         this.readFilter(use, show.highlight);
-        if (source.sort) use.read.add(source.sort.field);
+        for (const key of sortList(source.sort)) use.read.add(key.field);
         if (source.group?.by) use.read.add(source.group.by);
         const tapped = block.tools?.some((u) => u.as === 'tap');
         if (reachable && block.opens === undefined && !(look === 'tiles' && tapped))
@@ -422,14 +424,17 @@ class Analysis {
         if (wf) for (const ref of stepRefs(wf, this.registry)) tables.add(ref.table);
       }
       if (!isRecordToolUse(u)) continue;
-      tables.add(u.table);
-      this.readTool(u, {
-        via: u.as ? `${u.as} tool of ${where}` : where,
-        reachable,
-        target: `block:${page.id}/${c.id}`,
-        ...(sourceTable !== null && u.as !== 'addHere' ? { needsRowOf: sourceTable } : {}),
-        herePresets: this.herePresets(c),
-      });
+      // 点一下的几处（D-566）都算写。
+      for (const tool of tapWrites(u, sourceTable ?? u.table)) {
+        tables.add(tool.table);
+        this.readTool(tool, {
+          via: u.as ? `${u.as} tool of ${where}` : where,
+          reachable,
+          target: `block:${page.id}/${c.id}`,
+          ...(sourceTable !== null && u.as !== 'addHere' ? { needsRowOf: sourceTable } : {}),
+          herePresets: this.herePresets(c),
+        });
+      }
     }
   }
 
@@ -485,6 +490,13 @@ class Analysis {
     const use = this.uses.get(tool.table);
     const table = this.table(tool.table);
     if (!use || !table) return;
+    // 批量新建（D-567）：读来源表的筛选，写的是预设的字段（必填的检查在 record-ops.ts）。
+    if (tool.do === 'createAll') {
+      const from = this.uses.get(tool.from);
+      if (from) this.readFilter(from, tool.filter);
+      for (const id of Object.keys(tool.values)) use.written.add(id);
+      return;
+    }
     if (tool.do !== 'create') {
       use.written.add(tool.field);
       if (tool.do === 'setAll') this.readFilter(use, tool.filter);

@@ -128,6 +128,8 @@ export interface LocalSteps {
        * 存的时候改这一条，不新建。
        */
       existing?: DataRecord;
+      /** 上一步交来的是用户说的一句话（语音转的文字，D-575）：表单按它直接填有把握的字段。 */
+      heard?: string;
       index: number;
       total: number;
     };

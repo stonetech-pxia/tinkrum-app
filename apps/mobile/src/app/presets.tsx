@@ -3,6 +3,7 @@ import {
   MAX_PRESET_NAME,
   MAX_SAVED_PRESETS,
   appFileOps,
+  missingUses,
   canSavePreset,
   checkTools,
   issueReason,
@@ -98,7 +99,10 @@ export default function PresetsRoute() {
       return;
     }
     const result = await importPreset(picked.text, picked.fileName);
-    if (result.kind === 'refused')
+    const newer = needsUpdate(picked.text);
+    if ((result.kind === 'refused' || result.kind === 'invalid') && newer)
+      Alert.alert(title, newer);
+    else if (result.kind === 'refused')
       Alert.alert(title, configFileProblemText(locale, result.problem));
     else if (result.kind === 'invalid')
       Alert.alert(
@@ -107,6 +111,17 @@ export default function PresetsRoute() {
       );
     else if (result.kind === 'full')
       Alert.alert(title, t(locale, 'presetsFull', { max: MAX_SAVED_PRESETS }));
+  }
+
+  /**
+   * 文件外层的清单（D-556）里有这个版本没有的：准确地说缺什么、要更新。只在导入不成的时候用它代替笼统的说法
+   * （这个版本不认识的外观在整份配置里会原样留着，D-254，那样的预设照样存得进去）。没有清单的文件返回 null。
+   */
+  function needsUpdate(text: string): string | null {
+    const missing = missingUses(text, registry);
+    return missing.length > 0
+      ? t(locale, 'importNeedsUpdate', { missing: missing.join(t(locale, 'listSeparator')) })
+      : null;
   }
 
   /** 导入一个 App 文件：先选「导入主页」还是「做成新 App」，再预览，确认后生效，能在改动记录里撤销（底线 5、7）。 */
@@ -133,8 +148,15 @@ export default function PresetsRoute() {
     const result = await proposeOps(
       plan.ops,
       t(locale, mode === 'home' ? 'importHomeSummary' : 'importAppSummary', { name: plan.name }),
+      { fromAppFile: true },
     );
     if (result.kind === 'invalid') {
+      // 文件说了它用到的、这个版本没有的（D-556）：直接说缺什么。
+      const newer = needsUpdate(text);
+      if (newer) {
+        Alert.alert(title, newer);
+        return;
+      }
       // 新版本加的样子、字段类型版本号可能没变（D-545）：这里读得出文件但用不了，整份不导入，说清楚。
       Alert.alert(
         title,

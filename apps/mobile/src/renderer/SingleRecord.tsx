@@ -1,4 +1,5 @@
 import {
+  attachmentIds,
   attachmentIdsOfRecords,
   calendarOf,
   findWorkflowTarget,
@@ -22,7 +23,7 @@ import { useComputedRecords, useLinkResolver } from '../data/records';
 import { t } from '../i18n';
 import { useHandedRun } from '../run/useHandedRun';
 import { useWorkspaceContext } from '../workspace/context';
-import { useAssets } from './Attachments';
+import { AttachmentThumb, useAssets } from './Attachments';
 import type { RenderEnv } from './components';
 import { useCollection } from './data';
 import { openEditor } from './open-row';
@@ -30,11 +31,15 @@ import { cardColors } from './theme';
 import { Button, Card } from './ui';
 
 // 一张表的一条记录（最早加的那条，D-424）：几个字段、「编辑」，可以加这条记录的 vCard 二维码。
+// source.record（D-558）：给一条记录用的页面上是打开的那一条（画的时候 "$record" 已换成它的 ID）。
+// 附件字段里的图片画成图（D-558），别的文件照旧是一行字。
 // 二维码画的时候现算，不存（底线 14）；看的时候什么都不写（底线 15）。
 
 /** 手机屏幕上还扫得出来的最大边长（模块数）：再大就太密了，只写一句说明。 */
 const MAX_QR_MODULES = 105;
 const QR_SIDE = 240;
+/** 附件里的图片画多大（正方形，按显示的大小解码）。 */
+const PICTURE_SIDE = 132;
 
 function qrImage(text: string): string | null {
   try {
@@ -67,7 +72,11 @@ export function SingleRecord({
   const cal = calendarOf(env.config);
   const { view, records } = useComputedRecords(env.config.data.tables, collection, cal);
   const links = useLinkResolver(view);
-  const record = records && [...records].sort((a, b) => a.createdAt - b.createdAt)[0];
+  const record =
+    records &&
+    (block.source.record !== undefined
+      ? records.find((r) => r.id === block.source.record)
+      : [...records].sort((a, b) => a.createdAt - b.createdAt)[0]);
   const vcard =
     block.show.qr && collection && record ? recordToVCard(collection.fields, record.values) : null;
   const qr = useMemo(() => (vcard ? qrImage(vcard) : null), [vcard]);
@@ -83,7 +92,13 @@ export function SingleRecord({
   const takesFiles = tool !== undefined && handedInput(tool.steps, registry) === 'files';
   const fileIds =
     takesFiles && collection && record ? attachmentIdsOfRecords(collection, [record]) : [];
-  const loaded = useAssets(fileIds);
+  // 显示的附件字段里的文件：读到是图片的画成图。
+  const shownFiles = (collection && record ? block.show.fields : []).flatMap((id) =>
+    collection?.fields.some((f) => f.id === id && f.type === 'file')
+      ? attachmentIds(record!.values[id]).map((file) => ({ field: id, file }))
+      : [],
+  );
+  const loaded = useAssets([...fileIds, ...shownFiles.map((x) => x.file)]);
   if (!collection || !view || records === null) return null;
   const infos = new Map<string, AttachmentInfo>(
     [...loaded].flatMap(([id, asset]) =>
@@ -104,9 +119,16 @@ export function SingleRecord({
       </Card>
     );
   const now = new Date();
+  const pictures = (id: string) =>
+    shownFiles.flatMap((x) => {
+      const asset = x.field === id ? loaded.get(x.file) : undefined;
+      return asset?.mimeType.startsWith('image/') ? [asset] : [];
+    });
   const rows = block.show.fields.flatMap((id) => {
-    const text = formatRef(record, view, id, locale, links, now, cal);
-    return text ? [{ id, text, name: view.fields.find((f) => f.id === id)?.name ?? id }] : [];
+    const images = pictures(id);
+    const text = images.length > 0 ? '' : formatRef(record, view, id, locale, links, now, cal);
+    const name = view.fields.find((f) => f.id === id)?.name ?? id;
+    return text || images.length > 0 ? [{ id, text, images, name }] : [];
   });
   return (
     <Card palette={palette} background={background} testID={`single-${record.id}`}>
@@ -131,13 +153,27 @@ export function SingleRecord({
             {i > 0 ? (
               <Text style={[palette.font('body', 12), { color: palette.caption }]}>{row.name}</Text>
             ) : null}
-            <Text
-              style={[
-                i === 0 ? palette.font('title', 20) : palette.font('body', 15),
-                { color: palette.text },
-              ]}>
-              {row.text}
-            </Text>
+            {row.images.length > 0 ? (
+              <View style={styles.pictures}>
+                {row.images.map((asset) => (
+                  <AttachmentThumb
+                    key={asset.id}
+                    asset={asset}
+                    size={PICTURE_SIDE}
+                    radius={10}
+                    testID={`single-image-${asset.id}`}
+                  />
+                ))}
+              </View>
+            ) : (
+              <Text
+                style={[
+                  i === 0 ? palette.font('title', 20) : palette.font('body', 15),
+                  { color: palette.text },
+                ]}>
+                {row.text}
+              </Text>
+            )}
           </View>
         ))}
         <Button
@@ -177,4 +213,5 @@ export function SingleRecord({
 const styles = StyleSheet.create({
   qr: { width: QR_SIDE, height: QR_SIDE, alignSelf: 'center' },
   field: { gap: 2 },
+  pictures: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });

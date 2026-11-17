@@ -137,7 +137,7 @@ describe('reminder settings per entry (D-316)', () => {
     if (!added.ok) return;
     expect(added.after.tools).toEqual([r]);
     expect(added.lines).toContain(
-      '新建提醒「该做了」（「习惯」每条记录按自己的「日程」，在 20:00）',
+      '新建提醒「该做了」（「习惯」每条记录按自己的「日程」，在 20:00，当天「打卡」已有符合条件的记录就不提醒）',
     );
   });
 

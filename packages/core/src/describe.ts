@@ -61,8 +61,21 @@ export function componentLabel(
   return componentDefinition(c.look).describe(c, config, ctx);
 }
 
-/** 提醒什么时候响（修改说明用）。 */
+/**
+ * 提醒什么时候响（修改说明、「设置 → 提醒」用）。带 unless 时接着说什么时候不响（D-564）：只说表名，
+ * 有筛选或 link 时说「符合条件的记录」，不说筛选的值。
+ */
 export function reminderWhen(r: Reminder, config: WorkspaceConfig, locale: Locale): string {
+  const when = reminderWhenOnly(r, config, locale);
+  const unless = r.unless;
+  if (!unless) return when;
+  const table = config.data.tables.find((c) => c.id === unless.table);
+  const matching = (unless.filter?.length ?? 0) > 0 || unless.link !== undefined;
+  const key = `reminderUnless${unless.within === 'day' ? 'Day' : unless.within === 'week' ? 'Week' : 'Month'}${matching ? 'Matching' : ''}`;
+  return t(locale, key as StringKey, { when, table: table?.name ?? unless.table });
+}
+
+function reminderWhenOnly(r: Reminder, config: WorkspaceConfig, locale: Locale): string {
   const when = r.when;
   if ('every' in when && when.every === 'day')
     return t(locale, 'reminderWhenDaily', { time: when.at });
@@ -77,6 +90,16 @@ export function reminderWhen(r: Reminder, config: WorkspaceConfig, locale: Local
     const table = config.data.tables.find((c) => c.id === when.after.table);
     return t(locale, 'reminderWhenAfterAdd', {
       table: table?.name ?? when.after.table,
+      n: when.minutes,
+    });
+  }
+  if ('minutes' in when) {
+    // 日期时间前几分钟（D-562）。
+    const table = config.data.tables.find((c) => c.id === when.before.table);
+    const field = table?.fields.find((f) => f.id === when.before.field);
+    return t(locale, 'reminderWhenMinutesBefore', {
+      field: field?.name ?? when.before.field,
+      table: table?.name ?? when.before.table,
       n: when.minutes,
     });
   }
@@ -349,7 +372,12 @@ export function describeChange(
         return t(ctx.locale, off ? 'describeSourceFilterOff' : 'describeSourceFilter');
       case 'sort': {
         if (off) return t(ctx.locale, 'describeSourceSortOff');
-        const sort = v as { field: string; direction: 'asc' | 'desc' };
+        // 几个字段依次排（D-560）。
+        if (Array.isArray(v) && v.length > 1)
+          return t(ctx.locale, 'describeSourceSortMany', {
+            fields: (v as { field: string }[]).map((k) => fieldLabel(table, k.field)).join(' / '),
+          });
+        const sort = (Array.isArray(v) ? v[0] : v) as { field: string; direction: 'asc' | 'desc' };
         return t(
           ctx.locale,
           sort.direction === 'asc' ? 'describeSourceSortAsc' : 'describeSourceSortDesc',
@@ -621,6 +649,9 @@ export function describeChange(
             );
           if (changes.recordRow !== undefined)
             lines.push(t(ctx.locale, 'describeRecordRow', { name: collName(table) }));
+          // D-570：记录表单的分段和条件显示。
+          if (changes.form !== undefined)
+            lines.push(t(ctx.locale, 'describeEntryForm', { name: collName(table) }));
           if (changes.prefillRules !== undefined)
             lines.push(
               t(
@@ -658,6 +689,10 @@ export function describeChange(
                     : 'describeFieldFormatNone',
             ),
           );
+        // D-570：填写提示、范围。
+        if (changes.hint !== undefined) parts.push(t(ctx.locale, 'describeFieldHint'));
+        if (changes.min !== undefined || changes.max !== undefined)
+          parts.push(t(ctx.locale, 'describeFieldRange'));
         if (parts.length === 0) parts.push(t(ctx.locale, 'describe_update_settings_2aaf6'));
         lines.push(
           t(ctx.locale, 'describeFieldChange', {

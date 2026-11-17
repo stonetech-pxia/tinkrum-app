@@ -440,6 +440,9 @@ export const fr: MessageTable = {
   fieldRequired: 'Obligatoire',
   fieldInvalid: 'Format incorrect',
   fieldTooLong: 'Trop long',
+  fieldTooSmall: 'Doit être au moins {limit}.',
+  fieldTooLarge: 'Doit être au plus {limit}.',
+  formIssues: '{n} champs sont à revoir ; ils sont signalés plus haut.',
   tableFull: 'Ce tableau est plein (10 000 entrées).',
   useFullForm:
     'Certains champs obligatoires ne figurent pas dans ce formulaire. Ouvrez le formulaire complet pour les ajouter.',
@@ -560,6 +563,8 @@ export const fr: MessageTable = {
   shareAppItem: 'Partager cette app',
   importAppMaybeNewer:
     'S’il a été créé avec une version plus récente de Tinkrum, mettez Tinkrum à jour et réessayez.',
+  importNeedsUpdate:
+    'Ce fichier a été créé avec une version plus récente de Tinkrum et utilise des éléments que cette version n’a pas encore : {missing}. Mettez Tinkrum à jour, puis importez-le à nouveau. Rien n’a été importé.',
   appResetItem: 'Rétablir l’aspect d’origine',
   appResetConfirm:
     'Rétablir « {name} » tel qu’il était à l’import ? Les pages et actions rapides que vous y avez ajoutées disparaissent, son style et ses pages reviennent. Les tableaux que vous avez créés et toutes vos entrées restent. Vous pourrez annuler dans l’historique des modifications.',
@@ -600,6 +605,7 @@ export const fr: MessageTable = {
   prefillMemoryPicks: '{count} suggestions choisies mémorisées',
   // Formulaire de nouvelle entrée : valeurs proposées à partir des pièces jointes (D-394)
   suggestionFill: 'Remplir « {field} » avec {value}',
+  heardFilled: 'D’après ce que vous avez dit',
   suggestionsWorking: 'Recherche de valeurs dans les pièces jointes…',
   suggestionsNeedDownload:
     'Pour proposer des valeurs tirées des pièces jointes, un téléchargement unique est nécessaire.',
@@ -1068,6 +1074,8 @@ export const fr: MessageTable = {
   chartPoint: '{label} : {value}',
   chartPointCompare: '{label} : {value} (période précédente : {previous})',
   describe_period: 'Période : {n} choix',
+  describe_choices: 'Onglets par « {v0} »',
+  choicesAll: 'Tout',
   periodOpt_today: 'Aujourd’hui',
   periodOpt_thisWeek: 'Cette semaine',
   periodOpt_thisMonth: 'Ce mois-ci',
@@ -1076,6 +1084,10 @@ export const fr: MessageTable = {
   periodOpt_last30days: '30 derniers jours',
   periodOpt_last90days: '90 derniers jours',
   periodOpt_last365days: '365 derniers jours',
+  periodOpt_yesterday: 'Hier',
+  periodOpt_lastWeek: 'La semaine dernière',
+  periodOpt_lastMonth: 'Le mois dernier',
+  periodOpt_lastYear: 'L’année dernière',
   periodCustom: 'Personnalisée',
   periodCustomStart: 'Date de début',
   periodCustomEnd: 'Date de fin',
@@ -1125,7 +1137,17 @@ export const fr: MessageTable = {
   reminderWhenWeekly: 'chaque {days} à {time}',
   reminderWhenAfterAdd: '{n} minutes après chaque nouvelle entrée de « {table} »',
   reminderWhenDate: '{n} jours avant « {field} » dans « {table} », à {time}',
+  reminderWhenMinutesBefore: '{n} minutes avant « {field} » dans « {table} »',
   reminderWhenSchedule: 'Chaque entrée de « {table} » selon son « {field} », à {time}',
+  reminderUnlessDay: '{when}, sauf si « {table} » a déjà une entrée ce jour-là',
+  reminderUnlessWeek: '{when}, sauf si « {table} » a déjà une entrée cette semaine-là',
+  reminderUnlessMonth: '{when}, sauf si « {table} » a déjà une entrée ce mois-là',
+  reminderUnlessDayMatching:
+    '{when}, sauf si « {table} » a déjà une entrée correspondante ce jour-là',
+  reminderUnlessWeekMatching:
+    '{when}, sauf si « {table} » a déjà une entrée correspondante cette semaine-là',
+  reminderUnlessMonthMatching:
+    '{when}, sauf si « {table} » a déjà une entrée correspondante ce mois-là',
   reminderDoneButton: 'Fait',
   reminderSnoozeButton: 'Me le rappeler plus tard',
   reminderDoneToast: 'Enregistré : {title}',
@@ -1139,6 +1161,7 @@ export const fr: MessageTable = {
   reminderDueToday: 'Une entrée de « {table} » arrive à échéance aujourd’hui',
   reminderAddedAgo: 'Une entrée a été ajoutée à « {table} » il y a {n} minutes',
   reminderDueIn: 'Une entrée de « {table} » arrive à échéance dans {n} jours ({date})',
+  reminderStartsIn: 'Une entrée de « {table} » est à {time}, dans {n} minutes',
   remindersTitle: 'Rappels',
   remindersHint:
     'Les rappels sont des notifications sur cet appareil. En toucher un ouvre seulement la page ou l’action rapide ; rien ne s’exécute tout seul. Pour ajouter ou modifier un rappel, demandez à Tink (par exemple « rappelle-moi tous les jours à 9 h de noter mes dépenses »).',
@@ -1228,6 +1251,8 @@ export const fr: MessageTable = {
   describeFieldFormatEmail: 'format → e-mail',
   describeFieldFormatUrl: 'format → site web',
   describeFieldFormatNone: 'format retiré',
+  describeFieldHint: 'indication sous le champ modifiée',
+  describeFieldRange: 'plage autorisée modifiée',
   describe_options_64e79: 'options → {v0}',
   describe_update_settings_2aaf6: 'Modifier les réglages',
   describe_Move_field_of_to_position_aa798:
@@ -1283,6 +1308,7 @@ export const fr: MessageTable = {
   describeSourceFilterOff: 'affiche toutes les entrées',
   describeSourceSortAsc: 'trié par « {field} », du plus petit au plus grand',
   describeSourceSortDesc: 'trié par « {field} », du plus grand au plus petit',
+  describeSourceSortMany: 'trié par {fields}, dans cet ordre',
   describeSourceSortOff: 'ordre par défaut',
   describeSourceLimit: 'affiche jusqu’à {n} entrées',
   describeSourceGroupBy: 'regroupé par « {field} »',
@@ -1633,6 +1659,7 @@ export const fr: MessageTable = {
   // 一天、一周从什么时候开始（D-286）
   describeDayStart: 'Une journée commence à {hour} h',
   describeRecordRow: '« {name} » : modifier les boutons en haut de la page de l’entrée',
+  describeEntryForm: '« {name} » : modifier les sections du formulaire de l’entrée',
   describeReadAttachmentsOn:
     '« {name} » : lire les pièces jointes et proposer des valeurs dans les nouvelles entrées',
   describeReadAttachmentsOff:
@@ -1776,12 +1803,23 @@ export const fr: MessageTable = {
   recordActionConfirm: 'Cela modifie {n} entrées.',
   recordActionConfirmButton: 'Modifier',
   recordActionNothing: 'Aucune entrée à modifier',
+  recordActionNoValue: 'Rien n’a été modifié : une valeur dont ce bouton a besoin est encore vide.',
+  recordActionTooSmall: 'Rien n’a été modifié : « {field} » ne peut pas descendre sous {limit}.',
+  recordActionTooLarge: 'Rien n’a été modifié : « {field} » ne peut pas dépasser {limit}.',
   recordActionFailed:
     'Rien n’a été modifié : un problème est survenu, aucune entrée n’a été changée.',
   recordActionChangedMeanwhile:
     'Des entrées ont changé avant votre confirmation : rien n’a été modifié. Appuyez de nouveau pour utiliser les dernières données.',
   recordActionTooMany: 'Au plus {max} entrées peuvent changer à la fois ; cela en modifierait {n}.',
   recordActionGone: 'Cette entrée a été supprimée.',
+  recordUndoFailed: 'Cette entrée a été modifiée depuis : rien n’a été annulé.',
+  recordCreateAllConfirm: 'Cela crée {n} entrées dans « {table} ».',
+  recordCreateAllConfirmButton: 'Créer',
+  recordCreateAllNothing: 'Aucune entrée ne correspond : rien n’a été créé.',
+  recordCreateAllTooMany:
+    'Au plus {max} entrées peuvent être créées à la fois ; cela en créerait {n}.',
+  recordCreateAllDone: '{n} entrées créées dans « {table} »',
+  recordUndoBulkFailed: 'Certaines de ces entrées ont été modifiées depuis : rien n’a été annulé.',
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: 'Mois précédent',
   calendarNextMonth: 'Mois suivant',
@@ -1800,6 +1838,13 @@ export const fr: MessageTable = {
   compare_thisHalfMonth: 'Mêmes jours de la quinzaine précédente : {value}',
   compare_thisMonth: 'Mêmes jours le mois dernier : {value}',
   compare_thisYear: 'Même date l’an dernier : {value}',
+  compare_yesterday: 'La veille : {value}',
+  compare_lastWeek: 'La semaine d’avant : {value}',
+  compare_lastMonth: 'Le mois d’avant : {value}',
+  compare_lastYear: 'L’année d’avant : {value}',
+  compare_tomorrow: 'Aujourd’hui : {value}',
+  compare_nextWeek: 'Cette semaine : {value}',
+  compare_nextMonth: 'Ce mois-ci : {value}',
   compare_lastDays: 'Les {n} jours d’avant : {value}',
   compareUp: '↑ {n} %',
   compareDown: '↓ {n} %',
@@ -1931,9 +1976,59 @@ export const fr: MessageTable = {
     'Tink ne voit pas le fichier, seulement les champs de ce tableau. Le tableau est créé d’abord.',
   shareRecordTooMany: 'Une entrée contient au plus {n} fichiers : seuls les {n} premiers y vont.',
   shareRecordNewTable: 'Ajouter le tableau « {name} »',
+  // 表格文件的行导进表（D-574）：「设置 → 数据」，系统层。
+  importEntries: 'Importer des entrées depuis un fichier',
+  importTitle: 'Importer des entrées',
+  importIntro:
+    'Choisissez un fichier .xlsx ou .csv : chaque ligne devient une entrée dans « {table} ». Le fichier est lu sur ce téléphone uniquement, et l’original n’est pas modifié.',
+  importChooseFile: 'Choisir un fichier',
+  importReading: 'Lecture du fichier…',
+  importErrorUnsupported:
+    'Seuls les fichiers .xlsx et .csv peuvent être importés. Enregistrez d’abord le fichier dans l’un de ces formats.',
+  importErrorNotSpreadsheet:
+    'Ce fichier ne peut pas être lu comme un tableur. Il est peut-être endommagé, ou d’un autre type.',
+  importErrorEncoding:
+    'Ce fichier CSV n’est pas en UTF-8. Enregistrez-le de nouveau au format « CSV UTF-8 » et importez ce fichier.',
+  importErrorTooLarge:
+    'Ce fichier est trop volumineux pour être importé. Importez-en une partie plus petite.',
+  importErrorEmpty: 'Ce fichier ne contient aucune ligne à importer.',
+  importErrorNoFields: '« {table} » n’a aucun champ qui puisse être rempli depuis un fichier.',
+  importErrorTooManyRows:
+    'Ce fichier contient {n} lignes, et {max} au plus peuvent être importées en une fois. Divisez le fichier et importez les parties l’une après l’autre.',
+  importErrorTableFull:
+    'Cela ajouterait {n} entrées à « {table} », qui n’a de place que pour {room} de plus. Rien n’a été importé.',
+  importSheet: 'Feuille',
+  importHeaderRow: 'La première ligne contient les noms des colonnes',
+  importColumn: 'Colonne {col}',
+  importColumnsHint:
+    'Chaque colonne va dans le champ indiqué, ou est ignorée. Les colonnes sont associées aux champs de même nom ; vous pouvez changer chacune.',
+  importSkip: 'Ignorer',
+  importSampleUnreadable: '« {value} » ne peut pas être lu',
+  importDayFirst: 'Jour d’abord (31/12)',
+  importMonthFirst: 'Mois d’abord (12/31)',
+  importChangeColumns: 'Modifier les colonnes',
+  importContinue: 'Continuer',
+  importSummary: '{n} entrées seront ajoutées à « {table} ».',
+  importSummaryNone: 'Avec ces colonnes, aucune ligne de ce fichier ne peut être importée.',
+  importLeftOut: '{n} lignes seront laissées de côté :',
+  importReason_invalid: '{n} lignes où « {field} » ne peut pas être lu (lignes {rows})',
+  importReason_required:
+    '{n} lignes où « {field} » est vide alors qu’il est obligatoire (lignes {rows})',
+  importReason_tooLong: '{n} lignes où « {field} » est trop long (lignes {rows})',
+  importReason_tooSmall: '{n} lignes où « {field} » est inférieur à {limit} (lignes {rows})',
+  importReason_tooLarge: '{n} lignes où « {field} » est supérieur à {limit} (lignes {rows})',
+  importConfirm: 'Importer {n} entrées',
+  importDone: '{n} entrées importées dans « {table} »',
+  importUndone: 'Les entrées importées sont dans Supprimés récemment pendant 30 jours.',
+  importBatches: 'Importées depuis des fichiers',
+  importBatch: '{date} · {file} · {n} entrées',
+  importDeleteBatch: 'Supprimer cette importation',
+  importDeleteBatchConfirm:
+    'Les {n} entrées de « {file} » vont dans Supprimés récemment pendant 30 jours, y compris celles modifiées depuis.',
 };
 
 export const frSingular: SingularTable = {
+  formIssues: '{n} champ est à revoir ; il est signalé plus haut.',
   bulkDeleteButton: 'Supprimer {n} entrée',
   bulkDeleteConfirm: 'Supprimer {n} entrée de « {name} » ?',
   bulkDeleted: '{n} entrée supprimée',
@@ -2012,8 +2107,10 @@ export const frSingular: SingularTable = {
   runError_noneMatched: 'Le fichier ne remplit pas les conditions de « Filtrer les fichiers ».',
   reminderWhenAfterAdd: '{n} minute après chaque nouvelle entrée de « {table} »',
   reminderWhenDate: '{n} jour avant « {field} » dans « {table} », à {time}',
+  reminderWhenMinutesBefore: '{n} minute avant « {field} » dans « {table} »',
   reminderAddedAgo: 'Une entrée a été ajoutée à « {table} » il y a {n} minute',
   reminderDueIn: 'Une entrée de « {table} » arrive à échéance dans {n} jour ({date})',
+  reminderStartsIn: 'Une entrée de « {table} » est à {time}, dans {n} minute',
   remindersRowHint: '{n} rappel',
   resultTablesMissing:
     'Aucune grille à lignes n’a été trouvée à la page {pages} : tout son contenu a été inclus.',
@@ -2036,6 +2133,10 @@ export const frSingular: SingularTable = {
   recordActionChanged: '{n} entrée modifiée',
   recordActionConfirm: 'Cela modifie {n} entrée.',
   recordActionTooMany: 'Au plus {max} entrées peuvent changer à la fois ; cela en modifierait {n}.',
+  recordCreateAllConfirm: 'Cela crée {n} entrée dans « {table} ».',
+  recordCreateAllTooMany:
+    'Au plus {max} entrées peuvent être créées à la fois ; cela en créerait {n}.',
+  recordCreateAllDone: '{n} entrée créée dans « {table} »',
   calendarDayLabel: '{date}, {n} entrée',
   widgetDone: '{n} appui du widget enregistré',
   widgetSkipped: '{n} appui sur le widget n’a pas été enregistré, car la page a changé',
@@ -2051,4 +2152,21 @@ export const frSingular: SingularTable = {
   filesDeleteTitle: 'Supprimer ce fichier ?',
   filesDeleteUsed:
     '{n} d’entre eux est utilisé dans une entrée ou une page et n’y apparaîtra plus. Cette action est irréversible.',
+  importErrorTooManyRows:
+    'Ce fichier contient {n} ligne, et {max} au plus peuvent être importées en une fois. Divisez le fichier et importez les parties l’une après l’autre.',
+  importErrorTableFull:
+    'Cela ajouterait {n} entrée à « {table} », qui n’a de place que pour {room} de plus. Rien n’a été importé.',
+  importSummary: '{n} entrée sera ajoutée à « {table} ».',
+  importLeftOut: '{n} ligne sera laissée de côté :',
+  importReason_invalid: '{n} ligne où « {field} » ne peut pas être lu (ligne {rows})',
+  importReason_required:
+    '{n} ligne où « {field} » est vide alors qu’il est obligatoire (ligne {rows})',
+  importReason_tooLong: '{n} ligne où « {field} » est trop long (ligne {rows})',
+  importReason_tooSmall: '{n} ligne où « {field} » est inférieur à {limit} (ligne {rows})',
+  importReason_tooLarge: '{n} ligne où « {field} » est supérieur à {limit} (ligne {rows})',
+  importConfirm: 'Importer {n} entrée',
+  importDone: '{n} entrée importée dans « {table} »',
+  importBatch: '{date} · {file} · {n} entrée',
+  importDeleteBatchConfirm:
+    '{n} entrée de « {file} » va dans Supprimés récemment pendant 30 jours, même si elle a été modifiée depuis.',
 };

@@ -84,6 +84,8 @@ export interface FieldDefinition {
     total?: { rank: number; format(field: Field, sum: number, locale: Locale): string };
   };
   formula?: FormulaType;
+  formulaNumber?(field: Field, value: FieldValue | undefined): number | undefined;
+  formulaProblem?(field: Field): string | undefined;
   numeric?: true;
   inForm?: false;
   filter: {

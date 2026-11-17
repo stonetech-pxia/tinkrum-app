@@ -58,7 +58,7 @@ export const formulaField: FieldDefinitionOf<'formula', typeof schema> = defineF
       message: `${collection.id}.${f.id}: ${problem}`,
     })),
   ai: {
-    doc: '{expression, decimals? 0-4, unit?, currency?} (computed, never typed in: + - * / and parentheses over {fieldId} of number, money, rating, duration or other formula fields of the same table, e.g. "{price} * {qty}"; no required/default)',
+    doc: '{expression, decimals? 0-4, unit?, currency?} (computed, never typed in: + - * / and parentheses over {fieldId} of number, money, rating, duration, checkbox (1 or 0), choice (the value of the chosen option; rule 32) or other formula fields of the same table, e.g. "{price} * {qty}"; no required/default)',
   },
   example: {
     id: 'total',
@@ -84,8 +84,14 @@ function formulaProblems(fieldId: string, expression: string, collection: Collec
       problems.push(`formula uses ${id}, which is not a field of ${collection.id}`);
     else if (!kind(id))
       problems.push(
-        `formula uses ${id}, which is not a number, money, rating, duration, date, time, datetime or formula field`,
+        `formula uses ${id}, which is not a number, money, rating, duration, checkbox, choice, date, time, datetime or formula field`,
       );
+    else {
+      // D-569：单选要有选项带 value 才能算。
+      const ref = fields.find((f) => f.id === id)!;
+      const missing = fieldDefinition(ref.type).formulaProblem?.(ref);
+      if (missing) problems.push(`formula uses ${id}, ${missing}`);
+    }
   }
   if (problems.length > 0) return problems;
   const type = formulaType(parsed.node, (id) => kind(id) ?? null);

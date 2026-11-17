@@ -87,7 +87,7 @@ const NUMBER_SOURCE_PLAIN_KEYS = new Set([
   'days',
   'group',
 ]);
-const SCHEDULE_PLAIN_KEYS = new Set(['id', 'name', 'required', 'type', 'default']);
+const SCHEDULE_PLAIN_KEYS = new Set(['id', 'name', 'required', 'hint', 'type', 'default']);
 
 describe('完整性守护：schema 和登记表多一种东西，能力表少一个就失败', () => {
   const missing = (expected: string[]) => expected.filter((id) => !IDS.has(id));
@@ -146,9 +146,17 @@ describe('完整性守护：schema 和登记表多一种东西，能力表少一
     const whens = ReminderWhenSchema.options.map((o) => {
       const shape = o.shape as Record<string, { value?: string }>;
       if (shape.every) return shape.every.value === 'day' ? 'everyDay' : 'everyWeek';
+      if (shape.before && shape.minutes) return 'beforeMinutes';
       return Object.keys(shape)[0]!;
     });
-    expect(whens.sort()).toEqual(['after', 'before', 'each', 'everyDay', 'everyWeek']);
+    expect(whens.sort()).toEqual([
+      'after',
+      'before',
+      'beforeMinutes',
+      'each',
+      'everyDay',
+      'everyWeek',
+    ]);
     expect(missing(whens.map((w) => `remind.when.${w}`))).toEqual([]);
     const keys = Object.keys(ReminderSchema.shape).filter((k) => !REMINDER_PLAIN_KEYS.has(k));
     expect(missing(keys.map((k) => `remind.${k}`))).toEqual([]);
@@ -187,24 +195,42 @@ function everything() {
     'next7days',
     'next30days',
     'next90days',
+    'yesterday',
+    'lastWeek',
+    'lastMonth',
+    'lastYear',
+    'tomorrow',
+    'nextWeek',
+    'nextMonth',
   ];
   return buildConfig([
     addTable('groups', [text('name', { required: true })]),
     addTable('items', [
       text('title'),
       { id: 'body', name: 'body', type: 'note' },
-      { id: 'qty', name: 'qty', type: 'number' },
+      // D-570：填写提示和范围。
+      { id: 'qty', name: 'qty', type: 'number', min: 0, hint: 'How many' },
       money(),
       { id: 'done', name: 'done', type: 'checkbox' },
       date(),
       { id: 'at', name: 'at', type: 'datetime' },
       { id: 'clock', name: 'clock', type: 'time' },
       { id: 'mins', name: 'mins', type: 'duration' },
-      choice('status', ['a', 'b', 'skip'], { default: 'a' }),
+      {
+        ...choice('status', ['a', 'b', 'skip'], { default: 'a' }),
+        // D-568：选项代表的数和颜色。
+        options: [
+          { id: 'a', label: 'a', value: 1, color: 'green' },
+          { id: 'b', label: 'b' },
+          { id: 'skip', label: 'skip' },
+        ],
+      },
       { id: 'stars', name: 'stars', type: 'rating' },
       { id: 'photo', name: 'photo', type: 'file' },
       link('group', 'groups'),
       { id: 'twice', name: 'twice', type: 'formula', expression: '{qty} * 2' },
+      // D-569：公式读勾选框和单选。
+      { id: 'flags', name: 'flags', type: 'formula', expression: '{done} + {status}' },
       { id: 'group-name', name: 'group-name', type: 'lookup', via: 'group', field: 'name' },
       { id: 'before', name: 'before', type: 'previous', field: 'qty' },
       {
@@ -225,6 +251,13 @@ function everything() {
         readAttachments: true,
         prefillRules: 'receipt',
         recordRow: [{ tool: 'record-vcard' }],
+        // D-570：记录表单分两段，第二段勾了 done 才显示。
+        form: {
+          sections: [
+            { title: 'Main', fields: ['title', 'done'] },
+            { title: 'More', fields: ['body'], when: [{ field: 'done', op: 'is', value: true }] },
+          ],
+        },
       },
     },
     addField('items', { id: 'contact', name: 'contact', type: 'text', format: 'phone' }),
@@ -284,6 +317,12 @@ function everything() {
       [
         form('add-in-item', 'groups', ['name']),
         form('link-in-item', 'items', ['title'], { values: { group: '$record' } }),
+        {
+          id: 'this-group',
+          look: 'single',
+          source: { table: 'groups', record: '$record' },
+          show: { fields: ['name'] },
+        },
       ],
       { of: 'groups' },
     ),
@@ -299,6 +338,13 @@ function everything() {
         values: { at: 'now', status: 'b' },
       }),
       button('bulk', { do: 'setAll', table: 'items', field: 'status', value: 'a' }),
+      button('bulk-create', {
+        do: 'createAll',
+        table: 'items',
+        from: 'groups',
+        filter: [{ field: 'name', op: 'isNotEmpty' }],
+        values: { group: '$row' },
+      }),
       runAction('run-scan', 'scan-item'),
       records('list', 'rows', 'items', 'title', {
         source: { sort: { field: 'date', direction: 'desc' } },
@@ -340,6 +386,34 @@ function everything() {
         look: 'divider',
         showIf: { table: 'items', has: 'none' },
       },
+      records('list', 'relative', 'items', 'title', {
+        tools: [
+          {
+            as: 'button',
+            label: 'Snooze',
+            do: 'set',
+            table: 'items',
+            field: 'date',
+            value: { from: 'today', add: 7, unit: 'days' },
+          },
+          {
+            as: 'button',
+            label: 'Again',
+            do: 'increment',
+            table: 'items',
+            field: 'qty',
+            by: 'qty',
+            also: [{ do: 'set', field: 'date', value: 'today' }],
+          },
+          {
+            as: 'button',
+            label: 'Copy',
+            do: 'create',
+            table: 'items',
+            values: { title: { copy: 'title' } },
+          },
+        ],
+      }),
       records('list', 'browsed', 'items', 'title', {
         show: { browse: { search: true, sort: ['title', 'createdAt'], group: ['status'] } },
         tools: [{ as: 'list', tool: 'export-shown-items' }],
@@ -389,6 +463,14 @@ function everything() {
         },
       }),
       records('list', 'by-schedule', 'items', 'title', { source: { group: { by: 'plan' } } }),
+      records('list', 'by-two', 'items', 'title', {
+        source: {
+          sort: [
+            { field: 'status', direction: 'asc' },
+            { field: 'date', direction: 'desc' },
+          ],
+        },
+      }),
       number('n-goal', 'items', {
         aggregate: 'count',
         goal: 5,
@@ -426,11 +508,23 @@ function everything() {
       chart('c-pie', 'items', 'pie', { aggregate: 'count', group: { by: 'status' } }),
       { id: 'range', look: 'period', show: { options: ['thisWeek', 'thisMonth'], custom: true } },
       number('n-period', 'items', { aggregate: 'count', period: 'page' }),
+      records('list', 'l-period', 'items', 'title', { source: { period: 'page' } }),
       chart('c-compare', 'items', 'bar', {
         aggregate: 'count',
         group: { unit: 'month' },
         compare: 'previous',
         period: 'page',
+      }),
+    ]),
+    addPage('tabs', [
+      { id: 'tabs', look: 'choices', show: {}, source: { table: 'items', field: 'status' } },
+      { id: 'range-2', look: 'period', show: { options: ['thisMonth'] } },
+      number('n-choice', 'items', { aggregate: 'count', choice: 'page', period: 'page' }),
+      records('list', 'l-choice', 'items', 'title', { source: { choice: 'page' } }),
+      chart('c-choice', 'items', 'line', {
+        aggregate: 'count',
+        group: { unit: 'day' },
+        choice: 'page',
       }),
     ]),
     addPage(
@@ -453,6 +547,11 @@ function everything() {
       }),
     ]),
     addTool(reminder('r-day', { every: 'day', at: '09:00' }, 'page:views')),
+    addTool(
+      reminder('r-day-unless', { every: 'day', at: '21:00' }, 'page:views', {
+        unless: { table: 'items', within: 'day' },
+      }),
+    ),
     addTool(reminder('r-week', { every: 'week', days: [1], at: '09:00' }, 'page:views')),
     addTool(
       reminder(
@@ -469,6 +568,9 @@ function everything() {
       }),
     ),
     addTool(reminder('r-after', { after: { table: 'items' }, minutes: 5 }, 'page:views')),
+    addTool(
+      reminder('r-minutes', { before: { table: 'items', field: 'at' }, minutes: 30 }, 'page:views'),
+    ),
     navTo('writes', 'views', 'periods'),
     {
       op: 'addContainer',

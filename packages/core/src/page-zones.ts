@@ -25,6 +25,13 @@ export const pagePeriod = (page: Page): Extract<KnownComponent, { look: 'period'
       !c.hidden && isKnownComponent(c) && c.look === 'period',
   );
 
+/** 页面上的一排选项（D-573）：一页最多一个，隐藏的不算。 */
+export const pageChoices = (page: Page): Extract<KnownComponent, { look: 'choices' }> | undefined =>
+  page.blocks.find(
+    (c): c is Extract<KnownComponent, { look: 'choices' }> =>
+      !c.hidden && isKnownComponent(c) && c.look === 'choices',
+  );
+
 /**
  * 状态要放在页面上的那个列表：搜索、排序、筛选要画在固定区（browse.pin），或者分开的浮动按钮要拿它选出的记录。
  * 隐藏的不算。其余的列表状态在自己的块里。

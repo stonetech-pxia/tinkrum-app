@@ -34,6 +34,14 @@ export type SystemField = (typeof SYSTEM_FIELDS)[number];
 export const FieldRefSchema = z.union([IdSchema, z.enum(SYSTEM_FIELDS)]);
 
 /**
+ * 日期加几天、几个月里的「加几」（负数是往前）：固定的整数，或这一条记录的一个数字字段。算出来的日期字段（D-542）
+ * 和一键记录工具写的日期（D-565）共用。
+ */
+export const OffsetAddSchema = z.union([z.number().int().min(-36_500).max(36_500), IdSchema]);
+export const OffsetUnitSchema = z.enum(['days', 'months']);
+export type OffsetUnit = z.infer<typeof OffsetUnitSchema>;
+
+/**
  * 时间段（筛选、in.records、file.filter 共用）。最近几天是固定几档（D-285）；thisTwoWeeks 从「设置 → 日期」的
  * 锚定日起每 14 天一段，thisHalfMonth 是 1–15 号或 16 号到月底。按「今天」算，今天从几点开始见 calendar.ts。
  * 往后几天（D-537）：今天到今天 + N − 1，和最近 N 天一样含今天（快到期的合同、证件）。
@@ -53,6 +61,14 @@ export const PERIODS = [
   'next7days',
   'next30days',
   'next90days',
+  // 日历上前后的一整段（D-559）：昨天、上周、上月、去年、明天、下周、下月。
+  'yesterday',
+  'lastWeek',
+  'lastMonth',
+  'lastYear',
+  'tomorrow',
+  'nextWeek',
+  'nextMonth',
 ] as const;
 export type Period = (typeof PERIODS)[number];
 
@@ -66,6 +82,11 @@ export const PAGE_PERIODS = [
   'last30days',
   'last90days',
   'last365days',
+  // 已经过去的一整段（D-559）。往后的不放：页面上的范围是看已经记下的。
+  'yesterday',
+  'lastWeek',
+  'lastMonth',
+  'lastYear',
 ] as const;
 export type PagePeriod = (typeof PAGE_PERIODS)[number];
 

@@ -666,6 +666,12 @@ export const AUDIO_IMPLS: Record<string, Impl> = {
       items.length === 1
         ? parts[0]!.text
         : parts.map((p) => `【${p.name}】\n${p.text}`).join('\n\n');
-    return { type: 'text', text, name: items[0]!.name };
+    // 一段录音是用户说的一句话（D-575）：后面接「记一笔」时按它直接填表。几段录音拼起来的不算。
+    return {
+      type: 'text',
+      text,
+      name: items[0]!.name,
+      ...(items.length === 1 ? { spoken: true } : {}),
+    };
   },
 };

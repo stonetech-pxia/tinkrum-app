@@ -21,7 +21,9 @@ import {
   type Reminder,
   type WorkspaceConfig,
 } from '../schema';
+import { recordValue } from '../data';
 import { parseRichText } from '../richtext';
+import { sortList } from '../schema-base';
 import { createStarterWorkspace } from '../starter';
 import { templateOps } from '../templates';
 import { THEME_PRESETS } from '../presets';
@@ -5328,7 +5330,10 @@ const MODULE_EVAL_CASES: readonly EvalCase[] = [
     expect: {
       kind: 'ops',
       check: (c) =>
-        remindersOf(c).some((r) => 'before' in r.when && r.when.days === 3 && r.when.at === '08:00')
+        remindersOf(c).some(
+          (r) =>
+            'before' in r.when && 'days' in r.when && r.when.days === 3 && r.when.at === '08:00',
+        )
           ? null
           : `expected a dateField reminder 3 days before at 08:00, got ${JSON.stringify(remindersOf(c))}`,
     },
@@ -5564,7 +5569,10 @@ function scheduleProblem(
     return `expected a list of ${table.id} filtered with due ${want.due}`;
   if (
     want.sortAsc &&
-    !sources.some((p) => p.sort?.field === field.id && p.sort.direction === 'asc')
+    !sources.some((p) => {
+      const first = sortList(p.sort)[0];
+      return first?.field === field.id && first.direction === 'asc';
+    })
   )
     return `expected a list of ${table.id} sorted by ${field.id} ascending`;
   return null;
@@ -7882,6 +7890,7 @@ const DATE_OFFSET_USE_CASES: readonly EvalCase[] = [
         remindersOf(c).some(
           (r) =>
             'before' in r.when &&
+            'days' in r.when &&
             r.when.before.table === 'contracts' &&
             r.when.before.field === 'ends' &&
             r.when.days === 30,
@@ -7906,6 +7915,1052 @@ const DATE_OFFSET_USE_CASES: readonly EvalCase[] = [
           ? null
           : 'expected a contracts calendar grouped by ends',
     },
+  },
+];
+
+/** 植物有自己的页面（page.of），上面列出它的浇水记录（D-342）。 */
+const plantPageEarlier: EvalEarlier = {
+  input: 'Log waterings for each plant, and open a plant to see its waterings',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'waterings',
+        name: 'Waterings',
+        fields: [
+          { id: 'date', name: 'Date', type: 'date', default: 'today' },
+          { id: 'plant', name: 'Plant', type: 'link', table: 'plants' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'plant',
+        title: 'Plant',
+        of: 'plants',
+        blocks: [
+          {
+            id: 'its-waterings',
+            look: 'list',
+            source: {
+              table: 'waterings',
+              limit: 30,
+              filter: [{ field: 'plant', op: 'is', value: '$record' }],
+            },
+            show: { title: 'date' },
+          },
+        ],
+      },
+    },
+    { op: 'updateContainer', page: 'plants-page', block: 'all', changes: { opens: 'plant' } },
+  ],
+};
+/** 给一条植物用的页面上显示打开的那一条（D-558）。 */
+const showsOpenedPlant = (c: WorkspaceConfig) =>
+  c.containers.pages
+    .filter((p) => p.of === 'plants')
+    .flatMap((p) => allComponents(p))
+    .some(
+      (x) =>
+        x.look === 'single' &&
+        x.source.table === 'plants' &&
+        x.source.record === '$record' &&
+        x.show.fields.includes('photos'),
+    )
+    ? null
+    : 'expected a single block on the plant page with source.record "$record" showing photos';
+
+// 记录页上显示这一条自己的字段（D-558）。
+const OPENED_RECORD_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG15',
+    input: "On the plant page, show the plant's photo and name at the top",
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [plantsEarlier, plantPageEarlier],
+    expect: { kind: 'ops', check: showsOpenedPlant },
+  },
+  {
+    id: 'KG16',
+    input: '植物页最上面显示这株植物的照片和名字',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [plantsEarlier, plantPageEarlier],
+    expect: { kind: 'ops', check: showsOpenedPlant },
+  },
+];
+
+/** 账单表：名字、金额、到期日，一页列出来。 */
+const billsEarlier: EvalEarlier = {
+  input:
+    'Make a table of my bills with a name, an amount and a due date, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'bills',
+        name: 'Bills',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'amount', name: 'Amount', type: 'money', currency: 'USD' },
+          { id: 'due', name: 'Due date', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'bills-page',
+        title: 'Bills',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'bills', limit: 50 },
+            show: { title: 'name' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+// 日历上前后的时间段（D-559）。
+const NEIGHBOUR_PERIOD_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG17',
+    input: "Add a list of last month's bills",
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [billsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        recordBlocksOf(c, 'bills').some((x) =>
+          (x.source.filter ?? []).some(
+            (f) => f.field === 'due' && f.op === 'inPeriod' && f.value === 'lastMonth',
+          ),
+        )
+          ? null
+          : 'expected a bills list filtered on due inPeriod lastMonth',
+    },
+  },
+  {
+    id: 'KG18',
+    input: '记账页面加一个数字：上个月一共花了多少',
+    locale: 'zh',
+    setup: 'budget',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        numbersOf(c, 'expenses').some(
+          (x) =>
+            x.source.aggregate === 'sum' &&
+            (x.source.filter ?? []).some((f) => f.op === 'inPeriod' && f.value === 'lastMonth'),
+        )
+          ? null
+          : 'expected a sum number on expenses filtered inPeriod lastMonth',
+    },
+  },
+];
+
+/** 任务表：优先级（高、中、低）和到期日，一页列出来。 */
+const prioritiesEarlier: EvalEarlier = {
+  input:
+    'Make a table of my tasks with a priority (high, medium, low) and a due date, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'tasks',
+        name: 'Tasks',
+        fields: [
+          { id: 'title', name: 'Title', type: 'text', required: true },
+          {
+            id: 'priority',
+            name: 'Priority',
+            type: 'choice',
+            options: [
+              { id: 'high', label: 'High' },
+              { id: 'medium', label: 'Medium' },
+              { id: 'low', label: 'Low' },
+            ],
+          },
+          { id: 'due', name: 'Due date', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'tasks-page',
+        title: 'Tasks',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'tasks', limit: 50 },
+            show: { title: 'title' },
+          },
+        ],
+      },
+    },
+  ],
+};
+/** 任务列表先按优先级（高在前）再按到期日（早的在前）排（D-560）。 */
+const byPriorityThenDue = (c: WorkspaceConfig) =>
+  recordBlocksOf(c, 'tasks').some((x) => {
+    const keys = sortList(x.source.sort);
+    return (
+      keys.length >= 2 &&
+      keys[0]!.field === 'priority' &&
+      keys[0]!.direction === 'asc' &&
+      keys[1]!.field === 'due' &&
+      keys[1]!.direction === 'asc'
+    );
+  })
+    ? null
+    : 'expected a tasks list sorted by [priority asc, due asc]';
+
+// 按几个字段依次排（D-560）。
+const SORT_MANY_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG19',
+    input: 'Sort my tasks by priority, and tasks with the same priority by due date',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [prioritiesEarlier],
+    expect: { kind: 'ops', check: byPriorityThenDue },
+  },
+  {
+    id: 'KG20',
+    input: "Trie mes tâches par priorité, puis par date d'échéance",
+    locale: 'fr',
+    setup: 'default',
+    mock: false,
+    earlier: [prioritiesEarlier],
+    expect: { kind: 'ops', check: byPriorityThenDue },
+  },
+];
+
+/** 记账页上已经有一个时间范围（本月、本星期）和跟着它的柱状图（D-440）。 */
+const budgetRangeEarlier: EvalEarlier = {
+  input: '记账页面加一个时间范围，可以选本月和本星期，柱状图跟着变',
+  ops: [
+    {
+      op: 'addContainer',
+      page: 'budget',
+      block: { id: 'range', look: 'period', show: { options: ['thisMonth', 'thisWeek'] } },
+    } as Op,
+    {
+      op: 'addContainer',
+      page: 'budget',
+      block: {
+        id: 'by-day',
+        look: 'chart',
+        show: { kind: 'bar', title: 'Spending' },
+        source: {
+          table: 'expenses',
+          aggregate: 'sum',
+          field: 'amount',
+          group: { unit: 'day', by: 'date' },
+          period: 'page',
+        },
+      },
+    } as Op,
+  ],
+};
+/** 记账页上读 expenses 的记录块（月历除外）都跟着时间范围（D-561）。 */
+const expenseListsFollow = (c: WorkspaceConfig) => {
+  const lists = recordBlocksOf(c, 'expenses').filter((x) => x.look !== 'calendar');
+  return lists.length > 0 && lists.every((x) => x.source.period === 'page')
+    ? null
+    : `expected the expenses lists to have source.period "page", got ${JSON.stringify(lists.map((x) => x.source.period))}`;
+};
+
+// 页面上的时间范围也管记录列表（D-561）。
+const LIST_PERIOD_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG21',
+    input: '下面的账目列表也跟着时间范围变',
+    locale: 'zh',
+    setup: 'budget',
+    mock: false,
+    earlier: [budgetRangeEarlier],
+    expect: { kind: 'ops', check: expenseListsFollow },
+  },
+  {
+    id: 'KG22',
+    input:
+      'On the budget page, let me switch between this month and last month, and have everything on the page follow it',
+    locale: 'en',
+    setup: 'budget',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const periods = c.containers.pages
+          .flatMap((p) => allComponents(p))
+          .filter((x): x is ComponentOf<'period'> => x.look === 'period');
+        if (periods.length !== 1) return 'expected one period block';
+        const options = [...periods[0]!.show.options].sort().join();
+        if (options !== 'lastMonth,thisMonth')
+          return `expected this month and last month, got ${options}`;
+        return expenseListsFollow(c);
+      },
+    },
+  },
+];
+
+/** 预约表：做什么、什么时候（日期时间），一页列出来。 */
+const appointmentsEarlier: EvalEarlier = {
+  input:
+    'Make a table of my appointments with what it is and when (date and time), and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'appointments',
+        name: 'Appointments',
+        fields: [
+          { id: 'what', name: 'What', type: 'text', required: true },
+          { id: 'when', name: 'When', type: 'datetime' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'appointments-page',
+        title: 'Appointments',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'appointments', limit: 50 },
+            show: { title: 'what', trailing: 'when' },
+          },
+        ],
+      },
+    },
+  ],
+};
+const minutesBefore = (minutes: number) => (c: WorkspaceConfig) =>
+  remindersOf(c).some(
+    (r) =>
+      'before' in r.when &&
+      'minutes' in r.when &&
+      r.when.before.table === 'appointments' &&
+      r.when.before.field === 'when' &&
+      r.when.minutes === minutes,
+  )
+    ? null
+    : `expected a reminder ${minutes} minutes before appointments.when, got ${JSON.stringify(remindersOf(c).map((r) => r.when))}`;
+
+// 日期时间前几分钟提醒（D-562）。
+const MINUTES_BEFORE_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG23',
+    input: 'Remind me 30 minutes before each appointment',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [appointmentsEarlier],
+    expect: { kind: 'ops', check: minutesBefore(30) },
+  },
+  {
+    id: 'KG24',
+    input: '每个预约提前一小时提醒我',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [appointmentsEarlier],
+    expect: { kind: 'ops', check: minutesBefore(60) },
+  },
+];
+
+/** 每天 / 每周的提醒，那天（那周）expenses 里已经有记录就不响（D-563）。 */
+const quietWhenLogged = (every: 'day' | 'week', within: 'day' | 'week') => (c: WorkspaceConfig) =>
+  remindersOf(c).some(
+    (r) =>
+      'every' in r.when &&
+      r.when.every === every &&
+      r.unless?.table === 'expenses' &&
+      r.unless.within === within &&
+      r.unless.link === undefined,
+  )
+    ? null
+    : `expected an every ${every} reminder with unless {table: expenses, within: ${within}}, got ${JSON.stringify(remindersOf(c))}`;
+
+// 每天、每周的提醒，已经做了就不响（D-563）。
+const UNLESS_REPEATING_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG25',
+    input: "Remind me at 9 pm to log my expenses, but only if I haven't logged any today",
+    locale: 'en',
+    setup: 'budget',
+    mock: false,
+    expect: { kind: 'ops', check: quietWhenLogged('day', 'day') },
+  },
+  {
+    id: 'KG26',
+    input: '每周日晚上提醒我记账，这周已经记过就不用提醒',
+    locale: 'zh',
+    setup: 'budget',
+    mock: false,
+    expect: { kind: 'ops', check: quietWhenLogged('week', 'week') },
+  },
+];
+
+/** 商品表（价格）和订单表（引用商品、价格），一页列出商品（D-565）。 */
+const productsEarlier: EvalEarlier = {
+  input:
+    'Make a table of products with a name and a price, a table of orders linked to a product with a price, and a page that lists the products',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'products',
+        name: 'Products',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'price', name: 'Price', type: 'money', currency: 'EUR' },
+        ],
+      },
+    },
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'product', name: 'Product', type: 'link', table: 'products' },
+          { id: 'price', name: 'Price', type: 'money', currency: 'EUR' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'products-page',
+        title: 'Products',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'products', limit: 50 },
+            show: { title: 'name' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
+
+// 一键记录工具写从今天、从这一条起算的日期，抄这一条的值（D-565）。
+const RELATIVE_VALUE_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG27',
+    input: 'Add a Snooze button on each bill that moves its due date one week later',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [billsEarlier],
+    expect: {
+      kind: 'ops',
+      check: actionCheck(
+        'rows',
+        (a) =>
+          a.do === 'set' &&
+          a.table === 'bills' &&
+          a.field === 'due' &&
+          isObj(a.value) &&
+          (a.value.from === 'due' || a.value.from === 'today') &&
+          a.value.unit === 'days' &&
+          a.value.add === 7,
+        'a row button setting due to {from: due or today, add: 7, unit: days}',
+      ),
+    },
+  },
+  {
+    id: 'KG28',
+    input: '在每个商品旁边加一个「下单」按钮，按商品现在的价格新建一条订单',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [productsEarlier],
+    expect: {
+      kind: 'ops',
+      check: actionCheck(
+        'rows',
+        (a) =>
+          a.do === 'create' &&
+          a.table === 'orders' &&
+          values(a).product === '$row' &&
+          isObj(values(a).price) &&
+          (values(a).price as { copy?: string }).copy === 'price',
+        'a row button creating an order with product "$row" and price {copy: "price"}',
+      ),
+    },
+  },
+];
+
+/** 发货：订单有状态和发货日期（D-566）。 */
+const shippingEarlier: EvalEarlier = {
+  input:
+    'Make a table of orders with an item, a status and a ship date, and a page that lists them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'item', name: 'Item', type: 'text', required: true },
+          {
+            id: 'status',
+            name: 'Status',
+            type: 'choice',
+            options: [
+              { id: 'new', label: 'New' },
+              { id: 'shipped', label: 'Shipped' },
+            ],
+          },
+          { id: 'shipped-on', name: 'Ship date', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'orders-page',
+        title: 'Orders',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'orders', limit: 50 },
+            show: { title: 'item' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+/** 习惯（上次完成）和打卡（引用习惯）（D-566）。 */
+const habitLogEarlier: EvalEarlier = {
+  input: '建一个习惯表（名字、上次完成）和打卡表（习惯、日期），再做一页列出习惯',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'habits',
+        name: '习惯',
+        fields: [
+          { id: 'name', name: '名字', type: 'text', required: true },
+          { id: 'last', name: '上次完成', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addData',
+      table: {
+        id: 'checkins',
+        name: '打卡',
+        fields: [
+          { id: 'habit', name: '习惯', type: 'link', table: 'habits' },
+          { id: 'day', name: '日期', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'habits-page',
+        title: '习惯',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'habits', limit: 50 },
+            show: { title: 'name' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+/** 一个工具点一下要做的几处（工具本身加 also）。 */
+const writesOf = (a: AnyAction): AnyAction[] => [
+  a,
+  ...((Array.isArray(a.also) ? a.also : []) as AnyAction[]),
+];
+
+// 点一下改这一条的几处（D-566）。
+const TAP_ALSO_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG29',
+    input:
+      'Add a Ship button on each order that marks it shipped and sets the ship date to today in one tap',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [shippingEarlier],
+    expect: {
+      kind: 'ops',
+      check: actionCheck(
+        'rows',
+        (a) => {
+          const w = writesOf(a);
+          return (
+            Array.isArray(a.also) &&
+            w.some((x) => x.do === 'set' && x.field === 'status' && x.value === 'shipped') &&
+            w.some((x) => x.do === 'set' && x.field === 'shipped-on' && x.value === 'today')
+          );
+        },
+        'one row tool setting status shipped with also setting shipped-on today',
+      ),
+    },
+  },
+  {
+    id: 'KG30',
+    input: '每个习惯旁边放一个「完成」，点一下记一条打卡，同时把这个习惯的上次完成改成今天',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [habitLogEarlier],
+    expect: {
+      kind: 'ops',
+      check: actionCheck(
+        'rows',
+        (a) => {
+          const w = writesOf(a);
+          return (
+            Array.isArray(a.also) &&
+            w.some(
+              (x) => x.do === 'create' && x.table === 'checkins' && values(x).habit === '$row',
+            ) &&
+            w.some((x) => x.do === 'set' && x.field === 'last' && x.value === 'today')
+          );
+        },
+        'one row tool creating a check-in for "$row" with also setting last to today',
+      ),
+    },
+  },
+];
+
+/** 客户（老客户、常用金额）和订单（引用客户、金额、日期），一页列出客户（D-567）。 */
+const customersEarlier: EvalEarlier = {
+  input:
+    'Make a table of customers with a name, a regular checkbox and a usual amount, a table of orders linked to a customer with an amount and a date, and a page that lists the customers',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'customers',
+        name: 'Customers',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'regular', name: 'Regular', type: 'checkbox' },
+          { id: 'usual', name: 'Usual amount', type: 'money', currency: 'EUR' },
+        ],
+      },
+    },
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'customer', name: 'Customer', type: 'link', table: 'customers' },
+          { id: 'amount', name: 'Amount', type: 'money', currency: 'EUR' },
+          { id: 'date', name: 'Date', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'customers-page',
+        title: 'Customers',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'customers', limit: 50 },
+            show: { title: 'name' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+/** 一个按钮批量新建订单：每个老客户一条，引用这个客户（D-567）。 */
+const createsMonthlyOrders = (copiesAmount: boolean) =>
+  actionCheck(
+    'buttons',
+    (a) =>
+      a.do === 'createAll' &&
+      a.table === 'orders' &&
+      a.from === 'customers' &&
+      values(a).customer === '$row' &&
+      ((a.filter ?? []) as { field: string }[]).some((f) => f.field === 'regular') &&
+      (!copiesAmount || (values(a).amount as { copy?: string } | undefined)?.copy === 'usual'),
+    `a createAll button from regular customers into orders with customer "$row"${copiesAmount ? ' and amount {copy: "usual"}' : ''}`,
+  );
+
+// 批量新建（D-567）。
+const CREATE_ALL_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG31',
+    input:
+      "Add a button that creates this month's order for every regular customer, with the customer's usual amount",
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [customersEarlier],
+    expect: { kind: 'ops', check: createsMonthlyOrders(true) },
+  },
+  {
+    id: 'KG32',
+    input: '加一个按钮，一点就给每个老客户各新建一条订单',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [customersEarlier],
+    expect: { kind: 'ops', check: createsMonthlyOrders(false) },
+  },
+];
+
+const statusOptions = (c: WorkspaceConfig) => {
+  const f = c.data.tables.find((t) => t.id === 'orders')?.fields.find((x) => x.id === 'status');
+  return f?.type === 'choice' ? f.options : [];
+};
+
+// 选项的颜色（D-568）。
+const OPTION_COLOR_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG33',
+    input: 'Show cancelled orders in red and delivered ones in green',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [ordersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const color = (id: string) => statusOptions(c).find((o) => o.id === id)?.color;
+        if (color('cancelled') !== 'red' || color('delivered') !== 'green')
+          return `expected status options cancelled red and delivered green, got ${color('cancelled')} / ${color('delivered')}`;
+        return recordBlocksOf(c, 'orders').some((x) => x.show.color === 'status')
+          ? null
+          : 'expected an orders block coloured by status';
+      },
+    },
+  },
+];
+
+/** 订阅表：价格和计费周期（选项还没有数）。 */
+const subsEarlier: EvalEarlier = {
+  input: 'Make a table of my subscriptions with a name, a price and a billing cycle',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'subs',
+        name: 'Subscriptions',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'price', name: 'Price', type: 'money', currency: 'USD' },
+          {
+            id: 'cycle',
+            name: 'Billing cycle',
+            type: 'choice',
+            options: [
+              { id: 'monthly', label: 'Monthly' },
+              { id: 'yearly', label: 'Yearly' },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+};
+/** 账单表：金额和「已付」勾选框。 */
+const paidBillsEarlier: EvalEarlier = {
+  input: '做一个账单表：名称、金额、已付',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'bills',
+        name: '账单',
+        fields: [
+          { id: 'name', name: '名称', type: 'text', required: true },
+          { id: 'amount', name: '金额', type: 'money', currency: 'CNY' },
+          { id: 'paid', name: '已付', type: 'checkbox' },
+        ],
+      },
+    },
+  ],
+};
+/** 按一条假想的记录算表里的公式字段，看有没有一个给出 want。 */
+const formulaGives = (
+  c: WorkspaceConfig,
+  table: string,
+  values: Record<string, unknown>,
+  want: number,
+) => {
+  const t = c.data.tables.find((x) => x.id === table);
+  if (!t) return false;
+  const record = { id: 'x', collectionId: table, values, createdAt: 0, updatedAt: 0 };
+  return t.fields.some(
+    (f) => f.type === 'formula' && recordValue(record, t, f.id, new Date()) === want,
+  );
+};
+
+// 公式读勾选框和单选（D-569）。
+const FORMULA_CHOICE_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG34',
+    input:
+      'Add a cost per year to my subscriptions: the price times 12 when billed monthly, times 1 when yearly',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [subsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        formulaGives(c, 'subs', { price: 10, cycle: 'monthly' }, 120) &&
+        formulaGives(c, 'subs', { price: 10, cycle: 'yearly' }, 10)
+          ? null
+          : 'expected a formula giving price × 12 for monthly and price × 1 for yearly',
+    },
+  },
+  {
+    id: 'KG35',
+    input: '账单加一个「未付金额」：勾了已付就是 0，没勾就是金额',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [paidBillsEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        formulaGives(c, 'bills', { amount: 30, paid: false }, 30) &&
+        formulaGives(c, 'bills', { amount: 30, paid: true }, 0)
+          ? null
+          : 'expected a formula giving the amount when not paid and 0 when paid',
+    },
+  },
+];
+
+/** 订单表：有「要发票」和发票的几项。 */
+const invoiceOrdersEarlier: EvalEarlier = {
+  input: 'Make a table of my orders: item, quantity, needs invoice, tax number, company name',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'item', name: 'Item', type: 'text', required: true },
+          { id: 'qty', name: 'Quantity', type: 'number' },
+          { id: 'invoice', name: 'Needs invoice', type: 'checkbox' },
+          { id: 'tax-no', name: 'Tax number', type: 'text' },
+          { id: 'company', name: 'Company name', type: 'text' },
+        ],
+      },
+    },
+  ],
+};
+const ordersTable = (c: WorkspaceConfig) => c.data.tables.find((t) => t.id === 'orders');
+
+// 记录表单的分段、条件、提示和范围（D-570）。
+const ENTRY_FORM_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG36',
+    input:
+      'In the order form, put the tax number and company name in an Invoice section that only shows when Needs invoice is ticked',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [invoiceOrdersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const sections = ordersTable(c)?.form?.sections ?? [];
+        const invoice = sections.find(
+          (s) => s.fields.includes('tax-no') && s.fields.includes('company'),
+        );
+        if (!invoice) return 'expected a form section holding tax-no and company';
+        return (invoice.when ?? []).some(
+          (w) => w.field === 'invoice' && w.op === 'is' && w.value === true,
+        )
+          ? null
+          : 'expected that section to show when invoice is true';
+      },
+    },
+  },
+  {
+    id: 'KG37',
+    input: '数量至少是 1；税号下面提示一句「15 或 18 位」',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [invoiceOrdersEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const fields = ordersTable(c)?.fields ?? [];
+        const qty = fields.find((f) => f.id === 'qty');
+        const tax = fields.find((f) => f.id === 'tax-no');
+        if (qty?.type !== 'number' || qty.min !== 1)
+          return `expected qty min 1, got ${JSON.stringify(qty)}`;
+        return tax && 'hint' in tax && /15/.test(tax.hint ?? '') && /18/.test(tax.hint ?? '')
+          ? null
+          : 'expected a hint on tax-no mentioning 15 and 18';
+      },
+    },
+  },
+];
+
+/** 销售页：订单表（状态：待发货、已发货、完成），页上有列表、合计和按月的柱状图。 */
+const salesEarlier: EvalEarlier = {
+  input:
+    'Make an orders table (item, amount, date, status: To ship / Shipped / Done) and a Sales page with the list, the total and a monthly chart',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'orders',
+        name: 'Orders',
+        fields: [
+          { id: 'item', name: 'Item', type: 'text', required: true },
+          { id: 'amount', name: 'Amount', type: 'money', currency: 'USD' },
+          { id: 'date', name: 'Date', type: 'date', default: 'today' },
+          {
+            id: 'status',
+            name: 'Status',
+            type: 'choice',
+            options: [
+              { id: 'to-ship', label: 'To ship' },
+              { id: 'shipped', label: 'Shipped' },
+              { id: 'done', label: 'Done' },
+            ],
+          },
+        ],
+      },
+    } as Op,
+    {
+      op: 'addContainer',
+      page: {
+        id: 'sales',
+        title: 'Sales',
+        blocks: [
+          {
+            id: 'order-list',
+            look: 'list',
+            source: { table: 'orders', sort: { field: 'date', direction: 'desc' }, limit: 30 },
+            show: { title: 'item', subtitles: ['status'], trailing: 'amount' },
+          },
+          {
+            id: 'order-total',
+            look: 'number',
+            show: { label: 'Total' },
+            source: { table: 'orders', aggregate: 'sum', field: 'amount' },
+          },
+          {
+            id: 'by-month',
+            look: 'chart',
+            show: { kind: 'bar', title: 'Sales by month' },
+            source: {
+              table: 'orders',
+              aggregate: 'sum',
+              field: 'amount',
+              group: { unit: 'month', by: 'date' },
+            },
+          },
+        ],
+      },
+    } as Op,
+  ],
+};
+/** 销售页上已经有一个时间范围（本月、今年），三个块都跟着它（D-440、D-561）。 */
+const salesRangeEarlier: EvalEarlier = {
+  input: '销售页加一个时间范围，本月和今年，列表、合计和图表都跟着变',
+  ops: [
+    {
+      op: 'addContainer',
+      page: 'sales',
+      block: { id: 'range', look: 'period', show: { options: ['thisMonth', 'thisYear'] } },
+    } as Op,
+    ...['order-list', 'order-total', 'by-month'].map(
+      (block) =>
+        ({
+          op: 'updateContainer',
+          page: 'sales',
+          block,
+          changes: { source: { period: 'page' } },
+        }) as Op,
+    ),
+  ],
+};
+/** 销售页上有一排按状态切换的选项，列表、合计和图表都跟着它（D-573）。 */
+const salesFollowChoices = (c: WorkspaceConfig, period: boolean) => {
+  const page = c.containers.pages.find((p) => p.id === 'sales');
+  if (!page) return 'expected the sales page';
+  const rows = page.blocks.filter((b): b is ComponentOf<'choices'> => b.look === 'choices');
+  if (rows.length !== 1) return `expected one choices block, got ${rows.length}`;
+  const row = rows[0]!;
+  if (row.source.table !== 'orders' || row.source.field !== 'status')
+    return `expected the row on orders.status, got ${JSON.stringify(row.source)}`;
+  const followers = allComponents(page).filter(
+    (b) => (b.look === 'list' || b.look === 'number' || b.look === 'chart') && 'source' in b,
+  ) as { id: string; source: { choice?: string; period?: string } }[];
+  const off = followers.filter((b) => b.source.choice !== 'page').map((b) => b.id);
+  if (followers.length < 3 || off.length > 0)
+    return `expected the list, the total and the chart to have source.choice "page"; not: ${off.join()}`;
+  if (period) {
+    if (!page.blocks.some((b) => b.look === 'period')) return 'expected the period block kept';
+    const lost = followers.filter((b) => b.source.period !== 'page').map((b) => b.id);
+    if (lost.length > 0) return `expected the blocks to keep source.period "page": ${lost.join()}`;
+  }
+  return null;
+};
+
+// 页面上的一排选项，页上的块跟着它（D-573）。
+const PAGE_CHOICE_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG38',
+    input: 'Add tabs at the top of the Sales page to switch between To ship, Shipped and Done',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [salesEarlier],
+    expect: { kind: 'ops', check: (c) => salesFollowChoices(c, false) },
+  },
+  {
+    id: 'KG39',
+    input: '销售页上再加一排按状态切换，只看待发货或者已发货',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [salesEarlier, salesRangeEarlier],
+    expect: { kind: 'ops', check: (c) => salesFollowChoices(c, true) },
   },
 ];
 
@@ -7966,6 +9021,19 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...MARK_CASES,
   ...DATE_OFFSET_CASES,
   ...DATE_OFFSET_USE_CASES,
+  ...OPENED_RECORD_CASES,
+  ...NEIGHBOUR_PERIOD_CASES,
+  ...SORT_MANY_CASES,
+  ...LIST_PERIOD_CASES,
+  ...MINUTES_BEFORE_CASES,
+  ...UNLESS_REPEATING_CASES,
+  ...RELATIVE_VALUE_CASES,
+  ...TAP_ALSO_CASES,
+  ...CREATE_ALL_CASES,
+  ...OPTION_COLOR_CASES,
+  ...FORMULA_CHOICE_CASES,
+  ...ENTRY_FORM_CASES,
+  ...PAGE_CHOICE_CASES,
 ];
 
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };

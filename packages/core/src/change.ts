@@ -2,7 +2,7 @@ import { scopeProblems, tagNewForApp } from './app-scope';
 import { describeChange } from './describe';
 import { newFileRefs, restoreFileRefs } from './file-refs';
 import { migrateWorkspace } from './migrate';
-import { OpListSchema, applyOps } from './ops';
+import { AppFileOpListSchema, OpListSchema, applyOps } from './ops';
 import type { Registry } from './registry';
 import type { Locale, WorkspaceConfig } from './schema';
 import { validateWorkspace } from './validate';
@@ -27,6 +27,11 @@ export interface ChangeContext {
    * 从主页改不带这一项（整个工作区）。
    */
   scope?: { appId: string };
+  /**
+   * 操作来自一个 App 文件（导入、恢复初始样子，D-554）：不受一次修改 30 步的限制，配置本身的上限照管。
+   * 和 fromAI 一起出现时不算（AI 的计划永远最多 30 步）。
+   */
+  fromAppFile?: boolean;
 }
 
 export type PreparedChange =
@@ -39,7 +44,8 @@ export function prepareOps(
   rawOps: unknown,
   ctx: ChangeContext,
 ): PreparedChange {
-  const parsed = OpListSchema.safeParse(rawOps);
+  const schema = ctx.fromAppFile && !ctx.fromAI ? AppFileOpListSchema : OpListSchema;
+  const parsed = schema.safeParse(rawOps);
   if (!parsed.success) {
     return { ok: false, stage: 'parse', issues: issueLines(parsed.error) };
   }

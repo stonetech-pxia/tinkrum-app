@@ -46,6 +46,11 @@ describe('rule 13: a tool never triggers another tool', () => {
     expect(RecordToolSchema.safeParse({ do: 'create', table: 't', tool: 'x' }).success).toBe(false);
     // 块上的就地工具也不能顺带引用一个工具。
     expect(ToolUseSchema.safeParse({ do: 'create', table: 't', tool: 'x' }).success).toBe(false);
+    // 批量新建（D-567）是固定的一种工具：没有步骤、不引用工具；一条一条由引擎做，配置里没有循环。
+    const bulk = { do: 'createAll', table: 't', from: 's', values: {} };
+    expect(RecordToolSchema.safeParse(bulk).success).toBe(true);
+    for (const extra of [{ tool: 'x' }, { steps: [] }, { then: { do: 'create', table: 't' } }])
+      expect(RecordToolSchema.safeParse({ ...bulk, ...extra }).success).toBe(false);
   });
 
   it('a quick action step is a catalog action, never another quick action or reminder', () => {
@@ -72,7 +77,7 @@ describe('rule 13: a tool never triggers another tool', () => {
     expect(Object.keys(ReminderSchema.shape)).not.toContain('steps');
   });
 
-  it("a reminder's done acts on this entry: setAll and ask are rejected", () => {
+  it("a reminder's done acts on this entry: setAll, createAll and ask are rejected", () => {
     const config = fromV33(v33Fixture('default-en'));
     config.data.tables.push({
       id: 'plants',
@@ -103,6 +108,20 @@ describe('rule 13: a tool never triggers another tool', () => {
       /done acts on this entry/,
     );
     expect(withDone({ do: 'create', table: 'plants', ask: 'all' })).toMatch(/can't ask/);
+    // 批量新建（D-567）也不行：「完成」只改这一条。
+    expect(
+      withDone({ do: 'createAll', table: 'plants', from: 'notes', values: { watered: 'today' } }),
+    ).toMatch(/done acts on this entry.*not createAll/);
+    // 点一下改几处（D-566）也不行：通知上没有撤销提示条。
+    expect(
+      withDone({
+        do: 'set',
+        table: 'plants',
+        field: 'watered',
+        value: 'today',
+        also: [{ do: 'set', field: 'name', value: null }],
+      }),
+    ).not.toBe('');
     // 关系规则 12：「完成」写的是这一条（when.each.table）。
     expect(withDone({ do: 'set', table: 'notes', field: 'watered', value: 'today' })).toMatch(
       /so table must be plants, not notes/,

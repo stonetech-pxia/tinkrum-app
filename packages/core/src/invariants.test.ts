@@ -16,8 +16,16 @@ import { en, enSingular } from './messages/en';
 import { fr, frSingular } from './messages/fr';
 import { zh } from './messages/zh';
 import { migrateWorkspace } from './migrate';
+import { ruleEngine } from './prefill/engine';
 import { applyOps, OpSchema, type Op } from './ops';
-import { MAX_SET_ALL, PICK_TOOLS, RecordToolSchema, ToolUseSchema } from './record-ops-schema';
+import {
+  MAX_CREATE_ALL,
+  MAX_SET_ALL,
+  MAX_TAP_WRITES,
+  PICK_TOOLS,
+  RecordToolSchema,
+  ToolUseSchema,
+} from './record-ops-schema';
 import {
   allComponents,
   CollectionSchema,
@@ -29,6 +37,7 @@ import {
   type WorkspaceConfig,
 } from './schema';
 import { planDocument } from './prefill/code-rules';
+import { IMPORT_LIMITS, importLimitProblem } from './records-import';
 import { sampleOps } from './samples';
 import { createStarterWorkspace } from './starter';
 import { fromV33, registry, v33Fixture } from './test-helpers';
@@ -207,6 +216,35 @@ describe('底线 1 / 2 / 14：保存的预设不在配置里（D-410）', () => 
       WorkspaceConfigSchema.safeParse({ ...config, presets: [{ id: 'p', name: SENTINEL }] })
         .success,
     ).toBe(false);
+  });
+});
+
+describe('底线 2：本机模型从文件读的只给候选，只有用户为这一笔说的话才直接填（D-396、D-575）', () => {
+  const fields = [
+    { id: 'title', name: '事项', type: 'text' as const },
+    { id: 'due', name: '截止日期', type: 'date' as const },
+    { id: 'amount', name: '金额', type: 'money' as const, currency: 'CNY' },
+  ];
+  const page = (text: string) => ({
+    width: 600,
+    height: 40,
+    lines: [{ text, x: 0, y: 0, width: 600, height: 24 }],
+  });
+  const sure = (out: Record<string, { sure?: boolean }[]>) =>
+    Object.values(out)
+      .flat()
+      .some((s) => s.sure === true);
+
+  it('同一句话：从文件读出来的没有一个直接填，说出来的才有', async () => {
+    const text = '明天交房租 2026-11-18 金额 3000元';
+    const base = {
+      fields,
+      pages: [page(text)],
+      locale: 'zh' as const,
+      now: new Date(2026, 10, 17),
+    };
+    expect(sure(await ruleEngine(base))).toBe(false);
+    expect(sure(await ruleEngine({ ...base, spoken: true }))).toBe(true);
   });
 });
 
@@ -923,9 +961,10 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
   });
 });
 
-describe('底线 11：写数据的操作都能挽回；只有删除弹撤销提示；批量修改一定先问', () => {
-  // 删除弹撤销、其余写入（表单、打勾、一键新建、+1、点圆块）不弹：mobile 的 invariants-test.tsx；setAll 先问、
-  // 改完不弹撤销：mobile 的 record-actions-test.tsx；拖看板：tiles-board-test.tsx；桌面小组件：widgets-journeys-test.tsx。
+describe('底线 11：写数据的操作都能挽回；一个简单操作改不回来的才弹撤销（删除、点一下改几处、批量新建、导入的一批）；批量修改一定先问', () => {
+  // 删除弹撤销、点一下改几处弹撤销（D-566）、其余写入（表单、打勾、一键新建、+1、点圆块）不弹：mobile 的 invariants-test.tsx；
+  // setAll 先问、改完不弹撤销：mobile 的 record-actions-test.tsx；点一下改几处：record-tap-also-test.tsx；
+  // 拖看板：tiles-board-test.tsx；桌面小组件：widgets-journeys-test.tsx。
   it('asking before a bulk change does not promise an undo', () => {
     for (const text of [
       en.recordActionConfirm,
@@ -933,23 +972,87 @@ describe('底线 11：写数据的操作都能挽回；只有删除弹撤销提�
       zh.recordActionConfirm,
       fr.recordActionConfirm,
       frSingular.recordActionConfirm,
+      // 批量新建（D-567）也先问，问的时候也不提撤销。
+      en.recordCreateAllConfirm,
+      enSingular.recordCreateAllConfirm,
+      zh.recordCreateAllConfirm,
+      fr.recordCreateAllConfirm,
+      frSingular.recordCreateAllConfirm,
     ])
       expect(text).not.toMatch(/undo|撤销|annuler/i);
   });
 
   it('a bulk change has no setting that skips asking first', () => {
-    const base = { do: 'setAll', table: 't', field: 'a', value: true };
-    expect(RecordToolSchema.safeParse(base).success).toBe(true);
-    for (const skip of [{ confirm: false }, { ask: false }, { ask: 'none' }, { silent: true }])
-      expect(RecordToolSchema.safeParse({ ...base, ...skip }).success).toBe(false);
+    for (const base of [
+      { do: 'setAll', table: 't', field: 'a', value: true },
+      { do: 'createAll', table: 't', from: 's', values: {} },
+    ]) {
+      expect(RecordToolSchema.safeParse(base).success).toBe(true);
+      for (const skip of [{ confirm: false }, { ask: false }, { ask: 'none' }, { silent: true }])
+        expect(RecordToolSchema.safeParse({ ...base, ...skip }).success).toBe(false);
+    }
+  });
+
+  it('a tap that makes several changes makes at most 3, all to this entry, and none of them asks or fans out', () => {
+    const tap = {
+      as: 'button',
+      label: 'Ship',
+      do: 'set',
+      table: 't',
+      field: 'a',
+      value: true,
+      also: [{ do: 'set', field: 'b', value: 'today' }],
+    };
+    expect(MAX_TAP_WRITES).toBe(3);
+    expect(ToolUseSchema.safeParse(tap).success).toBe(true);
+    for (const also of [
+      [...tap.also, { do: 'toggle', field: 'c' }, { do: 'toggle', field: 'd' }],
+      [{ do: 'setAll', field: 'b', value: true }],
+      [{ do: 'set', table: 'other', field: 'b', value: true }],
+      [{ do: 'create', table: 'x', values: {}, ask: 'all' }],
+    ])
+      expect(ToolUseSchema.safeParse({ ...tap, also }).success, JSON.stringify(also)).toBe(false);
+    // 提醒通知上的「完成」没有地方弹撤销：只能改一处。
+    const { as: _as, label: _label, also, ...done } = tap;
+    expect(RecordToolSchema.safeParse(done).success).toBe(true);
+    expect(RecordToolSchema.safeParse({ ...done, also }).success).toBe(false);
+  });
+
+  // 从表格文件导入（D-574，创始人 2026-11-16 决定 ⑦）：系统层，先给汇总、用户点「导入」才写，导完弹撤销
+  // （mobile 的 import-records-test.tsx、invariants-test.tsx）。
+  it('asking before an import does not promise an undo, and the import has fixed caps it never passes in part', () => {
+    for (const text of [
+      en.importSummary,
+      enSingular.importSummary,
+      zh.importSummary,
+      fr.importSummary,
+      frSingular.importSummary,
+      en.importConfirm,
+      zh.importConfirm,
+      fr.importConfirm,
+    ])
+      expect(text).not.toMatch(/undo|撤销|annuler/i);
+    expect(IMPORT_LIMITS.maxRows).toBe(2000);
+    expect(importLimitProblem(2001, 1, 0)).not.toBeNull();
+    expect(importLimitProblem(10, 10, 9995)).not.toBeNull();
+  });
+
+  it('importing is not something a tool or the AI can do: no record tool imports a file', () => {
+    for (const kind of ['import', 'importFile', 'importRows'])
+      expect(RecordToolSchema.safeParse({ do: kind, table: 't' }).success).toBe(false);
   });
 
   it('setAll is capped at 200 entries', () => {
     const set = (n: number) =>
       RecordToolSchema.safeParse({ do: 'setAll', table: 't', field: 'a', value: true, max: n });
-    // 上限是常量，配置里写不进别的数。
+    // 上限是常量，配置里写不进别的数。批量新建一样（D-567）。
     expect(MAX_SET_ALL).toBe(200);
     expect(set(1000).success).toBe(false);
+    expect(MAX_CREATE_ALL).toBe(200);
+    expect(
+      RecordToolSchema.safeParse({ do: 'createAll', table: 't', from: 's', values: {}, max: 1000 })
+        .success,
+    ).toBe(false);
   });
 });
 

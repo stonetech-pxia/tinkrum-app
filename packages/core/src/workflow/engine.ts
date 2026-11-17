@@ -54,8 +54,11 @@ export interface RunItem {
 
 export type RunValue =
   | { type: FileValueType; items: RunItem[] }
-  /** 文字只留在本机（OCR、二维码识别）：复制、存成文件，绝不发给 AI。 */
-  | { type: 'text'; text: string; name: string }
+  /**
+   * 文字只留在本机（OCR、二维码识别）：复制、存成文件，绝不发给 AI。
+   * spoken：这段文字是一段录音转出来的、用户说的话（D-575）；「记一笔」按它直接填表。
+   */
+  | { type: 'text'; text: string; name: string; spoken?: boolean }
   /** 一张数据表里的记录（D-042）：只在本机生成 PDF / 打印，绝不发给 AI。 */
   | { type: 'records'; collectionId: string; records: DataRecord[]; name: string };
 

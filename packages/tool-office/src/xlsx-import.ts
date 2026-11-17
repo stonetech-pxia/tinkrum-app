@@ -1,4 +1,4 @@
-import { builtinFormat, formatNumber } from './number-format';
+import { builtinFormat, formatNumber, isDateFormat } from './number-format';
 import { OfficeImportFailure, openPackage, relKind } from './ooxml';
 import type { CellAlign, TableBlock, TableCell, TableDoc, TablePage } from './types';
 import { child, children, descendants, ownText, type XmlElement } from './xml';
@@ -77,8 +77,22 @@ interface Value {
   align?: CellAlign;
 }
 
-/** 读一份外来的 xlsx。加了密码、不是 xlsx、坏了、太大时抛 OfficeImportFailure。 */
-export function importXlsx(data: Uint8Array): XlsxImport {
+interface SheetValues {
+  name: string;
+  root: XmlElement | undefined;
+  values: Map<string, Value>;
+  maxRow: number;
+  maxCol: number;
+}
+
+/**
+ * 打开工作簿，读出每张工作表有内容的格子（图表工作表、对话框工作表没有格子，不算）。有内容的格子超过 maxCells 时
+ * 抛 tooLarge；加了密码、不是 xlsx、坏了时抛 OfficeImportFailure。
+ */
+function readWorkbook(
+  data: Uint8Array,
+  maxCells: number,
+): { sheets: SheetValues[]; formulas: number; date1904: boolean } {
   const pkg = openPackage(data, (name) => /\.(xml|rels)$/i.test(name));
   const main = pkg.main() ?? (pkg.xml('xl/workbook.xml') ? 'xl/workbook.xml' : undefined);
   const workbook = main ? pkg.xml(main) : undefined;
@@ -92,11 +106,10 @@ export function importXlsx(data: Uint8Array): XlsxImport {
   const xfs = readStyles(stylesPart ? pkg.xml(stylesPart) : undefined);
   const date1904 = flag(child(workbook, 'x:workbookPr')?.attrs.date1904);
   let formulas = 0;
-  let total = 0;
-  const pages: TablePage[] = [];
+  let cells = 0;
+  const sheets: SheetValues[] = [];
   for (const sheet of children(child(workbook, 'x:sheets'), 'x:sheet')) {
     const rel = rels.get(sheet.attrs['r:id'] ?? '');
-    // 图表工作表、对话框工作表没有格子。
     if (!rel || rel.external || relKind(rel) !== 'worksheet') continue;
     const root = pkg.xml(rel.target);
     if (!root) continue;
@@ -115,11 +128,24 @@ export function importXlsx(data: Uint8Array): XlsxImport {
         if (child(c, 'x:f')) formulas++;
         if (!value) continue;
         values.set(`${row},${col}`, value);
-        if (values.size > MAX_IMPORT_CELLS) throw new OfficeImportFailure('tooLarge');
+        if (++cells > maxCells) throw new OfficeImportFailure('tooLarge');
         maxRow = Math.max(maxRow, row);
         maxCol = Math.max(maxCol, col);
       }
     }
+    sheets.push({ name: sheet.attrs.name ?? '', root, values, maxRow, maxCol });
+  }
+  return { sheets, formulas, date1904 };
+}
+
+/** 读一份外来的 xlsx。加了密码、不是 xlsx、坏了、太大时抛 OfficeImportFailure。 */
+export function importXlsx(data: Uint8Array): XlsxImport {
+  const { sheets, formulas } = readWorkbook(data, MAX_IMPORT_CELLS);
+  let total = 0;
+  const pages: TablePage[] = [];
+  for (const { name, root, values, maxRow: lastRow, maxCol: lastCol } of sheets) {
+    let maxRow = lastRow;
+    let maxCol = lastCol;
     const merges: { row: number; col: number; rows: number; cols: number }[] = [];
     for (const m of children(child(root, 'x:mergeCells'), 'x:mergeCell')) {
       const [a, b] = (m.attrs.ref ?? '').split(':');
@@ -138,10 +164,45 @@ export function importXlsx(data: Uint8Array): XlsxImport {
     const cols = Math.max(1, maxCol + 1);
     total += rows * cols;
     if (total > MAX_IMPORT_CELLS) throw new OfficeImportFailure('tooLarge');
-    pages.push(sheetPage(sheet.attrs.name ?? '', root, values, merges, rows, cols));
+    pages.push(sheetPage(name, root, values, merges, rows, cols));
   }
   if (!pages.length) pages.push(sheetPage('Sheet1', undefined, new Map(), [], 1, 1));
   return { doc: { version: 3, scope: 'all', pages }, formulas };
+}
+
+/** 一格的值（导进表用，D-574）：看到的字；数字带着数字，日期格式的标上 date（序号换成 1900 年制）。 */
+export interface XlsxRowCell {
+  text: string;
+  number?: number;
+  date?: boolean;
+}
+
+/**
+ * 每张工作表的行（导进表用，D-574）：从第一行到最后一个有内容的行，每行到它最后一个有内容的格子；合并格子只有左上角
+ * 有值。有内容的格子超过 maxCells、或者行数超过 maxCells 时抛 tooLarge。
+ */
+export function readXlsxRows(
+  data: Uint8Array,
+  maxCells: number,
+): { name: string; rows: XlsxRowCell[][] }[] {
+  const { sheets, date1904 } = readWorkbook(data, maxCells);
+  return sheets.map(({ name, values, maxRow }) => {
+    if (maxRow + 1 > maxCells) throw new OfficeImportFailure('tooLarge');
+    const rows: XlsxRowCell[][] = Array.from({ length: maxRow + 1 }, () => []);
+    for (const [key, value] of values) {
+      const [r, c] = key.split(',').map(Number) as [number, number];
+      const row = rows[r]!;
+      while (row.length < c) row.push({ text: '' });
+      const cell: XlsxRowCell = { text: value.text };
+      if (value.write.kind === 'number') {
+        const date = isDateFormat(value.write.format);
+        cell.number = date && date1904 ? value.write.value + 1462 : value.write.value;
+        if (date) cell.date = true;
+      }
+      row[c] = cell;
+    }
+    return { name, rows };
+  });
 }
 
 function readCell(

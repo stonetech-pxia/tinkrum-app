@@ -1,4 +1,11 @@
-import { MAX_ATTACHMENTS, dayOf, prepareRecordValues, type FieldIssue } from '@morph/core';
+import {
+  MAX_ATTACHMENTS,
+  dayOf,
+  formInput,
+  issuesLeft,
+  prepareRecordValues,
+  type FieldIssue,
+} from '@morph/core';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -21,7 +28,7 @@ export function RecordEntryScreen({
   onDone,
   onCancel,
 }: LocalScreenProps<'recordEntry'>) {
-  const { collection, prefill, file, overflow, existing, index, total } = input;
+  const { collection, prefill, file, overflow, existing, index, total, heard } = input;
   const cal = useCalendar();
   // 新记录：先套用字段的默认值（日期是今天，按一天从几点开始算，D-286），再放进预先填好的文字。
   // 放进已有的记录（D-443）：从这条记录现在的值开始，再套上接在后面的文件和文字。
@@ -44,9 +51,11 @@ export function RecordEntryScreen({
   const [issues, setIssues] = useState<FieldIssue[]>([]);
   const mayProceed = useSimilarCheck();
   async function done() {
+    // D-570：藏着的段里的字段不交。
+    const input = formInput(collection, values, new Date(), cal);
     const prepared = prepareRecordValues(
       collection,
-      values,
+      input,
       existing?.values ?? null,
       new Date(),
       cal,
@@ -57,11 +66,11 @@ export function RecordEntryScreen({
     }
     // 放进已有的记录：改的是这一条，不会多出一条，所以不问「看起来一样」。
     if (existing) {
-      onDone({ values });
+      onDone({ values: input });
       return;
     }
     // D-426：这张表里有看起来一样的记录时问一句；同一次运行刚存的也算（out.addRecord 存完才开下一张表单）。
-    if (await mayProceed(collection, values)) onDone({ values });
+    if (await mayProceed(collection, input)) onDone({ values: input });
   }
 
   const isImage = file?.mimeType.startsWith('image/') && file.ext !== 'heic';
@@ -105,11 +114,16 @@ export function RecordEntryScreen({
           suggest
           collection={collection}
           values={values}
-          onChange={setValues}
+          onChange={(next) => {
+            // 改了一个字段，它的错误就去掉（D-572）。
+            setIssues((now) => issuesLeft(now, values, next));
+            setValues(next);
+          }}
           issues={issues}
           palette={palette}
           locale={locale}
           testPrefix="entry"
+          heard={heard}
         />
         {total > 1 ? (
           <Pressable

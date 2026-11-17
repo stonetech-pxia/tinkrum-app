@@ -1,5 +1,5 @@
 import {
-  CHART_COLORS,
+  optionColor,
   calendarOf,
   dateFieldOf,
   contrast,
@@ -7,6 +7,7 @@ import {
   dateOfDayNumber,
   dayTitle,
   filterRecords,
+  followedFilter,
   heatLevel,
   mix,
   monthDays,
@@ -88,7 +89,9 @@ export function MonthCalendar({
     return {};
   };
 
-  const matched = filterRecords(records ?? [], view, block.source.filter, now, cal);
+  // 跟着页面上的一排选项（D-573）：只显示选中那一项的记录，在某天添加时也预设成它。
+  const filter = followedFilter(block.source, env.pageChoice);
+  const matched = filterRecords(records ?? [], view, filter, now, cal);
   const { days, max } = monthDays(
     matched,
     view,
@@ -99,16 +102,14 @@ export function MonthCalendar({
   );
   const color = block.show.color ? view.fields.find((f) => f.id === block.show.color) : undefined;
   const options = color?.type === 'choice' ? color.options : [];
-  const scheme = palette.dark ? CHART_COLORS.dark : CHART_COLORS.light;
-  const other = palette.dark ? CHART_COLORS.other.dark : CHART_COLORS.other.light;
-  // 选项按顺序用分类色（和饼图一样，第 8 个起和「未选」一起用中性灰）。
-  const optionColor = (id: string | null) => {
+  // 选项写了颜色的用它的颜色（D-568），没写的按顺序用分类色（和饼图一样，第 8 个起和「未选」一起用中性灰）。
+  const colorOfOption = (id: string | null) => {
     const i = id === null ? -1 : options.findIndex((o) => o.id === id);
-    return i >= 0 && i < scheme.length ? scheme[i]! : other;
+    return optionColor(options[i], i, palette.dark, options);
   };
   const fillOf = (count: number, optionId: string | null) => {
     if (count === 0) return undefined;
-    if (color) return optionColor(optionId);
+    if (color) return colorOfOption(optionId);
     return mix(palette.surface, palette.primary, HEAT[heatLevel(count, max)]!);
   };
   const inMonth = (d: number) => dateOfDayNumber(d).slice(0, 7) === month;
@@ -241,7 +242,7 @@ export function MonthCalendar({
               ...(usedNone ? [{ id: null, label: t(locale, 'statNoChoice') }] : []),
             ].map((o) => (
               <View key={o.id ?? '-'} style={styles.legendItem}>
-                <View style={[styles.swatch, { backgroundColor: optionColor(o.id) }]} />
+                <View style={[styles.swatch, { backgroundColor: colorOfOption(o.id) }]} />
                 <Text style={[palette.font('body', 13), { color: palette.text }]}>{o.label}</Text>
               </View>
             ))}
@@ -270,8 +271,7 @@ export function MonthCalendar({
               onPress={
                 env.interactive
                   ? (env.locked ??
-                    (() =>
-                      openAddHere(router, collection, view, block.source, dayPreset(selected))))
+                    (() => openAddHere(router, collection, view, { filter }, dayPreset(selected))))
                   : undefined
               }
             />

@@ -253,9 +253,11 @@ describe('sample files', () => {
               op.tool.kind !== 'quickAction' ||
               !op.tool.preset,
           ),
-          // 默认货币随语言（D-429），算文字。
+          // 默认货币随语言（D-429）、语音转文字听哪种语言随语言（D-576），算文字。
           (k, v: unknown) =>
-            typeof v === 'string' && (k === 'default' || !/^[a-z0-9:-]+$/.test(v)) ? 'TEXT' : v,
+            typeof v === 'string' && (k === 'default' || k === 'lang' || !/^[a-z0-9:-]+$/.test(v))
+              ? 'TEXT'
+              : v,
         );
       // 英文用 Letter 纸，中文和法语用 A4。
       expect(shape('fr')).toBe(shape('zh'));
@@ -542,11 +544,15 @@ describe('draftReceiptSample（新建表单页选了购物凭证，D-479）', ()
       expect(got!.table.id).toBe('receipts');
       expect(got!.table.name).toBe(sampleInfo('receipts', locale).name);
       expect(added.data.tables[0]!.prefillRules).toBe('receipt');
-      // 整套：列表页、开销页、扫描和导出两个快捷操作。
+      // 整套：列表页、开销页、扫描、语音记一笔（D-576）和导出三个快捷操作。
       expect(added.containers.pages.map((p) => p.id)).toEqual(
         expect.arrayContaining(['receipts', 'spending']),
       );
-      expect(quickActionsOf(added).length).toBe(2);
+      expect(quickActionsOf(added).map((w) => w.id)).toEqual([
+        'scan-receipt',
+        'voice-receipt',
+        'export-receipts-excel',
+      ]);
     },
   );
 

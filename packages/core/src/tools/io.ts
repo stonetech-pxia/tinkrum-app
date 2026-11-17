@@ -100,6 +100,14 @@ const RECORD_PERIOD_OPTIONS = [
     value: 'next90days',
     label: { en: 'Next 90 days', zh: '往后 90 天', fr: '90 prochains jours' },
   },
+  // D-559：日历上前后的一整段。
+  { value: 'yesterday', label: { en: 'Yesterday', zh: '昨天', fr: 'Hier' } },
+  { value: 'lastWeek', label: { en: 'Last week', zh: '上周', fr: 'La semaine dernière' } },
+  { value: 'lastMonth', label: { en: 'Last month', zh: '上个月', fr: 'Le mois dernier' } },
+  { value: 'lastYear', label: { en: 'Last year', zh: '去年', fr: 'L’année dernière' } },
+  { value: 'tomorrow', label: { en: 'Tomorrow', zh: '明天', fr: 'Demain' } },
+  { value: 'nextWeek', label: { en: 'Next week', zh: '下周', fr: 'La semaine prochaine' } },
+  { value: 'nextMonth', label: { en: 'Next month', zh: '下个月', fr: 'Le mois prochain' } },
 ];
 
 export const MAX_PICK = 50;

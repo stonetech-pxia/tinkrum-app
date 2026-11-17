@@ -45,7 +45,7 @@ export const RECORD_OCCURRENCES = 7;
 /** 打开快捷操作的提醒目标 tool:<id> → id（只把它摆出来，不运行）；不是时为 null。 */
 export const reminderToolId = (target: ReminderTarget): string | null => toolTargetId(target);
 
-/** 到期提醒（when.before）、按记录的提醒（when.each）、加完提醒（when.after，看创建时间）看的表和字段。 */
+/** 到期提醒（when.before，天数或分钟数）、按记录的提醒（when.each）、加完提醒（when.after，看创建时间）看的表和字段。 */
 export const reminderTable = (r: Reminder): { table: string; field: string } | undefined =>
   'before' in r.when
     ? r.when.before
@@ -60,7 +60,15 @@ export function reminderProblems(r: Reminder, config: WorkspaceConfig): string[]
   const problems: string[] = [];
   const where = `reminder ${r.id}`;
   const when = r.when;
-  if ('before' in when) {
+  if ('before' in when && 'minutes' in when) {
+    // 前几分钟（D-562）要钟点：只能是日期时间字段。
+    const collection = config.data.tables.find((c) => c.id === when.before.table);
+    if (!collection) problems.push(`${where}: data table ${when.before.table} does not exist`);
+    else if (collection.fields.find((f) => f.id === when.before.field)?.type !== 'datetime')
+      problems.push(
+        `${where}: when.before.field must be a datetime field of ${collection.id} when minutes is set (use days and at for a date)`,
+      );
+  } else if ('before' in when) {
     const collection = config.data.tables.find((c) => c.id === when.before.table);
     if (!collection) problems.push(`${where}: data table ${when.before.table} does not exist`);
     else if (
@@ -75,8 +83,17 @@ export function reminderProblems(r: Reminder, config: WorkspaceConfig): string[]
   if ('after' in when && !config.data.tables.some((c) => c.id === when.after.table))
     problems.push(`${where}: data table ${when.after.table} does not exist`);
   if ('each' in when) problems.push(...recordReminderProblems(r, when.each, config));
-  else if (r.unless || r.done || r.snoozeMinutes !== undefined)
-    problems.push(`${where}: unless, done and snoozeMinutes only work with when.each`);
+  else {
+    // 每天、每周的提醒可以带 unless（D-563），没有「这一条」，所以不能有 link。
+    if ('every' in when && r.unless) {
+      problems.push(...unlessProblems(r, undefined, config));
+      if (r.unless.link !== undefined)
+        problems.push(`${where}: unless.link only works with when.each (there is no entry here)`);
+    } else if (r.unless)
+      problems.push(`${where}: unless only works with when.each, when.every day or week`);
+    if (r.done || r.snoozeMinutes !== undefined)
+      problems.push(`${where}: done and snoozeMinutes only work with when.each`);
+  }
   const toolId = reminderToolId(r.opens);
   if (toolId !== null) {
     if (!quickActionsOf(config).some((w) => w.id === toolId))
@@ -106,29 +123,7 @@ function recordReminderProblems(
   const problems: string[] = [];
   if (collection.fields.find((f) => f.id === each.field)?.type !== 'schedule')
     problems.push(`${where}: when.each.field must be a schedule field of ${collection.id}`);
-  const u = r.unless;
-  if (u) {
-    const other = config.data.tables.find((c) => c.id === u.table);
-    if (!other) problems.push(`${where} unless: data table ${u.table} does not exist`);
-    else {
-      problems.push(
-        ...conditionProblems(u.filter, expandCollection(config.data.tables, other)).map(
-          (x) => `${where} unless: ${x}`,
-        ),
-      );
-      const date = u.date;
-      const dateType = date && other.fields.find((f) => f.id === date)?.type;
-      if (date && !isSystemField(date) && dateType !== 'date' && dateType !== 'datetime')
-        problems.push(`${where} unless: date must be a date or datetime field of ${other.id}`);
-      if (u.link !== undefined) {
-        const link = other.fields.find((f) => f.id === u.link);
-        if (link?.type !== 'link' || link.table !== collection.id)
-          problems.push(
-            `${where} unless: link must be a link field of ${other.id} pointing to ${collection.id}`,
-          );
-      }
-    }
-  }
+  problems.push(...unlessProblems(r, collection, config));
   // 关系规则 12、13：「完成」作用在这一条（$row，when.each.table 的一条）上，只是一键记录工具。
   if (r.done)
     problems.push(
@@ -138,6 +133,34 @@ function recordReminderProblems(
         direct: true,
       }),
     );
+  return problems;
+}
+
+/** unless 的表、筛选、日期字段；link 要指向 collection（按记录的提醒那张表，D-317）。 */
+function unlessProblems(
+  r: Reminder,
+  collection: Collection | undefined,
+  config: WorkspaceConfig,
+): string[] {
+  const where = `reminder ${r.id}`;
+  const u = r.unless;
+  if (!u) return [];
+  const other = config.data.tables.find((c) => c.id === u.table);
+  if (!other) return [`${where} unless: data table ${u.table} does not exist`];
+  const problems = conditionProblems(u.filter, expandCollection(config.data.tables, other)).map(
+    (x) => `${where} unless: ${x}`,
+  );
+  const date = u.date;
+  const dateType = date && other.fields.find((f) => f.id === date)?.type;
+  if (date && !isSystemField(date) && dateType !== 'date' && dateType !== 'datetime')
+    problems.push(`${where} unless: date must be a date or datetime field of ${other.id}`);
+  if (u.link !== undefined && collection) {
+    const link = other.fields.find((f) => f.id === u.link);
+    if (link?.type !== 'link' || link.table !== collection.id)
+      problems.push(
+        `${where} unless: link must be a link field of ${other.id} pointing to ${collection.id}`,
+      );
+  }
   return problems;
 }
 
@@ -215,11 +238,56 @@ export function planNotifications(
       }
       continue;
     }
+    if ('before' in when && 'minutes' in when) {
+      // 日期时间那一刻之前 minutes 分钟（D-562）；已经过了的不排。正文只写表名和钟点（P-043 ②）。
+      const collection = config.data.tables.find((c) => c.id === when.before.table)!;
+      const field = collection.fields.find((f) => f.id === when.before.field)!;
+      for (const record of records.get(collection.id) ?? []) {
+        const value = readValue(field, record.values[field.id]);
+        if (typeof value !== 'string') continue;
+        const [y, m, d] = value.slice(0, 10).split('-').map(Number) as [number, number, number];
+        const { hour, minute } = hm(value.slice(11, 16));
+        const at = new Date(y, m - 1, d, hour, minute).getTime() - when.minutes * 60_000;
+        if (at <= now.getTime()) continue;
+        dated.push({
+          ...base,
+          id: `${r.id}-${record.id}`,
+          body: t(locale, 'reminderStartsIn', {
+            table: collection.name,
+            time: value.slice(11, 16),
+            n: when.minutes,
+          }),
+          trigger: { kind: 'date', at },
+        });
+      }
+      continue;
+    }
     const { hour, minute } = hm(when.at);
     if ('each' in when) {
       perRecord.push(
         ...planRecordReminder(r, { ...when.each, at: when.at }, config, records, now, locale, cal),
       );
+    } else if ('every' in when && r.unless) {
+      // 带 unless 的每天、每周提醒（D-563）：不能交给系统按天重复，一天一天排，已经有记录的那天不排。
+      const today = dayNumber(localDate(now))!;
+      let added = 0;
+      for (let day = today; added < RECORD_OCCURRENCES && day < today + 7 * 8; day++) {
+        const [y, m, d] = dateOfDayNumber(day).split('-').map(Number) as [number, number, number];
+        const weekday = new Date(y, m - 1, d).getDay() || 7;
+        if (when.every === 'week' && !when.days.includes(weekday)) continue;
+        const time = new Date(y, m - 1, d, hour, minute).getTime();
+        if (time <= now.getTime()) continue;
+        // 这个钟点算哪一天（早于一天开始的钟点算前一天，D-286）。
+        const logical = hour < cal.dayStartHour ? day - 1 : day;
+        if (reminderSkipped(r, null, logical, config, records, now)) continue;
+        dated.push({
+          ...base,
+          id: `${r.id}-${day}`,
+          body: '',
+          trigger: { kind: 'date', at: time },
+        });
+        added++;
+      }
     } else if ('every' in when && when.every === 'day') {
       repeating.push({ ...base, id: r.id, body: '', trigger: { kind: 'daily', hour, minute } });
     } else if ('every' in when) {
@@ -292,11 +360,11 @@ function periodAround(day: number, within: 'day' | 'week' | 'month', cal: Calend
 
 /**
  * unless（D-317）：record 这条的 day 那天要不要跳过。看 unless 表里符合筛选的记录（同一张表只看这条自己，
- * 有 link 只看指向这条的）有没有一条落在那天所在的时间段里。
+ * 有 link 只看指向这条的）有没有一条落在那天所在的时间段里。每天、每周的提醒（D-563）没有这一条（null），看整张表。
  */
 export function reminderSkipped(
   r: Reminder,
-  record: DataRecord,
+  record: DataRecord | null,
   day: number,
   config: WorkspaceConfig,
   records: ReadonlyMap<string, readonly DataRecord[]>,
@@ -310,9 +378,11 @@ export function reminderSkipped(
   const view = expandCollection(config.data.tables, table);
   const [from, to] = periodAround(day, u.within, cal);
   const candidates = (records.get(table.id) ?? []).filter((x) =>
-    table.id === reminderTable(r)?.table
-      ? x.id === record.id
-      : u.link === undefined || x.values[u.link] === record.id,
+    record === null
+      ? true
+      : table.id === reminderTable(r)?.table
+        ? x.id === record.id
+        : u.link === undefined || x.values[u.link] === record.id,
   );
   return filterRecords(candidates, view, u.filter, now, cal).some((x) => {
     const date = recordDay(x, view, u.date ?? 'createdAt', now, cal);
@@ -389,22 +459,30 @@ export function reminderDoneInput(
   collection: Collection,
   record: DataRecord,
   now: Date,
+  /** 算好的这一条（D-565：done 抄它的字段、从它的日期起算时要用；不给时只读存着的值）。 */
+  computed: DataRecord = record,
 ):
   | { kind: 'create'; collection: Collection; input: Record<string, unknown> }
   | { kind: 'update'; input: Record<string, unknown> }
   | null {
   const cal = calendarOf(config);
+  const entry = { record: computed, view: expandCollection(config.data.tables, collection) };
   if (done.do === 'create') {
     const target = config.data.tables.find((c) => c.id === done.table);
     if (!target) return null;
     return {
       kind: 'create',
       collection: target,
-      input: createInput(target, done.values, { now, cal, rowId: record.id }),
+      input: createInput(target, done.values, { now, cal, rowId: record.id, entry }),
     };
   }
-  if (done.do === 'setAll') return null;
-  const input = rowUpdateInput(done, collection, record.values, { now, cal, rowId: record.id });
+  if (done.do === 'setAll' || done.do === 'createAll') return null;
+  const input = rowUpdateInput(done, collection, record.values, {
+    now,
+    cal,
+    rowId: record.id,
+    entry,
+  });
   return input ? { kind: 'update', input } : null;
 }
 
@@ -420,6 +498,8 @@ export const reminderCollections = (config: WorkspaceConfig): string[] => [
   ...new Set(
     remindersOf(config).flatMap((r) => {
       const on = reminderTable(r);
+      // 带 unless 的每天、每周提醒（D-563）只读 unless 的表。
+      if (r.enabled && r.unless && 'every' in r.when) return [r.unless.table];
       if (!r.enabled || !on) return [];
       return r.unless && 'each' in r.when ? [on.table, r.unless.table] : [on.table];
     }),

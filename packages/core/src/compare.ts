@@ -7,6 +7,7 @@ import type { Condition, Locale, Period } from './schema';
 // 统计的「和上一段时间比」（D-308）：统计的筛选里有一个 inPeriod 条件时，把它换成上一段，再算一次。
 // 按日历的时间段（本周、本月、今年……）比上一段的同期：本月到 29 号就比上个月 1–29 号，
 // 不然月中总是「比上月少一半」；今天比昨天一整天；最近 N 天比再往前的 N 天。一天和一周的开始按 D-286。
+// 昨天、上周、上月、去年和明天、下周、下月（D-559）是一整段，比它前面的一整段。
 
 /** 上一段同期的日期范围（含两端）。 */
 export function previousPeriodRange(period: Period, now: Date, cal: Calendar): [string, string] {
@@ -40,6 +41,14 @@ export function previousPeriodRange(period: Period, now: Date, cal: Calendar): [
       return [ymd(y, m - 1, 1), ymd(y, m - 1, d)];
     case 'thisYear':
       return [`${y - 1}-01-01`, ymd(y - 1, m, d)];
+    // 上月、下月、去年（D-559）是一整段，比它前面的一整段（上月比再前一个月，下月比本月）。
+    case 'lastMonth':
+    case 'nextMonth': {
+      const [sy, sm] = startText.split('-').map(Number) as [number, number];
+      return [ymd(sy, sm - 1, 1), ymd(sy, sm, 0)];
+    }
+    case 'lastYear':
+      return [`${y - 2}-01-01`, `${y - 2}-12-31`];
     default:
       // 最近 N 天：再往前的 N 天。
       return shift(days, days);
@@ -94,7 +103,7 @@ export function previousLabel(period: Period, value: string, locale: Locale): st
   // 往后 N 天（D-537）的上一段也是再往前的 N 天。
   const days = /^(?:last|next)(\d+)days$/.exec(period);
   if (days) return t(locale, 'compare_lastDays', { n: Number(days[1]), value });
-  return t(locale, `compare_${period as Exclude<Period, `last${string}` | `next${string}`>}`, {
+  return t(locale, `compare_${period as Exclude<Period, `${'last' | 'next'}${number}days`>}`, {
     value,
   });
 }

@@ -23,7 +23,13 @@ export function Toast({ palette, bottom }: { palette: Palette; bottom: number })
   const hasNext = useWorkspace((s) => !!s.next);
   const actions = useRecordActions();
   const router = useRouter();
-  const canUndo = !!(toast?.restoreRecordId || toast?.restoreRecordIds || toast?.restorePreset);
+  const canUndo = !!(
+    toast?.restoreRecordId ||
+    toast?.restoreRecordIds ||
+    toast?.restorePreset ||
+    toast?.undo ||
+    toast?.undoImport
+  );
   const canContinue = !!toast?.continueTable;
   const timed = toast && !toast.held;
   const ms = canUndo || canContinue ? TOAST_UNDO_MS : TOAST_MS;
@@ -77,6 +83,9 @@ export function Toast({ palette, bottom }: { palette: Palette; bottom: number })
             if (toast.restoreRecordIds) void actions.restoreMany(toast.restoreRecordIds);
             if (toast.restorePreset) void restorePreset(toast.restorePreset);
             dismiss();
+            // 撤销失败时会换一条提示，所以先关掉这一条。
+            if (toast.undo) void actions.undo(toast.undo);
+            if (toast.undoImport) void actions.undoImport(toast.undoImport);
           }}>
           <Text style={[palette.font('bodyBold', 14), { color: palette.surface }]}>
             {t(locale, 'undo')}

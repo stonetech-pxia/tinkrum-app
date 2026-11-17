@@ -6,7 +6,10 @@ import {
   isRecordToolUse,
   isOpenUse,
   isToolRefUse,
-  type RecordToolUse,
+  tapWrites,
+  toolEntryFields,
+  valueEntryFields,
+  type RecordTool,
   type ToolUse,
 } from './record-ops-schema';
 import type { Registry } from './registry';
@@ -477,7 +480,17 @@ const hasKey = (o: object | undefined, key: string) =>
   o !== undefined && Object.prototype.hasOwnProperty.call(o, key);
 
 /** 就地的一键记录工具用到了被删掉的表或字段。 */
-function recordToolUses(use: RecordToolUse, gone: Gone): boolean {
+function recordToolUses(use: RecordTool, gone: Gone): boolean {
+  // 批量新建（D-567）：来源表、它的筛选和值里读来源的字段也算。
+  if (use.do === 'createAll' && use.from === gone.table) {
+    const id = gone.field;
+    if (
+      id === undefined ||
+      (use.filter ?? []).some((c) => c.field === id) ||
+      Object.values(use.values).some((v) => valueEntryFields(v).includes(id))
+    )
+      return true;
+  }
   if (use.table !== gone.table) return false;
   const id = gone.field;
   if (id === undefined) return true;
@@ -491,20 +504,33 @@ function recordToolUses(use: RecordToolUse, gone: Gone): boolean {
       );
     case 'setAll':
       return use.field === id || (use.filter ?? []).some((c) => c.field === id);
+    case 'createAll':
+      return hasKey(use.values, id);
     default:
       return use.field === id;
   }
 }
 
-/** 块（读 table 这张表）上的一个工具用到了被删掉的表或字段：工具自己的，或者 when 里的条件（读这一条）。 */
-function toolUses(use: ToolUse, table: string | null, gone: Gone): boolean {
+/**
+ * 块（读 table 这张表）上的一个工具用到了被删掉的表或字段：工具自己的，或者 when 里的条件（读这一条），
+ * 或者值里读「这一条」（entry 这张表，D-565）的字段：抄的字段、日期的起点和加数。
+ */
+function toolUses(use: ToolUse, table: string | null, gone: Gone, entry = table): boolean {
   if (
     gone.field !== undefined &&
     table === gone.table &&
     (use.when ?? []).some((c) => c.field === gone.field)
   )
     return true;
-  return isRecordToolUse(use) && recordToolUses(use, gone);
+  if (!isRecordToolUse(use)) return false;
+  // 点一下的几处（D-566）每一处都看。
+  return tapWrites(use, table ?? use.table).some(
+    (tool) =>
+      (gone.field !== undefined &&
+        entry === gone.table &&
+        toolEntryFields(tool).includes(gone.field)) ||
+      recordToolUses(tool, gone),
+  );
 }
 
 /**
@@ -513,9 +539,13 @@ function toolUses(use: ToolUse, table: string | null, gone: Gone): boolean {
  * 让 AI 一起改（和 v33 一样）。
  */
 function pruneRecordTools(config: WorkspaceConfig, gone: Gone, notes: ApplyNote[]): void {
+  // 按钮在记录页上时，「这一条」是页面的那一条（D-565）。
+  const pageOf = new Map<Component, string>();
+  for (const page of config.containers.pages)
+    if (page.of !== undefined) for (const c of allComponents(page)) pageOf.set(c, page.of);
   let count = removeEverywhere(config, (c) => {
     if (!isKnownComponent(c) || c.look !== 'button' || !c.tools) return false;
-    return c.tools.some((u) => toolUses(u, null, gone));
+    return c.tools.some((u) => toolUses(u, null, gone, pageOf.get(c) ?? null));
   });
   for (const c of everyBlock(config)) {
     if (!isKnownComponent(c) || c.look === 'button' || c.look === 'form') continue;
@@ -556,11 +586,12 @@ function pruneDials(config: WorkspaceConfig, notes: ApplyNote[]): void {
     (c) => isKnownComponent(c) && c.look === 'dial' && !c.tools?.length,
   );
   count += prunePagePeriod(config);
+  count += prunePageChoice(config);
   if (count > 0) notes.push({ kind: 'clearedBlockRefs', count });
 }
 
 /**
- * 页面上没有时间范围块了（删了、或者页面本来就没有），跟着它的图表和数字卡的 source.period 去掉，
+ * 页面上没有时间范围块了（删了、或者页面本来就没有），跟着它的图表、数字卡和记录块（D-561）的 source.period 去掉，
  * 回到自己配置里的范围（底线 18，D-440）。隐藏的时间范围块还算有（校验也这么看）。
  */
 function prunePagePeriod(config: WorkspaceConfig): number {
@@ -568,13 +599,63 @@ function prunePagePeriod(config: WorkspaceConfig): number {
   for (const page of config.containers.pages) {
     if (page.blocks.some((b) => b.look === 'period')) continue;
     for (const c of allComponents(page)) {
-      if (!isKnownComponent(c) || (c.look !== 'chart' && c.look !== 'number')) continue;
-      if (c.source.period === undefined) continue;
-      delete c.source.period;
+      if (!isKnownComponent(c) || !('source' in c)) continue;
+      const source = c.source as { period?: string } | undefined;
+      if (source?.period === undefined) continue;
+      delete source.period;
       count++;
     }
   }
   return count;
+}
+
+/**
+ * 页面上没有一排选项了（删了、或者页面本来就没有），跟着它的块的 source.choice 去掉，回到自己的筛选（底线 18，D-573）。
+ * 隐藏的那一排还算有（校验也这么看）。
+ */
+function prunePageChoice(config: WorkspaceConfig): number {
+  let count = 0;
+  for (const page of config.containers.pages) {
+    if (page.blocks.some((b) => b.look === 'choices')) continue;
+    for (const c of allComponents(page)) {
+      if (!isKnownComponent(c) || !('source' in c)) continue;
+      const source = c.source as { choice?: string } | undefined;
+      if (source?.choice === undefined) continue;
+      delete source.choice;
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * 一排选项跟着它的单选字段（底线 18，D-573）：字段删了，这一排去掉（跟着它的块随后由 prunePageChoice 清理）；
+ * 选项删了，这一排列出的选项和默认的那一项里去掉它（一个都不剩时回到显示全部选项）。
+ */
+function pruneChoiceRows(config: WorkspaceConfig, gone: Gone, notes: ApplyNote[]): void {
+  const rows = (c: Component) =>
+    isKnownComponent(c) && c.look === 'choices' && c.source.table === gone.table;
+  if (gone.field !== undefined) {
+    const count = removeEverywhere(
+      config,
+      (c) => rows(c) && (c as { source: { field: string } }).source.field === gone.field,
+    );
+    if (count > 0) notes.push({ kind: 'clearedBlockRefs', count });
+    return;
+  }
+  const table = config.data.tables.find((x) => x.id === gone.table);
+  for (const c of everyBlock(config)) {
+    if (!rows(c)) continue;
+    const row = c as Extract<KnownComponent, { look: 'choices' }>;
+    const field = table?.fields.find((f) => f.id === row.source.field);
+    if (field?.type !== 'choice') continue;
+    const ids = field.options.map((o) => o.id);
+    const left = row.show.options?.filter((id) => ids.includes(id));
+    if (left && left.length > 0) row.show.options = left;
+    else delete row.show.options;
+    if (row.show.default !== undefined && !(row.show.options ?? ids).includes(row.show.default))
+      delete row.show.default;
+  }
 }
 
 /** 删字段后，记录页顶部交这个字段的按钮跟着去掉（底线 18，D-428）。 */
@@ -584,6 +665,23 @@ function pruneRecordRow(table: Collection, field: string, notes: ApplyNote[]): v
   notes.push({ kind: 'removedRecordActions', count: table.recordRow.length - row.length });
   if (row.length > 0) table.recordRow = row;
   else delete table.recordRow;
+}
+
+/**
+ * 删字段后记录表单的分段跟着改（D-570，底线 18）：从段里拿掉，段空了就去掉；看它的条件去掉（段从此一直显示，
+ * 里面的字段和值都在）。分段一段都不剩时去掉 form。
+ */
+function pruneEntryForm(table: Collection, field: string): void {
+  if (!table.form) return;
+  const sections = table.form.sections.flatMap((s) => {
+    const fields = s.fields.filter((id) => id !== field);
+    if (fields.length === 0) return [];
+    const when = s.when?.filter((c) => c.field !== field);
+    const { when: _when, ...rest } = s;
+    return [{ ...rest, fields, ...(when && when.length > 0 ? { when } : {}) }];
+  });
+  if (sections.length > 0) table.form = { sections };
+  else delete table.form;
 }
 
 /**
@@ -723,7 +821,7 @@ function updateData(config: WorkspaceConfig, op: OpOf<'updateData'>): void {
   if (op.field === undefined) {
     onlyKeys(
       changes,
-      ['name', 'icon', 'readAttachments', 'prefillRules', 'recordRow', 'app'],
+      ['name', 'icon', 'readAttachments', 'prefillRules', 'recordRow', 'app', 'form'],
       `table ${table.id}`,
     );
     if (changes.name === null) throw new OpError(`table ${table.id} needs a name`);
@@ -749,12 +847,15 @@ function updateData(config: WorkspaceConfig, op: OpOf<'updateData'>): void {
       id: old.id,
       name: old.name,
       ...('required' in old && old.required ? { required: true } : {}),
+      ...('hint' in old && old.hint !== undefined ? { hint: old.hint } : {}),
     };
   } else {
     next = { ...old };
   }
   // 合法性（例如选项 ID 唯一、默认值存在）由 validateWorkspace 检查。
   table.fields[index] = merge(next, changes) as never;
+  // 删掉的选项从页面上的一排选项里去掉（D-573）。
+  pruneChoiceRows(config, { table: table.id }, []);
 }
 
 /**
@@ -853,8 +954,10 @@ function removeData(
     table.fields.splice(getFieldIndex(table, op.field), 1);
     pruneRecordTools(config, { table: op.table, field: op.field }, notes);
     pruneRecordRow(table, op.field, notes);
+    pruneEntryForm(table, op.field);
     pruneAggregateFields(config, { table: op.table, field: op.field });
     pruneBrowseFields(config, { table: op.table, field: op.field }, notes);
+    pruneChoiceRows(config, { table: op.table, field: op.field }, notes);
     pruneSteps(config, { table: op.table, field: op.field }, registry, notes);
     pruneDials(config, notes);
     return;

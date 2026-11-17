@@ -6,6 +6,8 @@ import {
   defineField,
   fieldBase,
   isNumber,
+  rangeKeys,
+  rangeProblems,
   numberWithUnit,
   readNumber,
   writeNumber,
@@ -18,6 +20,7 @@ const schema = z.strictObject({
   decimals: z.number().int().min(0).max(4).optional(),
   unit: boundedText(1, 10).optional(),
   default: z.number().finite().optional(),
+  ...rangeKeys,
 });
 
 /** 数字，可以有小数位和单位。 */
@@ -39,7 +42,8 @@ export const numberField: FieldDefinitionOf<'number', typeof schema> = defineFie
   filter: { is: isNumber, compare: 'number' },
   titleRank: 4,
   convertGroup: 'number',
-  ai: { doc: '{decimals? 0-4, unit?, default?}' },
+  check: (f, { collection }) => rangeProblems(f, collection.id),
+  ai: { doc: '{decimals? 0-4, unit?, default?, min?, max?}' },
   example: { id: 'weight', name: 'Weight', type: 'number', decimals: 1, unit: 'kg' },
   exampleValue: 2.5,
 });

@@ -419,6 +419,9 @@ export const en = {
   fieldRequired: 'Required',
   fieldInvalid: 'Not a valid value',
   fieldTooLong: 'Too long',
+  fieldTooSmall: 'Must be at least {limit}.',
+  fieldTooLarge: 'Must be at most {limit}.',
+  formIssues: '{n} fields need attention; they are marked above.',
   tableFull: 'This table is full (10,000 entries).',
   useFullForm: 'Some required fields aren’t in this form. Open the full form to add.',
   recordDeleted: 'Entry deleted',
@@ -529,6 +532,8 @@ export const en = {
   shareAppItem: 'Share this app',
   importAppMaybeNewer:
     'If it was made with a newer version of Tinkrum, update Tinkrum and try again.',
+  importNeedsUpdate:
+    'This file was made with a newer version of Tinkrum and uses things this version doesn’t have yet: {missing}. Update Tinkrum, then import it again. Nothing was imported.',
   appResetItem: 'Restore its original look',
   appResetConfirm:
     'Restore “{name}” to how it was when you imported it? Pages and quick actions you added to it go away, and its style and pages come back. Tables you made and all your entries stay. You can undo it in the change log.',
@@ -567,6 +572,7 @@ export const en = {
   prefillMemoryPicks: 'Remembers {count} picked suggestions',
   // New entry form: suggested values from attachments (D-394)
   suggestionFill: 'Fill “{field}” with {value}',
+  heardFilled: 'From what you said',
   suggestionsWorking: 'Looking for values in the attachments…',
   suggestionsNeedDownload: 'To suggest values from the attachments, a one-time download is needed.',
   suggestionsDownload: 'Suggest values',
@@ -1004,6 +1010,8 @@ export const en = {
   chartPoint: '{label}: {value}',
   chartPointCompare: '{label}: {value} (previous period: {previous})',
   describe_period: 'Time range: {n} choices',
+  describe_choices: 'Tabs by “{v0}”',
+  choicesAll: 'All',
   periodOpt_today: 'Today',
   periodOpt_thisWeek: 'This week',
   periodOpt_thisMonth: 'This month',
@@ -1012,6 +1020,10 @@ export const en = {
   periodOpt_last30days: 'Last 30 days',
   periodOpt_last90days: 'Last 90 days',
   periodOpt_last365days: 'Last 365 days',
+  periodOpt_yesterday: 'Yesterday',
+  periodOpt_lastWeek: 'Last week',
+  periodOpt_lastMonth: 'Last month',
+  periodOpt_lastYear: 'Last year',
   periodCustom: 'Custom',
   periodCustomStart: 'Start date',
   periodCustomEnd: 'End date',
@@ -1059,7 +1071,14 @@ export const en = {
   reminderWhenWeekly: 'every {days} at {time}',
   reminderWhenAfterAdd: '{n} minutes after each new entry in “{table}”',
   reminderWhenDate: '{n} days before “{field}” in “{table}”, at {time}',
+  reminderWhenMinutesBefore: '{n} minutes before “{field}” in “{table}”',
   reminderWhenSchedule: 'Each entry in “{table}” on its own “{field}”, at {time}',
+  reminderUnlessDay: '{when}, unless “{table}” already has an entry that day',
+  reminderUnlessWeek: '{when}, unless “{table}” already has an entry that week',
+  reminderUnlessMonth: '{when}, unless “{table}” already has an entry that month',
+  reminderUnlessDayMatching: '{when}, unless “{table}” already has a matching entry that day',
+  reminderUnlessWeekMatching: '{when}, unless “{table}” already has a matching entry that week',
+  reminderUnlessMonthMatching: '{when}, unless “{table}” already has a matching entry that month',
   reminderDoneButton: 'Done',
   reminderSnoozeButton: 'Remind me later',
   reminderDoneToast: 'Logged: {title}',
@@ -1073,6 +1092,7 @@ export const en = {
   reminderDueToday: 'An entry in “{table}” is due today',
   reminderAddedAgo: 'An entry was added to “{table}” {n} minutes ago',
   reminderDueIn: 'An entry in “{table}” is due in {n} days ({date})',
+  reminderStartsIn: 'An entry in “{table}” is at {time}, in {n} minutes',
   remindersTitle: 'Reminders',
   remindersHint:
     'Reminders are notifications on this device. Tapping one only opens the page or quick action; nothing runs by itself. To add or change a reminder, ask Tink (for example “remind me every day at 9 to log expenses”).',
@@ -1162,6 +1182,8 @@ export const en = {
   describeFieldFormatEmail: 'format → email',
   describeFieldFormatUrl: 'format → website',
   describeFieldFormatNone: 'format removed',
+  describeFieldHint: 'hint under the field changed',
+  describeFieldRange: 'allowed range changed',
   describe_options_64e79: 'options → {v0}',
   describe_update_settings_2aaf6: 'update settings',
   describe_Move_field_of_to_position_aa798: 'Move field “{v0}” of “{v1}” to position {v2}',
@@ -1215,6 +1237,7 @@ export const en = {
   describeSourceFilterOff: 'shows all entries',
   describeSourceSortAsc: 'sorted by “{field}”, lowest first',
   describeSourceSortDesc: 'sorted by “{field}”, highest first',
+  describeSourceSortMany: 'sorted by {fields}, in this order',
   describeSourceSortOff: 'default order',
   describeSourceLimit: 'shows up to {n} entries',
   describeSourceGroupBy: 'grouped by “{field}”',
@@ -1561,6 +1584,7 @@ export const en = {
   describeDayStart: 'A day starts at {hour}:00',
   describeReadAttachmentsOn: '“{name}”: read attachments and suggest values in new entries',
   describeRecordRow: '“{name}”: change the buttons at the top of the entry page',
+  describeEntryForm: '“{name}”: change the sections of the entry form',
   describeReadAttachmentsOff: '“{name}”: no longer read attachments in new entries',
   describePrefillRulesReceipt: '“{name}”: read attachments as receipts',
   describePrefillRulesCard: '“{name}”: read attachments as business cards',
@@ -1701,12 +1725,22 @@ export const en = {
   recordActionConfirm: 'This changes {n} entries.',
   recordActionConfirmButton: 'Change',
   recordActionNothing: 'Nothing to change',
+  recordActionNoValue: 'Nothing was changed: a value this button uses is still empty.',
+  recordActionTooSmall: 'Nothing was changed: “{field}” can’t go below {limit}.',
+  recordActionTooLarge: 'Nothing was changed: “{field}” can’t go above {limit}.',
   recordActionFailed:
     'Nothing was changed: something went wrong, so not a single entry was edited.',
   recordActionChangedMeanwhile:
     'Some entries changed before you confirmed, so nothing was changed. Tap again to use the latest.',
   recordActionTooMany: 'At most {max} entries can change at once; this would change {n}.',
   recordActionGone: 'This entry was deleted.',
+  recordUndoFailed: 'This entry has changed since: nothing was undone.',
+  recordCreateAllConfirm: 'This creates {n} entries in “{table}”.',
+  recordCreateAllConfirmButton: 'Create',
+  recordCreateAllNothing: 'No entries match, so nothing was created.',
+  recordCreateAllTooMany: 'At most {max} entries can be created at once; this would create {n}.',
+  recordCreateAllDone: 'Created {n} entries in “{table}”',
+  recordUndoBulkFailed: 'Some of these entries have changed since: nothing was undone.',
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: 'Previous month',
   calendarNextMonth: 'Next month',
@@ -1725,6 +1759,13 @@ export const en = {
   compare_thisHalfMonth: 'Same days of the previous half-month: {value}',
   compare_thisMonth: 'Same days last month: {value}',
   compare_thisYear: 'Same date last year: {value}',
+  compare_yesterday: 'The day before: {value}',
+  compare_lastWeek: 'The week before: {value}',
+  compare_lastMonth: 'The month before: {value}',
+  compare_lastYear: 'The year before: {value}',
+  compare_tomorrow: 'Today: {value}',
+  compare_nextWeek: 'This week: {value}',
+  compare_nextMonth: 'This month: {value}',
   compare_lastDays: 'The {n} days before: {value}',
   compareUp: '↑ {n}%',
   compareDown: '↓ {n}%',
@@ -1850,6 +1891,53 @@ export const en = {
     'Tink can’t see the file, only the fields of this table. The table is created first.',
   shareRecordTooMany: 'An entry holds at most {n} files: only the first {n} go in.',
   shareRecordNewTable: 'Add the table “{name}”',
+  // 表格文件的行导进表（D-574）：「设置 → 数据」，系统层。
+  importEntries: 'Import entries from a file',
+  importTitle: 'Import entries',
+  importIntro:
+    'Choose an .xlsx or .csv file: each row becomes an entry in “{table}”. The file is read on this phone only, and the original is not changed.',
+  importChooseFile: 'Choose a file',
+  importReading: 'Reading the file…',
+  importErrorUnsupported:
+    'Only .xlsx and .csv files can be imported. Save the file in one of these formats first.',
+  importErrorNotSpreadsheet:
+    'This file could not be read as a spreadsheet. It may be damaged, or be another kind of file.',
+  importErrorEncoding:
+    'This CSV file is not in UTF-8. Save it again as “CSV UTF-8” and import that file.',
+  importErrorTooLarge: 'This file is too large to import. Import a smaller part of it.',
+  importErrorEmpty: 'This file has no rows to import.',
+  importErrorNoFields: '“{table}” has no fields that can be filled from a file.',
+  importErrorTooManyRows:
+    'This file has {n} rows, and at most {max} can be imported at once. Split the file and import the parts one after the other.',
+  importErrorTableFull:
+    'This would add {n} entries to “{table}”, which has room for only {room} more. Nothing was imported.',
+  importSheet: 'Sheet',
+  importHeaderRow: 'The first row holds the column names',
+  importColumn: 'Column {col}',
+  importColumnsHint:
+    'Each column goes into the field shown, or is skipped. Columns are matched to fields with the same name; change any of them.',
+  importSkip: 'Skip',
+  importSampleUnreadable: '“{value}” cannot be read',
+  importDayFirst: 'Day first (31/12)',
+  importMonthFirst: 'Month first (12/31)',
+  importChangeColumns: 'Change the columns',
+  importContinue: 'Continue',
+  importSummary: '{n} entries will be added to “{table}”.',
+  importSummaryNone: 'No row of this file can be imported with these columns.',
+  importLeftOut: '{n} rows will be left out:',
+  importReason_invalid: '{n} rows where “{field}” cannot be read (rows {rows})',
+  importReason_required: '{n} rows where “{field}” is empty but required (rows {rows})',
+  importReason_tooLong: '{n} rows where “{field}” is too long (rows {rows})',
+  importReason_tooSmall: '{n} rows where “{field}” is below {limit} (rows {rows})',
+  importReason_tooLarge: '{n} rows where “{field}” is above {limit} (rows {rows})',
+  importConfirm: 'Import {n} entries',
+  importDone: 'Imported {n} entries into “{table}”',
+  importUndone: 'The imported entries are in Recently deleted for 30 days.',
+  importBatches: 'Imported from files',
+  importBatch: '{date} · {file} · {n} entries',
+  importDeleteBatch: 'Delete this import',
+  importDeleteBatchConfirm:
+    '{n} entries from “{file}” go to Recently deleted for 30 days, including any you edited since.',
 };
 
 export type StringKey = keyof typeof en;
@@ -1858,6 +1946,7 @@ export type MessageTable = Record<StringKey, string>;
 
 /** 单数写法（isSingular 为真时用），只放带数量的文案；哪个参数决定单复数见 messages.ts 的 PLURAL_COUNT_VARIABLE。 */
 export const enSingular = {
+  formIssues: '{n} field needs attention; it is marked above.',
   bulkDeleteButton: 'Delete {n} entry',
   bulkDeleteConfirm: 'Delete {n} entry from “{name}”?',
   bulkDeleted: '{n} entry deleted',
@@ -1934,8 +2023,10 @@ export const enSingular = {
   runError_noneMatched: 'The file doesn’t meet the conditions of “Keep only some files”.',
   reminderWhenAfterAdd: '{n} minute after each new entry in “{table}”',
   reminderWhenDate: '{n} day before “{field}” in “{table}”, at {time}',
+  reminderWhenMinutesBefore: '{n} minute before “{field}” in “{table}”',
   reminderAddedAgo: 'An entry was added to “{table}” {n} minute ago',
   reminderDueIn: 'An entry in “{table}” is due in {n} day ({date})',
+  reminderStartsIn: 'An entry in “{table}” is at {time}, in {n} minute',
   remindersRowHint: '{n} reminder',
   resultTablesMissing:
     'No ruled table was found on page {pages}, so everything on it was included.',
@@ -1958,6 +2049,9 @@ export const enSingular = {
   recordActionChanged: 'Changed {n} entry',
   recordActionConfirm: 'This changes {n} entry.',
   recordActionTooMany: 'At most {max} entries can change at once; this would change {n}.',
+  recordCreateAllConfirm: 'This creates {n} entry in “{table}”.',
+  recordCreateAllTooMany: 'At most {max} entries can be created at once; this would create {n}.',
+  recordCreateAllDone: 'Created {n} entry in “{table}”',
   calendarDayLabel: '{date}, {n} entry',
   widgetDone: 'Recorded {n} tap from the Home Screen widget',
   widgetSkipped: '{n} tap on the widget wasn’t recorded because the page changed',
@@ -1973,6 +2067,22 @@ export const enSingular = {
   filesDeleteTitle: 'Delete this file?',
   filesDeleteUsed:
     '{n} of them is used in an entry or a page and will no longer show there. This can’t be undone.',
+  importErrorTooManyRows:
+    'This file has {n} row, and at most {max} can be imported at once. Split the file and import the parts one after the other.',
+  importErrorTableFull:
+    'This would add {n} entry to “{table}”, which has room for only {room} more. Nothing was imported.',
+  importSummary: '{n} entry will be added to “{table}”.',
+  importLeftOut: '{n} row will be left out:',
+  importReason_invalid: '{n} row where “{field}” cannot be read (row {rows})',
+  importReason_required: '{n} row where “{field}” is empty but required (row {rows})',
+  importReason_tooLong: '{n} row where “{field}” is too long (row {rows})',
+  importReason_tooSmall: '{n} row where “{field}” is below {limit} (row {rows})',
+  importReason_tooLarge: '{n} row where “{field}” is above {limit} (row {rows})',
+  importConfirm: 'Import {n} entry',
+  importDone: 'Imported {n} entry into “{table}”',
+  importBatch: '{date} · {file} · {n} entry',
+  importDeleteBatchConfirm:
+    '{n} entry from “{file}” goes to Recently deleted for 30 days, even if you edited it since.',
 } satisfies Partial<MessageTable>;
 
 /** 单数表：键必须和 enSingular 完全一致。 */
