@@ -61,7 +61,7 @@ const EMPTY_IS_SURE: ReadonlySet<ConceptId> = new Set([
  * 自由填写的字段：单据上没有它的值，问模型只会得到地址、电话这类没用的候选
  * （iOS 模拟器上 2026-11-01 看到的；D-394 也不给这种字段列候选）。
  */
-const FREE_NOTE = /^(备注|附注|说明|notes?|remarks?|comments?|remarques?|commentaires?)$/i;
+export const FREE_NOTE = /^(备注|附注|说明|notes?|remarks?|comments?|remarques?|commentaires?)$/i;
 
 export interface FieldPlan {
   field: Field;

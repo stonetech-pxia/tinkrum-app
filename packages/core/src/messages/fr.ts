@@ -605,6 +605,7 @@ export const fr: MessageTable = {
   prefillMemoryPicks: '{count} suggestions choisies mémorisées',
   // Formulaire de nouvelle entrée : valeurs proposées à partir des pièces jointes (D-394)
   suggestionFill: 'Remplir « {field} » avec {value}',
+  heardFilled: 'D’après ce que vous avez dit',
   suggestionsWorking: 'Recherche de valeurs dans les pièces jointes…',
   suggestionsNeedDownload:
     'Pour proposer des valeurs tirées des pièces jointes, un téléchargement unique est nécessaire.',

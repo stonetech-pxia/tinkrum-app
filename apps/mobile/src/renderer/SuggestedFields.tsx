@@ -6,7 +6,7 @@ import {
   type PrefillEngine,
   type TextPage,
 } from '@morph/core';
-import type { ComponentProps } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Text, View } from 'react-native';
 
 import { useFieldSuggestions } from '../data/field-suggestions';
@@ -14,13 +14,15 @@ import { t } from '../i18n';
 import { PackGate } from '../packs/PackGate';
 import { usePacks } from '../packs/PackHost';
 import { useCalendar } from '../workspace/context';
-import { FieldsForm } from './data';
+import { FieldsForm, suggestionFormValue } from './data';
 import type { Palette } from './theme';
 import { Pill } from './ui';
 
 // 新记录表单的字段（D-394、D-397）：记录页和快捷操作的「记一笔」用同一份。附件里的照片、PDF 由表单自己读，
 // 给每个空字段候选，点了才填；快捷操作的步骤里不用写识别文字。表关掉 readAttachments 时不读。
 // D-570：字段按表上的 form 分段画，有条件的段按表单里现在的值显示或藏起来（边填边变）；藏起来的段里的值不清空。
+// D-575：快捷操作交来用户说的一句话（heard）时，候选从这句话来；有把握的直接填进用户还没动过的字段，
+// 下面写「按你说的填的」；没把握的照旧是候选。存不存还是用户点「保存」。
 
 export function SuggestedFields({
   suggest: enabled,
@@ -34,6 +36,7 @@ export function SuggestedFields({
   related,
   engine,
   onPages,
+  heard,
 }: {
   /** 只有新记录的表单给候选（编辑已有的记录不给）。 */
   suggest: boolean;
@@ -48,6 +51,8 @@ export function SuggestedFields({
   /** 新建表单页（D-444）：候选只用规则，字段一改就重新算，不能每次加载模型。 */
   engine?: PrefillEngine;
   onPages?: (pages: TextPage[]) => void;
+  /** 用户为这一笔说的话（D-575）。 */
+  heard?: string | undefined;
 }) {
   const packs = usePacks();
   const cal = useCalendar();
@@ -59,7 +64,42 @@ export function SuggestedFields({
     locale,
     ...(engine ? { engine } : {}),
     ...(onPages ? { onPages } : {}),
+    heard,
   });
+  // 有把握、用户没动过（打字、点候选）的字段：直接填的值。填过的字段写一行提示，用户一改就不写了。
+  const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
+  const sure: Record<string, unknown> = {};
+  if (enabled && heard !== undefined) {
+    for (const [id, list] of Object.entries(suggest.suggestions)) {
+      const field = collection.fields.find((f) => f.id === id);
+      if (list[0]?.sure && field && !touched.has(id))
+        sure[id] = suggestionFormValue(field, list[0].value);
+    }
+  }
+  const filled = new Set(Object.keys(sure).filter((id) => values[id] === sure[id]));
+  const latest = useRef({ values, onChange });
+  useEffect(() => {
+    latest.current = { values, onChange };
+  });
+  const pending = Object.keys(sure).filter((id) => values[id] !== sure[id]);
+  const pendingKey = pending.map((id) => `${id}=${String(sure[id])}`).join('|');
+  useEffect(() => {
+    if (!pendingKey) return;
+    const { values: now, onChange: change } = latest.current;
+    const next = { ...now };
+    for (const part of pendingKey.split('|')) {
+      const id = part.slice(0, part.indexOf('='));
+      const field = collection.fields.find((f) => f.id === id);
+      const top = suggest.suggestions[id]?.[0];
+      if (field && top) next[id] = suggestionFormValue(field, top.value);
+    }
+    change(next);
+  }, [pendingKey, collection, suggest.suggestions]);
+  const edit = (next: Record<string, unknown>) => {
+    const changed = collection.fields.filter((f) => next[f.id] !== values[f.id]).map((f) => f.id);
+    if (changed.length > 0) setTouched((prev) => new Set([...prev, ...changed]));
+    onChange(next);
+  };
   return (
     <>
       {suggest.missing.length > 0 && packs ? (
@@ -98,9 +138,10 @@ export function SuggestedFields({
             collection={collection}
             fieldIds={section.fields}
             values={values}
-            onChange={onChange}
+            onChange={edit}
             {...(enabled ? { suggestions: suggest.suggestions } : {})}
             onSuggestion={suggest.remember}
+            heard={filled}
             issues={issues}
             palette={palette}
             locale={locale}

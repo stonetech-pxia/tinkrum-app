@@ -543,6 +543,7 @@ export const zh: MessageTable = {
   prefillMemoryPicks: '记住了 {count} 个字段点过的候选',
   // 新记录表单：从附件里找的候选值（D-394）
   suggestionFill: '把 {value} 填进「{field}」',
+  heardFilled: '按你说的填的',
   suggestionsWorking: '正在从附件里找可以填的内容…',
   suggestionsNeedDownload: '要从附件里找出可以填的内容，需要先下载一次。',
   suggestionsDownload: '找可以填的内容',

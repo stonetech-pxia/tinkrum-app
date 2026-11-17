@@ -572,6 +572,7 @@ export const en = {
   prefillMemoryPicks: 'Remembers {count} picked suggestions',
   // New entry form: suggested values from attachments (D-394)
   suggestionFill: 'Fill “{field}” with {value}',
+  heardFilled: 'From what you said',
   suggestionsWorking: 'Looking for values in the attachments…',
   suggestionsNeedDownload: 'To suggest values from the attachments, a one-time download is needed.',
   suggestionsDownload: 'Suggest values',

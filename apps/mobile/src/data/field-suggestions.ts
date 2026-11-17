@@ -43,6 +43,8 @@ import {
 // 「设置 → 数据 → 预填记忆」能导出、恢复、清空。识别出的文字、文件名和记录都不发给云端 AI。
 // 这张表存过的店名、公司现查记录（底线 14：不另存值，只读）。下载了本机模型（D-396）时，模型的候选后来补上，
 // 表单不知道是哪个引擎。用户点过候选的字段，它的候选不再变（D-388：点过的留在原地）。
+// 文字有两个来源（D-575）：附件里读出来的（上面说的），和快捷操作里用户说的一句话（heard，语音转的文字）。
+// 说的话不用读附件、不用下载识别模型，按「说的话」交给同一个引擎，有把握的候选带 sure，由表单直接填。
 
 export interface FieldSuggestionsState {
   /** 正在读附件。 */
@@ -60,6 +62,12 @@ export interface FieldSuggestionsState {
 }
 
 const NONE: FieldSuggestions = {};
+/** 说的话当成一页一行（引擎只看文字，位置不用）。 */
+const spokenPage = (text: string): TextPage => ({
+  width: 1000,
+  height: 40,
+  lines: [{ text, x: 0, y: 0, width: 1000, height: 24 }],
+});
 const NO_NEEDS: PackNeed[] = [];
 
 export function useFieldSuggestions({
@@ -69,6 +77,7 @@ export function useFieldSuggestions({
   locale,
   engine: given,
   onPages,
+  heard,
 }: {
   /** 只在新记录的表单里（编辑已有的记录时不给候选）。 */
   enabled: boolean;
@@ -79,6 +88,8 @@ export function useFieldSuggestions({
   engine?: PrefillEngine;
   /** 读出文字时告诉调用方（新建表单页要用它找字段名和推荐预设，D-444），不用再读一遍。 */
   onPages?: (pages: TextPage[]) => void;
+  /** 用户为这一笔说的话（D-575）：有它时候选从这句话来，不读附件。 */
+  heard?: string | undefined;
 }): FieldSuggestionsState {
   const { repo, files } = useWorkspaceContext();
   const packs = usePacks();
@@ -104,15 +115,16 @@ export function useFieldSuggestions({
     tellPages.current = onPages;
   });
 
+  const spoken = enabled && heard !== undefined && heard.trim() !== '' ? heard.trim() : null;
   // 附件字段里的文件（按字段顺序），作为重新读的依据。
   const ids = useMemo(
     () =>
-      enabled && collection && collection.readAttachments !== false
+      enabled && spoken === null && collection && collection.readAttachments !== false
         ? collection.fields.flatMap((f) => (f.type === 'file' ? attachmentIds(values[f.id]) : []))
         : [],
-    [enabled, collection, values],
+    [enabled, spoken, collection, values],
   );
-  const key = ids.join(',');
+  const key = spoken !== null ? `heard:${spoken}` : ids.join(',');
   const run = `${key}#${installs}`;
 
   const deps = useMemo<AttachmentTextDeps>(
@@ -133,15 +145,17 @@ export function useFieldSuggestions({
     const abort = new AbortController();
     void (async () => {
       const assets: AssetRecord[] = [];
-      for (const id of key.split(',')) {
-        const a = await repo.getAsset(id);
-        if (a && readableKind(a)) assets.push(a);
+      if (spoken === null) {
+        for (const id of key.split(',')) {
+          const a = await repo.getAsset(id);
+          if (a && readableKind(a)) assets.push(a);
+        }
       }
       const first = assets.slice(0, MAX_READ_FILES);
       if (abort.signal.aborted) return;
-      if (first.length === 0) return;
+      if (spoken === null && first.length === 0) return;
       const kinds = first.map((a) => readableKind(a)!);
-      const list = await missingPacks(kinds, deps);
+      const list = spoken === null ? await missingPacks(kinds, deps) : NO_NEEDS;
       picks.current = parsePickStore(await repo.getMeta(PICK_STORE_KEY))[collection.id] ?? {};
       if (abort.signal.aborted) return;
       setNeeds({ run, list });
@@ -150,12 +164,17 @@ export function useFieldSuggestions({
         const card = collection.prefillRules === 'card';
         const cached = read.current?.run === run ? read.current : null;
         const codes =
-          cached?.codes ?? (card ? await readAttachmentCodes(first, deps, abort.signal) : []);
-        const pages = cached?.pages ?? (await readAttachmentPages(first, deps, abort.signal));
+          cached?.codes ??
+          (card && spoken === null ? await readAttachmentCodes(first, deps, abort.signal) : []);
+        const pages =
+          cached?.pages ??
+          (spoken !== null
+            ? [spokenPage(spoken)]
+            : await readAttachmentPages(first, deps, abort.signal));
         if (abort.signal.aborted) return;
         if (!cached || (card && cached.codes.length === 0)) {
           read.current = { run, pages, codes };
-          if (!cached) tellPages.current?.(pages);
+          if (!cached && spoken === null) tellPages.current?.(pages);
         }
         const known = collection.fields.some(usesValueMemory)
           ? knownValues(collection.fields, await repo.listRecords(collection.id))
@@ -166,6 +185,7 @@ export function useFieldSuggestions({
             fields: collection.fields,
             ...(collection.prefillRules ? { rules: collection.prefillRules } : {}),
             pages,
+            ...(spoken !== null ? { spoken: true } : {}),
             ...(codes.length > 0 ? { codes } : {}),
             locale,
             picks: picks.current,
@@ -190,7 +210,7 @@ export function useFieldSuggestions({
       }
     })();
     return () => abort.abort();
-  }, [collection, key, run, deps, repo, locale, engine]);
+  }, [collection, key, run, deps, repo, locale, engine, spoken]);
 
   const working = workingFor === run && key !== '';
   const missing = key && needs?.run === run ? needs.list : NO_NEEDS;

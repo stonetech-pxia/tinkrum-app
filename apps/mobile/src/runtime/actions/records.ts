@@ -9,6 +9,7 @@ import {
   isFileValue,
   prepareRecordValues,
   recordTargets,
+  spokenTextTarget,
   type ActionImpl,
   type Collection,
   type RunItem,
@@ -60,7 +61,11 @@ export const RECORD_IMPLS: Record<string, Impl> = {
         throw new RunError('tooMany', { max: RECORD_LIMITS.perCollection });
       }
       const prefill: Record<string, unknown> = {};
-      if (items === null && input?.type === 'text' && textField) prefill[textField] = input.text;
+      // 用户说的话放进备注这类字段（D-576），不放进商家这种第一个文字字段。
+      const spokenField =
+        input?.type === 'text' && input.spoken ? spokenTextTarget(collection) : undefined;
+      const intoField = spokenField ?? textField;
+      if (items === null && input?.type === 'text' && intoField) prefill[intoField] = input.text;
       // 打开表单前就存成用户文件，表单才能读它们（D-394）。这一步新存的是这张表单的副本：
       // 没进记录的（跳过、关掉、从表单里去掉、写入失败）都删掉；之前的步骤存好的不归它。
       const saved = fileField ? await saveItems(ctx.services, entry, ctx) : entry;
@@ -74,6 +79,9 @@ export const RECORD_IMPLS: Record<string, Impl> = {
           prefill,
           ...(!fileField && entry[0] ? { file: entry[0] } : {}),
           ...(together && items.length > MAX_ATTACHMENTS ? { overflow: true } : {}),
+          ...(items === null && input?.type === 'text' && input.spoken
+            ? { heard: input.text }
+            : {}),
           index: i,
           total: entries.length,
         });

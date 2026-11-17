@@ -1018,6 +1018,10 @@ function suggestionDate(iso: string, locale: RenderEnv['locale']): string {
   }).format(at);
 }
 
+/** 候选的值 → 表单里的写法（D-575）：评分是数，别的（金额、数字、日期、时间、时长 h:mm、选项 ID）就是这段文字。 */
+export const suggestionFormValue = (field: Pick<Field, 'type'>, value: string): unknown =>
+  field.type === 'rating' ? Number(value) : value;
+
 /**
  * 字段下面的候选值（D-394）：安静的小按钮，显示整理过的值（金额带货币、日期写出月份），
  * 太长时截断；点了才填，从不自动填。点了以后候选留在原地（下面的字段不往上跳），和字段里的值
@@ -1047,12 +1051,18 @@ function SuggestionChips({
   const shown = (s: ValueSuggestion) =>
     field.type === 'date'
       ? suggestionDate(s.value, locale)
-      : hasRecordCurrency(field)
-        ? formatNumber(Number(s.value), undefined, locale) // D-429：货币还要用户选，先不写。
-        : formatValue(field, numeric ? Number(s.value) : s.value, locale) || s.value;
+      : field.type === 'duration' || field.type === 'time'
+        ? s.value
+        : field.type === 'rating'
+          ? formatValue(field, Number(s.value), locale)
+          : hasRecordCurrency(field)
+            ? formatNumber(Number(s.value), undefined, locale) // D-429：货币还要用户选，先不写。
+            : formatValue(field, numeric ? Number(s.value) : s.value, locale) || s.value;
   const isCurrent = (s: ValueSuggestion) =>
     !isEmptyValue(current) &&
-    (numeric ? Number(current) === Number(s.value) : String(current) === s.value);
+    (numeric || field.type === 'rating'
+      ? Number(current) === Number(s.value)
+      : String(current) === s.value);
   return (
     <View testID={testID} style={styles.suggestions}>
       {list.map((s, i) => {
@@ -1107,6 +1117,7 @@ export function FieldsForm({
   autoFocus,
   suggestions,
   onSuggestion,
+  heard,
 }: {
   collection: Collection;
   fieldIds: readonly string[];
@@ -1131,6 +1142,8 @@ export function FieldsForm({
   suggestions?: Readonly<Record<string, readonly ValueSuggestion[]>> | undefined;
   /** 用户点了一个候选（已经填进字段）。 */
   onSuggestion?: ((fieldId: string, suggestion: ValueSuggestion) => void) | undefined;
+  /** 按用户说的话直接填的字段（D-575）：下面写一行「按你说的填的」，用户改了就不写了。 */
+  heard?: ReadonlySet<string> | undefined;
 }) {
   const cal = useCalendar();
   const firstText = fieldIds.find(
@@ -1226,10 +1239,17 @@ export function FieldsForm({
                 disabled={disabled}
                 testID={`${testPrefix}-${id}-suggestion`}
                 onPick={(s) => {
-                  onChange({ ...values, [id]: s.value });
+                  onChange({ ...values, [id]: suggestionFormValue(field, s.value) });
                   onSuggestion?.(id, s);
                 }}
               />
+            ) : null}
+            {heard?.has(id) ? (
+              <Text
+                testID={`${testPrefix}-${id}-heard`}
+                style={[palette.font('body', 13), { color: palette.caption }]}>
+                {t(locale, 'heardFilled')}
+              </Text>
             ) : null}
             {!inline ? hint : null}
             {issue ? (

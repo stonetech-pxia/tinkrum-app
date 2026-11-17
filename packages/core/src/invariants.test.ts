@@ -16,6 +16,7 @@ import { en, enSingular } from './messages/en';
 import { fr, frSingular } from './messages/fr';
 import { zh } from './messages/zh';
 import { migrateWorkspace } from './migrate';
+import { ruleEngine } from './prefill/engine';
 import { applyOps, OpSchema, type Op } from './ops';
 import {
   MAX_CREATE_ALL,
@@ -215,6 +216,35 @@ describe('底线 1 / 2 / 14：保存的预设不在配置里（D-410）', () => 
       WorkspaceConfigSchema.safeParse({ ...config, presets: [{ id: 'p', name: SENTINEL }] })
         .success,
     ).toBe(false);
+  });
+});
+
+describe('底线 2：本机模型从文件读的只给候选，只有用户为这一笔说的话才直接填（D-396、D-575）', () => {
+  const fields = [
+    { id: 'title', name: '事项', type: 'text' as const },
+    { id: 'due', name: '截止日期', type: 'date' as const },
+    { id: 'amount', name: '金额', type: 'money' as const, currency: 'CNY' },
+  ];
+  const page = (text: string) => ({
+    width: 600,
+    height: 40,
+    lines: [{ text, x: 0, y: 0, width: 600, height: 24 }],
+  });
+  const sure = (out: Record<string, { sure?: boolean }[]>) =>
+    Object.values(out)
+      .flat()
+      .some((s) => s.sure === true);
+
+  it('同一句话：从文件读出来的没有一个直接填，说出来的才有', async () => {
+    const text = '明天交房租 2026-11-18 金额 3000元';
+    const base = {
+      fields,
+      pages: [page(text)],
+      locale: 'zh' as const,
+      now: new Date(2026, 10, 17),
+    };
+    expect(sure(await ruleEngine(base))).toBe(false);
+    expect(sure(await ruleEngine({ ...base, spoken: true }))).toBe(true);
   });
 });
 

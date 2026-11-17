@@ -86,18 +86,26 @@ describe('in the app shell', () => {
 
 describe('new user', () => {
   it.each([
-    ['zh', '还没有收据。扫一张就有了。', '扫描', '开销', '手动添加'],
-    ['en', 'No receipts yet. Scan one to add it.', 'Scan', 'Spending', 'Add by hand'],
+    ['zh', '还没有收据。扫一张就有了。', '扫描', '开销', '手动添加', '语音添加'],
+    [
+      'en',
+      'No receipts yet. Scan one to add it.',
+      'Scan',
+      'Spending',
+      'Add by hand',
+      'Add by voice',
+    ],
     [
       'fr',
       'Aucun reçu pour l’instant. Numérisez-en un pour l’ajouter.',
       'Scanner',
       'Dépenses',
       'Ajouter à la main',
+      'Ajouter à la voix',
     ],
   ] as const)(
     'is the empty list with Spending and the dial (%s)',
-    async (locale, empty, scan, spending, byHand) => {
+    async (locale, empty, scan, spending, byHand, byVoice) => {
       await open('receipts', [], locale);
       expect(await screen.findByText(empty)).toBeTruthy();
       expect(screen.queryByTestId('browse-search')).toBeNull();
@@ -106,6 +114,8 @@ describe('new user', () => {
       expect(within(screen.getByTestId('dial-main')).getByText(scan)).toBeTruthy();
       await fireEvent.press(screen.getByTestId('dial-toggle'));
       expect(screen.getByText(byHand)).toBeTruthy();
+      // 语音记一笔（D-576）：录音 → 转文字 → 记一笔，表单按说的话直接填（D-575）。
+      expect(screen.getByText(byVoice)).toBeTruthy();
     },
   );
 

@@ -169,6 +169,17 @@ function categoryChoices(field: ChoiceField): { id: string; name: string; known:
   return out;
 }
 
+/** 问模型时的选项：名字（语法里用）和提示词里的一行（说出来的话也用这一份，D-575）。 */
+export function categoryPromptOptions(
+  field: ChoiceField,
+): { id: string; name: string; line: string }[] {
+  return categoryChoices(field).map((c) => ({
+    id: c.id,
+    name: c.name,
+    line: `- ${c.name}${c.known ? `: ${DESCRIPTIONS[c.id as CategoryId]}` : ''}`,
+  }));
+}
+
 const SYSTEM =
   'You read the OCR text of one receipt or document and choose the one category it belongs to. ' +
   'Use only what is written in the text. Output only the category.';

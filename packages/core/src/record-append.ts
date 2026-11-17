@@ -1,4 +1,5 @@
 import { MAX_ATTACHMENTS, attachmentIds } from './field-values';
+import { FREE_NOTE } from './prefill/code-rules';
 import type { Collection } from './schema';
 
 // 把一次运行的结果放进一条已有的记录（out.addRecord 的 into: "existing"，D-443）：只追加，不替换、不删除。
@@ -13,6 +14,18 @@ export function recordTargets(collection: Collection) {
       collection.fields.find((f) => f.type === 'text')
     )?.id,
   };
+}
+
+/**
+ * 用户说的一句话（D-575）原样放进哪个字段：长文本，没有就名字是「备注」这类的文字字段，再没有才是第一个文字字段。
+ * 收据表的第一个文字字段是「商家」，整句放进去用户还得删（D-576）。
+ */
+export function spokenTextTarget(collection: Collection): string | undefined {
+  return (
+    collection.fields.find((f) => f.type === 'note') ??
+    collection.fields.find((f) => f.type === 'text' && FREE_NOTE.test(f.name.trim())) ??
+    collection.fields.find((f) => f.type === 'text')
+  )?.id;
 }
 
 /** 这条记录的附件字段还能再放几个文件；表里没有附件字段是 0。 */

@@ -15,6 +15,7 @@
     "$page.main": "receipts",
     "$page.spending": "spending",
     "$tool.scan": "scan-receipt",
+    "$tool.voice": "voice-receipt",
     "$tool.excel": "export-receipts-excel"
   },
   "tables": [
@@ -176,6 +177,46 @@
       ]
     },
     {
+      "id": "$tool.voice",
+      "kind": "quickAction",
+      "name": {
+        "en": "Add a receipt by voice",
+        "zh": "语音记一笔",
+        "fr": "Ajouter un reçu à la voix"
+      },
+      "icon": "audio",
+      "steps": [
+        {
+          "id": "record",
+          "action": "in.audio",
+          "params": {
+            "source": "record",
+            "min": 1,
+            "max": 1
+          }
+        },
+        {
+          "id": "text",
+          "action": "audio.transcribe",
+          "params": {
+            "lang": {
+              "en": "en",
+              "zh": "zh",
+              "fr": "fr"
+            },
+            "model": "standard"
+          }
+        },
+        {
+          "id": "log",
+          "action": "out.addRecord",
+          "params": {
+            "collectionId": "$table.receipts"
+          }
+        }
+      ]
+    },
+    {
       "id": "$tool.excel",
       "kind": "quickAction",
       "name": {
@@ -263,6 +304,14 @@
                 "en": "Scan",
                 "zh": "扫描",
                 "fr": "Scanner"
+              }
+            },
+            {
+              "tool": "$tool.voice",
+              "label": {
+                "en": "Add by voice",
+                "zh": "语音添加",
+                "fr": "Ajouter à la voix"
               }
             },
             {

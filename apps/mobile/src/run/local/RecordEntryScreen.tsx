@@ -28,7 +28,7 @@ export function RecordEntryScreen({
   onDone,
   onCancel,
 }: LocalScreenProps<'recordEntry'>) {
-  const { collection, prefill, file, overflow, existing, index, total } = input;
+  const { collection, prefill, file, overflow, existing, index, total, heard } = input;
   const cal = useCalendar();
   // 新记录：先套用字段的默认值（日期是今天，按一天从几点开始算，D-286），再放进预先填好的文字。
   // 放进已有的记录（D-443）：从这条记录现在的值开始，再套上接在后面的文件和文字。
@@ -123,6 +123,7 @@ export function RecordEntryScreen({
           palette={palette}
           locale={locale}
           testPrefix="entry"
+          heard={heard}
         />
         {total > 1 ? (
           <Pressable
