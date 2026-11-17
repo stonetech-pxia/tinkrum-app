@@ -9,6 +9,7 @@ export * from './ai/session';
 export * from './ai/types';
 export * from './arrange';
 export * from './calendar';
+export * from './callout-text';
 export * from './change';
 export * from './zod-issues';
 export * from './page-zones';

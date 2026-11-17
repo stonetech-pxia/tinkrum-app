@@ -396,6 +396,10 @@ export const fr: MessageTable = {
   describeShowIfOff: 'Toujours afficher {component}',
   describeShowIfSome: 'Afficher {component} seulement quand « {table} » a des entrées',
   describeShowIfNone: 'Afficher {component} seulement quand « {table} » n’a aucune entrée',
+  describeShowIfSomeMatching:
+    'Afficher {component} seulement quand « {table} » a des entrées qui correspondent',
+  describeShowIfNoneMatching:
+    'Afficher {component} seulement quand « {table} » n’a aucune entrée qui corresponde',
   describeSingle: 'une entrée de « {table} »',
   groupNoText: 'Non renseigné',
   describe_dial: 'Un bouton flottant avec {n} actions',
@@ -972,7 +976,6 @@ export const fr: MessageTable = {
   needsSettingNote:
     'Affiche un bouton sous la réponse. Rien n’est envoyé sans que vous appuyiez dessus.',
   // ---- 记一笔、附件和公式字段（D-187、D-188）----
-  noAttachment: 'Aucune pièce jointe',
   attachmentMissing: 'Le fichier a été supprimé',
   removeAttachment: 'Retirer',
   attachmentAdd: 'Ajouter des photos ou des fichiers',
@@ -1024,6 +1027,7 @@ export const fr: MessageTable = {
   recordStart: 'Commencer l’enregistrement',
   recordPause: 'Pause',
   recordResume: 'Reprendre',
+  recordStopGo: 'Arrêter et continuer',
   recordDone: 'Terminé',
   recordHint:
     'L’enregistrement continue lorsque l’écran se verrouille. Appuyez sur « Terminer » une fois fini.',
@@ -1042,6 +1046,7 @@ export const fr: MessageTable = {
   // 统计按选项分组（D-248）
   statNoChoice: 'Non renseigné',
   // 图表（D-249）
+  describeCallout: 'carte d’alerte « {v0} »',
   describeChart: 'graphique « {v0} »',
   // D-254：更新的 App 加的组件，这个版本不认识，原样保留。
   describeUnknownComponent: 'contenu d’une version plus récente de cette app',
@@ -1131,6 +1136,7 @@ export const fr: MessageTable = {
     'L’action rapide « {name} » ne peut plus fonctionner sans ce tableau et est retirée aussi',
   reminderWhenDaily: 'tous les jours à {time}',
   reminderWhenWeekly: 'chaque {days} à {time}',
+  reminderWhenMonthly: 'le jour {day} de chaque mois à {time}',
   reminderWhenAfterAdd: '{n} minutes après chaque nouvelle entrée de « {table} »',
   reminderWhenDate: '{n} jours avant « {field} » dans « {table} », à {time}',
   reminderWhenMinutesBefore: '{n} minutes avant « {field} » dans « {table} »',

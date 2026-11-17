@@ -132,7 +132,7 @@ export const richText = (max: number) =>
 
 // ---- 主题：白名单样式 token ----
 
-export const FONT_CHOICES = ['clay', 'system', 'serif', 'mono'] as const;
+export const FONT_CHOICES = ['clay', 'system', 'serif', 'mono', 'inter'] as const;
 
 export const ThemeColorsSchema = z.strictObject({
   background: HexColorSchema.optional(),
@@ -152,7 +152,7 @@ export const ThemeSchema = z.strictObject({
   colors: ThemeColorsSchema,
   /** 深色模式下的颜色覆盖；没设置的颜色依次使用 colors、默认风格的深色值。 */
   darkColors: ThemeColorsSchema.optional(),
-  /** 字体组合：clay = 标题 Sora + 正文 Karla。 */
+  /** 字体组合：clay = 标题 Sora + 正文 Karla；inter = Inter（D-591，数字和大标题用中等粗细）。 */
   font: z.enum(FONT_CHOICES),
   fontScale: z.number().min(0.85).max(1.3),
   /** 卡片圆角（pt）；按钮等控件的圆角随之缩放。 */

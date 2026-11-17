@@ -8298,6 +8298,68 @@ const quietWhenLogged = (every: 'day' | 'week', within: 'day' | 'week') => (c: W
     ? null
     : `expected an every ${every} reminder with unless {table: expenses, within: ${within}}, got ${JSON.stringify(remindersOf(c))}`;
 
+/** 每月几号的提醒（D-577），可以带 unless。 */
+const monthlyReminder =
+  (day: number, at: string, quiet: boolean) =>
+  (c: WorkspaceConfig): string | null => {
+    const found = remindersOf(c).some(
+      (r) =>
+        'every' in r.when &&
+        r.when.every === 'month' &&
+        r.when.day === day &&
+        r.when.at === at &&
+        (quiet ? r.unless?.table === 'expenses' && r.unless.within === 'month' : !r.unless),
+    );
+    return found
+      ? null
+      : `expected an every month reminder on day ${day} at ${at}${quiet ? ' with unless {table: expenses, within: month}' : ''}, got ${JSON.stringify(remindersOf(c))}`;
+  };
+
+// 提示卡（D-580）：文字里数条数和合计，卡片里一个打开页面的按钮。
+const CALLOUT_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG42',
+    input: '在首页加一张提示卡：说本月有几笔开支、一共多少钱，带一个“看账目”的按钮打开记账页面',
+    locale: 'zh',
+    setup: 'budget',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const card = home(c).blocks.find((x) => x.look === 'callout');
+        if (!card || card.look !== 'callout') return 'expected a callout on the home page';
+        if (card.source.table !== 'expenses')
+          return `callout should read expenses, got ${card.source.table}`;
+        if (!card.show.text.includes('{count}') || !card.show.text.includes('{sum:amount}'))
+          return `callout text should use {count} and {sum:amount}, got ${card.show.text}`;
+        return card.opens !== undefined && card.show.openLabel
+          ? null
+          : 'callout should have an open button (opens and openLabel)';
+      },
+    },
+  },
+];
+
+// 每月几号的提醒（D-577）。
+const MONTHLY_REMINDER_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG40',
+    input: 'Remind me on the 1st of every month at 9 am to check my budget',
+    locale: 'en',
+    setup: 'budget',
+    mock: false,
+    expect: { kind: 'ops', check: monthlyReminder(1, '09:00', false) },
+  },
+  {
+    id: 'KG41',
+    input: '每月 15 号晚上 8 点提醒我记账，这个月已经记过就不用提醒',
+    locale: 'zh',
+    setup: 'budget',
+    mock: false,
+    expect: { kind: 'ops', check: monthlyReminder(15, '20:00', true) },
+  },
+];
+
 // 每天、每周的提醒，已经做了就不响（D-563）。
 const UNLESS_REPEATING_CASES: readonly EvalCase[] = [
   {
@@ -9027,6 +9089,8 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...LIST_PERIOD_CASES,
   ...MINUTES_BEFORE_CASES,
   ...UNLESS_REPEATING_CASES,
+  ...MONTHLY_REMINDER_CASES,
+  ...CALLOUT_CASES,
   ...RELATIVE_VALUE_CASES,
   ...TAP_ALSO_CASES,
   ...CREATE_ALL_CASES,

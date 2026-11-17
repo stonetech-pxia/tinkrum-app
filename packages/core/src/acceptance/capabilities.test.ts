@@ -145,7 +145,12 @@ describe('完整性守护：schema 和登记表多一种东西，能力表少一
   it('每种提醒时间和提醒上的选项', () => {
     const whens = ReminderWhenSchema.options.map((o) => {
       const shape = o.shape as Record<string, { value?: string }>;
-      if (shape.every) return shape.every.value === 'day' ? 'everyDay' : 'everyWeek';
+      if (shape.every)
+        return shape.every.value === 'day'
+          ? 'everyDay'
+          : shape.every.value === 'month'
+            ? 'everyMonth'
+            : 'everyWeek';
       if (shape.before && shape.minutes) return 'beforeMinutes';
       return Object.keys(shape)[0]!;
     });
@@ -155,6 +160,7 @@ describe('完整性守护：schema 和登记表多一种东西，能力表少一
       'beforeMinutes',
       'each',
       'everyDay',
+      'everyMonth',
       'everyWeek',
     ]);
     expect(missing(whens.map((w) => `remind.when.${w}`))).toEqual([]);
@@ -345,6 +351,27 @@ function everything() {
         filter: [{ field: 'name', op: 'isNotEmpty' }],
         values: { group: '$row' },
       }),
+      {
+        id: 'callout',
+        look: 'callout',
+        show: {
+          title: 'Waiting',
+          text: '{count} waiting, {sum:qty} in total',
+          actionLabel: 'Add',
+          openLabel: 'Settings',
+        },
+        source: { table: 'items', filter: [{ field: 'qty', op: 'lt', value: 5 }] },
+        tools: [
+          {
+            do: 'createAll',
+            table: 'items',
+            from: 'groups',
+            filter: [{ field: 'name', op: 'isNotEmpty' }],
+            values: { group: '$row' },
+          },
+        ],
+        opens: 'settings',
+      },
       runAction('run-scan', 'scan-item'),
       records('list', 'rows', 'items', 'title', {
         source: { sort: { field: 'date', direction: 'desc' } },
@@ -553,6 +580,7 @@ function everything() {
       }),
     ),
     addTool(reminder('r-week', { every: 'week', days: [1], at: '09:00' }, 'page:views')),
+    addTool(reminder('r-month', { every: 'month', day: 1, at: '09:00' }, 'page:views')),
     addTool(
       reminder(
         'r-before',

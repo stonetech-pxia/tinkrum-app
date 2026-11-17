@@ -102,10 +102,11 @@ describe('attachment fields in the record editor', () => {
     expect(screen.getByText('发票.jpg')).toBeTruthy();
   });
 
-  it('a new user sees no attachment', async () => {
+  it('a new user sees the attachment field without a "no attachment" sentence (D-590)', async () => {
     await renderToolsApp(new MemoryWorkspaceRepo(), undefined, { seed });
     await act(() => router.push('/record/expenses'));
-    expect(await screen.findByText('没有附件')).toBeTruthy();
+    expect(await screen.findByTestId('editor-receipt-add')).toBeTruthy();
+    expect(screen.queryByText('没有附件')).toBeNull();
   });
 });
 

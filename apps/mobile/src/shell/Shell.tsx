@@ -136,7 +136,9 @@ export function Shell() {
         setTimeout(() => {
           const s = store.getState();
           if (s.appId === null || s.appEnters > since) return;
-          if (router.canDismiss()) router.dismissAll();
+          // 有推入的页面（运行、记录表单……）说明用户正在做事：系统的权限窗口、文件和照片选择器也会让 App
+          // 进一下后台，不能把他正在做的事关掉，留在原地（D-585）。
+          if (router.canDismiss()) return;
           s.leaveApp();
         }, 700);
       }

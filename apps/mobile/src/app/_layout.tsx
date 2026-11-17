@@ -8,6 +8,10 @@ import {
   type Locale,
   trustedToolKeys,
 } from '@morph/core';
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { Karla_400Regular } from '@expo-google-fonts/karla/400Regular';
 import { Karla_400Regular_Italic } from '@expo-google-fonts/karla/400Regular_Italic';
 import { Karla_500Medium } from '@expo-google-fonts/karla/500Medium';
@@ -234,6 +238,11 @@ export default function RootLayout() {
     Karla_400Regular_Italic,
     [CLAY_FONTS.bodyMedium]: Karla_500Medium,
     [CLAY_FONTS.bodyBold]: Karla_700Bold,
+    // Inter（D-591）：选了 font: "inter" 的主题用。
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
   });
 
   useEffect(() => {

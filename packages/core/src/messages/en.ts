@@ -376,6 +376,8 @@ export const en = {
   describeShowIfOff: 'Always show {component}',
   describeShowIfSome: 'Show {component} only when “{table}” has entries',
   describeShowIfNone: 'Show {component} only when “{table}” has no entries',
+  describeShowIfSomeMatching: 'Show {component} only when “{table}” has matching entries',
+  describeShowIfNoneMatching: 'Show {component} only when “{table}” has no matching entries',
   describeSingle: 'one entry of “{table}”',
   groupNoText: 'Not filled in',
   describe_dial: 'A floating button with {n} actions',
@@ -917,7 +919,6 @@ export const en = {
   needsSettingTitle: 'Offer to send requests Tink can’t do',
   needsSettingNote: 'Shows a button under the answer. Nothing is sent unless you tap it.',
   // ---- 记一笔、附件和公式字段（D-187、D-188）----
-  noAttachment: 'No attachment',
   attachmentMissing: 'The file was deleted',
   removeAttachment: 'Remove',
   attachmentAdd: 'Add photos or files',
@@ -966,6 +967,7 @@ export const en = {
   recordStart: 'Start recording',
   recordPause: 'Pause',
   recordResume: 'Continue',
+  recordStopGo: 'Stop and continue',
   recordDone: 'Done',
   recordHint: 'It keeps recording when the screen locks. Tap Done when you have finished.',
   recordDiscardTitle: 'Discard this recording?',
@@ -982,6 +984,7 @@ export const en = {
   // 统计按选项分组（D-248）
   statNoChoice: 'Not set',
   // 图表（D-249）
+  describeCallout: 'callout “{v0}”',
   describeChart: 'chart “{v0}”',
   // D-254：更新的 App 加的组件，这个版本不认识，原样保留。
   describeUnknownComponent: 'content from a newer version of this app',
@@ -1066,6 +1069,7 @@ export const en = {
     'The quick action “{name}” can’t work without this table and is removed too',
   reminderWhenDaily: 'every day at {time}',
   reminderWhenWeekly: 'every {days} at {time}',
+  reminderWhenMonthly: 'on day {day} of every month at {time}',
   reminderWhenAfterAdd: '{n} minutes after each new entry in “{table}”',
   reminderWhenDate: '{n} days before “{field}” in “{table}”, at {time}',
   reminderWhenMinutesBefore: '{n} minutes before “{field}” in “{table}”',

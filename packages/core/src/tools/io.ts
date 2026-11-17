@@ -379,7 +379,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
   {
     // 音频（D-154）：从「文件」选录音或音乐（语音备忘录分享出来的、微信下载的），或者现在录一段。
     id: 'in.audio',
-    ai: 'Audio starts here: source "files" for recordings and music in the Files app, "record" to record now with the microphone; shared recordings fill it either way.',
+    ai: 'Audio starts here: source "files" for recordings and music in the Files app, "record" to record now with the microphone (autoStart: true starts recording as soon as the screen opens and one tap on Stop hands the recording on, for "say it and go" flows); shared recordings fill it either way.',
     label: {
       en: 'Choose or record audio',
       zh: '选音频 / 录音',
@@ -397,8 +397,13 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
         source: z.enum(['files', 'record']),
         min: z.number().int().min(1).max(MEDIA_LIMITS.maxCount),
         max: z.number().int().min(1).max(MEDIA_LIMITS.maxCount),
+        /** 现在录音时（D-587）：录音页一打开就开始录，按钮是「停止」，点一下停下并直接进入下一步。 */
+        autoStart: z.boolean().optional(),
       })
-      .refine((p) => p.min <= p.max, { message: 'min must not exceed max' }),
+      .refine((p) => p.min <= p.max, { message: 'min must not exceed max' })
+      .refine((p) => p.autoStart !== true || p.source === 'record', {
+        message: 'autoStart only applies to source "record"',
+      }),
     fields: [
       {
         key: 'source',
@@ -416,6 +421,16 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
         ...f,
         showIf: { key: 'source', equals: ['files'] },
       })),
+      {
+        key: 'autoStart',
+        label: {
+          en: 'Start recording at once, one tap to stop',
+          zh: '打开就开始录，点一下停止并继续',
+          fr: 'Démarrer l’enregistrement tout de suite, un seul appui pour arrêter',
+        },
+        kind: 'toggle',
+        showIf: { key: 'source', equals: ['record'] },
+      },
     ],
     presets: [
       {

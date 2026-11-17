@@ -388,11 +388,6 @@ export function AttachmentsInput({
 
   return (
     <View style={styles.list}>
-      {ids.length === 0 ? (
-        <Text style={[palette.font('body', 14), { color: palette.caption }]}>
-          {t(locale, 'noAttachment')}
-        </Text>
-      ) : null}
       {ids.map((id, i) => {
         const asset = assets.get(id);
         return (

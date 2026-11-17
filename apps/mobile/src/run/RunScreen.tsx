@@ -358,17 +358,32 @@ export function RunScreen({
     !handed &&
     !workflow.steps.some((st) => st.action.startsWith('out.')) &&
     (thenDesk || ((scans || incoming !== undefined) && !incoming?.result));
+  // 做完是「记一笔」的快捷操作（语音记一笔、扫收据，D-588）：和上面一样不摆步骤列表，只说一句在做什么；
+  // 记好了或者用户取消了，直接回到来的地方，不停在结果页。失败时照旧露出完整的运行页面。
+  const recordRun =
+    !noPreview &&
+    !handed &&
+    workflow.steps.some((st) => st.action === 'out.addRecord') &&
+    workflow.steps.every((st) => !st.action.startsWith('out.') || st.action === 'out.addRecord');
   const compact =
-    couldForward &&
-    (outcome === null || (outcome.status === 'succeeded' && (thenDesk || forwarding)));
+    (couldForward &&
+      (outcome === null || (outcome.status === 'succeeded' && (thenDesk || forwarding)))) ||
+    (recordRun && (outcome === null || outcome.status === 'succeeded'));
 
   // 扫描器里点了取消：直接回到来的地方，不留一个「已取消」的运行页面。
-  const scanCancelled = outcome?.status === 'cancelled' && scans && incoming === undefined;
+  const scanCancelled =
+    outcome?.status === 'cancelled' && (scans || recordRun) && incoming === undefined;
   useEffect(() => {
     if (scanCancelled) router.back();
     // router 每次渲染不变，只在变成「扫描取消了」时做一次。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanCancelled]);
+  const recorded = recordRun && outcome?.status === 'succeeded';
+  useEffect(() => {
+    if (recorded && router.canGoBack()) router.back();
+    // 只在「记好了」变成真时做一次。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorded]);
 
   async function saveResult() {
     if (!isFileValue(value) || !run.current) return;
@@ -448,7 +463,10 @@ export function RunScreen({
         <View
           testID="run-compact"
           // 扫描器在前面的那一步（选照片）这一页不露出来：用户只关心扫描器，不想先看到一个转圈的页面。
-          style={[styles.compact, scans && !incoming && current?.index === 0 && { opacity: 0 }]}>
+          style={[
+            styles.compact,
+            (scans || recordRun) && !incoming && current?.index === 0 && { opacity: 0 },
+          ]}>
           <ActivityIndicator size="large" color={palette.primary} />
           <Text
             testID="run-compact-name"

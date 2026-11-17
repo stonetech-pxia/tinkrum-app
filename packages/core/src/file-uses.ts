@@ -46,6 +46,8 @@ export const USES_FEATURES = [
   'reminderMinutesBefore',
   /** 每天、每周的提醒带 unless（D-563）。 */
   'reminderUnlessRepeating',
+  /** 提醒 when {every: "month", day}：每月几号（D-577）。 */
+  'reminderMonthly',
   /** 一键记录工具写的值 {from, add, unit}：从今天或这一条的日期起加几天、几个月（D-565）。 */
   'recordToolDateValue',
   /** 一键记录工具写的值 {copy}：抄这一条的一个字段（D-565）。 */
@@ -195,6 +197,7 @@ export function usesOf(content: unknown): FileUses {
         found.features.add('reminderMinutesBefore');
       if (node.when.every !== undefined && node.unless !== undefined)
         found.features.add('reminderUnlessRepeating');
+      if (node.when.every === 'month') found.features.add('reminderMonthly');
     }
     for (const [k, v] of Object.entries(node)) {
       // 图标：白名单里的名字（emoji 不算，哪个版本都认）。

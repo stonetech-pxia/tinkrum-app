@@ -177,7 +177,7 @@ export const ReminderTargetSchema = openTargetSchema(
 const tableField = z.strictObject({ table: IdSchema, field: IdSchema });
 
 /**
- * 提醒什么时候响：every day / week（days：1 = 周一 … 7 = 周日）在 at 提醒；before 在一张表的日期字段
+ * 提醒什么时候响：every day / week（days：1 = 周一 … 7 = 周日）/ month（day：每月几号，1–28，D-577）在 at 提醒；before 在一张表的日期字段
  * 到期前 days 天的 at 提醒（每条记录一次，原 dateField）；each 按一张表的日程字段给每条记录各排各的
  * （D-316，原 scheduleField）；after 在一张表每加一条记录后 minutes 分钟提醒一次（D-391）；
  * before + minutes 在日期时间字段那一刻之前 minutes 分钟提醒（D-562，最多 7 天）。
@@ -203,6 +203,12 @@ export const ReminderWhenSchema = z.union([
     minutes: z.number().int().min(1).max(1440),
   }),
   z.strictObject({ before: tableField, minutes: z.number().int().min(1).max(MAX_BEFORE_MINUTES) }),
+  // D-577：每月 day 号（1–28，每个月都有这一天）。
+  z.strictObject({
+    every: z.literal('month'),
+    day: z.number().int().min(1).max(28),
+    at: TimeOfDaySchema,
+  }),
 ]);
 export type ReminderWhen = z.infer<typeof ReminderWhenSchema>;
 

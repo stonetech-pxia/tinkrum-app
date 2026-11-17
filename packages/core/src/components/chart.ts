@@ -29,7 +29,15 @@ export const ChartSourceSchema = z.strictObject({
 export type ChartSource = z.infer<typeof ChartSourceSchema>;
 
 const shape = {
-  show: z.strictObject({ kind: z.enum(['bar', 'line', 'pie']), title: boundedText(1, 60) }),
+  show: z.strictObject({
+    kind: z.enum(['bar', 'line', 'pie']),
+    title: boundedText(1, 60),
+    /**
+     * 点一根柱子 / 一个点，页面上的时间范围就改成它那一段（D-585）：同一页要有一个带 custom 的 period 块，
+     * 这页上跟着时间范围的数字卡、列表、图表一起变。图表自己按 group.unit 分段，不跟着页面范围（没有 source.period）。
+     */
+    pickPeriod: z.literal(true).optional(),
+  }),
   source: ChartSourceSchema,
 };
 
@@ -62,6 +70,19 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
         problems.push(
           `${aggregate} can't chart ${f!.id}: each entry has its own currency, and amounts in different currencies can't be added up; use a number block or aggregate "count"`,
         );
+    }
+    if (c.show.pickPeriod) {
+      if (group.unit === undefined || c.show.kind === 'pie')
+        problems.push(
+          'show.pickPeriod needs a bar or line chart grouped by time (source.group.unit)',
+        );
+      if (c.source.period !== undefined)
+        problems.push(
+          'show.pickPeriod can not be used with source.period: the chart would follow the range its own taps set',
+        );
+      const picker = page.blocks.find((b) => b.look === 'period');
+      if (!picker || !(picker as { show: { custom?: boolean } }).show.custom)
+        problems.push('show.pickPeriod needs a period block with custom: true on the same page');
     }
     if (group.showEmpty || group.filter)
       problems.push('a chart groups by time (unit) or by a choice or link field (by)');
@@ -106,7 +127,7 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
   describe: (c, _config, ctx) => t(ctx.locale, 'describeChart', { v0: c.show.title }),
   edit: { text: [{ prop: 'title', max: 60 }], style: ['tone'] },
   ai: {
-    doc: 'show {kind: "bar"|"line"|"pie", title}, source {table, aggregate: "count"|"sum"|"avg"|"distinctDays" (days with at least one entry), field? (number, money, rating, duration or formula; only for sum and avg), filter?, group: {unit: "day"|"week"|"month", by? (a date or datetime field or "createdAt"; default: the first date field), last? (2-31; default 7 days, 8 weeks, 6 months)} or {by: a choice field, or a link field for one point per entry of the linked table}}: a pie chart needs group {by: a choice or link field} (rule 33); compare?: "previous" (only with a time group, bar or line, and no inPeriod filter) also draws the period before, shifted onto the same positions: a dashed line, or pale bars behind ("compared with last month", "和上个月比"); period?: "page" follows the time range picked in the period block on the same page (the chart then covers that range, by day, week or month depending on its length; group.unit and last are ignored; a pie follows it too); choice?: "page" draws only the entries with the option picked in the choices block on the same page (rule 65)',
+    doc: 'show {kind: "bar"|"line"|"pie", title}, source {table, aggregate: "count"|"sum"|"avg"|"distinctDays" (days with at least one entry), field? (number, money, rating, duration or formula; only for sum and avg), filter?, group: {unit: "day"|"week"|"month", by? (a date or datetime field or "createdAt"; default: the first date field), last? (2-31; default 7 days, 8 weeks, 6 months)} or {by: a choice field, or a link field for one point per entry of the linked table}}: a pie chart needs group {by: a choice or link field} (rule 33); compare?: "previous" (only with a time group, bar or line, and no inPeriod filter) also draws the period before, shifted onto the same positions: a dashed line, or pale bars behind ("compared with last month", "和上个月比"); pickPeriod?: true (bar or line grouped by time, not following the page range: tapping a bar or point sets the time range of the page to that day, week or month, so the number blocks, lists and charts that follow the range change with it; the page needs a period block with custom: true), period?: "page" follows the time range picked in the period block on the same page (the chart then covers that range, by day, week or month depending on its length; group.unit and last are ignored; a pie follows it too); choice?: "page" draws only the entries with the option picked in the choices block on the same page (rule 65)',
   },
   example: {
     show: { kind: 'bar', title: 'Spending by month' },

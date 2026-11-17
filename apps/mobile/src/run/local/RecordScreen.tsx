@@ -8,7 +8,7 @@ import {
   type RecordingOptions,
 } from 'expo-audio';
 import { File } from 'expo-file-system';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { t } from '../../i18n';
@@ -57,8 +57,21 @@ export function RecordScreen({
   const [phase, setPhase] = useState<Phase>('idle');
   const [denied, setDenied] = useState(false);
   const [failed, setFailed] = useState(false);
+  // 打开就开始录、点一下停止并继续（in.audio 的 autoStart，D-587）。
+  const quick = input.autoStart === true;
+  const starting = useRef(false);
 
   async function start() {
+    if (starting.current) return;
+    starting.current = true;
+    try {
+      await begin();
+    } finally {
+      starting.current = false;
+    }
+  }
+
+  async function begin() {
     const permission = await requestRecordingPermissionsAsync();
     if (!permission.granted) {
       setDenied(true);
@@ -88,8 +101,16 @@ export function RecordScreen({
     }
   }
 
+  useEffect(() => {
+    if (quick) void start();
+    // 只在打开时开始一次。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function toggle() {
     if (phase === 'idle') return void start();
+    // 打开就录的：录着时这个按钮是「停止并继续」，直接交给下一步。
+    if (quick && phase === 'recording') return void finish();
     if (phase === 'recording') {
       recorder.pause();
       setPhase('paused');
@@ -143,7 +164,13 @@ export function RecordScreen({
 
   const level = phase === 'recording' ? levelOf(state.metering) : 0;
   const label =
-    phase === 'idle' ? 'recordStart' : phase === 'recording' ? 'recordPause' : 'recordResume';
+    phase === 'idle'
+      ? 'recordStart'
+      : phase === 'recording'
+        ? quick
+          ? 'recordStopGo'
+          : 'recordPause'
+        : 'recordResume';
   return (
     <LocalFrame
       palette={palette}

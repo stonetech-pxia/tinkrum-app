@@ -109,7 +109,7 @@ export interface LocalSteps {
    * 录音（D-154）：开始 / 暂停 / 完成，锁屏后继续录。name 是录音的文件名（不含扩展名）。
    * 返回录好的文件（M4A，在缓存目录里，之后移进本次运行的临时目录）。
    */
-  record: { in: { name: string }; out: PickedFile };
+  record: { in: { name: string; autoStart?: boolean }; out: PickedFile };
   /**
    * 记一笔（D-187、D-397）：和记录页同样的新记录表单（公式不用填）。文件已经存好，
    * ID 在 prefill 的附件字段里，表单能读它们给候选；prefill 里还有预先填好的文字。
