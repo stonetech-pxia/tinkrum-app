@@ -68,3 +68,13 @@ export function formatWhen(locale: Locale, at: Date, now: Date): string {
   // 法语写「25 oct. à 13:51」。
   return locale === 'fr' ? `${date} à ${time}` : `${date}, ${time}`;
 }
+
+/**
+ * 存到手机时文件夹的显示名（D-583）：iOS「我的 iPhone」和 iCloud 云盘的最上层在文件系统里另有名字
+ * （File Provider Storage、com~apple~CloudDocs），按「文件」App 里的叫法显示；别的文件夹用它自己的名字。
+ */
+export function folderName(locale: Locale, name: string): string {
+  if (name === 'File Provider Storage') return t(locale, 'folderOnMyIPhone');
+  if (name === 'com~apple~CloudDocs') return t(locale, 'folderICloudDrive');
+  return name;
+}

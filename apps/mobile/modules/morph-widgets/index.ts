@@ -3,7 +3,7 @@ import { requireOptionalNativeModule, type EventSubscription } from 'expo';
 // 本地 Expo 模块 MorphWidgets（D-321–D-323）：桌面小组件和 App 之间的两份文件。
 // - snapshot.json：App 算好的画面（src/widgets/types.ts），写完让系统重画小组件。
 // - queue/：小组件上点了的操作，一次点按一个文件；App 先读出来、按点的时间执行并记下做完了，再确认删掉（读不删，R07）。
-// iOS 放在 App Group group.app.morph.mobile 里（小组件扩展 targets/widget 读写），Android 放在 App 自己的
+// iOS 放在 App Group group.dev.stonetech.tinkrum 里（小组件扩展 targets/widget 读写），Android 放在 App 自己的
 // files/widgets 里（小组件的 AppWidgetProvider 就在 App 里）。只用系统框架，不联网。Expo Go 和测试里是 null。
 
 export interface MorphWidgetsModule {

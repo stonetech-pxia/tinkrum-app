@@ -10,6 +10,6 @@ module.exports = {
   deploymentTarget: '17.0',
   frameworks: ['SwiftUI', 'WidgetKit', 'AppIntents'],
   entitlements: {
-    'com.apple.security.application-groups': ['group.app.morph.mobile'],
+    'com.apple.security.application-groups': ['group.dev.stonetech.tinkrum'],
   },
 };

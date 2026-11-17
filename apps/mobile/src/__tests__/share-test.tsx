@@ -685,6 +685,24 @@ describe('share journeys (UI)', () => {
     expect(await screen.findByTestId('preview-share-photos')).toBeTruthy();
   });
 
+  // 用户测试（2026-11-09、11-10）和模拟器（2026-11-14）：存到手机后什么提示都没有，
+  // 位置只写 "File Provider Storage"（iOS「我的 iPhone」那一层在文件系统里的名字）。
+  it('saving to the phone from the preview says which file went where, named as in Files (D-583)', async () => {
+    const { files } = await renderToolsApp();
+    files.nextFolder = 'File Provider Storage';
+    await share([files.offerShared('报告.pdf', await makePdf(1))]);
+    await fireEvent.press(await screen.findByTestId('preview-share'));
+    await fireEvent.press(await screen.findByTestId('preview-share-folder'));
+    expect(await screen.findByText('已把「报告.pdf」存到「我的 iPhone」')).toBeTruthy();
+    expect(screen.queryByText(/File Provider Storage/)).toBeNull();
+
+    // 关掉选择器：没存，不说存好了。
+    files.folderChoice = 'cancel';
+    await fireEvent.press(await screen.findByTestId('preview-share'));
+    await fireEvent.press(await screen.findByTestId('preview-share-folder'));
+    expect(screen.queryByText(/已把/)).toBeNull();
+  });
+
   it('a to-Word run that fails shows the full run page with the error and the steps (D-457)', async () => {
     const { files } = await renderToolsApp();
     const pdf = files.offerShared('报告.pdf', await makePdf(1));

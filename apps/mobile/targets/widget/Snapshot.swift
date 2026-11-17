@@ -3,7 +3,7 @@ import Foundation
 // App 写进 App Group 的小组件画面（D-321–D-323）。格式见 apps/mobile/src/widgets/types.ts，两边要一起改。
 // 文字、数字都由 App 按当时的语言算好；这里只按时间选一份、按还没执行的点按选「点了以后」的那份。
 
-let appGroup = "group.app.morph.mobile"
+let appGroup = "group.dev.stonetech.tinkrum"
 
 struct WidgetSnapshot: Decodable {
   let v: Int

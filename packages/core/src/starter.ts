@@ -194,3 +194,38 @@ export function createStarterWorkspace(locale: Locale, registry: Registry): Work
   const valid = validateWorkspace(applied.config, registry);
   return valid.ok ? valid.config : base;
 }
+
+type Page = WorkspaceConfig['containers']['pages'][number];
+
+/**
+ * 「文件」页：扫描、转换、打开过的文件按类型摆成书架（门户的 Clay 预设用，D-487）。
+ * 按语言生成，内置文字（builtin-text）也认它，所以导入后的预设跟着界面语言显示（D-582）。
+ */
+export function filesByTypePage(locale: Locale): Page {
+  const shelf = (id: string, title: string, kind: string) => ({
+    id,
+    look: 'files' as const,
+    show: { title },
+    source: {
+      table: FILES_TABLE,
+      filter: [{ field: 'kind', op: 'is' as const, value: kind }],
+      limit: 5,
+    },
+  });
+  return {
+    id: 'files',
+    title: t(locale, 'presetFilesTitle'),
+    icon: 'document',
+    blocks: [
+      {
+        id: 'files-hello',
+        look: 'header',
+        show: { title: t(locale, 'presetFilesTitle'), subtitle: t(locale, 'presetFilesSubtitle') },
+      },
+      shelf('shelf-pdf', t(locale, 'filesKindPdf'), 'pdf'),
+      shelf('shelf-doc', t(locale, 'filesKindDoc'), 'doc'),
+      shelf('shelf-sheet', 'Excel', 'sheet'),
+      shelf('shelf-image', t(locale, 'filesKindImage'), 'image'),
+    ],
+  } as Page;
+}

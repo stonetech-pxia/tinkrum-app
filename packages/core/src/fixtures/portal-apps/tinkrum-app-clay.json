@@ -227,7 +227,7 @@
           "id": "shelf-pdf",
           "look": "files",
           "show": {
-            "title": "PDFs"
+            "title": "PDF"
           },
           "source": {
             "table": "$files",
@@ -281,7 +281,7 @@
           "id": "shelf-image",
           "look": "files",
           "show": {
-            "title": "Pictures"
+            "title": "Images"
           },
           "source": {
             "table": "$files",

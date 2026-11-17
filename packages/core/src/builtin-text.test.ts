@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { builtinText } from './builtin-text';
@@ -37,5 +40,35 @@ describe('builtinText', () => {
     expect(builtinText(pageTarget(TOOLBOX_PAGE_ID), 'zh', registry)).toBe(
       pageTarget(TOOLBOX_PAGE_ID),
     );
+  });
+
+  // 模拟器上发现（2026-11-14）：门户的 Clay 预设切到法文后，「文件」页的标题、说明和书架名还是英文。
+  it('shows every text of the Clay preset in French and Chinese', () => {
+    const file = JSON.parse(
+      readFileSync(join(__dirname, 'fixtures', 'portal-apps', 'tinkrum-app-clay.json'), 'utf8'),
+    ) as { pages: { title: string; blocks: { show?: Record<string, unknown> }[] }[] };
+    const texts = file.pages.flatMap((p) => [
+      p.title,
+      ...p.blocks.flatMap((b) =>
+        ['title', 'subtitle', 'label']
+          .map((k) => b.show?.[k])
+          .filter((v): v is string => typeof v === 'string'),
+      ),
+    ]);
+    // 和英文写法一样的词（名字、格式名，法文的 Images）不用换。
+    const same = {
+      fr: ['Tinkrum', 'PDF', 'Word', 'Excel', 'Images'],
+      zh: ['Tinkrum', 'PDF', 'Word', 'Excel'],
+    };
+    for (const locale of ['fr', 'zh'] as const) {
+      const left = texts.filter(
+        (s) => !same[locale].includes(s) && builtinText(s, locale, registry) === s,
+      );
+      expect(left, locale).toEqual([]);
+    }
+    expect(builtinText('Everything you scan, convert or open, by type.', 'fr', registry)).toBe(
+      'Tout ce que vous scannez, convertissez ou ouvrez, classé par type.',
+    );
+    expect(builtinText('Images', 'zh', registry)).toBe('图片');
   });
 });

@@ -37,7 +37,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { runErrorText, t } from '../i18n';
+import { folderName, runErrorText, t } from '../i18n';
 import type { RenderEnv } from '../renderer/components';
 import { Item } from '../renderer/registry';
 import {
@@ -768,7 +768,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
         <Text
           testID="desk-folder-saved"
           style={[palette.font('bodyMedium', 14), styles.error, { color: palette.caption }]}>
-          {t(locale, 'resultFolderDone', { name: folderSaved })}
+          {t(locale, 'resultFolderDone', { name: folderName(locale, folderSaved) })}
         </Text>
       ) : null}
       {layout.strip && list.length > 1 ? (
@@ -901,7 +901,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
                 id="desk-folder"
                 label={
                   folderSaved
-                    ? t(locale, 'resultFolderDone', { name: folderSaved })
+                    ? t(locale, 'resultFolderDone', { name: folderName(locale, folderSaved) })
                     : t(locale, 'resultFolder')
                 }
                 palette={palette}

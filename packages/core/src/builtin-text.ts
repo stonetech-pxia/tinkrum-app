@@ -1,7 +1,7 @@
 import { applyOps } from './ops';
 import { registryRevision, type Registry } from './registry';
 import type { Locale, WorkspaceConfig } from './schema';
-import { createStarterWorkspace, homeFileEntryOps } from './starter';
+import { createStarterWorkspace, filesByTypePage, homeFileEntryOps } from './starter';
 
 // 内置文字跟着界面语言显示：新用户的首页、工具箱、工具页和内设快捷操作的文字，是建立时按当时的语言
 // 写进配置的。设置里改了语言以后，显示时把和某种语言的内置文字一字不差的换成新语言；用户自己改过的
@@ -62,6 +62,11 @@ function builtinIndex(registry: Registry): Map<string, Variants | null> {
   const index = new Map<string, Variants | null>();
   pairStrings(
     LOCALES.map((l) => starterWithEntries(l, registry)),
+    index,
+  );
+  // 门户预设里的「文件」页（D-582）。
+  pairStrings(
+    LOCALES.map((l) => filesByTypePage(l)),
     index,
   );
   for (const tool of registry.tools.values()) {

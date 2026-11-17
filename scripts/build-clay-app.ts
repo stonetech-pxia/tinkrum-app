@@ -13,7 +13,11 @@ import {
 } from '../packages/core/src/app-file';
 import { applyOps } from '../packages/core/src/ops';
 import { createRegistry } from '../packages/core/src/registry';
-import { createStarterWorkspace, homeFileEntryOps } from '../packages/core/src/starter';
+import {
+  createStarterWorkspace,
+  filesByTypePage,
+  homeFileEntryOps,
+} from '../packages/core/src/starter';
 import { BUILTIN_TOOLS } from '../packages/core/src/tools';
 import { validateWorkspace } from '../packages/core/src/validate';
 
@@ -32,32 +36,8 @@ const config = structuredClone(withHome.config);
 // 2. 预设里首页不放工具箱入口（工具箱在底栏上），多一页「文件」：按类型分开摆。
 const home = config.containers.pages.find((p) => p.id === 'home')!;
 home.blocks = home.blocks.filter((b) => b.id !== 'toolbox-entry');
-const shelf = (id: string, title: string, kind: string) => ({
-  id,
-  look: 'files' as const,
-  show: { title },
-  source: {
-    table: '$files' as const,
-    filter: [{ field: 'kind', op: 'is', value: kind }],
-    limit: 5,
-  },
-});
-config.containers.pages.push({
-  id: 'files',
-  title: 'Files',
-  icon: 'document',
-  blocks: [
-    {
-      id: 'files-hello',
-      look: 'header',
-      show: { title: 'Files', subtitle: 'Everything you scan, convert or open, by type.' },
-    },
-    shelf('shelf-pdf', 'PDFs', 'pdf'),
-    shelf('shelf-doc', 'Word', 'doc'),
-    shelf('shelf-sheet', 'Excel', 'sheet'),
-    shelf('shelf-image', 'Pictures', 'image'),
-  ],
-} as never);
+// 文件页按语言生成，导入后跟着界面语言显示（D-582）。
+config.containers.pages.push(filesByTypePage('en'));
 // D-552：预设的页面背景用纯沙色，不用 STARTER_THEME 的渐变（下半屏的鼠尾草绿发灰，像一层色雾）。
 config.theme.backdrop = 'plain';
 // 整份配置的底栏必须有设置；转成 App 文件时设置会被去掉（App 的底栏只有页面和 Tink）。
