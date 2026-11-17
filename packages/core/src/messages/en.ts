@@ -3,7 +3,7 @@
 
 export const en = {
   trustNote:
-    'No ads. No account needed to work with your files. Files are processed on this device. Tink is this app’s AI, provided by Anthropic’s Claude by default; you can choose another service in Settings. It gets your request and the app’s settings — never your files or entries.',
+    'No ads. No account needed to work with your files, and they are processed on this device. Tink is this app’s AI, provided by Anthropic’s Claude by default. It sees your request and the app’s design, never your files or entries.',
   resultContinue: 'Continue processing',
   resultIncoming: 'For these results: {what}',
   chainMake: 'Combine into one quick action',
@@ -110,23 +110,22 @@ export const en = {
   settingsTitle: 'Settings',
   thisApp: 'This app',
   general: 'General',
-  changeRowHint: 'Describe how the app should change',
-  historyRowHint: 'Undo a change or go back to how the app was before',
+  changeRowHint: 'Say what to change',
+  historyRowHint: 'Undo, or go back to how it was',
   toolsRowHint: 'Add, open or remove tools',
   openHistory: 'Change history',
   modelListFetch: 'Get model list',
   modelListEmpty: 'This provider did not return a model list. Type the model name yourself.',
   byokProviderCustom: 'Custom',
   settingsMoreTitle: 'Data & storage',
-  settingsMoreHint: 'My presets, data, storage, downloads',
   languageValue_system: 'Follow system',
   languageValue_zh: '简体中文',
   languageValue_en: 'English',
   languageValue_fr: 'Français',
   language: 'Language',
   aiEngine: 'Tink',
-  aiEngineRemote: 'Claude via the Tinkrum server',
-  aiEngineMock: 'Built-in rules (offline mock)',
+  aiEngineRemote: 'Claude',
+  aiEngineMock: 'Built-in rules (offline)',
   aiEngineByok: 'My own API key ({model})',
 
   // AI 设置
@@ -138,14 +137,14 @@ export const en = {
   aiModeServerNote: 'The model is called through a server.',
   // 测试期服务器保存请求（D-240）：只在用 Tinkrum 服务器时显示。
   aiServerStoredNote:
-    'During the beta, what you say to Tink and the app’s settings are saved to improve Tinkrum. Files and entries are never sent.',
+    'During the beta, what you say to Tink and the app’s design are saved to improve Tinkrum. Files and entries are never sent.',
   aiModeByok: 'API key',
   aiModeByokNote:
-    'Calls the provider you choose directly from this phone: Claude, or any OpenAI-compatible API. Usage is billed to your account with that provider.',
+    'Connects straight to Claude or another compatible service with your own key. Usage is billed to your account there.',
   // 自带 key 的两种 provider（D-241）
   byokProviderLabel: 'Provider',
   byokSentNote:
-    'When you ask for a change, what you say and the app’s settings are sent to {host}. Your files and entries are never sent.',
+    'When you ask for a change, what you say and the app’s design are sent to {host}. Your files and entries are never sent.',
   baseUrlLabel: 'Base URL',
   baseUrlPresets: 'Fill in the address for',
   customModelLabel: 'Model name',
@@ -158,7 +157,7 @@ export const en = {
   otherKeyPlaceholder: 'API key (not needed for local models)',
   otherKeyFormatInvalid: 'That doesn’t look like an API key (no spaces, at least 8 characters).',
   otherKeyPrivacyNote:
-    'The key is stored only in this phone’s secure storage (not synced or backed up to other devices) and is sent only to {host}. Changing the address deletes the key.',
+    'The key is stored only on this phone and sent only to {host}. Changing the address deletes the key.',
   testOkOther: 'Connected. The address and key work.',
   apiKeyLabel: 'API key',
   apiKeySaved: 'Saved (ends with {hint})',
@@ -171,7 +170,7 @@ export const en = {
   testConnection: 'Test connection',
   testOk: 'Connected. The key works with this model.',
   keyPrivacyNote:
-    'The key is stored only in this phone’s secure storage (not synced or backed up to other devices) and is sent only to api.anthropic.com. Set a spend limit in the Claude Console.',
+    'The key is stored only on this phone and sent only to api.anthropic.com. Set a spend limit in the Claude Console.',
 
   byokNoKey: 'Add your Claude API key in Settings → Tink first.',
   byokInvalidKey: 'The API key is invalid or was deleted. Check it in Settings → Tink.',
@@ -330,7 +329,6 @@ export const en = {
   workflowsTitle: 'Quick actions',
   workflowsRowHint: 'Ready-made and your own multi-step actions',
   packsTitle: 'Downloads',
-  packsRowHint: 'What was downloaded and the space it uses',
   packsHint:
     'Text recognition, PDF preview, page flattening and layout come with the app. Other features (the on-device model, speech to text, text recognition in more languages) download what they need the first time you use them. They work offline afterwards.',
   packsEmpty: 'Nothing downloaded yet.',
@@ -440,7 +438,7 @@ export const en = {
     'This data table is no longer part of the app. Its entries are kept in Settings → Data.',
   dataTitle: 'Data',
   storageTitle: 'Storage',
-  storageRowHint: 'Photos and files Tinkrum keeps, and where they are used',
+  storageRowHint: 'Photos and files',
   presetsTitle: 'My presets',
   presetsRowHint: 'Save this whole app and switch back to it anytime',
   presetsHint:
@@ -468,12 +466,11 @@ export const en = {
   storageSummary: '{n} files · {size}',
   storageEmpty:
     'Tinkrum has no saved files yet. Photos and files you add to entries, file slots and pictures are kept here.',
-  storageIntro:
-    'Files Tinkrum keeps on this phone and where they are used. Only you see this page.',
+  storageIntro: 'Files kept on this phone and where they are used.',
   storageCleanup: 'Clean up {n} unused files ({size})',
   storageCleanupTitle: 'Delete {n} unused files?',
   storageCleanupMessage:
-    'They take {size}. No entry, page or component uses them now. Files used only by older versions are deleted too, so restoring those versions will not bring them back. Results saved by quick actions are not included. This can’t be undone.',
+    'They take {size} and nothing uses them now. Files used only by older versions are deleted too. This can’t be undone.',
   storageUsedInRecord: '{table} · {title}',
   storageUsedInDeletedRecord: '{table} · {title} (recently deleted)',
   storageUsedInComponent: '{page} · {component}',
@@ -492,9 +489,9 @@ export const en = {
   storageDeleteUsed:
     'It is used in {n} places. They will show that the file is gone, and restoring an older version will not bring it back. This can’t be undone.',
   storageDeleteUnused: 'Restoring an older version will not bring it back. This can’t be undone.',
-  dataRowHint: 'Your entries: export, recently deleted, app design, prefill memory',
+  dataRowHint: 'Export, import, recently deleted',
   dataPrivacy:
-    'Entries are stored only on this phone. Tink only sees the structure of your tables (names and fields), never what you enter.',
+    'Entries are stored only on this phone. Tink sees table and field names, never what you enter.',
   dataTables: 'Data tables',
   unusedTables: 'Not in the app',
   unusedTablesHint:
@@ -536,7 +533,7 @@ export const en = {
     'This file was made with a newer version of Tinkrum and uses things this version doesn’t have yet: {missing}. Update Tinkrum, then import it again. Nothing was imported.',
   appResetItem: 'Restore its original look',
   appResetConfirm:
-    'Restore “{name}” to how it was when you imported it? Pages and quick actions you added to it go away, and its style and pages come back. Tables you made and all your entries stay. You can undo it in the change log.',
+    'Restore “{name}” to how it was when you imported it? Pages and quick actions you added go away. Your tables and entries stay. You can undo this in Change history.',
   appResetSummary: 'Restore “{name}” to its original look',
   importAppConfigNotJson:
     'This file isn’t valid JSON, so it can’t be an app configuration. Nothing was imported.',
@@ -556,7 +553,7 @@ export const en = {
     'Delete the on-device model? Suggestions go back to rules only. Your entries stay. You can download it again.',
   prefillMemoryTitle: 'Prefill memory',
   prefillMemoryHint:
-    'When you log an entry, Tinkrum remembers the layout of documents you saved: which label a value follows, roughly which line, and the shop name. It does not keep amounts or dates. Stored only on this phone, never sent to Tink. The exported file is also a backup: use “Restore from file” to bring it back. In a new entry form, Tinkrum also remembers which suggestion you picked for each field: the label it followed and roughly where it was, not the value.',
+    'Tinkrum remembers the layout of documents you saved, the shop name and the suggestions you picked, so the next entry fills in better. It does not keep amounts or dates. Stored only on this phone.',
   prefillMemoryCount: 'Remembers {count} document layouts',
   prefillMemoryNone: 'No document layouts remembered yet',
   prefillMemoryExport: 'Export',
@@ -1095,7 +1092,7 @@ export const en = {
   reminderStartsIn: 'An entry in “{table}” is at {time}, in {n} minutes',
   remindersTitle: 'Reminders',
   remindersHint:
-    'Reminders are notifications on this device. Tapping one only opens the page or quick action; nothing runs by itself. To add or change a reminder, ask Tink (for example “remind me every day at 9 to log expenses”).',
+    'Tapping a reminder only opens its page or quick action; nothing runs by itself. To add or change one, ask Tink, for example “remind me every day at 9 to log expenses”.',
   remindersNone: 'No reminders yet',
   remindersOff:
     'Notifications are off for Tinkrum. Turn them on in the system Settings to get reminders.',
@@ -1964,7 +1961,7 @@ export const enSingular = {
   storageCleanup: 'Clean up {n} unused file ({size})',
   storageCleanupTitle: 'Delete {n} unused file?',
   storageCleanupMessage:
-    'It takes {size}. No entry, page or component uses it now. A file used only by older versions is deleted too, so restoring those versions will not bring it back. Results saved by quick actions are not included. This can’t be undone.',
+    'It takes {size} and nothing uses it now. A file used only by older versions is deleted too. This can’t be undone.',
   storageDeleteUsed:
     'It is used in {n} place. It will show that the file is gone, and restoring an older version will not bring it back. This can’t be undone.',
   attachmentsFull: 'At most {n} file',

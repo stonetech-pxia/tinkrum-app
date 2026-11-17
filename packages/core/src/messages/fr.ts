@@ -4,7 +4,7 @@ import type { MessageTable, SingularTable } from './en';
 
 export const fr: MessageTable = {
   trustNote:
-    'Sans publicité. Aucun compte requis pour traiter vos fichiers. Le traitement reste sur votre appareil. Tink est l’IA de cette application, fournie par défaut par Claude d’Anthropic ; vous pouvez choisir un autre service dans Paramètres. Tink reçoit votre demande et la configuration de l’application, jamais le contenu des fichiers ou des entrées.',
+    'Sans publicité. Aucun compte requis pour traiter vos fichiers, et le traitement reste sur votre appareil. Tink est l’IA de cette application, fournie par défaut par Claude d’Anthropic. Tink reçoit votre demande et la configuration de l’application, jamais vos fichiers ni vos entrées.',
   resultContinue: 'Continuer le traitement',
   resultIncoming: 'Pour ces résultats : {what}',
   chainMake: 'Combiner en une action rapide',
@@ -118,23 +118,22 @@ export const fr: MessageTable = {
   settingsTitle: 'Paramètres',
   thisApp: 'Cette app',
   general: 'Général',
-  changeRowHint: 'Décrivez en une phrase comment modifier l’app',
-  historyRowHint: 'Annuler une modification ou revenir à un état antérieur de l’app',
+  changeRowHint: 'Dites ce qu’il faut changer',
+  historyRowHint: 'Annuler ou revenir en arrière',
   toolsRowHint: 'Ajouter, ouvrir ou retirer des outils',
   openHistory: 'Historique des modifications',
   modelListFetch: 'Obtenir la liste des modèles',
   modelListEmpty: 'Ce fournisseur n’a pas renvoyé de liste de modèles. Saisissez le nom du modèle.',
   byokProviderCustom: 'Personnalisé',
   settingsMoreTitle: 'Données et stockage',
-  settingsMoreHint: 'Mes préréglages, données, stockage, téléchargements',
   languageValue_system: 'Suivre le système',
   languageValue_zh: '简体中文',
   languageValue_en: 'English',
   languageValue_fr: 'Français',
   language: 'Langue',
   aiEngine: 'Tink',
-  aiEngineRemote: 'Claude via le serveur Tinkrum',
-  aiEngineMock: 'Règles intégrées (simulation hors ligne)',
+  aiEngineRemote: 'Claude',
+  aiEngineMock: 'Règles intégrées (hors ligne)',
   aiEngineByok: 'Ma propre clé API ({model})',
 
   // AI 设置
@@ -149,7 +148,7 @@ export const fr: MessageTable = {
     'Pendant la bêta, ce que vous dites à Tink et la configuration de l’application sont enregistrés pour améliorer Tinkrum. Les fichiers et les entrées ne sont jamais envoyés.',
   aiModeByok: 'Clé API',
   aiModeByokNote:
-    'Appelle directement depuis ce téléphone le fournisseur de votre choix : Claude, ou toute API compatible OpenAI. L’usage est facturé sur votre compte chez ce fournisseur.',
+    'Se connecte directement à Claude ou à un autre service compatible avec votre propre clé. L’usage est facturé sur votre compte chez ce service.',
   // 自带 key 的两种 provider（D-241）
   byokProviderLabel: 'Fournisseur',
   byokSentNote:
@@ -167,7 +166,7 @@ export const fr: MessageTable = {
   otherKeyPlaceholder: 'Clé API (inutile pour les modèles locaux)',
   otherKeyFormatInvalid: 'Ce n’est pas une clé API valide (sans espaces, au moins 8 caractères).',
   otherKeyPrivacyNote:
-    'La clé n’est enregistrée que dans le stockage sécurisé de ce téléphone (non synchronisée ni sauvegardée sur d’autres appareils) et n’est envoyée qu’à {host}. Changer l’adresse supprime la clé.',
+    'La clé n’est enregistrée que sur ce téléphone et n’est envoyée qu’à {host}. Changer l’adresse supprime la clé.',
   testOkOther: 'Connecté. L’adresse et la clé fonctionnent.',
   apiKeyLabel: 'API key',
   apiKeySaved: 'Enregistrée (se termine par {hint})',
@@ -180,7 +179,7 @@ export const fr: MessageTable = {
   testConnection: 'Tester la connexion',
   testOk: 'Connecté. La clé fonctionne avec ce modèle.',
   keyPrivacyNote:
-    'La clé n’est enregistrée que dans le stockage sécurisé de ce téléphone (non synchronisée ni sauvegardée sur d’autres appareils) et n’est envoyée qu’à api.anthropic.com. Définissez un plafond de dépenses dans la Claude Console.',
+    'La clé n’est enregistrée que sur ce téléphone et n’est envoyée qu’à api.anthropic.com. Définissez un plafond de dépenses dans la Claude Console.',
 
   byokNoKey: 'Ajoutez d’abord votre clé API Claude dans « Paramètres → Tink ».',
   byokInvalidKey:
@@ -349,7 +348,6 @@ export const fr: MessageTable = {
   workflowsTitle: 'Actions rapides',
   workflowsRowHint: 'Actions prêtes à l’emploi et vos propres actions en plusieurs étapes',
   packsTitle: 'Téléchargements',
-  packsRowHint: 'Contenu téléchargé et espace utilisé',
   packsHint:
     'La reconnaissance de texte, l’aperçu PDF, l’aplanissement des pages et l’analyse de mise en page sont inclus dans l’app. Les autres fonctions (le modèle sur l’appareil, la transcription, la reconnaissance de texte dans d’autres langues) téléchargent ce dont elles ont besoin lors de la première utilisation. Elles fonctionnent ensuite hors connexion.',
   packsEmpty: 'Aucun téléchargement pour l’instant.',
@@ -462,7 +460,7 @@ export const fr: MessageTable = {
     'Ce tableau de données ne fait plus partie de l’application. Ses entrées sont conservées dans Paramètres → Données.',
   dataTitle: 'Données',
   storageTitle: 'Stockage',
-  storageRowHint: 'Photos et fichiers conservés par Tinkrum, et où ils servent',
+  storageRowHint: 'Photos et fichiers',
   presetsTitle: 'Mes préréglages',
   presetsRowHint: 'Gardez toute l’app et revenez-y quand vous voulez',
   presetsHint:
@@ -493,12 +491,11 @@ export const fr: MessageTable = {
   storageSummary: '{n} fichiers · {size}',
   storageEmpty:
     'Tinkrum n’a encore aucun fichier enregistré. Les photos et fichiers ajoutés aux entrées, aux emplacements de fichier et aux images sont conservés ici.',
-  storageIntro:
-    'Les fichiers que Tinkrum garde sur ce téléphone et où ils sont utilisés. Vous seul voyez cette page.',
+  storageIntro: 'Les fichiers gardés sur ce téléphone et où ils sont utilisés.',
   storageCleanup: 'Nettoyer {n} fichiers inutilisés ({size})',
   storageCleanupTitle: 'Supprimer {n} fichiers inutilisés ?',
   storageCleanupMessage:
-    'Ils occupent {size}. Aucune entrée, page ni composant ne les utilise. Les fichiers utilisés seulement par d’anciennes versions sont aussi supprimés : restaurer ces versions ne les fera pas revenir. Les résultats enregistrés par les actions rapides ne sont pas concernés. Action irréversible.',
+    'Ils occupent {size} et plus rien ne les utilise. Les fichiers utilisés seulement par d’anciennes versions sont aussi supprimés. Action irréversible.',
   storageUsedInRecord: '{table} · {title}',
   storageUsedInDeletedRecord: '{table} · {title} (supprimée récemment)',
   storageUsedInComponent: '{page} · {component}',
@@ -518,10 +515,9 @@ export const fr: MessageTable = {
     'Il est utilisé à {n} endroits. Ils indiqueront que le fichier n’existe plus, et restaurer une ancienne version ne le fera pas revenir. Action irréversible.',
   storageDeleteUnused:
     'Restaurer une ancienne version ne le fera pas revenir. Action irréversible.',
-  dataRowHint:
-    'Vos données : exporter, supprimées récemment, configuration de l’app, mémoire de pré-remplissage',
+  dataRowHint: 'Exporter, importer, supprimées récemment',
   dataPrivacy:
-    'Les entrées sont stockées uniquement sur ce téléphone. Tink ne voit que la structure de vos tableaux (noms et champs), jamais ce que vous saisissez.',
+    'Les entrées sont stockées uniquement sur ce téléphone. Tink voit les noms des tableaux et des champs, jamais ce que vous saisissez.',
   dataTables: 'Tableaux de données',
   unusedTables: 'Données hors de l’application',
   unusedTablesHint:
@@ -567,7 +563,7 @@ export const fr: MessageTable = {
     'Ce fichier a été créé avec une version plus récente de Tinkrum et utilise des éléments que cette version n’a pas encore : {missing}. Mettez Tinkrum à jour, puis importez-le à nouveau. Rien n’a été importé.',
   appResetItem: 'Rétablir l’aspect d’origine',
   appResetConfirm:
-    'Rétablir « {name} » tel qu’il était à l’import ? Les pages et actions rapides que vous y avez ajoutées disparaissent, son style et ses pages reviennent. Les tableaux que vous avez créés et toutes vos entrées restent. Vous pourrez annuler dans l’historique des modifications.',
+    'Rétablir « {name} » tel qu’il était à l’import ? Les pages et actions rapides que vous y avez ajoutées disparaissent. Vos tableaux et vos entrées restent. Vous pourrez annuler dans l’historique des modifications.',
   appResetSummary: 'Rétablir l’aspect d’origine de « {name} »',
   importAppConfigNotJson:
     'Ce fichier n’est pas un JSON valide, ce n’est donc pas une configuration d’app. Rien n’a été importé.',
@@ -589,7 +585,7 @@ export const fr: MessageTable = {
     'Supprimer le modèle sur l’appareil ? Les suggestions reviennent aux règles seules. Vos entrées restent. Vous pourrez le télécharger de nouveau.',
   prefillMemoryTitle: 'Mémoire de pré-remplissage',
   prefillMemoryHint:
-    'Quand vous ajoutez une entrée, Tinkrum retient la mise en page des documents enregistrés : après quelle étiquette se trouve une valeur, à peu près sur quelle ligne, et le nom du commerce. Les montants et les dates ne sont pas conservés. Stockée uniquement sur ce téléphone, jamais envoyée à Tink. Le fichier exporté sert aussi de sauvegarde : « Restaurer depuis un fichier » la remet en place. Dans le formulaire d’une nouvelle entrée, Tinkrum retient aussi la suggestion choisie pour chaque champ : l’étiquette qui la précède et sa position approximative, pas la valeur.',
+    'Tinkrum retient la mise en page des documents enregistrés, le nom du commerce et les suggestions choisies, pour mieux remplir la prochaine entrée. Les montants et les dates ne sont pas conservés. Stockée uniquement sur ce téléphone.',
   prefillMemoryCount: '{count} mises en page de documents mémorisées',
   prefillMemoryNone: 'Aucune mise en page mémorisée pour l’instant',
   prefillMemoryExport: 'Exporter',
@@ -1164,7 +1160,7 @@ export const fr: MessageTable = {
   reminderStartsIn: 'Une entrée de « {table} » est à {time}, dans {n} minutes',
   remindersTitle: 'Rappels',
   remindersHint:
-    'Les rappels sont des notifications sur cet appareil. En toucher un ouvre seulement la page ou l’action rapide ; rien ne s’exécute tout seul. Pour ajouter ou modifier un rappel, demandez à Tink (par exemple « rappelle-moi tous les jours à 9 h de noter mes dépenses »).',
+    'Toucher un rappel ouvre seulement sa page ou son action rapide ; rien ne s’exécute tout seul. Pour en ajouter ou en modifier un, demandez à Tink, par exemple « rappelle-moi tous les jours à 9 h de noter mes dépenses ».',
   remindersNone: 'Aucun rappel pour l’instant',
   remindersOff:
     'Les notifications de Tinkrum sont désactivées. Activez-les dans les Réglages du système pour recevoir les rappels.',
@@ -2047,7 +2043,7 @@ export const frSingular: SingularTable = {
   storageCleanup: 'Nettoyer {n} fichier inutilisé ({size})',
   storageCleanupTitle: 'Supprimer {n} fichier inutilisé ?',
   storageCleanupMessage:
-    'Il occupe {size}. Aucune entrée, page ni composant ne l’utilise. Un fichier utilisé seulement par d’anciennes versions est aussi supprimé : restaurer ces versions ne le fera pas revenir. Les résultats enregistrés par les actions rapides ne sont pas concernés. Action irréversible.',
+    'Il occupe {size} et plus rien ne l’utilise. Un fichier utilisé seulement par d’anciennes versions est aussi supprimé. Action irréversible.',
   storageDeleteUsed:
     'Il est utilisé à {n} endroit. Celui-ci indiquera que le fichier n’existe plus, et restaurer une ancienne version ne le fera pas revenir. Action irréversible.',
   attachmentsFull: '{n} fichier au maximum',

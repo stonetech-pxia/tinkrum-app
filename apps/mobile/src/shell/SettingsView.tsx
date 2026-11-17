@@ -197,7 +197,6 @@ export function SettingsView({ env }: { env: RenderEnv }) {
         testID="settings-more"
         icon="folder"
         label={t(locale, 'settingsMoreTitle')}
-        value={t(locale, 'settingsMoreHint')}
         onPress={() => setMoreOpen((open) => !open)}
       />
       {/* 点开才看到：我的预设、数据、存储空间、已下载内容。 */}
@@ -232,7 +231,6 @@ export function SettingsView({ env }: { env: RenderEnv }) {
             testID="settings-packs"
             icon="archive"
             label={t(locale, 'packsTitle')}
-            value={t(locale, 'packsRowHint')}
             onPress={env.locked ?? (() => router.push('/packs'))}
           />
         </>

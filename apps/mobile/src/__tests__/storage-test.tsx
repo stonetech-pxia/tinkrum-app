@@ -197,7 +197,7 @@ describe('storage page (D-264)', () => {
     const alerts = pressInAlerts('删除', '删除');
     await fireEvent.press(await screen.findByTestId('storage-file-lunch1'));
     expect(alerts.mock.calls[1]![0]).toBe('删除「午饭发票.jpg」？');
-    expect(alerts.mock.calls[1]![1]).toMatch(/有 1 个地方用到它.*恢复旧版本也找不回/);
+    expect(alerts.mock.calls[1]![1]).toMatch(/有 1 个地方用到它.*删除后找不回，恢复旧版本也一样/);
     await waitFor(() => expect(screen.queryByTestId('storage-file-lunch1')).toBeNull());
     expect(await repo.getAsset('lunch1')).toBeNull();
     expect(files.disk.has('assets/lunch1/午饭发票.jpg')).toBe(false);

@@ -680,7 +680,7 @@ describe('user journeys (UI)', () => {
   it('Settings → AI: switch to my own key; bad keys are refused, good keys are kept on device', async () => {
     const { aiSettings } = await renderApp();
     await fireEvent.press(screen.getByTestId('nav-settings'));
-    await fireEvent.press(await screen.findByText('内置规则（离线 mock）'));
+    await fireEvent.press(await screen.findByText('内置规则（离线）'));
     await fireEvent.press(await screen.findByTestId('ai-mode-byok'));
 
     await fireEvent.changeText(await screen.findByTestId('api-key-input'), 'not-a-key');
@@ -704,7 +704,7 @@ describe('user journeys (UI)', () => {
   it('Settings → AI: an OpenAI-compatible provider needs a saved https address before a key (D-241)', async () => {
     const { aiSettings } = await renderApp();
     await fireEvent.press(screen.getByTestId('nav-settings'));
-    await fireEvent.press(await screen.findByText('内置规则（离线 mock）'));
+    await fireEvent.press(await screen.findByText('内置规则（离线）'));
     await fireEvent.press(await screen.findByTestId('ai-mode-byok'));
     // Anthropic 时：发到 api.anthropic.com。
     expect(await screen.findByText(/会发送到 api.anthropic.com/)).toBeTruthy();
