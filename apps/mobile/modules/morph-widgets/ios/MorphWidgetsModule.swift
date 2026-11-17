@@ -4,7 +4,7 @@ import WidgetKit
 // 桌面小组件（D-321–D-323）的 App 这一边：画面写进 App Group，让 WidgetKit 重画；取走小组件点了的操作。
 // iOS 不能替用户把小组件放到桌面，canPin 永远是 false（用户在桌面上「编辑 → 添加小组件」）。
 
-private let appGroup = "group.app.morph.mobile"
+private let appGroup = "group.dev.stonetech.tinkrum"
 
 public class MorphWidgetsModule: Module {
   private var dir: URL? {

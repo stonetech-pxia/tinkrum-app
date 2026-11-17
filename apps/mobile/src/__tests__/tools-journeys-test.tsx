@@ -89,6 +89,11 @@ describe('tool journeys (UI)', () => {
     expect(await screen.findByText('已存到「Receipts」')).toBeTruthy();
     expect(files.folderPicks).toBe(4);
     expect(files.remembered).toBe('Receipts');
+
+    // iOS「我的 iPhone」那一层在文件系统里叫 File Provider Storage，按「文件」App 里的名字显示（D-583）。
+    files.nextFolder = 'File Provider Storage';
+    await fireEvent.press(screen.getByTestId('result-folderChange'));
+    expect(await screen.findByText('已存到「我的 iPhone」')).toBeTruthy();
   });
 
   it('offers the remembered folder by name on the result page', async () => {

@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DeskPreview, type OfficePreview } from '../desk/DeskPreview';
 import { placeAssetOnDesk, savedWordDoc } from '../desk/saved-source';
 import { loadDesk, placeOnDesk } from '../desk/store';
-import { runErrorText, t, type StringKey } from '../i18n';
+import { folderName, runErrorText, t, type StringKey } from '../i18n';
 import { useFileBundleOffer } from '../packs/FileBundleOffer';
 import { formatSize } from '../renderer/FileList';
 import { Icon, UiIcon } from '../renderer/Icon';
@@ -90,6 +90,8 @@ export function FilePreviewScreen({ index }: { index?: number }) {
   // 这一页放上桌的那个桌面：返回再点「编辑」继续同一个，不再每次复制一份。
   const [deskId, setDeskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 存到手机以后说一句存了哪个文件、存到哪里（D-583）。
+  const [savedNote, setSavedNote] = useState<string | null>(null);
   const record = useSaveAsRecord(share?.files ?? [], () => setPanel(null));
   // 读到使用次数之前不排推荐，同收件页面。
   const [usage, setUsage] = useState<SucceededRuns | null>(null);
@@ -301,6 +303,7 @@ export function FilePreviewScreen({ index }: { index?: number }) {
   const out = { uri: file.uri, name: shown.name, ext: shown.ext, mimeType: info.mimeType };
   async function act(fn: () => Promise<unknown>) {
     setError(null);
+    setSavedNote(null);
     try {
       await fn();
       setPanel(null);
@@ -309,6 +312,16 @@ export function FilePreviewScreen({ index }: { index?: number }) {
       setPanel(null);
       setError(code ? runErrorText(locale, code) : String(e));
     }
+  }
+  async function saveToPhone() {
+    const done = await files.saveToFolder([out], 'preview', true);
+    if (!done) return;
+    setSavedNote(
+      t(locale, 'previewSavedToFolder', {
+        name: out.ext ? `${out.name}.${out.ext}` : out.name,
+        folder: folderName(locale, done.folder),
+      }),
+    );
   }
   const shareRow = (id: string, label: string, onPress: () => void) => (
     <Pressable
@@ -327,11 +340,7 @@ export function FilePreviewScreen({ index }: { index?: number }) {
         t(locale, 'previewShareSend'),
         () => void act(() => files.shareUris([out])),
       )}
-      {shareRow(
-        'preview-share-folder',
-        t(locale, 'resultFolder'),
-        () => void act(() => files.saveToFolder([out], 'preview', true)),
-      )}
+      {shareRow('preview-share-folder', t(locale, 'resultFolder'), () => void act(saveToPhone))}
       {kind === 'image'
         ? shareRow(
             'preview-share-photos',
@@ -388,7 +397,7 @@ export function FilePreviewScreen({ index }: { index?: number }) {
       icon: 'folder',
       label: t(locale, 'resultFolder'),
       color: '#F29D38',
-      onPress: () => void act(() => files.saveToFolder([out], 'preview', true)),
+      onPress: () => void act(saveToPhone),
     });
     items.push({
       id: 'preview-more-send',
@@ -523,6 +532,13 @@ export function FilePreviewScreen({ index }: { index?: number }) {
           testID="share-preview-error"
           style={[palette.font('bodyMedium', 14), styles.error, { color: palette.danger }]}>
           {error ?? record.error}
+        </Text>
+      ) : null}
+      {savedNote && !error ? (
+        <Text
+          testID="preview-saved-note"
+          style={[palette.font('bodyMedium', 14), styles.error, { color: palette.caption }]}>
+          {savedNote}
         </Text>
       ) : null}
       {member ? null : sizeProblem ? (

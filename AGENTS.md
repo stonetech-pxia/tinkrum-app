@@ -100,7 +100,7 @@ The original product handoff document was deleted on 2026-11-08; the parts that 
 - **Touch the founder's phone only when he explicitly asks.** When a real-device test is needed, write the test steps and hand them to him. Ask which branch and which commit to install first.
 - So far builds have been made only for Android (the founder's Samsung SM-S948B, connected by USB). **An iPhone build has not been made yet**: it needs an Apple developer team and signing first, and prebuild will warn that the share extension has no `DEVELOPMENT_TEAM`. Ask the founder about this; do not guess at the configuration.
 - Environment: `export JAVA_HOME=~/development/jdk-17/Contents/Home ANDROID_HOME=~/development/android-sdk`. Put `LANG=en_US.UTF-8` in front of CocoaPods and Gradle.
-- **Back up the data on the phone first.** A release build cannot `run-as`, so first `adb install -r` a debug build, **do not open it**, then run `adb exec-out run-as app.morph.mobile tar cf - . > app-data.tar` and save the backup in `side-session-notes/android-backups/<time>/`. Both kinds of build are signed with the Expo template's debug key, so they can be installed over each other and the data stays.
+- **Back up the data on the phone first.** A release build cannot `run-as`, so first `adb install -r` a debug build, **do not open it**, then run `adb exec-out run-as dev.stonetech.tinkrum tar cf - . > app-data.tar` and save the backup in `side-session-notes/android-backups/<time>/`. Both kinds of build are signed with the Expo template's debug key, so they can be installed over each other and the data stays.
 - **Building a release build** (it does not depend on Metro; the JS is fixed at build time):
 
   ```bash

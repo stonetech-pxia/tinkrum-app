@@ -11,7 +11,7 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { runErrorText, t, type StringKey } from '../i18n';
+import { folderName, runErrorText, t, type StringKey } from '../i18n';
 import { Icon } from '../renderer/Icon';
 import type { Palette } from '../renderer/theme';
 import { Card, Pill } from '../renderer/ui';
@@ -163,9 +163,9 @@ export function ResultView({
         choose
           ? t(locale, 'resultFolderChange')
           : done.has('folder') && folder
-            ? t(locale, 'resultFolderDone', { name: folder })
+            ? t(locale, 'resultFolderDone', { name: folderName(locale, folder) })
             : folder
-              ? t(locale, 'resultFolderNamed', { name: folder })
+              ? t(locale, 'resultFolderNamed', { name: folderName(locale, folder) })
               : t(locale, 'resultFolder')
       }
       onPress={() =>

@@ -8,10 +8,12 @@
     "scheme": "morph",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "app.morph.mobile",
+      "bundleIdentifier": "dev.stonetech.tinkrum",
+      "appleTeamId": "62W2LKUT45",
+      "buildNumber": "1",
       "infoPlist": {
         "NSSpeechRecognitionUsageDescription": "Tinkrum transcribes recordings on this device when you run speech to text. Recordings stay on this device.",
-        "BGTaskSchedulerPermittedIdentifiers": ["app.morph.mobile.work.*"],
+        "BGTaskSchedulerPermittedIdentifiers": ["dev.stonetech.tinkrum.work.*"],
         "NSPhotoLibraryUsageDescription": "Tinkrum accesses your photo library when you choose photos or videos to process. Your files stay on this device.",
         "NSPhotoLibraryAddUsageDescription": "Tinkrum saves photos and videos to your library only when you ask it to.",
         "NSCameraUsageDescription": "Tinkrum uses the camera when you take a photo or scan a document. Photos stay on this device.",
@@ -19,7 +21,7 @@
       }
     },
     "android": {
-      "package": "app.morph.mobile",
+      "package": "dev.stonetech.tinkrum",
       "adaptiveIcon": {
         "backgroundColor": "#D92D20",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -44,9 +46,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#D92D20",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 120
         }
       ],
       "expo-sqlite",

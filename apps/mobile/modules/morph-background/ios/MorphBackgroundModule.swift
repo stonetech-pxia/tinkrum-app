@@ -85,8 +85,8 @@ public class MorphBackgroundModule: Module {
   private func begin(_ title: String, _ text: String) -> Bool {
     guard Self.available else { return false }
     guard #available(iOS 26.0, *) else { return false }
-    let bundle = Bundle.main.bundleIdentifier ?? "app.morph.mobile"
-    // Info.plist 的 BGTaskSchedulerPermittedIdentifiers 里是 app.morph.mobile.work.*；每次一个新标识（同一个标识注册两次系统会杀掉 App）。
+    let bundle = Bundle.main.bundleIdentifier ?? "dev.stonetech.tinkrum"
+    // Info.plist 的 BGTaskSchedulerPermittedIdentifiers 里是 dev.stonetech.tinkrum.work.*；每次一个新标识（同一个标识注册两次系统会杀掉 App）。
     let id = "\(bundle).work.\(UUID().uuidString)"
     lock.withLock {
       identifier = id
