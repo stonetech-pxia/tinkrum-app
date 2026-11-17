@@ -364,6 +364,22 @@ describe('apps (UI)', () => {
     expect(store.getState().appId).toBe('fit');
   });
 
+  it('stays where it is when a pushed page is open: a permission window or a picker only flashes the app away', async () => {
+    appState();
+    const { store } = await start();
+    await screen.findByTestId('nav-settings');
+    await act(async () => store.getState().enterApp('fit'));
+    await screen.findByTestId('nav-page:fit-home');
+    await act(async () =>
+      router.push({ pathname: '/page/[pageId]', params: { pageId: 'fit-plan' } }),
+    );
+    await screen.findByTestId('page-ai');
+    await leaveAndReturn();
+    // 推入的页面还在，也没有退出 App。
+    expect(store.getState().appId).toBe('fit');
+    expect(screen.getByTestId('page-ai')).toBeTruthy();
+  });
+
   it('being away from the home page changes nothing', async () => {
     appState();
     const { store } = await start();

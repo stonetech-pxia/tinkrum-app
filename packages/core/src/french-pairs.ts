@@ -24,6 +24,7 @@ export const FRENCH_PAIRS: Readonly<Record<string, string>> = {
   'the system font': 'la police du système',
   'a serif font': 'une police avec empattements',
   'a monospaced font': 'une police à chasse fixe',
+  'the Inter font': 'la police Inter',
   compact: 'compact',
   comfortable: 'confortable',
   spacious: 'aéré',

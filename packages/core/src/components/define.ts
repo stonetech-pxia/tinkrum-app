@@ -5,6 +5,7 @@ import type { RecordToolKind, ToolUseAs } from '../record-ops-schema';
 import type { Registry } from '../registry';
 import type { Page, WorkspaceConfig } from '../schema';
 import { BackdropSchema, IdSchema, type Collection, type FieldType } from '../schema-base';
+import { filterSchema } from '../schema-primitives';
 
 // 块的登记表（v34：容器）：每种外观（look）一份定义（新增外观的步骤见 docs/COMPONENTS.md），
 // 结构校验、引用检查、草稿说明、长按编辑、提示词都从这里读，不再各写一份按类型的 switch。
@@ -21,10 +22,15 @@ export const ComponentStyleSchema = z.strictObject({
 });
 export type ComponentStyle = z.infer<typeof ComponentStyleSchema>;
 
-/** 块只在一张表有（some）或没有（none）记录时显示（D-424）。只影响画不画，不写东西。 */
+/**
+ * 块只在一张表有（some）或没有（none）记录时显示（D-424）。只影响画不画，不写东西。
+ * filter（D-579）：只数符合这些条件的记录，写法和列表的筛选一样，汇总、查找算出来的字段也能用
+ * （例如「本月还没记的订阅」有 → 显示待确认的提示）。
+ */
 export const ShowIfSchema = z.strictObject({
   table: IdSchema,
   has: z.enum(['some', 'none']),
+  filter: filterSchema(5).optional(),
 });
 export type ShowIf = z.infer<typeof ShowIfSchema>;
 

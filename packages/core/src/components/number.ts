@@ -130,7 +130,7 @@ export const numberComponent: LookDefinitionOf<'number', typeof shape> = defineL
     return problems;
   },
   describe: (c, _config, ctx) => t(ctx.locale, 'describe_stat_c1587', { v0: c.show.label }),
-  edit: { text: [], style: ['tone'], backdrop: true },
+  edit: { text: [], style: ['tone', 'size'], backdrop: true },
   ai: {
     doc: 'show {label}, source {table, aggregate: "count"|"sum"|"avg"|"min"|"max"|"streak"|"daysSince"|"avgInterval"|"distinctDays", field? (a number, money, rating, duration or formula field; only for sum, avg, min, max), filter?, group? {by: a choice or link field} (one row per option, e.g. spending per category), days? {date? (for the day-based aggregates: a date or datetime field or "createdAt"; default: the first date field), unit?: "day"|"week"|"month", perUnit? (1-50), skip? {field, option}} (unit, perUnit and skip: streak only), goal? (a number: shows "3 / 5" and progress), compare?: "previous", period?: "page" (follows the time range picked in the period block on the same page: an inPeriod in the filter is then ignored, and compare works without one), choice?: "page" (counts only the entries with the option picked in the choices block on the same page, rule 65; minus is not narrowed), minus? ({table, aggregate: "count"|"sum", field?, filter?}: shows this total minus that one)} (rule 33)',
     rule: {

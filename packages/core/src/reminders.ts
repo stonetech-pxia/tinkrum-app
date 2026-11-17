@@ -90,7 +90,7 @@ export function reminderProblems(r: Reminder, config: WorkspaceConfig): string[]
       if (r.unless.link !== undefined)
         problems.push(`${where}: unless.link only works with when.each (there is no entry here)`);
     } else if (r.unless)
-      problems.push(`${where}: unless only works with when.each, when.every day or week`);
+      problems.push(`${where}: unless only works with when.each, when.every day, week or month`);
     if (r.done || r.snoozeMinutes !== undefined)
       problems.push(`${where}: done and snoozeMinutes only work with when.each`);
   }
@@ -267,14 +267,17 @@ export function planNotifications(
       perRecord.push(
         ...planRecordReminder(r, { ...when.each, at: when.at }, config, records, now, locale, cal),
       );
-    } else if ('every' in when && r.unless) {
+    } else if ('every' in when && (r.unless || when.every === 'month')) {
       // 带 unless 的每天、每周提醒（D-563）：不能交给系统按天重复，一天一天排，已经有记录的那天不排。
+      // 每月几号的提醒（D-577）：系统没有按月重复的通知，也这样排接下来的几次（有 unless 时同样跳过）。
       const today = dayNumber(localDate(now))!;
+      const span = when.every === 'month' ? 366 : 7 * 8;
       let added = 0;
-      for (let day = today; added < RECORD_OCCURRENCES && day < today + 7 * 8; day++) {
+      for (let day = today; added < RECORD_OCCURRENCES && day < today + span; day++) {
         const [y, m, d] = dateOfDayNumber(day).split('-').map(Number) as [number, number, number];
         const weekday = new Date(y, m - 1, d).getDay() || 7;
         if (when.every === 'week' && !when.days.includes(weekday)) continue;
+        if (when.every === 'month' && d !== when.day) continue;
         const time = new Date(y, m - 1, d, hour, minute).getTime();
         if (time <= now.getTime()) continue;
         // 这个钟点算哪一天（早于一天开始的钟点算前一天，D-286）。
@@ -290,7 +293,7 @@ export function planNotifications(
       }
     } else if ('every' in when && when.every === 'day') {
       repeating.push({ ...base, id: r.id, body: '', trigger: { kind: 'daily', hour, minute } });
-    } else if ('every' in when) {
+    } else if ('every' in when && when.every === 'week') {
       for (const weekday of [...new Set(when.days)].sort()) {
         repeating.push({
           ...base,

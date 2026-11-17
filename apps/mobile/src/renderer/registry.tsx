@@ -1,7 +1,11 @@
 import {
+  aggregateRecords,
   bindRecord,
   builtinText,
+  calendarOf,
   entryKind,
+  fillCallout,
+  filterRecords,
   isKnownComponent,
   isRecordToolUse,
   isToolRefUse,
@@ -18,7 +22,7 @@ import {
   type ShowIf,
 } from '@morph/core';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Keyboard,
   Pressable,
@@ -30,14 +34,14 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { useRecords } from '../data/records';
+import { useComputedRecords, useRecords } from '../data/records';
 import { LONG_PRESS_MS } from '../editing/entry';
 import { t } from '../i18n';
 import { FocusItem } from '../editing/FocusItem';
 import { Chart } from './Chart';
 import { ChoiceBar } from './ChoiceBar';
 import type { RenderEnv } from './components';
-import { RecordForm, RecordList, Stat, type RecordBlock } from './data';
+import { RecordForm, RecordList, Stat, amountText, type RecordBlock } from './data';
 import { BottomPill, DialButton } from './Dial';
 import { ListTools } from './ListTools';
 import { MonthCalendar } from './MonthCalendar';
@@ -49,6 +53,7 @@ import { FilePick } from './FilePick';
 import { FileSlot } from './FileSlot';
 import { ImageView } from './ImageView';
 import { onPicture } from './Backdrop';
+import { UiIcon } from './Icon';
 import { QuickActionList } from './QuickActionList';
 import { ActionButton } from './RecordActions';
 import { RichText } from './RichText';
@@ -78,6 +83,7 @@ const alignOf = (c: KnownComponent): TextStyle | undefined =>
   c.style?.align === 'center' ? styles.textCenter : undefined;
 
 export const RENDERERS: { [T in ComponentType]: Renderer<T> } = {
+  callout: (c, env) => <CalloutCard c={c} env={env} />,
   picker: (c, env) => (
     <FilePick
       source={
@@ -257,7 +263,13 @@ export const RENDERERS: { [T in ComponentType]: Renderer<T> } = {
   board: (c, env) => <Board block={c} env={env} tone={c.style?.tone} />,
   form: (c, env) => <RecordForm block={c} env={env} tone={c.style?.tone} />,
   number: (c, env) => (
-    <Stat block={c} env={env} tone={c.style?.tone} backdrop={c.style?.backdrop} />
+    <Stat
+      block={c}
+      env={env}
+      tone={c.style?.tone}
+      backdrop={c.style?.backdrop}
+      size={c.style?.size}
+    />
   ),
   chart: (c, env) => <Chart block={c} env={env} tone={c.style?.tone} />,
   files: (c, env) => <FileList block={c} env={env} />,
@@ -352,6 +364,90 @@ function withBuiltinTexts<C extends Component>(component: C, env: RenderEnv): C 
 }
 
 /** 更新的 App 加的组件（D-254）：配置里原样保留，这里只说明要更新 App 才能显示。 */
+/**
+ * 提示卡（D-580）：和「提示」同样的卡片和字样，文字里的 {count}、{sum:字段} 按本机的记录算（不存），
+ * 卡片里最多两个按钮：一个做一键记录，一个打开页面。还没算完时不画，不会闪一下。
+ */
+function CalloutCard({ c, env }: { c: ComponentOf<'callout'>; env: RenderEnv }) {
+  const palette = onPicture(env.palette, c.style?.backdrop);
+  const table = env.config.data.tables.find((x) => x.id === c.source.table);
+  const cal = calendarOf(env.config);
+  const { view, records } = useComputedRecords(env.config.data.tables, table, cal);
+  if (!view || records === null) return null;
+  const matching = filterRecords(records, view, c.source.filter, new Date(), cal);
+  const text = fillCallout(c.show.text, {
+    count: String(matching.length),
+    sum: (id) =>
+      amountText(
+        aggregateRecords(matching, view, 'sum', id) ?? 0,
+        view.fields.find((f) => f.id === id),
+        env.locale,
+      ),
+  });
+  const tone = c.style?.tone;
+  const colors = cardColors(palette, tone ?? 'secondary');
+  const fg =
+    (tone ?? 'secondary') === 'secondary'
+      ? palette.onSecondaryTint
+      : tone === 'tertiary'
+        ? palette.onTertiaryTint
+        : palette.text;
+  const use = c.tools?.[0];
+  return (
+    <Card
+      palette={palette}
+      background={colors.background}
+      backdrop={c.style?.backdrop}
+      style={styles.noticeCard}>
+      <View style={styles.tileRow}>
+        {c.show.icon ? (
+          <IconTile
+            palette={palette}
+            icon={c.show.icon}
+            size={36}
+            {...iconColors(palette, 'solid', tone ?? 'secondary')}
+          />
+        ) : null}
+        <View style={styles.flexText}>
+          <Text style={[palette.font('title', 15 * scaleOf(c)), { color: fg }, alignOf(c)]}>
+            {c.show.title}
+          </Text>
+          <RichText
+            source={text}
+            env={{ ...env, palette }}
+            color={fg}
+            size={14 * scaleOf(c)}
+            align={alignOf(c)}
+          />
+        </View>
+      </View>
+      {use || c.opens ? (
+        <View style={styles.calloutButtons}>
+          {use && isRecordToolUse(use) && c.show.actionLabel ? (
+            <ActionButton
+              action={use}
+              label={c.show.actionLabel}
+              variant="filled"
+              env={env}
+              style={styles.flexButton}
+            />
+          ) : null}
+          {c.opens && c.show.openLabel ? (
+            <Button
+              palette={env.palette}
+              label={c.show.openLabel}
+              variant="outline"
+              onPress={env.interactive ? () => open(env, c.opens!) : undefined}
+              onLongPress={env.onLongPress}
+              style={styles.flexButton}
+            />
+          ) : null}
+        </View>
+      ) : null}
+    </Card>
+  );
+}
+
 function UnknownComponentView({ env }: { env: RenderEnv }) {
   const palette = onSurface(env.palette);
   return (
@@ -366,7 +462,9 @@ function UnknownComponentView({ env }: { env: RenderEnv }) {
 function Group({ component, env }: { component: ComponentOf<'group'>; env: RenderEnv }) {
   const { palette } = env;
   const children = component.children.filter((c) => !c.hidden);
-  const { layout, title } = component.show;
+  const { layout, title, fold } = component.show;
+  // 可以收起（D-578）：一开始收着还是开着由配置定，之后点标题来回；状态只在画着的时候有，不存（底线 15）。
+  const [open, setOpen] = useState(fold !== 'closed');
   const item = (c: Component, column?: { index: number; of: number }) => (
     <Item
       key={c.id}
@@ -411,22 +509,39 @@ function Group({ component, env }: { component: ComponentOf<'group'>; env: Rende
       </View>
     );
   }
+  const titleStyle = [
+    palette.font('bodyBold', 12),
+    {
+      color: textColor(palette, component.style?.tone, palette.caption),
+      letterSpacing: 0.5,
+    },
+    component.style?.align === 'center' && styles.textCenter,
+  ];
   return (
     <View style={{ gap: 10 }}>
-      {title ? (
-        <Text
-          style={[
-            palette.font('bodyBold', 12),
-            {
-              color: textColor(palette, component.style?.tone, palette.caption),
-              letterSpacing: 0.5,
-            },
-            component.style?.align === 'center' && styles.textCenter,
-          ]}>
-          {title.toUpperCase()}
-        </Text>
+      {title && fold ? (
+        <Pressable
+          testID={`group-fold-${component.id}`}
+          accessibilityRole="button"
+          accessibilityLabel={title}
+          accessibilityState={{ expanded: open }}
+          onPress={() => setOpen((v) => !v)}
+          style={styles.foldHeader}>
+          <Text style={titleStyle}>{title.toUpperCase()}</Text>
+          <UiIcon
+            name={open ? 'chevronUp' : 'chevronDown'}
+            size={16}
+            color={textColor(palette, component.style?.tone, palette.caption)}
+          />
+        </Pressable>
+      ) : title ? (
+        <Text style={titleStyle}>{title.toUpperCase()}</Text>
       ) : null}
-      {children.length === 0 && env.focus ? <View style={{ height: 44 }} /> : body}
+      {fold && !open ? null : children.length === 0 && env.focus ? (
+        <View style={{ height: 44 }} />
+      ) : (
+        body
+      )}
     </View>
   );
 }
@@ -446,7 +561,14 @@ export function Item({
 }) {
   const showIf = isKnownComponent(component) ? component.showIf : undefined;
   const item = <ShownItem component={component} env={env} style={style} />;
-  return showIf ? <WhenRecords showIf={showIf}>{item}</WhenRecords> : item;
+  if (!showIf) return item;
+  return showIf.filter?.length ? (
+    <WhenMatching showIf={showIf} env={env}>
+      {item}
+    </WhenMatching>
+  ) : (
+    <WhenRecords showIf={showIf}>{item}</WhenRecords>
+  );
 }
 
 /** 按一张表有没有记录决定画不画（D-424）。只读；还没读完时不画，不会闪一下。 */
@@ -454,6 +576,27 @@ export function WhenRecords({ showIf, children }: { showIf: ShowIf; children: Re
   const records = useRecords(showIf.table);
   if (records === null) return null;
   return (showIf.has === 'some') === records.length > 0 ? children : null;
+}
+
+/**
+ * 带筛选的显示条件（D-579）：只数符合筛选的记录，用算好的值（汇总、查找），所以和数字块、列表读同一份。
+ * 只读；还没算完时不画，不会闪一下。
+ */
+function WhenMatching({
+  showIf,
+  env,
+  children,
+}: {
+  showIf: ShowIf;
+  env: RenderEnv;
+  children: ReactNode;
+}) {
+  const table = env.config.data.tables.find((c) => c.id === showIf.table);
+  const cal = calendarOf(env.config);
+  const { view, records } = useComputedRecords(env.config.data.tables, table, cal);
+  if (!view || records === null) return null;
+  const matching = filterRecords(records, view, showIf.filter, new Date(), cal);
+  return (showIf.has === 'some') === matching.length > 0 ? children : null;
 }
 
 function ShownItem({
@@ -501,7 +644,10 @@ const styles = StyleSheet.create({
   header: { paddingVertical: 8, gap: 6 },
   tileRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   flexText: { flex: 1, gap: 3 },
+  calloutButtons: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  flexButton: { flex: 1 },
   textCenter: { textAlign: 'center' },
+  foldHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   centerSelf: { alignSelf: 'center' },
   row: { flexDirection: 'row', alignItems: 'stretch' },
   cell: { flex: 1 },

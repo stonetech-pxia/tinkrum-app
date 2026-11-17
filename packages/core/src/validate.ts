@@ -339,6 +339,15 @@ function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
   }
   if (c.showIf && !config.data.tables.some((x) => x.id === c.showIf!.table))
     problems.push(`showIf: data table ${c.showIf.table} does not exist`);
+  else if (c.showIf?.filter?.length) {
+    // D-579：筛选读的是这张表算好的值（汇总、查找），所以按显示用的表检查字段，和列表的筛选一样。
+    const table = config.data.tables.find((x) => x.id === c.showIf!.table)!;
+    problems.push(
+      ...conditionProblems(c.showIf.filter, expandCollection(config.data.tables, table)).map(
+        (p) => `showIf.filter: ${p}`,
+      ),
+    );
+  }
   // 固定区属于页面（创始人 2026-11-04 定）：分组里的块不能固定。
   if (c.pin !== undefined && ctx.parent)
     problems.push(
@@ -428,7 +437,10 @@ function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
   // 数字相减（D-337）：被减的那张表和它的筛选。
   if (c.look === 'number') problems.push(...statMinusProblems(c, collection, config, page.of));
   // 记录块上的工具作用在 source 表的一条上（$row）；表单的提交写自己那张表（关系规则 12）。
-  problems.push(...toolUseProblems(c, ctx, c.look === 'form' ? undefined : table));
+  // 表单（提交时新建）和提示卡（D-580，按钮不绑定某一条）的工具不作用在读的表的某一行上。
+  problems.push(
+    ...toolUseProblems(c, ctx, c.look === 'form' || c.look === 'callout' ? undefined : table),
+  );
   return problems;
 }
 

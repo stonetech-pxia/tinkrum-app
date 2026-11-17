@@ -13,6 +13,7 @@ import {
   previousFullRange,
   recordsInRange,
   todayText,
+  unitRange,
   type ChartPoint,
   type BlockOf,
   type ComponentStyle,
@@ -131,7 +132,19 @@ export function Chart({
   const fallback = byChoice
     ? points.reduce((best, p, i) => (p.value > (points[best]?.value ?? -Infinity) ? i : best), 0)
     : nowIndex;
-  const selected = picked !== null && picked < points.length ? picked : fallback;
+  // show.pickPeriod（D-585）：页面上选的范围正好是某一段时，高亮那一段，不管是点柱子选的还是别处选的。
+  const unit = source.group.unit;
+  const rangePicked =
+    show.pickPeriod && unit && env.pageRange
+      ? (() => {
+          const at = choiceRange(env.pageRange.choice, now, cal);
+          return points.findIndex(
+            (p) => p.key === at.start && unitRange(p.key, unit).end === at.end,
+          );
+        })()
+      : -1;
+  const selected =
+    rangePicked >= 0 ? rangePicked : picked !== null && picked < points.length ? picked : fallback;
   const current = points[selected];
 
   const header = (
@@ -157,7 +170,12 @@ export function Chart({
           accessibilityRole="button"
           accessibilityLabel={pointText(p, i)}
           disabled={!env.interactive}
-          onPress={() => setPicked(i)}
+          onPress={() => {
+            setPicked(i);
+            // 点一根柱子，页面的时间范围改成它那一段（D-585）；只改页面上的选择，什么都不写（底线 15）。
+            if (show.pickPeriod && unit && p.key && env.pageRange)
+              env.pageRange.set(unitRange(p.key, unit));
+          }}
           onLongPress={env.onLongPress}
           style={styles.barSlot}
         />

@@ -768,6 +768,7 @@ export const CAPABILITIES: readonly Capability[] = [
   lookCap('dial'),
   lookCap('period'),
   lookCap('choices'),
+  lookCap('callout'),
   lookCap('list'),
   lookCap('cards'),
   lookCap('checklist'),
@@ -928,6 +929,9 @@ export const CAPABILITIES: readonly Capability[] = [
   ),
   cap('remind.when.everyWeek', 'remind', (v) =>
     v.reminders.some((r) => 'every' in r.when && r.when.every === 'week'),
+  ),
+  cap('remind.when.everyMonth', 'remind', (v) =>
+    v.reminders.some((r) => 'every' in r.when && r.when.every === 'month'),
   ),
   cap('remind.when.before', 'remind', (v) =>
     v.reminders.some((r) => 'before' in r.when && 'days' in r.when),

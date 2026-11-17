@@ -119,6 +119,7 @@ import type { RenderEnv } from './components';
 import { Icon, UiIcon } from './Icon';
 import { ProgressBar, ProgressRing } from './Progress';
 import { useTicker } from './ticker';
+import { SIZES } from './style';
 import { cardColors, onPage, type Palette } from './theme';
 import { ColorDot, recordMarks } from './record-marks';
 import { DayGrid, PickButton, TimeChips } from './DatePicker';
@@ -2388,12 +2389,16 @@ export function Stat({
   env,
   tone,
   backdrop,
+  size,
 }: {
   block: BlockOf<'number'>;
   env: RenderEnv;
   tone?: Tone;
   backdrop?: Backdrop | undefined;
+  /** style.size（D-589）：数字的字号比例，不写是中。 */
+  size?: keyof typeof SIZES | null | undefined;
 }) {
+  const scale = SIZES[size ?? 'medium'];
   const palette = onPicture(env.palette, backdrop);
   const src = block.source;
   const label = block.show.label;
@@ -2544,7 +2549,7 @@ export function Stat({
               <View style={styles.statValue}>
                 <Text
                   testID={`stat-group-${src.table}-${g.optionId ?? 'none'}`}
-                  style={[palette.font('title', 16), { color: palette.text }]}>
+                  style={[palette.font('title', 16 * scale), { color: palette.text }]}>
                   {goalProgress(v)?.label ?? listText(g.records) ?? text(v)}
                 </Text>
                 {best ? (
@@ -2581,7 +2586,7 @@ export function Stat({
       <View style={styles.row}>
         <Text
           testID={`stat-value-${src.table}-${label}`}
-          style={[styles.flex, palette.font('display', 26), { color: palette.text }]}>
+          style={[styles.flex, palette.font('display', 26 * scale), { color: palette.text }]}>
           {progress ? progress.label : (listText(matched) ?? text(v))}
         </Text>
         {progress ? (

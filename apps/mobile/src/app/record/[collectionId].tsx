@@ -195,7 +195,8 @@ export default function RecordRoute() {
       <Stack.Screen
         options={{
           ...stackScreenOptions(palette),
-          title: `${collection.name} · ${t(locale, record ? 'editRecord' : 'newRecord')}`,
+          // 编辑已有的一条：标题只写「编辑」（D-590）；新记录照旧带表名。
+          title: record ? t(locale, 'edit') : `${collection.name} · ${t(locale, 'newRecord')}`,
           headerRight: tableEntry(collection.id, palette),
         }}
       />

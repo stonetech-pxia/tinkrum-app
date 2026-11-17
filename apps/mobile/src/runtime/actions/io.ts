@@ -362,14 +362,22 @@ export const IO_IMPLS: Record<string, Impl> = {
   async 'in.audio'(_input, params, ctx) {
     const shared = await importShared(ctx, params, 'audio');
     if (shared) return shared;
-    const { source, min, max } = params as { source: 'files' | 'record'; min: number; max: number };
+    const { source, min, max, autoStart } = params as {
+      source: 'files' | 'record';
+      min: number;
+      max: number;
+      autoStart?: boolean;
+    };
     if (source === 'record') {
       const name = renderNameTemplate(t(ctx.locale, 'io_Recording_1a04e'), {
         now: ctx.now(),
         index: 1,
         sourceName: '',
       });
-      const recorded = await ctx.services.ui.open('record', { name });
+      const recorded = await ctx.services.ui.open('record', {
+        name,
+        ...(autoStart === true ? { autoStart: true } : {}),
+      });
       if (!recorded) throw new RunCancelled();
       return { type: 'audio', items: await importPicked(ctx.services, [recorded], ctx) };
     }

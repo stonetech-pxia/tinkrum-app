@@ -79,6 +79,8 @@ function reminderWhenOnly(r: Reminder, config: WorkspaceConfig, locale: Locale):
   const when = r.when;
   if ('every' in when && when.every === 'day')
     return t(locale, 'reminderWhenDaily', { time: when.at });
+  if ('every' in when && when.every === 'month')
+    return t(locale, 'reminderWhenMonthly', { day: when.day, time: when.at });
   if ('every' in when) {
     const days = [...new Set(when.days)]
       .sort()
@@ -137,6 +139,7 @@ function describeToken(key: ThemeTokenKey, value: unknown, locale: Locale): stri
       system: ['系统字体', 'the system font'],
       serif: ['衬线字体', 'a serif font'],
       mono: ['等宽字体', 'a monospaced font'],
+      inter: ['Inter 字体', 'the Inter font'],
     },
     density: {
       compact: ['紧凑', 'compact'],
@@ -833,7 +836,14 @@ export function describeChange(
               ? t(ctx.locale, 'describeShowIfOff', { component: label })
               : t(
                   ctx.locale,
-                  changes.showIf.has === 'some' ? 'describeShowIfSome' : 'describeShowIfNone',
+                  // D-579：带筛选的说「符合条件的记录」。
+                  changes.showIf.filter?.length
+                    ? changes.showIf.has === 'some'
+                      ? 'describeShowIfSomeMatching'
+                      : 'describeShowIfNoneMatching'
+                    : changes.showIf.has === 'some'
+                      ? 'describeShowIfSome'
+                      : 'describeShowIfNone',
                   { component: label, table: collName(changes.showIf.table) },
                 ),
           );

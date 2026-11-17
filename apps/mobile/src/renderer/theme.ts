@@ -28,6 +28,19 @@ export const CLAY_FONTS: Record<FontRole, string> = {
   bodyBold: 'Karla_700Bold',
 };
 
+/**
+ * Inter（D-591）：每个字重一个静态字体。display（数字、大标题）用中等粗细 500，不是粗体；
+ * 标题 600，正文 400，正文加重 500，正文粗体 700。
+ */
+export const INTER_FONTS: Record<FontRole, string> = {
+  display: 'Inter_500Medium',
+  heading: 'Inter_600SemiBold',
+  title: 'Inter_600SemiBold',
+  body: 'Inter_400Regular',
+  bodyMedium: 'Inter_500Medium',
+  bodyBold: 'Inter_700Bold',
+};
+
 const WEIGHTS: Record<FontRole, TextStyle['fontWeight']> = {
   display: '700',
   heading: '700',
@@ -133,6 +146,8 @@ function buildPalette(theme: Theme, colors: ResolvedColors, page: ResolvedColors
         return { fontFamily: MONO, fontWeight: WEIGHTS[role] };
       case 'system':
         return { fontWeight: WEIGHTS[role] };
+      case 'inter':
+        return { fontFamily: INTER_FONTS[role] };
     }
   };
   return {

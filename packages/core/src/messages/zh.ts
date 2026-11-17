@@ -362,6 +362,8 @@ export const zh: MessageTable = {
   describeShowIfOff: '一直显示{component}',
   describeShowIfSome: '只在「{table}」有记录时显示{component}',
   describeShowIfNone: '只在「{table}」没有记录时显示{component}',
+  describeShowIfSomeMatching: '只在「{table}」有符合条件的记录时显示{component}',
+  describeShowIfNoneMatching: '只在「{table}」没有符合条件的记录时显示{component}',
   describeSingle: '「{table}」的一条记录',
   groupNoText: '未填',
   describe_dial: '有 {n} 个操作的浮动按钮',
@@ -390,7 +392,7 @@ export const zh: MessageTable = {
   browseShowing: '显示 {shown} / {total} 条，往下滚动看更多。',
   browseShowingMatches: '找到 {total} 条，显示 {shown} 条，往下滚动看更多。',
   singleTooMuch: '内容太多，放不进二维码。',
-  listToolAll: '这个列表的全部 {n} 条',
+  listToolAll: '共 {n} 条',
   listToolFound: '只有找到的 {n} 条',
 
   // 用户数据
@@ -866,7 +868,6 @@ export const zh: MessageTable = {
   needsSettingTitle: 'Tink 做不到时，可以把需求告诉我们',
   needsSettingNote: '在回答下面显示一个按钮，你点了才会发送那一句话。',
   // ---- 记一笔、附件和公式字段（D-187、D-188）----
-  noAttachment: '没有附件',
   attachmentMissing: '文件已经删掉了',
   removeAttachment: '去掉',
   attachmentAdd: '添加照片或文件',
@@ -909,6 +910,7 @@ export const zh: MessageTable = {
   recordStart: '开始录音',
   recordPause: '暂停',
   recordResume: '继续录',
+  recordStopGo: '停止并继续',
   recordDone: '完成',
   recordHint: '锁屏后会继续录。录完点「完成」。',
   recordDiscardTitle: '不要这段录音了？',
@@ -925,6 +927,7 @@ export const zh: MessageTable = {
   // 统计按选项分组（D-248）
   statNoChoice: '未选',
   // 图表（D-249）
+  describeCallout: '提示卡“{v0}”',
   describeChart: '图表「{v0}」',
   // D-254：更新的 App 加的组件，这个版本不认识，原样保留。
   describeUnknownComponent: '新版本 App 才能显示的内容',
@@ -1005,6 +1008,7 @@ export const zh: MessageTable = {
   describeRemovedQuickAction: '快捷操作「{name}」没有这张表就用不了，也会移除',
   reminderWhenDaily: '每天 {time}',
   reminderWhenWeekly: '每{days} {time}',
+  reminderWhenMonthly: '每月 {day} 号 {time}',
   reminderWhenAfterAdd: '「{table}」每加一条，{n} 分钟后提醒',
   reminderWhenDate: '「{table}」的「{field}」前 {n} 天的 {time}',
   reminderWhenMinutesBefore: '「{table}」的「{field}」前 {n} 分钟',

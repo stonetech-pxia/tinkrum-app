@@ -159,3 +159,12 @@ export function validChoice(choice: PageChoice): boolean {
 /** 今天是哪一天（页面上显示「今天」「本周」用）。 */
 export const todayText = (now: Date, cal: Calendar = DEFAULT_CALENDAR): string =>
   dateOfDayNumber(todayNumber(now, cal));
+
+/** 一个时间段（图表上的一根柱子）从 start 开始、按 unit 长，到哪天结束（含）：一天、一周（7 天）或到月底。 */
+export function unitRange(start: string, unit: GroupUnit): DayRange {
+  if (unit === 'day') return { start, end: start };
+  if (unit === 'week') return { start, end: dateOfDayNumber(dayNumber(start)! + 6) };
+  const [y, m] = start.split('-').map(Number) as [number, number];
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return { start, end: `${start.slice(0, 8)}${String(last).padStart(2, '0')}` };
+}
