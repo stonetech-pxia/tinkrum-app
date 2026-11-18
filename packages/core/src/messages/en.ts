@@ -3,7 +3,7 @@
 
 export const en = {
   trustNote:
-    'No ads. No account needed to work with your files, and they are processed on this device. Tink is this app’s AI, provided by Anthropic’s Claude by default. It sees your request and the app’s design, never your files or entries.',
+    'No ads. Your files are processed on this phone, with no account. Tink is this app’s AI, provided by Anthropic’s Claude by default. It sees what you say and how the app is built, not your files or entries.',
   resultContinue: 'Continue processing',
   resultIncoming: 'For these results: {what}',
   chainMake: 'Combine into one quick action',
@@ -140,11 +140,11 @@ export const en = {
     'During the beta, what you say to Tink and the app’s design are saved to improve Tinkrum. Files and entries are never sent.',
   aiModeByok: 'API key',
   aiModeByokNote:
-    'Connects straight to Claude or another compatible service with your own key. Usage is billed to your account there.',
+    'Uses your own key to connect straight to Claude or a compatible service. Usage is billed to your account there.',
   // 自带 key 的两种 provider（D-241）
   byokProviderLabel: 'Provider',
   byokSentNote:
-    'When you ask for a change, what you say and the app’s design are sent to {host}. Your files and entries are never sent.',
+    'When you ask for a change, what you say and the app’s design go to {host}. Files and entries don’t.',
   baseUrlLabel: 'Base URL',
   baseUrlPresets: 'Fill in the address for',
   customModelLabel: 'Model name',
@@ -157,7 +157,7 @@ export const en = {
   otherKeyPlaceholder: 'API key (not needed for local models)',
   otherKeyFormatInvalid: 'That doesn’t look like an API key (no spaces, at least 8 characters).',
   otherKeyPrivacyNote:
-    'The key is stored only on this phone and sent only to {host}. Changing the address deletes the key.',
+    'The key stays on this phone and goes only to {host}. Changing the address deletes it.',
   testOkOther: 'Connected. The address and key work.',
   apiKeyLabel: 'API key',
   apiKeySaved: 'Saved (ends with {hint})',
@@ -170,7 +170,7 @@ export const en = {
   testConnection: 'Test connection',
   testOk: 'Connected. The key works with this model.',
   keyPrivacyNote:
-    'The key is stored only on this phone and sent only to api.anthropic.com. Set a spend limit in the Claude Console.',
+    'The key stays on this phone and goes only to api.anthropic.com. You can set a spend limit in the Claude Console.',
 
   byokNoKey: 'Add your Claude API key in Settings → Tink first.',
   byokInvalidKey: 'The API key is invalid or was deleted. Check it in Settings → Tink.',
@@ -330,14 +330,14 @@ export const en = {
   workflowsRowHint: 'Ready-made and your own multi-step actions',
   packsTitle: 'Downloads',
   packsHint:
-    'Text recognition, PDF preview, page flattening and layout come with the app. Other features (the on-device model, speech to text, text recognition in more languages) download what they need the first time you use them. They work offline afterwards.',
+    'Text recognition, PDF preview, page flattening and layout are built in. The on-device model, speech to text and text recognition in other languages download the first time you use them, then work offline.',
   packsEmpty: 'Nothing downloaded yet.',
   packsTotal: 'Using {size}',
   packDelete: 'Delete',
   packDeleteTitle: 'Delete “{name}”?',
   packDeleteMessage: 'You can download it again the next time a tool needs it.',
   packDeleteWithLanguages:
-    'Its {count} languages are deleted too. You can download them again the next time you need them.',
+    'Its {count} languages are deleted too. You can download them again when needed.',
 
   // 图片与链接
   imagePlaceholder: 'Tap to choose a photo',
@@ -444,19 +444,18 @@ export const en = {
   presetsTitle: 'My presets',
   presetsRowHint: 'Save this whole app and switch back to it anytime',
   presetsHint:
-    'A preset keeps the whole app: tables, pages, quick actions and look. It has none of your entries or files, and image and file slots come back empty.',
-  presetsNone:
-    'No presets yet. Save the app as it is now, and you can switch back to it after changing things.',
+    'A preset saves the whole app: tables, pages, quick actions and look. It has no entries or files, so image and file slots come back empty.',
+  presetsNone: 'No presets yet. Save the app as it is now to switch back to it later.',
   presetsNew: 'Save the current app as a preset',
   presetsNamePlaceholder: 'Name this preset',
   presetsFull: 'You can keep up to {max} presets. Delete one to save another.',
   presetsImport: 'Import from a file',
   presetsImportHint:
-    'Have a file, for example one downloaded from the Tinkrum website? An app file is added as a new app next to yours. A whole-app preset file only joins this list; your app changes when you apply it.',
+    'Import a file, for example one from the Tinkrum website. An app file is added as a new app. A full preset joins this list and replaces your app only when you tap Apply.',
   presetImported: 'Added the preset “{name}”. Tap Apply when you want to use it.',
   presetsSamplesTitle: 'Sample apps',
   presetsSamplesHint:
-    'Pick one to look at: it goes into a draft first and is only added when you tap Apply. You can undo it in Change history. Your entries stay as they are.',
+    'A sample opens as a draft and is added only when you tap Apply. You can undo it in Change history. Your entries are not touched.',
   presetApply: 'Apply',
   presetRename: 'Rename',
   presetDeleted: 'Preset “{name}” deleted',
@@ -466,13 +465,12 @@ export const en = {
   presetApplyIntro: 'Pages, navigation, tables, theme and quick actions become what “{name}” saved',
   presetApplyFiles: 'Images and file slots you picked won’t carry over; you pick them again after',
   storageSummary: '{n} files · {size}',
-  storageEmpty:
-    'Tinkrum has no saved files yet. Photos and files you add to entries, file slots and pictures are kept here.',
+  storageEmpty: 'No files yet. Photos and files in entries, file slots and pictures are kept here.',
   storageIntro: 'Files kept on this phone and where they are used.',
   storageCleanup: 'Clean up {n} unused files ({size})',
   storageCleanupTitle: 'Delete {n} unused files?',
   storageCleanupMessage:
-    'They take {size} and nothing uses them now. Files used only by older versions are deleted too. This can’t be undone.',
+    'They take {size}, including files only older versions used. This can’t be undone.',
   storageUsedInRecord: '{table} · {title}',
   storageUsedInDeletedRecord: '{table} · {title} (recently deleted)',
   storageUsedInComponent: '{page} · {component}',
@@ -489,15 +487,15 @@ export const en = {
   storagePreview: 'Preview',
   storageDeleteTitle: 'Delete “{name}”?',
   storageDeleteUsed:
-    'It is used in {n} places. They will show that the file is gone, and restoring an older version will not bring it back. This can’t be undone.',
-  storageDeleteUnused: 'Restoring an older version will not bring it back. This can’t be undone.',
+    'It is used in {n} places, which will show the file as deleted. This can’t be undone, even by restoring an older version.',
+  storageDeleteUnused: 'This can’t be undone, even by restoring an older version.',
   dataRowHint: 'Export, import, recently deleted',
   dataPrivacy:
-    'Entries are stored only on this phone. Tink sees table and field names, never what you enter.',
+    'Entries are stored only on this phone. Tink sees table and field names, not what you enter.',
   dataTables: 'Data tables',
   unusedTables: 'Not in the app',
   unusedTablesHint:
-    'Tables that were removed from the app. Their entries come back if you go back to a time when the table was there.',
+    'Tables removed from the app. Go back in Change history to a version that had the table, and its entries return.',
   recentlyDeleted: 'Recently deleted',
   recentlyDeletedHint: 'Kept for 30 days, then removed for good.',
   recordCount: '{count} entries',
@@ -518,15 +516,15 @@ export const en = {
   importAppConfigInvalid: 'This file isn’t a Tinkrum app configuration, so nothing was imported.',
   importAppConfigName: 'imported file',
   importAppConfirm:
-    'Add “{name}” as a new app? Nothing you have is replaced. You can undo it in the change log.',
+    'Add “{name}” as a new app? Everything you have stays, and you can undo it in Change history.',
   importAppSummary: 'Add app “{name}”',
   importAppClash: 'This app is already added, or its names clash with something you have: {reason}',
   importAppChoose:
-    'Import into your home page (its style replaces the home style and its pages join the navigation bar), or make it a new app (your home page stays as it is, with a new entry on it)?',
+    '“Import into home” switches to its style and adds its pages to the navigation bar. “Make a new app” leaves your home page as it is and adds a link to it.',
   importAppToHome: 'Import into home',
   importAppToApp: 'Make a new app',
   importHomeConfirm:
-    'Import “{name}” into your home page? The home style changes to its style and its pages join the navigation bar. Your pages and entries stay. You can undo it in the change log.',
+    'Import “{name}” into your home page? Home switches to its style and its pages join the navigation bar. Your pages and entries stay, and you can undo it in Change history.',
   importHomeSummary: 'Import “{name}” into the home page',
   shareAppItem: 'Share this app',
   importAppMaybeNewer:
@@ -555,7 +553,7 @@ export const en = {
     'Delete the on-device model? Suggestions go back to rules only. Your entries stay. You can download it again.',
   prefillMemoryTitle: 'Prefill memory',
   prefillMemoryHint:
-    'Tinkrum remembers the layout of documents you saved, the shop name and the suggestions you picked, so the next entry fills in better. It does not keep amounts or dates. Stored only on this phone.',
+    'Tinkrum remembers document layouts, shop names and the suggestions you picked, so the next entry fills in better. It keeps no amounts or dates, and stays on this phone.',
   prefillMemoryCount: 'Remembers {count} document layouts',
   prefillMemoryNone: 'No document layouts remembered yet',
   prefillMemoryExport: 'Export',
@@ -917,7 +915,7 @@ export const en = {
   needSent: 'Thanks, we got it. New tools come through updates and downloads.',
   needPrivacy: 'Only this sentence is sent to Tinkrum — no files, entries or settings.',
   needsSettingTitle: 'Offer to send requests Tink can’t do',
-  needsSettingNote: 'Shows a button under the answer. Nothing is sent unless you tap it.',
+  needsSettingNote: 'Adds a button under the answer. The sentence is sent only if you tap it.',
   // ---- 记一笔、附件和公式字段（D-187、D-188）----
   attachmentMissing: 'The file was deleted',
   removeAttachment: 'Remove',
@@ -1096,7 +1094,7 @@ export const en = {
   reminderStartsIn: 'An entry in “{table}” is at {time}, in {n} minutes',
   remindersTitle: 'Reminders',
   remindersHint:
-    'Tapping a reminder only opens its page or quick action; nothing runs by itself. To add or change one, ask Tink, for example “remind me every day at 9 to log expenses”.',
+    'Tapping a reminder opens its page or quick action; it runs nothing itself. To add or change one, ask Tink, for example “remind me every day at 9 to log expenses”.',
   remindersNone: 'No reminders yet',
   remindersOff:
     'Notifications are off for Tinkrum. Turn them on in the system Settings to get reminders.',
@@ -1591,14 +1589,13 @@ export const en = {
   describePrefillRulesCard: '“{name}”: read attachments as business cards',
   describePrefillRulesGeneral: '“{name}”: read attachments with the general rules',
   prefillRulesLabel: 'Attachments are',
-  prefillRulesHint:
-    'Suggestions use rules made for this kind of document, on top of the general ones.',
+  prefillRulesHint: 'Adds rules made for this kind of document to the general ones.',
   prefillRulesGeneral: 'Other',
   prefillRulesReceipt: 'Receipts',
   prefillRulesCard: 'Business cards',
   readAttachmentsLabel: 'Read attachments automatically',
   readAttachmentsHint:
-    'New entries read photos and PDFs on this device and suggest values. Nothing is filled in until you tap it.',
+    'New entries read photos and PDFs on this phone and suggest values. Tap one to fill it in.',
   describeWeekStartMonday: 'Weeks start on Monday',
   describeWeekStartSunday: 'Weeks start on Sunday',
   describeTwoWeekStart: 'Two-week periods count from {date}',
@@ -1938,7 +1935,7 @@ export const en = {
   importBatch: '{date} · {file} · {n} entries',
   importDeleteBatch: 'Delete this import',
   importDeleteBatchConfirm:
-    '{n} entries from “{file}” go to Recently deleted for 30 days, including any you edited since.',
+    '{n} entries from “{file}”, including any you edited since, go to Recently deleted for 30 days.',
 };
 
 export type StringKey = keyof typeof en;
@@ -1965,9 +1962,9 @@ export const enSingular = {
   storageCleanup: 'Clean up {n} unused file ({size})',
   storageCleanupTitle: 'Delete {n} unused file?',
   storageCleanupMessage:
-    'It takes {size} and nothing uses it now. A file used only by older versions is deleted too. This can’t be undone.',
+    'It takes {size}, even if only older versions used it. This can’t be undone.',
   storageDeleteUsed:
-    'It is used in {n} place. It will show that the file is gone, and restoring an older version will not bring it back. This can’t be undone.',
+    'It is used in {n} place, which will show the file as deleted. This can’t be undone, even by restoring an older version.',
   attachmentsFull: 'At most {n} file',
   data_attachments: '{n} attachment',
   shareSummary: '{n} file',
@@ -1998,8 +1995,7 @@ export const enSingular = {
   runError_tooFew: 'Choose at least {min} file.',
   runError_tooMany: 'Choose at most {max} file.',
   runError_tooLong: '“{name}” is too long for a GIF (at most {seconds} second). Trim it first.',
-  packDeleteWithLanguages:
-    'Its language is deleted too. You can download it again the next time you need it.',
+  packDeleteWithLanguages: 'Its language is deleted too. You can download it again when needed.',
   recordCount: '{count} entry',
   prefillMemoryCount: 'Remembers {count} document layout',
   prefillMemoryRestoreConfirm:
@@ -2083,7 +2079,7 @@ export const enSingular = {
   importDone: 'Imported {n} entry into “{table}”',
   importBatch: '{date} · {file} · {n} entry',
   importDeleteBatchConfirm:
-    '{n} entry from “{file}” goes to Recently deleted for 30 days, even if you edited it since.',
+    '{n} entry from “{file}”, even if you edited it since, goes to Recently deleted for 30 days.',
 } satisfies Partial<MessageTable>;
 
 /** 单数表：键必须和 enSingular 完全一致。 */

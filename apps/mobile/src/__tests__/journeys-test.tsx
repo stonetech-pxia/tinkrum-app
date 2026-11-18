@@ -707,7 +707,7 @@ describe('user journeys (UI)', () => {
     await fireEvent.press(await screen.findByText('内置规则（离线）'));
     await fireEvent.press(await screen.findByTestId('ai-mode-byok'));
     // Anthropic 时：发到 api.anthropic.com。
-    expect(await screen.findByText(/会发送到 api.anthropic.com/)).toBeTruthy();
+    expect(await screen.findByText(/会发到 api.anthropic.com/)).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('byok-preset-custom'));
     // 没有 Claude 专属的警告；地址没存之前 key 框在，但存不了（先存地址）；也不显示 Claude 模型。
@@ -725,7 +725,7 @@ describe('user journeys (UI)', () => {
     await fireEvent.changeText(screen.getByTestId('byok-model'), 'some/model');
     await fireEvent.press(screen.getByTestId('byok-endpoint-save'));
     expect(await screen.findByText('已保存。')).toBeTruthy();
-    expect(await screen.findByText(/会发送到 openrouter.ai/)).toBeTruthy();
+    expect(await screen.findByText(/会发到 openrouter.ai/)).toBeTruthy();
 
     await fireEvent.changeText(
       screen.getByTestId('api-key-input'),

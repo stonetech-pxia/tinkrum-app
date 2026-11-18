@@ -242,7 +242,7 @@ it('with data: undo removes exactly the batch; the data screen lists it, deletin
   const cancelled = answerNext('取消');
   await fireEvent.press(screen.getByTestId(`import-delete-${batch!.id}`));
   expect(cancelled.message).toBe(
-    '「orders.csv」导入的 2 条记录会放进「最近删除」，保留 30 天；之后改过的也一样。',
+    '「orders.csv」导入的 2 条记录（包括后来改过的）会进「最近删除」，保留 30 天。',
   );
   expect(await customers(repo)).toEqual(['Ana', 'Bo', 'Old']);
   answerNext('删除');

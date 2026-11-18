@@ -3,7 +3,7 @@ import type { MessageTable } from './en';
 
 export const zh: MessageTable = {
   trustNote:
-    '没有广告。处理文件不用账号，文件只在这台手机上处理。Tink 是这个 App 里的 AI，默认由 Anthropic 的 Claude 提供；它只看到你说的话和 App 的结构，看不到文件和记录。',
+    '没有广告。文件都在这台手机上处理，不用账号。Tink 是这个 App 里的 AI，默认由 Anthropic 的 Claude 提供，能看到你说的话和 App 的结构，看不到文件和记录。',
   resultContinue: '接着处理',
   resultIncoming: '接着处理这些结果：{what}',
   chainMake: '合成一个快捷操作',
@@ -136,10 +136,10 @@ export const zh: MessageTable = {
   aiServerStoredNote:
     '测试期间会保存你对 Tink 说的话和 App 的结构，用来改进 Tinkrum。文件和记录不会发送。',
   aiModeByok: 'API key',
-  aiModeByokNote: '用你自己的 key 直接连 Claude 或其他兼容服务，费用由你的账号支付。',
+  aiModeByokNote: '用你自己的 key 直连 Claude 或兼容服务，费用记在你的账号上。',
   // 自带 key 的两种 provider（D-241）
   byokProviderLabel: '服务商',
-  byokSentNote: '请 Tink 修改时，你说的话和 App 的结构会发送到 {host}；文件和记录不会发送。',
+  byokSentNote: '修改时，你说的话和 App 的结构会发到 {host}，文件和记录不会。',
   baseUrlLabel: '地址',
   baseUrlPresets: '填入常见服务商的地址',
   customModelLabel: '模型名',
@@ -151,7 +151,7 @@ export const zh: MessageTable = {
   customModelMissing: '请填写模型名。',
   otherKeyPlaceholder: 'API key（本地模型可以不填）',
   otherKeyFormatInvalid: '这看起来不是 API key（不能有空格，至少 8 个字符）。',
-  otherKeyPrivacyNote: 'key 只存在这台手机上，只发给 {host}。换地址时 key 会被删除。',
+  otherKeyPrivacyNote: 'key 只存在这台手机上，只发给 {host}。换地址会删掉 key。',
   testOkOther: '连接成功，地址和 key 都可以用。',
   apiKeyLabel: 'API key',
   apiKeySaved: '已保存（末四位 {hint}）',
@@ -164,7 +164,7 @@ export const zh: MessageTable = {
   testConnection: '测试连接',
   testOk: '连接成功，这个 key 可以使用所选模型。',
   keyPrivacyNote:
-    'key 只存在这台手机上，只发给 api.anthropic.com。建议在 Claude Console 设个花费上限。',
+    'key 只存在这台手机上，只发给 api.anthropic.com。可以在 Claude Console 设个花费上限。',
 
   byokNoKey: '请先在「设置 → Tink」里填写你的 Claude API key。',
   byokInvalidKey: 'API key 无效或已被删除，请在「设置 → Tink」里检查。',
@@ -313,13 +313,13 @@ export const zh: MessageTable = {
   workflowsRowHint: '现成的和你自己的多步操作',
   packsTitle: '已下载内容',
   packsHint:
-    '文字识别、PDF 预览、页面展平和版面分析已经内置在 App 里。其他功能（本机模型、语音转文字、更多语言的文字识别）第一次用时要下载一些内容，之后不联网也能用。',
+    '文字识别、PDF 预览、页面展平和版面分析已经内置。本机模型、语音转文字和其他语言的文字识别第一次用时要下载，之后不联网也能用。',
   packsEmpty: '还没有下载过内容。',
   packsTotal: '共占用 {size}',
   packDelete: '删除',
   packDeleteTitle: '删除「{name}」？',
   packDeleteMessage: '下次用到时可以再下载。',
-  packDeleteWithLanguages: '它的 {count} 种语言也会一起删除。下次用到时可以再下载。',
+  packDeleteWithLanguages: '它的 {count} 种语言也会删掉，用到时可以再下载。',
 
   // 图片与链接
   imagePlaceholder: '点按选择一张照片',
@@ -425,18 +425,17 @@ export const zh: MessageTable = {
   presetsTitle: '我的预设',
   presetsRowHint: '存下现在的样子，随时换回',
   presetsHint:
-    '预设存的是整个 App：表、页面、快捷操作和风格。不带你的记录和文件，图片和文件位换回来时是空的。',
-  presetsNone: '还没有预设。把现在的 App 存一份，以后改过了也能换回来。',
+    '预设存的是整个 App：表、页面、快捷操作和风格，不含记录和文件。换回来时图片和文件位是空的。',
+  presetsNone: '还没有预设。存一份现在的 App，以后随时能换回来。',
   presetsNew: '把当前 App 存成预设',
   presetsNamePlaceholder: '给预设起个名字',
   presetsFull: '最多存 {max} 个预设。先删掉一个再存。',
   presetsImport: '从文件导入',
   presetsImportHint:
-    '有文件（比如从 Tinkrum 网站下载的）？App 文件会加成一个新的 App，原来的不动；整份预设文件存在这个列表里，点「应用」才会换成它。',
+    '可以导入文件，比如从 Tinkrum 网站下载的。App 文件会加成一个新 App；整份预设会进这个列表，点「应用」才换上。',
   presetImported: '已添加预设「{name}」，要用时点「应用」。',
   presetsSamplesTitle: '样板 App',
-  presetsSamplesHint:
-    '选一个看看：先放进草稿，点「应用」才加上，也能在改动记录里撤销。你的记录不动。',
+  presetsSamplesHint: '点开先进草稿，点「应用」才加上，也能在改动记录里撤销。记录不受影响。',
   presetApply: '应用',
   presetRename: '改名',
   presetDeleted: '已删除预设「{name}」',
@@ -446,12 +445,11 @@ export const zh: MessageTable = {
   presetApplyIntro: '页面、导航、表、主题和快捷操作都换成「{name}」保存时的样子',
   presetApplyFiles: '现在选好的图片和文件位不会跟过来，换完要重新选',
   storageSummary: '{n} 个文件 · {size}',
-  storageEmpty:
-    'Tinkrum 里还没有保存的文件。记录里的照片和文件、文件入口和图片用到的文件都存在这里。',
+  storageEmpty: '还没有文件。记录里的照片和文件、文件位和图片用到的文件都存在这里。',
   storageIntro: '存在这台手机上的文件，和用到它们的地方。',
   storageCleanup: '清理 {n} 个没有在用的文件（{size}）',
   storageCleanupTitle: '删除 {n} 个没有在用的文件？',
-  storageCleanupMessage: '共 {size}，现在没有地方用到。只在旧版本里用过的也会删掉，删除后找不回。',
+  storageCleanupMessage: '共 {size}，包括只在旧版本里用过的。删除后找不回。',
   storageUsedInRecord: '{table} · {title}',
   storageUsedInDeletedRecord: '{table} · {title}（最近删除）',
   storageUsedInComponent: '{page} · {component}',
@@ -467,14 +465,13 @@ export const zh: MessageTable = {
   storageKindOther: '文件',
   storagePreview: '预览',
   storageDeleteTitle: '删除「{name}」？',
-  storageDeleteUsed:
-    '有 {n} 个地方用到它，删除后那里会显示文件已不在。删除后找不回，恢复旧版本也一样。',
-  storageDeleteUnused: '删除后找不回，恢复旧版本也一样。',
+  storageDeleteUsed: '有 {n} 个地方用到它，那里会显示文件已删除。删除后找不回，恢复旧版本也不行。',
+  storageDeleteUnused: '删除后找不回，恢复旧版本也不行。',
   dataRowHint: '导出、导入、最近删除',
-  dataPrivacy: '记录只存在这台手机上。Tink 只看得到表名和字段，看不到内容。',
+  dataPrivacy: '记录只存在这台手机上。Tink 能看到表名和字段名，看不到内容。',
   dataTables: '数据表',
   unusedTables: '不在界面里的数据',
-  unusedTablesHint: '已从界面移除的数据表。在改动记录里回到有这张表的时候，记录会回来。',
+  unusedTablesHint: '从界面上拿掉的表。在改动记录里回到有这张表的版本，记录就回来了。',
   recentlyDeleted: '最近删除',
   recentlyDeletedHint: '保留 30 天，之后永久删除。',
   recordCount: '{count} 条记录',
@@ -493,16 +490,15 @@ export const zh: MessageTable = {
   exportAppConfig: '导出 App 配置',
   importAppConfigInvalid: '这个文件不是 Tinkrum 的 App 配置，没有导入。',
   importAppConfigName: '导入的文件',
-  importAppConfirm:
-    '把「{name}」加成一个新的 App？你现有的东西都不会被替换，之后可以在改动记录里撤销。',
+  importAppConfirm: '把「{name}」加成一个新 App？现有的东西都留着，可以在改动记录里撤销。',
   importAppSummary: '导入 App「{name}」',
   importAppClash: '这个 App 已经添加过了，或者里面的名字和你现有的重名：{reason}',
   importAppChoose:
-    '导入主页（换成它的风格，它的页面加进导航栏），还是做成一个新 App（原来的主页不变，主页上多一个入口）？',
+    '「导入主页」会换成它的风格，并把它的页面加进导航栏；「做成新 App」不动主页，只在主页上多一个入口。',
   importAppToHome: '导入主页',
   importAppToApp: '做成新 App',
   importHomeConfirm:
-    '把「{name}」导入主页？主页会换成它的风格，它的页面加进导航栏。你现有的页面和记录都留着，之后可以在改动记录里撤销。',
+    '把「{name}」导入主页？主页会换成它的风格，它的页面加进导航栏。现有的页面和记录都留着，可以在改动记录里撤销。',
   importHomeSummary: '把「{name}」导入主页',
   shareAppItem: '分享这个 App',
   importAppMaybeNewer: '如果它是新版本的 Tinkrum 做的，先更新 Tinkrum 再试。',
@@ -526,7 +522,7 @@ export const zh: MessageTable = {
   localModelRemoveConfirm: '删除本机模型？候选回到只用规则，记录都还在，以后可以再下载。',
   prefillMemoryTitle: '预填记忆',
   prefillMemoryHint:
-    'Tinkrum 会记住单据的版式、商家名和你点过的候选，下次填得更准。不记金额和日期，只存在这台手机上。',
+    'Tinkrum 会记住单据版式、商家名和你选过的候选，下次填得更准。不记金额和日期，只存在这台手机上。',
   prefillMemoryCount: '记住了 {count} 种单据版式',
   prefillMemoryNone: '还没有记住单据版式',
   prefillMemoryExport: '导出',
@@ -860,7 +856,7 @@ export const zh: MessageTable = {
   needSent: '收到了，谢谢。新功能会通过更新和下载内容加进来。',
   needPrivacy: '只发送这一句话给 Tinkrum，不含文件、记录和设置。',
   needsSettingTitle: 'Tink 做不到时，可以把需求告诉我们',
-  needsSettingNote: '在回答下面显示一个按钮，你点了才会发送那一句话。',
+  needsSettingNote: '回答下面会多一个按钮，你点了才发送那句话。',
   // ---- 记一笔、附件和公式字段（D-187、D-188）----
   attachmentMissing: '文件已经删掉了',
   removeAttachment: '去掉',
@@ -1029,7 +1025,7 @@ export const zh: MessageTable = {
   reminderStartsIn: '「{table}」里有一条记录在 {time}，还有 {n} 分钟',
   remindersTitle: '提醒',
   remindersHint:
-    '点提醒只会打开对应的页面或快捷操作，不会自动运行。要加或改提醒，对 Tink 说就行，例如「每天 9 点提醒我记账」。',
+    '点提醒会打开对应的页面或快捷操作，不会自己运行。要加或改提醒，跟 Tink 说一句，比如「每天 9 点提醒我记账」。',
   remindersNone: '还没有提醒',
   remindersOff: 'Tinkrum 的通知已关闭。要收到提醒，请在系统「设置」里打开。',
   reminderRemove: '移除',
@@ -1508,12 +1504,12 @@ export const zh: MessageTable = {
   describePrefillRulesCard: '「{name}」：按名片读附件',
   describePrefillRulesGeneral: '「{name}」：按通用规则读附件',
   prefillRulesLabel: '附件是',
-  prefillRulesHint: '在通用规则之外，再用这种单据专门的规则给候选。',
+  prefillRulesHint: '在通用规则之外，加上这种单据的专用规则。',
   prefillRulesGeneral: '其他',
   prefillRulesReceipt: '收据',
   prefillRulesCard: '名片',
   readAttachmentsLabel: '自动读取附件',
-  readAttachmentsHint: '新记录会在本机读取照片和 PDF，给出候选；你点了才会填。',
+  readAttachmentsHint: '新记录会在手机上读照片和 PDF，给出候选，你点了才填。',
   describeWeekStartMonday: '一周从周一开始',
   describeWeekStartSunday: '一周从周日开始',
   describeTwoWeekStart: '两周一段从 {date} 起算',
@@ -1831,5 +1827,5 @@ export const zh: MessageTable = {
   importBatch: '{date} · {file} · {n} 条记录',
   importDeleteBatch: '删除这次导入',
   importDeleteBatchConfirm:
-    '「{file}」导入的 {n} 条记录会放进「最近删除」，保留 30 天；之后改过的也一样。',
+    '「{file}」导入的 {n} 条记录（包括后来改过的）会进「最近删除」，保留 30 天。',
 };

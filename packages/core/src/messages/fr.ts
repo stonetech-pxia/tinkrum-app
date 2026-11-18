@@ -4,7 +4,7 @@ import type { MessageTable, SingularTable } from './en';
 
 export const fr: MessageTable = {
   trustNote:
-    'Sans publicité. Aucun compte requis pour traiter vos fichiers, et le traitement reste sur votre appareil. Tink est l’IA de cette application, fournie par défaut par Claude d’Anthropic. Tink reçoit votre demande et la configuration de l’application, jamais vos fichiers ni vos entrées.',
+    'Sans publicité. Vos fichiers sont traités sur ce téléphone, sans compte. Tink est l’IA de cette application, fournie par défaut par Claude d’Anthropic. Tink voit ce que vous dites et la structure de l’application, pas vos fichiers ni vos entrées.',
   resultContinue: 'Continuer le traitement',
   resultIncoming: 'Pour ces résultats : {what}',
   chainMake: 'Combiner en une action rapide',
@@ -148,11 +148,11 @@ export const fr: MessageTable = {
     'Pendant la bêta, ce que vous dites à Tink et la configuration de l’application sont enregistrés pour améliorer Tinkrum. Les fichiers et les entrées ne sont jamais envoyés.',
   aiModeByok: 'Clé API',
   aiModeByokNote:
-    'Se connecte directement à Claude ou à un autre service compatible avec votre propre clé. L’usage est facturé sur votre compte chez ce service.',
+    'Votre propre clé, connectée directement à Claude ou à un service compatible. L’usage est facturé sur votre compte.',
   // 自带 key 的两种 provider（D-241）
   byokProviderLabel: 'Fournisseur',
   byokSentNote:
-    'Quand vous demandez une modification, ce que vous dites et la configuration de l’application sont envoyés à {host}. Vos fichiers et entrées ne sont jamais envoyés.',
+    'Quand vous demandez une modification, ce que vous dites et la structure de l’application vont à {host}. Pas vos fichiers ni vos entrées.',
   baseUrlLabel: 'URL de base',
   baseUrlPresets: 'Remplir l’adresse pour',
   customModelLabel: 'Nom du modèle',
@@ -166,7 +166,7 @@ export const fr: MessageTable = {
   otherKeyPlaceholder: 'Clé API (inutile pour les modèles locaux)',
   otherKeyFormatInvalid: 'Ce n’est pas une clé API valide (sans espaces, au moins 8 caractères).',
   otherKeyPrivacyNote:
-    'La clé n’est enregistrée que sur ce téléphone et n’est envoyée qu’à {host}. Changer l’adresse supprime la clé.',
+    'La clé reste sur ce téléphone et ne va qu’à {host}. Changer l’adresse la supprime.',
   testOkOther: 'Connecté. L’adresse et la clé fonctionnent.',
   apiKeyLabel: 'API key',
   apiKeySaved: 'Enregistrée (se termine par {hint})',
@@ -179,7 +179,7 @@ export const fr: MessageTable = {
   testConnection: 'Tester la connexion',
   testOk: 'Connecté. La clé fonctionne avec ce modèle.',
   keyPrivacyNote:
-    'La clé n’est enregistrée que sur ce téléphone et n’est envoyée qu’à api.anthropic.com. Définissez un plafond de dépenses dans la Claude Console.',
+    'La clé reste sur ce téléphone et ne va qu’à api.anthropic.com. Vous pouvez fixer un plafond de dépenses dans la Claude Console.',
 
   byokNoKey: 'Ajoutez d’abord votre clé API Claude dans « Paramètres → Tink ».',
   byokInvalidKey:
@@ -349,7 +349,7 @@ export const fr: MessageTable = {
   workflowsRowHint: 'Actions prêtes à l’emploi et vos propres actions en plusieurs étapes',
   packsTitle: 'Téléchargements',
   packsHint:
-    'La reconnaissance de texte, l’aperçu PDF, l’aplanissement des pages et l’analyse de mise en page sont inclus dans l’app. Les autres fonctions (le modèle sur l’appareil, la transcription, la reconnaissance de texte dans d’autres langues) téléchargent ce dont elles ont besoin lors de la première utilisation. Elles fonctionnent ensuite hors connexion.',
+    'La reconnaissance de texte, l’aperçu PDF, l’aplanissement des pages et la mise en page sont intégrés. Le modèle sur l’appareil, la transcription et la reconnaissance de texte dans d’autres langues se téléchargent à la première utilisation, puis marchent hors connexion.',
   packsEmpty: 'Aucun téléchargement pour l’instant.',
   packsTotal: 'Occupe {size}',
   packDelete: 'Supprimer',
@@ -357,7 +357,7 @@ export const fr: MessageTable = {
   packDeleteMessage:
     'Vous pourrez le télécharger à nouveau la prochaine fois qu’un outil en aura besoin.',
   packDeleteWithLanguages:
-    'Ses {count} langues seront aussi supprimées. Vous pourrez les télécharger à nouveau la prochaine fois que vous en aurez besoin.',
+    'Ses {count} langues sont aussi supprimées. Vous pourrez les retélécharger au besoin.',
 
   // 图片与链接
   imagePlaceholder: 'Touchez pour choisir une photo',
@@ -468,20 +468,19 @@ export const fr: MessageTable = {
   presetsTitle: 'Mes préréglages',
   presetsRowHint: 'Gardez toute l’app et revenez-y quand vous voulez',
   presetsHint:
-    'Un préréglage garde toute l’app : tableaux, pages, actions rapides et style. Il ne contient ni vos entrées ni vos fichiers, et les images et emplacements de fichier reviennent vides.',
-  presetsNone:
-    'Aucun préréglage pour l’instant. Gardez l’app telle qu’elle est : vous pourrez y revenir après l’avoir modifiée.',
+    'Un préréglage garde toute l’app : tableaux, pages, actions rapides et style. Il ne contient ni entrées ni fichiers : les images et emplacements de fichier reviennent vides.',
+  presetsNone: 'Aucun préréglage. Gardez l’app telle qu’elle est pour pouvoir y revenir plus tard.',
   presetsNew: 'Garder l’app actuelle comme préréglage',
   presetsNamePlaceholder: 'Nom du préréglage',
   presetsFull:
     'Vous pouvez garder {max} préréglages au maximum. Supprimez-en un pour en ajouter un autre.',
   presetsImport: 'Importer depuis un fichier',
   presetsImportHint:
-    'Vous avez un fichier, par exemple téléchargé sur le site de Tinkrum ? Un fichier d’app est ajouté comme nouvelle app, à côté des vôtres. Un fichier de préréglage complet rejoint seulement cette liste ; votre app ne change que lorsque vous l’appliquez.',
+    'Importez un fichier, par exemple du site de Tinkrum. Un fichier d’app devient une nouvelle app. Un préréglage complet rejoint cette liste et ne remplace votre app que si vous touchez Appliquer.',
   presetImported: 'Préréglage « {name} » ajouté. Touchez Appliquer pour l’utiliser.',
   presetsSamplesTitle: 'Apps modèles',
   presetsSamplesHint:
-    'Choisissez-en une pour la voir : elle va d’abord dans un brouillon et n’est ajoutée que lorsque vous touchez Appliquer. Vous pouvez l’annuler dans l’historique des modifications. Vos entrées ne changent pas.',
+    'Un modèle s’ouvre en brouillon et n’est ajouté que si vous touchez Appliquer. Vous pouvez l’annuler dans l’historique des modifications. Vos entrées ne bougent pas.',
   presetApply: 'Appliquer',
   presetRename: 'Renommer',
   presetDeleted: 'Préréglage « {name} » supprimé',
@@ -494,12 +493,12 @@ export const fr: MessageTable = {
     'Les images et emplacements de fichier choisis ne suivent pas : il faudra les choisir à nouveau',
   storageSummary: '{n} fichiers · {size}',
   storageEmpty:
-    'Tinkrum n’a encore aucun fichier enregistré. Les photos et fichiers ajoutés aux entrées, aux emplacements de fichier et aux images sont conservés ici.',
+    'Aucun fichier pour l’instant. Les photos et fichiers des entrées, des emplacements de fichier et des images sont gardés ici.',
   storageIntro: 'Les fichiers gardés sur ce téléphone et où ils sont utilisés.',
   storageCleanup: 'Nettoyer {n} fichiers inutilisés ({size})',
   storageCleanupTitle: 'Supprimer {n} fichiers inutilisés ?',
   storageCleanupMessage:
-    'Ils occupent {size} et plus rien ne les utilise. Les fichiers utilisés seulement par d’anciennes versions sont aussi supprimés. Action irréversible.',
+    'Ils occupent {size}, y compris ceux utilisés seulement par d’anciennes versions. Action irréversible.',
   storageUsedInRecord: '{table} · {title}',
   storageUsedInDeletedRecord: '{table} · {title} (supprimée récemment)',
   storageUsedInComponent: '{page} · {component}',
@@ -516,16 +515,15 @@ export const fr: MessageTable = {
   storagePreview: 'Aperçu',
   storageDeleteTitle: 'Supprimer « {name} » ?',
   storageDeleteUsed:
-    'Il est utilisé à {n} endroits. Ils indiqueront que le fichier n’existe plus, et restaurer une ancienne version ne le fera pas revenir. Action irréversible.',
-  storageDeleteUnused:
-    'Restaurer une ancienne version ne le fera pas revenir. Action irréversible.',
+    'Il est utilisé à {n} endroits, qui indiqueront que le fichier est supprimé. Action irréversible, même en restaurant une ancienne version.',
+  storageDeleteUnused: 'Action irréversible, même en restaurant une ancienne version.',
   dataRowHint: 'Exporter, importer, supprimées récemment',
   dataPrivacy:
-    'Les entrées sont stockées uniquement sur ce téléphone. Tink voit les noms des tableaux et des champs, jamais ce que vous saisissez.',
+    'Les entrées sont stockées uniquement sur ce téléphone. Tink voit les noms des tableaux et des champs, pas ce que vous saisissez.',
   dataTables: 'Tableaux de données',
   unusedTables: 'Données hors de l’application',
   unusedTablesHint:
-    'Tableaux retirés de l’application. Leurs entrées reviennent si vous revenez, dans l’historique des modifications, à une époque où ce tableau existait.',
+    'Tableaux retirés de l’application. Revenez, dans l’historique des modifications, à une version qui avait le tableau, et ses entrées reviennent.',
   recentlyDeleted: 'Supprimés récemment',
   recentlyDeletedHint: 'Conservé pendant 30 jours, puis supprimé définitivement.',
   recordCount: '{count} entrées',
@@ -549,16 +547,16 @@ export const fr: MessageTable = {
     'Ce fichier n’est pas une configuration d’app Tinkrum, rien n’a été importé.',
   importAppConfigName: 'fichier importé',
   importAppConfirm:
-    'Ajouter « {name} » comme nouvelle app ? Rien de ce que vous avez n’est remplacé. Vous pourrez annuler dans l’historique des modifications.',
+    'Ajouter « {name} » comme nouvelle app ? Tout ce que vous avez reste, et vous pourrez annuler dans l’historique des modifications.',
   importAppSummary: 'Ajouter l’app « {name} »',
   importAppClash:
     'Cette app est déjà ajoutée, ou ses noms entrent en conflit avec ce que vous avez : {reason}',
   importAppChoose:
-    'Importer dans votre page d’accueil (son style remplace celui de l’accueil et ses pages rejoignent la barre de navigation), ou en faire une nouvelle app (votre accueil reste tel quel, avec un nouvel accès) ?',
+    '« Importer dans l’accueil » prend son style et ajoute ses pages à la barre de navigation. « Créer une nouvelle app » laisse votre accueil tel quel et y ajoute un accès.',
   importAppToHome: 'Importer dans l’accueil',
   importAppToApp: 'Créer une nouvelle app',
   importHomeConfirm:
-    'Importer « {name} » dans votre page d’accueil ? Le style de l’accueil devient le sien et ses pages rejoignent la barre de navigation. Vos pages et entrées restent. Vous pourrez annuler dans l’historique des modifications.',
+    'Importer « {name} » dans votre page d’accueil ? L’accueil prend son style et ses pages rejoignent la barre de navigation. Vos pages et entrées restent, et vous pourrez annuler dans l’historique des modifications.',
   importHomeSummary: 'Importer « {name} » dans la page d’accueil',
   shareAppItem: 'Partager cette app',
   importAppMaybeNewer:
@@ -589,7 +587,7 @@ export const fr: MessageTable = {
     'Supprimer le modèle sur l’appareil ? Les suggestions reviennent aux règles seules. Vos entrées restent. Vous pourrez le télécharger de nouveau.',
   prefillMemoryTitle: 'Mémoire de pré-remplissage',
   prefillMemoryHint:
-    'Tinkrum retient la mise en page des documents enregistrés, le nom du commerce et les suggestions choisies, pour mieux remplir la prochaine entrée. Les montants et les dates ne sont pas conservés. Stockée uniquement sur ce téléphone.',
+    'Tinkrum retient la mise en page des documents, le nom des commerces et les suggestions choisies, pour mieux remplir la prochaine entrée. Ni montants ni dates, et seulement sur ce téléphone.',
   prefillMemoryCount: '{count} mises en page de documents mémorisées',
   prefillMemoryNone: 'Aucune mise en page mémorisée pour l’instant',
   prefillMemoryExport: 'Exporter',
@@ -974,7 +972,7 @@ export const fr: MessageTable = {
   needPrivacy: 'Seule cette phrase est envoyée à Tinkrum — ni fichiers, ni entrées, ni réglages.',
   needsSettingTitle: 'Proposer d’envoyer les demandes que Tink ne sait pas traiter',
   needsSettingNote:
-    'Affiche un bouton sous la réponse. Rien n’est envoyé sans que vous appuyiez dessus.',
+    'Ajoute un bouton sous la réponse. La phrase n’est envoyée que si vous le touchez.',
   // ---- 记一笔、附件和公式字段（D-187、D-188）----
   attachmentMissing: 'Le fichier a été supprimé',
   removeAttachment: 'Retirer',
@@ -1166,7 +1164,7 @@ export const fr: MessageTable = {
   reminderStartsIn: 'Une entrée de « {table} » est à {time}, dans {n} minutes',
   remindersTitle: 'Rappels',
   remindersHint:
-    'Toucher un rappel ouvre seulement sa page ou son action rapide ; rien ne s’exécute tout seul. Pour en ajouter ou en modifier un, demandez à Tink, par exemple « rappelle-moi tous les jours à 9 h de noter mes dépenses ».',
+    'Toucher un rappel ouvre sa page ou son action rapide ; il ne lance rien tout seul. Pour en ajouter ou en modifier un, demandez à Tink, par exemple « rappelle-moi tous les jours à 9 h de noter mes dépenses ».',
   remindersNone: 'Aucun rappel pour l’instant',
   remindersOff:
     'Les notifications de Tinkrum sont désactivées. Activez-les dans les Réglages du système pour recevoir les rappels.',
@@ -1670,14 +1668,13 @@ export const fr: MessageTable = {
   describePrefillRulesCard: '« {name} » : lire les pièces jointes comme des cartes de visite',
   describePrefillRulesGeneral: '« {name} » : lire les pièces jointes avec les règles générales',
   prefillRulesLabel: 'Les pièces jointes sont',
-  prefillRulesHint:
-    'Les suggestions utilisent des règles faites pour ce type de document, en plus des règles générales.',
+  prefillRulesHint: 'Ajoute aux règles générales des règles faites pour ce type de document.',
   prefillRulesGeneral: 'Autre',
   prefillRulesReceipt: 'Reçus',
   prefillRulesCard: 'Cartes de visite',
   readAttachmentsLabel: 'Lire les pièces jointes automatiquement',
   readAttachmentsHint:
-    'Les nouvelles entrées lisent les photos et les PDF sur cet appareil et proposent des valeurs. Rien n’est rempli sans que vous touchiez la proposition.',
+    'Les nouvelles entrées lisent les photos et les PDF sur ce téléphone et proposent des valeurs. Touchez-en une pour la remplir.',
   describeWeekStartMonday: 'La semaine commence le lundi',
   describeWeekStartSunday: 'La semaine commence le dimanche',
   describeTwoWeekStart: 'Les périodes de deux semaines partent du {date}',
@@ -2026,7 +2023,7 @@ export const fr: MessageTable = {
   importBatch: '{date} · {file} · {n} entrées',
   importDeleteBatch: 'Supprimer cette importation',
   importDeleteBatchConfirm:
-    'Les {n} entrées de « {file} » vont dans Supprimés récemment pendant 30 jours, y compris celles modifiées depuis.',
+    'Les {n} entrées de « {file} », même modifiées depuis, vont dans Supprimés récemment pendant 30 jours.',
 };
 
 export const frSingular: SingularTable = {
@@ -2049,9 +2046,9 @@ export const frSingular: SingularTable = {
   storageCleanup: 'Nettoyer {n} fichier inutilisé ({size})',
   storageCleanupTitle: 'Supprimer {n} fichier inutilisé ?',
   storageCleanupMessage:
-    'Il occupe {size} et plus rien ne l’utilise. Un fichier utilisé seulement par d’anciennes versions est aussi supprimé. Action irréversible.',
+    'Il occupe {size}, même s’il ne sert qu’à d’anciennes versions. Action irréversible.',
   storageDeleteUsed:
-    'Il est utilisé à {n} endroit. Celui-ci indiquera que le fichier n’existe plus, et restaurer une ancienne version ne le fera pas revenir. Action irréversible.',
+    'Il est utilisé à {n} endroit, qui indiquera que le fichier est supprimé. Action irréversible, même en restaurant une ancienne version.',
   attachmentsFull: '{n} fichier au maximum',
   data_attachments: '{n} pièce jointe',
   shareSummary: '{n} fichier',
@@ -2084,7 +2081,7 @@ export const frSingular: SingularTable = {
   runError_tooLong:
     '« {name} » est trop long pour un GIF (maximum {seconds} seconde). Coupez-le d’abord.',
   packDeleteWithLanguages:
-    'Sa langue sera aussi supprimée. Vous pourrez la télécharger à nouveau la prochaine fois que vous en aurez besoin.',
+    'Sa langue est aussi supprimée. Vous pourrez la retélécharger au besoin.',
   recordCount: '{count} entrée',
   prefillMemoryCount: '{count} mise en page de document mémorisée',
   prefillMemoryRestoreConfirm:
@@ -2170,5 +2167,5 @@ export const frSingular: SingularTable = {
   importDone: '{n} entrée importée dans « {table} »',
   importBatch: '{date} · {file} · {n} entrée',
   importDeleteBatchConfirm:
-    '{n} entrée de « {file} » va dans Supprimés récemment pendant 30 jours, même si elle a été modifiée depuis.',
+    '{n} entrée de « {file} », même modifiée depuis, va dans Supprimés récemment pendant 30 jours.',
 };

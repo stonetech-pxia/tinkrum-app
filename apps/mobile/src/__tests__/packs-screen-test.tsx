@@ -46,8 +46,6 @@ describe('extension packs screen', () => {
     expect(await screen.findByTestId('packs-empty')).toHaveTextContent('Nothing downloaded yet.');
     expect(screen.queryByTestId('pack-ocr')).toBeNull();
     expect(await store.isInstalled('ocr')).toBe(true);
-    expect(
-      screen.getByText(/PDF preview, page flattening and layout come with the app/),
-    ).toBeTruthy();
+    expect(screen.getByText(/PDF preview, page flattening and layout are built in/)).toBeTruthy();
   });
 });
