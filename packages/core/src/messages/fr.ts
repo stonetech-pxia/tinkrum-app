@@ -476,7 +476,14 @@ export const fr: MessageTable = {
     'Vous pouvez garder {max} préréglages au maximum. Supprimez-en un pour en ajouter un autre.',
   presetsImport: 'Importer depuis un fichier',
   presetsImportHint:
-    'Importez un fichier, par exemple du site de Tinkrum. Un fichier d’app devient une nouvelle app. Un préréglage complet rejoint cette liste et ne remplace votre app que si vous touchez Appliquer.',
+    'Importez un fichier, par exemple du site de Tinkrum, ou collez un fichier d’app écrit pour vous par Claude, ChatGPT ou une autre IA. Un fichier d’app devient une nouvelle app. Un préréglage complet rejoint cette liste et ne remplace votre app que si vous touchez Appliquer.',
+  presetsPaste: 'Coller depuis le presse-papiers',
+  presetsPasteEmpty:
+    'Le presse-papiers ne contient pas de texte. Copiez d’abord le fichier d’app, puis touchez Coller depuis le presse-papiers.',
+  importAppFileBroken: 'Ce fichier d’app contient des erreurs, rien n’a été importé :',
+  importCopyProblems: 'Copier les problèmes',
+  importProblemsForAi:
+    'Tinkrum n’a pas pu importer ce fichier d’app. Corrigez ces problèmes et renvoyez le fichier en entier :',
   presetImported: 'Préréglage « {name} » ajouté. Touchez Appliquer pour l’utiliser.',
   presetsSamplesTitle: 'Apps modèles',
   presetsSamplesHint:

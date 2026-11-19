@@ -432,7 +432,12 @@ export const zh: MessageTable = {
   presetsFull: '最多存 {max} 个预设。先删掉一个再存。',
   presetsImport: '从文件导入',
   presetsImportHint:
-    '可以导入文件，比如从 Tinkrum 网站下载的。App 文件会加成一个新 App；整份预设会进这个列表，点「应用」才换上。',
+    '可以导入文件，比如从 Tinkrum 网站下载的；也可以粘贴 Claude、ChatGPT 等 AI 帮你写的 App 文件。App 文件会加成一个新 App；整份预设会进这个列表，点「应用」才换上。',
+  presetsPaste: '从剪贴板粘贴',
+  presetsPasteEmpty: '剪贴板里没有文字。先复制 App 文件，再点「从剪贴板粘贴」。',
+  importAppFileBroken: '这个 App 文件有错，没有导入：',
+  importCopyProblems: '复制问题',
+  importProblemsForAi: 'Tinkrum 导入不了这个 App 文件。请改好下面这些问题，再把整个文件发一遍：',
   presetImported: '已添加预设「{name}」，要用时点「应用」。',
   presetsSamplesTitle: '样板 App',
   presetsSamplesHint: '点开先进草稿，点「应用」才加上，也能在改动记录里撤销。记录不受影响。',

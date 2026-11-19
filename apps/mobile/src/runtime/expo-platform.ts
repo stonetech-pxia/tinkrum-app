@@ -1,5 +1,5 @@
 import { RunError } from '@morph/core';
-import { setStringAsync } from 'expo-clipboard';
+import { getStringAsync, setStringAsync } from 'expo-clipboard';
 import { getDocumentAsync } from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import { FlipType, ImageManipulator, SaveFormat } from 'expo-image-manipulator';
@@ -560,6 +560,10 @@ export const expoFilePlatform: FilePlatform = {
 
   async copyText(text) {
     await setStringAsync(text);
+  },
+
+  async readClipboardText() {
+    return getStringAsync();
   },
 
   async loadSignatures() {

@@ -1,8 +1,12 @@
 import {
+  APP_FILE_FORMAT,
   HOME_PAGE_ID,
+  MAX_APP_CONFIG_SIZE,
   MAX_PRESET_NAME,
   MAX_SAVED_PRESETS,
+  appFileJsonText,
   appFileOps,
+  checkAppFileText,
   missingUses,
   canSavePreset,
   checkTools,
@@ -93,13 +97,45 @@ export default function PresetsRoute() {
       Alert.alert(title, configFileProblemText(locale, picked.problem));
       return;
     }
-    const appFile = readAppFile(picked.text);
-    if (appFile) {
-      importApp(appFile, picked.text, title);
+    await importText(picked.text, picked.fileName, title);
+  }
+
+  /**
+   * 从剪贴板粘贴（D-593）：别的 AI（Claude、ChatGPT）在对话里写好的 App 文件，复制过来直接导入，不用先存成文件。
+   * 之后和「从文件导入」完全一样（先问、预览、能撤销）；整份配置存成预设时用默认名字。
+   */
+  async function pasteFile() {
+    const title = t(locale, 'presetsPaste');
+    const text = await files.readClipboardText();
+    if (!text.trim()) {
+      Alert.alert(title, t(locale, 'presetsPasteEmpty'));
       return;
     }
-    const result = await importPreset(picked.text, picked.fileName);
-    const newer = needsUpdate(picked.text);
+    if (text.length > MAX_APP_CONFIG_SIZE) {
+      Alert.alert(title, configFileProblemText(locale, 'tooLarge'));
+      return;
+    }
+    await importText(text, '', title);
+  }
+
+  /** 读出来的文字按自己的格式处理：App 文件加成新 App，整份配置存成预设。代码块、前后的话先去掉。 */
+  async function importText(raw: string, fileName: string, title: string) {
+    const text = appFileJsonText(raw);
+    const appFile = readAppFile(text);
+    if (appFile) {
+      importApp(appFile, text, title);
+      return;
+    }
+    // 说自己是 App 文件、却读不了的（多半是 AI 写错了）：逐条说哪里不对，可以复制给写它的 AI。
+    if (formatOf(text) === APP_FILE_FORMAT) {
+      const check = checkAppFileText(text, { registry, locale, now: new Date() });
+      if (!check.ok) {
+        problemsAlert(title, t(locale, 'importAppFileBroken'), check.problems);
+        return;
+      }
+    }
+    const result = await importPreset(text, fileName);
+    const newer = needsUpdate(text);
     if ((result.kind === 'refused' || result.kind === 'invalid') && newer)
       Alert.alert(title, newer);
     else if (result.kind === 'refused')
@@ -111,6 +147,23 @@ export default function PresetsRoute() {
       );
     else if (result.kind === 'full')
       Alert.alert(title, t(locale, 'presetsFull', { max: MAX_SAVED_PRESETS }));
+  }
+
+  /**
+   * App 文件导入不了：列出前几条原因，另有一个按钮把全部原因复制下来，用户贴回给写文件的 AI 去改。
+   * 只有结构上的问题（ID、外观、字段），没有记录和文件；只在用户点了才复制（底线 10）。
+   */
+  function problemsAlert(title: string, lead: string, problems: readonly string[], tail?: string) {
+    Alert.alert(title, [lead, ...problems.slice(0, 3), ...(tail ? [tail] : [])].join('\n'), [
+      {
+        text: t(locale, 'importCopyProblems'),
+        onPress: () =>
+          void files.copyText(
+            [t(locale, 'importProblemsForAi'), ...problems.map((p) => `- ${p}`)].join('\n'),
+          ),
+      },
+      { text: t(locale, 'ok'), style: 'cancel' },
+    ]);
   }
 
   /**
@@ -142,7 +195,7 @@ export default function PresetsRoute() {
   async function proceedImport(appFile: AppFile, text: string, mode: ImportMode, title: string) {
     const plan = appFileOps(appFile, config, { mode });
     if (!plan.ok) {
-      Alert.alert(title, t(locale, 'importAppClash', { reason: plan.error }));
+      problemsAlert(title, t(locale, 'importAppClash', { reason: '' }).trimEnd(), [plan.error]);
       return;
     }
     const result = await proposeOps(
@@ -158,13 +211,11 @@ export default function PresetsRoute() {
         return;
       }
       // 新版本加的样子、字段类型版本号可能没变（D-545）：这里读得出文件但用不了，整份不导入，说清楚。
-      Alert.alert(
+      problemsAlert(
         title,
-        [
-          t(locale, 'importAppConfigBroken'),
-          ...result.issues.slice(0, 3),
-          t(locale, 'importAppMaybeNewer'),
-        ].join('\n'),
+        t(locale, 'importAppConfigBroken'),
+        result.issues,
+        t(locale, 'importAppMaybeNewer'),
       );
       return;
     }
@@ -312,6 +363,13 @@ export default function PresetsRoute() {
             label={t(locale, 'presetsImport')}
             onPress={() => void importFile()}
           />
+          <Button
+            palette={palette}
+            testID="preset-paste"
+            variant="outline"
+            label={t(locale, 'presetsPaste')}
+            onPress={() => void pasteFile()}
+          />
         </Card>
         <Card palette={palette} testID="preset-samples">
           <Text style={[palette.font('title', 16), { color: palette.text }]}>
@@ -401,6 +459,18 @@ export default function PresetsRoute() {
       <Toast palette={palette} bottom={insets.bottom + 16} />
     </View>
   );
+}
+
+/** 文字里 JSON 的 format；不是 JSON 或没有 format 时是 undefined。 */
+function formatOf(text: string): unknown {
+  try {
+    const data = JSON.parse(text) as unknown;
+    return typeof data === 'object' && data !== null
+      ? (data as { format?: unknown }).format
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function NameInput({

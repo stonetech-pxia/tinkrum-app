@@ -745,6 +745,8 @@ export interface FilePlatform {
   previewFile(item: { uri: string; mimeType: string; name: string }): Promise<void>;
   print(item: { uri: string; mimeType: string }): Promise<void>;
   copyText(text: string): Promise<void>;
+  /** 剪贴板里的文字（用户点「从剪贴板粘贴」时才读，D-593）；没有文字时是空字符串。 */
+  readClipboardText(): Promise<string>;
 
   // ---- 图片（expo-image-manipulator）----
   /** 图片尺寸（已按拍摄方向摆正）。 */

@@ -31,6 +31,7 @@ export * from './home-entry';
 export * from './home-screen';
 export * from './app-view';
 export * from './app-file';
+export * from './app-file-check';
 export { hiddenIdsForAI, opsForApp, scopedViewForAI } from './app-scope';
 export * from './html';
 export * from './limits';

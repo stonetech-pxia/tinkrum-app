@@ -469,6 +469,9 @@ export class FakeFiles implements FilePlatform {
   async copyText(text: string) {
     this.clipboard = text;
   }
+  async readClipboardText() {
+    return this.clipboard;
+  }
   /** 假图片的尺寸（uri → 宽高）。 */
   imageSizes = new Map<string, { width: number; height: number }>();
   /** 编码结果的最小字节数（模拟怎么压都压不下去的图片）。 */

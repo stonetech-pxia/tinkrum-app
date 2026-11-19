@@ -661,6 +661,79 @@ describe('import a preset from a file', () => {
       expect(store.getState().proposal).toBeNull();
     });
 
+    // 从剪贴板粘贴（D-593）：别的 AI 在对话里写的 App 文件，复制过来就能导入；写错了能把原因复制回去。
+    describe('pasted from the clipboard', () => {
+      const paste = async () => {
+        await openScreen();
+        await fireEvent.press(await screen.findByTestId('preset-paste'));
+      };
+
+      it('a file a chat assistant wrapped in a code block imports like a picked file, and can be undone', async () => {
+        const { repo, files, store } = await starterApp();
+        files.clipboard = `这是你的 App：\n\`\`\`json\n${clay()}\n\`\`\`\n导入后就能用。`;
+        chooseNewApp();
+        acceptNextAlert();
+        await paste();
+        await waitFor(() => expect(store.getState().config!.nav.apps?.[0]?.id).toBe('clay'));
+        expect(await repo.listPresets()).toEqual([]);
+        await act(() => store.getState().undo());
+        expect(store.getState().config!.nav.apps ?? []).toEqual([]);
+      });
+
+      it('an empty clipboard says to copy the file first and changes nothing', async () => {
+        const { files, store } = await starterApp();
+        const head = store.getState().head!.id;
+        files.clipboard = '  ';
+        const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+        await paste();
+        await waitFor(() => expect(alert).toHaveBeenCalled());
+        expect(alert.mock.calls[0]![0]).toBe('从剪贴板粘贴');
+        expect(String(alert.mock.calls[0]![1])).toContain('先复制 App 文件');
+        expect(store.getState().head!.id).toBe(head);
+      });
+
+      it('an app file with mistakes lists them, imports nothing, and copies them for the AI only on a tap', async () => {
+        const { repo, files, store } = await starterApp();
+        const head = store.getState().head!.id;
+        const data = JSON.parse(clay()) as Record<string, unknown>;
+        delete data.schemaVersion;
+        files.clipboard = JSON.stringify(data);
+        const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+        await paste();
+        await waitFor(() => expect(alert).toHaveBeenCalled());
+        const [, message, buttons] = alert.mock.calls[0]!;
+        expect(String(message)).toContain('这个 App 文件有错，没有导入');
+        expect(String(message)).toContain('schemaVersion');
+        expect(store.getState().head!.id).toBe(head);
+        expect(store.getState().proposal).toBeNull();
+        expect(await repo.listPresets()).toEqual([]);
+        // 没点之前剪贴板还是用户自己复制的；点了「复制问题」才换成给 AI 的话。
+        expect(files.clipboard).toBe(JSON.stringify(data));
+        buttons!.find((b) => b.text === '复制问题')!.onPress!();
+        await waitFor(() =>
+          expect(files.clipboard).toMatch(/^Tinkrum 导入不了这个 App 文件。.*\n- schemaVersion: /),
+        );
+      });
+
+      it('an id the phone already has: the reason can be copied too', async () => {
+        const { files, store } = await starterApp();
+        const head = store.getState().head!.id;
+        const data = JSON.parse(clay()) as { pages: { id: string }[]; app: { bar: string[] } };
+        data.pages[0]!.id = 'home';
+        data.app.bar[0] = 'page:home';
+        files.clipboard = JSON.stringify(data);
+        chooseNewApp();
+        const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+        await paste();
+        await waitFor(() => expect(alert).toHaveBeenCalledTimes(2));
+        const [, message, buttons] = alert.mock.calls[1]!;
+        expect(String(message)).toContain('page home already exist');
+        buttons!.find((b) => b.text === '复制问题')!.onPress!();
+        await waitFor(() => expect(files.clipboard).toContain('- page home already exist'));
+        expect(store.getState().head!.id).toBe(head);
+      });
+    });
+
     it('with 50 presets an App file is still added', async () => {
       const { repo, files, store } = await starterApp();
       for (let i = 0; i < MAX_SAVED_PRESETS; i++)
@@ -714,6 +787,7 @@ describe('import a preset from a file', () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await openScreen();
     expect(await screen.findByText('Importer depuis un fichier')).toBeTruthy();
+    expect(screen.getByText('Coller depuis le presse-papiers')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('preset-import'));
     await waitFor(() => expect(alert).toHaveBeenCalled());
     expect(alert.mock.calls[0]![0]).toBe('Importer depuis un fichier');

@@ -451,7 +451,14 @@ export const en = {
   presetsFull: 'You can keep up to {max} presets. Delete one to save another.',
   presetsImport: 'Import from a file',
   presetsImportHint:
-    'Import a file, for example one from the Tinkrum website. An app file is added as a new app. A full preset joins this list and replaces your app only when you tap Apply.',
+    'Import a file, for example one from the Tinkrum website, or paste an app file that Claude, ChatGPT or another AI wrote for you. An app file is added as a new app. A full preset joins this list and replaces your app only when you tap Apply.',
+  presetsPaste: 'Paste from clipboard',
+  presetsPasteEmpty:
+    'The clipboard has no text. Copy the app file first, then tap Paste from clipboard.',
+  importAppFileBroken: 'This app file has mistakes, so nothing was imported:',
+  importCopyProblems: 'Copy the problems',
+  importProblemsForAi:
+    'Tinkrum could not import this app file. Fix these problems and send the whole file again:',
   presetImported: 'Added the preset “{name}”. Tap Apply when you want to use it.',
   presetsSamplesTitle: 'Sample apps',
   presetsSamplesHint:
