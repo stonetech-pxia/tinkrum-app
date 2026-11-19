@@ -15,7 +15,7 @@ import {
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
-import { Alert } from 'react-native';
+import { Alert, Linking } from 'react-native';
 
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import type { SavedPreset, WorkspaceRepo } from '../storage/types';
@@ -680,6 +680,16 @@ describe('import a preset from a file', () => {
         expect(store.getState().config!.nav.apps ?? []).toEqual([]);
       });
 
+      it('the link to the website only opens its page and writes nothing', async () => {
+        const { store } = await starterApp();
+        const head = store.getState().head!.id;
+        const opened = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined as never);
+        await openScreen();
+        await fireEvent.press(await screen.findByText('用 Claude 或 ChatGPT 做一个 App'));
+        expect(opened).toHaveBeenCalledWith('https://tinkrum.stonetech.dev/make.html');
+        expect(store.getState().head!.id).toBe(head);
+      });
+
       it('an empty clipboard says to copy the file first and changes nothing', async () => {
         const { files, store } = await starterApp();
         const head = store.getState().head!.id;
@@ -788,6 +798,7 @@ describe('import a preset from a file', () => {
     await openScreen();
     expect(await screen.findByText('Importer depuis un fichier')).toBeTruthy();
     expect(screen.getByText('Coller depuis le presse-papiers')).toBeTruthy();
+    expect(screen.getByText('Créer une app avec Claude ou ChatGPT')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('preset-import'));
     await waitFor(() => expect(alert).toHaveBeenCalled());
     expect(alert.mock.calls[0]![0]).toBe('Importer depuis un fichier');

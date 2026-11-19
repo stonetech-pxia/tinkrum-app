@@ -478,6 +478,7 @@ export const fr: MessageTable = {
   presetsImportHint:
     'Importez un fichier, par exemple du site de Tinkrum, ou collez un fichier d’app écrit pour vous par Claude, ChatGPT ou une autre IA. Un fichier d’app devient une nouvelle app. Un préréglage complet rejoint cette liste et ne remplace votre app que si vous touchez Appliquer.',
   presetsPaste: 'Coller depuis le presse-papiers',
+  presetsMakeWithAi: 'Créer une app avec Claude ou ChatGPT',
   presetsPasteEmpty:
     'Le presse-papiers ne contient pas de texte. Copiez d’abord le fichier d’app, puis touchez Coller depuis le presse-papiers.',
   importAppFileBroken: 'Ce fichier d’app contient des erreurs, rien n’a été importé :',

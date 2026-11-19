@@ -20,7 +20,7 @@ import {
 } from '@morph/core';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { saveAppOrigin } from '@/apps/origin';
@@ -32,6 +32,9 @@ import { Button, Card, Pill } from '@/renderer/ui';
 import { Toast } from '@/shell/Toast';
 import type { SavedPreset } from '@/storage/types';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
+
+/** 网站上「用你自己的 AI 做 App」的页面（D-593）：写法说明、示例和 App 文件检查。只打开网页，不带任何数据。 */
+const MAKE_WITH_AI_URL = 'https://tinkrum.stonetech.dev/make.html';
 
 /**
  * 「设置 → 我的预设」（D-410）：把整个 App 存起来，以后换回来。系统层的页面，AI 改不了（底线 8）。
@@ -369,6 +372,13 @@ export default function PresetsRoute() {
             variant="outline"
             label={t(locale, 'presetsPaste')}
             onPress={() => void pasteFile()}
+          />
+          <Button
+            palette={palette}
+            testID="preset-make-with-ai"
+            variant="text"
+            label={t(locale, 'presetsMakeWithAi')}
+            onPress={() => void Linking.openURL(MAKE_WITH_AI_URL).catch(() => {})}
           />
         </Card>
         <Card palette={palette} testID="preset-samples">
