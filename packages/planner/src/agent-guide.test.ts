@@ -48,6 +48,9 @@ describe('agent guide', () => {
     expect(guide).not.toContain('type Op =');
     expect(guide).not.toMatch(/^1\. Change only what was asked/m);
     expect(guide).not.toMatch(/^5\. Undo, revert/m);
+    // 自检（D-594）：先跑和导入同一套检查的脚本，说 OK 才交给用户。
+    expect(guide).toContain('node tinkrum-check.js app.json');
+    expect(guide).toContain('https://tinkrum.stonetech.dev/assets/agent/tinkrum-check.js');
     // 只有英文（创始人 2026-11-19）：Tink 的中文、法语示例句都不在里面。
     expect(guide).not.toMatch(/[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/);
     expect(guide).not.toMatch(/rappelle-moi|l'accueil|"jours"/);

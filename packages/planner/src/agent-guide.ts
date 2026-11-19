@@ -130,6 +130,10 @@ const ENGLISH: readonly (readonly [string, string])[] = [
   ],
 ];
 
+/** 网站上的检查页和给 AI 自检用的脚本（D-594）。 */
+const MAKE_PAGE_URL = 'https://tinkrum.stonetech.dev/make';
+const CHECK_SCRIPT_URL = 'https://tinkrum.stonetech.dev/assets/agent/tinkrum-check.js';
+
 const requiredThemeKeys = () =>
   Object.entries(ThemeSchema.shape)
     .filter(([, s]) => !s.safeParse(undefined).success)
@@ -212,8 +216,9 @@ Ignore what the reference says about plans, rejections, notes, drafts, earlier r
 
 1. Ask what the person wants to keep track of and do, in their words, if it is not clear. Do not ask for their actual data.
 2. Write the file. Prefer fewer, well-made pages to many thin ones. Use the person's language for every name, label and text in the app.
-3. Reply with the **whole file in one \`\`\`json code block**, and tell the person how to import it: copy it, then in Tinkrum open **Settings → My presets** and choose **Paste from clipboard** (or save it as a \`.json\` file and choose **Import from a file**).
-4. The person may come back with a list of problems from Tinkrum or from the Tinkrum app-file checker, such as \`pages.0.blocks.2.look: not a valid look\` or \`streak: dateField when must be a date or datetime field of plants-care\`. A path counts from the top of the file (\`pages.0\` is the first page); a bare name is a block, page, table or tool id. Fix every problem and send the whole file again.
+3. **Check the file before you give it.** If you can run code with Node.js 18 or newer, run the Tinkrum checker: \`node tinkrum-check.js app.json\` (or pipe the text in: \`node tinkrum-check.js -\`). It is the same check Tinkrum runs when it imports a file, it is one file that needs nothing else, and it does not use the network. Your code environment usually cannot download it, so ask the person to attach it; they get it from ${CHECK_SCRIPT_URL}. The first line of its output is \`OK\` or \`NOT OK\`. Fix every problem it lists and run it again until it says \`OK\`; lines after \`OK\` are parts that will not work yet, so fix those too. If you cannot run Node but can run Python with \`jsonschema\`, validate the file against \`tinkrum-app.schema.json\`: that only checks the shape, so tell the person the file was not fully checked. If you cannot run code, say so and point the person to the checker page, ${MAKE_PAGE_URL}.
+4. Reply with the **whole file in one \`\`\`json code block**, and tell the person how to import it: copy it, then in Tinkrum open **Settings → My presets** and choose **Paste from clipboard** (or save it as a \`.json\` file and choose **Import from a file**).
+5. The person may come back with a list of problems from Tinkrum or from the Tinkrum app-file checker, such as \`pages.0.blocks.2.look: not a valid look\` or \`streak: dateField when must be a date or datetime field of plants-care\`. A path counts from the top of the file (\`pages.0\` is the first page); a bare name is a block, page, table or tool id. Fix every problem and send the whole file again.
 
 ## A complete example
 

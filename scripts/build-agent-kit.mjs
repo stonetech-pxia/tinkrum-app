@@ -1,5 +1,6 @@
 // 把给别的 AI 用的 App 文件材料放进网站（D-593）：写法说明、JSON Schema、示例（docs/agent/，由
-// packages/planner 的快照测试生成），加上 App 文件检查页用的脚本（和 App 导入时同一套检查，在浏览器里跑）。
+// packages/planner 的快照测试生成），加上 App 文件检查页用的脚本（和 App 导入时同一套检查，在浏览器里跑），
+// 和给 AI 自检用的命令行脚本 tinkrum-check.js（D-594）。
 // 用法：node scripts/build-agent-kit.mjs ../tinkrum-site
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -26,6 +27,21 @@ await build({
   minify: true,
   legalComments: 'none',
   outfile: join(out, 'checker.js'),
+  logLevel: 'warning',
+});
+// 给别的 AI 在自己的代码环境里跑的同一套检查（D-594）：一个文件，不依赖别的包。
+await build({
+  entryPoints: [join(root, 'scripts', 'agent-kit', 'check-cli.ts')],
+  bundle: true,
+  format: 'cjs',
+  platform: 'node',
+  target: 'node18',
+  minify: true,
+  legalComments: 'none',
+  banner: {
+    js: '#!/usr/bin/env node\n// Tinkrum app-file checker: node tinkrum-check.js app.json',
+  },
+  outfile: join(out, 'tinkrum-check.js'),
   logLevel: 'warning',
 });
 console.log(`agent kit written to ${out}`);
