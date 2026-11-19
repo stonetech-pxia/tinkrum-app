@@ -12,14 +12,16 @@ export type WelcomeArtKind = 'scan' | 'records' | 'style';
 /** 「改之后」的缩略图固定用赛博霓虹：不管现在是什么风格，都看得出变化。 */
 const NEON = makePalette(THEME_PRESETS.neon.theme, true);
 
+// D-592：记录有三个来源（扫描、文件、说一句，D-575），记进各自的小 App（D-485）。
 const SOURCES: { icon: IconName; label: StringKey }[] = [
   { icon: 'scan', label: 'guideIntroSourceScan' },
-  { icon: 'document', label: 'guideIntroSourceOpen' },
+  { icon: 'document', label: 'guideIntroSourceFile' },
+  { icon: 'audio', label: 'guideIntroSourceVoice' },
 ];
 const RECORDS: { icon: IconName; title: StringKey; value: StringKey }[] = [
+  { icon: 'chart', title: 'guideIntroExpenses', value: 'guideIntroExpensesValue' },
+  { icon: 'calendar', title: 'guideIntroSubs', value: 'guideIntroSubsValue' },
   { icon: 'note', title: 'guideIntroReceipt', value: 'guideIntroReceiptValue' },
-  { icon: 'person', title: 'guideIntroCard', value: 'guideIntroCardValue' },
-  { icon: 'document', title: 'guideIntroContract', value: 'guideIntroContractValue' },
 ];
 
 export function WelcomeArt({
@@ -73,7 +75,7 @@ function ScanArt({ palette, locale }: { palette: Palette; locale: Locale }) {
   );
 }
 
-/** 记录：扫描和打开文件两个来源，下面是几种不同的记录。 */
+/** 记录：扫描、文件、说一句三个来源，下面是几个小 App。 */
 function RecordsArt({ palette, locale }: { palette: Palette; locale: Locale }) {
   return (
     <View style={styles.art} testID="welcome-art-records">
@@ -121,7 +123,10 @@ function RecordsArt({ palette, locale }: { palette: Palette; locale: Locale }) {
   );
 }
 
-/** 改风格和界面：改之前（当前风格）→ 一句话 → 改之后（霓虹，数字卡片换到最上面）。 */
+/**
+ * 加功能、换样子（D-592）：改之前（当前风格）→ 一句话 → 改之后（霓虹，最上面多了一张提醒卡片）。
+ * 一张图里同时看得到功能多了一个、样子变了。
+ */
 function StyleArt({ palette, locale }: { palette: Palette; locale: Locale }) {
   const title = t(locale, 'guideIntroMiniTitle');
   return (
@@ -135,22 +140,27 @@ function StyleArt({ palette, locale }: { palette: Palette; locale: Locale }) {
         </View>
         <UiIcon name="arrowRight" size={22} color={palette.primary} />
       </View>
-      <MiniPhone p={NEON} frame={palette.text} title={title} numberFirst />
+      <MiniPhone
+        p={NEON}
+        frame={palette.text}
+        title={title}
+        reminder={t(locale, 'guideIntroMiniReminder')}
+      />
     </View>
   );
 }
 
-/** 迷你手机界面：标题、待办卡片、数字卡片、按钮、导航栏，颜色全部来自 p。 */
+/** 迷你手机界面：标题、（提醒卡片、）待办卡片、数字卡片、按钮、导航栏，颜色全部来自 p。 */
 function MiniPhone({
   p,
   frame,
   title,
-  numberFirst,
+  reminder,
 }: {
   p: Palette;
   frame: string;
   title: string;
-  numberFirst?: boolean;
+  reminder?: string;
 }) {
   const card = miniCard(p);
   const todo = (
@@ -185,8 +195,16 @@ function MiniPhone({
       <Text numberOfLines={1} style={[p.font('title', 11), { color: p.text }]}>
         {title}
       </Text>
-      {numberFirst ? number : todo}
-      {numberFirst ? todo : number}
+      {reminder ? (
+        <View style={[card, styles.miniRow]} testID="welcome-mini-reminder">
+          <Icon name="calendar" size={9} color={p.primary} />
+          <Text numberOfLines={1} style={[p.font('bodyBold', 8), styles.flex, { color: p.text }]}>
+            {reminder}
+          </Text>
+        </View>
+      ) : null}
+      {todo}
+      {number}
       <View style={[styles.miniButton, { backgroundColor: p.primary }]} />
       <View style={[styles.miniNav, { borderColor: p.border }]}>
         {[0, 1, 2].map((i) => (
