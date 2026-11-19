@@ -48,6 +48,12 @@ describe('agent guide', () => {
     expect(guide).not.toContain('type Op =');
     expect(guide).not.toMatch(/^1\. Change only what was asked/m);
     expect(guide).not.toMatch(/^5\. Undo, revert/m);
+    // 只有英文（创始人 2026-11-19）：Tink 的中文、法语示例句都不在里面。
+    expect(guide).not.toMatch(/[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/);
+    expect(guide).not.toMatch(/rappelle-moi|l'accueil|"jours"/);
+    expect(guide).toContain('"days" and decimals 0');
+    // 函数名后面的空括号不是删掉例子剩下的，留着。
+    expect(guide).toContain('compared in if()');
     // 规则 23（用户看到的叫法）和 57（App）留着。
     expect(guide).toMatch(/^23\. /m);
     expect(guide).toMatch(/^57\. /m);
