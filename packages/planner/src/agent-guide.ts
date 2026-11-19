@@ -77,7 +77,7 @@ const SEP = String.raw`(?:\s*,\s*|\s*\/\s*|\s+or\s+)`;
 function englishOnly(text: string): string {
   const other = (m: string) => CJK.test(m) || frenchQuote(m);
   let out = text;
-  for (const [from, to] of ENGLISH) out = out.split(from).join(to);
+  for (const { from, to } of ENGLISH) out = out.split(from).join(to);
   return (
     out
       // "合并-日期" → "合并-{date}", 这样的一整对
@@ -108,26 +108,36 @@ function frenchQuote(m: string): boolean {
 }
 
 /** 规则去不掉的地方：整句改写成英文。 */
-const ENGLISH: readonly (readonly [string, string])[] = [
-  ['banner image, cover, 图片, 照片, 头图, 封面, 横幅图片 or 配图, ', 'banner image or cover, '],
-  ['(改动记录, the bottom-bar entry "history")', '(the bottom-bar entry "history")'],
-  ['(图片工具, "the PDF tool"', '("the image tool", "the PDF tool"'],
-  ['("添加图片工具" = setPackage', '("add the image tool" = setPackage'],
-  ['"移除 PDF 工具" = setPackage', '"remove the PDF tool" = setPackage'],
-  [
-    'A goal ("喝水显示今天的进度，目标 8 杯" →',
-    'A goal ("show today\'s water against a goal of 8 glasses" →',
-  ],
-  ['"压缩这条记录的 PDF" →', '"compress this entry\'s PDF" →'],
-  ['(fewer is better: "本月 本星期" →', '(fewer is better: "this month, this week" →'],
-  ['e.g. "全年合计不用跟着变")', 'e.g. "the yearly total stays as it is")'],
-  ['"导出搜索到的", an export button', '"export what I searched", an export button'],
-  [', a spreadsheet from a paper table, 表格转 Excel"', ', a spreadsheet from a paper table"'],
-  [', letter or book page to Word, 拍文档转 Word, 图片转 Word"', ', letter or book page to Word"'],
-  [
-    'unless ("今天已经打过卡就别提醒")',
-    'unless ("don\'t remind me if I already checked in today")',
-  ],
+// 不是界面文案（不进文案表）：写成 {from, to}，免得被当成要补法语的名称对。
+const ENGLISH: readonly { from: string; to: string }[] = [
+  {
+    from: 'banner image, cover, 图片, 照片, 头图, 封面, 横幅图片 or 配图, ',
+    to: 'banner image or cover, ',
+  },
+  { from: '(改动记录, the bottom-bar entry "history")', to: '(the bottom-bar entry "history")' },
+  { from: '(图片工具, "the PDF tool"', to: '("the image tool", "the PDF tool"' },
+  { from: '("添加图片工具" = setPackage', to: '("add the image tool" = setPackage' },
+  { from: '"移除 PDF 工具" = setPackage', to: '"remove the PDF tool" = setPackage' },
+  {
+    from: 'A goal ("喝水显示今天的进度，目标 8 杯" →',
+    to: 'A goal ("show today\'s water against a goal of 8 glasses" →',
+  },
+  { from: '"压缩这条记录的 PDF" →', to: '"compress this entry\'s PDF" →' },
+  { from: '(fewer is better: "本月 本星期" →', to: '(fewer is better: "this month, this week" →' },
+  { from: 'e.g. "全年合计不用跟着变")', to: 'e.g. "the yearly total stays as it is")' },
+  { from: '"导出搜索到的", an export button', to: '"export what I searched", an export button' },
+  {
+    from: ', a spreadsheet from a paper table, 表格转 Excel"',
+    to: ', a spreadsheet from a paper table"',
+  },
+  {
+    from: ', letter or book page to Word, 拍文档转 Word, 图片转 Word"',
+    to: ', letter or book page to Word"',
+  },
+  {
+    from: 'unless ("今天已经打过卡就别提醒")',
+    to: 'unless ("don\'t remind me if I already checked in today")',
+  },
 ];
 
 /** 网站上的检查页和给 AI 自检用的脚本（D-594）。 */
@@ -187,7 +197,8 @@ This guide is for an AI assistant (Claude, ChatGPT or any other) that a person a
 \`\`\`
 
 - \`schemaVersion\` is **${v}**.
-- \`app.id\`: lowercase letters, digits and "-", starting with a letter, at most 20 characters (for example \`"plants"\`).
+- **Every id** (the app, pages, blocks, tables, fields, choice options, quick actions, their steps, reminders) is lowercase letters, digits and "-", starts with a letter and has at most 48 characters: \`"due-date"\`, not \`"dueDate"\`, \`"due_date"\` or \`"Due date"\`. The name people see goes in \`name\`, \`title\` or \`label\`.
+- \`app.id\`: the same, at most 20 characters (for example \`"plants"\`).
 - **Every page, table, quick action and reminder id starts with the app id and a dash** (\`"plants-home"\`, \`"plants-care"\`). The person's phone already has pages such as \`home\`, \`toolbox\` and \`files\`; an id that is already taken stops the import. Block ids only need to be unique within their page; field ids within their table; option ids within their field.
 - \`app.bar\`: 1–5 entries, each \`"page:<page id>"\` of this file or \`"ai"\` (Tink, the in-app assistant; put it last). The first entry is the page the app opens on. Settings and other system screens are not allowed in an app's bar; the person reaches them from the main Tinkrum home.
 - \`app.icon\` and page/table icons: an icon name from the list in the reference, or one emoji.

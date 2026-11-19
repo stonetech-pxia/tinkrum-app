@@ -756,11 +756,14 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     expect(params).toEqual([]);
   });
 
-  it('only the record page and rich text can open something outside the app', () => {
+  // 预设页（系统层，D-593）也能打开一个网页：固定的网址（网站上「用你自己的 AI 做 App」），用户点了才开，
+  // 不带任何数据。创始人 2026-11-19 在对话里选了「允许，加进白名单」（D-596）。
+  it('only the record page, rich text and the presets page link to the site can open something outside the app', () => {
     const openers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
       .filter((path) => /\bLinking\.openURL\b/.test(readFileSync(path, 'utf8')))
       .map((path) => relative(REPO, path));
     expect(openers.sort()).toEqual([
+      join('apps', 'mobile', 'src', 'app', 'presets.tsx'),
       join('apps', 'mobile', 'src', 'renderer', 'RichText.tsx'),
       join('apps', 'mobile', 'src', 'renderer', 'open-link.ts'),
     ]);

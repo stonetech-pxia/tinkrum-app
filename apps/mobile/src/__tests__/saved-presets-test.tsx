@@ -620,8 +620,9 @@ describe('import a preset from a file', () => {
       expect(store.getState().head!.id).toBe(head);
     });
 
-    // 新版本加的样子、字段类型（版本号没变，D-545）：这个版本读得出文件，但用不了；说清楚，整份不导入。
-    it('a file using something this build does not know says so and imports nothing', async () => {
+    // 这个版本不认识的外观（D-545）：整份不导入，按文件里的位置说哪里不对，和网站、自检脚本一样（D-595）。
+    // 文件没有说自己用到了什么（D-556 的 uses）时，不知道它是新版本做的还是写错了，所以不说「先更新」。
+    it('a file using something this build does not know names the place and imports nothing', async () => {
       const { files, store } = await starterApp();
       const head = store.getState().head!.id;
       const data = JSON.parse(clay()) as { pages: { blocks: { look: string }[] }[] };
@@ -631,11 +632,41 @@ describe('import a preset from a file', () => {
       const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       await importThroughScreen();
       await waitFor(() => expect(alert).toHaveBeenCalledTimes(2));
-      expect(String(alert.mock.calls[1]![1])).toContain('用不了');
-      expect(String(alert.mock.calls[1]![1])).toContain('新版本');
+      const said = String(alert.mock.calls[1]![1]);
+      expect(said).toContain('这个 App 文件有错，没有导入');
+      expect(said).toContain('pages.0.blocks.0.look: not a valid look');
+      expect(said).not.toContain('新版本');
       expect(store.getState().head!.id).toBe(head);
       expect(store.getState().config!.nav.apps ?? []).toEqual([]);
       expect(store.getState().proposal).toBeNull();
+    });
+
+    // 别的 AI 写的文件（创始人 2026-11-19 在手机上遇到）：字段 ID 写成了大写和下划线。说的是文件里的位置
+    // （tables.1.fields.3.id），不是导入操作的编号（1.table.fields.3.id），也不怪版本。
+    it('a wrong field id from another AI is named by its place in the file, and can be copied', async () => {
+      const { files, store } = await starterApp();
+      const head = store.getState().head!.id;
+      const data = JSON.parse(readFileSync(join(PORTAL, 'tinkrum-app-habits.json'), 'utf8')) as {
+        tables: { fields: { id: string }[] }[];
+      };
+      data.tables[1]!.fields[3]!.id = 'Note_Text';
+      pickFile(files, JSON.stringify(data), { name: 'habits.json' });
+      chooseNewApp();
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      await importThroughScreen();
+      await waitFor(() => expect(alert).toHaveBeenCalledTimes(2));
+      const [, message, buttons] = alert.mock.calls[1]!;
+      expect(String(message)).toContain(
+        'tables.1.fields.3.id: id must be lowercase letters, digits or -',
+      );
+      expect(String(message)).not.toContain('1.table.fields');
+      expect(String(message)).not.toContain('新版本');
+      buttons!.find((b) => b.text === '复制问题')!.onPress!();
+      await waitFor(() =>
+        expect(files.clipboard).toContain('- tables.1.fields.3.id: id must be lowercase letters'),
+      );
+      expect(store.getState().head!.id).toBe(head);
+      expect(store.getState().config!.nav.apps ?? []).toEqual([]);
     });
 
     // 文件外层带了「用到了什么」（D-556）：缺的东西准确地说出来，不再是笼统的「用不了」。

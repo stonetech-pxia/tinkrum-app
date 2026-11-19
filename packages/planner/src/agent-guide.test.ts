@@ -48,6 +48,9 @@ describe('agent guide', () => {
     expect(guide).not.toContain('type Op =');
     expect(guide).not.toMatch(/^1\. Change only what was asked/m);
     expect(guide).not.toMatch(/^5\. Undo, revert/m);
+    // 所有 ID 的写法（D-595）：别的 AI 写过 dueDate 这样的字段 ID，导入被拒。
+    expect(guide).toContain('**Every id** (the app, pages, blocks, tables, fields, choice options');
+    expect(guide).toContain('`"due-date"`, not `"dueDate"`');
     // 自检（D-594）：先跑和导入同一套检查的脚本，说 OK 才交给用户。
     expect(guide).toContain('node tinkrum-check.js app.json');
     expect(guide).toContain('https://tinkrum.stonetech.dev/assets/agent/tinkrum-check.js');

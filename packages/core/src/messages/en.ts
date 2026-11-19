@@ -535,8 +535,6 @@ export const en = {
     'Import “{name}” into your home page? Home switches to its style and its pages join the navigation bar. Your pages and entries stay, and you can undo it in Change history.',
   importHomeSummary: 'Import “{name}” into the home page',
   shareAppItem: 'Share this app',
-  importAppMaybeNewer:
-    'If it was made with a newer version of Tinkrum, update Tinkrum and try again.',
   importNeedsUpdate:
     'This file was made with a newer version of Tinkrum and uses things this version doesn’t have yet: {missing}. Update Tinkrum, then import it again. Nothing was imported.',
   appResetItem: 'Restore its original look',

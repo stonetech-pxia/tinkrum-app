@@ -156,8 +156,8 @@ export default function PresetsRoute() {
    * App 文件导入不了：列出前几条原因，另有一个按钮把全部原因复制下来，用户贴回给写文件的 AI 去改。
    * 只有结构上的问题（ID、外观、字段），没有记录和文件；只在用户点了才复制（底线 10）。
    */
-  function problemsAlert(title: string, lead: string, problems: readonly string[], tail?: string) {
-    Alert.alert(title, [lead, ...problems.slice(0, 3), ...(tail ? [tail] : [])].join('\n'), [
+  function problemsAlert(title: string, lead: string, problems: readonly string[]) {
+    Alert.alert(title, [lead, ...problems.slice(0, 3)].join('\n'), [
       {
         text: t(locale, 'importCopyProblems'),
         onPress: () =>
@@ -213,13 +213,12 @@ export default function PresetsRoute() {
         Alert.alert(title, newer);
         return;
       }
-      // 新版本加的样子、字段类型版本号可能没变（D-545）：这里读得出文件但用不了，整份不导入，说清楚。
-      problemsAlert(
-        title,
-        t(locale, 'importAppConfigBroken'),
-        result.issues,
-        t(locale, 'importAppMaybeNewer'),
-      );
+      // 和网站、自检脚本同一套说法（D-595）：按文件里的位置说哪里不对（tables.1.fields.3.id），不是导入操作的
+      // 编号；文件没说自己用到了新东西，就不说「先更新」。文件本身没错、只是和这台手机上已有的东西对不上的
+      // （上限、表的归属这类），说这里的原因。
+      const check = checkAppFileText(text, { registry, locale, now: new Date() });
+      if (check.ok) problemsAlert(title, t(locale, 'importAppConfigBroken'), result.issues);
+      else problemsAlert(title, t(locale, 'importAppFileBroken'), check.problems);
       return;
     }
     if (result.kind !== 'preview') {
