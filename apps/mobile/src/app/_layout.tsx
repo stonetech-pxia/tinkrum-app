@@ -20,9 +20,9 @@ import { Sora_600SemiBold } from '@expo-google-fonts/sora/600SemiBold';
 import { Sora_700Bold } from '@expo-google-fonts/sora/700Bold';
 import Constants from 'expo-constants';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -54,7 +54,9 @@ import { ToolDownloadsProvider } from '@/tool-download/context';
 import { expoToolFs } from '@/tool-download/expo-tool-fs';
 import { createToolDownloads } from '@/tool-download/state';
 import { ToolDownloadStore } from '@/tool-download/store';
-import { openRepo } from '@/storage/open';
+import { getBackup } from '@/backup';
+import { registerBackupRuntime } from '@/backup/runtime';
+import { closeRepo, openRepo } from '@/storage/open';
 import type { SQLiteWorkspaceRepo } from '@/storage/sqlite';
 import { useStopBuildInBackground } from '@/shell/BuildPanel';
 import {
@@ -221,13 +223,64 @@ function ThemedStack() {
   );
 }
 
+/** 一个正在用的工作空间：store、数据库、建它时的语言。 */
+interface Runtime {
+  store: WorkspaceStore;
+  repo: SQLiteWorkspaceRepo;
+  /** 这个工作空间是按哪种语言建的；设置里改了语言就按新的重建。 */
+  locale: Locale;
+}
+
+/**
+ * 打开数据库、建工作空间并读出来（启动、整体恢复和撤销之后都走这里）。
+ * strict：读不出来（进入错误状态）、或者没有读到 expectHeadId 那个版本（读不懂、退回了旧版本）就抛错，
+ * 不把读不对的数据当成功（整体恢复，D-600）。
+ */
+async function bootRuntime(strict?: { strict: true; expectHeadId?: number }): Promise<Runtime> {
+  const repo = await openRepo();
+  try {
+    // 设置里选的语言（没选就跟随系统）：先读出来，工作空间按它建。
+    const saved = parseLanguage(await repo.getMeta(LANGUAGE_META_KEY).catch(() => null));
+    useLanguage.getState().set(saved);
+    const bootLocale = resolveLocale(saved);
+    // 先把本机下载过的工具注册进来，用到它们的配置才校验得过。
+    await toolDownloads.getState().load();
+    const created = createWorkspaceStore({
+      repo,
+      provider,
+      registry,
+      locale: bootLocale,
+      now: () => new Date(),
+      seed: createStarterWorkspace,
+      toolName: (id) =>
+        localize(
+          toolDownloads.getState().catalog?.tools.find((e) => e.id === id)?.name,
+          bootLocale,
+        ),
+    });
+    await created.getState().boot();
+    if (strict) {
+      const { status, head, error } = created.getState();
+      if (status !== 'ready') throw new Error(error ?? 'The workspace could not be read');
+      if (strict.expectHeadId !== undefined && head?.id !== strict.expectHeadId) {
+        throw new Error('The workspace fell back to an older version');
+      }
+    }
+    await useGuide.getState().load(repo);
+    void toolDownloads.getState().refresh(CATALOG_DAY_MS);
+    // 已经删掉的快捷操作不再记着文件夹（D-196）。
+    const booted = created.getState().config;
+    if (booted) expoFilePlatform.forgetFolders(quickActionsOf(booted).map((w) => w.id));
+    return { store: created, repo, locale: bootLocale };
+  } catch (e) {
+    // 没读好：关掉刚打开的，免得留着一个指向错地方的数据库。
+    await closeRepo().catch(() => undefined);
+    throw e;
+  }
+}
+
 export default function RootLayout() {
-  const [runtime, setRuntime] = useState<{
-    store: WorkspaceStore;
-    repo: SQLiteWorkspaceRepo;
-    /** 这个工作空间是按哪种语言建的；设置里改了语言就按新的重建。 */
-    locale: Locale;
-  } | null>(null);
+  const [runtime, setRuntime] = useState<Runtime | null>(null);
   const locale = resolveLocale(useLanguage((s) => s.preference));
   const [error, setError] = useState<string | null>(null);
   // 默认风格 Clay 的字体（Sora 标题、Karla 正文）。加载失败时退回系统字体，不阻塞启动。
@@ -248,39 +301,76 @@ export default function RootLayout() {
   useEffect(() => {
     (async () => {
       await aiSettings.getState().load();
-      const repo = await openRepo();
-      // 设置里选的语言（没选就跟随系统）：先读出来，工作空间按它建。
-      const saved = parseLanguage(await repo.getMeta(LANGUAGE_META_KEY).catch(() => null));
-      useLanguage.getState().set(saved);
-      const bootLocale = resolveLocale(saved);
-      // 先把本机下载过的工具注册进来，用到它们的配置才校验得过。
-      await toolDownloads.getState().load();
-      const created = createWorkspaceStore({
-        repo,
-        provider,
-        registry,
-        locale: bootLocale,
-        now: () => new Date(),
-        seed: createStarterWorkspace,
-        toolName: (id) =>
-          localize(
-            toolDownloads.getState().catalog?.tools.find((e) => e.id === id)?.name,
-            bootLocale,
-          ),
-      });
-      await created.getState().boot();
-      await useGuide.getState().load(repo);
-      void toolDownloads.getState().refresh(CATALOG_DAY_MS);
+      const booted = await bootRuntime();
       // 上次运行没来得及删除的临时文件（D-063）。
       await expoFilePlatform.removeAllRuns().catch(() => undefined);
       // 上次在 App 里选了文件、没有处理完就退出时，选择器留在缓存里的副本。
       await expoFilePlatform.removeStalePickerCopies().catch(() => undefined);
-      // 已经删掉的快捷操作不再记着文件夹（D-196）。
-      const booted = created.getState().config;
-      if (booted) expoFilePlatform.forgetFolders(quickActionsOf(booted).map((w) => w.id));
-      setRuntime({ store: created, repo, locale: bootLocale });
+      setRuntime(booted);
     })().catch((e) => setError(String(e)));
   }, []);
+
+  // 整体恢复和撤销（D-600）：换数据目录前关掉数据库并卸下界面（不让任何界面碰关掉的数据库），换完后重开、
+  // 重建工作空间，读回来才算成功；读不回来就抛错，由备份流程换回旧数据再来一遍。
+  const rebuilt = useRef<Runtime | null>(null);
+  const [homeSignal, setHomeSignal] = useState(0);
+  useEffect(() => {
+    registerBackupRuntime({
+      async release() {
+        rebuilt.current = null;
+        setRuntime(null);
+        await closeRepo();
+      },
+      async reload(expectHeadId) {
+        try {
+          const next = await bootRuntime({ strict: true, expectHeadId });
+          rebuilt.current = next;
+          setError(null);
+          setRuntime(next);
+        } catch (e) {
+          // 界面这时是卸下的：连换回旧数据也读不回来时，至少显示出了什么错，而不是一直转圈。
+          setError(String(e));
+          throw e;
+        }
+      },
+      notify(kind) {
+        const next = rebuilt.current;
+        if (!next) return;
+        // 回到主页（界面换了新数据重新挂上之后）：恢复之前打开的页面在新数据里不一定还在。
+        setHomeSignal((n) => n + 1);
+        const message = {
+          restored: 'backupRestored',
+          undone: 'backupUndone',
+          undoFailed: 'backupUndoFailed',
+        } as const;
+        next.store.getState().showToast({
+          message: t(next.locale, message[kind]),
+          ...(kind === 'restored' ? { undoRestore: true } : {}),
+        });
+        // 恢复提示不再出现（到时间、关掉、被别的提示换掉）：恢复之前的数据不再能撤销，删掉。
+        if (kind === 'restored') {
+          const off = next.store.subscribe((state) => {
+            if (state.toast?.undoRestore) return;
+            off();
+            void getBackup().discardPrevious();
+          });
+        }
+      },
+    });
+    return () => registerBackupRuntime(null);
+  }, []);
+  useEffect(() => {
+    if (homeSignal === 0) return;
+    const timer = setTimeout(() => {
+      try {
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/');
+      } catch {
+        // 导航器还没挂好：留在原来的页面。
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [homeSignal]);
 
   // 设置里改了语言：同一个数据库，按新语言重建工作空间（store 里的文案、校验提示都带着语言）。
   const builtLocale = runtime?.locale;

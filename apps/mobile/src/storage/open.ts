@@ -29,3 +29,12 @@ export function openRepo(): Promise<SQLiteWorkspaceRepo> {
   });
   return opened;
 }
+
+/** 关掉数据库并忘掉打开的那个（整体恢复换数据目录之前，D-600）；下一次 openRepo 会重新打开。 */
+export async function closeRepo(): Promise<void> {
+  const current = opened;
+  opened = null;
+  if (!current) return;
+  const repo = await current.catch(() => null);
+  await repo?.close();
+}

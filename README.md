@@ -119,7 +119,7 @@ Most limits come from the rules that keep your data on your phone and keep the a
 
 - No live data from the internet: no exchange rates (amounts in different currencies are never added together), no weather, prices or news.
 - No connection to other services: Tinkrum doesn't sync with your calendar, bank, cloud drive or other apps, and doesn't send email or post for you. Sharing goes through the phone's share sheet, when you tap.
-- No accounts or sync: your app and records live on one phone, and nobody can edit a table with you. Export to keep a backup.
+- No accounts or sync: your app and records live on one phone, and nobody can edit a table with you. To keep your data safe, export a backup file (Settings → Data) and restore it here or on another phone.
 
 **There's no code, only parts from fixed lists, so:**
 

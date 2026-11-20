@@ -1944,6 +1944,45 @@ export const en = {
   importDeleteBatch: 'Delete this import',
   importDeleteBatchConfirm:
     '{n} entries from “{file}”, including any you edited since, go to Recently deleted for 30 days.',
+  backupTitle: 'Back up and restore',
+  backupHint:
+    'Tinkrum keeps everything on this phone and has no account or sync, so a lost or replaced phone loses it all. Export a backup file, keep it somewhere safe, and restore it here or on another phone.',
+  backupExport: 'Export everything',
+  backupExportTitle: 'Export everything?',
+  backupExportConfirm:
+    'The file will contain all your entries, files and app design. It is not encrypted: anyone who gets it can read everything in it. Keep it somewhere private.',
+  backupExportAction: 'Export',
+  backupWorking_prepare: 'Getting ready…',
+  backupWorking_checking: 'Checking the backup file…',
+  backupWorking_write: 'Writing the backup file… {done} of {total}',
+  backupWorking_unpack: 'Unpacking the backup… {done} of {total}',
+  backupWorking_verify: 'Checking the data in the backup…',
+  backupWorking_switch: 'Switching to the backup…',
+  backupReady: 'Your backup is ready: {name} ({size}).',
+  backupReadyHint:
+    'It is not saved anywhere yet. Choose where it goes. This copy is deleted when you tap Done.',
+  backupSaveToFolder: 'Save to a folder',
+  backupShare: 'Share',
+  backupSaved: 'Saved to “{folder}”.',
+  backupSaveFailed: 'The file could not be saved there. Try another folder.',
+  backupRestore: 'Restore from a backup',
+  backupRestoreTitle: 'Replace everything in Tinkrum?',
+  backupRestoreConfirm:
+    'This backup was made on {date} and holds {n} entries (about {size}). Restoring replaces everything in Tinkrum now: all entries, files and the app design. You can undo it right after.',
+  backupRestoreAction: 'Replace everything',
+  backupRestored: 'Restored from the backup.',
+  backupUndone: 'Back to the data you had before the restore.',
+  backupUndoFailed: 'Couldn’t go back to the earlier data. Nothing was changed.',
+  backupError_notBackup: 'This isn’t a Tinkrum backup file, so nothing was changed.',
+  backupError_damaged: 'This backup file is damaged or incomplete, so nothing was changed.',
+  backupError_newer:
+    'This backup was made by a newer version of Tinkrum. Update Tinkrum, then try again. Nothing was changed.',
+  backupError_noSpace:
+    'There isn’t enough free space on this phone. Free up about {size} and try again. Nothing was changed.',
+  backupError_cancelled: 'Cancelled. Nothing was changed.',
+  backupError_switchFailed:
+    'The backup could not be opened, so Tinkrum is back to the data you had before.',
+  backupError_failed: 'Something went wrong. Your data is as it was before.',
 };
 
 export type StringKey = keyof typeof en;
@@ -2088,6 +2127,8 @@ export const enSingular = {
   importBatch: '{date} · {file} · {n} entry',
   importDeleteBatchConfirm:
     '{n} entry from “{file}”, even if you edited it since, goes to Recently deleted for 30 days.',
+  backupRestoreConfirm:
+    'This backup was made on {date} and holds {n} entry (about {size}). Restoring replaces everything in Tinkrum now: all entries, files and the app design. You can undo it right after.',
 } satisfies Partial<MessageTable>;
 
 /** 单数表：键必须和 enSingular 完全一致。 */

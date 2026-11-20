@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { getBackup } from '../backup';
 import { useRecordActions } from '../data/records';
 import { t } from '../i18n';
 import type { Palette } from '../renderer/theme';
@@ -12,6 +13,9 @@ import { aboutParams } from './ai-entry';
 export const TOAST_MS = 4000;
 /** 能点的提示（删除后撤销、接着改）多留一会儿，够读完再点。 */
 export const TOAST_UNDO_MS = 8000;
+
+/** 从备份恢复之后的「撤销」留得更久：一次换掉全部内容，要给人时间看清楚再决定（D-600）。 */
+export const TOAST_RESTORE_MS = 15000;
 
 /** 记录操作的提示条（例如删除后撤销）。和版本提示条分开：记录不属于任何版本。 */
 export function Toast({ palette, bottom }: { palette: Palette; bottom: number }) {
@@ -28,11 +32,16 @@ export function Toast({ palette, bottom }: { palette: Palette; bottom: number })
     toast?.restoreRecordIds ||
     toast?.restorePreset ||
     toast?.undo ||
-    toast?.undoImport
+    toast?.undoImport ||
+    toast?.undoRestore
   );
   const canContinue = !!toast?.continueTable;
   const timed = toast && !toast.held;
-  const ms = canUndo || canContinue ? TOAST_UNDO_MS : TOAST_MS;
+  const ms = toast?.undoRestore
+    ? TOAST_RESTORE_MS
+    : canUndo || canContinue
+      ? TOAST_UNDO_MS
+      : TOAST_MS;
   // 换了一条提示重新计时；手指按在按钮上时不消失。
   useEffect(() => {
     if (!timed) return;
@@ -82,6 +91,8 @@ export function Toast({ palette, bottom }: { palette: Palette; bottom: number })
             if (toast.restoreRecordId) void actions.restore(toast.restoreRecordId);
             if (toast.restoreRecordIds) void actions.restoreMany(toast.restoreRecordIds);
             if (toast.restorePreset) void restorePreset(toast.restorePreset);
+            // 先开始撤销再关提示：提示一关，恢复之前的数据就删了（backup/service.ts 里 undoing 先于 await 置位）。
+            if (toast.undoRestore) void getBackup().undoRestore();
             dismiss();
             // 撤销失败时会换一条提示，所以先关掉这一条。
             if (toast.undo) void actions.undo(toast.undo);

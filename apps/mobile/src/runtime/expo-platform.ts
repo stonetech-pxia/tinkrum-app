@@ -409,11 +409,11 @@ export const expoFilePlatform: FilePlatform = {
     return pickedPhoto(result.assets[0]);
   },
 
-  async pickDocuments(types, multiple) {
+  async pickDocuments(types, multiple, inPlace = false) {
     const result = await getDocumentAsync({
       type: [...types],
       multiple,
-      copyToCacheDirectory: true,
+      copyToCacheDirectory: !inPlace,
     });
     if (result.canceled) return null;
     return result.assets.map((a) => ({
