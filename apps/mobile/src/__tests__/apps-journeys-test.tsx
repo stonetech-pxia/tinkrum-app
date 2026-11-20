@@ -77,11 +77,20 @@ describe('apps (UI)', () => {
       { timeout: ms + 3000, interval: 50 },
     );
   };
-  /** 离开 App 再回来（点手机上的 Tinkrum 图标）。 */
-  const leaveAndReturn = async () => {
+  /** 离开 App 再回来（点手机上的 Tinkrum 图标）；默认离开 31 秒，超过 30 秒才算离开（D-609）。 */
+  let clockSkew = 0;
+  let dateSpy: jest.SpyInstance | undefined;
+  const leaveAndReturn = async (awayMs = 31_000) => {
     await act(async () => toState('background'));
+    // 只把时钟往前拨，等待的时间照常（测试里的计时器是真的）。
+    dateSpy?.mockRestore();
+    const now = Date.now.bind(Date);
+    clockSkew = awayMs;
+    dateSpy = jest.spyOn(Date, 'now').mockImplementation(() => now() + clockSkew);
     await act(async () => toState('active'));
     await wait(900);
+    dateSpy.mockRestore();
+    dateSpy = undefined;
   };
 
   it('opens an app from a home button, swaps the bar, and has no way back inside', async () => {
@@ -501,6 +510,20 @@ describe('apps (UI)', () => {
     // 推入的页面还在，也没有退出 App。
     expect(store.getState().appId).toBe('fit');
     expect(screen.getByTestId('page-ai')).toBeTruthy();
+  });
+
+  it('stays in the app when it was away for 30 seconds or less', async () => {
+    appState();
+    const { store } = await start();
+    await screen.findByTestId('nav-settings');
+    await act(async () => store.getState().enterApp('fit'));
+    await screen.findByTestId('nav-page:fit-home');
+    await leaveAndReturn(30_000);
+    expect(store.getState().appId).toBe('fit');
+    expect(screen.getByTestId('nav-page:fit-home')).toBeTruthy();
+    // 超过 30 秒才回主页。
+    await leaveAndReturn(30_001);
+    expect(store.getState().appId).toBeNull();
   });
 
   it('being away from the home page changes nothing', async () => {

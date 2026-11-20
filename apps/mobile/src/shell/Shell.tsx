@@ -81,6 +81,9 @@ export function useShellEnv(): Pick<RenderEnv, 'navigate' | 'locked'> & { inDraf
 }
 
 /** App 外壳：内容区域、按配置渲染的底部导航和浮动按钮。 */
+/** 在后台超过这么久，再回来就回到主页（D-485、D-609）。 */
+const LEAVE_APP_AFTER_MS = 30_000;
+
 export function Shell() {
   const { registry, locale, store } = useWorkspaceContext();
   // 草稿模式里显示草稿（D-190）。
@@ -113,8 +116,8 @@ export function Shell() {
     if (missingApp) leaveApp();
   }, [missingApp, leaveApp]);
 
-  // 子 App 里没有「返回 Tinkrum」（D-485）：回主页只能从手机上打开 Tinkrum。离开 App 再回来（点图标、切换器）就是
-  // 回到主页；从桌面菜单、深链接直接打开某个 App 时，进入 App 发生在回来之后，留在那个 App 里。
+  // 子 App 里没有「返回 Tinkrum」（D-485）：回主页只能从手机上打开 Tinkrum。离开 App 超过 30 秒再回来（点图标、
+  // 切换器）就是回到主页（D-609）；从桌面菜单、深链接直接打开某个 App 时，进入 App 发生在回来之后，留在那个 App 里。
 
   // 渲染完成（没有被 ErrorBoundary 拦截）才确认这次提交成功（§4）。
   useEffect(() => {
@@ -126,12 +129,14 @@ export function Shell() {
   const router = useRouter();
 
   useEffect(() => {
-    let left: number | null = null;
+    let left: { enters: number; at: number } | null = null;
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'background') left = store.getState().appEnters;
+      if (state === 'background') left = { enters: store.getState().appEnters, at: Date.now() };
       else if (state === 'active' && left !== null) {
-        const since = left;
+        const { enters: since, at } = left;
         left = null;
+        // 短暂切走（看一眼别的 App、通知栏）不算离开：超过 30 秒才回主页（D-609）。
+        if (Date.now() - at <= LEAVE_APP_AFTER_MS) return;
         // 打开 App 的事件（桌面菜单、深链接）比「回到前台」晚一点到，等它。
         setTimeout(() => {
           const s = store.getState();
