@@ -42,6 +42,11 @@ export interface MorphShareModule {
   previewFile(uri: string, mimeType: string, name: string): Promise<void>;
   /** 忘掉不在 keep 里的快捷操作的文件夹（快捷操作已经删掉了）；最后选过的那个不动。 */
   forgetFolders(keep: readonly string[]): void;
+  /**
+   * 把这些目录（file:// 地址）标成不进系统备份（D-599；只有 iOS：iCloud 备份和电脑上的备份都跳过目录里的
+   * 全部内容）。标不上的跳过。Android 在 app.json 里关掉 allowBackup，没有这个函数。
+   */
+  excludeFromBackup?(uris: readonly string[]): Promise<void>;
 }
 
 export default requireOptionalNativeModule<MorphShareModule>('MorphShare');
