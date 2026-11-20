@@ -197,6 +197,8 @@ export {
   MAX_RECORD_TAGS,
   MAX_TAG_LENGTH,
   tagKey,
+  isMultipleChoice,
+  pickedOptions,
 } from './fields';
 
 /**

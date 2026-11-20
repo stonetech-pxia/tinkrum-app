@@ -71,7 +71,10 @@ export function sampleRecords(collections: readonly Collection[]): Map<string, D
               NOW.getTime() - Math.floor(r() * 50 * 86400000) + Math.floor(r() * 5 * 86400000);
             break;
           case 'choice':
-            values[f.id] = pick(f.options).id;
+            // 多选（D-607）：一到全部几项。
+            values[f.id] = f.multiple
+              ? [pick(f.options).id, ...f.options.filter(() => r() < 0.3).map((o) => o.id)]
+              : pick(f.options).id;
             break;
           case 'link':
             values[f.id] = `${f.table}-${Math.floor(r() * 30)}`;

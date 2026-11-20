@@ -12,7 +12,9 @@ import { registry } from './test-helpers';
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 19) };
 const DIR = join(__dirname, 'fixtures', 'portal-apps');
 const habitsText = readFileSync(join(DIR, 'tinkrum-app-habits.json'), 'utf8');
-const habits = () => JSON.parse(habitsText) as Record<string, any>;
+// 按当前版本逐项查的说法：用当前版本号（预设文件可能还是上一版，D-607 起是 40）。
+const habits = () =>
+  ({ ...JSON.parse(habitsText), schemaVersion: CURRENT_SCHEMA_VERSION }) as Record<string, any>;
 const check = (data: unknown) => checkAppFileText(JSON.stringify(data), ctx);
 const problems = (data: unknown) => {
   const result = check(data);

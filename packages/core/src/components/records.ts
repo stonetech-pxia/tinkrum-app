@@ -126,7 +126,7 @@ const refs = {
   'show.title': { to: 'field' },
   'show.subtitles': { to: 'field', role: 'subtitleField' },
   'show.trailing': { to: 'field', role: 'trailingField' },
-  'show.color': { to: 'field', role: 'colorField', types: ['choice'] },
+  'show.color': { to: 'field', role: 'colorField', types: ['choice'], one: true },
   'show.columns': { to: 'field', role: 'show.columns' },
   'show.browse.sort': { to: 'field', role: 'show.browse.sort' },
   'show.browse.group': { to: 'field', role: 'show.browse.group' },

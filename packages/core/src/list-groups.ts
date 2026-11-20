@@ -11,7 +11,7 @@ import { dayNumber } from './formula';
 import { localeTag } from './localization';
 import { t } from './messages';
 import { shortDate, weekdayName } from './schedule';
-import type { Collection, Grouping, Locale } from './schema';
+import { isMultipleChoice, type Collection, type Grouping, type Locale } from './schema';
 import { dateFieldOf } from './sequence';
 
 // 记录列表分段（D-347）：按单选、引用分（每个选项 / 被引用的每条一段，顺序同 D-336 的分组），或者按日子分
@@ -104,7 +104,10 @@ export function listGroups(
         key: g.optionId ?? 'none',
         label: g.label,
         records: g.records,
-        ...(g.optionId === null ? {} : { preset: g.optionId }),
+        // 多选（D-607）：在这一段添加时选上这一项。
+        ...(g.optionId === null
+          ? {}
+          : { preset: isMultipleChoice(field) ? [g.optionId] : g.optionId }),
       }));
   }
   // 文字（D-424，列表上临时按公司分）：每个不同的值一段，按字母排，没填的放最后。
@@ -183,7 +186,8 @@ export function filterPresets(
     if (c.op !== 'is') continue;
     const f = fieldOf(collection, c.field);
     if (!f) continue;
-    if (f.type === 'choice' && f.options.some((o) => o.id === c.value)) presets[f.id] = c.value;
+    if (f.type === 'choice' && f.options.some((o) => o.id === c.value))
+      presets[f.id] = f.multiple ? [c.value] : c.value;
     else if (f.type === 'link' && typeof c.value === 'string' && c.value !== '$record')
       presets[f.id] = c.value;
     else if (f.type === 'checkbox' && typeof c.value === 'boolean') presets[f.id] = c.value;

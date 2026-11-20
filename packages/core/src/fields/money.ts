@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { formatMoney } from '../field-values';
 import { CURRENCY_OPTION } from '../money-currency';
+import { MULTIPLE_CHOICE_NOT_ONE } from './choice';
 import { IdSchema } from '../schema-primitives';
 import {
   defineField,
@@ -54,6 +55,14 @@ export const moneyField: FieldDefinitionOf<'money', typeof schema> = defineField
         {
           code: 'data',
           message: `${at}: currencyField ${f.currencyField} must be a choice field of ${collection.id}`,
+        },
+      ];
+    if (source.multiple)
+      return [
+        ...range,
+        {
+          code: 'data',
+          message: `${at}: currencyField ${source.id} ${MULTIPLE_CHOICE_NOT_ONE}; an entry has one currency`,
         },
       ];
     const bad = source.options.filter((o) => !CURRENCY_OPTION.test(o.id)).map((o) => o.id);

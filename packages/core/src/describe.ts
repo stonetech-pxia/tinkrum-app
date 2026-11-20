@@ -694,6 +694,8 @@ export function describeChange(
           );
         // D-570：填写提示、范围。
         if (changes.hint !== undefined) parts.push(t(ctx.locale, 'describeFieldHint'));
+        // D-607：单选改成可以选多个。
+        if (changes.multiple === true) parts.push(t(ctx.locale, 'describeFieldMultiple'));
         if (changes.min !== undefined || changes.max !== undefined)
           parts.push(t(ctx.locale, 'describeFieldRange'));
         if (parts.length === 0) parts.push(t(ctx.locale, 'describe_update_settings_2aaf6'));

@@ -1258,6 +1258,7 @@ export const fr: MessageTable = {
   describeFieldFormatUrl: 'format → site web',
   describeFieldFormatNone: 'format retiré',
   describeFieldHint: 'indication sous le champ modifiée',
+  describeFieldMultiple: 'plusieurs options possibles',
   describeFieldRange: 'plage autorisée modifiée',
   describe_options_64e79: 'options → {v0}',
   describe_update_settings_2aaf6: 'Modifier les réglages',

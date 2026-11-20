@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { t } from '../messages';
+import { isMultipleChoice, MULTIPLE_CHOICE_NOT_ONE } from '../fields';
 import { hasRecordCurrency } from '../money-currency';
 import { boundedText, DaysSchema, filterSchema, GroupingSchema, IdSchema } from '../schema-base';
 import { followChoiceProblems } from './choices';
@@ -88,6 +89,11 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
       problems.push('a chart groups by time (unit) or by a choice or link field (by)');
     if (group.unit === undefined) {
       const type = group.by ? field(group.by)?.type : undefined;
+      // 多选（D-607）：一条记录算进几块，各块加起来超过整个圆。
+      if (c.show.kind === 'pie' && isMultipleChoice(group.by ? field(group.by) : undefined))
+        problems.push(
+          `a pie chart can't be grouped by ${group.by}: it ${MULTIPLE_CHOICE_NOT_ONE} and the slices would add up to more than the whole; use a bar chart`,
+        );
       if (type !== 'choice' && type !== 'link')
         problems.push(
           'a chart needs source.group {unit: "day"|"week"|"month", by?: a date field} or {by: a choice or link field} (a link field: one point per entry of the linked table)',

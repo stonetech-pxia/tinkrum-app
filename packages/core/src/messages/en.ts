@@ -1190,6 +1190,7 @@ export const en = {
   describeFieldFormatUrl: 'format → website',
   describeFieldFormatNone: 'format removed',
   describeFieldHint: 'hint under the field changed',
+  describeFieldMultiple: 'several options can be picked',
   describeFieldRange: 'allowed range changed',
   describe_options_64e79: 'options → {v0}',
   describe_update_settings_2aaf6: 'update settings',
