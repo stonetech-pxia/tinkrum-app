@@ -35,6 +35,7 @@ This guide is for an AI assistant (Claude, ChatGPT or any other) that a person a
 - `tables`: the app's tables (see **Data**). `pages`: its pages (see **Containers**); there is no page `home` in an app file. `tools`: its quick actions and reminders (see **Tools**).
 - Limits: at most 30 top-level blocks on a page; the person's whole phone holds at most 60 pages and 40 tables, so keep an app small (2–5 pages, 1–6 tables).
 - Every page needs a way in: put it in `app.bar`, or have an `entry` or `button` block open it, or (for a page with `of`, a page for one entry) have a record block's `opens` point at it.
+- A date that comes back (a subscription that renews every month, a monthly bill, a yearly check-up) should not be a plain `date` field the person has to move on by hand: use a `schedule` field (a repeat rule each entry keeps, with `lastDone` pointing at the date it was last done) or a `dateOffset` field computed from the last date (for example the next payment = the last payment + 1 month). See **Data**.
 - Give every table that a page lists an empty state: a `notice` block with `showIf: {"table": "<id>", "has": "none"}` that says how to add the first entry.
 
 ## How to read the reference

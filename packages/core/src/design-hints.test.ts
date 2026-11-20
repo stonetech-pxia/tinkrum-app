@@ -8,7 +8,8 @@ import { checkAppFileText } from './app-file-check';
 import { designHints } from './design-hints';
 import { registry } from './test-helpers';
 
-// 设计建议（D-599）：AI 常这样写、我们的预设里一处也没有的三种。预设一条都不能触发：触发了就是规则错了。
+// 设计建议（D-599）：创始人看过前后对比图后定的六种。条件按道理写，不为避开预设收窄：预设碰到的列在下面，
+// 等创始人决定改不改那几个预设（2026-11-20）。
 
 const DIR = join(__dirname, 'fixtures', 'portal-apps');
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 20) };
@@ -17,12 +18,22 @@ const read = (name: string) => JSON.parse(readFileSync(join(DIR, name), 'utf8'))
 const habits = () => read('tinkrum-app-habits.json') as any;
 
 describe('designHints', () => {
-  it('has nothing to say about any of our presets', () => {
+  it('says only these things about our presets, awaiting the founder on whether to change them', () => {
     const manifest = JSON.parse(readFileSync(join(DIR, 'manifest.json'), 'utf8')) as {
       apps: { file: string }[];
     };
-    for (const app of manifest.apps)
-      expect([app.file, designHints(read(app.file))]).toEqual([app.file, []]);
+    const said = manifest.apps.flatMap((app) =>
+      designHints(read(app.file)).map((h) => `${app.file} ${h.slice(0, h.indexOf(':'))}`),
+    );
+    expect(said).toEqual([
+      'tinkrum-app-wallet.json pages.0.blocks.8.children.0 (block "recent")',
+      'tinkrum-app-wallet.json pages.3.blocks.2 (block "txs")',
+      'tinkrum-app-focus.json pages.0.blocks.4.children.0 (block "run")',
+      'tinkrum-app-focus.json pages.2.blocks.2.children.0 (block "run")',
+      'tinkrum-app-focus.json pages.2.blocks.4.children.0 (block "sessions")',
+      'tinkrum-app-focus.json pages.3.blocks.3 (block "sess")',
+      'tinkrum-app-reading.json pages.0.blocks.5 (block "days")',
+    ]);
   });
 
   it('is part of a passing check', () => {
@@ -80,16 +91,62 @@ describe('designHints', () => {
     ]);
   });
 
-  it('notices a header that repeats the title bar of a page outside the bar', () => {
+  it('suggests progress when a total sits next to what may be its goal', () => {
     const d = habits();
-    d.app.bar = d.app.bar.filter((x: string) => x !== 'page:habits-insights');
-    d.pages[2].title = 'Insights';
-    d.pages[2].blocks.unshift({ id: 'h', look: 'header', show: { title: 'Insights' } });
+    d.tables[0].fields.push({
+      id: 'done',
+      name: 'Done',
+      type: 'rollup',
+      table: 'habits-checkins',
+      via: 'habit',
+      aggregate: 'count',
+    });
+    d.pages[1].blocks[1].show = { title: 'name', subtitles: ['goal'], trailing: 'done' };
     expect(designHints(d)).toEqual([
-      'pages.2.blocks.0 (block "h"): this page is not in the bar, so its title "Insights" is already shown at the top; remove this header or give it other text',
+      'pages.1.blocks.1 (block "list"): it shows "done" and "goal" side by side; if "goal" is the goal or limit for "done", show the progress instead: "trailing": "done", "format": {"kind": "progress", "goal": "goal", "style": "bar"} (it reads "done / goal" with a bar)',
     ]);
-    // 底栏里的页面没有标题栏，标题块就是它的标题。
-    d.app.bar.splice(1, 0, 'page:habits-insights');
+    d.pages[1].blocks[1].show.format = { kind: 'progress', goal: 'goal' };
     expect(designHints(d)).toEqual([]);
+  });
+
+  it('notices a row button that adds a new entry of the same table', () => {
+    const d = habits();
+    d.pages[1].blocks[1].tools.push({
+      as: 'button',
+      label: 'Add',
+      do: 'create',
+      table: 'habits-habits',
+      ask: 'all',
+    });
+    expect(designHints(d)).toEqual([
+      expect.stringMatching(
+        /^pages\.1\.blocks\.1 \(block "list"\): every row gets a button that adds a new habits-habits entry/,
+      ),
+    ]);
+  });
+
+  it('asks for a header between two lists that follow each other, of any tables', () => {
+    const d = habits();
+    const second = {
+      id: 'more',
+      look: 'list',
+      source: { table: 'habits-habits' },
+      show: { title: 'name' },
+    };
+    d.pages[1].blocks.splice(2, 0, second);
+    expect(designHints(d)).toEqual([
+      'pages.1.blocks.2 (block "more"): this list comes right after another list with no header between them, so people cannot tell the two apart; put a header block before each list',
+    ]);
+    d.pages[1].blocks.splice(2, 0, { id: 'h2', look: 'header', show: { title: 'More' } });
+    expect(designHints(d)).toEqual([]);
+  });
+
+  it('notices an optional field as the row title', () => {
+    const d = habits();
+    d.tables[0].fields.push({ id: 'nickname', name: 'Nickname', type: 'text' });
+    d.pages[1].blocks[1].show.title = 'nickname';
+    expect(designHints(d)).toEqual([
+      'pages.1.blocks.1 (block "list"): the row title "nickname" is optional, so entries without it show the table\'s name and the day they were added instead; use a field that is always filled as the title (a required field, or a date with a default) and move "nickname" to subtitles',
+    ]);
   });
 });

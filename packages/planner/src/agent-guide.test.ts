@@ -72,6 +72,8 @@ describe('agent guide', () => {
     expect(guide.length).toBeLessThan(60_000);
     // 设计建议（D-599）：照做，除非用户要的就是这样。
     expect(guide).toContain('apply them unless the person asked for it this way');
+    // 重复的日期（D-599）：订阅、账单这类用日程字段或日期偏移，不用手改的日期。
+    expect(guide).toContain('A date that comes back');
   });
 
   it('the action catalog is English only and lists the actions', () => {
