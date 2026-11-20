@@ -1,6 +1,7 @@
 import type { Op } from './ops';
 import { workflowKinds, QUICK_ACTION_CATEGORIES } from './quick-actions';
 import { MAX_HOME_SCREEN, quickActionsOf, type IconValue, type WorkspaceConfig } from './schema';
+import { isDark, resolveColors } from './theme';
 
 // 手机桌面（D-271）：nav.phoneHomeScreen 里的快捷操作出现在长按 Morph 图标的菜单里（iOS Home Screen Quick Actions、
 // Android App Shortcuts）。菜单由配置算出来，每次配置变了（AI 修改、撤销、恢复、删除、改名）整份换掉。
@@ -15,6 +16,11 @@ export interface HomeScreenItem {
   title: string;
   /** 快捷操作自己的图标，没有时用它的分类图标；App 用自己的图标，没有时是 apps。 */
   icon: IconValue;
+  /**
+   * App 的桌面图标用的颜色（D-606）：底色是这个 App 自己主题的主色，图标用主色上的字色。
+   * 桌面图标不跟着系统的深浅色变，跟随系统的主题按浅色算。快捷操作没有，用 Tinkrum 的图标（D-271）。
+   */
+  colors?: { background: string; foreground: string };
 }
 
 /** 桌面菜单里的项（快捷操作、App）的 ID，按 nav.phoneHomeScreen 的顺序；不在配置里的不算。 */
@@ -32,7 +38,14 @@ export function homeScreenItems(config: WorkspaceConfig): HomeScreenItem[] {
     .map((id): HomeScreenItem => {
       if (id.startsWith('app:')) {
         const app = config.nav.apps!.find((a) => `app:${a.id}` === id)!;
-        return { id, kind: 'app', title: app.name, icon: app.icon ?? 'apps' };
+        const c = resolveColors(app.theme, isDark(app.theme, false));
+        return {
+          id,
+          kind: 'app',
+          title: app.name,
+          icon: app.icon ?? 'apps',
+          colors: { background: c.primary, foreground: c.onPrimary },
+        };
       }
       const w = workflows.find((x) => x.id === id)!;
       return {

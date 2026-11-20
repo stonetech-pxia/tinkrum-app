@@ -1,12 +1,23 @@
+import type { IconValue } from '@morph/core';
+
 // 手机桌面（D-271）：长按 Morph 图标的菜单和 Android 桌面上单独的图标。App 里由本地模块 MorphShortcuts
 // 实现（native.ts），测试里换成假的。
 
+/** 桌面图标上画的东西（D-606）：这个图标，画在这个底色上。 */
+export interface HomeScreenArt {
+  icon: IconValue;
+  background: string;
+  foreground: string;
+}
+
 export interface HomeScreenEntry {
-  /** 快捷操作的 ID。 */
+  /** 快捷操作的 ID，或 app:<id>。 */
   id: string;
   title: string;
   /** iOS 菜单里的 SF Symbol 名字。 */
   symbol?: string;
+  /** App 才有（D-606）：Android 的长按菜单和桌面上单独的图标画它；没有时用 Tinkrum 的图标。 */
+  art?: HomeScreenArt;
 }
 
 export interface HomeScreenPlatform {

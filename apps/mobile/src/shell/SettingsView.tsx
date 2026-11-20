@@ -8,6 +8,7 @@ import {
   homeScreenOp,
   remindersOf,
   type AppFile,
+  type IconValue,
 } from '@morph/core';
 import { MODELS } from '@morph/planner';
 import { useRouter } from 'expo-router';
@@ -16,13 +17,14 @@ import { Alert, ScrollView, Text } from 'react-native';
 
 import { useAISettings } from '../ai/context';
 import { useHomeScreenPlatform } from '../home-screen/context';
-import { iosSymbolName } from '../renderer/Icon';
+import { homeScreenEntries } from '../home-screen/useHomeScreen';
 import { useWorkflowChange } from '../run/workflow-change';
 import { useLanguage } from '../language';
 import { t, type StringKey } from '../i18n';
 import type { RenderEnv } from '../renderer/components';
 import { ListRow, PageTitle, SectionLabel } from '../renderer/ui';
 import { loadAppOrigin } from '../apps/origin';
+import { AppIconPicker, AppMenuRow, AppMenuSheet } from './AppMenu';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 
 /**
@@ -48,7 +50,13 @@ export function SettingsView({ env }: { env: RenderEnv }) {
               : (MODELS.find((m) => m.id === aiModel)?.name ?? aiModel),
         })
       : t(locale, aiMode === 'server' ? 'aiEngineRemote' : 'aiEngineMock');
-  // 长按一个 App：放到手机桌面的菜单里，或拿掉；Android 上放进去以后还能单独放一个图标（D-271、D-485）。
+  // 长按一个 App：放到手机桌面的菜单里，或拿掉；Android 上放进去以后还能单独放一个图标（D-271、D-485）；
+  // 换图标（D-606）。picking：菜单里正在选图标。
+  const [menu, setMenu] = useState<{
+    appId: string;
+    origin: AppFile | null;
+    picking: boolean;
+  } | null>(null);
   const change = useWorkflowChange();
   const homeScreen = useHomeScreenPlatform();
   const { repo, registry, files } = useWorkspaceContext();
@@ -83,15 +91,15 @@ export function SettingsView({ env }: { env: RenderEnv }) {
     );
   }
 
-  async function homeScreenMenu(
-    appId: string,
-    name: string,
-    icon: string | undefined,
-    onHome: boolean,
-  ) {
+  async function openAppMenu(appId: string) {
     // 从文件导入的 App 才有初始样子；Tink 或自己搭的没有，不显示这一项。
-    const origin = await loadAppOrigin(repo, appId);
+    setMenu({ appId, origin: await loadAppOrigin(repo, appId), picking: false });
+  }
+
+  /** 菜单里的项：点了先收起菜单再做。 */
+  function appMenuItems(appId: string, name: string, origin: AppFile | null) {
     const id = appTarget(appId);
+    const onHome = (env.config.nav.phoneHomeScreen ?? []).includes(id);
     const toggle = () => {
       if (!onHome && homeScreenFull(env.config)) {
         Alert.alert(t(locale, 'homeScreenFull'));
@@ -101,6 +109,14 @@ export function SettingsView({ env }: { env: RenderEnv }) {
         [homeScreenOp(env.config, id, !onHome)],
         t(locale, onHome ? 'homeScreenRemoved' : 'homeScreenAdded', { name }),
       );
+    };
+    // Android：在桌面上单独放一个图标，画的是这个 App 自己的图标（D-606）。系统弹确认框，用户决定。
+    const pin = () => {
+      const entry = homeScreenEntries(env.config).find((e) => e.id === id);
+      if (entry)
+        void homeScreen?.pin(entry).then((sent) => {
+          if (!sent) Alert.alert(t(locale, 'homeScreenPinFailed'));
+        });
     };
     // 分享这个 App（D-545）：只有结构，用户文件的引用清空；用户自己点了才发出去（底线 3、10、14）。
     const share = () => {
@@ -112,32 +128,72 @@ export function SettingsView({ env }: { env: RenderEnv }) {
           'application/json',
         );
     };
-    const symbol = icon ? iosSymbolName(icon) : undefined;
-    Alert.alert(name, undefined, [
-      { text: t(locale, onHome ? 'homeScreenRemove' : 'homeScreenAdd'), onPress: toggle },
-      { text: t(locale, 'shareAppItem'), onPress: share },
-      ...(origin
-        ? [{ text: t(locale, 'appResetItem'), onPress: () => void restoreApp(appId, name, origin) }]
-        : []),
+    return [
+      { id: 'home', label: t(locale, onHome ? 'homeScreenRemove' : 'homeScreenAdd'), run: toggle },
       ...(onHome && homeScreen?.canPin()
+        ? [{ id: 'pin', label: t(locale, 'homeScreenPin'), run: pin }]
+        : []),
+      // 这一项不收起菜单：菜单里换成选图标的格子。
+      {
+        id: 'icon',
+        label: t(locale, 'appIconItem'),
+        run: () => setMenu({ appId, origin, picking: true }),
+      },
+      { id: 'share', label: t(locale, 'shareAppItem'), run: share },
+      ...(origin
         ? [
             {
-              text: t(locale, 'homeScreenPin'),
-              onPress: () =>
-                void homeScreen
-                  .pin({ id, title: name, ...(symbol ? { symbol } : {}) })
-                  .then((sent) => {
-                    if (!sent) Alert.alert(t(locale, 'homeScreenPinFailed'));
-                  }),
+              id: 'reset',
+              label: t(locale, 'appResetItem'),
+              run: () => void restoreApp(appId, name, origin),
             },
           ]
         : []),
-      { text: t(locale, 'cancel'), style: 'cancel' as const },
-    ]);
+    ];
   }
+
+  /** 换图标（D-606）：用户点的就是确认，直接生效，能在改动记录里撤销。 */
+  function pickIcon(appId: string, name: string, icon: IconValue) {
+    setMenu(null);
+    void change(
+      [{ op: 'updateContainer', app: { id: appId, icon } }],
+      t(locale, 'appIconChanged', { name }),
+    );
+  }
+
+  const menuApp = menu ? (env.config.nav.apps ?? []).find((a) => a.id === menu.appId) : undefined;
   return (
     <ScrollView
       contentContainerStyle={{ padding: palette.pad, gap: palette.gap - 4, paddingBottom: 160 }}>
+      {menu && menuApp ? (
+        <AppMenuSheet
+          palette={palette}
+          locale={locale}
+          title={menuApp.name}
+          onClose={() => setMenu(null)}>
+          {menu.picking ? (
+            <AppIconPicker
+              palette={palette}
+              locale={locale}
+              current={menuApp.icon ?? 'apps'}
+              onPick={(icon) => pickIcon(menuApp.id, menuApp.name, icon)}
+            />
+          ) : (
+            appMenuItems(menuApp.id, menuApp.name, menu.origin).map((item) => (
+              <AppMenuRow
+                key={item.id}
+                id={`app-menu-${item.id}`}
+                label={item.label}
+                palette={palette}
+                onPress={() => {
+                  setMenu(null);
+                  item.run();
+                }}
+              />
+            ))
+          )}
+        </AppMenuSheet>
+      ) : null}
       <PageTitle palette={palette}>{t(locale, 'settingsTitle')}</PageTitle>
       {/* 我的 App（D-485）：入口可以没有，这里一定进得去。系统层，AI 改不了。 */}
       {(env.config.nav.apps ?? []).length > 0 ? (
@@ -154,9 +210,7 @@ export function SettingsView({ env }: { env: RenderEnv }) {
                 label={app.name}
                 {...(onHome ? { value: t(locale, 'settingsAppOnHome') } : {})}
                 onPress={env.locked ?? (() => env.navigate(appTarget(app.id)))}
-                onLongPress={
-                  env.locked ?? (() => homeScreenMenu(app.id, app.name, app.icon, onHome))
-                }
+                onLongPress={env.locked ?? (() => void openAppMenu(app.id))}
               />
             );
           })}

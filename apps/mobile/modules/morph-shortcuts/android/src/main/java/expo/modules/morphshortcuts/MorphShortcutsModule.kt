@@ -2,6 +2,8 @@ package expo.modules.morphshortcuts
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
+import android.util.Base64
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -12,7 +14,8 @@ import expo.modules.kotlin.records.Record
 
 // 长按 Morph 图标的菜单和桌面上单独的图标（D-271）。快捷方式的 ID 是快捷操作的 ID；点了打开 App 的主界面，
 // intent 的 action 是 ACTION_OPEN、extra 里是 ID。冷启动时 JS 启动完用 takeLaunched 取，
-// App 开着时（singleTask，走 onNewIntent）发 onOpen。图标用 App 自己的图标。
+// App 开着时（singleTask，走 onNewIntent）发 onOpen。图标用 App 自己的图标；带 image 的项（D-606，
+// 用户的子 App）用 JS 画好的那张图：自适应图标的整张图（108dp 见方），桌面自己裁成它的形状。
 
 private const val ACTION_OPEN = "app.morph.mobile.OPEN_QUICK_ACTION"
 private const val EXTRA_ID = "morphQuickAction"
@@ -21,6 +24,7 @@ class ShortcutItemRecord : Record {
   @Field val id: String = ""
   @Field val title: String = ""
   @Field val symbol: String? = null
+  @Field val image: String? = null
 }
 
 class MorphShortcutsModule : Module() {
@@ -87,8 +91,20 @@ class MorphShortcutsModule : Module() {
     return ShortcutInfoCompat.Builder(ctx, item.id)
       .setShortLabel(item.title)
       .setLongLabel(item.title)
-      .setIcon(IconCompat.createWithResource(ctx, ctx.applicationInfo.icon))
+      .setIcon(iconOf(ctx, item))
       .setIntent(intent)
       .build()
+  }
+
+  /** 这一项自己的图；没有或读不出来时用 App 图标。 */
+  private fun iconOf(ctx: Context, item: ShortcutItemRecord): IconCompat {
+    val bitmap = item.image?.let {
+      runCatching {
+        val bytes = Base64.decode(it, Base64.DEFAULT)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+      }.getOrNull()
+    }
+    return if (bitmap != null) IconCompat.createWithAdaptiveBitmap(bitmap)
+    else IconCompat.createWithResource(ctx, ctx.applicationInfo.icon)
   }
 }

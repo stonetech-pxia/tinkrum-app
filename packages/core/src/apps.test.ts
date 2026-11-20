@@ -268,10 +268,37 @@ describe('桌面菜单里的 App（D-485）', () => {
     const config = buildFitness();
     const next = run(config, [homeScreenOp(config, 'app:fit', true)]).config;
     expect(next.nav.phoneHomeScreen).toEqual(['app:fit']);
-    expect(homeScreenItems(next)).toEqual([
+    expect(homeScreenItems(next)).toMatchObject([
       { id: 'app:fit', kind: 'app', title: 'Fitness', icon: 'apps' },
     ]);
     expect(codes(next)).toEqual([]);
+  });
+
+  // 桌面图标画 App 自己的图标（D-606）：底色是这个 App 自己主题的主色，图标用主色上的字色。
+  it('an app on the menu carries its own icon and the colors of its own theme', () => {
+    const config = buildFitness();
+    const next = run(config, [
+      { op: 'updateContainer', app: { id: 'fit', icon: '🏋️' } },
+      { op: 'setTheme', app: 'fit', primaryColor: '#2255AA' },
+      // 主页的主色是另一个：App 的桌面图标不跟主页走。
+      { op: 'setTheme', primaryColor: '#F5D90A' },
+      homeScreenOp(config, 'app:fit', true),
+    ]).config;
+    expect(homeScreenItems(next)).toEqual([
+      {
+        id: 'app:fit',
+        kind: 'app',
+        title: 'Fitness',
+        icon: '🏋️',
+        colors: { background: '#2255AA', foreground: '#FFFFFF' },
+      },
+    ]);
+    // 浅的主色上图标用深色，看得清。
+    const light = run(next, [{ op: 'setTheme', app: 'fit', primaryColor: '#F5D90A' }]).config;
+    expect(homeScreenItems(light)[0]!.colors).toEqual({
+      background: '#F5D90A',
+      foreground: '#1A1714',
+    });
   });
 
   it('counts apps in the four places, and rejects a missing app', () => {

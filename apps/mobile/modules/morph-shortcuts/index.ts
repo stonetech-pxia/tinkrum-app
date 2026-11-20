@@ -4,7 +4,8 @@ import { requireOptionalNativeModule, type EventSubscription } from 'expo';
 // iOS 是 ios/MorphShortcutsModule.swift（UIApplicationShortcutItem，点了由 app delegate 订阅者收到；
 // SDK 58 的 ExpoAppSceneDelegate 把冷启动和 App 开着时的点按都转给它）。
 // Android 是 android/…/MorphShortcutsModule.kt（ShortcutManagerCompat 的动态快捷方式；用户点按钮时
-// requestPinShortcut 在桌面上单独放一个图标，系统弹确认框；不在菜单里的已固定图标用 disableShortcuts 停用）。
+// requestPinShortcut 在桌面上单独放一个图标，系统弹确认框；不在菜单里的已固定图标用 disableShortcuts 停用；
+// 带 image 的项用那张图当图标，D-606）。
 // 只用系统框架，不联网。Expo Go 和测试里是 null，调用方什么也不做。
 
 export interface ShortcutItem {
@@ -13,6 +14,8 @@ export interface ShortcutItem {
   title: string;
   /** iOS 的 SF Symbol 名字；Android 用 App 图标。 */
   symbol?: string;
+  /** Android：这一项自己的图标（D-606），一张自适应图标大小的 PNG（base64）；没有时用 App 图标。iOS 不传。 */
+  image?: string;
 }
 
 export interface MorphShortcutsModule {

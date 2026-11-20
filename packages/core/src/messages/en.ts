@@ -541,6 +541,11 @@ export const en = {
   appResetConfirm:
     'Restore “{name}” to how it was when you imported it? Pages and quick actions you added go away. Your tables and entries stay. You can undo this in Change history.',
   appResetSummary: 'Restore “{name}” to its original look',
+  appIconItem: 'Change icon',
+  appIconEmoji: 'Or type one emoji',
+  appIconEmojiUse: 'Use it',
+  appIconEmojiInvalid: 'Type just one emoji.',
+  appIconChanged: 'Changed the icon of “{name}”',
   importAppConfigNotJson:
     'This file isn’t valid JSON, so it can’t be an app configuration. Nothing was imported.',
   importAppConfigTooLarge:
@@ -1000,7 +1005,7 @@ export const en = {
   v34descDeskRemove: 'Remove {v0} from the desk',
   appDescAdd: 'Add app “{v0}”',
   settingsMyApps: 'My apps',
-  settingsMyAppsHint: 'Long-press an app to put it on the phone home screen.',
+  settingsMyAppsHint: 'Long-press an app to put it on the phone home screen or change its icon.',
   settingsAppOnHome: 'On the home screen menu',
   appEmpty: 'This app has no pages yet. Tap Tink to build one.',
   appDescUpdate: 'Change app “{v0}”',

@@ -11,15 +11,20 @@ import type { HomeScreenEntry, HomeScreenPlatform } from './platform';
 // 删除和改名快捷操作之后整份换掉；Android 上不在菜单里的已固定图标停用。
 // 点了菜单项或桌面图标：打开那个快捷操作的运行页面，和点运行卡片一样直接开始（D-108）；App 项（app:<id>）进那个 App（D-485）。
 
-/** 菜单里的项：快捷操作的 ID、名字和 iOS 的系统图标。 */
+/** 菜单里的项：快捷操作的 ID、名字和 iOS 的系统图标；App 另带它自己的图标和颜色（D-606）。 */
 export function homeScreenEntries(config: WorkspaceConfig): HomeScreenEntry[] {
   return homeScreenItems(config).map((item) => {
     const symbol = iosSymbolName(item.icon);
-    return { id: item.id, title: item.title, ...(symbol ? { symbol } : {}) };
+    return {
+      id: item.id,
+      title: item.title,
+      ...(symbol ? { symbol } : {}),
+      ...(item.colors ? { art: { icon: item.icon, ...item.colors } } : {}),
+    };
   });
 }
 
-/** 菜单的内容变了就整份换掉（只看放到桌面的快捷操作的 ID、名字、图标）。 */
+/** 菜单的内容变了就整份换掉（只看放到桌面的快捷操作和 App 的 ID、名字、图标、颜色）。 */
 export function useHomeScreenSync(platform: HomeScreenPlatform | null) {
   const { locale } = useWorkspaceContext();
   const key = useWorkspace((s) => (s.config ? JSON.stringify(homeScreenEntries(s.config)) : null));

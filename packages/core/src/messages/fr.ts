@@ -573,6 +573,11 @@ export const fr: MessageTable = {
   appResetConfirm:
     'Rétablir « {name} » tel qu’il était à l’import ? Les pages et actions rapides que vous y avez ajoutées disparaissent. Vos tableaux et vos entrées restent. Vous pourrez annuler dans l’historique des modifications.',
   appResetSummary: 'Rétablir l’aspect d’origine de « {name} »',
+  appIconItem: 'Changer l’icône',
+  appIconEmoji: 'Ou saisissez un emoji',
+  appIconEmojiUse: 'Utiliser',
+  appIconEmojiInvalid: 'Saisissez un seul emoji.',
+  appIconChanged: 'Icône de « {name} » changée',
   importAppConfigNotJson:
     'Ce fichier n’est pas un JSON valide, ce n’est donc pas une configuration d’app. Rien n’a été importé.',
   importAppConfigTooLarge:
@@ -1060,7 +1065,8 @@ export const fr: MessageTable = {
   v34descDeskRemove: 'Retirer {v0} du bureau',
   appDescAdd: 'Ajouter l’app « {v0} »',
   settingsMyApps: 'Mes apps',
-  settingsMyAppsHint: 'Appuyez longuement sur une app pour la placer sur l’écran d’accueil.',
+  settingsMyAppsHint:
+    'Appuyez longuement sur une app pour la placer sur l’écran d’accueil ou changer son icône.',
   settingsAppOnHome: 'Dans le menu de l’écran d’accueil',
   appEmpty: 'Cette app n’a pas encore de page. Touchez Tink pour en créer une.',
   appDescUpdate: 'Modifier l’app « {v0} »',

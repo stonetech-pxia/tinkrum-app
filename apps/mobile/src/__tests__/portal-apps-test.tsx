@@ -255,19 +255,14 @@ describe('restore the original look (D-485)', () => {
     expect(store.getState().config!.nav.apps![0]!.name).toBe('Changed');
 
     // 长按这个 App：菜单里有「恢复初始样子」；点它，预览里点「应用」。
-    let menu: string[] = [];
     jest
       .spyOn(Alert, 'alert')
-      .mockImplementationOnce((_t, _m, buttons) => {
-        menu = (buttons ?? []).map((b) => b.text ?? '');
-        void buttons?.find((b) => b.text === 'Restore its original look')?.onPress?.();
-      })
       .mockImplementationOnce((_t, _m, buttons) => void buttons?.[1]?.onPress?.());
     await act(async () => router.back());
     await fireEvent.press(await screen.findByTestId('nav-settings'));
     await fireEvent(await screen.findByTestId('settings-app-habits'), 'longPress');
+    await fireEvent.press(await screen.findByText('Restore its original look'));
     await waitFor(() => expect(store.getState().config!.nav.apps![0]!.name).toBe(original.name));
-    expect(menu).toContain('Restore its original look');
     const after = store.getState().config!;
     expect(after.nav.apps![0]!.theme).toEqual(original.theme);
     expect(after.containers.pages.some((p) => p.id === 'habits-insights')).toBe(true);
@@ -281,12 +276,8 @@ describe('restore the original look (D-485)', () => {
         .proposeOps([{ op: 'addContainer', app: { id: 'mine', name: 'Mine' } }], 'add');
       await store.getState().confirm();
     });
-    let mineMenu: string[] = [];
-    jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
-      mineMenu = (buttons ?? []).map((b) => b.text ?? '');
-    });
     await fireEvent(await screen.findByTestId('settings-app-mine'), 'longPress');
-    await waitFor(() => expect(mineMenu.length).toBeGreaterThan(0));
-    expect(mineMenu).not.toContain('Restore its original look');
+    await screen.findByText('Share this app');
+    expect(screen.queryByText('Restore its original look')).toBeNull();
   });
 });

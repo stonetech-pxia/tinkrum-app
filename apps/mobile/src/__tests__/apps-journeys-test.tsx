@@ -1,9 +1,18 @@
-import { THEME_PRESETS, applyOps, readAppFile, type AIProvider, type Op } from '@morph/core';
+import {
+  THEME_PRESETS,
+  appFileOfApp,
+  appFileText,
+  applyOps,
+  readAppFile,
+  type AIProvider,
+  type Op,
+} from '@morph/core';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
-import { Alert, AppState } from 'react-native';
+import { AppState } from 'react-native';
 
+import { saveAppOrigin } from '../apps/origin';
 import type { HomeScreenEntry, HomeScreenPlatform } from '../home-screen/platform';
 
 import { MemoryWorkspaceRepo } from '../storage/memory';
@@ -309,18 +318,132 @@ describe('apps (UI)', () => {
     const fake = new FakeHomeScreen();
     const { store } = await withHomeScreen(fake);
     await fireEvent.press(await screen.findByTestId('nav-settings'));
-    // 长按弹出菜单，点第一项「放到桌面」。
-    jest
-      .spyOn(Alert, 'alert')
-      .mockImplementationOnce((_title, _message, buttons) => void buttons?.[0]?.onPress?.());
+    // 长按弹出菜单，点「放到桌面」。
     await fireEvent(await screen.findByTestId('settings-app-fit'), 'longPress');
+    await fireEvent.press(await screen.findByText('放到桌面'));
     await screen.findByText('在桌面菜单里');
     expect(store.getState().config!.nav.phoneHomeScreen).toEqual(['app:fit']);
-    expect(fake.menus.at(-1)).toEqual([{ id: 'app:fit', title: '健身', symbol: 'heart.fill' }]);
+    // 桌面上画的是这个 App 自己的图标，底色是它自己的主色（D-606）。
+    expect(fake.menus.at(-1)).toEqual([
+      {
+        id: 'app:fit',
+        title: '健身',
+        symbol: 'heart.fill',
+        art: { icon: 'heart', background: '#2255aa', foreground: '#FFFFFF' },
+      },
+    ]);
     // 点桌面菜单：进那个 App。
     await act(async () => fake.tap('app:fit'));
     expect(store.getState().appId).toBe('fit');
     expect(await screen.findByTestId('nav-page:fit-home')).toBeTruthy();
+  });
+
+  // 换图标（D-606）：长按菜单里选一个内置图标或填一个表情；桌面上的图标跟着换。
+  const openMenu = async (id = 'fit') => {
+    await fireEvent(await screen.findByTestId(`settings-app-${id}`), 'longPress');
+    await screen.findByTestId('app-menu');
+  };
+
+  it('changes the icon of an app to a built-in one, and the phone home screen follows', async () => {
+    const fake = new FakeHomeScreen();
+    const { store } = await withHomeScreen(fake);
+    await fireEvent.press(await screen.findByTestId('nav-settings'));
+    await openMenu();
+    await fireEvent.press(screen.getByText('放到桌面'));
+    await screen.findByText('在桌面菜单里');
+    const head = store.getState().head!.id;
+    // 打开菜单、打开图标格子只是看：什么都不改（底线 15）。
+    await openMenu();
+    await fireEvent.press(screen.getByText('换图标'));
+    await screen.findByTestId('app-icon-star');
+    expect(store.getState().head!.id).toBe(head);
+    // 现在用的那个标出来了。
+    expect(screen.getByTestId('app-icon-heart').props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+    await fireEvent.press(screen.getByTestId('app-icon-star'));
+    await waitFor(() => expect(store.getState().config!.nav.apps![0]!.icon).toBe('star'));
+    await waitFor(() => expect(screen.queryByTestId('app-menu')).toBeNull());
+    // 是一次能在改动记录里撤销的修改，别的都没动。
+    expect(store.getState().head!.id).not.toBe(head);
+    expect(store.getState().config!.nav.apps![0]).toMatchObject({ id: 'fit', name: '健身' });
+    await waitFor(() =>
+      expect(fake.menus.at(-1)).toEqual([
+        {
+          id: 'app:fit',
+          title: '健身',
+          symbol: 'star.fill',
+          art: { icon: 'star', background: '#2255aa', foreground: '#FFFFFF' },
+        },
+      ]),
+    );
+  });
+
+  it('takes one emoji as the icon; anything else is refused and nothing changes', async () => {
+    const { store } = await start();
+    await fireEvent.press(await screen.findByTestId('nav-settings'));
+    await openMenu();
+    await fireEvent.press(screen.getByText('换图标'));
+    const head = store.getState().head!.id;
+    await fireEvent.changeText(await screen.findByTestId('app-icon-emoji'), 'gym');
+    await fireEvent.press(screen.getByTestId('app-icon-emoji-use'));
+    await screen.findByText('只能填一个表情。');
+    expect(store.getState().head!.id).toBe(head);
+    // 前后的空格不算。
+    await fireEvent.changeText(screen.getByTestId('app-icon-emoji'), ' 🏋️ ');
+    await fireEvent.press(screen.getByTestId('app-icon-emoji-use'));
+    await waitFor(() => expect(store.getState().config!.nav.apps![0]!.icon).toBe('🏋️'));
+    await waitFor(() => expect(screen.queryByTestId('app-menu')).toBeNull());
+  });
+
+  it('closes the menu without changing anything', async () => {
+    const { store } = await start();
+    const head = store.getState().head!.id;
+    await fireEvent.press(await screen.findByTestId('nav-settings'));
+    await openMenu();
+    await fireEvent.press(screen.getByText('换图标'));
+    await fireEvent.press(await screen.findByTestId('app-menu-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('app-menu')).toBeNull());
+    await openMenu();
+    await fireEvent.press(screen.getByTestId('app-menu-backdrop'));
+    await waitFor(() => expect(screen.queryByTestId('app-menu')).toBeNull());
+    expect(store.getState().head!.id).toBe(head);
+  });
+
+  // 系统弹窗在 Android 上最多三个按钮：导入的 App 放到桌面以后菜单有五六项，「添加到桌面」以前被丢掉了。
+  it('an imported app on the menu still offers its own home screen icon, next to the other items', async () => {
+    const fake = new FakeHomeScreen();
+    const repo = new MemoryWorkspaceRepo();
+    const { store } = await renderToolsApp(repo, new FakeFiles(), {
+      seed: withFitness,
+      homeScreen: fake,
+    });
+    // 从文件导入的 App 在本机留着原文件（「恢复初始样子」用）。
+    await saveAppOrigin(
+      repo,
+      'fit',
+      appFileText(appFileOfApp(store.getState().config!, 'fit')!, new Date()),
+    );
+    await fireEvent.press(await screen.findByTestId('nav-settings'));
+    await openMenu();
+    // 还没放到桌面菜单里：没有「添加到桌面」。
+    expect(screen.queryByText('添加到桌面')).toBeNull();
+    await fireEvent.press(screen.getByText('放到桌面'));
+    await screen.findByText('在桌面菜单里');
+    await openMenu();
+    for (const item of ['从桌面拿掉', '添加到桌面', '换图标', '分享这个 App', '恢复初始样子'])
+      expect(screen.getByText(item)).toBeTruthy();
+    await fireEvent.press(screen.getByText('添加到桌面'));
+    await waitFor(() =>
+      expect(fake.pinned).toEqual([
+        {
+          id: 'app:fit',
+          title: '健身',
+          symbol: 'heart.fill',
+          art: { icon: 'heart', background: '#2255aa', foreground: '#FFFFFF' },
+        },
+      ]),
+    );
   });
 
   it('opens the app when the app was started from its home screen item', async () => {
@@ -394,16 +517,11 @@ describe('apps (UI)', () => {
 describe('share an app', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  /** 长按 App，点菜单里的这一项；返回菜单上的字。 */
+  /** 长按 App，点菜单里的这一项。 */
   async function longPressAndPick(id: string, item: string) {
-    let menu: string[] = [];
-    jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
-      menu = (buttons ?? []).map((b) => b.text ?? '');
-      void buttons?.find((b) => b.text === item)?.onPress?.();
-    });
     await fireEvent(await screen.findByTestId(`settings-app-${id}`), 'longPress');
-    await waitFor(() => expect(menu.length).toBeGreaterThan(0));
-    return menu;
+    await screen.findByTestId('app-menu');
+    await fireEvent.press(screen.getByText(item));
   }
 
   it('a new user has no app of their own, so there is nothing to share', async () => {
@@ -422,8 +540,7 @@ describe('share an app', () => {
     });
     const head = store.getState().head!.id;
     await fireEvent.press(await screen.findByTestId('nav-settings'));
-    const menu = await longPressAndPick('fit', '分享这个 App');
-    expect(menu).toContain('分享这个 App');
+    await longPressAndPick('fit', '分享这个 App');
     await waitFor(() => expect(files.sharedTexts.size).toBe(1));
     const [name, text] = [...files.sharedTexts][0]!;
     expect(name).toBe('tinkrum-app-fit.json');

@@ -117,6 +117,15 @@ export function iosSymbolName(name: IconValue): string | undefined {
   return name in SYMBOLS ? SYMBOLS[name as keyof typeof SYMBOLS].ios : undefined;
 }
 
+/**
+ * 把图标画成图片时用（Android 的桌面图标，D-606）：系统图标给 Material Symbols 的名字，自带图形的给那张
+ * 单色 PNG，表情两样都没有（按文字画）。
+ */
+export function iconSource(name: IconValue): { symbol?: string; image?: number } {
+  if (name in CUSTOM_IMAGES) return { image: CUSTOM_IMAGES[name as CustomIconName] };
+  return name in SYMBOLS ? { symbol: SYMBOLS[name as keyof typeof SYMBOLS].android } : {};
+}
+
 export function Icon({
   name,
   size = 22,
