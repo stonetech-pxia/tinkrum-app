@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { APP_FILE_FORMAT, appFileOps, readAppFile, type AppFile } from './app-file';
+import { explainProblems } from './app-file-explain';
 import { prepareOps } from './change';
 import type { Registry } from './registry';
 import {
@@ -89,7 +90,7 @@ export function checkAppFileText(
   const older = typeof raw.schemaVersion === 'number' && raw.schemaVersion < CURRENT_SCHEMA_VERSION;
   if (!older) {
     const shape = AppFileSchema.safeParse(raw);
-    if (!shape.success) return fail(issueLines(shape.error));
+    if (!shape.success) return fail(issueLines(shape.error, { value: raw }));
   }
   const file = readAppFile(JSON.stringify(raw));
   if (!file)
@@ -99,9 +100,9 @@ export function checkAppFileText(
 
   const starter = createStarterWorkspace(ctx.locale, ctx.registry);
   const plan = appFileOps(file, starter);
-  if (!plan.ok) return fail([plan.error]);
+  if (!plan.ok) return fail(explainProblems([plan.error], file, ctx.registry));
   const prepared = prepareOps(starter, plan.ops, { ...ctx, fromAppFile: true });
-  if (!prepared.ok) return fail(prepared.issues);
+  if (!prepared.ok) return fail(explainProblems(prepared.issues, file, ctx.registry));
 
   // 能导入了。下面的只提醒（和「我的预设」上的完成度一样，D-417）：导入后才有的、用不了的地方。
   const after = prepared.after;

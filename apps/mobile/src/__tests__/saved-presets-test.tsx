@@ -634,7 +634,7 @@ describe('import a preset from a file', () => {
       await waitFor(() => expect(alert).toHaveBeenCalledTimes(2));
       const said = String(alert.mock.calls[1]![1]);
       expect(said).toContain('这个 App 文件有错，没有导入');
-      expect(said).toContain('pages.0.blocks.0.look: not a valid look');
+      expect(said).toContain('pages.0.blocks.0.look: "fromTheFuture" is not a valid look');
       expect(said).not.toContain('新版本');
       expect(store.getState().head!.id).toBe(head);
       expect(store.getState().config!.nav.apps ?? []).toEqual([]);
@@ -656,14 +656,14 @@ describe('import a preset from a file', () => {
       await importThroughScreen();
       await waitFor(() => expect(alert).toHaveBeenCalledTimes(2));
       const [, message, buttons] = alert.mock.calls[1]!;
-      expect(String(message)).toContain(
-        'tables.1.fields.3.id: id must be lowercase letters, digits or -',
-      );
+      expect(String(message)).toContain('tables.1.fields.3.id: "Note_Text" is not a valid id');
       expect(String(message)).not.toContain('1.table.fields');
       expect(String(message)).not.toContain('新版本');
       buttons!.find((b) => b.text === '复制问题')!.onPress!();
+      // 复制给 AI 的带着改法（D-597）。
+      await waitFor(() => expect(files.clipboard).toContain('write "note-text"'));
       await waitFor(() =>
-        expect(files.clipboard).toContain('- tables.1.fields.3.id: id must be lowercase letters'),
+        expect(files.clipboard).toContain('- tables.1.fields.3.id: "Note_Text" is not a valid id'),
       );
       expect(store.getState().head!.id).toBe(head);
       expect(store.getState().config!.nav.apps ?? []).toEqual([]);
