@@ -20,6 +20,7 @@ for (const file of [
   'tinkrum-app-guide.md',
   'tinkrum-app-actions.md',
   'tinkrum-app-patterns.md',
+  'tinkrum-app-rules.md',
   'tinkrum-app.schema.json',
   'example-plants.json',
 ])

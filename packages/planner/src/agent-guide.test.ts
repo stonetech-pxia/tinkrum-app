@@ -8,6 +8,7 @@ import {
   buildActionCatalog,
   buildAgentGuide,
   buildPatternsDoc,
+  buildRulesDoc,
 } from './agent-guide';
 
 // 给别的 AI 看的 App 文件写法（D-593）：生成的说明和 JSON Schema 放在 docs/agent/，改了登记表、提示词或 App 文件的
@@ -30,6 +31,10 @@ describe('agent guide', () => {
     await expect(buildActionCatalog(registry)).toMatchFileSnapshot(
       `${DOCS}/tinkrum-app-actions.md`,
     );
+  });
+
+  it('rules', async () => {
+    await expect(buildRulesDoc(registry)).toMatchFileSnapshot(`${DOCS}/tinkrum-app-rules.md`);
   });
 
   it('patterns', async () => {
@@ -112,5 +117,23 @@ describe('agent guide', () => {
     expect(catalog).not.toMatch(/[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/);
     expect(catalog).toContain('records.toExcel');
     expect(catalog).toContain('## Quick-action presets');
+    // 讲快捷操作的规则（D-604）跟着动作目录。
+    expect(catalog).toContain('## Rules for quick actions');
+    expect(catalog).toMatch(/^20\. Building quick actions/m);
+  });
+
+  // 功能规则另放一个文件（D-604）：主指南不变短不了，资料又不能没有；指南说清楚去哪里读。
+  it('keeps the feature rules in their own file, English only, and the guide points to it', () => {
+    const rules = buildRulesDoc(registry);
+    expect(rules).not.toMatch(/[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/);
+    expect(rules).not.toMatch(/rappelle-moi|l'accueil|"jours"/);
+    for (const n of [32, 42, 43, 44, 46, 62]) expect(rules).toMatch(new RegExp(`^${n}\\. `, 'm'));
+    // 对话、草稿和整台手机的规则不放：1 只改要改的、23 用户看到的叫法、39 手机桌面。
+    for (const n of [1, 23, 39]) expect(rules).not.toMatch(new RegExp(`^${n}\\. `, 'm'));
+    expect(rules).toContain('days(today, {due})');
+    // 函数名后面的空括号不是删掉例子剩下的，留着。
+    expect(rules).toContain('compared in if()');
+    const guide = buildAgentGuide(registry, example);
+    expect(guide).toContain('https://tinkrum.stonetech.dev/assets/agent/tinkrum-app-rules.md');
   });
 });

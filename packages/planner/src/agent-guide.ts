@@ -17,8 +17,7 @@ import { buildSystemPrompt } from './prompt';
 // 和 Tink 用的是同一份，登记表一改两边一起变。快照测试把它写进 docs/agent/（vitest -u 更新）。
 
 /**
- * 提示词里的这几段放进参考（标题原样）。Tink 的 Rules 不放（D-598）：大半是对话、草稿和改动步骤的规矩，放进来指南长了
- * 两倍多，测下来别的 AI 第一次就写对的反而少；动作目录和快捷操作预设另放一个文件，要做快捷操作时才读。
+ * 提示词里的这几段放进参考（标题原样）。动作目录和快捷操作预设另放一个文件，要做快捷操作时才读（D-598）。
  */
 const SECTIONS = [
   'Data · containers · tools',
@@ -27,9 +26,34 @@ const SECTIONS = [
   'Tools',
   'Theme',
   'Output',
+  'Rules',
   'Quick-action presets',
   'Built-in tool catalog',
 ] as const;
+
+/**
+ * Tink 的 Rules 里讲「App 能做什么、怎么写」的几条（D-604）：汇总、日程、行上的按钮、显示格式、days()、also……
+ * 短版指南（D-598）把 Rules 整段去掉以后，别的 AI 不知道这些写法，能做的也做不出来，所以放进单独的规则文件。
+ * 只讲 Tink 对话、草稿和整台手机（桌面、文件工作台、图片背景、风格用词）的不放。
+ */
+const FEATURE_RULES: ReadonlySet<number> = new Set([
+  10, 13, 32, 33, 34, 35, 38, 40, 42, 43, 44, 45, 46, 47, 48, 49, 50, 55, 56, 58, 59, 60, 61, 62,
+  63, 64, 65, 66, 67,
+]);
+/** 讲快捷操作的几条：放进动作目录。 */
+const QUICK_ACTION_RULES: ReadonlySet<number> = new Set([15, 20, 21, 22, 28, 29, 30, 31, 54]);
+
+/** Rules 里挑出这几条（一条从「N. 」开头，到下一条之前）。 */
+function pickRules(rules: string, wanted: ReadonlySet<number>): string {
+  const out: string[] = [];
+  let keep = false;
+  for (const line of rules.split('\n')) {
+    const n = /^(\d+)\. /.exec(line);
+    if (n) keep = wanted.has(Number(n[1]));
+    if (keep) out.push(line);
+  }
+  return out.join('\n');
+}
 
 function promptSections(registry: Registry): Map<string, string> {
   const [, ...parts] = buildSystemPrompt(registry, 'full').split('\n\n## ');
@@ -101,6 +125,18 @@ const ENGLISH: readonly { from: string; to: string }[] = [
     from: 'banner image, cover, 图片, 照片, 头图, 封面, 横幅图片 or 配图, ',
     to: 'banner image or cover, ',
   },
+  { from: '(改动记录, the bottom-bar entry "history")', to: '(the bottom-bar entry "history")' },
+  { from: '(图片工具, "the PDF tool"', to: '("the image tool", "the PDF tool"' },
+  { from: '("添加图片工具" = setPackage', to: '("add the image tool" = setPackage' },
+  { from: '"移除 PDF 工具" = setPackage', to: '"remove the PDF tool" = setPackage' },
+  {
+    from: 'A goal ("喝水显示今天的进度，目标 8 杯" →',
+    to: 'A goal ("show today\'s water against a goal of 8 glasses" →',
+  },
+  { from: '"压缩这条记录的 PDF" →', to: '"compress this entry\'s PDF" →' },
+  { from: '(fewer is better: "本月 本星期" →', to: '(fewer is better: "this month, this week" →' },
+  { from: 'e.g. "全年合计不用跟着变")', to: 'e.g. "the yearly total stays as it is")' },
+  { from: '"导出搜索到的", an export button', to: '"export what I searched", an export button' },
   {
     from: ', a spreadsheet from a paper table, 表格转 Excel"',
     to: ', a spreadsheet from a paper table"',
@@ -108,6 +144,10 @@ const ENGLISH: readonly { from: string; to: string }[] = [
   {
     from: ', letter or book page to Word, 拍文档转 Word, 图片转 Word"',
     to: ', letter or book page to Word"',
+  },
+  {
+    from: 'unless ("今天已经打过卡就别提醒")',
+    to: 'unless ("don\'t remind me if I already checked in today")',
   },
 ];
 
@@ -119,6 +159,9 @@ const ACTIONS_FILE = 'tinkrum-app-actions.md';
 const ACTIONS_URL = `https://tinkrum.stonetech.dev/assets/agent/${ACTIONS_FILE}`;
 /** 结构模式（D-603）：网上模板库里常见的 8 种结构，各一份完整的 App 文件。 */
 const PATTERNS_FILE = 'tinkrum-app-patterns.md';
+/** 功能规则（D-604）：Tink 的 Rules 里讲 App 能做什么的几条。 */
+const RULES_FILE = 'tinkrum-app-rules.md';
+const RULES_URL = `https://tinkrum.stonetech.dev/assets/agent/${RULES_FILE}`;
 const PATTERNS_URL = `https://tinkrum.stonetech.dev/assets/agent/${PATTERNS_FILE}`;
 
 const requiredThemeKeys = () =>
@@ -199,7 +242,7 @@ The reference below is shared with Tink, the assistant inside Tinkrum, which cha
 - \`nav.bar\` → \`app.bar\` (with the limits above).
 - \`setPackage\`, \`nav.floating\`, \`nav.phoneHomeScreen\`, \`data.calendar\` and \`containers.desk\` belong to the whole phone, not to an app file: leave them out.
 
-Ignore what the reference says about plans, rejections, notes, drafts, earlier requests, "the user's current config", Settings and the home page: those are about Tink's conversation. Some lines mention Tink's rules by number ("rule 45"). Those rules are about Tink's conversation and are not part of this guide: ignore those mentions.
+Ignore what the reference says about plans, rejections, notes, drafts, earlier requests, "the user's current config", Settings and the home page: those are about Tink's conversation. Rule numbers ("rule 45") refer to Tink's rules: the ones about what an app can do are in \`${RULES_FILE}\` (${RULES_URL}), the ones about quick actions in \`${ACTIONS_FILE}\`. Read a rule there when you need it, for example for a progress bar or a timer on a list row, a date that repeats, one tap that changes two things, or the days left until a date. Rules about Tink's conversation and about the whole phone are left out: when a line mentions a rule you cannot find, ignore that mention.
 
 ## How to work
 
@@ -238,6 +281,25 @@ ${s.get('Theme')!.trimEnd()}
 \`\`\`ts
 ${objectTypes(s.get('Output')!)}
 \`\`\`
+`);
+}
+
+/**
+ * 功能规则（D-604）：Tink 的 Rules 里讲 App 能做什么、怎么写的那几条，另放一个文件，要用时才读。补进主指南测下来
+ * 没有好处（有结构模式时设计建议持平，主指南长了七成），资料又不能没有。
+ */
+export function buildRulesDoc(registry: Registry): string {
+  const s = promptSections(registry);
+  return englishOnly(`<!-- Generated by packages/planner/src/agent-guide.ts (npx vitest -u in packages/planner). Do not edit by hand. -->
+
+# Tinkrum app rules: how to build what people ask for
+
+A companion to the Tinkrum app-file guide (tinkrum-app-guide.md). Read the rule you need when an app calls for something the guide and the patterns don't show: totals and streaks from a linked table (rule 42), dates that repeat (43, 47, 50), one-tap buttons on entries (44, 61, 62, 63), grouping and calendars (45), progress or a running timer on a list row (46), a page for one entry (48, 58), days left until a date (32), reminders (35, 59, 60, 66), tabs and time ranges on a page (56, 65), the entry form's layout (64), fixed zones and block sizes (55, 67).
+
+These rules come from Tink, the assistant inside Tinkrum, which changes an app one operation at a time: where a rule names an operation (\`addData\`, \`addContainer\`, \`addTool\`, \`updateData\`…), write the finished object into the file instead, as the guide's "How to read the reference" says. Rules about Tink's conversation and about the whole phone are left out, so the numbers have gaps: when a rule mentions one that is not here, ignore that mention.
+
+## Rules
+${pickRules(s.get('Rules')!, FEATURE_RULES)}
 `);
 }
 
@@ -287,5 +349,8 @@ ${s.get('Quick-action presets')!.trimEnd()}
 
 ## Built-in tool catalog
 ${s.get('Built-in tool catalog')!.trimEnd()}
+
+## Rules for quick actions
+${pickRules(s.get('Rules')!, QUICK_ACTION_RULES)}
 `);
 }
