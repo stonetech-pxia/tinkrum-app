@@ -158,6 +158,7 @@ export const AGENT_EXAMPLE_APP = {
             subtitles: ['room'],
             trailing: 'watered',
           },
+          opens: 'plants-plant',
           tools: [
             {
               as: 'button',
@@ -259,6 +260,48 @@ export const AGENT_EXAMPLE_APP = {
           tools: [
             {
               tool: 'plants-export',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'plants-plant',
+      title: 'Plant',
+      icon: '🪴',
+      of: 'plants-plants',
+      blocks: [
+        {
+          id: 'care',
+          look: 'list',
+          source: {
+            table: 'plants-care',
+            filter: [
+              {
+                field: 'plant',
+                op: 'is',
+                value: '$record',
+              },
+            ],
+            sort: {
+              field: 'date',
+              direction: 'desc',
+            },
+            limit: 30,
+          },
+          show: {
+            title: 'what',
+            subtitles: ['note'],
+            trailing: 'date',
+            emptyText: 'No care logged yet',
+          },
+          tools: [
+            {
+              as: 'addHere',
+              do: 'create',
+              table: 'plants-care',
+              ask: 'all',
+              values: '$here',
             },
           ],
         },

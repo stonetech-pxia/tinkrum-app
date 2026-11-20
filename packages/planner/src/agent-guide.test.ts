@@ -39,9 +39,11 @@ describe('agent guide', () => {
   it('the example imports as it is, with nothing left to fix', () => {
     const result = checkAppFileText(example, ctx);
     expect(result.ok && result.warnings).toEqual([]);
+    // 设计建议（D-599）也没有：示例就是照建议写的（一株植物有自己的页面）。
+    expect(result.ok && result.hints).toEqual([]);
     expect(result.ok && result.summary).toEqual({
       name: 'Plants',
-      pages: 2,
+      pages: 3,
       tables: 2,
       quickActions: 1,
       reminders: 1,
@@ -68,6 +70,8 @@ describe('agent guide', () => {
     expect(guide).not.toContain('## Built-in tool catalog');
     expect(guide).toContain('https://tinkrum.stonetech.dev/assets/agent/tinkrum-app-actions.md');
     expect(guide.length).toBeLessThan(60_000);
+    // 设计建议（D-599）：照做，除非用户要的就是这样。
+    expect(guide).toContain('apply them unless the person asked for it this way');
   });
 
   it('the action catalog is English only and lists the actions', () => {

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { APP_FILE_FORMAT, appFileOps, readAppFile, type AppFile } from './app-file';
 import { explainProblems } from './app-file-explain';
+import { designHints } from './design-hints';
 import { prepareOps } from './change';
 import type { Registry } from './registry';
 import {
@@ -47,7 +48,14 @@ export interface AppFileSummary {
 }
 
 export type AppFileCheck =
-  | { ok: true; file: AppFile; summary: AppFileSummary; warnings: string[] }
+  | {
+      ok: true;
+      file: AppFile;
+      summary: AppFileSummary;
+      warnings: string[];
+      /** 设计建议（D-599）：能用，但用起来可以更顺手的地方。不挡导入。 */
+      hints: string[];
+    }
   | { ok: false; problems: string[] };
 
 /** 最多说这么多条：再多对改文件也没帮助，先改前面的。 */
@@ -126,5 +134,6 @@ export function checkAppFileText(
       reminders: mine(remindersOf(after)),
     },
     warnings,
+    hints: designHints(file),
   };
 }
