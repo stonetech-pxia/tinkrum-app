@@ -25,7 +25,7 @@ How to use them:
 {
   "format": "tinkrum-app",
   "version": 1,
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "app": {
     "id": "spend",
     "name": "Spending",
@@ -254,7 +254,7 @@ How to use them:
 {
   "format": "tinkrum-app",
   "version": 1,
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "app": {
     "id": "budget",
     "name": "Budget",
@@ -584,7 +584,7 @@ How to use them:
 {
   "format": "tinkrum-app",
   "version": 1,
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "app": {
     "id": "goals",
     "name": "Savings goals",
@@ -829,7 +829,7 @@ How to use them:
 {
   "format": "tinkrum-app",
   "version": 1,
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "app": {
     "id": "habit",
     "name": "Habits",
@@ -1106,7 +1106,7 @@ How to use them:
 {
   "format": "tinkrum-app",
   "version": 1,
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "app": {
     "id": "upkeep",
     "name": "Home upkeep",
@@ -1352,7 +1352,7 @@ How to use them:
 {
   "format": "tinkrum-app",
   "version": 1,
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "app": {
     "id": "jobs",
     "name": "Job search",
@@ -1545,12 +1545,13 @@ How to use them:
 - One table with a status choice that splits want / have / done, and a rating.
 - A `choices` block (tabs) on the status, with the list following it (`source.choice: "page"`).
 - Counts per status.
+- Genres as a choice with `multiple: true` (a book can have several), with a row of genres to tap above the list (`show.browse.filter`).
 
 ```json
 {
   "format": "tinkrum-app",
   "version": 1,
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "app": {
     "id": "shelf",
     "name": "Bookshelf",
@@ -1587,6 +1588,34 @@ How to use them:
           "id": "author",
           "name": "Author",
           "type": "text"
+        },
+        {
+          "id": "genres",
+          "name": "Genres",
+          "type": "choice",
+          "multiple": true,
+          "options": [
+            {
+              "id": "novel",
+              "label": "Novel"
+            },
+            {
+              "id": "history",
+              "label": "History"
+            },
+            {
+              "id": "science",
+              "label": "Science"
+            },
+            {
+              "id": "poetry",
+              "label": "Poetry"
+            },
+            {
+              "id": "memoir",
+              "label": "Memoir"
+            }
+          ]
         },
         {
           "id": "status",
@@ -1718,7 +1747,12 @@ How to use them:
               "author",
               "status"
             ],
-            "trailing": "rating"
+            "trailing": "rating",
+            "browse": {
+              "filter": [
+                "genres"
+              ]
+            }
           }
         },
         {
@@ -1758,7 +1792,7 @@ How to use them:
 {
   "format": "tinkrum-app",
   "version": 1,
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "app": {
     "id": "pets",
     "name": "Pets",

@@ -52,7 +52,7 @@ This matches the existing split of "tool config goes with versions, user files a
 | `money`    | Number (2 decimal places) + currency (ISO code, one per field)                      | Amount                    |
 | `checkbox` | true / false                                                                        | Done, read                |
 | `date`     | `YYYY-MM-DD`, device-local date                                                     | Date, due date            |
-| `choice`   | Option ID (single choice); an option may carry a `value` and a `color` (D-568)      | Category, status          |
+| `choice`   | Option ID; a list if `multiple` (D-607); options can have `value`, `color` (D-568)  | Category, weekdays        |
 | `rating`   | Integer 1–5                                                                         | Rating                    |
 | `tags`     | A set of text (stored in the record, the config has no tag names, D-432)            | Tags                      |
 | `file`     | A set of Morph file IDs, up to 20 (D-187, D-263)                                    | Receipts, photos          |
@@ -370,3 +370,16 @@ Additive and optional: no schema version bump, no migration; an exported file li
 - **Blocks that follow it**: a record block (any record look, the calendar included), a number block or a chart that reads the same table may write `source.choice: "page"`; while the page is drawn it shows only the entries whose field is the picked option, as if its filter had one more `is` condition; "All" adds nothing. A number's `minus` is not narrowed. A block reading another table, a block grouped by the same field (a board column per option, a pie or number grouped by it) and a list whose own `show.browse.filter` uses the same field are refused, with a sentence saying which key to remove. A block may follow both a `period` block and the choices block.
 - **Nothing is written** (invariant 15): the pick lives in the page's state; option ids are config, not content (invariants 2 and 14). An Add under a following list (`"$here"`, D-349) starts the new entry with the picked option, and a list tool (`as: "list"`, D-428) hands over the entries the list shows, so only the picked option's.
 - **Consistency** (invariant 18): removing the choices block takes `source.choice` off the blocks that followed it; removing its field removes the block (and then the key); removing the table removes it with the table's other blocks; removing an option drops it from `show.options` and `default` (when none is left, the row shows all options again).
+
+## 26. Choice fields that pick several options (since D-607)
+
+- **The field**: `{type: "choice", options, multiple: true, default?: optionId or [optionIds]}`. An entry stores a list of option IDs in option order; an empty list is not stored. Options stay in the config like any choice (invariants 2 and 14).
+- **Reading**: an ID stored before `multiple` was turned on reads as a one-item list; IDs of options removed later are not shown or counted, but stay in the entry and never block saving it. Shown as the labels in option order joined by the list separator ("Monday, Thursday", "周一、周四").
+- **Filters**: `is` with an option ID (or a list of them) keeps the entries that have any of them; `isNot` keeps those that have none; `isEmpty` / `isNotEmpty` as usual. The same everywhere conditions are read (block sources, rollup filters, reminders' unless, setAll, showIf, highlight, form sections).
+- **Grouping**: list, cards and checklist sections, number blocks and bar charts grouped by it, a board (read-only) and the `choices` row put an entry under every option it has, so the counts can add up to more than the entries. Sorting uses the first option picked.
+- **Refused**: a formula over it, `show.color`, a pie chart grouped by it, a board drag on it, a money `currencyField` and a previous `within` (each needs one option per entry). Lookups and `latest` rollups of it show and filter like the field.
+- **Record tools**: `create`, `createAll`, `set` and `setAll` write a list of option IDs, which replaces what the entry had; one ID alone is refused on a multiple field (add or replace would be unclear).
+- **Turning it on and off**: turning `multiple` on keeps every entry as it is. Turning it off is refused. If an undo or a restore brings back the single field, a stored list is still shown but reads as not set; saving another field keeps it, and picking an option replaces it.
+- **Import and export**: CSV and sheet export write the labels with the list separator; import reads the labels (or IDs) separated by `,` `，` `、` `;` `；` and skips the row if one is not an option.
+- **On-device suggestions** (D-398, D-575) leave a multiple field alone.
+- **Schema**: version 40; the migration only raises the version.

@@ -16,7 +16,7 @@
     "schemaVersion": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 39
+      "maximum": 40
     },
     "uses": {},
     "app": {
@@ -1867,6 +1867,14 @@
             "copy"
           ],
           "additionalProperties": false
+        },
+        {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
         }
       ]
     },
@@ -4251,8 +4259,24 @@
                 "$ref": "#/$defs/__schema85"
               }
             },
+            "multiple": {
+              "type": "boolean",
+              "const": true
+            },
             "default": {
-              "$ref": "#/$defs/__schema0"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/__schema0"
+                },
+                {
+                  "minItems": 1,
+                  "maxItems": 50,
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/__schema0"
+                  }
+                }
+              ]
             }
           },
           "required": [
