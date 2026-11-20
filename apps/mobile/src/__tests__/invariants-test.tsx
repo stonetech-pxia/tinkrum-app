@@ -6,7 +6,9 @@ import {
   HIDDEN_RECORD_PRESETS,
   REDACTED_FILE,
   applyOps,
+  calendarOf,
   createDefaultWorkspace,
+  dayOf,
   createRegistry,
   createStarterWorkspace,
   sampleOps,
@@ -566,7 +568,60 @@ const VIEWED: [string, () => WorkspaceConfig, Locale][] = [
   ),
   // 名片样板（D-423）：有二维码的页面、按表显示的块、能搜索的列表，看的时候也不写。
   ['sample business-cards', businessCards, 'zh'],
+  // 打卡格（D-606）：画格子、算每格的数不写。
+  ['grid', gridConfig, 'zh'],
 ];
+
+/** 习惯 × 最近 7 天的打卡格（D-606），在页面 week 上。 */
+function gridConfig(): WorkspaceConfig {
+  const r = applyOps(
+    createDefaultWorkspace('zh'),
+    [
+      {
+        op: 'addData',
+        table: { id: 'habits', name: '习惯', fields: [{ id: 'name', name: '名字', type: 'text' }] },
+      },
+      {
+        op: 'addData',
+        table: {
+          id: 'checkins',
+          name: '打卡',
+          fields: [
+            { id: 'habit', name: '习惯', type: 'link', table: 'habits' },
+            { id: 'date', name: '日期', type: 'date' },
+          ],
+        },
+      },
+      {
+        op: 'addContainer',
+        page: {
+          id: 'week',
+          title: '这一周',
+          blocks: [
+            {
+              id: 'grid',
+              look: 'grid',
+              source: {
+                table: 'checkins',
+                group: { by: 'habit', showEmpty: true },
+                across: { unit: 'day', by: 'date' },
+                limit: 30,
+              },
+              show: { title: 'habit' },
+              tools: [
+                { as: 'tap', do: 'create', table: 'checkins', values: '$here' },
+                { as: 'tap', do: 'remove', table: 'checkins' },
+              ],
+            },
+          ],
+        },
+      },
+    ] as Op[],
+    { registry, locale: 'zh' },
+  );
+  if (!r.ok) throw new Error(r.error);
+  return r.config;
+}
 
 function businessCards(): WorkspaceConfig {
   const base = createStarterWorkspace('zh', registry);
@@ -1283,5 +1338,62 @@ describe('底线 2：标签的值不发给 AI（创始人 2026-11-04 定）', ()
     });
     await store.getState().change('再换个颜色', provider);
     for (const body of bodies) expect(body).not.toContain(SENTINEL);
+  });
+});
+
+describe('底线 11 / 15：打卡格（D-606）', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    useGuide.setState({ stage: null, repo: null });
+  });
+  const today = (back = 0) => {
+    const d = new Date();
+    d.setDate(d.getDate() - back);
+    return dayOf(d, calendarOf({ data: { tables: [] } }));
+  };
+  let visit = 0;
+  async function openGrid() {
+    const repo = new MemoryWorkspaceRepo();
+    await repo.setMeta('guide', 'done');
+    await act(() => useGuide.getState().load(repo));
+    const at = Date.now();
+    const put = (id: string, collectionId: string, values: Record<string, unknown>) =>
+      repo.insertRecord({ id, collectionId, values, createdAt: at, updatedAt: at });
+    await put('run', 'habits', { name: '跑步' });
+    await put('read', 'habits', { name: '读书' });
+    await put('c1', 'checkins', { habit: 'run', date: today() });
+    await put('c2', 'checkins', { habit: 'read', date: today(2) });
+    await put('c3', 'checkins', { habit: 'read', date: today(2) });
+    const app = await renderToolsApp(repo, new FakeFiles(), { seed: gridConfig, locale: 'zh' });
+    await act(() =>
+      router.push({ pathname: '/page/[pageId]', params: { pageId: 'week', visit: ++visit } }),
+    );
+    await screen.findByTestId(`grid-grid-cell-run-${today()}`);
+    await settle();
+    return { ...app, repo };
+  }
+
+  it('底线 15: paging back and forth and opening a cell writes nothing', async () => {
+    const { repo } = await openGrid();
+    const spies = spyWrites(repo);
+    await fireEvent.press(screen.getByTestId('grid-grid-prev'));
+    await fireEvent.press(screen.getByTestId('grid-grid-prev'));
+    await fireEvent.press(screen.getByTestId('grid-grid-today'));
+    // 两条的格子点一下只是列出来；有记录的格子长按也只是列出来。
+    await fireEvent.press(await screen.findByTestId(`grid-grid-cell-read-${today(2)}`));
+    await fireEvent(screen.getByTestId(`grid-grid-cell-run-${today()}`), 'longPress');
+    await settle();
+    expect(spies.filter(([, s]) => s.mock.calls.length > 0).map(([n]) => n)).toEqual([]);
+  });
+
+  it('底线 11: adding in a cell shows no undo; removing the only entry of a cell shows undo', async () => {
+    const { repo } = await openGrid();
+    await fireEvent.press(screen.getByTestId(`grid-grid-cell-read-${today()}`));
+    expect(await screen.findByTestId('toast')).toHaveTextContent(/已在「打卡」添加一条/);
+    expect(screen.queryByTestId('toast-undo')).toBeNull();
+    await fireEvent.press(screen.getByTestId(`grid-grid-cell-run-${today()}`));
+    expect(await screen.findByTestId('toast')).toHaveTextContent(/已从「打卡」删除一条/);
+    expect(screen.getByTestId('toast-undo')).toBeTruthy();
+    expect((await repo.listDeletedRecords()).map((r) => r.id)).toEqual(['c1']);
   });
 });

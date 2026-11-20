@@ -29,7 +29,7 @@ import type { WidgetOpRef } from './types';
 export type RecordsByTable = ReadonlyMap<string, readonly DataRecord[]>;
 
 /** 小组件上能直接执行的一键记录工具：直接存的新建、设值、勾选、加减。 */
-type WidgetTool = Exclude<RecordTool, { do: 'setAll' | 'createAll' }>;
+type WidgetTool = Exclude<RecordTool, { do: 'setAll' | 'createAll' | 'remove' }>;
 
 /** 工具定义的指纹：页面改过（工具换了）以后，之前点的不再执行。 */
 export function actionHash(action: ToolUse): string {
@@ -57,6 +57,8 @@ function widgetTool(use: ToolUse | undefined): WidgetTool | undefined {
   if (
     tool.do === 'setAll' ||
     tool.do === 'createAll' ||
+    // 删掉（D-606）只在打卡格上，要弹撤销：小组件上没有。
+    tool.do === 'remove' ||
     (tool.do === 'create' && tool.ask !== undefined)
   )
     return undefined;

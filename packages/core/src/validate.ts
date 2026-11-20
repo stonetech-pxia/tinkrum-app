@@ -9,6 +9,8 @@ import {
 import { conditionProblems } from './conditions';
 import { entryFormProblems } from './entry-form';
 import { FILES_COLLECTION, FILES_TABLE } from './files-table';
+import { gridDateField } from './grid-view';
+import { filterPresets } from './list-groups';
 import { attachmentField, fieldHandsTo } from './handed';
 import { pageBrowseLists } from './page-zones';
 import { recordToolUseProblems, toolLabelMax, type ToolWhere } from './record-ops';
@@ -724,10 +726,22 @@ function toolUseProblems(
       ...(page.of !== undefined ? { recordOf: page.of } : {}),
       ...(c.look === 'form' ? { form: true } : {}),
       ...(u.as === 'drag' && group?.by !== undefined ? { dragField: group.by } : {}),
+      ...(c.look === 'grid' ? { grid: true, hereFields: gridHereFields(c, rowOf) } : {}),
     };
     problems.push(...recordToolUseProblems(u, config, where));
   });
   return problems;
+}
+
+/** 打卡格（D-606）上 "$here" 一定会填的字段：分行的字段、分列的日期字段和筛选里的等于条件（grid-view.ts 的 gridHereValues）。 */
+function gridHereFields(c: KnownComponent, table: Collection | undefined): string[] {
+  const source = (c as Extract<KnownComponent, { look: 'grid' }>).source;
+  if (!table || !source.across) return [];
+  return [
+    ...(source.group?.by ? [source.group.by] : []),
+    gridDateField(table, source.across),
+    ...Object.keys(filterPresets(table, source.filter)),
+  ];
 }
 
 const KNOWN_LOOKS = new Set<string>(COMPONENTS.map((d) => d.look));

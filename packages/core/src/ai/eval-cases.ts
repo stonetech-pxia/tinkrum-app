@@ -8562,6 +8562,47 @@ const habitLogEarlier: EvalEarlier = {
   ],
 };
 
+// 打卡格（D-606）：习惯 × 最近几天，点空格打卡、点打过的取消。
+const weekGrid =
+  (removes: boolean) =>
+  (c: WorkspaceConfig): string | null => {
+    const grid = recordBlocksOf(c, 'checkins').find((x) => x.look === 'grid');
+    if (!grid) return 'expected a grid on checkins';
+    if (grid.source.group?.by !== 'habit') return 'the grid rows should be source.group.by habit';
+    if (grid.source.across?.unit !== 'day') return 'the grid columns should be days';
+    const tools = grid.tools ?? [];
+    const has = (kind: string) => tools.some((u) => u.as === 'tap' && 'do' in u && u.do === kind);
+    if (
+      !tools.some((u) => u.as === 'tap' && 'do' in u && u.do === 'create' && u.values === '$here')
+    )
+      return 'expected a tap create with values "$here"';
+    return has('remove') === removes
+      ? null
+      : `remove tap should be ${removes ? 'there' : 'absent'}`;
+  };
+
+const GRID_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG43',
+    input:
+      'Add a week grid of my check-ins: one row per habit and the last 7 days, tap a day to tick it and tap again to untick',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [habitLogEarlier],
+    expect: { kind: 'ops', check: weekGrid(true) },
+  },
+  {
+    id: 'KG44',
+    input: '做一个打卡表：每个习惯一行，最近 7 天每天一格，点一下打卡，再点一下取消',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [habitLogEarlier],
+    expect: { kind: 'ops', check: weekGrid(true) },
+  },
+];
+
 /** 一个工具点一下要做的几处（工具本身加 also）。 */
 const writesOf = (a: AnyAction): AnyAction[] => [
   a,
@@ -9091,6 +9132,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...UNLESS_REPEATING_CASES,
   ...MONTHLY_REMINDER_CASES,
   ...CALLOUT_CASES,
+  ...GRID_CASES,
   ...RELATIVE_VALUE_CASES,
   ...TAP_ALSO_CASES,
   ...CREATE_ALL_CASES,

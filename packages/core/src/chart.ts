@@ -86,7 +86,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
 /**
  * 最近 n 段的开始日期（从早到晚，最后一段包含今天）。今天和一周的第一天按 cal（D-286），和数据筛选一样。
  */
-function periodStarts(
+export function periodStarts(
   group: GroupUnit,
   n: number,
   now: Date,

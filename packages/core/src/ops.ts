@@ -506,6 +506,9 @@ function recordToolUses(use: RecordTool, gone: Gone): boolean {
       return use.field === id || (use.filter ?? []).some((c) => c.field === id);
     case 'createAll':
       return hasKey(use.values, id);
+    // 移到「最近删除」（D-606）不用字段；表删了上面已经算。
+    case 'remove':
+      return false;
     default:
       return use.field === id;
   }

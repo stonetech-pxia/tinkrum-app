@@ -18,6 +18,7 @@ import {
   perCurrencyText,
 } from './data';
 import { FILES_COLLECTION, FILES_TABLE, fileKindOf } from './files-table';
+import { gridRead, type GridRead } from './grid-view';
 import { filterPresets, listGroups } from './list-groups';
 import { t } from './messages';
 import { currentMonth, monthDays, type MonthDay } from './month-view';
@@ -125,7 +126,7 @@ export function sourceTableIds(
   return [...ids];
 }
 
-// ---- 记录块（list cards checklist tiles board calendar）----
+// ---- 记录块（list cards checklist tiles board calendar table gallery grid）----
 
 /** 列表的一段（source.group）：count 是这一段一共几条，records 最多 limit 条。 */
 export interface SourceGroup {
@@ -161,13 +162,22 @@ export interface RecordsRead {
   columns?: BoardColumn[];
   /** calendar：这个月（options.month，默认今天所在的月）。 */
   days?: MonthRead;
+  /** grid（D-606）：行 × 列（options.page 往前翻几页）；分行字段不对时没有。 */
+  grid?: GridRead;
 }
 
 /** 一个记录块读出来的东西；表不存在时为 undefined。 */
 export function readRecords(
-  block: { look: RecordLook; source: RecordSource; show?: { color?: string | undefined } },
+  block: {
+    look: RecordLook;
+    source: RecordSource;
+    show?: {
+      color?: string | undefined;
+      format?: { kind: string; goal?: number | string } | undefined;
+    };
+  },
   ctx: SourceContext,
-  options: { month?: string } = {},
+  options: { month?: string; page?: number } = {},
 ): RecordsRead | undefined {
   const { source, look } = block;
   const read = readTable(ctx, source.table);
@@ -187,6 +197,17 @@ export function readRecords(
     if (!field) return base;
     const linked = linkedOf(ctx, view, field.id, bind(group.filter, ctx));
     return { ...base, by: field.id, columns: boardColumns(field, rows, source.limit, linked) };
+  }
+  if (look === 'grid') {
+    const linked = linkedOf(ctx, view, group.by, bind(group.filter, ctx));
+    const grid = gridRead(filtered, view, source, block.show ?? {}, {
+      now,
+      cal,
+      locale,
+      linked,
+      ...(options.page === undefined ? {} : { page: options.page }),
+    });
+    return grid ? { ...base, by: grid.by, grid } : base;
   }
   if (look === 'calendar') {
     const date = dateFieldOf(view, group.by);

@@ -47,6 +47,7 @@ import { ListTools } from './ListTools';
 import { MonthCalendar } from './MonthCalendar';
 import { PeriodBar } from './PeriodBar';
 import { Board } from './Board';
+import { Grid } from './Grid';
 import { Tiles } from './Tiles';
 import { FileList } from './FileList';
 import { FilePick } from './FilePick';
@@ -260,6 +261,8 @@ export const RENDERERS: { [T in ComponentType]: Renderer<T> } = {
     <MonthCalendar block={c} env={env} tone={c.style?.tone} componentId={c.id} />
   ),
   tiles: (c, env) => <Tiles block={c} env={env} tone={c.style?.tone} />,
+  // 打卡格（D-606）：行 × 时间列，点格子加一条或删掉唯一的那一条。
+  grid: (c, env) => <Grid block={c} env={env} tone={c.style?.tone} />,
   board: (c, env) => <Board block={c} env={env} tone={c.style?.tone} />,
   form: (c, env) => <RecordForm block={c} env={env} tone={c.style?.tone} />,
   number: (c, env) => (

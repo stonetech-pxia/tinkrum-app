@@ -24,6 +24,7 @@ export * from './asset-usage';
 export * from './defaults';
 export * from './file-filter';
 export * from './grouping';
+export * from './grid-view';
 export * from './describe';
 export * from './desk';
 export * from './habits';

@@ -45,7 +45,7 @@ What the user wants
 
 19. What the user wants can be done: a quick action processes files and ends by handing over to a page (for example a new-record form or the record page) where the user confirms the save; any two actions whose types match can be chained; the AI cannot refuse a combination that can be done because it is "unreasonable", at most it adds a reminder. It is still a straight chain, and each step only takes the output of the previous one (invariant 9) (D-381). (core: any two actions whose types match can be chained; planner `invariants.test.ts`: the prompt has no rule that refuses a combination that can be done)
 
-The design rules (the one way to write a read, nesting depth, 6 ways of appearing and 6 one-tap records, setAll and createAll ≤ 200, containment and references) are not invariants and can be adjusted through DECISIONS.
+The design rules (the one way to write a read, nesting depth, 6 ways of appearing and 7 one-tap records (remove, D-606, only as a tap on a grid), setAll and createAll ≤ 200, containment and references) are not invariants and can be adjusted through DECISIONS.
 
 ## Product principles
 
