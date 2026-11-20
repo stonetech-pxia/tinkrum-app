@@ -38,7 +38,8 @@
         "Wallet",
         "Bills",
         "Accounts",
-        "Category"
+        "Category",
+        "Goal"
       ],
       "tables": [
         "Budgets",
@@ -46,6 +47,7 @@
         "Income",
         "Bills",
         "Goals",
+        "Deposits",
         "Accounts"
       ],
       "reminders": 2,
@@ -55,7 +57,7 @@
         "Spending chart against the previous period",
         "Bills calendar with due-date reminders",
         "Accounts and net worth that you update yourself",
-        "Savings goals with a one-tap +$50",
+        "Savings goals with a one-tap +$50, every deposit kept",
         "Excel export of your spending"
       ],
       "includesRecords": false,
@@ -161,7 +163,8 @@
       "pages": [
         "Reading",
         "Shelf",
-        "Quotes"
+        "Quotes",
+        "Book"
       ],
       "tables": [
         "Books",
@@ -173,10 +176,11 @@
       "features": [
         "Shelves: want to read, reading, read",
         "Yearly goal with a same-date-last-year comparison",
-        "Page progress rings and a +25 pages button",
+        "Page progress rings; +25 pages adds to the reading log",
         "Reading streak, calendar and pace",
         "Capture a quote from a photo with on-device text recognition",
-        "Daily reminder"
+        "Daily reminder",
+        "A page for each book with its reading log and quotes"
       ],
       "includesRecords": false,
       "icon": "book"

@@ -167,10 +167,13 @@
                       "value": 0
                     }
                   ],
-                  "do": "increment",
-                  "table": "reading-books",
-                  "field": "read",
-                  "by": 25
+                  "do": "create",
+                  "table": "reading-sessions",
+                  "values": {
+                    "book": "$row",
+                    "date": "today",
+                    "pages": 25
+                  }
                 },
                 {
                   "as": "tap",
@@ -190,7 +193,8 @@
                   "field": "finished",
                   "value": "today"
                 }
-              ]
+              ],
+              "opens": "reading-book"
             }
           ]
         },
@@ -216,7 +220,8 @@
                   "values": {
                     "date": "today",
                     "minutes": 20
-                  }
+                  },
+                  "ask": "all"
                 }
               ]
             },
@@ -249,8 +254,9 @@
             }
           },
           "show": {
-            "title": "minutes",
+            "title": "book",
             "subtitles": [
+              "minutes",
               "pages"
             ],
             "emptyText": "No reading logged this day."
@@ -455,10 +461,13 @@
                       "value": 0
                     }
                   ],
-                  "do": "increment",
-                  "table": "reading-books",
-                  "field": "read",
-                  "by": 25
+                  "do": "create",
+                  "table": "reading-sessions",
+                  "values": {
+                    "book": "$row",
+                    "date": "today",
+                    "pages": 25
+                  }
                 },
                 {
                   "as": "button",
@@ -478,7 +487,8 @@
                   "field": "finished",
                   "value": "today"
                 }
-              ]
+              ],
+              "opens": "reading-book"
             }
           ]
         },
@@ -538,7 +548,8 @@
                   "field": "started",
                   "value": "today"
                 }
-              ]
+              ],
+              "opens": "reading-book"
             }
           ]
         },
@@ -595,7 +606,8 @@
                   "as": "list",
                   "tool": "reading-export-books"
                 }
-              ]
+              ],
+              "opens": "reading-book"
             }
           ]
         }
@@ -668,6 +680,164 @@
               "period": "saved"
             }
           }
+        }
+      ]
+    },
+    {
+      "id": "reading-book",
+      "title": "Book",
+      "icon": "📖",
+      "of": "reading-books",
+      "blocks": [
+        {
+          "id": "it",
+          "look": "single",
+          "source": {
+            "table": "reading-books",
+            "record": "$record"
+          },
+          "show": {
+            "fields": [
+              "title",
+              "author",
+              "left"
+            ]
+          }
+        },
+        {
+          "id": "nums",
+          "look": "group",
+          "show": {
+            "layout": "row"
+          },
+          "children": [
+            {
+              "id": "pages",
+              "look": "number",
+              "show": {
+                "label": "Pages read"
+              },
+              "source": {
+                "table": "reading-sessions",
+                "aggregate": "sum",
+                "field": "pages",
+                "filter": [
+                  {
+                    "field": "book",
+                    "op": "is",
+                    "value": "$record"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "time",
+              "style": {
+                "tone": "secondary"
+              },
+              "look": "number",
+              "show": {
+                "label": "Time read"
+              },
+              "source": {
+                "table": "reading-sessions",
+                "aggregate": "sum",
+                "field": "minutes",
+                "filter": [
+                  {
+                    "field": "book",
+                    "op": "is",
+                    "value": "$record"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "h-log",
+          "look": "header",
+          "show": {
+            "title": "Reading log"
+          }
+        },
+        {
+          "id": "log",
+          "look": "list",
+          "source": {
+            "table": "reading-sessions",
+            "filter": [
+              {
+                "field": "book",
+                "op": "is",
+                "value": "$record"
+              }
+            ],
+            "sort": {
+              "field": "date",
+              "direction": "desc"
+            },
+            "limit": 10
+          },
+          "show": {
+            "title": "date",
+            "subtitles": [
+              "minutes"
+            ],
+            "trailing": "pages",
+            "emptyText": "No reading logged for this book yet."
+          },
+          "tools": [
+            {
+              "as": "addHere",
+              "do": "create",
+              "table": "reading-sessions",
+              "values": "$here",
+              "ask": "all"
+            }
+          ]
+        },
+        {
+          "id": "h-quotes",
+          "look": "header",
+          "show": {
+            "title": "Quotes"
+          }
+        },
+        {
+          "id": "quotes",
+          "look": "cards",
+          "source": {
+            "table": "reading-quotes",
+            "filter": [
+              {
+                "field": "book",
+                "op": "is",
+                "value": "$record"
+              }
+            ],
+            "sort": {
+              "field": "saved",
+              "direction": "desc"
+            },
+            "limit": 6
+          },
+          "show": {
+            "title": "quote",
+            "subtitles": [
+              "page"
+            ],
+            "emptyText": "No quotes from this book yet."
+          },
+          "tools": [
+            {
+              "as": "addHere",
+              "do": "create",
+              "table": "reading-quotes",
+              "values": "$here",
+              "ask": "all"
+            }
+          ]
         }
       ]
     }
@@ -744,9 +914,11 @@
         {
           "id": "read",
           "name": "Pages read",
-          "type": "number",
-          "decimals": 0,
-          "default": 0
+          "type": "rollup",
+          "table": "reading-sessions",
+          "via": "book",
+          "aggregate": "sum",
+          "field": "pages"
         },
         {
           "id": "started",
@@ -803,6 +975,13 @@
       "icon": "⏱️",
       "fields": [
         {
+          "id": "book",
+          "name": "Book",
+          "type": "link",
+          "table": "reading-books",
+          "required": true
+        },
+        {
           "id": "date",
           "name": "Date",
           "type": "date",
@@ -811,7 +990,6 @@
         {
           "id": "minutes",
           "name": "Time read",
-          "required": true,
           "type": "duration"
         },
         {
@@ -837,7 +1015,8 @@
         {
           "id": "book",
           "name": "Book",
-          "type": "text"
+          "type": "link",
+          "table": "reading-books"
         },
         {
           "id": "page",
