@@ -2,7 +2,7 @@ import { BUILTIN_TOOLS, checkAppFileText, createRegistry } from '@morph/core';
 import { describe, expect, it } from 'vitest';
 
 import { AGENT_EXAMPLE_APP } from './agent-example';
-import { appFileJsonSchema, buildAgentGuide } from './agent-guide';
+import { appFileJsonSchema, buildActionCatalog, buildAgentGuide } from './agent-guide';
 
 // 给别的 AI 看的 App 文件写法（D-593）：生成的说明和 JSON Schema 放在 docs/agent/，改了登记表、提示词或 App 文件的
 // 形状要有意地更新（npx vitest -u）；里面的示例必须能照原样导入。
@@ -17,6 +17,12 @@ describe('agent guide', () => {
   it('guide', async () => {
     await expect(buildAgentGuide(registry, example)).toMatchFileSnapshot(
       `${DOCS}/tinkrum-app-guide.md`,
+    );
+  });
+
+  it('action catalog', async () => {
+    await expect(buildActionCatalog(registry)).toMatchFileSnapshot(
+      `${DOCS}/tinkrum-app-actions.md`,
     );
   });
 
@@ -57,11 +63,17 @@ describe('agent guide', () => {
     // 只有英文（创始人 2026-11-19）：Tink 的中文、法语示例句都不在里面。
     expect(guide).not.toMatch(/[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/);
     expect(guide).not.toMatch(/rappelle-moi|l'accueil|"jours"/);
-    expect(guide).toContain('"days" and decimals 0');
-    // 函数名后面的空括号不是删掉例子剩下的，留着。
-    expect(guide).toContain('compared in if()');
-    // 规则 23（用户看到的叫法）和 57（App）留着。
-    expect(guide).toMatch(/^23\. /m);
-    expect(guide).toMatch(/^57\. /m);
+    // 短版（D-598）：Tink 的规则不放，动作目录另放一个文件，指南里说去哪里拿。
+    expect(guide).not.toContain('## Rules');
+    expect(guide).not.toContain('## Built-in tool catalog');
+    expect(guide).toContain('https://tinkrum.stonetech.dev/assets/agent/tinkrum-app-actions.md');
+    expect(guide.length).toBeLessThan(60_000);
+  });
+
+  it('the action catalog is English only and lists the actions', () => {
+    const catalog = buildActionCatalog(registry);
+    expect(catalog).not.toMatch(/[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/);
+    expect(catalog).toContain('records.toExcel');
+    expect(catalog).toContain('## Quick-action presets');
   });
 });

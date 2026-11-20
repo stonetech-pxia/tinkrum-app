@@ -9,22 +9,16 @@ import {
 } from '@morph/core';
 import { z } from 'zod';
 
-import { RULE_GROUPS, buildSystemPrompt } from './prompt';
+import { buildSystemPrompt } from './prompt';
 
 // 给别的 AI（Claude、ChatGPT……）看的 App 文件写法（D-593）：用户请它们生成一个 tinkrum-app 文件，再从「我的预设」
 // 导入。前面是 App 文件自己的规矩（手写），后面的参考从 Tink 的提示词按「## 」标题切出来，外观、字段、动作、风格
 // 和 Tink 用的是同一份，登记表一改两边一起变。快照测试把它写进 docs/agent/（vitest -u 更新）。
 
-/** Tink 的规则里只关于对话、草稿、拒绝和改动步骤的，App 文件用不上。 */
-const SKIPPED_RULES: ReadonlySet<number> = new Set([
-  ...RULE_GROUPS.core.filter((n) => n !== 23 && n !== 57),
-  7, // 移动块
-  8, // 主页改名
-  14, // 简化快捷操作
-  19, // 删字段、删表
-]);
-
-/** 提示词里的这几段放进参考（标题原样）。 */
+/**
+ * 提示词里的这几段放进参考（标题原样）。Tink 的 Rules 不放（D-598）：大半是对话、草稿和改动步骤的规矩，放进来指南长了
+ * 两倍多，测下来别的 AI 第一次就写对的反而少；动作目录和快捷操作预设另放一个文件，要做快捷操作时才读。
+ */
 const SECTIONS = [
   'Data · containers · tools',
   'Data',
@@ -32,7 +26,6 @@ const SECTIONS = [
   'Tools',
   'Theme',
   'Output',
-  'Rules',
   'Quick-action presets',
   'Built-in tool catalog',
 ] as const;
@@ -55,13 +48,6 @@ function objectTypes(output: string): string {
   const to = output.indexOf('type Plan =');
   if (from < 0 || to < from) throw new Error('prompt Output section changed shape');
   return output.slice(from, to).trimEnd();
-}
-
-function keptRules(rules: string): string {
-  return rules
-    .split('\n')
-    .filter((line) => !SKIPPED_RULES.has(parseInt(line, 10)))
-    .join('\n');
 }
 
 const CJK = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/;
@@ -114,18 +100,6 @@ const ENGLISH: readonly { from: string; to: string }[] = [
     from: 'banner image, cover, 图片, 照片, 头图, 封面, 横幅图片 or 配图, ',
     to: 'banner image or cover, ',
   },
-  { from: '(改动记录, the bottom-bar entry "history")', to: '(the bottom-bar entry "history")' },
-  { from: '(图片工具, "the PDF tool"', to: '("the image tool", "the PDF tool"' },
-  { from: '("添加图片工具" = setPackage', to: '("add the image tool" = setPackage' },
-  { from: '"移除 PDF 工具" = setPackage', to: '"remove the PDF tool" = setPackage' },
-  {
-    from: 'A goal ("喝水显示今天的进度，目标 8 杯" →',
-    to: 'A goal ("show today\'s water against a goal of 8 glasses" →',
-  },
-  { from: '"压缩这条记录的 PDF" →', to: '"compress this entry\'s PDF" →' },
-  { from: '(fewer is better: "本月 本星期" →', to: '(fewer is better: "this month, this week" →' },
-  { from: 'e.g. "全年合计不用跟着变")', to: 'e.g. "the yearly total stays as it is")' },
-  { from: '"导出搜索到的", an export button', to: '"export what I searched", an export button' },
   {
     from: ', a spreadsheet from a paper table, 表格转 Excel"',
     to: ', a spreadsheet from a paper table"',
@@ -134,15 +108,14 @@ const ENGLISH: readonly { from: string; to: string }[] = [
     from: ', letter or book page to Word, 拍文档转 Word, 图片转 Word"',
     to: ', letter or book page to Word"',
   },
-  {
-    from: 'unless ("今天已经打过卡就别提醒")',
-    to: 'unless ("don\'t remind me if I already checked in today")',
-  },
 ];
 
 /** 网站上的检查页和给 AI 自检用的脚本（D-594）。 */
 const MAKE_PAGE_URL = 'https://tinkrum.stonetech.dev/make';
 const CHECK_SCRIPT_URL = 'https://tinkrum.stonetech.dev/assets/agent/tinkrum-check.js';
+/** 动作目录（D-598）：快捷操作的步骤能用哪些动作、内置的快捷操作预设。 */
+const ACTIONS_FILE = 'tinkrum-app-actions.md';
+const ACTIONS_URL = `https://tinkrum.stonetech.dev/assets/agent/${ACTIONS_FILE}`;
 
 const requiredThemeKeys = () =>
   Object.entries(ThemeSchema.shape)
@@ -216,12 +189,12 @@ The reference below is shared with Tink, the assistant inside Tinkrum, which cha
 
 - \`addData {table}\` → put the table in \`tables\`.
 - \`addContainer {page}\` → put the page in \`pages\`; a block added to a page → put it in that page's \`blocks\`.
-- \`addTool {tool}\` → put the quick action or reminder in \`tools\`. \`addTool {tool: {preset}}\` is not available in a file: write the quick action's steps yourself, or use an \`action\` block whose tool is the preset id (that runs the built-in quick action).
+- \`addTool {tool}\` → put the quick action or reminder in \`tools\`. \`addTool {tool: {preset}}\` is not available in a file: write the quick action's steps yourself, or use an \`action\` block whose tool is the preset id (that runs the built-in quick action). The actions a step can use and the preset ids are in a separate file, \`${ACTIONS_FILE}\` (${ACTIONS_URL}): read it when the app needs a quick action other than exporting entries as in the example. If you cannot get it, leave quick actions out.
 - \`setTheme\` → \`app.theme\` (a whole theme object, not a patch).
 - \`nav.bar\` → \`app.bar\` (with the limits above).
 - \`setPackage\`, \`nav.floating\`, \`nav.phoneHomeScreen\`, \`data.calendar\` and \`containers.desk\` belong to the whole phone, not to an app file: leave them out.
 
-Ignore what the reference says about plans, rejections, notes, drafts, earlier requests, "the user's current config", Settings and the home page: those are about Tink's conversation. Rule numbers ("rule 45") refer to **Rules** in the reference. Tink's rules about its conversation are left out, so the numbers have gaps; when a rule mentions one that is not there, ignore that mention.
+Ignore what the reference says about plans, rejections, notes, drafts, earlier requests, "the user's current config", Settings and the home page: those are about Tink's conversation. Some lines mention Tink's rules by number ("rule 45"). Those rules are about Tink's conversation and are not part of this guide: ignore those mentions.
 
 ## How to work
 
@@ -259,9 +232,17 @@ ${s.get('Theme')!.trimEnd()}
 \`\`\`ts
 ${objectTypes(s.get('Output')!)}
 \`\`\`
+`);
+}
 
-## Rules
-${keptRules(s.get('Rules')!.trimEnd())}
+/** 动作目录（D-598）：快捷操作的步骤能用的动作和内置预设，从 Tink 的提示词切出来，和指南分开放。 */
+export function buildActionCatalog(registry: Registry): string {
+  const s = promptSections(registry);
+  return englishOnly(`<!-- Generated by packages/planner/src/agent-guide.ts (npx vitest -u in packages/planner). Do not edit by hand. -->
+
+# Tinkrum quick actions: presets and actions
+
+A companion to the Tinkrum app-file guide (tinkrum-app-guide.md). Read it when an app needs a quick action: the steps of a quick action in \`tools\` use the actions below, and an \`action\` block can run a built-in preset by its id. Lines that mention Tink's rules or operations (\`addTool\`, "rule 45") are about Tink, the assistant inside Tinkrum: in an app file, write the quick action into \`tools\` as the guide shows.
 
 ## Quick-action presets
 ${s.get('Quick-action presets')!.trimEnd()}
