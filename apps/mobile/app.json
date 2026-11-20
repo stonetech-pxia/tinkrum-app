@@ -22,6 +22,7 @@
     },
     "android": {
       "package": "dev.stonetech.tinkrum",
+      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#D92D20",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

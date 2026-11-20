@@ -38,7 +38,7 @@ describe('agent guide', () => {
     );
   });
 
-  // 结构模式（D-600）：每一份都能照原样导入，没有要修的，也没有设计建议；只有英文。
+  // 结构模式（D-603）：每一份都能照原样导入，没有要修的，也没有设计建议；只有英文。
   it('every pattern imports as it is, with nothing to fix and no suggestions', () => {
     expect(AGENT_PATTERNS).toHaveLength(8);
     for (const p of AGENT_PATTERNS) {
@@ -67,7 +67,7 @@ describe('agent guide', () => {
   it('the example imports as it is, with nothing left to fix', () => {
     const result = checkAppFileText(example, ctx);
     expect(result.ok && result.warnings).toEqual([]);
-    // 设计建议（D-599）也没有：示例就是照建议写的（一株植物有自己的页面）。
+    // 设计建议（D-602）也没有：示例就是照建议写的（一株植物有自己的页面）。
     expect(result.ok && result.hints).toEqual([]);
     expect(result.ok && result.summary).toEqual({
       name: 'Plants',
@@ -98,11 +98,11 @@ describe('agent guide', () => {
     expect(guide).not.toContain('## Built-in tool catalog');
     expect(guide).toContain('https://tinkrum.stonetech.dev/assets/agent/tinkrum-app-actions.md');
     expect(guide.length).toBeLessThan(60_000);
-    // 设计建议（D-599）：照做，除非用户要的就是这样。
+    // 设计建议（D-602）：照做，除非用户要的就是这样。
     expect(guide).toContain('apply them unless the person asked for it this way');
-    // 重复的日期（D-599）：订阅、账单这类用日程字段或日期偏移，不用手改的日期。
+    // 重复的日期（D-602）：订阅、账单这类用日程字段或日期偏移，不用手改的日期。
     expect(guide).toContain('A date that comes back');
-    // 先从结构模式起步（D-600）。
+    // 先从结构模式起步（D-603）。
     expect(guide).toContain('**Start from a pattern.**');
     expect(guide).toContain('https://tinkrum.stonetech.dev/assets/agent/tinkrum-app-patterns.md');
   });

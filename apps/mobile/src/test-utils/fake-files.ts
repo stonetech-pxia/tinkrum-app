@@ -287,8 +287,11 @@ export class FakeFiles implements FilePlatform {
     }
     return this.camera.shift() ?? null;
   }
-  async pickDocuments(types: readonly string[]) {
+  /** 最近一次选文件是不是「原位置读、不复制进缓存」（整体恢复选压缩包，D-600）。 */
+  lastPickInPlace = false;
+  async pickDocuments(types: readonly string[], _multiple?: boolean, inPlace = false) {
     this.lastPickTypes = types;
+    this.lastPickInPlace = inPlace;
     return this.nextPick;
   }
   fileUri(path: string) {

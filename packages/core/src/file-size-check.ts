@@ -1,4 +1,4 @@
-import { FILE_LIMITS, MEDIA_LIMITS } from './limits';
+import { MEDIA_LIMITS, inMemorySizeProblem } from './limits';
 import { mediaKindOf } from './media';
 import { RunError } from './workflow/engine';
 
@@ -11,7 +11,7 @@ export const isMediaFile = (f: { name: string; mimeType?: string | null }) => {
 };
 
 /**
- * 要整份读进 JS 内存处理的文件：检查大小上限（P-006）。选择器不一定提供大小，复制后再检查一次。
+ * 要整份读进 JS 内存处理的文件：检查大小上限（P-006；PDF 单个 100 MB、合计 200 MB，其他 50 / 100，D-601）。选择器不一定提供大小，复制后再检查一次。
  * 视频和音频单独用 MEDIA_LIMITS：单个 4 GB、最多 10 个，不计入合计（D-142）。
  * 快捷操作和全部文件页面的合并 PDF 都走这一个函数，阈值只有一份（R04）。
  */
@@ -27,13 +27,8 @@ export function checkSizes(
   if (media.length > MEDIA_LIMITS.maxCount) {
     throw new RunError('tooMany', { max: MEDIA_LIMITS.maxCount });
   }
-  const others = sizes.filter((f) => !isMediaFile(f));
-  for (const f of others) {
-    if ((f.size ?? 0) > FILE_LIMITS.maxFileBytes) {
-      throw new RunError('tooLarge', { name: f.name, mb: FILE_LIMITS.maxFileBytes / MB });
-    }
-  }
-  if (others.reduce((sum, f) => sum + (f.size ?? 0), 0) > FILE_LIMITS.maxTotalBytes) {
-    throw new RunError('tooLargeTotal', { mb: FILE_LIMITS.maxTotalBytes / MB });
-  }
+  const problem = inMemorySizeProblem(sizes.filter((f) => !isMediaFile(f)));
+  if (problem?.code === 'tooLarge')
+    throw new RunError('tooLarge', { name: problem.name, mb: problem.mb });
+  if (problem) throw new RunError('tooLargeTotal', { mb: problem.mb });
 }

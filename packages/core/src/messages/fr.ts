@@ -2030,6 +2030,45 @@ export const fr: MessageTable = {
   importDeleteBatch: 'Supprimer cette importation',
   importDeleteBatchConfirm:
     'Les {n} entrées de « {file} », même modifiées depuis, vont dans Supprimés récemment pendant 30 jours.',
+  backupTitle: 'Sauvegarde et restauration',
+  backupHint:
+    'Tinkrum garde tout sur ce téléphone, sans compte ni synchronisation : un téléphone perdu ou remplacé emporte tout avec lui. Exportez un fichier de sauvegarde, rangez-le en lieu sûr, puis restaurez-le ici ou sur un autre téléphone.',
+  backupExport: 'Tout exporter',
+  backupExportTitle: 'Tout exporter ?',
+  backupExportConfirm:
+    'Le fichier contiendra toutes vos entrées, vos fichiers et la conception de l’app. Il n’est pas chiffré : quiconque l’obtient peut tout y lire. Gardez-le dans un endroit privé.',
+  backupExportAction: 'Exporter',
+  backupWorking_prepare: 'Préparation…',
+  backupWorking_checking: 'Vérification du fichier de sauvegarde…',
+  backupWorking_write: 'Écriture du fichier de sauvegarde… {done} sur {total}',
+  backupWorking_unpack: 'Ouverture de la sauvegarde… {done} sur {total}',
+  backupWorking_verify: 'Vérification des données de la sauvegarde…',
+  backupWorking_switch: 'Passage aux données de la sauvegarde…',
+  backupReady: 'Votre sauvegarde est prête : {name} ({size}).',
+  backupReadyHint:
+    'Elle n’est encore enregistrée nulle part. Choisissez où la mettre. Cette copie est supprimée quand vous touchez Terminé.',
+  backupSaveToFolder: 'Enregistrer dans un dossier',
+  backupShare: 'Partager',
+  backupSaved: 'Enregistrée dans « {folder} ».',
+  backupSaveFailed: 'Le fichier n’a pas pu être enregistré là. Essayez un autre dossier.',
+  backupRestore: 'Restaurer une sauvegarde',
+  backupRestoreTitle: 'Remplacer tout le contenu de Tinkrum ?',
+  backupRestoreConfirm:
+    'Cette sauvegarde date du {date} et contient {n} entrées (environ {size}). La restauration remplace maintenant tout le contenu de Tinkrum : toutes les entrées, les fichiers et la conception de l’app. Vous pourrez l’annuler juste après.',
+  backupRestoreAction: 'Tout remplacer',
+  backupRestored: 'Sauvegarde restaurée.',
+  backupUndone: 'Retour aux données d’avant la restauration.',
+  backupUndoFailed: 'Impossible de revenir aux données d’avant. Rien n’a été modifié.',
+  backupError_notBackup: 'Ce n’est pas un fichier de sauvegarde Tinkrum : rien n’a été modifié.',
+  backupError_damaged: 'Ce fichier de sauvegarde est abîmé ou incomplet : rien n’a été modifié.',
+  backupError_newer:
+    'Cette sauvegarde a été faite par une version plus récente de Tinkrum. Mettez Tinkrum à jour, puis réessayez. Rien n’a été modifié.',
+  backupError_noSpace:
+    'Il n’y a pas assez d’espace libre sur ce téléphone. Libérez environ {size}, puis réessayez. Rien n’a été modifié.',
+  backupError_cancelled: 'Annulé. Rien n’a été modifié.',
+  backupError_switchFailed:
+    'La sauvegarde n’a pas pu être ouverte : Tinkrum est revenu aux données d’avant.',
+  backupError_failed: 'Une erreur est survenue. Vos données sont comme avant.',
 };
 
 export const frSingular: SingularTable = {
@@ -2174,4 +2213,6 @@ export const frSingular: SingularTable = {
   importBatch: '{date} · {file} · {n} entrée',
   importDeleteBatchConfirm:
     '{n} entrée de « {file} », même modifiée depuis, va dans Supprimés récemment pendant 30 jours.',
+  backupRestoreConfirm:
+    'Cette sauvegarde date du {date} et contient {n} entrée (environ {size}). La restauration remplace maintenant tout le contenu de Tinkrum : toutes les entrées, les fichiers et la conception de l’app. Vous pourrez l’annuler juste après.',
 };

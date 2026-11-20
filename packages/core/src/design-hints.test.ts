@@ -8,7 +8,7 @@ import { checkAppFileText } from './app-file-check';
 import { designHints } from './design-hints';
 import { registry } from './test-helpers';
 
-// 设计建议（D-599）：创始人看过前后对比图后定的六种。条件按道理写，不为避开预设收窄：预设碰到了就改预设。
+// 设计建议（D-602）：创始人看过前后对比图后定的六种。条件按道理写，不为避开预设收窄：预设碰到了就改预设。
 
 const DIR = join(__dirname, 'fixtures', 'portal-apps');
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 20) };

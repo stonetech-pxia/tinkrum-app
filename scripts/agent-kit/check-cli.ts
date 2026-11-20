@@ -46,7 +46,7 @@ function main(): number {
     console.log('It imports, but these parts will not work yet; fix them too:');
     for (const w of check.warnings) console.log(`- ${w}`);
   }
-  // 设计建议（D-599）：能导入，用起来可以更顺手。照做，除非用户要的就是这样。
+  // 设计建议（D-602）：能导入，用起来可以更顺手。照做，除非用户要的就是这样。
   if (check.hints.length > 0) {
     console.log(
       'Suggestions to make the app easier to use; apply them unless the person asked for it this way:',

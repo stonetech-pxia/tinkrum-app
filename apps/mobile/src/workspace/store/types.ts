@@ -228,6 +228,8 @@ export interface RecordToast {
   restoreRecordId?: string;
   /** 刚导入的一批（D-574）：撤销时这一批进「最近删除」。 */
   undoImport?: { id: string; table: string };
+  /** 刚从备份恢复（D-600）：撤销时换回恢复之前的数据；这条提示不再出现，那份旧数据就删掉。 */
+  undoRestore?: true;
   /** 一起删的几条（D-547）：撤销时全部放回来。 */
   restoreRecordIds?: string[];
   /** 删掉的预设（D-410）：预设是真删，撤销时把这份放回去。 */

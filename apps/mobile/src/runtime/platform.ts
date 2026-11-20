@@ -669,8 +669,16 @@ export interface FilePlatform {
   takePhoto(): Promise<PickedFile | null>;
   /** 从相册多选视频（不在选的时候转码）；用户取消时返回 null。 */
   pickVideos(max: number): Promise<PickedFile[] | null>;
-  /** 从「文件」App 选文件；types 是 MIME 类型（可含 image/*、* / *）。 */
-  pickDocuments(types: readonly string[], multiple: boolean): Promise<PickedFile[] | null>;
+  /**
+   * 从「文件」App 选文件；types 是 MIME 类型（可含 image/*、* / *）。
+   * inPlace 为 true 时不复制进缓存，给原件的地址（iOS 是原位置，Android 是 content://）：几个 GB 的压缩包不先复制一遍
+   * （整体恢复，D-600）；原件只读，不移动、不删除。
+   */
+  pickDocuments(
+    types: readonly string[],
+    multiple: boolean,
+    inPlace?: boolean,
+  ): Promise<PickedFile[] | null>;
 
   // ---- 工作流执行：临时文件（缓存目录 runs/<runId>/，D-063）----
   /** 把选择器给的文件复制进本次运行的临时目录。 */

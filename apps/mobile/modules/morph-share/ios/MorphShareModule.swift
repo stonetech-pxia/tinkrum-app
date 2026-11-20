@@ -86,6 +86,16 @@ public class MorphShareModule: Module {
       UserDefaults.standard.set(kept, forKey: folderBookmarksKey)
     }
 
+    // 系统备份里不放 Tinkrum 的数据（D-599）：把这些目录标成不备份（iCloud 备份、电脑上的备份都跳过目录里的
+    // 全部内容）。标在目录上：文件被整个换掉时文件上的标记会丢，目录上的不会。标不上的跳过，不挡启动。
+    AsyncFunction("excludeFromBackup") { (uris: [URL]) in
+      var values = URLResourceValues()
+      values.isExcludedFromBackup = true
+      for var uri in uris {
+        try? uri.setResourceValues(values)
+      }
+    }
+
     // mimeTypes 只给 Android 用。useRemembered：有记住的文件夹就直接存进去，不弹选择器。key：快捷操作 ID。
     AsyncFunction("exportFiles") { (uris: [URL], names: [String], _: [String], useRemembered: Bool, key: String, promise: Promise) in
       guard !self.busy else {

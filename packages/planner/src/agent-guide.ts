@@ -117,7 +117,7 @@ const CHECK_SCRIPT_URL = 'https://tinkrum.stonetech.dev/assets/agent/tinkrum-che
 /** 动作目录（D-598）：快捷操作的步骤能用哪些动作、内置的快捷操作预设。 */
 const ACTIONS_FILE = 'tinkrum-app-actions.md';
 const ACTIONS_URL = `https://tinkrum.stonetech.dev/assets/agent/${ACTIONS_FILE}`;
-/** 结构模式（D-600）：网上模板库里常见的 8 种结构，各一份完整的 App 文件。 */
+/** 结构模式（D-603）：网上模板库里常见的 8 种结构，各一份完整的 App 文件。 */
 const PATTERNS_FILE = 'tinkrum-app-patterns.md';
 const PATTERNS_URL = `https://tinkrum.stonetech.dev/assets/agent/${PATTERNS_FILE}`;
 
@@ -241,7 +241,7 @@ ${objectTypes(s.get('Output')!)}
 `);
 }
 
-/** 结构模式（D-600）：每种一段说明和一份完整的 App 文件，从 agent-patterns.ts 生成。 */
+/** 结构模式（D-603）：每种一段说明和一份完整的 App 文件，从 agent-patterns.ts 生成。 */
 export function buildPatternsDoc(patterns: readonly AgentPattern[]): string {
   const parts = patterns.map(
     (p, i) => `## ${i + 1}. ${p.name}

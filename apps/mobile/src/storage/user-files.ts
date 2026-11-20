@@ -44,7 +44,7 @@ export async function renameUserFile(
 /**
  * 把几个 PDF 按顺序合成一个新的用户文件（全部文件页面，D-472）：原来的文件都不动。新文件和快捷操作存的一样
  * 画缩略图（saveRunFile）、在后面读文字（D-455）。读不了、加了密的 PDF 报 RunError（和「合并 PDF」一样的说明）；
- * 太大的（单个 50 MB、合计 100 MB）也报 RunError，在读文件之前。
+ * 太大的（单个 100 MB、合计 200 MB，D-601）也报 RunError，在读文件之前。
  */
 export async function mergeUserPdfs(
   assets: readonly AssetRecord[],
@@ -53,7 +53,7 @@ export async function mergeUserPdfs(
   files: FilePlatform,
   ctx: { now(): Date; newId(): string },
 ): Promise<AssetRecord> {
-  // pdf-lib 把整份文件读进内存：和快捷操作一样先按单个 50 MB、合计 100 MB 检查（P-006），读文件之前就拒绝。
+  // pdf-lib 把整份文件读进内存：和快捷操作一样先按单个 100 MB、合计 200 MB 检查（P-006、D-601），读文件之前就拒绝。
   // 大小用存进文档库时记下的（runner 的 copyHandedFiles 也是这样查的）。
   checkSizes(assets.map((a) => ({ name: a.name, size: a.size, mimeType: a.mimeType })));
   const inputs: { name: string; bytes: Uint8Array }[] = [];

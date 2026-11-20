@@ -354,9 +354,9 @@ describe('share journeys (UI)', () => {
 
   it('refuses files over the size limit and removes them when the page is closed', async () => {
     const { files } = await setupApp();
-    await share([{ ...files.offerShared('huge.pdf', await makePdf(1)), size: 51 * 1024 * 1024 }]);
+    await share([{ ...files.offerShared('huge.pdf', await makePdf(1)), size: 101 * 1024 * 1024 }]);
     expect(await screen.findByTestId('share-too-large')).toBeTruthy();
-    expect(screen.getByText('「huge.pdf」超过 50 MB，暂不支持。')).toBeTruthy();
+    expect(screen.getByText('「huge.pdf」超过 100 MB，暂不支持。')).toBeTruthy();
     expect(screen.queryByTestId('share-save')).toBeNull();
     expect(screen.queryByText('运行')).toBeNull();
 

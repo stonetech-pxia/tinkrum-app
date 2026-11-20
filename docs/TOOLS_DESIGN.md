@@ -121,7 +121,7 @@ Step     = { id, action, params, ask?: string[] }   // ask: these parameters are
 - **Parameters are parsed again before running** (D-020); parameters asked at run time are merged into this run and not written back to the config.
 - **Results can be previewed**: image thumbnails, PDF page count and size, the full text (shown only on the device). The result page always offers "Save to files", "Share", "Save to Photos" (images), "Print" (PDF / images) and "Copy" (text).
 - **`tool_runs` records metadata only**: workflow ID, status, error code, output file ID; no content and no file names.
-- **Size limits** (P-006): 50 MB per file and 100 MB in total per run; images sent into the WebView are first scaled down to within 16.77 million pixels (the iOS canvas limit). Video and audio are counted separately: 4 GB per file and at most 10 per run, free space is checked before processing starts, and large files are not copied (D-142).
+- **Size limits** (P-006): 100 MB per PDF and 200 MB of PDFs in total per run, 50 MB per file and 100 MB in total for other files read whole into memory (D-601; PDF to images and text extraction stay at 50 MB per PDF); images sent into the WebView are first scaled down to within 16.77 million pixels (the iOS canvas limit). Video and audio are counted separately: 4 GB per file and at most 10 per run, free space is checked before processing starts, and large files are not copied (D-142).
 - **Asking a question mid-run**: `LocalUi.choose` asks only a fixed set of questions (the text is in the app), for example when compressing a PDF cannot reach the target: "Convert to images / Use the current one" (D-145).
 
 The interface of an action implementation:

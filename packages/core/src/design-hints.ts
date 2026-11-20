@@ -2,7 +2,7 @@ import type { AppFile } from './app-file';
 import { fieldDefinition } from './fields';
 import type { Collection, Component, Page } from './schema';
 
-// 设计建议（D-599）：别的 AI 写的 App 文件能导入以后，再说哪里用起来不顺手。只是建议，不挡导入。
+// 设计建议（D-602）：别的 AI 写的 App 文件能导入以后，再说哪里用起来不顺手。只是建议，不挡导入。
 // 每一条都是创始人 2026-11-20 在对话里看过模拟器里的前后对比图后定的；证据是 AI 写的 69 份文件和 9 个预设
 // （side-session-notes/design-hints-2026-11-20）。条件按道理写，不为了避开预设收窄；预设碰到了就改预设。
 // 设计上的取舍（标题块的副标题、一点就记的按钮和完整表单并存、日历和列表同页、首页放一份摘要）是风格，不在这里。
@@ -178,7 +178,7 @@ export function designHints(file: AppFile): string[] {
   return hints;
 }
 
-/** 每条建议指向结构模式里照着能写对的那一个（D-600，tinkrum-app-patterns.md）。 */
+/** 每条建议指向结构模式里照着能写对的那一个（D-603，tinkrum-app-patterns.md）。 */
 const see = (...n: number[]) =>
   `; see ${n.length > 1 ? 'patterns' : 'pattern'} ${n.join(' and ')} in tinkrum-app-patterns.md`;
 

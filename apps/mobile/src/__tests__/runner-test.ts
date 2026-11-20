@@ -336,13 +336,13 @@ describe('PDF merge workflow (migrated to typed steps)', () => {
       error: { code: 'wrongType', detail: { name: 'photo.jpg', kind: 'PDF' } },
     });
 
-    const huge = { ...files.offer('huge.pdf', new Uint8Array([1])), size: 60 * 1024 * 1024 };
+    const huge = { ...files.offer('huge.pdf', new Uint8Array([1])), size: 101 * 1024 * 1024 };
     files.nextPick = [files.offer('a.pdf', await makePdf(1)), huge];
     expect(await run()).toMatchObject({
-      error: { code: 'tooLarge', detail: { name: 'huge.pdf', mb: 50 } },
+      error: { code: 'tooLarge', detail: { name: 'huge.pdf', mb: 100 } },
     });
 
-    const big = (n: string) => ({ ...files.offer(n, new Uint8Array([1])), size: 40 * 1024 * 1024 });
+    const big = (n: string) => ({ ...files.offer(n, new Uint8Array([1])), size: 70 * 1024 * 1024 });
     files.nextPick = [big('1.pdf'), big('2.pdf'), big('3.pdf')];
     expect(await run()).toMatchObject({ error: { code: 'tooLargeTotal' } });
 

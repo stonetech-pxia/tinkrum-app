@@ -1,0 +1,67 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+import { sqliteRepo } from '../test-utils/node-sqlite';
+import { DB_MIGRATIONS } from '../storage/sqlite';
+
+// 整体导出里的数据库（D-600）：真的 SQLite 文件、WAL 模式。VACUUM INTO 得到一份一致的拷贝：WAL 里还没写回主文件的
+// 记录也在，user_version 带着，打开就能用，不需要 -wal / -shm。
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { DatabaseSync } = require('node:sqlite') as {
+  DatabaseSync: new (p: string) => {
+    prepare(sql: string): { get(...p: unknown[]): Record<string, number> };
+    close(): void;
+  };
+};
+
+let dir: string;
+beforeEach(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tinkrum-backup-db-'));
+});
+afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+describe('database snapshot for the backup', () => {
+  it('includes writes that are still only in the WAL, keeps user_version, and stands alone', async () => {
+    const live = path.join(dir, 'morph.db');
+    const repo = await sqliteRepo(live);
+    for (let i = 0; i < 25; i++) {
+      await repo.insertRecord({
+        id: `r${i}`,
+        collectionId: 'notes',
+        values: { title: `note ${i}` },
+        createdAt: i,
+        updatedAt: i,
+      });
+    }
+    // 真的在 WAL 模式、还有没写回主文件的东西：这时只拷主文件会丢。
+    expect(fs.existsSync(`${live}-wal`)).toBe(true);
+    expect(fs.statSync(`${live}-wal`).size).toBeGreaterThan(0);
+
+    const copy = path.join(dir, 'snapshot.db');
+    await repo.snapshotTo(copy);
+    expect(fs.existsSync(`${copy}-wal`)).toBe(false);
+
+    const opened = new DatabaseSync(copy);
+    expect(opened.prepare('SELECT COUNT(*) AS n FROM records').get().n).toBe(25);
+    expect(opened.prepare('PRAGMA user_version').get().user_version).toBe(DB_MIGRATIONS.length);
+    opened.close();
+
+    expect(await repo.backupInfo()).toEqual({
+      userVersion: DB_MIGRATIONS.length,
+      schemaVersion: null,
+      records: 25,
+    });
+    await repo.close();
+  });
+
+  it('does not count deleted entries in the manifest numbers', async () => {
+    const repo = await sqliteRepo(path.join(dir, 'morph.db'));
+    await repo.insertRecord({ id: 'a', collectionId: 't', values: {}, createdAt: 1, updatedAt: 1 });
+    await repo.insertRecord({ id: 'b', collectionId: 't', values: {}, createdAt: 2, updatedAt: 2 });
+    await repo.deleteRecord('b', 5);
+    expect((await repo.backupInfo()).records).toBe(1);
+    await repo.close();
+  });
+});

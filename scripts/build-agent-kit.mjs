@@ -1,4 +1,4 @@
-// 把给别的 AI 用的 App 文件材料放进网站（D-593）：写法说明、动作目录（D-598）、结构模式（D-600）、JSON Schema、示例（docs/agent/，由
+// 把给别的 AI 用的 App 文件材料放进网站（D-593）：写法说明、动作目录（D-598）、结构模式（D-603）、JSON Schema、示例（docs/agent/，由
 // packages/planner 的快照测试生成），加上 App 文件检查页用的脚本（和 App 导入时同一套检查，在浏览器里跑），
 // 和给 AI 自检用的命令行脚本 tinkrum-check.js（D-594）。
 // 用法：node scripts/build-agent-kit.mjs ../tinkrum-site

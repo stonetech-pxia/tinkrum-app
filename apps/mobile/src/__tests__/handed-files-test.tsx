@@ -239,7 +239,7 @@ describe('edge cases', () => {
   });
 
   it('a file that is too large is refused before anything is copied', async () => {
-    const huge = asset('a9', 'huge.pdf', 'application/pdf', 60 * 1024 * 1024);
+    const huge = asset('a9', 'huge.pdf', 'application/pdf', 101 * 1024 * 1024);
     const { files } = await start(
       [{ id: 'r1', values: { title: 'A', scan: ['a9'] } }],
       [huge],

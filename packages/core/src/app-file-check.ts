@@ -53,7 +53,7 @@ export type AppFileCheck =
       file: AppFile;
       summary: AppFileSummary;
       warnings: string[];
-      /** 设计建议（D-599）：能用，但用起来可以更顺手的地方。不挡导入。 */
+      /** 设计建议（D-602）：能用，但用起来可以更顺手的地方。不挡导入。 */
       hints: string[];
     }
   | { ok: false; problems: string[] };

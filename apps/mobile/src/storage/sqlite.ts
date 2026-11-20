@@ -221,6 +221,36 @@ interface ChangeRequestRow {
 export class SQLiteWorkspaceRepo implements WorkspaceRepo {
   constructor(private readonly db: SQLiteDatabase) {}
 
+  /** 整体导出（D-600）：把整个数据库存成一份一致的拷贝（VACUUM INTO，WAL 里没写回的也在内）。dest 是本机路径，文件必须还不存在。 */
+  async snapshotTo(dest: string): Promise<void> {
+    await this.db.runAsync('VACUUM INTO ?', dest);
+  }
+
+  /** 整体导出（D-600）写进说明里的：数据库版本、当前配置版本、记录条数（不含已删除的）。 */
+  async backupInfo(): Promise<{
+    userVersion: number;
+    schemaVersion: number | null;
+    records: number;
+  }> {
+    const version = await this.db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+    const head = await this.db.getFirstAsync<{ schema_version: number }>(
+      'SELECT r.schema_version FROM workspace_head h JOIN revisions r ON r.id = h.revision_id WHERE h.singleton = 1',
+    );
+    const count = await this.db.getFirstAsync<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM records WHERE deleted_at IS NULL',
+    );
+    return {
+      userVersion: version?.user_version ?? 0,
+      schemaVersion: head?.schema_version ?? null,
+      records: count?.n ?? 0,
+    };
+  }
+
+  /** 关掉数据库（恢复换数据目录之前）。 */
+  async close(): Promise<void> {
+    await this.db.closeAsync();
+  }
+
   async getHead() {
     const row = await this.db.getFirstAsync<RevisionRow>(
       'SELECT r.* FROM workspace_head h JOIN revisions r ON r.id = h.revision_id WHERE h.singleton = 1',

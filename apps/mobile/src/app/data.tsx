@@ -27,6 +27,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
+import { BackupCard } from '@/backup/BackupCard';
 import { useRecordActions } from '@/data/records';
 import { t } from '@/i18n';
 import { LocalModelCard } from '@/packs/LocalModelCard';
@@ -41,7 +42,8 @@ import { useWorkspace, useWorkspaceContext } from '@/workspace/context';
  * 「设置 → 数据」：用户记录的管理页，由内核提供，AI 不能修改。
  * 导出 CSV、查看已移出界面的数据表、恢复最近删除的记录（D-037、D-038、D-041）；
  * 导出 App 配置；预填记忆的导出（也是备份）、从文件恢复、一键清空（D-244）；每张表的「自动读取附件」（D-397）；
- * 本机模型的下载和删除（D-396）；从表格文件导入记录、每张表导入过的批次和整批删除（D-574）。
+ * 本机模型的下载和删除（D-396）；从表格文件导入记录、每张表导入过的批次和整批删除（D-574）；
+ * 整体导出和从压缩包恢复（D-600，backup/BackupCard.tsx）。
  */
 /** 表上的「附件是」的选项（D-421）。 */
 const PREFILL_RULES = [
@@ -276,6 +278,8 @@ export default function DataRoute() {
           {t(locale, 'dataPrivacy')}
         </Text>
       </Card>
+
+      <BackupCard palette={palette} locale={locale} files={files} />
 
       <SectionLabel palette={palette}>{t(locale, 'dataTables')}</SectionLabel>
       {config.data.tables.map((c) => (

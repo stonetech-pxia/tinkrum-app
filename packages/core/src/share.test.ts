@@ -135,11 +135,51 @@ describe('sharedSizeProblem (P-006)', () => {
 
   it('applies the same limits as the pickers', () => {
     expect(sharedSizeProblem([pdf('a', 10 * MB)])).toBeNull();
-    expect(sharedSizeProblem([pdf('big', 51 * MB)])).toEqual({
+    // PDF 单独算（D-601）：单个 100 MB、合计 200 MB。
+    expect(sharedSizeProblem([pdf('a', 60 * MB), pdf('b', 100 * MB)])).toBeNull();
+    expect(sharedSizeProblem([pdf('big', 101 * MB)])).toEqual({
       code: 'tooLarge',
-      detail: { name: 'big.pdf', mb: 50 },
+      detail: { name: 'big.pdf', mb: 100 },
     });
-    expect(sharedSizeProblem([pdf('1', 40 * MB), pdf('2', 40 * MB), pdf('3', 40 * MB)])).toEqual({
+    expect(sharedSizeProblem([pdf('1', 100 * MB), pdf('2', 100 * MB)])).toBeNull();
+    expect(sharedSizeProblem([pdf('1', 100 * MB), pdf('2', 100 * MB), pdf('3', 1 * MB)])).toEqual({
+      code: 'tooLargeTotal',
+      detail: { mb: 200 },
+    });
+    // 其他文件不变：单个 50 MB、合计 100 MB；混合时各算各的。
+    const png = (name: string, size: number) => ({
+      name: `${name}.png`,
+      mimeType: 'image/png',
+      size,
+    });
+    const zip = (name: string, size: number) => ({
+      name: `${name}.zip`,
+      mimeType: 'application/zip',
+      size,
+    });
+    expect(sharedSizeProblem([png('big', 60 * MB)])).toEqual({
+      code: 'tooLarge',
+      detail: { name: 'big.png', mb: 50 },
+    });
+    expect(sharedSizeProblem([zip('big', 51 * MB)])).toEqual({
+      code: 'tooLarge',
+      detail: { name: 'big.zip', mb: 50 },
+    });
+    expect(sharedSizeProblem([png('1', 40 * MB), png('2', 40 * MB), png('3', 40 * MB)])).toEqual({
+      code: 'tooLargeTotal',
+      detail: { mb: 100 },
+    });
+    expect(
+      sharedSizeProblem([pdf('p', 100 * MB), png('1', 50 * MB), png('2', 50 * MB)]),
+    ).toBeNull();
+    expect(
+      sharedSizeProblem([
+        pdf('p', 100 * MB),
+        png('1', 50 * MB),
+        png('2', 40 * MB),
+        png('3', 20 * MB),
+      ]),
+    ).toEqual({
       code: 'tooLargeTotal',
       detail: { mb: 100 },
     });

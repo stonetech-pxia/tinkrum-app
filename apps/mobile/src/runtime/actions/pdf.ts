@@ -1,4 +1,5 @@
 import {
+  FILE_LIMITS,
   RunCancelled,
   RunError,
   fixCjkRadicals,
@@ -209,6 +210,16 @@ function stampBox(
 const today = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+/**
+ * 走 PDF 预览包（WebView + pdf.js）的动作要把整份文件塞进 WebView：模拟器里实测内存约是文件的 20–30 倍
+ * （49 MB 约 1.9 GB，99 MB 约 2.8 GB），远高于只用 pdf-lib 的动作，所以仍按 50 MB 收，不跟着 PDF 的 100 MB 走（D-601）。
+ */
+function checkViewSize(item: RunItem): void {
+  if (item.size > FILE_LIMITS.maxFileBytes) {
+    throw new RunError('tooLarge', { name: fileName(item), mb: FILE_LIMITS.maxFileBytes / MB });
+  }
+}
+
 /** 用 PDF 预览包把页面渲染成 JPEG（App 里的 WebView + pdf.js）。返回本次运行的临时图片。 */
 export async function renderPages(
   ctx: Ctx,
@@ -217,6 +228,7 @@ export async function renderPages(
 ): Promise<RunItem[]> {
   const packs = ctx.services.packs;
   if (!packs) throw new RunError('packFailed', { detail: 'pdfview' });
+  checkViewSize(item);
   let pages: {
     index: number;
     width: number;
@@ -584,6 +596,7 @@ export const PDF_IMPLS: Record<string, Impl> = {
     const [item] = fileItems(input);
     const packs = ctx.services.packs;
     if (!item || !packs) throw new RunError('packFailed', { detail: 'pdfview' });
+    checkViewSize(item);
     let result: { pages: string[] };
     try {
       result = await packs.runtime.call('pdfview', 'text', { file: 'input' }, { input: item.uri });

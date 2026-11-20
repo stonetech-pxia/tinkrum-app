@@ -45,19 +45,19 @@ describe('文档库合并 PDF 的大小检查', () => {
     expect(names).toEqual([...assets.map((a) => a.name), 'merged.pdf'].sort());
   });
 
-  it('单个文件超过 50 MB：读文件之前就拒绝，什么都不写', async () => {
-    const { repo, read, merge } = await setup([100_000, 51 * MB]);
+  it('单个文件超过 100 MB（PDF，D-601）：读文件之前就拒绝，什么都不写', async () => {
+    const { repo, read, merge } = await setup([100_000, 101 * MB]);
     await expect(merge()).rejects.toMatchObject({ code: 'tooLarge' });
     await expect(merge()).rejects.toBeInstanceOf(RunError);
     expect(read).not.toHaveBeenCalled();
     expect(await repo.listAssets()).toHaveLength(2);
   });
 
-  it('每个都不超过 50 MB、合计超过 100 MB：读文件之前就拒绝', async () => {
-    const { repo, read, merge } = await setup([30 * MB, 30 * MB, 30 * MB, 30 * MB]);
+  it('每个都不超过 100 MB、合计超过 200 MB：读文件之前就拒绝', async () => {
+    const { repo, read, merge } = await setup([70 * MB, 70 * MB, 70 * MB]);
     await expect(merge()).rejects.toMatchObject({ code: 'tooLargeTotal' });
     expect(read).not.toHaveBeenCalled();
-    expect(await repo.listAssets()).toHaveLength(4);
+    expect(await repo.listAssets()).toHaveLength(3);
   });
 
   it('刚好 50 MB 一个、合计不超过 100 MB 的不拦', async () => {

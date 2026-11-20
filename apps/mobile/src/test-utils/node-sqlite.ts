@@ -9,6 +9,7 @@ import { SQLiteWorkspaceRepo, migrateDatabase } from '../storage/sqlite';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { DatabaseSync } = require('node:sqlite') as {
   DatabaseSync: new (path: string) => {
+    close(): void;
     exec(sql: string): void;
     prepare(sql: string): {
       run(...p: unknown[]): { lastInsertRowid: number | bigint; changes: number | bigint };
@@ -18,8 +19,9 @@ const { DatabaseSync } = require('node:sqlite') as {
   };
 };
 
-export function nodeSqlite(): SQLiteDatabase {
-  const db = new DatabaseSync(':memory:');
+/** path 不给就是内存数据库；给了就是真的文件（有 -wal、-shm，整体导出的测试要用）。 */
+export function nodeSqlite(path = ':memory:'): SQLiteDatabase {
+  const db = new DatabaseSync(path);
   let queue: Promise<unknown> = Promise.resolve();
   const transaction = (fn: (txn: unknown) => Promise<void>) => {
     const run = async () => {
@@ -45,14 +47,15 @@ export function nodeSqlite(): SQLiteDatabase {
     getFirstAsync: async (sql: string, ...params: unknown[]) =>
       db.prepare(sql).get(...params) ?? null,
     getAllAsync: async (sql: string, ...params: unknown[]) => db.prepare(sql).all(...params),
+    closeAsync: async () => db.close(),
     withTransactionAsync: transaction,
     withExclusiveTransactionAsync: transaction,
   };
   return api as unknown as SQLiteDatabase;
 }
 
-export async function sqliteRepo() {
-  const db = nodeSqlite();
+export async function sqliteRepo(path?: string) {
+  const db = nodeSqlite(path);
   await migrateDatabase(db);
   return new SQLiteWorkspaceRepo(db);
 }
