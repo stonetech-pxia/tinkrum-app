@@ -12,9 +12,7 @@ import { registry } from './test-helpers';
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 19) };
 const DIR = join(__dirname, 'fixtures', 'portal-apps');
 const habitsText = readFileSync(join(DIR, 'tinkrum-app-habits.json'), 'utf8');
-// 按当前版本逐项查的说法：用当前版本号（预设文件可能还是上一版，D-607 起是 40）。
-const habits = () =>
-  ({ ...JSON.parse(habitsText), schemaVersion: CURRENT_SCHEMA_VERSION }) as Record<string, any>;
+const habits = () => JSON.parse(habitsText) as Record<string, any>;
 const check = (data: unknown) => checkAppFileText(JSON.stringify(data), ctx);
 const problems = (data: unknown) => {
   const result = check(data);
@@ -57,6 +55,14 @@ describe('checkAppFileText', () => {
   it('names what is missing from the outside of the file', () => {
     const { schemaVersion: _, ...rest } = habits();
     expect(problems(rest)).toEqual([expect.stringMatching(/^schemaVersion: /)]);
+  });
+
+  // D-607：39 → 40 只加了单选的 multiple；39 的文件（网站上的预设）照样逐项说清楚。
+  it('checks a file of the previous version in detail when migrating it changes nothing else', () => {
+    const d = habits();
+    expect(d.schemaVersion).toBe(CURRENT_SCHEMA_VERSION - 1);
+    d.pages[0].blocks[0].look = 'banner';
+    expect(problems(d)[0]).toMatch(/^pages\.0\.blocks\.0\.look: "banner" is not a valid look/);
   });
 
   it('tells a newer file to use the current version', () => {

@@ -51,6 +51,7 @@ import {
   linkTitle,
   localDateTime,
   prepareRecordValues,
+  pickedOptions,
   readValue,
   recordValue,
   sequenceText,
@@ -453,21 +454,38 @@ export const FIELD_EDITORS: { [T in FieldType]: FieldEditor<FieldOf<T>> } = {
       />
     ),
   },
+  // 多选（D-607）：同样的一排选项，点一个加上或去掉，表单里的值是选项 ID 的列表。
   choice: {
-    input: ({ field, value, onChange, palette, disabled, testID, chip }) => (
-      <View style={styles.chips}>
-        {field.options.map((o) => (
-          <Pressable
-            key={o.id}
-            testID={`${testID}-${o.id}`}
-            disabled={disabled}
-            onPress={() => onChange(value === o.id ? '' : o.id)}
-            style={chip(value === o.id)}>
-            <Text style={[palette.font('bodyBold', 13), { color: palette.text }]}>{o.label}</Text>
-          </Pressable>
-        ))}
-      </View>
-    ),
+    input: ({ field, value, onChange, palette, disabled, testID, chip }) => {
+      const picked = field.multiple ? pickedOptions(field, value) : [];
+      const isOn = (id: string) => (field.multiple ? picked.includes(id) : value === id);
+      const toggle = (id: string) =>
+        field.multiple
+          ? onChange(
+              isOn(id) ? picked.filter((x) => x !== id) : pickedOptions(field, [...picked, id]),
+            )
+          : onChange(value === id ? '' : id);
+      return (
+        <View style={styles.chips}>
+          {field.options.map((o) => (
+            <Pressable
+              key={o.id}
+              testID={`${testID}-${o.id}`}
+              disabled={disabled}
+              {...(field.multiple
+                ? {
+                    accessibilityRole: 'checkbox' as const,
+                    accessibilityState: { checked: isOn(o.id) },
+                  }
+                : {})}
+              onPress={() => toggle(o.id)}
+              style={chip(isOn(o.id))}>
+              <Text style={[palette.font('bodyBold', 13), { color: palette.text }]}>{o.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      );
+    },
   },
   file: {
     input: ({ field, value, onChange, palette, locale, disabled, testID }) => (
