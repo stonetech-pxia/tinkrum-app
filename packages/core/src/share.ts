@@ -1,4 +1,4 @@
-import { FILE_LIMITS, MEDIA_LIMITS } from './limits';
+import { MEDIA_LIMITS, inMemorySizeProblem } from './limits';
 import { OFFICE_MIME_TYPES, mediaKindOf } from './media';
 import type { Workflow } from './schema';
 import { FILE_ACCEPT, MAX_PICK } from './tools/io';
@@ -108,7 +108,7 @@ export function shareFit(workflow: Workflow, files: readonly SharedFileInfo[]): 
 }
 
 /**
- * 大小上限（P-006）：和选择器选的文件一样，单个 50 MB、合计 100 MB。视频和音频单独算（D-142）：
+ * 大小上限（P-006）：和选择器选的文件一样：PDF 单个 100 MB、合计 200 MB，其他文件单个 50 MB、合计 100 MB，各算各的（D-601）。视频和音频单独算（D-142）：
  * 单个 4 GB、最多 10 个，不计入合计。没问题时返回 null。
  */
 export function sharedSizeProblem(
@@ -129,15 +129,9 @@ export function sharedSizeProblem(
   if (media.length > MEDIA_LIMITS.maxCount) {
     return { code: 'tooMany', detail: { max: MEDIA_LIMITS.maxCount } };
   }
-  const others = files.filter((f) => !isMedia(f));
-  for (const f of others) {
-    if ((f.size ?? 0) > FILE_LIMITS.maxFileBytes) {
-      return { code: 'tooLarge', detail: { name: f.name, mb: mb(FILE_LIMITS.maxFileBytes) } };
-    }
-  }
-  const total = others.reduce((sum, f) => sum + (f.size ?? 0), 0);
-  if (total > FILE_LIMITS.maxTotalBytes) {
-    return { code: 'tooLargeTotal', detail: { mb: mb(FILE_LIMITS.maxTotalBytes) } };
-  }
+  const problem = inMemorySizeProblem(files.filter((f) => !isMedia(f)));
+  if (problem?.code === 'tooLarge')
+    return { code: 'tooLarge', detail: { name: problem.name, mb: problem.mb } };
+  if (problem) return { code: 'tooLargeTotal', detail: { mb: problem.mb } };
   return null;
 }
