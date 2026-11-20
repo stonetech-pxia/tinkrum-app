@@ -8,8 +8,7 @@ import { checkAppFileText } from './app-file-check';
 import { designHints } from './design-hints';
 import { registry } from './test-helpers';
 
-// 设计建议（D-599）：创始人看过前后对比图后定的六种。条件按道理写，不为避开预设收窄：预设碰到的列在下面，
-// 等创始人决定改不改那几个预设（2026-11-20）。
+// 设计建议（D-599）：创始人看过前后对比图后定的六种。条件按道理写，不为避开预设收窄：预设碰到了就改预设。
 
 const DIR = join(__dirname, 'fixtures', 'portal-apps');
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 20) };
@@ -18,22 +17,15 @@ const read = (name: string) => JSON.parse(readFileSync(join(DIR, name), 'utf8'))
 const habits = () => read('tinkrum-app-habits.json') as any;
 
 describe('designHints', () => {
-  it('says only these things about our presets, awaiting the founder on whether to change them', () => {
+  // 我们的预设一条建议都没有：创始人 2026-11-20 同意按建议改了 Wallet、Focus、Reading。
+  it('has nothing to say about any of our presets', () => {
     const manifest = JSON.parse(readFileSync(join(DIR, 'manifest.json'), 'utf8')) as {
       apps: { file: string }[];
     };
     const said = manifest.apps.flatMap((app) =>
-      designHints(read(app.file)).map((h) => `${app.file} ${h.slice(0, h.indexOf(':'))}`),
+      designHints(read(app.file)).map((h) => `${app.file} ${h}`),
     );
-    expect(said).toEqual([
-      'tinkrum-app-wallet.json pages.0.blocks.8.children.0 (block "recent")',
-      'tinkrum-app-wallet.json pages.3.blocks.2 (block "txs")',
-      'tinkrum-app-focus.json pages.0.blocks.4.children.0 (block "run")',
-      'tinkrum-app-focus.json pages.2.blocks.2.children.0 (block "run")',
-      'tinkrum-app-focus.json pages.2.blocks.4.children.0 (block "sessions")',
-      'tinkrum-app-focus.json pages.3.blocks.3 (block "sess")',
-      'tinkrum-app-reading.json pages.0.blocks.5 (block "days")',
-    ]);
+    expect(said).toEqual([]);
   });
 
   it('is part of a passing check', () => {

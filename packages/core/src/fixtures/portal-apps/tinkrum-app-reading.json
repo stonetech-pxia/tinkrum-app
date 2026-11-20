@@ -811,6 +811,7 @@
         {
           "id": "minutes",
           "name": "Time read",
+          "required": true,
           "type": "duration"
         },
         {
