@@ -69,7 +69,7 @@ export function designHints(file: AppFile): string[] {
       if (n > FORM_FIRST_MAX) {
         flagged.add(blocks[first]!);
         hints.push(
-          `pages.${p}.blocks.${first} (block "${blocks[first]!.id}"): the page opens with a form of ${n} fields before anything else; use one add button instead (a "button" block whose tool is {"do": "create", "table": …, "ask": "all"}) and put what the page shows first`,
+          `pages.${p}.blocks.${first} (block "${blocks[first]!.id}"): the page opens with a form of ${n} fields before anything else; use one add button instead (a "button" block whose tool is {"do": "create", "table": …, "ask": "all"}) and put what the page shows first${see(1)}`,
         );
       }
     }
@@ -80,7 +80,7 @@ export function designHints(file: AppFile): string[] {
           const n = formFields(b, tables);
           if (n > FORM_MAX)
             hints.push(
-              `${path} (block "${b.id}"): an inline form with ${n} fields is long to fill on a phone; use one add button instead (a "button" block whose tool is {"do": "create", "table": …, "ask": "all"}), or ask only the fields people fill every time`,
+              `${path} (block "${b.id}"): an inline form with ${n} fields is long to fill on a phone; use one add button instead (a "button" block whose tool is {"do": "create", "table": …, "ask": "all"}), or ask only the fields people fill every time${see(1)}`,
             );
         }
         walk(childrenOf(b), `${path}.children`);
@@ -93,7 +93,7 @@ export function designHints(file: AppFile): string[] {
       if (PLAIN_LISTS.has(b.look)) {
         if (previous)
           hints.push(
-            `pages.${p}.blocks.${i} (block "${b.id}"): this list comes right after another list with no header between them, so people cannot tell the two apart; put a header block before each list`,
+            `pages.${p}.blocks.${i} (block "${b.id}"): this list comes right after another list with no header between them, so people cannot tell the two apart; put a header block before each list${see(8)}`,
           );
         previous = true;
       } else if (b.look === 'header' || (b.look === 'group' && showOf(b).title)) previous = false;
@@ -114,7 +114,7 @@ export function designHints(file: AppFile): string[] {
           !JSON.stringify(tool.values ?? null).includes('$row')
         )
           hints.push(
-            `${path} (block "${b.id}"): every row gets a button that adds a new ${t} entry; put one add button below the list instead (a "button" block whose tool is {"do": "create", "table": "${t}", "ask": "all"}), or use {"as": "addHere", "do": "create", "table": "${t}", "ask": "all", "values": "$here"}`,
+            `${path} (block "${b.id}"): every row gets a button that adds a new ${t} entry; put one add button below the list instead (a "button" block whose tool is {"do": "create", "table": "${t}", "ask": "all"}), or use {"as": "addHere", "do": "create", "table": "${t}", "ask": "all", "values": "$here"}${see(1)}`,
           );
       // 6. 行标题是选填字段：没填的那几行显示的是表名和录入那天，不是这条记录。
       const title = field(show.title);
@@ -125,7 +125,7 @@ export function designHints(file: AppFile): string[] {
         !COMPUTED.has(title.type)
       )
         hints.push(
-          `${path} (block "${b.id}"): the row title "${title.id}" is optional, so entries without it show the table's name and the day they were added instead; use a field that is always filled as the title (a required field, or a date with a default) and move "${title.id}" to subtitles`,
+          `${path} (block "${b.id}"): the row title "${title.id}" is optional, so entries without it show the table's name and the day they were added instead; use a field that is always filled as the title (a required field, or a date with a default) and move "${title.id}" to subtitles${see(3)}`,
         );
       // 3. 一行里并排显示一个汇总（已存、已花）和另一个数字（目标、预算）：如果是目标或上限，进度条一眼看出差多少。
       if (show.format === undefined && (b.look === 'list' || b.look === 'cards')) {
@@ -144,7 +144,7 @@ export function designHints(file: AppFile): string[] {
         const other = shown.find((f) => f !== total && (f.type === 'money' || f.type === 'number'));
         if (total && other)
           hints.push(
-            `${path} (block "${b.id}"): it shows "${total.id}" and "${other.id}" side by side; if "${other.id}" is the goal or limit for "${total.id}", show the progress instead: "trailing": "${total.id}", "format": {"kind": "progress", "goal": "${other.id}", "style": "bar"} (it reads "${total.id} / ${other.id}" with a bar)`,
+            `${path} (block "${b.id}"): it shows "${total.id}" and "${other.id}" side by side; if "${other.id}" is the goal or limit for "${total.id}", show the progress instead: "trailing": "${total.id}", "format": {"kind": "progress", "goal": "${other.id}", "style": "bar"} (it reads "${total.id} / ${other.id}" with a bar)${see(2, 3)}`,
           );
       }
     }
@@ -172,11 +172,15 @@ export function designHints(file: AppFile): string[] {
     if (links.length === 0) return;
     const { child, field } = links[0]!;
     hints.push(
-      `tables.${i} ("${parent.id}"): ${list(links.map((l) => l.child))} link to its entries, but there is no page for one ${parent.id} entry, so tapping one cannot show its ${child} entries; add a page with "of": "${parent.id}" that lists ${child} filtered by {"field": "${field}", "op": "is", "value": "$record"}, and set "opens" to that page on the blocks that list ${parent.id}`,
+      `tables.${i} ("${parent.id}"): ${list(links.map((l) => l.child))} link to its entries, but there is no page for one ${parent.id} entry, so tapping one cannot show its ${child} entries; add a page with "of": "${parent.id}" that lists ${child} filtered by {"field": "${field}", "op": "is", "value": "$record"}, and set "opens" to that page on the blocks that list ${parent.id}${see(8)}`,
     );
   });
   return hints;
 }
+
+/** 每条建议指向结构模式里照着能写对的那一个（D-600，tinkrum-app-patterns.md）。 */
+const see = (...n: number[]) =>
+  `; see ${n.length > 1 ? 'patterns' : 'pattern'} ${n.join(' and ')} in tinkrum-app-patterns.md`;
 
 const list = (items: readonly string[]) => [...new Set(items)].join(', ');
 

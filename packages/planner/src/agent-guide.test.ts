@@ -2,7 +2,13 @@ import { BUILTIN_TOOLS, checkAppFileText, createRegistry } from '@morph/core';
 import { describe, expect, it } from 'vitest';
 
 import { AGENT_EXAMPLE_APP } from './agent-example';
-import { appFileJsonSchema, buildActionCatalog, buildAgentGuide } from './agent-guide';
+import { AGENT_PATTERNS } from './agent-patterns';
+import {
+  appFileJsonSchema,
+  buildActionCatalog,
+  buildAgentGuide,
+  buildPatternsDoc,
+} from './agent-guide';
 
 // 给别的 AI 看的 App 文件写法（D-593）：生成的说明和 JSON Schema 放在 docs/agent/，改了登记表、提示词或 App 文件的
 // 形状要有意地更新（npx vitest -u）；里面的示例必须能照原样导入。
@@ -23,6 +29,28 @@ describe('agent guide', () => {
   it('action catalog', async () => {
     await expect(buildActionCatalog(registry)).toMatchFileSnapshot(
       `${DOCS}/tinkrum-app-actions.md`,
+    );
+  });
+
+  it('patterns', async () => {
+    await expect(buildPatternsDoc(AGENT_PATTERNS)).toMatchFileSnapshot(
+      `${DOCS}/tinkrum-app-patterns.md`,
+    );
+  });
+
+  // 结构模式（D-600）：每一份都能照原样导入，没有要修的，也没有设计建议；只有英文。
+  it('every pattern imports as it is, with nothing to fix and no suggestions', () => {
+    expect(AGENT_PATTERNS).toHaveLength(8);
+    for (const p of AGENT_PATTERNS) {
+      const result = checkAppFileText(JSON.stringify(p.app), ctx);
+      expect([p.name, result.ok && result.warnings, result.ok && result.hints]).toEqual([
+        p.name,
+        [],
+        [],
+      ]);
+    }
+    expect(buildPatternsDoc(AGENT_PATTERNS)).not.toMatch(
+      /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/,
     );
   });
 
@@ -74,6 +102,9 @@ describe('agent guide', () => {
     expect(guide).toContain('apply them unless the person asked for it this way');
     // 重复的日期（D-599）：订阅、账单这类用日程字段或日期偏移，不用手改的日期。
     expect(guide).toContain('A date that comes back');
+    // 先从结构模式起步（D-600）。
+    expect(guide).toContain('**Start from a pattern.**');
+    expect(guide).toContain('https://tinkrum.stonetech.dev/assets/agent/tinkrum-app-patterns.md');
   });
 
   it('the action catalog is English only and lists the actions', () => {

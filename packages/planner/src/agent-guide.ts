@@ -9,6 +9,7 @@ import {
 } from '@morph/core';
 import { z } from 'zod';
 
+import type { AgentPattern } from './agent-patterns';
 import { buildSystemPrompt } from './prompt';
 
 // 给别的 AI（Claude、ChatGPT……）看的 App 文件写法（D-593）：用户请它们生成一个 tinkrum-app 文件，再从「我的预设」
@@ -116,6 +117,9 @@ const CHECK_SCRIPT_URL = 'https://tinkrum.stonetech.dev/assets/agent/tinkrum-che
 /** 动作目录（D-598）：快捷操作的步骤能用哪些动作、内置的快捷操作预设。 */
 const ACTIONS_FILE = 'tinkrum-app-actions.md';
 const ACTIONS_URL = `https://tinkrum.stonetech.dev/assets/agent/${ACTIONS_FILE}`;
+/** 结构模式（D-600）：网上模板库里常见的 8 种结构，各一份完整的 App 文件。 */
+const PATTERNS_FILE = 'tinkrum-app-patterns.md';
+const PATTERNS_URL = `https://tinkrum.stonetech.dev/assets/agent/${PATTERNS_FILE}`;
 
 const requiredThemeKeys = () =>
   Object.entries(ThemeSchema.shape)
@@ -181,7 +185,7 @@ This guide is for an AI assistant (Claude, ChatGPT or any other) that a person a
 - \`tables\`: the app's tables (see **Data**). \`pages\`: its pages (see **Containers**); there is no page \`home\` in an app file. \`tools\`: its quick actions and reminders (see **Tools**).
 - Limits: at most ${MAX_PAGE_BLOCKS} top-level blocks on a page; the person's whole phone holds at most ${MAX_PAGES} pages and ${MAX_TABLES} tables, so keep an app small (2–5 pages, 1–6 tables).
 - Every page needs a way in: put it in \`app.bar\`, or have an \`entry\` or \`button\` block open it, or (for a page with \`of\`, a page for one entry) have a record block's \`opens\` point at it.
-- A date that comes back (a subscription that renews every month, a monthly bill, a yearly check-up) should not be a plain \`date\` field the person has to move on by hand: use a \`schedule\` field (a repeat rule each entry keeps, with \`lastDone\` pointing at the date it was last done) or a \`dateOffset\` field computed from the last date (for example the next payment = the last payment + 1 month). See **Data**.
+- A date that comes back (a subscription that renews every month, a monthly bill, a yearly check-up) should not be a plain \`date\` field the person has to move on by hand: use a \`schedule\` field (a repeat rule each entry keeps, with \`lastDone\` pointing at the date it was last done) or a \`dateOffset\` field computed from the last date (for example the next payment = the last payment + 1 month). See **Data**, and pattern 5 in \`${PATTERNS_FILE}\`.
 - Give every table that a page lists an empty state: a \`notice\` block with \`showIf: {"table": "<id>", "has": "none"}\` that says how to add the first entry.
 
 ## How to read the reference
@@ -200,10 +204,11 @@ Ignore what the reference says about plans, rejections, notes, drafts, earlier r
 ## How to work
 
 1. Ask what the person wants to keep track of and do, in their words, if it is not clear. Do not ask for their actual data.
-2. Write the file. Prefer fewer, well-made pages to many thin ones. Use the person's language for every name, label and text in the app.
-3. **Check the file before you give it.** If you can run code with Node.js 18 or newer, run the Tinkrum checker: \`node tinkrum-check.js app.json\` (or pipe the text in: \`node tinkrum-check.js -\`). It is the same check Tinkrum runs when it imports a file, it is one file that needs nothing else, and it does not use the network. Your code environment usually cannot download it, so ask the person to attach it; they get it from ${CHECK_SCRIPT_URL}. The first line of its output is \`OK\` or \`NOT OK\`. Fix every problem it lists and run it again until it says \`OK\`; lines after \`OK\` are parts that will not work yet, so fix those too. It may then list suggestions to make the app easier to use: apply them unless the person asked for it this way. If you cannot run Node but can run Python with \`jsonschema\`, validate the file against \`tinkrum-app.schema.json\`: that only checks the shape, so tell the person the file was not fully checked. If you cannot run code, say so and point the person to the checker page, ${MAKE_PAGE_URL}.
-4. Reply with the **whole file in one \`\`\`json code block**, and tell the person how to import it: copy it, then in Tinkrum open **Settings → My presets** and choose **Paste from clipboard** (or save it as a \`.json\` file and choose **Import from a file**).
-5. The person may come back with a list of problems from Tinkrum or from the Tinkrum app-file checker, such as \`pages.0.blocks.2.look: "banner" is not a valid look; use one of …\` or \`pages.1.blocks.3 (block "log"): show.subtitles type is not a field of plants-care; fields of plants-care: plant, what, date, note\`. A path counts from the top of the file (\`pages.0\` is the first page); a bare name is a block, page, table or tool id. Most problems say what to write instead. Fix every problem and send the whole file again.
+2. **Start from a pattern.** \`${PATTERNS_FILE}\` (${PATTERNS_URL}) holds eight proven structures, each a complete app file that imports cleanly: a log with totals by period, a category budget against spending, a goal against progress, check-ins and streaks, recurring due items, a status pipeline, a collection with a wishlist, and a parent with child logs. Pick the one closest to what the person wants (or combine two), keep its structure, and change the names, fields and wording to fit; give every id your own app's prefix. If you cannot get the file, follow the example below.
+3. Write the file. Prefer fewer, well-made pages to many thin ones. Use the person's language for every name, label and text in the app.
+4. **Check the file before you give it.** If you can run code with Node.js 18 or newer, run the Tinkrum checker: \`node tinkrum-check.js app.json\` (or pipe the text in: \`node tinkrum-check.js -\`). It is the same check Tinkrum runs when it imports a file, it is one file that needs nothing else, and it does not use the network. Your code environment usually cannot download it, so ask the person to attach it; they get it from ${CHECK_SCRIPT_URL}. The first line of its output is \`OK\` or \`NOT OK\`. Fix every problem it lists and run it again until it says \`OK\`; lines after \`OK\` are parts that will not work yet, so fix those too. It may then list suggestions to make the app easier to use: apply them unless the person asked for it this way. If you cannot run Node but can run Python with \`jsonschema\`, validate the file against \`tinkrum-app.schema.json\`: that only checks the shape, so tell the person the file was not fully checked. If you cannot run code, say so and point the person to the checker page, ${MAKE_PAGE_URL}.
+5. Reply with the **whole file in one \`\`\`json code block**, and tell the person how to import it: copy it, then in Tinkrum open **Settings → My presets** and choose **Paste from clipboard** (or save it as a \`.json\` file and choose **Import from a file**).
+6. The person may come back with a list of problems from Tinkrum or from the Tinkrum app-file checker, such as \`pages.0.blocks.2.look: "banner" is not a valid look; use one of …\` or \`pages.1.blocks.3 (block "log"): show.subtitles type is not a field of plants-care; fields of plants-care: plant, what, date, note\`. A path counts from the top of the file (\`pages.0\` is the first page); a bare name is a block, page, table or tool id. Most problems say what to write instead. Fix every problem and send the whole file again.
 
 ## A complete example
 
@@ -234,6 +239,38 @@ ${s.get('Theme')!.trimEnd()}
 ${objectTypes(s.get('Output')!)}
 \`\`\`
 `);
+}
+
+/** 结构模式（D-600）：每种一段说明和一份完整的 App 文件，从 agent-patterns.ts 生成。 */
+export function buildPatternsDoc(patterns: readonly AgentPattern[]): string {
+  const parts = patterns.map(
+    (p, i) => `## ${i + 1}. ${p.name}
+
+**Use it when** ${p.when}.
+
+**How it is built**
+
+${p.how.map((h) => `- ${h}`).join('\n')}
+
+\`\`\`json
+${JSON.stringify(p.app, null, 2)}
+\`\`\`
+`,
+  );
+  return `<!-- Generated by packages/planner/src/agent-guide.ts (npx vitest -u in packages/planner). Do not edit by hand. -->
+
+# Tinkrum app patterns
+
+A companion to the Tinkrum app-file guide (tinkrum-app-guide.md). These are structures that personal trackers keep coming back to in the big template galleries (Notion, Airtable, Google Sheets, Microsoft, Apple Numbers), each written as a complete Tinkrum app file that imports with no problems and no design suggestions.
+
+How to use them:
+
+- Pick the pattern closest to what the person wants, or combine two (for example a parent with child logs whose child log has a budget).
+- Keep the structure: the tables, the links and rollups, which page lists what and how an entry is added.
+- Change everything that is about this example: the app id and name, ids (keep them prefixed by your own app id), field names, choice options, labels, colours and icons, in the person's language.
+- The sample apps have no reminders or quick actions; add them as the guide says.
+
+${parts.join('\n')}`;
 }
 
 /** 动作目录（D-598）：快捷操作的步骤能用的动作和内置预设，从 Tink 的提示词切出来，和指南分开放。 */

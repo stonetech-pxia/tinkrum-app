@@ -13,7 +13,6 @@ import { registry } from './test-helpers';
 const DIR = join(__dirname, 'fixtures', 'portal-apps');
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 20) };
 const read = (name: string) => JSON.parse(readFileSync(join(DIR, name), 'utf8')) as AppFile;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const habits = () => read('tinkrum-app-habits.json') as any;
 
 describe('designHints', () => {
@@ -45,7 +44,7 @@ describe('designHints', () => {
       tools: [{ as: 'submit', label: 'Add', do: 'create', table: 'habits-habits', ask: 'all' }],
     });
     expect(designHints(d)).toEqual([
-      'pages.1.blocks.1 (block "add"): the page opens with a form of 4 fields before anything else; use one add button instead (a "button" block whose tool is {"do": "create", "table": …, "ask": "all"}) and put what the page shows first',
+      'pages.1.blocks.1 (block "add"): the page opens with a form of 4 fields before anything else; use one add button instead (a "button" block whose tool is {"do": "create", "table": …, "ask": "all"}) and put what the page shows first; see pattern 1 in tinkrum-app-patterns.md',
     ]);
     // 三个字段以内放在开头没关系。
     d.pages[1].blocks[1].tools[0].ask = ['name', 'goal', 'part'];
@@ -79,7 +78,7 @@ describe('designHints', () => {
         for (const c of b.children ?? []) delete c.opens;
       }
     expect(designHints(d)).toEqual([
-      'tables.0 ("habits-habits"): habits-checkins link to its entries, but there is no page for one habits-habits entry, so tapping one cannot show its habits-checkins entries; add a page with "of": "habits-habits" that lists habits-checkins filtered by {"field": "habit", "op": "is", "value": "$record"}, and set "opens" to that page on the blocks that list habits-habits',
+      'tables.0 ("habits-habits"): habits-checkins link to its entries, but there is no page for one habits-habits entry, so tapping one cannot show its habits-checkins entries; add a page with "of": "habits-habits" that lists habits-checkins filtered by {"field": "habit", "op": "is", "value": "$record"}, and set "opens" to that page on the blocks that list habits-habits; see pattern 8 in tinkrum-app-patterns.md',
     ]);
   });
 
@@ -95,7 +94,7 @@ describe('designHints', () => {
     });
     d.pages[1].blocks[1].show = { title: 'name', subtitles: ['goal'], trailing: 'done' };
     expect(designHints(d)).toEqual([
-      'pages.1.blocks.1 (block "list"): it shows "done" and "goal" side by side; if "goal" is the goal or limit for "done", show the progress instead: "trailing": "done", "format": {"kind": "progress", "goal": "goal", "style": "bar"} (it reads "done / goal" with a bar)',
+      'pages.1.blocks.1 (block "list"): it shows "done" and "goal" side by side; if "goal" is the goal or limit for "done", show the progress instead: "trailing": "done", "format": {"kind": "progress", "goal": "goal", "style": "bar"} (it reads "done / goal" with a bar); see patterns 2 and 3 in tinkrum-app-patterns.md',
     ]);
     d.pages[1].blocks[1].show.format = { kind: 'progress', goal: 'goal' };
     expect(designHints(d)).toEqual([]);
@@ -127,7 +126,7 @@ describe('designHints', () => {
     };
     d.pages[1].blocks.splice(2, 0, second);
     expect(designHints(d)).toEqual([
-      'pages.1.blocks.2 (block "more"): this list comes right after another list with no header between them, so people cannot tell the two apart; put a header block before each list',
+      'pages.1.blocks.2 (block "more"): this list comes right after another list with no header between them, so people cannot tell the two apart; put a header block before each list; see pattern 8 in tinkrum-app-patterns.md',
     ]);
     d.pages[1].blocks.splice(2, 0, { id: 'h2', look: 'header', show: { title: 'More' } });
     expect(designHints(d)).toEqual([]);
@@ -138,7 +137,7 @@ describe('designHints', () => {
     d.tables[0].fields.push({ id: 'nickname', name: 'Nickname', type: 'text' });
     d.pages[1].blocks[1].show.title = 'nickname';
     expect(designHints(d)).toEqual([
-      'pages.1.blocks.1 (block "list"): the row title "nickname" is optional, so entries without it show the table\'s name and the day they were added instead; use a field that is always filled as the title (a required field, or a date with a default) and move "nickname" to subtitles',
+      'pages.1.blocks.1 (block "list"): the row title "nickname" is optional, so entries without it show the table\'s name and the day they were added instead; use a field that is always filled as the title (a required field, or a date with a default) and move "nickname" to subtitles; see pattern 3 in tinkrum-app-patterns.md',
     ]);
   });
 });
