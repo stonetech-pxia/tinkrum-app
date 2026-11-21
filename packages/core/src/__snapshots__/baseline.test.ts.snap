@@ -2676,6 +2676,8 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.unit "days"|"months"
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 8> object
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 8>.copy string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 9> array items 1..50
+<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 9>[] string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.tools[]<anyOf 1>.values<anyOf 1> "$here"
 <oneOf 6>.tools[]<anyOf 1>.ask?
 <oneOf 6>.tools[]<anyOf 1>.ask<anyOf 0> "all"
@@ -3244,7 +3246,7 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 exports[`baseline > workspace config JSON Schema 2`] = `
 "
 . object
-.schemaVersion 39
+.schemaVersion 40
 .theme object
 .theme.primaryColor string /^#[0-9A-Fa-f]{6}$/
 .theme.mode "light"|"dark"|"system"
@@ -3354,7 +3356,11 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .data.tables[].fields[]<oneOf choice>.options[].label string len 1..40
 .data.tables[].fields[]<oneOf choice>.options[].value? number
 .data.tables[].fields[]<oneOf choice>.options[].color? "red"|"orange"|"yellow"|"green"|"blue"|"purple"|"pink"|"grey"
-.data.tables[].fields[]<oneOf choice>.default? string /^[a-z][a-z0-9-]{0,47}$/
+.data.tables[].fields[]<oneOf choice>.multiple? true
+.data.tables[].fields[]<oneOf choice>.default?
+.data.tables[].fields[]<oneOf choice>.default<anyOf 0> string /^[a-z][a-z0-9-]{0,47}$/
+.data.tables[].fields[]<oneOf choice>.default<anyOf 1> array items 1..50
+.data.tables[].fields[]<oneOf choice>.default<anyOf 1>[] string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf rating> object
 .data.tables[].fields[]<oneOf rating>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf rating>.name string len 1..40
@@ -3648,6 +3654,8 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 7>.unit "days"|"months"
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 8> object
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 8>.copy string /^[a-z][a-z0-9-]{0,47}$/
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 9> array items 1..50
+.tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}<anyOf 9>[] string /^[a-z][a-z0-9-]{0,47}$/
 .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 1> "$here"
 .tools[]<oneOf 1>.done<oneOf 0>.ask?
 .tools[]<oneOf 1>.done<oneOf 0>.ask<anyOf 0> "all"

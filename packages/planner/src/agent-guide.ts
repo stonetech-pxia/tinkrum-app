@@ -38,7 +38,7 @@ const SECTIONS = [
  */
 const FEATURE_RULES: ReadonlySet<number> = new Set([
   10, 13, 32, 33, 34, 35, 38, 40, 42, 43, 44, 45, 46, 47, 48, 49, 50, 55, 56, 58, 59, 60, 61, 62,
-  63, 64, 65, 66, 67, 68,
+  63, 64, 65, 66, 67, 68, 69,
 ]);
 /** 讲快捷操作的几条：放进动作目录。 */
 const QUICK_ACTION_RULES: ReadonlySet<number> = new Set([15, 20, 21, 22, 28, 29, 30, 31, 54]);

@@ -4,13 +4,21 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { PlanAboutSchema, PlanSchema } from './ai/types';
+import { DEFAULT_CALENDAR } from './calendar';
 import { createMockAIProvider } from './ai/mock';
 import { prepareOps, prepareSnapshot } from './change';
 import { createDefaultWorkspace } from './defaults';
 import { defaultDeskTools } from './desk/tools';
 import { V4_CUSTOM_ASK, V4_DEFAULT_MERGE, V4_FIXED_NAME } from './fixtures/v4';
-import { perCurrencyText } from './data';
+import {
+  filterRecords,
+  formatValue,
+  perCurrencyText,
+  prepareRecordValues,
+  type DataRecord,
+} from './data';
 import { fieldLink } from './field-link';
+import { listGroups } from './list-groups';
 import { fieldDefinition } from './fields';
 import { en, enSingular } from './messages/en';
 import { fr, frSingular } from './messages/fr';
@@ -1150,7 +1158,8 @@ describe('底线 12：旧的永远能打开', () => {
       const r = migrateWorkspace(structuredClone(config));
       expect(r.ok && r.config).toEqual(config);
     }
-    expect(CURRENT_SCHEMA_VERSION).toBe(39);
+    // D-607：单选多了 multiple，升到 40（只提升版本号）。
+    expect(CURRENT_SCHEMA_VERSION).toBe(40);
   });
 
   // D-424：showIf、browse、single 都是新的可选值，没有它们的旧配置一个字不变；schemaVersion 不变。
@@ -1943,7 +1952,8 @@ describe('底线 9：容器上的工具也是直链，不能触发别的工具�
 
 describe('底线 12：旧配置不变（D-428）', () => {
   it('stays on the same version: every addition is optional', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(39);
+    // D-607 升到 40 是另一件事（多选），容器上的工具没有再改版本。
+    expect(CURRENT_SCHEMA_VERSION).toBe(40);
   });
 
   it.each(CONFIGS)('%s loads with no row and no list tool made up', (_name, config) => {
@@ -2495,7 +2505,8 @@ describe('底线 2 / 14：标签只在记录里，配置和发给 AI 的都没�
 
 describe('底线 12：打卡格是新外观，旧配置和改动历史里的旧版本照样打开（D-610）', () => {
   it('a new look and keys used only by it: no version bump, old configs load unchanged', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(39);
+    // 打卡格自己没升版本；40 是多选（D-607）升的。
+    expect(CURRENT_SCHEMA_VERSION).toBe(40);
     for (const [, config] of CONFIGS) {
       const text = JSON.stringify(config);
       expect(text).not.toMatch(/"look":"grid"|"across"|"do":"remove"/);
@@ -2532,8 +2543,9 @@ describe('底线 12：打卡格是新外观，旧配置和改动历史里的旧�
 });
 
 describe('底线 12：旧的配置不用固定区、标签和浮动按钮照样打开（创始人 2026-11-04 定）', () => {
-  it('schemaVersion stays 39 and a config without the new keys is valid and unchanged', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(39);
+  it('schemaVersion stays 40 and a config without the new keys is valid and unchanged', () => {
+    // 39 → 40 是 D-607（多选），只提升版本号。
+    expect(CURRENT_SCHEMA_VERSION).toBe(40);
     const old = fromV33(v33Fixture('sample-expense-helper-zh') as never);
     const text = JSON.stringify(old);
     for (const key of ['"pin"', '"dial"', '"tags"']) expect(text).not.toContain(key);
@@ -2728,5 +2740,108 @@ describe('底线 18：固定区、标签筛选、浮动按钮的引用（创始�
       show: { title: 'name', browse: { filter: ['name'] } },
     });
     expect(wrongType.ok).toBe(false);
+  });
+});
+
+describe('底线 2 / 5 / 12 / 15：单选可以选多个（D-607）', () => {
+  const days = {
+    id: 'days',
+    name: 'Days',
+    type: 'choice' as const,
+    multiple: true as const,
+    options: [
+      { id: 'mon', label: 'Monday' },
+      { id: 'thu', label: 'Thursday' },
+    ],
+  };
+  const meals = {
+    id: 'meals',
+    name: 'Meals',
+    fields: [{ id: 'name', name: 'Name', type: 'text' as const }, days],
+  };
+  const withMeals = () => {
+    const r = applyOps(createDefaultWorkspace('en'), [{ op: 'addData', table: meals }], ctx);
+    if (!r.ok) throw new Error(r.error);
+    return r.config;
+  };
+
+  it('5: going back to one option is refused, so no entry loses an option it has', () => {
+    const r = applyOps(
+      withMeals(),
+      [{ op: 'updateData', table: 'meals', field: 'days', changes: { multiple: null } }],
+      ctx,
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it('5: after an undo to one option, saving another field keeps the stored list', () => {
+    const single = { ...meals, fields: [meals.fields[0]!, { ...days, multiple: undefined }] };
+    const r = prepareRecordValues(
+      single as never,
+      { name: 'b' },
+      { name: 'a', days: ['mon', 'thu'] },
+      ctx.now,
+    );
+    expect(r).toEqual({ ok: true, values: { name: 'b', days: ['mon', 'thu'] } });
+  });
+
+  it('12: a v39 config and a v39 snapshot open; the migration only raises the version', () => {
+    const v39 = { ...createDefaultWorkspace('en'), schemaVersion: 39 };
+    const r = migrateWorkspace(structuredClone(v39));
+    expect(r.ok && r.config).toEqual({ ...v39, schemaVersion: CURRENT_SCHEMA_VERSION });
+    const snap = prepareSnapshot({ ...withMeals(), schemaVersion: 39 }, registry);
+    expect(snap.ok ? [] : snap.issues).toEqual([]);
+  });
+
+  it('12: an entry saved before the field took several options reads as one of them', () => {
+    expect(formatValue(days, 'thu', 'en')).toBe('Thursday');
+  });
+
+  it('15: filtering, grouping and showing leave the entries as they were', () => {
+    const records: DataRecord[] = [
+      {
+        id: 'a',
+        collectionId: 'meals',
+        values: { name: 'a', days: ['thu', 'mon'] },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: 'b',
+        collectionId: 'meals',
+        values: { name: 'b', days: 'mon' },
+        createdAt: 2,
+        updatedAt: 2,
+      },
+    ];
+    const before = structuredClone(records);
+    filterRecords(records, meals, [{ field: 'days', op: 'is', value: ['mon'] }], ctx.now);
+    listGroups(
+      records,
+      meals,
+      { by: 'days' },
+      { locale: 'en', now: ctx.now, cal: DEFAULT_CALENDAR },
+    );
+    for (const r of records) formatValue(days, r.values.days, 'en');
+    expect(records).toEqual(before);
+  });
+
+  it('2: the configuration holds only the options; on-device suggestions never fill a multiple field', async () => {
+    const text = JSON.stringify(withMeals());
+    expect(text).toContain('"multiple":true');
+    const found = await ruleEngine({
+      fields: meals.fields,
+      pages: [
+        {
+          width: 1000,
+          height: 40,
+          lines: [{ text: 'Monday and Thursday', x: 0, y: 0, width: 1000, height: 24 }],
+        },
+      ],
+      spoken: true,
+      locale: 'en',
+      now: ctx.now,
+    });
+    expect(found.days).toBeUndefined();
   });
 });

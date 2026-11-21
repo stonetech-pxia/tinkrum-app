@@ -7,6 +7,7 @@ import {
   type CheckProblem,
 } from './components/define';
 import { conditionProblems } from './conditions';
+import { MULTIPLE_CHOICE_NOT_ONE } from './fields';
 import { entryFormProblems } from './entry-form';
 import { FILES_COLLECTION, FILES_TABLE } from './files-table';
 import { gridDateField } from './grid-view';
@@ -38,6 +39,7 @@ import {
   componentDefinition,
   fieldDefinition,
   isKnownComponent,
+  isMultipleChoice,
   packageTargetId,
   pageIdOf,
   quickActionsOf,
@@ -411,6 +413,10 @@ function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
       } else if (!isSystemField(id) && !field) {
         problems.push(`${role} ${id} is not a field of ${collection.id}`);
       }
+      if (ref.one && isMultipleChoice(field))
+        problems.push(
+          `${role} ${id} ${MULTIPLE_CHOICE_NOT_ONE}; use a choice field without multiple`,
+        );
     }
   }
   problems.push(...(def.check?.(c, { ...ctx, collection }) ?? []));

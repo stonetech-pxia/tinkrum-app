@@ -2,7 +2,7 @@
 export const AGENT_EXAMPLE_APP = {
   format: 'tinkrum-app',
   version: 1,
-  schemaVersion: 39,
+  schemaVersion: 40,
   app: {
     id: 'plants',
     name: 'Plants',

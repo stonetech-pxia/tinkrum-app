@@ -299,6 +299,9 @@ export function readNumberText(text: string): number | undefined {
   return Number.isFinite(n) ? (negative ? -n : n) : undefined;
 }
 
+/** 一格里几个标签、几个选项之间的分隔：逗号、顿号、分号（中英文）。 */
+const TAG_SEPARATORS = /[,，、;；]/;
+
 const TRUE_WORDS = new Set(['yes', 'y', 'true', '1', '✓', '✔', '√', '是', '对', 'oui', 'vrai']);
 const FALSE_WORDS = new Set(['no', 'n', 'false', '0', '否', '不是', '错', 'non', 'faux']);
 
@@ -339,14 +342,22 @@ export function readCellFor(
       return bad;
     }
     case 'choice': {
-      const key = normalizeName(text);
-      const option =
-        field.options.find((o) => normalizeName(o.label) === key) ??
-        field.options.find((o) => o.id === text);
-      return option ? { value: option.id } : bad;
+      const optionOf = (part: string) =>
+        field.options.find((o) => normalizeName(o.label) === normalizeName(part)) ??
+        field.options.find((o) => o.id === part);
+      const option = optionOf(text);
+      if (option) return { value: field.multiple ? [option.id] : option.id };
+      if (!field.multiple) return bad;
+      // 多选（D-607）：几个选项名用逗号、顿号或分号隔开（和标签一样，也是导出时的写法）；一个认不出这一格就不导。
+      const parts = text
+        .split(TAG_SEPARATORS)
+        .map((p) => p.trim())
+        .filter(Boolean);
+      const ids = parts.map((p) => optionOf(p)?.id);
+      return parts.length > 0 && ids.every((id) => id !== undefined) ? { value: ids } : bad;
     }
     case 'tags':
-      return { value: cleanTags(text.split(/[,，、;；]/)) };
+      return { value: cleanTags(text.split(TAG_SEPARATORS)) };
     case 'date':
     case 'datetime': {
       if (num !== undefined) {

@@ -47,7 +47,7 @@ function rowValues(
     }));
   if (field.type !== 'choice') return [];
   // 单选按选项的顺序，只列有记录用的。
-  const used = new Set(records.map((r) => recordValue(r, view, field.id)));
+  const used = new Set(records.flatMap((r) => [recordValue(r, view, field.id)].flat()));
   return field.options.filter((o) => used.has(o.id)).map((o) => ({ value: o.id, label: o.label }));
 }
 
@@ -65,14 +65,16 @@ export function browseFilterRows(
   });
 }
 
-/** 只留下这个字段是这个值的记录（标签：这条记录有这个标签，不分大小写）。 */
+/** 只留下这个字段是这个值的记录（标签：这条记录有这个标签，不分大小写；多选：选了这一项，D-607）。 */
 export function browseFilter(
   records: readonly DataRecord[],
   view: Collection,
   picked: { field: string; value: string },
 ): DataRecord[] {
+  const choice = view.fields.find((f) => f.id === picked.field)?.type === 'choice';
   return records.filter((r) => {
     const v = recordValue(r, view, picked.field);
+    if (choice) return [v].flat().includes(picked.value);
     return Array.isArray(v)
       ? (v as readonly string[]).some((tag) => tagKey(tag) === tagKey(picked.value))
       : v === picked.value;

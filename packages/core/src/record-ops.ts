@@ -11,6 +11,7 @@ import {
   type PreparedValues,
 } from './data';
 import { localDateTime, round } from './field-values';
+import { isMultipleChoice, MULTIPLE_CHOICE_NOT_ONE } from './fields';
 import { expandCollection } from './related';
 import {
   isCopyValue,
@@ -137,10 +138,11 @@ function copyProblem(
     (target.type !== 'link' || (source.type === 'link' && source.table === target.table)) &&
     (target.type !== 'choice' ||
       (source.type === 'choice' &&
+        source.multiple === target.multiple &&
         source.options.every((o) => target.options.some((x) => x.id === o.id))));
   return fits
     ? null
-    : `${where.label}: can't copy ${entry.id}.${source.id} (${kind ?? source.type}) into ${name} (${target.type}); copy a field of the same type (number and money mix, text and note mix; a link to the same table; a choice whose options the target has)`;
+    : `${where.label}: can't copy ${entry.id}.${source.id} (${kind ?? source.type}) into ${name} (${target.type}); copy a field of the same type (number and money mix, text and note mix; a link to the same table; a choice whose options the target has, both picking one or both several)`;
 }
 
 function dateValueProblem(
@@ -189,10 +191,14 @@ function valueProblem(
   if (isCopyValue(value)) return copyProblem(field, name, value, where);
   if (isDateValue(value)) return dateValueProblem(field, name, value, where);
   // 拖到的那一栏（看板）：只给拖动，写进分栏的字段。
-  if (value === GROUP_REF)
-    return where.dragField === fieldId
-      ? null
-      : `${where.label}: "${GROUP_REF}" (the column a card is dragged to) only works in a board's {as: "drag", do: "set", field: <source.group.by>}`;
+  if (value === GROUP_REF) {
+    if (where.dragField !== fieldId)
+      return `${where.label}: "${GROUP_REF}" (the column a card is dragged to) only works in a board's {as: "drag", do: "set", field: <source.group.by>}`;
+    // 多选（D-607）：一张卡片在几栏里，拖走说不清是加还是换，这种看板只能看。
+    return isMultipleChoice(field)
+      ? `${where.label}: ${name} ${MULTIPLE_CHOICE_NOT_ONE}; a board grouped by it shows a card in each of its columns and can't be dragged: leave the drag tool out`
+      : null;
+  }
   if (field.type === 'link') {
     const row =
       value === ROW_REF &&
@@ -220,10 +226,23 @@ function valueProblem(
   if (value === null) {
     return where.creating ? `${where.label}: leave ${name} out instead of null` : null;
   }
+  const ids = field.type === 'choice' ? field.options.map((o) => o.id).join(', ') : '';
+  // 多选（D-607）：一组选项 ID（不重复），替换原来选的；一个 ID 不行（说不清是加上还是换成它）。
+  if (field.type === 'choice' && field.multiple) {
+    if (
+      Array.isArray(value) &&
+      value.every((v) => field.options.some((o) => o.id === v)) &&
+      new Set(value).size === value.length
+    )
+      return null;
+    return `${where.label}: ${name} is a choice field with multiple: true; the value must be a list of its option ids (${ids}), e.g. ["${field.options[0]!.id}"], which replaces what the entry had, or null`;
+  }
   if (field.type === 'choice') {
     if (typeof value === 'string' && field.options.some((o) => o.id === value)) return null;
-    return `${where.label}: ${name} is a choice field; the value must be one of its option ids (${field.options.map((o) => o.id).join(', ')}) or null`;
+    return `${where.label}: ${name} is a choice field; the value must be one of its option ids (${ids}) or null`;
   }
+  if (Array.isArray(value))
+    return `${where.label}: ${name} is a ${field.type} field; a list of option ids only fits a choice field with multiple: true`;
   const rule = PRESET_RULES[field.type];
   if (!rule) {
     return `${where.label}: ${name} is a ${field.type} field and can't be set by a button (text is the user's own; computed fields can't be written). Only ${PRESETTABLE}`;

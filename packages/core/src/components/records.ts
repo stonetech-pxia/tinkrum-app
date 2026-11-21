@@ -142,7 +142,7 @@ const refs = {
   'show.title': { to: 'field' },
   'show.subtitles': { to: 'field', role: 'subtitleField' },
   'show.trailing': { to: 'field', role: 'trailingField' },
-  'show.color': { to: 'field', role: 'colorField', types: ['choice'] },
+  'show.color': { to: 'field', role: 'colorField', types: ['choice'], one: true },
   'show.columns': { to: 'field', role: 'show.columns' },
   'show.browse.sort': { to: 'field', role: 'show.browse.sort' },
   'show.browse.group': { to: 'field', role: 'show.browse.group' },
@@ -315,6 +315,12 @@ function gridProblems(c: RecordBlock, ctx: CheckContext, byType: string | undefi
     problems.push(
       'a grid needs source.group.by set to a choice or link field (one row per option or per linked entry)',
     );
+  // 多选字段（D-607）一条会在几行里，点掉一格就从几行一起删了：行只用单选或引用。
+  const byField = group?.by === undefined ? undefined : table.fields.find((f) => f.id === group.by);
+  if (byField?.type === 'choice' && byField.multiple)
+    problems.push(
+      `a grid has one row per option: source.group.by ${byField.id} picks several options (multiple), use a single choice or a link field`,
+    );
   if (group?.unit) problems.push('a grid has one row per option: no source.group.unit');
   if (group?.filter && byType !== 'link')
     problems.push('source.group.filter only applies when grouping by a link field');
@@ -391,7 +397,7 @@ const DOCS: Record<RecordLook, string> = {
     'a spreadsheet-like table, one row per entry under a header of field names: show.title is the first column (kept in view), show.columns? (1-7 fields) the others (default: subtitles and trailing); scrolls sideways; read-only cells, tapping a row opens the entry',
   gallery:
     "a grid of pictures, 2 per row: the first image in each entry's attachments with show.title under it (no image: a placeholder with the title); tapping one opens the entry",
-  grid: 'a check-in grid (rule 68): rows × time columns over one table, each cell = the entries of that row in that day, week or month. source.group {by: a link or choice field (one row per linked entry or option), showEmpty?: true, filter? (link only, on the linked table)} and source.across {unit: "day"|"week"|"month", by?: a date or datetime field (default the first date field), last?: 2-31 columns (default 7 days, 8 weeks, 6 months; the newest is the current one)}. A cell shows a mark when it has entries and the count from 2; show.trailing? (a number field) sums it instead of counting; show.format {kind: "progress", goal: a number or a number field of the linked table} draws a ring. show.title is the title of the entries listed when a cell is opened. tools: {as: "tap", do: "create", table, values: "$here"} adds an entry for that row and day; {as: "tap", do: "remove", table} makes a tap on a cell with exactly one entry move it to the trash (with undo); without remove a tap adds one more (counting) and a long press lists the entries',
+  grid: 'a check-in grid (rule 68): rows × time columns over one table, each cell = the entries of that row in that day, week or month. source.group {by: a link or choice field, not a multiple one (one row per linked entry or option), showEmpty?: true, filter? (link only, on the linked table)} and source.across {unit: "day"|"week"|"month", by?: a date or datetime field (default the first date field), last?: 2-31 columns (default 7 days, 8 weeks, 6 months; the newest is the current one)}. A cell shows a mark when it has entries and the count from 2; show.trailing? (a number field) sums it instead of counting; show.format {kind: "progress", goal: a number or a number field of the linked table} draws a ring. show.title is the title of the entries listed when a cell is opened. tools: {as: "tap", do: "create", table, values: "$here"} adds an entry for that row and day; {as: "tap", do: "remove", table} makes a tap on a cell with exactly one entry move it to the trash (with undo); without remove a tap adds one more (counting) and a long press lists the entries',
 };
 
 const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {

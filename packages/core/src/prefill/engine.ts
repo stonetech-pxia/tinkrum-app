@@ -9,7 +9,7 @@ import {
   type ModelSession,
   type OpenModel,
 } from './model';
-import type { Field } from '../schema';
+import { isMultipleChoice, type Field } from '../schema';
 import type { SuggestInput, ValueSuggestion } from './rank';
 import { mergeSpoken, planSpoken } from './spoken';
 
@@ -95,8 +95,11 @@ function spokenJob(input: SuggestInput): Job {
   };
 }
 
-const jobOf = (input: SuggestInput, limits: ModelLimits): Job =>
-  input.spoken ? spokenJob(input) : documentJob(input, limits);
+/** 多选字段（D-607）不给候选：候选是一个值，点了填进去；多选要用户自己选几项。 */
+const jobOf = (raw: SuggestInput, limits: ModelLimits): Job => {
+  const input = { ...raw, fields: raw.fields.filter((f) => !isMultipleChoice(f)) };
+  return input.spoken ? spokenJob(input) : documentJob(input, limits);
+};
 
 /** 只用代码：规则打分、算术、中文规则、值记忆。模型没装时用的就是这些。 */
 export const ruleEngine: PrefillEngine = async (input) => jobOf(input, MODEL_LIMITS).current();

@@ -75,7 +75,8 @@ export function streakOf(
     const unit = unitOf(day, rule.unit, cal);
     const isSkip =
       skipField !== undefined &&
-      readValue(skipField, record.values[skipField.id]) === rule.skip!.option;
+      // 多选（D-607）：选了「跳过」这一项就算。
+      [readValue(skipField, record.values[skipField.id])].flat().includes(rule.skip!.option);
     if (isSkip) skipped.add(unit);
     else done.set(unit, (done.get(unit) ?? 0) + 1);
   }

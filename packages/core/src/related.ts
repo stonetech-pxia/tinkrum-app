@@ -11,6 +11,7 @@ import {
   type DataRecord,
   type FieldValue,
 } from './data';
+import { isMultipleChoice, MULTIPLE_CHOICE_NOT_ONE } from './fields';
 import type { FieldCheckContext } from './fields/define';
 import { hasRecordCurrency } from './money-currency';
 import { dayNumber, parseFormula } from './formula';
@@ -537,6 +538,9 @@ function shapeProblems(
           problems.push(
             `within ${field.within} must be a choice or link field of ${collection.id}`,
           );
+        // 多选（D-607）：一条记录在几组里，「同一组的上一条」说不清。
+        else if (isMultipleChoice(g))
+          problems.push(`within ${field.within} ${MULTIPLE_CHOICE_NOT_ONE}`);
       }
       return problems;
     }

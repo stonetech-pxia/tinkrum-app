@@ -442,6 +442,13 @@ export function prepareRecordValues(
     if (def.emptyNew !== undefined && raw === undefined && previous === null) raw = def.emptyNew;
 
     const result = isBlank(raw) ? null : def.write(field, raw);
+    // 单选、多选存着的值这次没改、现在又写不进去（选项删了，多选改回单选后留着的列表，D-607）：原样留着，
+    // 不挡住保存别的字段（底线 5）。用户自己改这个字段时照常检查。
+    const kept =
+      field.type === 'choice' &&
+      previous !== null &&
+      !Object.prototype.hasOwnProperty.call(input, field.id);
+    if (result && 'issue' in result && kept) continue;
     if (result && 'issue' in result) {
       issues.push({ fieldId: field.id, code: result.issue });
     } else if (result === null || result.value === '') {
@@ -505,8 +512,10 @@ export function matchesCondition(
     ? recordDay(record, collection, condition.field, now, cal)
     : recordValue(record, collection, condition.field, now, cal);
   // 附件（D-263）：一组文件 ID。is / isNot 看有没有这个文件，其他比较都不成立。
+  // 多选（D-607）：一组选项 ID，is 一个列表是「含有其中一个」。
   if (Array.isArray(value)) {
-    const has = typeof target === 'string' && value.includes(target);
+    const wanted: unknown[] = Array.isArray(target) ? target : [target];
+    const has = wanted.some((x) => typeof x === 'string' && value.includes(x));
     if (condition.op === 'isNotEmpty') return true;
     if (condition.op === 'is') return has;
     if (condition.op === 'isNot') return !has;
@@ -739,8 +748,10 @@ export function groupRecords(
   for (const id of labels.keys()) buckets.set(id, []);
   for (const r of records) {
     const v = readValue(field, r.values[groupBy]);
-    const key = typeof v === 'string' && labels.has(v) ? v : null;
-    buckets.set(key, [...(buckets.get(key) ?? []), r]);
+    // 多选（D-607）：一条记录算进它选的每一项，所以各组加起来可能比记录多。
+    const keys = [v].flat().filter((k): k is string => typeof k === 'string' && labels.has(k));
+    for (const key of keys.length > 0 ? keys : [null])
+      buckets.set(key, [...(buckets.get(key) ?? []), r]);
   }
   return [...buckets.entries()].flatMap(([optionId, list]) =>
     optionId === null && list.length === 0

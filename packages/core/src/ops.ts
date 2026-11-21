@@ -1,4 +1,5 @@
 import { entryKind } from './components';
+import { MULTIPLE_CHOICE_NOT_ONE } from './fields';
 import { addMissingEntryForms } from './entry-forms';
 import type { BlockChanges, Op, OpOf } from './ops-schema';
 import { THEME_PRESETS } from './presets';
@@ -855,6 +856,11 @@ function updateData(config: WorkspaceConfig, op: OpOf<'updateData'>): void {
   } else {
     next = { ...old };
   }
+  // 多选改回单选（D-607）：记录里可能存着几个选项，单选只认一个，拒绝（底线 5、12）；要一个的加新字段。
+  if (old.type === 'choice' && old.multiple && changes.multiple === null)
+    throw new OpError(
+      `field ${old.id} ${MULTIPLE_CHOICE_NOT_ONE} and entries may already have several; it can't go back to one option; add a new choice field instead`,
+    );
   // 合法性（例如选项 ID 唯一、默认值存在）由 validateWorkspace 检查。
   table.fields[index] = merge(next, changes) as never;
   // 删掉的选项从页面上的一排选项里去掉（D-573）。

@@ -50,9 +50,11 @@ export function boardColumns(
           }));
   const none: BoardColumn = { option: null, label: null, records: [] };
   for (const r of records) {
-    const value = r.values[field.id];
-    const column = columns.find((c) => c.option === value) ?? none;
-    if (column.records.length < limit) column.records.push(r);
+    // 多选（D-607）：卡片在它选的每一栏里都有（这种看板不能拖，检查时拒绝拖动工具）。
+    const values: unknown[] = [r.values[field.id]].flat();
+    const mine = columns.filter((c) => values.includes(c.option));
+    for (const column of mine.length > 0 ? mine : [none])
+      if (column.records.length < limit) column.records.push(r);
   }
   if (!field.required || none.records.length > 0) columns.push(none);
   return columns;

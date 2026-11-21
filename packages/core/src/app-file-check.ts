@@ -95,12 +95,15 @@ export function checkAppFileText(
       `schemaVersion ${raw.schemaVersion} is newer than this checker knows (${CURRENT_SCHEMA_VERSION}); write schemaVersion ${CURRENT_SCHEMA_VERSION}`,
     ]);
   // 先按当前版本的形状逐项查（路径从文件的顶层算起）；旧版本的文件先迁移，形状交给导入时的校验。
+  // 迁移只改了版本号的旧文件（之后的版本只加了新的可选值，例如 39 → 40，D-607）照当前版本逐项查。
   const older = typeof raw.schemaVersion === 'number' && raw.schemaVersion < CURRENT_SCHEMA_VERSION;
-  if (!older) {
-    const shape = AppFileSchema.safeParse(raw);
+  const file = readAppFile(JSON.stringify(raw));
+  if (!older || (file && onlyVersionMoved(raw, file))) {
+    const shape = AppFileSchema.safeParse(
+      older ? { ...raw, schemaVersion: CURRENT_SCHEMA_VERSION } : raw,
+    );
     if (!shape.success) return fail(issueLines(shape.error, { value: raw }));
   }
-  const file = readAppFile(JSON.stringify(raw));
   if (!file)
     return fail([
       'cannot read the file: it needs format, version, schemaVersion, app {id, name, bar, theme}, pages, tables and tools',
@@ -136,4 +139,13 @@ export function checkAppFileText(
     warnings,
     hints: designHints(file),
   };
+}
+
+/** 迁移到当前版本以后，文件里的主题、页面、表和快捷操作一个字没变。 */
+function onlyVersionMoved(raw: Record<string, unknown>, file: AppFile): boolean {
+  const app = raw.app as { theme?: unknown } | undefined;
+  return (
+    JSON.stringify([app?.theme, raw.pages, raw.tables, raw.tools]) ===
+    JSON.stringify([file.app.theme, file.pages, file.tables, file.tools])
+  );
 }

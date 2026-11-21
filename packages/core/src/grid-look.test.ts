@@ -134,6 +134,35 @@ describe('grid look: validation (D-610)', () => {
     );
   });
 
+  it('rows are not a multiple choice field (D-607): one entry would sit in several rows', () => {
+    const meals = {
+      id: 'meals',
+      name: 'Meals',
+      fields: [
+        {
+          id: 'days',
+          name: 'Days',
+          type: 'choice',
+          multiple: true,
+          options: [
+            { id: 'mon', label: 'Mon' },
+            { id: 'tue', label: 'Tue' },
+          ],
+        },
+        { id: 'date', name: 'Date', type: 'date' },
+      ],
+    };
+    const block = {
+      id: 'g',
+      look: 'grid',
+      source: { table: 'meals', group: { by: 'days' }, across: { unit: 'day' } },
+      show: { title: 'days' },
+      tools: [{ as: 'tap', do: 'create', table: 'meals', values: '$here' }],
+    };
+    const r = prepare([block], [{ op: 'addData', table: meals } as unknown as Op]);
+    expect(r.ok ? '' : r.issues.join('\n')).toMatch(/multiple/);
+  });
+
   it('columns use a date or datetime field; the default is the first one', () => {
     expect(issues(grid({}, { across: { unit: 'week' } }))).toEqual([]);
     expect(issues(grid({}, { across: { unit: 'day', by: 'note' } })).join()).toMatch(

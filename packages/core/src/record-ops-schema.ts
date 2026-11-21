@@ -41,6 +41,7 @@ export type CopyValue = z.infer<typeof CopyValueSchema>;
  * 日期时间字段）、null（清空）；"$row" 是工具作用的那一条，"$record" 是记录页打开的那一条（D-342），
  * 都只给引用字段；"$group" 是拖到的那一栏（只给 drag）。按字段类型解释，不能写文字：文字是用户的内容（D-042）。
  * D-565 起还有：从今天或这一条的日期起加几天、几个月（DateValueSchema），和抄这一条的一个字段（CopyValueSchema）。
+ * D-607：多选字段写一组选项 ID（替换原来选的）。
  */
 export const RecordToolValueSchema = z.union([
   IdSchema,
@@ -52,6 +53,8 @@ export const RecordToolValueSchema = z.union([
   z.null(),
   DateValueSchema,
   CopyValueSchema,
+  // 多选字段的几个选项 ID（D-607）。
+  z.array(IdSchema).min(1).max(50),
 ]);
 export type RecordToolValue = z.infer<typeof RecordToolValueSchema>;
 /** v33 的名字（同一个东西）。 */

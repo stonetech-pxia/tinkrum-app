@@ -9067,8 +9067,88 @@ const PAGE_CHOICE_CASES: readonly EvalCase[] = [
   },
 ];
 
+// 单选可以选多个（D-607，规则 68）：固定的几项、一条可以选几个用 multiple；用户自己的词用标签。
+const multipleChoiceFields = (c: WorkspaceConfig) =>
+  c.data.tables.flatMap((t) =>
+    t.fields.flatMap((f) => (f.type === 'choice' && f.multiple ? [{ table: t, field: f }] : [])),
+  );
+
+const MULTI_CHOICE_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG40',
+    input:
+      'Make me a meal planner: each meal has the weekdays I plan it on (a meal can be on several days), and the home page lists the meals planned on Monday',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const days = multipleChoiceFields(c).find((x) => x.field.options.length >= 5);
+        if (!days) return 'expected a choice field with multiple: true for the weekdays';
+        const monday = days.field.options.find((o) => /mon/i.test(o.id + o.label));
+        if (!monday) return 'expected a Monday option';
+        const lists = c.containers.pages
+          .flatMap((p) => allComponents(p))
+          .filter(
+            (b) =>
+              'source' in b &&
+              (b.source as { table?: string }).table === days.table.id &&
+              (
+                (b.source as { filter?: { field: string; op: string; value?: unknown }[] })
+                  .filter ?? []
+              ).some(
+                (x) =>
+                  x.field === days.field.id &&
+                  x.op === 'is' &&
+                  [x.value].flat().includes(monday.id),
+              ),
+          );
+        // 页面那一半可以留到下一轮（规则 26）：读这张表的块有的话，要有一个只列周一的。
+        const reads = c.containers.pages
+          .flatMap((p) => allComponents(p))
+          .some((b) => 'source' in b && (b.source as { table?: string }).table === days.table.id);
+        return lists.length > 0 || !reads
+          ? null
+          : `expected a list filtered to ${days.field.id} is ${monday.id}`;
+      },
+    },
+  },
+  {
+    id: 'KG41',
+    input: '建一个读书表：书名、作者、类型（小说、历史、科普、诗歌），一本书可以有好几个类型',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        multipleChoiceFields(c).some((x) => x.field.options.length >= 4)
+          ? null
+          : 'expected the genres as a choice field with multiple: true',
+    },
+  },
+  {
+    id: 'KG42',
+    input: 'Add a notes table where I can tag each note with whatever words I like',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        if (multipleChoiceFields(c).length > 0) return 'expected tags, not a multiple choice';
+        return c.data.tables.some((t) => t.fields.some((f) => f.type === 'tags'))
+          ? null
+          : 'expected a tags field';
+      },
+    },
+  },
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
   ...FIX_CASES,
+  ...MULTI_CHOICE_CASES,
   ...PAGE_ENTRY_CASES,
   ...SEQUENCE_CASES,
   ...RECORD_ACTION_CASES,

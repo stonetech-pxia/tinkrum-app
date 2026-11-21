@@ -26,7 +26,12 @@ import { textField } from './text';
 import { timeField } from './time';
 
 export * from './define';
-export { ChoiceOptionSchema } from './choice';
+export {
+  ChoiceOptionSchema,
+  isMultipleChoice,
+  MULTIPLE_CHOICE_NOT_ONE,
+  pickedOptions,
+} from './choice';
 export { ROLLUP_AGGREGATES } from './rollup';
 export { SCHEDULE_LAST_DONE_TYPES } from './schedule';
 export { cleanTags, MAX_RECORD_TAGS, MAX_TAG_LENGTH, tagKey } from './tags';

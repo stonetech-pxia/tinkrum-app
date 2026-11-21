@@ -58,14 +58,15 @@ export type EntryLook = z.infer<typeof EntryLookSchema>;
  * "show.title"、"source.group.by"）：
  * - table：数据表 ID；同一个块里的 field、filter 都指这张表（"$files" 是系统表，见 files-table.ts）。
  * - field：这张表的字段（也可以是 createdAt / updatedAt），值可以是一个或一组；
- *   types 限定字段类型（系统字段算日期），role 是问题文字里的名字，不写就用键名。
+ *   types 限定字段类型（系统字段算日期），role 是问题文字里的名字，不写就用键名；one：单选字段只能是选一个的
+ *   （多选不行，D-607）。
  * - filter：这张表的筛选条件。
  * - target：页面、系统入口、tool:<id>、package:<id> 或 {file}（opens）。
  * - package：installed = 已添加的工具包（一个），catalog = 目录里的工具包（一组）。
  */
 export type ComponentRef =
   | { to: 'table' }
-  | { to: 'field'; role?: string; types?: readonly FieldType[] }
+  | { to: 'field'; role?: string; types?: readonly FieldType[]; one?: true }
   | { to: 'filter' }
   | { to: 'target' }
   | { to: 'package'; in: 'installed' | 'catalog' };
