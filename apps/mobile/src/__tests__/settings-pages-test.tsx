@@ -136,6 +136,11 @@ describe('Data page', () => {
     const labels = screen.getAllByText(/^(主页|健身|数据表)$/).map((n) => n.props.children);
     expect(labels).toEqual(['主页', '健身']);
     expect(screen.getByTestId('table-runs')).toHaveTextContent(/^跑步0 条记录›$/);
+    // 最近删除和更多在表的上面，表再多也在第一屏（D-615）。
+    const order = screen
+      .getAllByTestId(/^(data-deleted|data-more|table-notes|table-runs)$/)
+      .map((n) => n.props.testID);
+    expect(order).toEqual(['data-deleted', 'data-more', 'table-notes', 'table-runs']);
   });
 
   it('French: the new rows and pages use French words', async () => {

@@ -10,9 +10,9 @@ import { RowGroup } from '@/shell/RowGroup';
 
 /**
  * 「设置 → 数据」：用户记录的管理页，由内核提供，AI 不能修改（底线 8）。
- * 一屏看完（D-614、D-615）：每张表一行（名字和条数），有几个 App 时按 App 分组；点进去是这张表的导出、导入、
- * 批次、选择删除、附件设置（data-table/[tableId]）。备份和恢复（D-600）、最近删除（D-037）、
- * 不在界面里的表（D-038、D-041）、更多各一行；隐私说明是页底的一行小字。
+ * 一屏看完（D-614、D-615）：最上面是备份和恢复（D-600）、最近删除（D-037）、不在界面里的表（D-038、D-041）、更多；
+ * 下面每张表一行（名字和条数），有几个 App 时按 App 分组，点进去是这张表的导出、导入、批次、选择删除、
+ * 附件设置（data-table/[tableId]）；隐私说明是页底的一行小字。
  */
 export default function DataRoute() {
   const { locale, config, palette, router, counts, orphans, deleted } = useDataOverview();
@@ -39,23 +39,7 @@ export default function DataRoute() {
     <ScrollView
       style={{ backgroundColor: palette.background }}
       contentContainerStyle={{ padding: palette.pad, gap: palette.gap - 4, paddingBottom: 48 }}>
-      {/* 标题在导航栏上，页面里不再写一遍（D-614）。 */}
-      {groups.map((g) => (
-        <Fragment key={g.key || 'home'}>
-          <SectionLabel palette={palette}>{single ? t(locale, 'dataTables') : g.name}</SectionLabel>
-          <RowGroup
-            palette={palette}
-            rows={g.tables.map((c) => ({
-              testID: `table-${c.id}`,
-              label: c.name,
-              trailing: t(locale, 'recordCount', { count: counts.get(c.id) ?? 0 }),
-              onPress: () =>
-                router.push({ pathname: '/data-table/[tableId]', params: { tableId: c.id } }),
-            }))}
-          />
-        </Fragment>
-      ))}
-
+      {/* 标题在导航栏上，页面里不再写一遍（D-614）。这几行在表的上面，表再多也总在第一屏（D-615）。 */}
       <RowGroup
         palette={palette}
         rows={[
@@ -93,6 +77,22 @@ export default function DataRoute() {
           },
         ]}
       />
+
+      {groups.map((g) => (
+        <Fragment key={g.key || 'home'}>
+          <SectionLabel palette={palette}>{single ? t(locale, 'dataTables') : g.name}</SectionLabel>
+          <RowGroup
+            palette={palette}
+            rows={g.tables.map((c) => ({
+              testID: `table-${c.id}`,
+              label: c.name,
+              trailing: t(locale, 'recordCount', { count: counts.get(c.id) ?? 0 }),
+              onPress: () =>
+                router.push({ pathname: '/data-table/[tableId]', params: { tableId: c.id } }),
+            }))}
+          />
+        </Fragment>
+      ))}
 
       <Text style={[palette.font('body', 13), { color: palette.muted }]}>
         {t(locale, 'dataPrivacy')}
