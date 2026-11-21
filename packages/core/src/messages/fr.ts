@@ -928,7 +928,7 @@ export const fr: MessageTable = {
   buildUndoHint:
     'Les fonctions sont déjà actives. Vous pouvez les annuler dans l’historique des modifications.',
   buildPresetHint:
-    'Si cela vous plaît, enregistrez-le comme préréglage : Paramètres → Mes préréglages.',
+    'Si cela vous plaît, enregistrez-le comme préréglage : Paramètres → Apps et préréglages.',
   buildFinish: 'Terminé',
   buildFailedModel: 'Tink n’a pas répondu pour cette étape. Vous pouvez réessayer.',
   buildFailedInvalid:

@@ -822,7 +822,7 @@ export const zh: MessageTable = {
   buildLookInDraft: '外观部分在草稿里，看过并应用才生效。',
   buildSeeLook: '看看外观',
   buildUndoHint: '功能部分已经生效，能在改动记录里撤销。',
-  buildPresetHint: '满意的话，可以存成预设：设置 → 我的预设。',
+  buildPresetHint: '满意的话，可以存成预设：设置 → App 和预设。',
   buildFinish: '好了',
   buildFailedModel: 'Tink 这一步没有回答，可以重试。',
   buildFailedInvalid: 'Tink 这一步给的修改不合格，可以重试。',

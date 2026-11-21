@@ -880,7 +880,7 @@ export const en = {
     'The look changes are in your draft. They take effect once you’ve seen and applied them.',
   buildSeeLook: 'See the look',
   buildUndoHint: 'Functions are already live. You can undo them in Change history.',
-  buildPresetHint: 'If you like it, save it as a preset: Settings → My presets.',
+  buildPresetHint: 'If you like it, save it as a preset: Settings → Apps and presets.',
   buildFinish: 'Done',
   buildFailedModel: 'Tink didn’t answer this step. You can try it again.',
   buildFailedInvalid: 'Tink’s change for this step wasn’t valid. You can try it again.',
