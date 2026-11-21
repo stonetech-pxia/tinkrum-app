@@ -90,7 +90,7 @@ export interface ToolWhere {
   /** 打卡格上 "$here" 一定会填的字段（这一行、这一天、筛选里的等于条件）：必填的检查算它们有值。 */
   hereFields?: readonly string[];
   /**
-   * 列表分段、看板分栏、月历选中那天写进的字段（D-613）：在这一段勾选新建时 "$here" 可能填它（有的段没有值，
+   * 列表分段、看板分栏、月历选中那天写进的字段（D-616）：在这一段勾选新建时 "$here" 可能填它（有的段没有值，
    * 例如「未分」），所以不算必填有值，但 values 不能再写它。
    */
   hereGroup?: string;
@@ -99,7 +99,7 @@ export interface ToolWhere {
 interface ValueWhere extends ToolWhere {
   /** 是新建（create）：null 没有意义。 */
   creating?: boolean;
-  /** 新记录一定带上 "$here" 的值（勾选新建，D-613）：hereFields 算必填有值。 */
+  /** 新记录一定带上 "$here" 的值（勾选新建，D-616）：hereFields 算必填有值。 */
   hereFilled?: boolean;
   /**
    * 「这一条」（D-565，换过的表：查找、汇总换成它们显示的那种字段）：抄的字段、日期的起点和加数从它读。
@@ -448,7 +448,7 @@ function createAllProblems(
     label: where.label,
     rowOf: source,
     entry: view,
-    // 勾选新建（D-613）：新记录带上这一段的值，列表筛选里的等于条件算必填有值。
+    // 勾选新建（D-616）：新记录带上这一段的值，列表筛选里的等于条件算必填有值。
     ...(tool.pick && where.hereFields ? { hereFields: where.hereFields, hereFilled: true } : {}),
   };
   return [
@@ -459,7 +459,7 @@ function createAllProblems(
 }
 
 /**
- * 勾选新建（D-613）：values 里正好一个指向来源表的引用字段是 "$row"（勾的那一条；「已添加」也按它算）；
+ * 勾选新建（D-616）：values 里正好一个指向来源表的引用字段是 "$row"（勾的那一条；「已添加」也按它算）；
  * 这一段会填的字段（列表筛选里的等于条件、分段的字段）不能再写，否则新的一条不在用户点的这一段里。
  */
 function pickProblems(
@@ -504,7 +504,7 @@ export function recordToolUseProblems(
     problems.push(`${where.label}: needs a label (shown on the button and read by screen readers)`);
   // $here：就地添加（这一段的值 + 列表筛选里的等于条件）；打卡格上是点的那一格（这一行、这一天，D-610）。
   const here = tool.do === 'create' && tool.values === HERE_REF;
-  // 勾选新建（D-613）：只给列表下面的「添加」，写列表自己那张表（底线 17），新记录带上这一段的值。
+  // 勾选新建（D-616）：只给列表下面的「添加」，写列表自己那张表（底线 17），新记录带上这一段的值。
   const picking = tool.do === 'createAll' && tool.pick === true;
   const pickShape = `{as: "addHere", do: "createAll", table: ${row?.id ?? '<the list table>'}, from: <the table to pick from>, pick: true, filter?, values: {<a link field to it>: "${ROW_REF}"}}`;
   if (picking && use.as !== 'addHere')
@@ -817,7 +817,7 @@ export function createAllInputs(
     }));
 }
 
-/** 勾选新建（D-613）：values 里设成 "$row"、指向来源表的引用字段（检查保证正好一个）。 */
+/** 勾选新建（D-616）：values 里设成 "$row"、指向来源表的引用字段（检查保证正好一个）。 */
 export function pickLinkFields(
   tool: Extract<RecordTool, { do: 'createAll' }>,
   target: Collection,
@@ -831,7 +831,7 @@ export function pickLinkFields(
     .map(([id]) => id);
 }
 
-/** 来源表里能勾的（按 tool.filter，D-613）：records 是算好的记录（筛选可以用查找来的值）。 */
+/** 来源表里能勾的（按 tool.filter，D-616）：records 是算好的记录（筛选可以用查找来的值）。 */
 export function pickChoices(
   tool: Extract<RecordTool, { do: 'createAll' }>,
   sourceView: Collection,
@@ -852,7 +852,7 @@ function sameHere(stored: unknown, here: unknown): boolean {
 }
 
 /**
- * 勾选新建（D-613）：这一段里已经连着哪些来源（显示成「已添加」，不再建）。targets 是目标表现有的记录，
+ * 勾选新建（D-616）：这一段里已经连着哪些来源（显示成「已添加」，不再建）。targets 是目标表现有的记录，
  * here 是这一段的值（列表筛选里的等于条件和这一段，同 hereValues）：每个值都对得上的，才算在这一段里。
  */
 export function pickedAlready(
@@ -874,7 +874,7 @@ export function pickedAlready(
 }
 
 /**
- * 勾选新建（D-613）：用户勾的每一条来源（按勾的顺序，已添加的跳过）各一份新记录的表单输入：这一段的值加上
+ * 勾选新建（D-616）：用户勾的每一条来源（按勾的顺序，已添加的跳过）各一份新记录的表单输入：这一段的值加上
  * values（"$row" 是勾的那一条，抄的、日期起点也读它）。结果再交给 prepareRecordValues。
  */
 export function pickCreateInputs(

@@ -11,7 +11,7 @@ import { screen } from 'expo-router/testing-library';
 import type { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from './render-app';
 
-// 勾选新建（D-613）的测试用的：菜谱、食材、菜谱用料；菜谱页上用料列表下面的「添加食材」是 {do: "createAll", pick: true}。
+// 勾选新建（D-616）的测试用的：菜谱、食材、菜谱用料；菜谱页上用料列表下面的「添加食材」是 {do: "createAll", pick: true}。
 
 export const tables: Collection[] = [
   { id: 'recipes', name: '菜谱', fields: [{ id: 'name', name: '名字', type: 'text' }] },

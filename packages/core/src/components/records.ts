@@ -435,7 +435,7 @@ const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
     open: true,
     max: 4,
   },
-  // 表格的格子只读（D-539）：没有每行的按钮。createAll 只是下面「添加」的勾选新建（D-613）。
+  // 表格的格子只读（D-539）：没有每行的按钮。createAll 只是下面「添加」的勾选新建（D-616）。
   table: {
     as: ['addHere', 'list'],
     do: ['create', 'createAll'],

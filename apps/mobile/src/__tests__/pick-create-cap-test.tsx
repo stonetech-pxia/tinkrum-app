@@ -4,7 +4,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { openPicker, put } from '../test-utils/pick-fixtures';
 
-// 勾选新建（D-613）一次最多勾 MAX_CREATE_ALL 条（200，D-567）。在测试里把上限换成 3，看勾满以后别的勾不上、
+// 勾选新建（D-616）一次最多勾 MAX_CREATE_ALL 条（200，D-567）。在测试里把上限换成 3，看勾满以后别的勾不上、
 // 说一句上限；取消一个又能勾。上限本身是 200 由 core 的 invariants.test.ts 守着。
 jest.mock('@morph/core', () => ({ ...jest.requireActual('@morph/core'), MAX_CREATE_ALL: 3 }));
 

@@ -17,7 +17,7 @@ import type { Collection, Component, WorkspaceConfig } from './schema';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 勾选新建（D-613，创始人 2026-11-21「开工」）：多对多、连接本身带数据（菜谱 → 食材和用量）。在菜谱页上「添加」，
+// 勾选新建（D-616，创始人 2026-11-21「开工」）：多对多、连接本身带数据（菜谱 → 食材和用量）。在菜谱页上「添加」，
 // 勾几样食材，每样在「菜谱用料」里建一条，连着这个菜谱（列表筛选里的等于条件，"$here"）和勾的那样食材（"$row"）。
 // 已经连着的显示成「已添加」，不再建。照样先问、最多 200 条、提示条能撤回这一批（底线 11，D-567）。
 process.env.TZ = 'Europe/Paris';
@@ -84,7 +84,7 @@ function problems(blocks: unknown[], page = 'recipe', config = base()): string {
   return r.ok ? '' : r.issues.map((i) => i.message).join('\n');
 }
 
-describe('pick several, create one each (D-613)', () => {
+describe('pick several, create one each (D-616)', () => {
   it('is an optional key of createAll, still asking first and capped at 200', () => {
     const { as: _as, label: _label, ...tool } = pick;
     expect(RecordToolSchema.safeParse(tool).success).toBe(true);

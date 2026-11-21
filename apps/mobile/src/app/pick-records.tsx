@@ -23,7 +23,7 @@ import { Toast } from '@/shell/Toast';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '@/workspace/context';
 
 /**
- * 勾选新建（D-613）：列表下面的「添加」是 {do: "createAll", pick: true} 时打开这一页，勾另一张表（from）的几条，
+ * 勾选新建（D-616）：列表下面的「添加」是 {do: "createAll", pick: true} 时打开这一页，勾另一张表（from）的几条，
  * 每条在列表那张表里建一条，带上这一段的值（here，"$here"）。这一段里已经连着的显示成「已添加」，不能再勾。
  * 只看不写（底线 15）：勾选只在这一页的内存里；下面的按钮写明条数和表，就是先问的那一句（底线 11，创始人 2026-11-21），
  * 点了直接建，建好了关掉这一页，提示条能撤回这一批。一次最多勾 MAX_CREATE_ALL 条。

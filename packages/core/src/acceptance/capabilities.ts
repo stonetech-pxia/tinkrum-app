@@ -755,7 +755,7 @@ export const CAPABILITIES: readonly Capability[] = [
       toolsOf(block).some((u) => isRecordToolUse(u) && tapAlsoOf(u).length > 0),
     ),
   ),
-  // D-613：列表下面的「添加」勾另一张表的几条，每条建一条。
+  // D-616：列表下面的「添加」勾另一张表的几条，每条建一条。
   cap('write.createAll.pick', 'write', (v) =>
     v.writes.some((w) => w.tool.do === 'createAll' && w.tool.pick === true),
   ),

@@ -8603,7 +8603,7 @@ const GRID_CASES: readonly EvalCase[] = [
   },
 ];
 
-// 勾选新建（D-613）：菜谱页上用料列表下面的「添加」勾几样食材，每样建一条。
+// 勾选新建（D-616）：菜谱页上用料列表下面的「添加」勾几样食材，每样建一条。
 const recipeEarlier: EvalEarlier = {
   input:
     'Make recipes, ingredients and recipe items (a recipe, an ingredient and an amount), and a page for one recipe that lists its items',

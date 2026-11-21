@@ -1,5 +1,5 @@
 // 给别的 AI 的结构模式（D-603）：网上的模板库（Notion、Airtable、Google Sheets、Microsoft、Numbers）里反复出现的
-// 8 种结构（第 9 种「连接带数据」是 D-613 加的），各做成一份能导入、没有设计建议的 App 文件，创始人 2026-11-20 看过模拟器截图后同意收录。
+// 8 种结构（第 9 种「连接带数据」是 D-616 加的），各做成一份能导入、没有设计建议的 App 文件，创始人 2026-11-20 看过模拟器截图后同意收录。
 // docs/agent/tinkrum-app-patterns.md 由快照测试从这里生成；调研和截图在 side-session-notes/template-library-2026-11-20。
 
 export interface AgentPattern {

@@ -757,7 +757,7 @@ function gridHereFields(c: KnownComponent, table: Collection | undefined): strin
 }
 
 /**
- * 列表下面的「添加」（"$here"，D-349）会填的字段（D-613 勾选新建用）：筛选里的等于条件一定填（"$record" 打开页面时
+ * 列表下面的「添加」（"$here"，D-349）会填的字段（D-616 勾选新建用）：筛选里的等于条件一定填（"$record" 打开页面时
  * 换成那一条，D-342，这里当它有值），分段、分栏、月历那天的字段不一定（有的段没有值）。
  */
 function listHere(

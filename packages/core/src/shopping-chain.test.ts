@@ -6,7 +6,7 @@ import { computeRecords, expandCollection } from './related';
 import { readRecords } from './source';
 import type { Collection } from './schema';
 
-// 买菜清单这条链（D-613 第二部分，只验证不改）：菜谱的汇总数本周计划了几次 → 用料查找这个次数 → 公式 用量 × 次数 →
+// 买菜清单这条链（D-616 第二部分，只验证不改）：菜谱的汇总数本周计划了几次 → 用料查找这个次数 → 公式 用量 × 次数 →
 // 食材的汇总把用料的这个公式加起来 = 本周每样食材一共要多少。表和 side-session-notes/pick-create-2026-11-21 的
 // meals.tinkrum-app.json 一样。
 process.env.TZ = 'Europe/Paris';
@@ -81,7 +81,7 @@ const rec = (id: string, collectionId: string, values: object): DataRecord => ({
   updatedAt: 1,
 });
 
-describe('shopping list: this week’s total per ingredient (D-613 part 2)', () => {
+describe('shopping list: this week’s total per ingredient (D-616 part 2)', () => {
   const stored = new Map<string, DataRecord[]>([
     [
       'meals-recipes',

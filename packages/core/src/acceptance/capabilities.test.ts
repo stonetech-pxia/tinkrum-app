@@ -413,7 +413,7 @@ function everything() {
         look: 'divider',
         showIf: { table: 'items', has: 'none' },
       },
-      // D-613：下面的「添加」勾几个分组，每个建一条。
+      // D-616：下面的「添加」勾几个分组，每个建一条。
       records('cards', 'picked', 'items', 'title', {
         tools: [
           {

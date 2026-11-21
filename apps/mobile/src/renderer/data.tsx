@@ -1324,7 +1324,7 @@ export const isRecordBlock = (c: Component): c is RecordBlock =>
 /** 每一段 / 每一天 / 每一栏下面的「添加」（as addHere，D-349）。 */
 export const addHereOf = (block: RecordBlock) => block.tools?.find((u) => u.as === 'addHere');
 
-/** 「添加」是勾选新建（D-613）：勾另一张表的几条，每条在这里建一条。 */
+/** 「添加」是勾选新建（D-616）：勾另一张表的几条，每条在这里建一条。 */
 export const isPickAdd = (use: ToolUse | undefined): use is RecordToolUse =>
   use !== undefined && isRecordToolUse(use) && use.do === 'createAll' && use.pick === true;
 
@@ -1879,7 +1879,7 @@ export function openAddHere(
   view: Collection,
   source: Pick<RecordBlock['source'], 'filter'>,
   preset: Record<string, unknown> = {},
-  /** 块的「添加」工具：勾选新建（D-613）打开勾选页面，同样的预设值是每条新记录都带上的这一段的值（"$here"）。 */
+  /** 块的「添加」工具：勾选新建（D-616）打开勾选页面，同样的预设值是每条新记录都带上的这一段的值（"$here"）。 */
   use?: ToolUse,
 ) {
   const prefill = { ...filterPresets(view, source.filter), ...preset };

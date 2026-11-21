@@ -1016,7 +1016,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       zh.recordCreateAllConfirm,
       fr.recordCreateAllConfirm,
       frSingular.recordCreateAllConfirm,
-      // 勾选新建（D-613）问的那一句是勾选页的按钮。
+      // 勾选新建（D-616）问的那一句是勾选页的按钮。
       en.recordPickAddButton,
       enSingular.recordPickAddButton,
       zh.recordPickAddButton,
@@ -1026,7 +1026,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       expect(text).not.toMatch(/undo|撤销|annuler/i);
   });
 
-  it('the picker’s button is the question of a pick (D-613): it says how many and into which table', () => {
+  it('the picker’s button is the question of a pick (D-616): it says how many and into which table', () => {
     for (const text of [
       en.recordPickAddButton,
       enSingular.recordPickAddButton,
@@ -1043,7 +1043,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     for (const base of [
       { do: 'setAll', table: 't', field: 'a', value: true },
       { do: 'createAll', table: 't', from: 's', values: {} },
-      // 勾选新建（D-613）：勾选页的按钮「添加 N 条到 B」就是先问的那一句（创始人 2026-11-21），配置里同样没有跳过它的设置。
+      // 勾选新建（D-616）：勾选页的按钮「添加 N 条到 B」就是先问的那一句（创始人 2026-11-21），配置里同样没有跳过它的设置。
       { do: 'createAll', table: 't', from: 's', pick: true, values: {} },
     ]) {
       expect(RecordToolSchema.safeParse(base).success).toBe(true);
@@ -1385,7 +1385,7 @@ describe('底线 17：打卡格只改它显示的那张表（D-610）', () => {
   });
 });
 
-describe('底线 9 / 17 / 18：勾选新建只在列表下面、只写列表那张表（D-613）', () => {
+describe('底线 9 / 17 / 18：勾选新建只在列表下面、只写列表那张表（D-616）', () => {
   const config = createDefaultWorkspace('en');
   config.data.tables.push(
     { id: 'recipes', name: 'Recipes', fields: [{ id: 'name', name: 'Name', type: 'text' }] },
