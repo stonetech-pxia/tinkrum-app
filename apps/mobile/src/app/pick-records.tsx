@@ -49,9 +49,11 @@ export default function PickRecordsRoute() {
   const router = useRouter();
   const cal = useCalendar();
   const runner = useRecordActionRunner();
-  const use = parse<RecordToolUse>(params.tool);
-  const tool = use && recordToolOf(use);
-  const pick = tool?.do === 'createAll' && tool.pick === true ? tool : undefined;
+  const use = useMemo(() => parse<RecordToolUse>(params.tool), [params.tool]);
+  const pick = useMemo(() => {
+    const tool = use && recordToolOf(use);
+    return tool?.do === 'createAll' && tool.pick === true ? tool : undefined;
+  }, [use]);
   const here = useMemo(() => parse<Record<string, unknown>>(params.here) ?? {}, [params.here]);
   const target = config.data.tables.find((c) => c.id === pick?.table);
   const source = config.data.tables.find((c) => c.id === pick?.from);
