@@ -1,4 +1,4 @@
-import { RunError } from '@morph/core';
+import { CHECKER_FILE_NAME, RunError } from '@morph/core';
 import { getStringAsync, setStringAsync } from 'expo-clipboard';
 import { getDocumentAsync } from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
@@ -24,7 +24,7 @@ import {
   shareAll,
   type ShareDeps,
 } from './expo-share';
-import { Platform } from 'react-native';
+import { Platform, Share } from 'react-native';
 
 import { expoDeskFs } from '../desk/expo-desk-fs';
 import { expoDocuments } from './expo-documents';
@@ -345,6 +345,38 @@ export const expoFilePlatform: FilePlatform = {
       mimeType,
       ...(mimeType === 'text/csv' ? { UTI: 'public.comma-separated-values-text' } : {}),
     });
+  },
+
+  async shareWithAi({ file, prompt }) {
+    const send = MorphShare?.shareFilesWithText?.bind(MorphShare);
+    if (!send) {
+      // Expo Go、比这个功能早的开发版：只发文字，App 文件写在后面。
+      await Share.share({
+        message: `${prompt({ attached: false, checker: false })}\n\n\`\`\`json\n${file.text}\n\`\`\``,
+      });
+      return;
+    }
+    // 放在缓存的 share/ 里：Android 的 FileProvider 只开放这里（D-466）；每次分享前清掉上一次的。
+    const dir = new Directory(Paths.cache, 'share');
+    if (dir.exists) dir.delete();
+    dir.create({ intermediates: true, idempotent: true });
+    const app = new File(dir, file.name);
+    app.create();
+    await app.write(file.text);
+    const uris = [app.uri];
+    const types = ['application/json'];
+    let checker = false;
+    try {
+      // prebuild 时打包进 App 的检查器（plugins/with-agent-checker.js）；没有（老的开发版）就不带。
+      const copy = new File(dir, CHECKER_FILE_NAME);
+      await new File(Paths.bundle, 'agent', CHECKER_FILE_NAME).copy(copy);
+      uris.push(copy.uri);
+      types.push('application/javascript');
+      checker = true;
+    } catch (e) {
+      if (__DEV__) console.warn('[share] no bundled checker', e);
+    }
+    await send(prompt({ attached: true, checker }), uris, types);
   },
 
   async share(path, mimeType) {

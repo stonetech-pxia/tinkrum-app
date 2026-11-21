@@ -1,7 +1,10 @@
 import {
   allComponents,
+  appFileOfApp,
+  appFileText,
   appViewOf,
   createMockAIProvider,
+  handoffPrompt,
   isKnownComponent,
   openItems,
   pageTarget,
@@ -78,7 +81,7 @@ const PROGRESS_TEXT: Record<PlanProgress | 'start', readonly [StringKey, StringK
  */
 
 export function ChangeScreen() {
-  const { locale, registry, store } = useWorkspaceContext();
+  const { locale, registry, store, files } = useWorkspaceContext();
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -101,10 +104,8 @@ export function ChangeScreen() {
   const deleteDraft = useWorkspace((s) => s.deleteDraft);
   const showInShell = useWorkspace((s) => s.showInShell);
   // 在 App 里打开 Tink 页就用这个 App 的风格（D-485）；风格选择器也标这个 App 现在的风格。
-  const theme = appViewOf(
-    config,
-    useWorkspace((s) => s.appId),
-  ).theme;
+  const appId = useWorkspace((s) => s.appId);
+  const theme = appViewOf(config, appId).theme;
   const palette = usePalette(theme);
   const aiMode = useAISettings((s) => s.mode);
   // 从一个快捷操作（「让 AI 改这个」）或收件页面打开时带上的上下文（D-124）。
@@ -150,6 +151,42 @@ export function ChangeScreen() {
     return aboutFromParams(params, config);
   });
   const place = aboutPlace(about, config, locale);
+  // 交给别的 AI App 改（D-611）：在一个子 App 里才有；从它的某一页进来的，提示词里写明这一页。
+  const handoff = useMemo(() => {
+    const from =
+      about?.kind === 'page'
+        ? config.containers.pages.find((p) => p.id === about.pageId)
+        : undefined;
+    const id = from?.app ?? appId;
+    const app = id ? config.nav.apps?.find((a) => a.id === id) : undefined;
+    if (!app) return null;
+    return {
+      id: app.id,
+      name: app.name,
+      ...(from?.app === app.id ? { page: { id: from.id, title: from.title } } : {}),
+    };
+  }, [about, appId, config]);
+
+  /** 把这个 App 的文件和提示词交给分享面板，用户自己挑 App、点发送（底线 10）；只有结构（底线 1、2、3）。 */
+  async function handOff() {
+    if (!handoff) return;
+    const file = appFileOfApp(config, handoff.id);
+    if (!file) return;
+    const now = new Date();
+    const name = `tinkrum-app-${handoff.id}.json`;
+    const scope = {
+      kind: 'app' as const,
+      app: handoff.name,
+      ...(handoff.page ? { page: handoff.page } : {}),
+    };
+    await files
+      .shareWithAi({
+        file: { name, text: appFileText(file, now) },
+        prompt: ({ attached, checker }) =>
+          handoffPrompt(scope, locale, now, { attached, checker, fileName: name }),
+      })
+      .catch(() => {});
+  }
   const aboutName =
     about?.kind === 'workflow'
       ? quickActionsOf(config).find((w) => w.id === about.workflowId)?.name
@@ -699,6 +736,15 @@ export function ChangeScreen() {
             )}
           </View>
         )}
+        {handoff && !guide && !planBusy ? (
+          <Button
+            palette={palette}
+            testID="change-handoff"
+            variant="text"
+            label={t(locale, 'handoffButton')}
+            onPress={() => void handOff()}
+          />
+        ) : null}
       </ScrollView>
 
       {/* 「换个风格」：从底部弹出风格选择（D-095），选了直接进入草稿看效果。 */}

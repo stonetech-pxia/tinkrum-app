@@ -1,8 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
   WORKFLOW_PRESETS,
+  appFileOps,
   applyOps,
   createStarterWorkspace,
   presetWorkflow,
+  readAppFile,
   templateOps,
   type PlanAbout,
 } from '@morph/core';
@@ -263,5 +268,57 @@ describe('the AI entry at the top right of a page (D-406)', () => {
     });
     await fireEvent.press(screen.getByTestId('draft-apply'));
     expect(await screen.findByTestId('banner')).toHaveTextContent(/撤销/);
+  });
+});
+
+// D-611：在一个子 App 里，AI 页可以把这个 App 交给别的 AI App 改：App 文件（只有结构）和提示词一起交给分享面板，
+// 从哪一页进来的写进提示词。主页（不属于哪个 App）没有这个按钮。
+describe('hand the app to another AI app (D-611)', () => {
+  const walletText = readFileSync(
+    join(__dirname, '../../../../packages/core/src/fixtures/portal-apps/tinkrum-app-wallet.json'),
+    'utf8',
+  );
+
+  async function renderWithWallet() {
+    const files = new FakeFiles();
+    const app = await renderToolsApp(new MemoryWorkspaceRepo(), files, {
+      locale: 'zh',
+      seed: (locale, registry) => {
+        const base = createStarterWorkspace(locale, registry);
+        const plan = appFileOps(readAppFile(walletText)!, base);
+        if (!plan.ok) throw new Error(plan.error);
+        const made = applyOps(base, plan.ops, { registry, locale });
+        if (!made.ok) throw new Error(made.error);
+        return made.config;
+      },
+    });
+    return { ...app, files };
+  }
+
+  it('from a page of the app: shares its file and a prompt that names the page', async () => {
+    const { store, files } = await renderWithWallet();
+    await act(async () => store.getState().enterApp('wallet'));
+    await fireEvent.press(await screen.findByTestId('page-ai'));
+    await fireEvent.press(await screen.findByTestId('change-handoff'));
+    await waitFor(() => expect(files.aiShares).toHaveLength(1));
+    const [shared] = files.aiShares;
+    expect(shared!.files.map((f) => f.name)).toEqual([
+      'tinkrum-app-wallet.json',
+      'tinkrum-check.js',
+    ]);
+    const sent = JSON.parse(shared!.files[0]!.text) as { app: { id: string }; tables: unknown[] };
+    expect(sent.app.id).toBe('wallet');
+    expect(shared!.text).toContain('tinkrum-app-guide.md?v=');
+    expect(shared!.text).toContain('「Wallet」');
+    expect(shared!.text).toContain('id "wallet-home"');
+    expect(shared!.text).toMatch(/先改这一页/);
+    expect(shared!.text).toContain('node tinkrum-check.js');
+  });
+
+  it('on the home there is no hand-off button', async () => {
+    await renderWithWallet();
+    await fireEvent.press(await screen.findByTestId('page-ai'));
+    await screen.findByTestId('change-input');
+    expect(screen.queryByTestId('change-handoff')).toBeNull();
   });
 });

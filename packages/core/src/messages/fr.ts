@@ -481,6 +481,20 @@ export const fr: MessageTable = {
   presetsShareToAi: 'Envoyer à une app d’IA',
   presetsShareToAiPrompt:
     'Lis ces deux pages en entier avant de commencer. Ouvre les liens directement, sans passer par une recherche ni une copie en cache :\n1. {guide}\n2. {patterns}\n\nAide-moi ensuite à créer un fichier d’app Tinkrum. Demande-moi d’abord ce que je veux suivre et faire. Dis-moi ensuite en une ligne de quel modèle tu pars, puis donne-moi le fichier complet dans un seul bloc de code json.',
+  handoffRead:
+    'Lis ces deux pages en entier avant de commencer. Ouvre les liens directement, sans passer par une recherche ni une copie en cache :\n1. {guide}\n2. {patterns}',
+  handoffAttached:
+    'En pièces jointes : mon fichier d’app Tinkrum actuel ({file}) et le vérificateur Tinkrum (tinkrum-check.js).',
+  handoffAttachedApp: 'En pièce jointe : mon fichier d’app Tinkrum actuel ({file}).',
+  handoffInline: 'Mon fichier d’app Tinkrum actuel est à la fin de ce message.',
+  handoffApp: 'Je veux modifier mon app « {app} ».',
+  handoffPage:
+    'Je viens de la page « {page} » (id "{pageId}") de mon app « {app} ». Quand ma demande ne dit pas quelle partie changer, change d’abord cette page.',
+  handoffRules:
+    'Règles pour modifier mon fichier :\n- Garde tous les id qui existent déjà : l’app, les tableaux, les champs, les options, les pages et les blocs. Mes entrées sont liées aux id des tableaux et des champs ; un id changé les perd.\n- Ne supprime ni tableau ni champ sauf si je le demande. Leurs entrées restent sur mon téléphone mais sont masquées.\n- Donne-moi le fichier complet dans un seul bloc de code json.',
+  handoffCheck: 'Lance node tinkrum-check.js sur le fichier jusqu’à ce qu’il affiche OK.',
+  handoffAsk: 'Demande-moi d’abord ce que je veux changer.',
+  handoffButton: 'Modifier avec une autre app d’IA',
   presetsMakeWithAi: 'Créer une app avec Claude ou ChatGPT',
   presetsPasteEmpty:
     'Le presse-papiers ne contient pas de texte. Copiez d’abord le fichier d’app, puis touchez Coller depuis le presse-papiers.',
@@ -575,6 +589,27 @@ export const fr: MessageTable = {
   appResetItem: 'Rétablir l’aspect d’origine',
   appResetConfirm:
     'Rétablir « {name} » tel qu’il était à l’import ? Les pages et actions rapides que vous y avez ajoutées disparaissent. Vos tableaux et vos entrées restent. Vous pourrez annuler dans l’historique des modifications.',
+  importUpdateChoose:
+    'Vous avez déjà l’app « {name} ». Ce fichier peut la mettre à jour : ses pages, ses tableaux et son style deviennent ceux du fichier. Vos entrées restent.',
+  importUpdateButton: 'Mettre à jour « {name} »',
+  importUpdateSummary: 'Mettre à jour « {name} » depuis un fichier',
+  importUpdateConfirm:
+    'Mettre à jour « {name} » avec ce fichier ? Les champs absents du fichier gardent leurs valeurs dans vos entrées, et les tableaux absents passent dans votre accueil. Vous pourrez annuler dans l’historique des modifications.',
+  updateAppRenamed: 'Nom : « {name} »',
+  updateStyle: 'Un nouveau style',
+  updatePageAdded: 'Nouvelle page « {page} »',
+  updatePageRemoved: 'Page « {page} » supprimée',
+  updatePageChanged: 'Page « {page} » modifiée',
+  updateTableAdded: 'Nouveau tableau « {table} »',
+  updateTableLeft: 'Le tableau « {table} » passe dans votre accueil avec ses entrées',
+  updateTableRenamed: 'Le tableau « {old} » s’appelle maintenant « {table} »',
+  updateFieldAdded: '« {table} » : nouveau champ « {field} »',
+  updateFieldRemoved: '« {table} » : champ « {field} » supprimé (les entrées gardent ses valeurs)',
+  updateFieldChanged: '« {table} » : champ « {field} » modifié',
+  updateToolAdded: 'Nouveau : « {tool} »',
+  updateToolRemoved: '« {tool} » supprimé',
+  updateToolChanged: '« {tool} » modifié',
+  updateNothing: 'Le fichier est identique à votre app : rien ne change.',
   appResetSummary: 'Rétablir l’aspect d’origine de « {name} »',
   appIconItem: 'Changer l’icône',
   appIconEmoji: 'Ou saisissez un emoji',

@@ -655,6 +655,15 @@ export interface FilePlatform {
   /** 把一段文字存成临时文件并打开系统分享面板（导出 CSV 用）。不会成为用户文件。 */
   shareText(fileName: string, text: string, mimeType: string): Promise<void>;
   /**
+   * 交给别的 AI App（D-611）：App 文件连同提示词交给系统分享面板，用户自己挑 App、自己点发送（底线 10）。
+   * 有原生分享时 App 文件作附件，打包在 App 里的检查器（tinkrum-check.js）也附上；prompt 按实际带了什么写。
+   * 没有原生分享（Expo Go）时只发文字，App 文件写在提示词后面。App 文件只有结构（底线 1、2、3）。
+   */
+  shareWithAi(input: {
+    file: { name: string; text: string };
+    prompt: (how: { attached: boolean; checker: boolean }) => string;
+  }): Promise<void>;
+  /**
    * 读用户从「文件」选的一个文字文件（恢复预填记忆的备份用）。读完删掉选择器放在 App 缓存里的副本
    * （Caches/DocumentPicker，是 App 自己的）；原件不动。
    */

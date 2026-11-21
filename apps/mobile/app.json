@@ -92,6 +92,7 @@
       ],
       "./plugins/with-llama-from-source",
       "./plugins/with-bundled-packs",
+      "./plugins/with-agent-checker",
       [
         "./plugins/with-share-extension",
         {

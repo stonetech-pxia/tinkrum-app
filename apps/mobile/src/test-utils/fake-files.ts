@@ -353,6 +353,17 @@ export class FakeFiles implements FilePlatform {
   async shareText(fileName: string, text: string) {
     this.sharedTexts.set(fileName, text);
   }
+  /** 交给别的 AI App 的（D-611）：带了检查器，App 文件是附件。 */
+  aiShares: { text: string; files: { name: string; text: string }[] }[] = [];
+  async shareWithAi(input: {
+    file: { name: string; text: string };
+    prompt: (how: { attached: boolean; checker: boolean }) => string;
+  }) {
+    this.aiShares.push({
+      text: input.prompt({ attached: true, checker: true }),
+      files: [input.file, { name: 'tinkrum-check.js', text: '// checker' }],
+    });
+  }
   async copyToRun(uri: string, runId: string, fileName: string) {
     // 用户文件的地址（fileUri）也能复制进来，例如「加上已有文件」（D-197）。
     const bytes = this.disk.get(uri) ?? this.disk.get(uri.replace('file:///fake/', ''));

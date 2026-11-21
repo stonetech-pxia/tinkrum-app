@@ -6,7 +6,10 @@ import {
   MAX_SAVED_PRESETS,
   appFileJsonText,
   appFileOps,
+  appUpdateOps,
   checkAppFileText,
+  describeAppUpdate,
+  handoffPrompt,
   missingUses,
   canSavePreset,
   checkTools,
@@ -17,7 +20,6 @@ import {
   sessionIsEmpty,
   type AppFile,
   type ImportMode,
-  type Locale,
 } from '@morph/core';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -36,20 +38,6 @@ import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/cont
 
 /** 网站上「用你自己的 AI 做 App」的页面（D-593）：写法说明、示例和 App 文件检查。只打开网页，不带任何数据。 */
 const MAKE_WITH_AI_URL = 'https://tinkrum.stonetech.dev/make.html';
-const AGENT_DOCS_URL = 'https://tinkrum.stonetech.dev/assets/agent/';
-
-/**
- * D-609：给别的 AI App 的提示词：读网站上的指南和模板库，先问用户要什么，再给整个文件。
- * 网址带当天日期（?v=YYYYMMDD），让 AI 不用前几天缓存的旧版。只有这两个网址和固定的话，不带这个 App 的任何内容。
- */
-function shareToAiPrompt(locale: Locale, now = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const v = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
-  return t(locale, 'presetsShareToAiPrompt', {
-    guide: `${AGENT_DOCS_URL}tinkrum-app-guide.md?v=${v}`,
-    patterns: `${AGENT_DOCS_URL}tinkrum-app-patterns.md?v=${v}`,
-  });
-}
 
 /**
  * 「设置 → 我的预设」（D-410）：把整个 App 存起来，以后换回来。系统层的页面，AI 改不了（底线 8）。
@@ -197,6 +185,20 @@ export default function PresetsRoute() {
 
   /** 导入一个 App 文件：先选「导入主页」还是「做成新 App」，再预览，确认后生效，能在改动记录里撤销（底线 5、7）。 */
   function importApp(appFile: AppFile, text: string, title: string) {
+    // 已经装了同一个 App（别的 AI 改完交回来的，D-611）：默认更新它，按 ID 接上，记录都留着。
+    const installed = (config.nav.apps ?? []).find((a) => a.id === appFile.app.id);
+    if (installed) {
+      Alert.alert(installed.name, t(locale, 'importUpdateChoose', { name: installed.name }), [
+        {
+          text: t(locale, 'importUpdateButton', { name: installed.name }),
+          style: 'default',
+          isPreferred: true,
+          onPress: () => void proceedImport(appFile, text, 'update', title),
+        },
+        { text: t(locale, 'cancel'), style: 'cancel' },
+      ]);
+      return;
+    }
     Alert.alert(appFile.app.name, t(locale, 'importAppChoose'), [
       {
         text: t(locale, 'importAppToHome'),
@@ -210,15 +212,31 @@ export default function PresetsRoute() {
     ]);
   }
 
-  async function proceedImport(appFile: AppFile, text: string, mode: ImportMode, title: string) {
-    const plan = appFileOps(appFile, config, { mode });
+  async function proceedImport(
+    appFile: AppFile,
+    text: string,
+    mode: ImportMode | 'update',
+    title: string,
+  ) {
+    const plan =
+      mode === 'update'
+        ? appUpdateOps(appFile, config, registry)
+        : appFileOps(appFile, config, { mode });
     if (!plan.ok) {
       problemsAlert(title, t(locale, 'importAppClash', { reason: '' }).trimEnd(), [plan.error]);
       return;
     }
     const result = await proposeOps(
       plan.ops,
-      t(locale, mode === 'home' ? 'importHomeSummary' : 'importAppSummary', { name: plan.name }),
+      t(
+        locale,
+        mode === 'home'
+          ? 'importHomeSummary'
+          : mode === 'update'
+            ? 'importUpdateSummary'
+            : 'importAppSummary',
+        { name: plan.name },
+      ),
       { fromAppFile: true },
     );
     if (result.kind === 'invalid') {
@@ -243,8 +261,19 @@ export default function PresetsRoute() {
     Alert.alert(
       title,
       [
-        t(locale, mode === 'home' ? 'importHomeConfirm' : 'importAppConfirm', { name: plan.name }),
-        ...result.proposal.lines,
+        t(
+          locale,
+          mode === 'home'
+            ? 'importHomeConfirm'
+            : mode === 'update'
+              ? 'importUpdateConfirm'
+              : 'importAppConfirm',
+          { name: plan.name },
+        ),
+        // 更新是先移除再装回（D-611）：逐个操作的说法会说「移除 App」，这里只列真正变了的。
+        ...(mode === 'update'
+          ? describeAppUpdate(result.proposal.before, result.proposal.after, appFile.app.id, locale)
+          : result.proposal.lines),
       ].join('\n'),
       [
         { text: t(locale, 'cancel'), style: 'cancel', onPress: () => void cancel() },
@@ -395,7 +424,7 @@ export default function PresetsRoute() {
             onPress={() =>
               // 系统分享面板：用户自己挑一个 App，再自己点发送（底线 10）。
               void Share.share(
-                { message: shareToAiPrompt(locale) },
+                { message: handoffPrompt({ kind: 'new' }, locale, new Date()) },
                 { dialogTitle: t(locale, 'presetsShareToAi') },
               ).catch(() => {})
             }

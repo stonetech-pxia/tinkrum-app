@@ -437,6 +437,20 @@ export const zh: MessageTable = {
   presetsShareToAi: '把说明发给 AI App',
   presetsShareToAiPrompt:
     '开始之前，请完整读完这两个网页。直接打开链接，不要用搜索结果或缓存的旧版：\n1. {guide}\n2. {patterns}\n\n然后帮我做一个 Tinkrum App 文件。先问我想记录什么、做什么。再用一句话告诉我你从哪个模式开始，最后把整个文件放在一个 json 代码块里给我。',
+  handoffRead:
+    '开始之前，请完整读完这两个网页。直接打开链接，不要用搜索结果或缓存的旧版：\n1. {guide}\n2. {patterns}',
+  handoffAttached:
+    '附件是我现在的 Tinkrum App 文件（{file}）和 Tinkrum 检查器（tinkrum-check.js）。',
+  handoffAttachedApp: '附件是我现在的 Tinkrum App 文件（{file}）。',
+  handoffInline: '我现在的 Tinkrum App 文件在这条消息的最后。',
+  handoffApp: '我想改我的 App「{app}」。',
+  handoffPage:
+    '我是从我的 App「{app}」里的页面「{page}」（id "{pageId}"）进来的。我没说改哪里的时候，先改这一页。',
+  handoffRules:
+    '改文件的规矩：\n- 已有的 ID 一个都不改：App、表、字段、选项、页面和块。我的记录是靠表和字段的 ID 挂上去的，ID 一改就对不上了。\n- 我没说要删，就不删表和字段。删了的话，它们的记录还在我手机上，只是看不到了。\n- 把整个文件放在一个 json 代码块里给我。',
+  handoffCheck: '对文件运行 node tinkrum-check.js，直到它输出 OK。',
+  handoffAsk: '先问我想改什么。',
+  handoffButton: '交给别的 AI App 改',
   presetsMakeWithAi: '用 Claude 或 ChatGPT 做一个 App',
   presetsPasteEmpty: '剪贴板里没有文字。先复制 App 文件，再点「从剪贴板粘贴」。',
   importAppFileBroken: '这个 App 文件有错，没有导入：',
@@ -515,6 +529,27 @@ export const zh: MessageTable = {
   appResetItem: '恢复初始样子',
   appResetConfirm:
     '把「{name}」恢复成刚导入时的样子？你加的页面和快捷操作会去掉，表和记录都留着。可以在改动记录里撤销。',
+  importUpdateChoose:
+    '你已经有 App「{name}」了。这个文件可以更新它：页面、表和风格换成文件里的，记录都留着。',
+  importUpdateButton: '更新「{name}」',
+  importUpdateSummary: '用文件更新「{name}」',
+  importUpdateConfirm:
+    '用这个文件更新「{name}」？文件里去掉的字段，记录里的值还留着；去掉的表连同记录移到主页。可以在改动记录里撤销。',
+  updateAppRenamed: '名字改成「{name}」',
+  updateStyle: '换了风格',
+  updatePageAdded: '新页面「{page}」',
+  updatePageRemoved: '去掉页面「{page}」',
+  updatePageChanged: '改了页面「{page}」',
+  updateTableAdded: '新表「{table}」',
+  updateTableLeft: '表「{table}」连同记录移到主页',
+  updateTableRenamed: '表「{old}」改名为「{table}」',
+  updateFieldAdded: '「{table}」加字段「{field}」',
+  updateFieldRemoved: '「{table}」去掉字段「{field}」（记录里的值还在）',
+  updateFieldChanged: '「{table}」改了字段「{field}」',
+  updateToolAdded: '新的「{tool}」',
+  updateToolRemoved: '去掉「{tool}」',
+  updateToolChanged: '改了「{tool}」',
+  updateNothing: '文件和现在的 App 一样，没有要改的。',
   appResetSummary: '恢复「{name}」的初始样子',
   appIconItem: '换图标',
   appIconEmoji: '或者填一个表情',

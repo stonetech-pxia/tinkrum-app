@@ -456,6 +456,20 @@ export const en = {
   presetsShareToAi: 'Send to an AI app',
   presetsShareToAiPrompt:
     'Read these two pages in full before you start. Open the links directly; do not use search results or a cached copy:\n1. {guide}\n2. {patterns}\n\nThen help me make a Tinkrum app file. First ask me what I want to keep track of and do. Then tell me in one line which pattern you start from, and give me the whole file in one json code block.',
+  handoffRead:
+    'Read these two pages in full before you start. Open the links directly; do not use search results or a cached copy:\n1. {guide}\n2. {patterns}',
+  handoffAttached:
+    'Attached are my current Tinkrum app file ({file}) and the Tinkrum checker (tinkrum-check.js).',
+  handoffAttachedApp: 'Attached is my current Tinkrum app file ({file}).',
+  handoffInline: 'My current Tinkrum app file is at the end of this message.',
+  handoffApp: 'I want to change my app “{app}”.',
+  handoffPage:
+    'I opened this from the page “{page}” (id "{pageId}") of my app “{app}”. When my request does not say which part to change, change this page first.',
+  handoffRules:
+    'Rules for changing my file:\n- Keep every id that is already there: the app, tables, fields, choice options, pages and blocks. My entries are linked to table and field ids; a changed id loses them.\n- Do not remove a table or a field unless I ask. Their entries stay on my phone but are hidden.\n- Give me the whole file in one json code block.',
+  handoffCheck: 'Run node tinkrum-check.js on the file until it prints OK.',
+  handoffAsk: 'First ask me what I want to change.',
+  handoffButton: 'Change it with another AI app',
   presetsMakeWithAi: 'Make an app with Claude or ChatGPT',
   presetsPasteEmpty:
     'The clipboard has no text. Copy the app file first, then tap Paste from clipboard.',
@@ -543,6 +557,27 @@ export const en = {
   appResetItem: 'Restore its original look',
   appResetConfirm:
     'Restore “{name}” to how it was when you imported it? Pages and quick actions you added go away. Your tables and entries stay. You can undo this in Change history.',
+  importUpdateChoose:
+    'You already have the app “{name}”. This file can update it: its pages, tables and look become what the file says. Your entries stay.',
+  importUpdateButton: 'Update “{name}”',
+  importUpdateSummary: 'Update “{name}” from a file',
+  importUpdateConfirm:
+    'Update “{name}” with this file? Fields the file leaves out keep their values in your entries, and tables it leaves out move to your home. You can undo this in Change history.',
+  updateAppRenamed: 'Name: “{name}”',
+  updateStyle: 'A new style',
+  updatePageAdded: 'New page “{page}”',
+  updatePageRemoved: 'Page “{page}” removed',
+  updatePageChanged: 'Page “{page}” changed',
+  updateTableAdded: 'New table “{table}”',
+  updateTableLeft: 'Table “{table}” moves to your home with its entries',
+  updateTableRenamed: 'Table “{old}” is now “{table}”',
+  updateFieldAdded: '“{table}”: new field “{field}”',
+  updateFieldRemoved: '“{table}”: field “{field}” removed (entries keep its values)',
+  updateFieldChanged: '“{table}”: field “{field}” changed',
+  updateToolAdded: 'New “{tool}”',
+  updateToolRemoved: '“{tool}” removed',
+  updateToolChanged: '“{tool}” changed',
+  updateNothing: 'The file is the same as your app: nothing changes.',
   appResetSummary: 'Restore “{name}” to its original look',
   appIconItem: 'Change icon',
   appIconEmoji: 'Or type one emoji',

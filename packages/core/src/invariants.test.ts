@@ -770,12 +770,27 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
   });
 
   // D-609：预设页把给别的 AI 的提示词交给系统分享面板（固定的话和两个网址，不带数据），用户挑 App、点发送。
+  // D-611：交给别的 AI App 改一个 App 时，没有原生分享（Expo Go）的退路也只发文字（提示词和 App 文件）。
   // 文件、记录的分享走快捷操作的 out.share 和本地模块，不用 react-native 的 Share。
-  it('only the presets page hands text to the system share sheet', () => {
+  it('only the presets page and the hand-off fallback hand text to the system share sheet', () => {
     const sharers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
       .filter((path) => /\bShare\.share\b/.test(readFileSync(path, 'utf8')))
       .map((path) => relative(REPO, path));
-    expect(sharers).toEqual([join('apps', 'mobile', 'src', 'app', 'presets.tsx')]);
+    expect(sharers.sort()).toEqual([
+      join('apps', 'mobile', 'src', 'app', 'presets.tsx'),
+      join('apps', 'mobile', 'src', 'runtime', 'expo-platform.ts'),
+    ]);
+  });
+
+  // D-611：把一个 App 的文件（只有结构，文件引用清空）和提示词交给别的 AI App，只有 AI 页上用户点了按钮才做。
+  it('only the AI page hands an app to another AI app', () => {
+    const callers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
+      .filter((path) => /\.shareWithAi\(|\.shareFilesWithText\b/.test(readFileSync(path, 'utf8')))
+      .map((path) => relative(REPO, path));
+    expect(callers.sort()).toEqual([
+      join('apps', 'mobile', 'src', 'runtime', 'expo-platform.ts'),
+      join('apps', 'mobile', 'src', 'shell', 'ChangeScreen.tsx'),
+    ]);
   });
 
   // D-423：导出成 vCard 只是快捷操作的一步，只做一个文件；要离开 App 还要接 out.share（快捷操作是用户点了才运行）。

@@ -3,11 +3,13 @@ import { usesOf } from './file-uses';
 import { homeScreenOp } from './home-screen';
 import { applyOps, type Op } from './ops';
 import { migrateWorkspace } from './migrate';
+import { t } from './messages';
 import type { Registry } from './registry';
 import {
   CURRENT_SCHEMA_VERSION,
   HOME_PAGE_ID,
   type Collection,
+  type Locale,
   type Page,
   type Tool,
   type WorkspaceConfig,
@@ -150,7 +152,7 @@ export type ImportMode = 'app' | 'home';
 export function appFileOps(
   file: AppFile,
   config: WorkspaceConfig,
-  options: { mode?: ImportMode } = {},
+  options: { mode?: ImportMode; update?: boolean } = {},
 ): AppImport {
   const mode = options.mode ?? 'app';
   const id = file.app.id;
@@ -198,9 +200,13 @@ export function appFileOps(
       ops.push({ op: 'addData', table: { ...table, ...owner } as never });
       continue;
     }
-    // 接回来：属于这个 App，缺的字段补上，已有的不改。
+    // 接回来：属于这个 App，缺的字段补上，已有的不改（更新时照文件改，见 tableUpdateOps）。
     if (mode === 'app')
       ops.push({ op: 'updateData', table: table.id, changes: { app: id } } as never);
+    if (options.update) {
+      ops.push(...tableUpdateOps(have, table));
+      continue;
+    }
     const fields = new Set(have.fields.map((f) => f.id));
     for (const field of table.fields)
       if (!fields.has(field.id)) ops.push({ op: 'addData', table: table.id, field } as never);
@@ -239,21 +245,179 @@ export function appFileOps(
  * 在桌面菜单里的还放回去。能在改动记录里撤销。
  */
 export function appResetOps(file: AppFile, config: WorkspaceConfig, registry: Registry): AppImport {
+  return reinstallOps(file, config, registry, false);
+}
+
+/**
+ * 用改过的 App 文件更新装好的同一个 App（D-611，别的 AI 改完交回来的文件）：和恢复初始样子一样先移除再装回，
+ * 页面、快捷操作、提醒、名字、风格、底栏都换成文件里的；表按 ID 接回来后照文件改：表名、图标，字段加、改、去、
+ * 排序。去掉的字段记录里的值留着，文件里没有的表连同记录归主页（底线 5）；字段类型只能在能互换的类型之间换，
+ * 别的由操作拒绝，说「加一个新字段」（和 Tink 改的时候一样）。能在改动记录里撤销。
+ */
+export function appUpdateOps(
+  file: AppFile,
+  config: WorkspaceConfig,
+  registry: Registry,
+): AppImport {
+  return reinstallOps(file, config, registry, true);
+}
+
+function reinstallOps(
+  file: AppFile,
+  config: WorkspaceConfig,
+  registry: Registry,
+  update: boolean,
+): AppImport {
   const id = file.app.id;
   if (!(config.nav.apps ?? []).some((a) => a.id === id))
     return { ok: false, error: `app ${id} is not installed` };
   const removal: Op = { op: 'removeContainer', app: id };
   const mid = applyOps(config, [removal], { registry, locale: 'en' });
   if (!mid.ok) return { ok: false, error: mid.error };
-  const plan = appFileOps(file, mid.config);
+  const plan = appFileOps(file, mid.config, { update });
   if (!plan.ok) return plan;
   const onMenu = (config.nav.phoneHomeScreen ?? []).includes(`app:${id}`);
+  // 更新时主页上的入口放回原来的位置（D-611）：移除 App 时它被去掉，装回时默认加在主页最后。
+  const home = config.containers.pages.find((p) => p.id === HOME_PAGE_ID);
+  const at = update
+    ? (home?.blocks.findIndex((b) => (b as { opens?: unknown }).opens === `app:${id}`) ?? -1)
+    : -1;
+  const placed = plan.ops.map((op) =>
+    at >= 0 &&
+    op.op === 'addContainer' &&
+    op.page === HOME_PAGE_ID &&
+    (op.block as { opens?: unknown } | undefined)?.opens === `app:${id}`
+      ? ({ ...op, block: home!.blocks[at], index: at } as Op)
+      : op,
+  );
   const ops: Op[] = [
     removal,
-    ...plan.ops,
+    ...placed,
     ...(onMenu ? [homeScreenOp(mid.config, `app:${id}`, true)] : []),
   ];
   return { ok: true, ops, name: file.app.name };
+}
+
+/** 表上能照文件改的属性（和 updateData 允许的一样，app 由导入自己管）。 */
+const TABLE_KEYS = [
+  'name',
+  'icon',
+  'readAttachments',
+  'prefillRules',
+  'recordRow',
+  'form',
+] as const;
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * 把装好的表 have 改成文件里的 next（D-611）：只用普通操作，所以每一步都有和 Tink 改的时候一样的检查。
+ * 字段按 ID 对：新的加、变了的整个换成文件里的（去掉的属性写 null）、文件里没有的去掉（值留在记录里），
+ * 最后按文件的顺序排。
+ */
+function tableUpdateOps(have: Collection, next: Collection): Op[] {
+  const ops: Op[] = [];
+  const changes: Record<string, unknown> = {};
+  for (const key of TABLE_KEYS) {
+    const before = (have as Record<string, unknown>)[key];
+    const after = (next as Record<string, unknown>)[key];
+    if (!same(before, after)) changes[key] = after ?? null;
+  }
+  if (Object.keys(changes).length > 0)
+    ops.push({ op: 'updateData', table: have.id, changes } as never);
+  const nextIds = new Set(next.fields.map((f) => f.id));
+  for (const field of have.fields)
+    if (!nextIds.has(field.id)) ops.push({ op: 'removeData', table: have.id, field: field.id });
+  const order = have.fields.filter((f) => nextIds.has(f.id)).map((f) => f.id);
+  for (const field of next.fields) {
+    const old = have.fields.find((f) => f.id === field.id);
+    if (!old) {
+      ops.push({ op: 'addData', table: have.id, field } as never);
+      order.push(field.id);
+      continue;
+    }
+    if (same(old, field)) continue;
+    const { id: _id, ...wanted } = field as unknown as Record<string, unknown>;
+    const patch: Record<string, unknown> = { ...wanted };
+    for (const key of Object.keys(old)) if (key !== 'id' && !(key in wanted)) patch[key] = null;
+    ops.push({ op: 'updateData', table: have.id, field: field.id, changes: patch } as never);
+  }
+  next.fields.forEach((field, index) => {
+    if (order[index] === field.id) return;
+    ops.push({ op: 'moveData', table: have.id, field: field.id, toIndex: index });
+    order.splice(order.indexOf(field.id), 1);
+    order.splice(index, 0, field.id);
+  });
+  return ops;
+}
+
+/**
+ * 用文件更新 App 时预览里列的（D-611）：比较更新前后这个 App 自己的东西，只说真正变了的（页面、表、字段、
+ * 快捷操作和提醒、名字、风格）。更新是先移除再装回，逐个操作的说法会说「移除 App」，用户看了会误会。
+ */
+export function describeAppUpdate(
+  before: WorkspaceConfig,
+  after: WorkspaceConfig,
+  appId: string,
+  locale: Locale,
+): string[] {
+  const lines: string[] = [];
+  const strip = <T extends { app?: string | undefined }>(x: T) => {
+    const { app: _app, ...rest } = x;
+    return JSON.stringify(rest);
+  };
+  const own = <T extends { app?: string | undefined; id: string }>(items: T[]) =>
+    new Map(items.filter((x) => x.app === appId).map((x) => [x.id, x]));
+  const appBefore = (before.nav.apps ?? []).find((a) => a.id === appId);
+  const appAfter = (after.nav.apps ?? []).find((a) => a.id === appId);
+  if (appBefore && appAfter && appBefore.name !== appAfter.name)
+    lines.push(t(locale, 'updateAppRenamed', { name: appAfter.name }));
+  if (appBefore && appAfter && !same(appBefore.theme, appAfter.theme))
+    lines.push(t(locale, 'updateStyle'));
+  const pagesBefore = own(before.containers.pages);
+  const pagesAfter = own(after.containers.pages);
+  for (const [id, page] of pagesAfter) {
+    const old = pagesBefore.get(id);
+    if (!old) lines.push(t(locale, 'updatePageAdded', { page: page.title }));
+    else if (strip(old) !== strip(page))
+      lines.push(t(locale, 'updatePageChanged', { page: page.title }));
+  }
+  for (const [id, page] of pagesBefore)
+    if (!pagesAfter.has(id)) lines.push(t(locale, 'updatePageRemoved', { page: page.title }));
+  const tablesBefore = own(before.data.tables);
+  const tablesAfter = own(after.data.tables);
+  for (const [id, table] of tablesAfter) {
+    const old = tablesBefore.get(id);
+    if (!old) {
+      lines.push(t(locale, 'updateTableAdded', { table: table.name }));
+      continue;
+    }
+    if (old.name !== table.name)
+      lines.push(t(locale, 'updateTableRenamed', { old: old.name, table: table.name }));
+    for (const field of table.fields) {
+      const was = old.fields.find((f) => f.id === field.id);
+      if (!was) lines.push(t(locale, 'updateFieldAdded', { table: table.name, field: field.name }));
+      else if (!same(was, field))
+        lines.push(t(locale, 'updateFieldChanged', { table: table.name, field: field.name }));
+    }
+    for (const field of old.fields)
+      if (!table.fields.some((f) => f.id === field.id))
+        lines.push(t(locale, 'updateFieldRemoved', { table: table.name, field: field.name }));
+  }
+  for (const [id, table] of tablesBefore)
+    if (!tablesAfter.has(id)) lines.push(t(locale, 'updateTableLeft', { table: table.name }));
+  const toolsBefore = own(before.tools);
+  const toolsAfter = own(after.tools);
+  const toolName = (tool: Tool) => ('name' in tool ? tool.name : tool.title);
+  for (const [id, tool] of toolsAfter) {
+    const old = toolsBefore.get(id);
+    if (!old) lines.push(t(locale, 'updateToolAdded', { tool: toolName(tool) }));
+    else if (strip(old) !== strip(tool))
+      lines.push(t(locale, 'updateToolChanged', { tool: toolName(tool) }));
+  }
+  for (const [id, tool] of toolsBefore)
+    if (!toolsAfter.has(id)) lines.push(t(locale, 'updateToolRemoved', { tool: toolName(tool) }));
+  return lines.length > 0 ? lines : [t(locale, 'updateNothing')];
 }
 
 // ---- 整份配置 → App 文件（做预设用）----
