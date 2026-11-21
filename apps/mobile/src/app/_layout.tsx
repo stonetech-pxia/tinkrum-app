@@ -173,6 +173,7 @@ function ThemedStack() {
         <Stack.Screen name="ai-settings" options={{ title: t(locale, 'aiSettingsTitle') }} />
         <Stack.Screen name="data" options={{ title: t(locale, 'dataTitle') }} />
         <Stack.Screen name="select-records" options={{ title: t(locale, 'bulkSelectTitle') }} />
+        <Stack.Screen name="pick-records" options={{ ...closable, title: '' }} />
         <Stack.Screen name="import-records" options={{ title: t(locale, 'importTitle') }} />
         <Stack.Screen name="storage" options={{ title: t(locale, 'storageTitle') }} />
         <Stack.Screen name="files" options={{ title: t(locale, 'filesAllTitle') }} />

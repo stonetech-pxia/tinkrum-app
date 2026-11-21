@@ -22,6 +22,7 @@ import { useDraftUi } from '../draft/ui';
 import { createAISettingsStore, type SecretStore } from '../ai/settings';
 import ChangeRoute from '../app/change';
 import DataRoute from '../app/data';
+import PickRecordsRoute from '../app/pick-records';
 import SelectRecordsRoute from '../app/select-records';
 import ImportRecordsRoute from '../app/import-records';
 import DeskRoute from '../app/desk/[deskId]';
@@ -176,6 +177,7 @@ export async function renderToolsApp(
     'ready/[workflowId]': ReadyRoute,
     data: DataRoute,
     'select-records': SelectRecordsRoute,
+    'pick-records': PickRecordsRoute,
     'import-records': ImportRecordsRoute,
     'record/[collectionId]': RecordRoute,
     'new-table': NewTableRoute,

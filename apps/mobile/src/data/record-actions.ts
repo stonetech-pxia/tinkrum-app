@@ -4,6 +4,8 @@ import {
   RECORD_LIMITS,
   createAllInputs,
   createInput,
+  pickCreateInputs,
+  pickedAlready,
   formatValue,
   loadComputedRecords,
   prepareRecordValues,
@@ -325,16 +327,63 @@ export function useRecordActionRunner() {
         return prepared.ok ? [prepared.values] : [];
       },
     );
+    return createBatch(target, planned, label);
+  }
+
+  /**
+   * 勾选新建（D-613）：用户在列表下面的「添加」里勾的几条来源，各新建一条（带上这一段的值 here）。点的那一刻再读一次
+   * 这一段，已经连着的跳过（别处刚加过的不重复）。之后和批量新建一样：先问、最多 200 条、一个事务、提示条能撤回这一批。
+   * 建好了返回 true（勾选页面关掉）；取消、什么都没建返回 false。
+   */
+  async function pickCreate(
+    tool: Extract<RecordTool, { do: 'createAll' }>,
+    here: Record<string, unknown>,
+    sourceIds: readonly string[],
+    label: string,
+  ): Promise<boolean> {
+    const target = config?.data.tables.find((c) => c.id === tool.table);
+    const source = config?.data.tables.find((c) => c.id === tool.from);
+    if (!config || !target || !source) return false;
+    const now = new Date();
+    const { view, records } = await loadComputedRecords(
+      (id) => repo.listRecords(id),
+      config.data.tables,
+      source,
+      now,
+      cal,
+    );
+    const picked = sourceIds.flatMap((id) => records.filter((r) => r.id === id));
+    const already = pickedAlready(tool, target, await repo.listRecords(target.id), here);
+    const planned = pickCreateInputs(tool, target, view, picked, here, already, {
+      now,
+      cal,
+    }).flatMap(({ input }) => {
+      const prepared = prepareRecordValues(target, input, null, now, cal);
+      return prepared.ok ? [prepared.values] : [];
+    });
+    return createBatch(
+      target,
+      planned,
+      label || t(locale, 'recordPickTitle', { table: source.name }),
+    );
+  }
+
+  /** 批量新建的后半段（D-567、D-613）：没有就说一声，超过上限说上限，先问，一个事务建好，提示条能撤回这一批。 */
+  async function createBatch(
+    target: Collection,
+    planned: Record<string, unknown>[],
+    label: string,
+  ): Promise<boolean> {
     if (planned.length === 0) {
       showToast({ message: t(locale, 'recordCreateAllNothing') });
-      return;
+      return false;
     }
     if (planned.length > MAX_CREATE_ALL) {
       Alert.alert(
         label,
         t(locale, 'recordCreateAllTooMany', { max: MAX_CREATE_ALL, n: planned.length }),
       );
-      return;
+      return false;
     }
     const confirmed = await new Promise<boolean>((resolve) =>
       Alert.alert(
@@ -347,11 +396,13 @@ export function useRecordActionRunner() {
         { cancelable: true, onDismiss: () => resolve(false) },
       ),
     );
-    if (!confirmed) return;
+    if (!confirmed) return false;
     const counts = await repo.countRecords();
     const count = counts.find((c) => c.collectionId === target.id)?.count ?? 0;
-    if (count + planned.length > RECORD_LIMITS.perCollection)
-      return void Alert.alert(t(locale, 'tableFull'));
+    if (count + planned.length > RECORD_LIMITS.perCollection) {
+      Alert.alert(t(locale, 'tableFull'));
+      return false;
+    }
     const at = Date.now();
     const created = planned.map((values) => ({ id: newAssetId(), values }));
     try {
@@ -362,7 +413,8 @@ export function useRecordActionRunner() {
         })),
       );
     } catch {
-      return void showToast({ message: t(locale, 'recordActionFailed') });
+      showToast({ message: t(locale, 'recordActionFailed') });
+      return false;
     }
     bump([target.id]);
     showToast({
@@ -377,6 +429,7 @@ export function useRecordActionRunner() {
         failed: 'recordUndoBulkFailed',
       },
     });
+    return true;
   }
 
   /**
@@ -402,6 +455,22 @@ export function useRecordActionRunner() {
 
   return {
     /**
+     * 勾选新建（D-613）：勾选页面上点了「添加 N 条到 B」。use 是列表下面的「添加」（as addHere，pick: true），
+     * here 是这一段的值，sourceIds 按勾的顺序。
+     */
+    runPick(
+      use: RecordToolUse,
+      here: Record<string, unknown>,
+      sourceIds: readonly string[],
+    ): Promise<boolean> {
+      return serial(async () => {
+        const tool = recordToolOf(use);
+        if (tool.do !== 'createAll' || !tool.pick) return false;
+        return pickCreate(tool, here, sourceIds, use.label ?? '');
+      });
+    },
+
+    /**
      * 打卡格（D-610）上点一格：create 在这一格加一条（here 是格子算好的「这一行、这一天」），不弹撤销（再点一下就删掉，
      * 底线 11）；remove 把格子里唯一的那一条移到「最近删除」，弹撤销。
      */
@@ -424,7 +493,7 @@ export function useRecordActionRunner() {
       return serial(async () => {
         const tool = recordToolOf(use);
         if (tool.do === 'setAll') return setAll(tool, label);
-        if (tool.do === 'createAll') return createAll(tool, label);
+        if (tool.do === 'createAll') return void (await createAll(tool, label));
         if (tool.do === 'create') await create(tool, recordId ? { recordId } : {});
       });
     },
@@ -445,7 +514,7 @@ export function useRecordActionRunner() {
         const tool = recordToolOf(use);
         if (tool.do === 'create') return create(tool, { rowId: record.id });
         if (tool.do === 'setAll') return setAll(tool, use.label ?? '');
-        if (tool.do === 'createAll') return createAll(tool, use.label ?? '');
+        if (tool.do === 'createAll') return void (await createAll(tool, use.label ?? ''));
         // 删掉只在打卡格上（runCell），这里不会有（校验拦）。
         if (tool.do === 'remove') return;
         const collection = config?.data.tables.find((c) => c.id === tool.table);

@@ -71,6 +71,7 @@ import {
   type RecordLook,
   type Sort,
   type RecordToolUse,
+  type ToolUse,
   isOpenUse,
   isRecordToolUse,
   localeTag,
@@ -1323,6 +1324,14 @@ export const isRecordBlock = (c: Component): c is RecordBlock =>
 /** 每一段 / 每一天 / 每一栏下面的「添加」（as addHere，D-349）。 */
 export const addHereOf = (block: RecordBlock) => block.tools?.find((u) => u.as === 'addHere');
 
+/** 「添加」是勾选新建（D-613）：勾另一张表的几条，每条在这里建一条。 */
+export const isPickAdd = (use: ToolUse | undefined): use is RecordToolUse =>
+  use !== undefined && isRecordToolUse(use) && use.do === 'createAll' && use.pick === true;
+
+/** 「添加」上的字：勾选新建写了 label 就用它（例如「添加食材」），否则照旧。 */
+export const addHereLabel = (use: ToolUse | undefined, fallback: string) =>
+  isPickAdd(use) && use.label !== undefined ? use.label : fallback;
+
 /** 清单的勾（as check）：勾的是哪个勾选框字段。 */
 export function checkOf(block: RecordBlock): { table: string; field: string } | undefined {
   const use = block.look === 'checklist' ? block.tools?.find((u) => u.as === 'check') : undefined;
@@ -1530,6 +1539,7 @@ function RecordListBody({
             view,
             { filter: followedFilter(block.source, env.pageChoice) },
             preset,
+            addHereOf(block),
           )))
       : undefined;
   if (narrowed && found.length === 0)
@@ -1633,7 +1643,11 @@ function RecordListBody({
   const list = addHere ? (
     <View style={{ gap: 6 }}>
       {rows.list(shown)}
-      <AddHere label={t(locale, 'entryFormAdd')} onPress={add()} palette={page} />
+      <AddHere
+        label={addHereLabel(addHereOf(block), t(locale, 'entryFormAdd'))}
+        onPress={add()}
+        palette={page}
+      />
     </View>
   ) : (
     rows.list(shown)
@@ -1825,7 +1839,11 @@ function Empty({
         {block.show.emptyText ?? t(locale, 'noRecords')}
       </Text>
       {addHere ? (
-        <AddHere label={t(locale, 'entryFormAdd')} onPress={add} palette={palette} />
+        <AddHere
+          label={addHereLabel(addHereOf(block), t(locale, 'entryFormAdd'))}
+          onPress={add}
+          palette={palette}
+        />
       ) : null}
     </Card>
   );
@@ -1861,8 +1879,17 @@ export function openAddHere(
   view: Collection,
   source: Pick<RecordBlock['source'], 'filter'>,
   preset: Record<string, unknown> = {},
+  /** 块的「添加」工具：勾选新建（D-613）打开勾选页面，同样的预设值是每条新记录都带上的这一段的值（"$here"）。 */
+  use?: ToolUse,
 ) {
   const prefill = { ...filterPresets(view, source.filter), ...preset };
+  if (isPickAdd(use)) {
+    router.push({
+      pathname: '/pick-records',
+      params: { tool: JSON.stringify(use), here: JSON.stringify(prefill) },
+    });
+    return;
+  }
   router.push({
     pathname: '/record/[collectionId]',
     params: { collectionId: collection.id, prefill: JSON.stringify(prefill) },

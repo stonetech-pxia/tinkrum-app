@@ -271,7 +271,15 @@ export function MonthCalendar({
               onPress={
                 env.interactive
                   ? (env.locked ??
-                    (() => openAddHere(router, collection, view, { filter }, dayPreset(selected))))
+                    (() =>
+                      openAddHere(
+                        router,
+                        collection,
+                        view,
+                        { filter },
+                        dayPreset(selected),
+                        addHereOf(block),
+                      )))
                   : undefined
               }
             />
