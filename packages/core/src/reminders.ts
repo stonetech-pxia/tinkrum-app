@@ -479,7 +479,7 @@ export function reminderDoneInput(
       input: createInput(target, done.values, { now, cal, rowId: record.id, entry }),
     };
   }
-  if (done.do === 'setAll' || done.do === 'createAll') return null;
+  if (done.do === 'setAll' || done.do === 'createAll' || done.do === 'remove') return null;
   const input = rowUpdateInput(done, collection, record.values, {
     now,
     cal,

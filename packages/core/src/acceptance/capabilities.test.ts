@@ -483,6 +483,17 @@ function everything() {
       }),
       records('table', 'grid', 'items', 'title', { show: { columns: ['qty', 'status'] } }),
       records('gallery', 'pics', 'items', 'title'),
+      // 打卡格（D-610）：每个分组一行，按天一列；点空格新建、点只有一条的格子删掉。
+      records('grid', 'week', 'items', 'title', {
+        source: {
+          group: { by: 'group', showEmpty: true },
+          across: { unit: 'day', by: 'date' },
+        },
+        tools: [
+          { as: 'tap', do: 'create', table: 'items', values: '$here' },
+          { as: 'tap', do: 'remove', table: 'items' },
+        ],
+      }),
       records('list', 'by-week', 'items', 'title', {
         source: {
           group: { unit: 'week' },

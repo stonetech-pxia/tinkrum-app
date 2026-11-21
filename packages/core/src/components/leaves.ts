@@ -24,6 +24,7 @@ import {
   cardsComponent,
   checklistComponent,
   galleryComponent,
+  gridComponent,
   listComponent,
   tableComponent,
   tilesComponent,
@@ -32,7 +33,7 @@ import { singleComponent } from './single';
 import { spacerComponent } from './spacer';
 import { textComponent } from './text';
 
-/** 可以放进分组的外观（29 种，加上 group 本身共 30 种；choices 和 period 一样只能在页面上，校验拦；dial 要固定在页面下方，进不了分组，校验拦）。新外观加在最后（顺序就是 JSON Schema 里的顺序）。 */
+/** 可以放进分组的外观（30 种，加上 group 本身共 31 种；choices 和 period 一样只能在页面上，校验拦；dial 要固定在页面下方，进不了分组，校验拦）。新外观加在最后（顺序就是 JSON Schema 里的顺序）。 */
 export const LEAF_COMPONENTS = [
   headerComponent,
   textComponent,
@@ -63,6 +64,7 @@ export const LEAF_COMPONENTS = [
   galleryComponent,
   choicesComponent,
   calloutComponent,
+  gridComponent,
 ] as const;
 
 type Schemas<D extends readonly { schema: unknown }[]> = {

@@ -109,13 +109,15 @@ export function useRecordActionRunner() {
   async function create(
     tool: Extract<RecordTool, { do: 'create' }>,
     ctx: { rowId?: string | undefined; recordId?: string | undefined },
+    /** 打卡格（D-610）上 "$here" 算好的值：这一行、这一天、筛选里的等于条件。 */
+    here: Record<string, unknown> = {},
   ) {
     const collection = config?.data.tables.find((c) => c.id === tool.table);
     if (!collection) return;
     const now = new Date();
     // 「这一条」：工具作用的那一条，没有时是记录页的那一条。
     const entry = await entryOf(tool, ctx.rowId ?? ctx.recordId, now);
-    const input = createInput(collection, tool.values, { now, cal, ...ctx, entry });
+    const input = { ...createInput(collection, tool.values, { now, cal, ...ctx, entry }), ...here };
     // D-338：打开新记录的表单，预设的值先填好，用户补完再保存（表单自己保存，不弹提示条）。
     // Q6：按钮模式的「添加」（原 recordForm button）也预填预设值。
     if (tool.ask !== undefined) return void openNew(collection.id, input);
@@ -228,7 +230,7 @@ export function useRecordActionRunner() {
         created = { collection: target, values: prepared.values };
         continue;
       }
-      if (tool.do === 'setAll' || tool.do === 'createAll') continue;
+      if (tool.do === 'setAll' || tool.do === 'createAll' || tool.do === 'remove') continue;
       const next = rowUpdateInput(tool, row, { ...stored.values, ...input }, ctx);
       if (!next) return;
       input = { ...input, ...next };
@@ -377,7 +379,43 @@ export function useRecordActionRunner() {
     });
   }
 
+  /**
+   * 打卡格（D-610）：把格子里唯一的那一条移到「最近删除」，和用户自己删一样（软删除，30 天内能找回），
+   * 提示条上有撤销（底线 11：删除弹撤销）。只删工具那张表里的（关系规则 12）；已经不在了就说一声。
+   */
+  async function removeOne(tool: Extract<RecordTool, { do: 'remove' }>, record: DataRecord) {
+    const stored = await repo.getRecord(record.id);
+    if (!stored || stored.deletedAt !== null) {
+      showToast({ message: t(locale, 'recordActionGone') });
+      bump();
+      return;
+    }
+    if (stored.collectionId !== tool.table) return;
+    const collection = config?.data.tables.find((c) => c.id === tool.table);
+    await repo.deleteRecord(record.id, Date.now());
+    bump([stored.collectionId]);
+    showToast({
+      message: t(locale, 'recordActionRemoved', { table: collection?.name ?? '' }),
+      restoreRecordId: record.id,
+    });
+  }
+
   return {
+    /**
+     * 打卡格（D-610）上点一格：create 在这一格加一条（here 是格子算好的「这一行、这一天」），不弹撤销（再点一下就删掉，
+     * 底线 11）；remove 把格子里唯一的那一条移到「最近删除」，弹撤销。
+     */
+    runCell(
+      use: RecordToolUse,
+      cell: { here: Record<string, unknown> } | { record: DataRecord },
+    ): Promise<void> {
+      return serial(async () => {
+        const tool = recordToolOf(use);
+        if (tool.do === 'create' && 'here' in cell) return create(tool, {}, cell.here);
+        if (tool.do === 'remove' && 'record' in cell) return removeOne(tool, cell.record);
+      });
+    },
+
     /**
      * 块本身的工具（button 的 tools[0]）：不作用在某一条上。recordId 是记录页打开的那一条（"$record"，
      * 和抄它的字段，D-342、D-565）。
@@ -408,6 +446,8 @@ export function useRecordActionRunner() {
         if (tool.do === 'create') return create(tool, { rowId: record.id });
         if (tool.do === 'setAll') return setAll(tool, use.label ?? '');
         if (tool.do === 'createAll') return createAll(tool, use.label ?? '');
+        // 删掉只在打卡格上（runCell），这里不会有（校验拦）。
+        if (tool.do === 'remove') return;
         const collection = config?.data.tables.find((c) => c.id === tool.table);
         if (!collection) return;
         const stored = await repo.getRecord(record.id);

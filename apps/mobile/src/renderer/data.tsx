@@ -1321,6 +1321,8 @@ export function rowToolOf(
   now: Date,
   cal: Calendar,
 ): RecordToolUse | OpenUse | undefined {
+  // 打卡格（D-610）的点一下作用在格子上，打开一格列出的记录上没有按钮。
+  if (block.look === 'grid') return undefined;
   const use = shownRowAction(block.tools, record, view, now, cal);
   return use && (isRecordToolUse(use) || isOpenUse(use)) ? use : undefined;
 }

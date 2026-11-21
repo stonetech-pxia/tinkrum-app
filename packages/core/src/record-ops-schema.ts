@@ -142,7 +142,13 @@ const createAll = {
   values: RecordToolValuesSchema,
 };
 
-/** 一键记录的 6 种（关系规则 7）。 */
+/**
+ * 把这一条移到「最近删除」（D-610，创始人 2026-11-20）：和用户自己删一样是软删除（30 天内能找回），做完提示条上有撤销
+ * （底线 11）。这一版只给打卡格（look grid）上的点一下：格子里正好一条时点一下删掉它；别处一律拒绝（record-ops.ts）。
+ */
+const remove = { do: z.literal('remove'), table: IdSchema };
+
+/** 一键记录的 7 种（关系规则 7；remove 是 D-610 加的）。 */
 export const RECORD_TOOL_KINDS = [
   'create',
   'set',
@@ -150,6 +156,7 @@ export const RECORD_TOOL_KINDS = [
   'increment',
   'setAll',
   'createAll',
+  'remove',
 ] as const;
 export type RecordToolKind = (typeof RECORD_TOOL_KINDS)[number];
 
@@ -160,6 +167,7 @@ export const RecordToolSchema = z.discriminatedUnion('do', [
   z.strictObject(increment),
   z.strictObject(setAll),
   z.strictObject(createAll),
+  z.strictObject(remove),
 ]);
 export type RecordTool = z.infer<typeof RecordToolSchema>;
 
@@ -203,6 +211,7 @@ export const ToolUseSchema = z.union([
   z.strictObject({ ...useBase, ...increment, ...also }),
   z.strictObject({ ...useBase, ...setAll }),
   z.strictObject({ ...useBase, ...createAll }),
+  z.strictObject({ ...useBase, ...remove }),
   z.strictObject({ ...useBase, opens: z.union([z.literal('record'), IdSchema]) }),
 ]);
 export type ToolUse = z.infer<typeof ToolUseSchema>;
@@ -267,6 +276,7 @@ export function toolEntryFields(tool: RecordTool): string[] {
       return [];
     // 批量新建读的是来源表的每一条，不是「这一条」（record-ops.ts 的 createAllInputs 自己算）。
     case 'createAll':
+    case 'remove':
       return [];
   }
 }

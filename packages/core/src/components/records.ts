@@ -9,6 +9,7 @@ import {
   ConditionSchema,
   FieldRefSchema,
   filterSchema,
+  GROUP_UNITS,
   GroupingSchema,
   IdSchema,
   SortKeysSchema,
@@ -40,6 +41,18 @@ export const TrailingFormatSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
+/**
+ * 打卡格（D-610）横着的时间：unit 一列是一天、一周或一个月，by 是这张表的一个日期或日期时间字段（不写是第一个日期字段，
+ * 没有就是第一个日期时间字段），last 是几列（和图表一样，不写是 7 天、8 周、6 个月；最后一列是今天所在的那一段）。
+ * 一周从哪天开始跟着「设置 → 日期」（data.calendar.weekStart）。只给 look grid。
+ */
+export const GridAcrossSchema = z.strictObject({
+  unit: z.enum(GROUP_UNITS),
+  by: IdSchema.optional(),
+  last: z.number().int().min(2).max(31).optional(),
+});
+export type GridAcross = z.infer<typeof GridAcrossSchema>;
+
 /** 记录块读什么：一张表，筛选、排序、条数，可以分组（每组一段 / 一栏 / 一天）。limit 是每段 / 每栏最多几条。 */
 export const RecordSourceSchema = z.strictObject({
   table: IdSchema,
@@ -58,6 +71,8 @@ export const RecordSourceSchema = z.strictObject({
   // 不写时 30 条（模型偶尔漏写，不该因此拒绝整份修改）。
   limit: z.number().int().min(1).max(100).default(30),
   group: GroupingSchema.optional(),
+  /** 打卡格（D-610）横着的时间：每一列一天、一周或一个月。只给 look grid。 */
+  across: GridAcrossSchema.optional(),
 });
 export type RecordSource = z.infer<typeof RecordSourceSchema>;
 
@@ -112,6 +127,7 @@ export const RECORD_LOOKS = [
   'calendar',
   'table',
   'gallery',
+  'grid',
 ] as const;
 export type RecordLook = (typeof RECORD_LOOKS)[number];
 
@@ -132,6 +148,7 @@ const refs = {
   'show.browse.group': { to: 'field', role: 'show.browse.group' },
   'show.browse.period': { to: 'field', role: 'show.browse.period', types: ['date', 'datetime'] },
   'show.browse.filter': { to: 'field', role: 'show.browse.filter', types: ['tags', 'choice'] },
+  'source.across.by': { to: 'field', role: 'source.across.by', types: ['date', 'datetime'] },
   'source.filter': { to: 'filter' },
 } as const;
 
@@ -190,7 +207,9 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
         );
     }
   }
-  const format = c.show.format;
+  if (c.source.across !== undefined && c.look !== 'grid')
+    problems.push('source.across only applies to look "grid"');
+  const format = c.look === 'grid' ? undefined : c.show.format;
   const trailing = c.show.trailing;
   const trailingType = trailing ? typeOf(trailing) : undefined;
   if (format && !trailing) problems.push(`show.format ${format.kind} needs show.trailing`);
@@ -218,7 +237,9 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
   if (by !== undefined && !isSystemField(by) && !field(by))
     problems.push(`source.group.by ${by} is not a field of ${collection!.id}`);
   if (group?.last !== undefined) problems.push('source.group.last only applies to a chart');
-  if (c.look === 'calendar') {
+  if (c.look === 'grid') {
+    problems.push(...gridProblems(c, ctx, byType));
+  } else if (c.look === 'calendar') {
     if (group?.unit !== 'day')
       problems.push('a calendar needs source.group {unit: "day", by?: a date field}');
     else if (
@@ -255,6 +276,7 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
     if (group.filter) problems.push('source.group.filter only applies to a board');
   }
   if (c.source.period !== undefined) {
+    if (c.look === 'grid') problems.push('a grid has its own columns of time: no source.period');
     if (!ctx.page.blocks.some((b) => b.look === 'period'))
       problems.push('source.period "page" needs a period block on the same page');
     if (c.look === 'calendar') problems.push('a calendar moves by month itself: no source.period');
@@ -273,6 +295,76 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
       problems.push(`can't sort by the ${sorted.type} field ${key.field}`);
     if (seen.has(key.field)) problems.push(`sort lists ${key.field} more than once`);
     seen.add(key.field);
+  }
+  return problems;
+}
+
+/**
+ * 打卡格（D-610）自己的要求：行是 source.group.by（单选的每个选项，或引用的那张表的每一条，和看板一样可以用 group.filter
+ * 先筛那张表、showEmpty 列出没有记录的行），列是 source.across（日期或日期时间字段，不写用第一个）。格子里的值是条数，
+ * 有 show.trailing（数字类字段）时是它的合计；show.format progress 的 goal 是固定数，或者行的那张表的数字字段（每个习惯
+ * 自己的目标），不用 show.trailing。工具只有点一下：最多一个 {do: "create", values: "$here"}（填这一行、这一天）和一个
+ * {do: "remove"}（格子里正好一条时把它移到「最近删除」）；没有 when、also，标签可以不写（读屏说的是这一格）。
+ */
+function gridProblems(c: RecordBlock, ctx: CheckContext, byType: string | undefined): string[] {
+  const { collection, config } = ctx;
+  const table = collection!;
+  const problems: string[] = [];
+  const group = c.source.group;
+  if (!group || group.by === undefined || (byType !== 'choice' && byType !== 'link'))
+    problems.push(
+      'a grid needs source.group.by set to a choice or link field (one row per option or per linked entry)',
+    );
+  if (group?.unit) problems.push('a grid has one row per option: no source.group.unit');
+  if (group?.filter && byType !== 'link')
+    problems.push('source.group.filter only applies when grouping by a link field');
+  const across = c.source.across;
+  if (!across)
+    problems.push(
+      'a grid needs source.across {unit: "day"|"week"|"month", by?: a date or datetime field, last?: 2-31}',
+    );
+  else if (
+    across.by === undefined &&
+    !table.fields.some((f) => f.type === 'date' || f.type === 'datetime')
+  )
+    problems.push(
+      `a grid needs a date or datetime field in ${table.id} for its columns (source.across.by)`,
+    );
+  const trailing = c.show.trailing;
+  const trailingType = trailing ? table.fields.find((f) => f.id === trailing)?.type : undefined;
+  if (trailing !== undefined && (!trailingType || !NUMERIC_FIELD_TYPES.includes(trailingType)))
+    problems.push(
+      'on a grid show.trailing is summed in each cell: a number, money, duration, formula or rollup field (leave it out to count entries)',
+    );
+  const format = c.show.format;
+  if (format?.kind === 'elapsed') problems.push('a grid has no show.format elapsed');
+  if (format?.kind === 'progress' && typeof format.goal === 'string') {
+    const link =
+      byType === 'link'
+        ? table.fields.find((f) => f.id === group?.by && f.type === 'link')
+        : undefined;
+    const rows =
+      link?.type === 'link' ? config.data.tables.find((x) => x.id === link.table) : undefined;
+    const goal = rows?.fields.find((f) => f.id === format.goal);
+    if (!goal || !NUMERIC_FIELD_TYPES.includes(goal.type))
+      problems.push(
+        rows
+          ? `show.format goal ${format.goal} must be a number or a number field of ${rows.id} (each row's own goal)`
+          : `show.format goal ${format.goal}: rows by a choice field have no goal field; use a number`,
+      );
+  }
+  const tools = c.tools ?? [];
+  const creates = tools.filter((u) => 'do' in u && u.do === 'create');
+  const removes = tools.filter((u) => 'do' in u && u.do === 'remove');
+  if (creates.length > 1 || removes.length > 1)
+    problems.push('a grid has at most one create and one remove (both as: "tap")');
+  for (const u of tools) {
+    if ('when' in u && u.when !== undefined) problems.push('a grid tap has no when');
+    if ('also' in u && u.also !== undefined) problems.push('a grid tap makes one change: no also');
+    if ('do' in u && u.do === 'create' && u.values !== '$here')
+      problems.push(
+        `a grid adds in the tapped cell: {as: "tap", do: "create", table: ${table.id}, values: "$here"} (fills the row and the day)`,
+      );
   }
   return problems;
 }
@@ -299,6 +391,7 @@ const DOCS: Record<RecordLook, string> = {
     'a spreadsheet-like table, one row per entry under a header of field names: show.title is the first column (kept in view), show.columns? (1-7 fields) the others (default: subtitles and trailing); scrolls sideways; read-only cells, tapping a row opens the entry',
   gallery:
     "a grid of pictures, 2 per row: the first image in each entry's attachments with show.title under it (no image: a placeholder with the title); tapping one opens the entry",
+  grid: 'a check-in grid (rule 68): rows × time columns over one table, each cell = the entries of that row in that day, week or month. source.group {by: a link or choice field (one row per linked entry or option), showEmpty?: true, filter? (link only, on the linked table)} and source.across {unit: "day"|"week"|"month", by?: a date or datetime field (default the first date field), last?: 2-31 columns (default 7 days, 8 weeks, 6 months; the newest is the current one)}. A cell shows a mark when it has entries and the count from 2; show.trailing? (a number field) sums it instead of counting; show.format {kind: "progress", goal: a number or a number field of the linked table} draws a ring. show.title is the title of the entries listed when a cell is opened. tools: {as: "tap", do: "create", table, values: "$here"} adds an entry for that row and day; {as: "tap", do: "remove", table} makes a tap on a cell with exactly one entry move it to the trash (with undo); without remove a tap adds one more (counting) and a long press lists the entries',
 };
 
 const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
@@ -340,6 +433,8 @@ const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
   table: { as: ['addHere', 'list'], do: ['create'], ref: ['quickAction'], open: true, max: 4 },
   // 图片墙（D-540）只有图片和标题：没有每张的按钮。
   gallery: { as: ['addHere', 'list'], do: ['create'], ref: ['quickAction'], open: true, max: 4 },
+  // 打卡格（D-610）：只有点格子，在这一格加一条（$here）或删掉格子里唯一的那一条。
+  grid: { as: ['tap'], do: ['create', 'remove'], max: 2 },
 };
 
 function recordLook<L extends RecordLook>(look: L): LookDefinitionOf<L, typeof shape> {
@@ -368,7 +463,12 @@ function recordLook<L extends RecordLook>(look: L): LookDefinitionOf<L, typeof s
           ? { group: { unit: 'day' as const } }
           : look === 'board'
             ? { group: { by: 'category' } }
-            : {}),
+            : look === 'grid'
+              ? {
+                  group: { by: 'category', showEmpty: true as const },
+                  across: { unit: 'day' as const, by: 'date', last: 7 },
+                }
+              : {}),
       },
       show: {
         title: 'category',
@@ -407,3 +507,4 @@ export const boardComponent = recordLook('board');
 export const calendarComponent = recordLook('calendar');
 export const tableComponent = recordLook('table');
 export const galleryComponent = recordLook('gallery');
+export const gridComponent = recordLook('grid');

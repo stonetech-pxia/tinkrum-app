@@ -84,6 +84,10 @@ export interface ToolWhere {
   direct?: boolean;
   /** 看板的拖动：value "$group" 写进的字段（source.group.by）。 */
   dragField?: string;
+  /** 打卡格（D-610）上的点一下：可以 values "$here"（这一行、这一天）和 remove，标签可以不写。 */
+  grid?: boolean;
+  /** 打卡格上 "$here" 一定会填的字段（这一行、这一天、筛选里的等于条件）：必填的检查算它们有值。 */
+  hereFields?: readonly string[];
 }
 
 interface ValueWhere extends ToolWhere {
@@ -255,6 +259,7 @@ function createProblems(
   for (const f of collection.fields) {
     const def = fieldDefinition(f.type);
     if (!('required' in f) || !f.required || !def.write || values?.[f.id] !== undefined) continue;
+    if (tool.values === HERE_REF && where.hereFields?.includes(f.id)) continue;
     const hasDefault = ('default' in f && f.default !== undefined) || def.emptyNew !== undefined;
     if (!hasDefault) {
       problems.push(
@@ -337,6 +342,11 @@ export function recordToolProblems(
     : (where.rowOf ?? config.data.tables.find((c) => c.id === where.recordOf));
   if (entryTable)
     where = { ...where, entry: expandCollection(config.data.tables, entryTable) } as ValueWhere;
+  // 移到「最近删除」（D-610）：这一版只给打卡格上的点一下，别处（每一条的按钮、按钮块、提醒的完成、快捷操作）都不行。
+  if (tool.do === 'remove' && !where.grid)
+    return [
+      `${where.label}: remove only works as a tap on a grid ({as: "tap", do: "remove", table: <the grid's table>}); elsewhere the user deletes an entry from the entry page`,
+    ];
   const scope = scopeProblem(tool, collection, where);
   if (scope) return [scope];
   if (tool.do !== 'create' && tool.do !== 'setAll' && tool.do !== 'createAll' && !where.rowOf)
@@ -368,6 +378,9 @@ export function recordToolProblems(
       const p = valueProblem(collection, tool.field, tool.value, where);
       return p ? [p] : [];
     }
+    // 只写格子读的那张表（关系规则 12，scopeProblem 已经查过）。
+    case 'remove':
+      return [];
     case 'toggle': {
       const p = fieldProblem(collection, tool.field, where, ['checkbox'], 'toggle');
       return p ? [p] : [];
@@ -428,16 +441,19 @@ export function recordToolUseProblems(
   const row = where.rowOf;
   if (use.label !== undefined && use.label.length > toolLabelMax(use.as))
     problems.push(`${where.label}: label can be at most ${toolLabelMax(use.as)} characters`);
-  if ((use.as === 'button' || use.as === 'tap') && use.label === undefined)
+  // 打卡格的格子由读屏说出是哪一行、哪一天（D-610），不用标签。
+  if ((use.as === 'button' || use.as === 'tap') && use.label === undefined && !where.grid)
     problems.push(`${where.label}: needs a label (shown on the button and read by screen readers)`);
-  // $here：就地添加（这一段的值 + 列表筛选里的等于条件）。
+  // $here：就地添加（这一段的值 + 列表筛选里的等于条件）；打卡格上是点的那一格（这一行、这一天，D-610）。
   const here = tool.do === 'create' && tool.values === HERE_REF;
   if (use.as === 'addHere' && (tool.do !== 'create' || !here || (row && tool.table !== row.id)))
     problems.push(
       `${where.label}: addHere adds an entry right in this section: {as: "addHere", do: "create", table: ${row?.id ?? '<the block table>'}, ask?: "all", values: "${HERE_REF}"}`,
     );
-  else if (here && use.as !== 'addHere')
-    problems.push(`${where.label}: values "${HERE_REF}" only works with as: "addHere"`);
+  else if (here && use.as !== 'addHere' && !(where.grid && use.as === 'tap'))
+    problems.push(
+      `${where.label}: values "${HERE_REF}" only works with as: "addHere" (or a tap on a grid)`,
+    );
   if (use.when) {
     if (use.as !== 'button' && use.as !== 'tap')
       problems.push(`${where.label}: when only applies to a button or tap on each entry`);
@@ -500,7 +516,8 @@ function alsoProblems(use: RecordToolUse, config: WorkspaceConfig, where: ToolWh
     problems.push(
       `${label}: with also, the create must link back to this entry (a link field to ${row.id} set to "${ROW_REF}")`,
     );
-  const fields = tool.do === 'create' || tool.do === 'createAll' ? [] : [tool.field];
+  const fields =
+    tool.do === 'create' || tool.do === 'createAll' || tool.do === 'remove' ? [] : [tool.field];
   for (const a of also) {
     const at = { ...where, label: `${label} also` };
     if (a.do === 'create') {

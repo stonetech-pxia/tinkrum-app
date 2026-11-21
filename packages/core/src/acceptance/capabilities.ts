@@ -262,7 +262,7 @@ export function entryWrites(v: AppView, table: string, field: string): boolean {
         ? createCovers(w, field)
         : w.tool.do === 'createAll'
           ? Object.prototype.hasOwnProperty.call(w.tool.values, field)
-          : w.tool.field === field),
+          : w.tool.do !== 'remove' && w.tool.field === field),
   );
 }
 
@@ -715,6 +715,7 @@ export const CAPABILITIES: readonly Capability[] = [
   doCap('increment'),
   doCap('setAll'),
   doCap('createAll'),
+  doCap('remove'),
   asCap('submit'),
   asCap('button'),
   asCap('check'),
@@ -777,6 +778,7 @@ export const CAPABILITIES: readonly Capability[] = [
   lookCap('calendar'),
   lookCap('table'),
   lookCap('gallery'),
+  lookCap('grid'),
   lookCap('number'),
   lookCap('chart'),
   lookCap('single'),

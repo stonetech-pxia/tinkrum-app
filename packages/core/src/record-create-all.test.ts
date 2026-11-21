@@ -67,6 +67,7 @@ function problems(blocks: unknown[], config = base()): string {
 
 describe('bulk create (D-567)', () => {
   it('is the sixth record tool kind, with a fixed cap of 200', () => {
+    // 第七种 remove 是 D-610 加的（只给打卡格）。
     expect(RECORD_TOOL_KINDS).toEqual([
       'create',
       'set',
@@ -74,6 +75,7 @@ describe('bulk create (D-567)', () => {
       'increment',
       'setAll',
       'createAll',
+      'remove',
     ]);
     expect(MAX_CREATE_ALL).toBe(200);
     expect(RecordToolSchema.safeParse(monthly).success).toBe(true);

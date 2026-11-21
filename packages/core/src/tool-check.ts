@@ -362,8 +362,12 @@ class Analysis {
           if (id !== undefined) use.read.add(id);
         const format = show.format;
         if (format?.kind === 'elapsed' && format.until) use.read.add(format.until);
+        // 打卡格（D-610）的目标是行那张表（被引用的表）的字段。
+        const goalUse = look === 'grid' ? this.linkedUse(source) : use;
         if (format?.kind === 'progress' && typeof format.goal === 'string')
-          use.read.add(format.goal);
+          goalUse?.read.add(format.goal);
+        if (source.across)
+          use.read.add(source.across.by ?? dateFieldOf(this.table(source.table)!, undefined));
         this.readFilter(use, source.filter);
         this.readFilter(use, show.highlight);
         for (const key of sortList(source.sort)) use.read.add(key.field);
@@ -431,7 +435,10 @@ class Analysis {
           via: u.as ? `${u.as} tool of ${where}` : where,
           reachable,
           target: `block:${page.id}/${c.id}`,
-          ...(sourceTable !== null && u.as !== 'addHere' ? { needsRowOf: sourceTable } : {}),
+          // 打卡格（D-610）的格子不用表里先有记录：行来自选项或被引用的表。
+          ...(sourceTable !== null && u.as !== 'addHere' && c.look !== 'grid'
+            ? { needsRowOf: sourceTable }
+            : {}),
           herePresets: this.herePresets(c),
         });
       }
@@ -461,11 +468,19 @@ class Analysis {
     return inputs;
   }
 
-  /** 就地添加（"$here"）会带上的字段：这一段的值和列表筛选里的等于条件。 */
+  /** 打卡格（D-610）按引用字段分行时，被引用那张表的用法。 */
+  private linkedUse(source: { table: string; group?: { by?: string | undefined } | undefined }) {
+    const link = this.table(source.table)?.fields.find((f) => f.id === source.group?.by);
+    return link?.type === 'link' ? this.uses.get(link.table) : undefined;
+  }
+
+  /** 就地添加（"$here"）会带上的字段：这一段的值和列表筛选里的等于条件；打卡格还有这一天（D-610）。 */
   private herePresets(c: KnownComponent): string[] {
     if (!isRecordLook(c)) return [];
     const { source } = c as Extract<KnownComponent, { look: 'list' }>;
+    const table = this.table(source.table);
     return [
+      ...(source.across && table ? [source.across.by ?? dateFieldOf(table, undefined)] : []),
       ...(source.group?.by ? [source.group.by] : []),
       ...(source.filter ?? [])
         .filter((x) => x.op === 'is' && !Array.isArray(x.value))
@@ -497,6 +512,8 @@ class Analysis {
       for (const id of Object.keys(tool.values)) use.written.add(id);
       return;
     }
+    // 移到「最近删除」（D-610）不写字段。
+    if (tool.do === 'remove') return;
     if (tool.do !== 'create') {
       use.written.add(tool.field);
       if (tool.do === 'setAll') this.readFilter(use, tool.filter);

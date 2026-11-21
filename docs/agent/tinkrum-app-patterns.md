@@ -823,6 +823,8 @@ How to use them:
 - A habits table and a check-ins table: one entry per check-in, linking to the habit, with a date (default "today"). Never one checkbox field per habit: adding a habit would then change the table.
 - Rollups on the habit: count of today's check-ins.
 - Tiles: a tap creates a check-in for `$row`; `trailing` = today's count with a ring against "times a day".
+- A week grid of the check-ins: a row per habit, a column per day; tapping an empty day adds a check-in for that habit and day (`$here`), tapping a ticked day takes it back.
+- A week grid on the check-ins (look `grid`): one row per habit, one column per day; tapping an empty cell fills in that day (a missed day too), tapping a ticked cell takes it back with Undo.
 - A page for one habit: a streak number and a calendar of its check-ins.
 
 ```json
@@ -977,6 +979,41 @@ How to use them:
             }
           ],
           "opens": "habit-habit"
+        },
+        {
+          "id": "week",
+          "look": "grid",
+          "source": {
+            "table": "habit-checkins",
+            "group": {
+              "by": "habit",
+              "showEmpty": true
+            },
+            "across": {
+              "unit": "day",
+              "by": "date",
+              "last": 7
+            }
+          },
+          "show": {
+            "title": "habit",
+            "subtitles": [
+              "date"
+            ]
+          },
+          "tools": [
+            {
+              "as": "tap",
+              "do": "create",
+              "table": "habit-checkins",
+              "values": "$here"
+            },
+            {
+              "as": "tap",
+              "do": "remove",
+              "table": "habit-checkins"
+            }
+          ]
         },
         {
           "id": "add",

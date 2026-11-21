@@ -711,10 +711,13 @@ describe('底线 9：工具不能触发工具；没有分支、循环', () => {
       ).toBe(false);
   });
 
-  it('a one-tap record tool is one of five fixed kinds and cannot chain another tool', () => {
+  it('a one-tap record tool is one of seven fixed kinds and cannot chain another tool', () => {
     for (const bad of [
       { do: 'run', table: 't', tool: 'x' },
       { do: 'create', table: 't', then: { do: 'set', table: 't', field: 'a', value: 1 } },
+      // 打卡格的删掉（D-610）也只是一种，不能接着做别的。
+      { do: 'remove', table: 't', then: { do: 'create', table: 't' } },
+      { do: 'remove', table: 't', tool: 'x' },
     ])
       expect(RecordToolSchema.safeParse(bad).success).toBe(false);
   });
@@ -1045,6 +1048,58 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       expect(RecordToolSchema.safeParse({ do: kind, table: 't' }).success).toBe(false);
   });
 
+  // 打卡格（D-610）：点只有一条的格子把它移到「最近删除」，提示条上有撤销（mobile 的 grid-test.tsx、invariants-test.tsx）；
+  // 在格子里新建不弹撤销（再点一下就删掉）。这里管住结构：一次只删格子里的一条，没有筛选、条数，也没有跳过撤销的设置；
+  // 只能是打卡格上的点一下（每一条的按钮、按钮块、提醒的完成都不行，grid-look.test.ts）。
+  it('removing from a grid is one entry, with no setting that skips the undo, and only on a grid', () => {
+    expect(RecordToolSchema.safeParse({ do: 'remove', table: 't' }).success).toBe(true);
+    for (const extra of [
+      { filter: [] },
+      { max: 10 },
+      { undo: false },
+      { quiet: true },
+      { all: true },
+    ])
+      expect(
+        ToolUseSchema.safeParse({ as: 'tap', do: 'remove', table: 't', ...extra }).success,
+        JSON.stringify(extra),
+      ).toBe(false);
+    const config = createDefaultWorkspace('en');
+    config.data.tables.push({
+      id: 'logs',
+      name: 'Logs',
+      fields: [
+        { id: 'kind', name: 'Kind', type: 'choice', options: [{ id: 'a', label: 'A' }] },
+        { id: 'day', name: 'Day', type: 'date' },
+      ],
+    });
+    const on = (block: object) => {
+      const copy = structuredClone(config);
+      copy.containers.pages[0]!.blocks.push(block as never);
+      const r = validateWorkspace(copy, registry);
+      return r.ok ? '' : r.issues.map((i) => i.message).join('\n');
+    };
+    const remove = { as: 'tap', do: 'remove', table: 'logs' };
+    expect(
+      on({
+        id: 'g',
+        look: 'grid',
+        source: { table: 'logs', limit: 30, group: { by: 'kind' }, across: { unit: 'day' } },
+        show: { title: 'kind' },
+        tools: [remove],
+      }),
+    ).toBe('');
+    expect(
+      on({
+        id: 'l',
+        look: 'list',
+        source: { table: 'logs', limit: 30 },
+        show: { title: 'kind' },
+        tools: [{ ...remove, as: 'button', label: 'Delete' }],
+      }),
+    ).toMatch(/remove/);
+  });
+
   it('setAll is capped at 200 entries', () => {
     const set = (n: number) =>
       RecordToolSchema.safeParse({ do: 'setAll', table: 't', field: 'a', value: true, max: n });
@@ -1221,9 +1276,12 @@ describe('底线 14：配置里没有名片内容（D-423）', () => {
 describe('底线 15：看永远不会改', () => {
   // 渲染每个模版、样板页面时数据库零写入：mobile 的 invariants-test.tsx。
   it('reading data is a pure function of the configuration and the entries', () => {
-    // source.ts 的读法不收写入的回调；这里检查它导出的读函数都不接受 repo（静态检查）。
-    const text = readFileSync(join(__dirname, 'source.ts'), 'utf8');
-    expect(text).not.toMatch(/insertRecord|updateRecord|deleteRecord|setMeta|commitRevision/);
+    // source.ts 的读法不收写入的回调；这里检查它导出的读函数都不接受 repo（静态检查）。打卡格（D-610）的行、列、
+    // 每格的数和翻页也一样（grid-view.ts）。
+    for (const file of ['source.ts', 'grid-view.ts']) {
+      const text = readFileSync(join(__dirname, file), 'utf8');
+      expect(text).not.toMatch(/insertRecord|updateRecord|deleteRecord|setMeta|commitRevision/);
+    }
   });
 });
 
@@ -1233,6 +1291,43 @@ describe('底线 16：每次写入都来自用户的一次操作', () => {
   it('the code that schedules reminders cannot write entries', () => {
     const text = readFileSync(join(__dirname, 'reminders.ts'), 'utf8');
     expect(text).not.toMatch(/insertRecord|updateRecord|deleteRecord/);
+  });
+});
+
+describe('底线 17：打卡格只改它显示的那张表（D-610）', () => {
+  it('a grid tap adds to or removes from the table the grid reads, never another one', () => {
+    const config = createDefaultWorkspace('en');
+    config.data.tables.push(
+      { id: 'habits', name: 'Habits', fields: [{ id: 'name', name: 'Name', type: 'text' }] },
+      {
+        id: 'logs',
+        name: 'Logs',
+        fields: [
+          { id: 'habit', name: 'Habit', type: 'link', table: 'habits' },
+          { id: 'day', name: 'Day', type: 'date' },
+        ],
+      },
+    );
+    const grid = (tools: object[]) => {
+      const copy = structuredClone(config);
+      copy.containers.pages[0]!.blocks.push({
+        id: 'g',
+        look: 'grid',
+        source: { table: 'logs', limit: 30, group: { by: 'habit' }, across: { unit: 'day' } },
+        show: { title: 'habit' },
+        tools,
+      } as never);
+      const r = validateWorkspace(copy, registry);
+      return r.ok ? '' : r.issues.map((i) => i.message).join('\n');
+    };
+    expect(
+      grid([
+        { as: 'tap', do: 'create', table: 'logs', values: '$here' },
+        { as: 'tap', do: 'remove', table: 'logs' },
+      ]),
+    ).toBe('');
+    expect(grid([{ as: 'tap', do: 'remove', table: 'habits' }])).toMatch(/table must be logs/);
+    expect(grid([{ as: 'tap', do: 'create', table: 'habits', values: '$here' }])).not.toBe('');
   });
 });
 
@@ -2395,6 +2490,44 @@ describe('底线 2 / 14：标签只在记录里，配置和发给 AI 的都没�
   it('the sample and the contacts preset hold no tag name', () => {
     const text = JSON.stringify(cardsSample());
     for (const old of ['"client"', '"colleague"', '"friend"']) expect(text).not.toContain(old);
+  });
+});
+
+describe('底线 12：打卡格是新外观，旧配置和改动历史里的旧版本照样打开（D-610）', () => {
+  it('a new look and keys used only by it: no version bump, old configs load unchanged', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(39);
+    for (const [, config] of CONFIGS) {
+      const text = JSON.stringify(config);
+      expect(text).not.toMatch(/"look":"grid"|"across"|"do":"remove"/);
+      const r = prepareSnapshot(structuredClone(config), registry);
+      expect(r.ok && r.after).toEqual(config);
+    }
+  });
+
+  it('a version saved with a grid opens again from the change history, unchanged', () => {
+    const config = createDefaultWorkspace('en');
+    config.data.tables.push({
+      id: 'logs',
+      name: 'Logs',
+      fields: [
+        { id: 'kind', name: 'Kind', type: 'choice', options: [{ id: 'a', label: 'A' }] },
+        { id: 'day', name: 'Day', type: 'date' },
+      ],
+    });
+    config.containers.pages[0]!.blocks.push({
+      id: 'g',
+      look: 'grid',
+      source: { table: 'logs', limit: 30, group: { by: 'kind' }, across: { unit: 'week' } },
+      show: { title: 'kind' },
+      tools: [
+        { as: 'tap', do: 'create', table: 'logs', values: '$here' },
+        { as: 'tap', do: 'remove', table: 'logs' },
+      ],
+    } as never);
+    const frozen = JSON.parse(JSON.stringify(config));
+    const r = prepareSnapshot(frozen, registry);
+    expect(r.ok ? [] : r.issues).toEqual([]);
+    expect(r.ok && r.after).toEqual(frozen);
   });
 });
 
