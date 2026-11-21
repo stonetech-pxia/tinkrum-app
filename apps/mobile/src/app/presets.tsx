@@ -23,7 +23,17 @@ import {
 } from '@morph/core';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { saveAppOrigin } from '@/apps/origin';
@@ -31,7 +41,8 @@ import { configFileProblemText, pickConfigText } from '@/data/config-file-import
 import { SampleRows, usePickSample } from '@/guide/GuideCard';
 import { formatWhen, t } from '@/i18n';
 import { usePalette, type Palette } from '@/renderer/theme';
-import { Button, Card, Pill } from '@/renderer/ui';
+import { Button, Card, Pill, SectionLabel } from '@/renderer/ui';
+import { RowGroup } from '@/shell/RowGroup';
 import { Toast } from '@/shell/Toast';
 import type { SavedPreset } from '@/storage/types';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
@@ -69,6 +80,8 @@ export default function PresetsRoute() {
   const [presets, setPresets] = useState<SavedPreset[] | null>(null);
   const [name, setName] = useState('');
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  // 展开的是哪一块（D-614）：添加 App 的几种方式、示例 App、保存现在的样子。
+  const [open, setOpen] = useState<'add' | 'samples' | 'save' | null>(null);
   const sample = usePickSample();
 
   useEffect(() => {
@@ -83,6 +96,7 @@ export default function PresetsRoute() {
     const result = await savePreset(name);
     if (result.kind !== 'saved') return;
     setName('');
+    setOpen(null);
     // 这个 App 做好了：工具清单可以清掉，开始下一个（D-414）。
     if (hasSession)
       Alert.alert(t(locale, 'sessionClearAfterPreset'), undefined, [
@@ -347,14 +361,114 @@ export default function PresetsRoute() {
     };
   }, [config, registry]);
 
+  /** 预设旁边的「⋯」：改名、删除（D-614）。 */
+  function presetMenu(preset: SavedPreset) {
+    Alert.alert(preset.name, undefined, [
+      {
+        text: t(locale, 'presetRename'),
+        onPress: () => setRenaming({ id: preset.id, name: preset.name }),
+      },
+      {
+        text: t(locale, 'delete'),
+        style: 'destructive',
+        onPress: () => void deletePreset(preset),
+      },
+      { text: t(locale, 'cancel'), style: 'cancel' },
+    ]);
+  }
+
+  /** 「添加 App」里的一项：点了先收起，再做。 */
+  const addRow = (testID: string, label: string, value: string, run: () => void) => ({
+    testID,
+    label,
+    value,
+    onPress: () => {
+      setOpen(null);
+      run();
+    },
+  });
+
+  // 一屏看完（D-614）：上面「添加 App」「保存现在的样子」两个按钮，点了在下面展开；再下面是我的预设，
+  // 点一下换成它，「⋯」里改名、删除。不用弹出层：iOS 上弹出层收起时接着打开文件选择或分享面板会失败。
   return (
     <View style={styles.flex}>
       <ScrollView
         testID="presets-screen"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={{ padding: palette.pad, gap: palette.gap, paddingBottom: 96 }}>
-        <Text style={caption}>{t(locale, 'presetsHint')}</Text>
+        contentContainerStyle={{ padding: palette.pad, gap: palette.gap - 4, paddingBottom: 96 }}>
+        <Button
+          palette={palette}
+          testID="preset-add"
+          label={t(locale, 'presetsAdd')}
+          onPress={() => setOpen(open === 'add' || open === 'samples' ? null : 'add')}
+        />
+        {open === 'add' ? (
+          <>
+            <RowGroup
+              palette={palette}
+              rows={[
+                addRow(
+                  'preset-samples',
+                  t(locale, 'presetsSamplesTitle'),
+                  t(locale, 'presetsSamplesRowHint'),
+                  () => setOpen('samples'),
+                ),
+                addRow(
+                  'preset-import',
+                  t(locale, 'presetsImport'),
+                  t(locale, 'presetsImportRowHint'),
+                  () => void importFile(),
+                ),
+                addRow(
+                  'preset-paste',
+                  t(locale, 'presetsPaste'),
+                  t(locale, 'presetsPasteRowHint'),
+                  () => void pasteFile(),
+                ),
+                addRow(
+                  'preset-share-to-ai',
+                  t(locale, 'presetsAskAi'),
+                  t(locale, 'presetsAskAiRowHint'),
+                  () =>
+                    // 系统分享面板：用户自己挑一个 App，再自己点发送（底线 10）。
+                    void Share.share(
+                      { message: handoffPrompt({ kind: 'new' }, locale, new Date()) },
+                      { dialogTitle: t(locale, 'presetsShareToAi') },
+                    ).catch(() => {}),
+                ),
+              ]}
+            />
+            <Button
+              palette={palette}
+              testID="preset-make-with-ai"
+              variant="text"
+              label={t(locale, 'presetsMakeWithAi')}
+              onPress={() => void Linking.openURL(MAKE_WITH_AI_URL).catch(() => {})}
+            />
+            <Text style={caption}>{t(locale, 'presetsAddUpdateNote')}</Text>
+          </>
+        ) : null}
+        {open === 'samples' ? (
+          <Card palette={palette} testID="preset-samples-panel">
+            <Text style={[palette.font('title', 16), { color: palette.text }]}>
+              {t(locale, 'presetsSamplesTitle')}
+            </Text>
+            <Text style={caption}>{t(locale, 'presetsSamplesHint')}</Text>
+            <SampleRows
+              palette={palette}
+              testPrefix="preset-sample"
+              busy={sample.busy}
+              onPick={(id) =>
+                void sample.pick(id, () => {
+                  // 回到主页看草稿。
+                  leaveApp();
+                  router.back();
+                })
+              }
+            />
+          </Card>
+        ) : null}
         {full ? (
           <Card palette={palette}>
             <Text testID="presets-full" style={caption}>
@@ -362,99 +476,53 @@ export default function PresetsRoute() {
             </Text>
           </Card>
         ) : (
-          <>
-            <Card palette={palette}>
-              <Text style={[palette.font('title', 16), { color: palette.text }]}>
-                {t(locale, 'presetsNew')}
-              </Text>
-              <NameInput
-                palette={palette}
-                testID="preset-name-input"
-                value={name}
-                placeholder={t(locale, 'presetsNamePlaceholder')}
-                onChangeText={setName}
-              />
-              <Text testID="preset-check-tools" style={caption}>
-                {t(locale, 'presetCheckTools', { n: check.tools })}
-              </Text>
-              <Text testID="preset-check-summary" style={caption}>
-                {check.blockers.length > 0
-                  ? t(locale, 'presetCheckProblems', { n: check.blockers.length })
-                  : t(locale, 'presetCheckOk')}
-              </Text>
-              {check.blockers.slice(0, 4).map((issue) => (
-                <Text
-                  key={`${issue.code}|${issue.target}`}
-                  testID="preset-check-problem"
-                  style={caption}>
-                  • {issueReason(issue, config, locale)}
-                </Text>
-              ))}
-              <Button
-                palette={palette}
-                testID="preset-save"
-                label={t(locale, check.blockers.length > 0 ? 'presetSaveAnyway' : 'save')}
-                disabled={!name.trim()}
-                onPress={() => void save()}
-              />
-            </Card>
-          </>
+          <Button
+            palette={palette}
+            testID="preset-new"
+            variant="outline"
+            label={t(locale, 'presetsSave')}
+            onPress={() => setOpen(open === 'save' ? null : 'save')}
+          />
         )}
-        <Card palette={palette}>
-          <Text style={caption}>{t(locale, 'presetsImportHint')}</Text>
-          <Button
-            palette={palette}
-            testID="preset-import"
-            variant="outline"
-            label={t(locale, 'presetsImport')}
-            onPress={() => void importFile()}
-          />
-          <Button
-            palette={palette}
-            testID="preset-paste"
-            variant="outline"
-            label={t(locale, 'presetsPaste')}
-            onPress={() => void pasteFile()}
-          />
-          <Button
-            palette={palette}
-            testID="preset-share-to-ai"
-            variant="outline"
-            label={t(locale, 'presetsShareToAi')}
-            onPress={() =>
-              // 系统分享面板：用户自己挑一个 App，再自己点发送（底线 10）。
-              void Share.share(
-                { message: handoffPrompt({ kind: 'new' }, locale, new Date()) },
-                { dialogTitle: t(locale, 'presetsShareToAi') },
-              ).catch(() => {})
-            }
-          />
-          <Button
-            palette={palette}
-            testID="preset-make-with-ai"
-            variant="text"
-            label={t(locale, 'presetsMakeWithAi')}
-            onPress={() => void Linking.openURL(MAKE_WITH_AI_URL).catch(() => {})}
-          />
-        </Card>
-        <Card palette={palette} testID="preset-samples">
-          <Text style={[palette.font('title', 16), { color: palette.text }]}>
-            {t(locale, 'presetsSamplesTitle')}
-          </Text>
-          <Text style={caption}>{t(locale, 'presetsSamplesHint')}</Text>
-          <SampleRows
-            palette={palette}
-            testPrefix="preset-sample"
-            busy={sample.busy}
-            onPick={(id) =>
-              void sample.pick(id, () => {
-                // 回到主页看草稿。
-                leaveApp();
-                router.back();
-              })
-            }
-          />
-        </Card>
+        {open === 'save' && !full ? (
+          <Card palette={palette} testID="preset-save-panel">
+            <Text style={[palette.font('title', 16), { color: palette.text }]}>
+              {t(locale, 'presetsNew')}
+            </Text>
+            <NameInput
+              palette={palette}
+              testID="preset-name-input"
+              autoFocus
+              value={name}
+              placeholder={t(locale, 'presetsNamePlaceholder')}
+              onChangeText={setName}
+            />
+            <Text testID="preset-check-tools" style={caption}>
+              {t(locale, 'presetCheckTools', { n: check.tools })}
+            </Text>
+            <Text testID="preset-check-summary" style={caption}>
+              {check.blockers.length > 0
+                ? t(locale, 'presetCheckProblems', { n: check.blockers.length })
+                : t(locale, 'presetCheckOk')}
+            </Text>
+            {check.blockers.slice(0, 4).map((issue) => (
+              <Text
+                key={`${issue.code}|${issue.target}`}
+                testID="preset-check-problem"
+                style={caption}>
+                • {issueReason(issue, config, locale)}
+              </Text>
+            ))}
+            <Button
+              palette={palette}
+              testID="preset-save"
+              label={t(locale, check.blockers.length > 0 ? 'presetSaveAnyway' : 'save')}
+              disabled={!name.trim()}
+              onPress={() => void save()}
+            />
+          </Card>
+        ) : null}
+        <SectionLabel palette={palette}>{t(locale, 'presetsListTitle')}</SectionLabel>
         {presets?.length === 0 ? (
           <Card palette={palette}>
             <Text testID="presets-none" style={caption}>
@@ -462,65 +530,55 @@ export default function PresetsRoute() {
             </Text>
           </Card>
         ) : null}
-        {presets?.map((preset) => (
-          <Card key={preset.id} palette={palette} testID={`preset-${preset.id}`}>
-            {renaming?.id === preset.id ? (
-              <>
-                <NameInput
+        {presets
+          ?.filter((preset) => renaming?.id === preset.id)
+          .map((preset) => (
+            <Card key={preset.id} palette={palette} testID={`preset-${preset.id}`}>
+              <NameInput
+                palette={palette}
+                testID="preset-rename-input"
+                autoFocus
+                value={renaming!.name}
+                placeholder={t(locale, 'presetsNamePlaceholder')}
+                onChangeText={(text) => setRenaming({ id: preset.id, name: text })}
+              />
+              <View style={styles.row}>
+                <Pill
                   palette={palette}
-                  testID="preset-rename-input"
-                  autoFocus
-                  value={renaming.name}
-                  placeholder={t(locale, 'presetsNamePlaceholder')}
-                  onChangeText={(text) => setRenaming({ id: preset.id, name: text })}
+                  testID="preset-rename-save"
+                  label={t(locale, 'save')}
+                  onPress={() => void rename()}
                 />
-                <View style={styles.row}>
-                  <Pill
-                    palette={palette}
-                    testID="preset-rename-save"
-                    label={t(locale, 'save')}
-                    onPress={() => void rename()}
-                  />
-                  <Pill
-                    palette={palette}
-                    label={t(locale, 'cancel')}
-                    onPress={() => setRenaming(null)}
-                  />
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={[palette.font('title', 16), { color: palette.text }]}>
-                  {preset.name}
-                </Text>
-                <Text style={caption}>
-                  {formatWhen(locale, new Date(preset.createdAt), new Date())}
-                </Text>
-                <View style={styles.row}>
-                  <Pill
-                    palette={palette}
-                    testID={`preset-${preset.id}-apply`}
-                    label={t(locale, 'presetApply')}
-                    onPress={() => void apply(preset)}
-                  />
-                  <Pill
-                    palette={palette}
-                    testID={`preset-${preset.id}-rename`}
-                    label={t(locale, 'presetRename')}
-                    onPress={() => setRenaming({ id: preset.id, name: preset.name })}
-                  />
-                  <Pill
-                    palette={palette}
-                    danger
-                    testID={`preset-${preset.id}-delete`}
-                    label={t(locale, 'delete')}
-                    onPress={() => void deletePreset(preset)}
-                  />
-                </View>
-              </>
-            )}
-          </Card>
-        ))}
+                <Pill
+                  palette={palette}
+                  label={t(locale, 'cancel')}
+                  onPress={() => setRenaming(null)}
+                />
+              </View>
+            </Card>
+          ))}
+        <RowGroup
+          palette={palette}
+          rows={(presets ?? [])
+            .filter((preset) => renaming?.id !== preset.id)
+            .map((preset) => ({
+              testID: `preset-${preset.id}`,
+              label: preset.name,
+              value: formatWhen(locale, new Date(preset.createdAt), new Date()),
+              onPress: () => void apply(preset),
+              extra: (
+                <Pressable
+                  testID={`preset-${preset.id}-more`}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(locale, 'presetMore')}
+                  hitSlop={12}
+                  onPress={() => presetMenu(preset)}>
+                  <Text style={[palette.font('title', 20), { color: palette.caption }]}>⋯</Text>
+                </Pressable>
+              ),
+            }))}
+        />
+        <Text style={caption}>{t(locale, 'presetsHint')}</Text>
       </ScrollView>
       <Toast palette={palette} bottom={insets.bottom + 16} />
     </View>

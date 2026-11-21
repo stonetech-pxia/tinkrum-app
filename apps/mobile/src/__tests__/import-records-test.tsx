@@ -121,7 +121,9 @@ async function start(
   const app = await renderToolsApp(repo, files, { seed, locale });
   await screen.findByTestId('nav-settings');
   await act(() => router.push('/data'));
-  await screen.findByTestId('table-orders');
+  // 每张表一页（D-614）：导入在表的页面里。
+  await fireEvent.press(await screen.findByTestId('table-orders'));
+  await screen.findByTestId('data-table-screen');
   return { ...app, repo, files };
 }
 
@@ -251,9 +253,11 @@ it('with data: undo removes exactly the batch; the data screen lists it, deletin
   expect(await customers(repo)).toEqual(['Old']);
   await waitFor(() => expect(screen.queryByTestId(`import-batch-${batch!.id}`)).toBeNull());
   // 「最近删除」里一条条能放回来；放回来的那条又算进这次导入。
+  await act(() => router.push('/data-deleted'));
   await fireEvent.press(await screen.findByTestId(`restore-record-${ana.id}`));
   await flush();
   expect(await customers(repo)).toEqual(['Ana', 'Old']);
+  await act(() => router.back());
   expect(await screen.findByTestId(`import-batch-${batch!.id}`)).toHaveTextContent(/1 条记录/);
 });
 

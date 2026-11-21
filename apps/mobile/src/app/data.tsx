@@ -1,520 +1,102 @@
-import {
-  appConfigFile,
-  appConfigFileName,
-  LAYOUT_STORE_KEY,
-  layoutCount,
-  layoutStoreFile,
-  parseLayoutStore,
-  parsePickStore,
-  PICK_STORE_KEY,
-  pickCount,
-  readLayoutStoreFile,
-  readPickStoreFile,
-  RECORD_LIMITS,
-  serializeLayoutStore,
-  serializePickStore,
-  formatRef,
-  formatTimestamp,
-  calendarOf,
-  importTargets,
-  linkedCollectionIds,
-  loadComputedRecords,
-  loadLinkResolver,
-  recordsToCsv,
-  type Collection,
-} from '@morph/core';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import type { Collection } from '@morph/core';
+import { Fragment } from 'react';
+import { ScrollView, Text } from 'react-native';
 
-import { BackupCard } from '@/backup/BackupCard';
-import { useRecordActions } from '@/data/records';
+import { backupAvailable } from '@/backup';
+import { useDataOverview } from '@/data/useDataOverview';
 import { t } from '@/i18n';
-import { LocalModelCard } from '@/packs/LocalModelCard';
-import { Card, PageTitle, Pill, SectionLabel } from '@/renderer/ui';
-import { usePalette } from '@/renderer/theme';
-import { useWorkflowChange } from '@/run/workflow-change';
-import { findRevisionTables } from '@/storage/revision-pages';
-import type { RecordImport, StoredRecord } from '@/storage/types';
-import { useWorkspace, useWorkspaceContext } from '@/workspace/context';
+import { SectionLabel } from '@/renderer/ui';
+import { RowGroup } from '@/shell/RowGroup';
 
 /**
- * 「设置 → 数据」：用户记录的管理页，由内核提供，AI 不能修改。
- * 导出 CSV、查看已移出界面的数据表、恢复最近删除的记录（D-037、D-038、D-041）；
- * 导出 App 配置；预填记忆的导出（也是备份）、从文件恢复、一键清空（D-244）；每张表的「自动读取附件」（D-397）；
- * 本机模型的下载和删除（D-396）；从表格文件导入记录、每张表导入过的批次和整批删除（D-574）；
- * 整体导出和从压缩包恢复（D-600，backup/BackupCard.tsx）。
+ * 「设置 → 数据」：用户记录的管理页，由内核提供，AI 不能修改（底线 8）。
+ * 一屏看完（D-614、D-615）：每张表一行（名字和条数），有几个 App 时按 App 分组；点进去是这张表的导出、导入、
+ * 批次、选择删除、附件设置（data-table/[tableId]）。备份和恢复（D-600）、最近删除（D-037）、
+ * 不在界面里的表（D-038、D-041）、更多各一行；隐私说明是页底的一行小字。
  */
-/** 表上的「附件是」的选项（D-421）。 */
-const PREFILL_RULES = [
-  { rules: undefined, label: 'prefillRulesGeneral' },
-  { rules: 'receipt', label: 'prefillRulesReceipt' },
-  { rules: 'card', label: 'prefillRulesCard' },
-] as const;
-
 export default function DataRoute() {
-  const { repo, files, locale } = useWorkspaceContext();
-  const config = useWorkspace((s) => s.config)!;
-  const version = useWorkspace((s) => s.recordsVersion);
-  const bump = useWorkspace((s) => s.bumpRecords);
-  const palette = usePalette(config.theme);
-  const actions = useRecordActions();
-  const change = useWorkflowChange();
-  const router = useRouter();
-  const [counts, setCounts] = useState<Map<string, number>>(new Map());
-  const [orphans, setOrphans] = useState<
-    { collection: Collection | null; id: string; count: number }[]
-  >([]);
-  const [deleted, setDeleted] = useState<StoredRecord[]>([]);
-  // 每张表从文件导入的批次（D-574），只留还有记录在的。
-  const [imports, setImports] = useState<Map<string, RecordImport[]>>(new Map());
-  const [known, setKnown] = useState<Map<string, Collection>>(new Map());
-  const [layouts, setLayouts] = useState(0);
-  // 新记录表单里点过的候选（D-394）：一个字段算一个。
-  const [picks, setPicks] = useState(0);
+  const { locale, config, palette, router, counts, orphans, deleted } = useDataOverview();
+  const apps = config.nav.apps ?? [];
 
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      const rows = await repo.countRecords();
-      const deletedRows = await repo.listDeletedRecords();
-      // 已移出界面的数据表：从历史版本里找回它的结构（版本只追加、不删除）。
-      const missing = new Set(
-        [...rows.map((r) => r.collectionId), ...deletedRows.map((r) => r.collectionId)].filter(
-          (id) => !config.data.tables.some((c) => c.id === id),
-        ),
-      );
-      const found = await findRevisionTables(repo, missing);
-      const batches = new Map<string, RecordImport[]>();
-      for (const c of config.data.tables)
-        batches.set(
-          c.id,
-          (await repo.listImports(c.id)).filter((b) => b.present > 0),
-        );
-      if (!alive) return;
-      setImports(batches);
-      setCounts(new Map(rows.map((r) => [r.collectionId, r.count])));
-      setOrphans(
-        rows
-          .filter((r) => missing.has(r.collectionId))
-          .map((r) => ({
-            id: r.collectionId,
-            count: r.count,
-            collection: found.get(r.collectionId) ?? null,
-          })),
-      );
-      // 超过保留期、但还没到下次启动清除的记录不再显示。
-      const cutoff = Date.now() - RECORD_LIMITS.deletedRetentionDays * 24 * 60 * 60 * 1000;
-      setDeleted(deletedRows.filter((r) => r.deletedAt! >= cutoff));
-      setKnown(new Map([...found, ...config.data.tables.map((c) => [c.id, c] as const)]));
-      setLayouts(layoutCount(parseLayoutStore(await repo.getMeta(LAYOUT_STORE_KEY))));
-      setPicks(pickCount(parsePickStore(await repo.getMeta(PICK_STORE_KEY))));
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [repo, config, version]);
-
-  async function exportCsv(collection: Collection) {
-    // 查找、汇总、上一条导出算出来的值（D-291）。
-    const { view, records } = await loadComputedRecords(
-      (id) => repo.listRecords(id),
-      config.data.tables,
-      collection,
-      new Date(),
-      calendarOf(config),
-    );
-    records.sort((a, b) => a.createdAt - b.createdAt);
-    // 引用字段导出被引用记录的标题（D-250）。
-    const links = await loadLinkResolver(
-      (id) => repo.listRecords(id),
-      config.data.tables,
-      linkedCollectionIds(view),
-      locale,
-    );
-    await files.shareText(
-      `${collection.name}.csv`,
-      recordsToCsv(view, records, locale, links),
-      'text/csv',
-    );
-  }
-
-  /** 文件名里的日期（本地时间），导出几次不会互相覆盖。 */
-  const today = (now: Date) =>
-    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-  async function exportConfig() {
-    const now = new Date();
-    await files.shareText(appConfigFileName(now), appConfigFile(config, now), 'application/json');
-  }
-
-  async function exportMemory() {
-    const now = new Date();
-    const store = parseLayoutStore(await repo.getMeta(LAYOUT_STORE_KEY));
-    const tapped = parsePickStore(await repo.getMeta(PICK_STORE_KEY));
-    await files.shareText(
-      `tinkrum-prefill-memory-${today(now)}.json`,
-      layoutStoreFile(store, now, tapped),
-      'application/json',
-    );
-  }
-
-  async function restoreMemory() {
-    const picked = await files.pickDocuments(['application/json', 'text/plain'], false);
-    const file = picked?.[0];
-    if (!file) return;
-    let store = null;
-    let fromFile = null;
-    try {
-      const text = await files.readPickedText(file.uri);
-      store = readLayoutStoreFile(text);
-      fromFile = readPickStoreFile(text);
-    } catch {
-      store = null;
+  // 按 App 分组：主页在前，再按 App 的顺序；表指向的 App 不存在时算主页。
+  const groups: { key: string; name: string; tables: Collection[] }[] = [];
+  for (const c of config.data.tables) {
+    const app = c.app ? apps.find((a) => a.id === c.app) : undefined;
+    const key = app?.id ?? '';
+    let group = groups.find((g) => g.key === key);
+    if (!group) {
+      group = { key, name: app?.name ?? t(locale, 'dataTableHome'), tables: [] };
+      groups.push(group);
     }
-    if (!store) {
-      Alert.alert(t(locale, 'prefillMemoryRestore'), t(locale, 'prefillMemoryRestoreInvalid'));
-      return;
-    }
-    const count = layoutCount(store);
-    Alert.alert(
-      t(locale, 'prefillMemoryRestore'),
-      t(locale, 'prefillMemoryRestoreConfirm', { count }),
-      [
-        { text: t(locale, 'cancel'), style: 'cancel' },
-        {
-          text: t(locale, 'prefillMemoryRestore'),
-          onPress: () =>
-            void repo
-              .setMeta(LAYOUT_STORE_KEY, serializeLayoutStore(store))
-              .then(() => repo.setMeta(PICK_STORE_KEY, serializePickStore(fromFile ?? {})))
-              .then(() => {
-                setLayouts(count);
-                setPicks(pickCount(fromFile ?? {}));
-                Alert.alert(t(locale, 'prefillMemoryRestored', { count }));
-              }),
-        },
-      ],
-    );
+    group.tables.push(c);
   }
-
-  /** 表上的「自动读取附件」（D-397）：默认打开，不写；关掉才写 false。能在改动记录里撤销。 */
-  const setReadAttachments = (c: Collection, on: boolean) =>
-    change(
-      [{ op: 'updateData', table: c.id, changes: { readAttachments: on ? null : false } }],
-      t(locale, on ? 'describeReadAttachmentsOn' : 'describeReadAttachmentsOff', { name: c.name }),
-    );
-
-  /** 表上的「附件是」（D-421）：其他不写，只有通用规则。 */
-  const setPrefillRules = (c: Collection, rules: Collection['prefillRules']) =>
-    change(
-      [{ op: 'updateData', table: c.id, changes: { prefillRules: rules ?? null } }],
-      t(
-        locale,
-        rules === 'receipt'
-          ? 'describePrefillRulesReceipt'
-          : rules === 'card'
-            ? 'describePrefillRulesCard'
-            : 'describePrefillRulesGeneral',
-        { name: c.name },
-      ),
-    );
-
-  function clearMemory() {
-    Alert.alert(t(locale, 'prefillMemoryClear'), t(locale, 'prefillMemoryClearConfirm'), [
-      { text: t(locale, 'cancel'), style: 'cancel' },
-      {
-        text: t(locale, 'prefillMemoryClear'),
-        style: 'destructive',
-        onPress: () =>
-          void repo
-            .setMeta(LAYOUT_STORE_KEY, serializeLayoutStore({}))
-            .then(() => repo.setMeta(PICK_STORE_KEY, serializePickStore({})))
-            .then(() => {
-              setLayouts(0);
-              setPicks(0);
-            }),
-      },
-    ]);
-  }
-
-  /** 删除一次导入（D-574）：先问；这一批还在的记录进「最近删除」30 天，之后改过的也一起。 */
-  function deleteImport(c: Collection, batch: RecordImport) {
-    Alert.alert(
-      t(locale, 'importDeleteBatch'),
-      t(locale, 'importDeleteBatchConfirm', { n: batch.present, file: batch.fileName }),
-      [
-        { text: t(locale, 'cancel'), style: 'cancel' },
-        {
-          text: t(locale, 'delete'),
-          style: 'destructive',
-          onPress: () => void repo.deleteImport(batch.id, Date.now()).then(() => bump([c.id])),
-        },
-      ],
-    );
-  }
-
-  function deleteForever(id: string, name: string, count: number) {
-    Alert.alert(t(locale, 'deleteForever'), t(locale, 'deleteForeverConfirm', { name, count }), [
-      { text: t(locale, 'cancel'), style: 'cancel' },
-      {
-        text: t(locale, 'deleteForever'),
-        style: 'destructive',
-        onPress: () => void repo.purgeCollection(id).then(() => bump()),
-      },
-    ]);
-  }
-
-  const caption = [palette.font('body', 13), { color: palette.muted }];
-  const name = (c: Collection | null, id: string) => c?.name ?? t(locale, 'unknownTable', { id });
+  const order = (key: string) => (key === '' ? -1 : apps.findIndex((a) => a.id === key));
+  groups.sort((a, b) => order(a.key) - order(b.key));
+  // 只有一组时不写 App 名字，标题还是「数据表」。
+  const single = groups.length <= 1;
 
   return (
     <ScrollView
       style={{ backgroundColor: palette.background }}
       contentContainerStyle={{ padding: palette.pad, gap: palette.gap - 4, paddingBottom: 48 }}>
-      <PageTitle palette={palette}>{t(locale, 'dataTitle')}</PageTitle>
-      <Card palette={palette} background={palette.secondaryTint}>
-        <Text style={[palette.font('bodyMedium', 14), { color: palette.onSecondaryTint }]}>
-          {t(locale, 'dataPrivacy')}
-        </Text>
-      </Card>
-
-      <BackupCard palette={palette} locale={locale} files={files} />
-
-      <SectionLabel palette={palette}>{t(locale, 'dataTables')}</SectionLabel>
-      {config.data.tables.map((c) => (
-        <Card key={c.id} palette={palette} testID={`table-${c.id}`}>
-          <Text style={[palette.font('title', 16), { color: palette.text }]}>{c.name}</Text>
-          <Text style={caption}>{t(locale, 'recordCount', { count: counts.get(c.id) ?? 0 })}</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pill
-              palette={palette}
-              testID={`export-${c.id}`}
-              label={t(locale, 'exportCsv')}
-              onPress={() => void exportCsv(c)}
-            />
-            {(counts.get(c.id) ?? 0) > 0 ? (
-              <Pill
-                palette={palette}
-                testID={`select-${c.id}`}
-                label={t(locale, 'bulkSelectTitle')}
-                onPress={() =>
-                  router.push({ pathname: '/select-records', params: { table: c.id } })
-                }
-              />
-            ) : null}
-          </View>
-          {importTargets(c).length > 0 ? (
-            <View style={{ flexDirection: 'row' }}>
-              <Pill
-                palette={palette}
-                testID={`import-${c.id}`}
-                label={t(locale, 'importEntries')}
-                onPress={() =>
-                  router.push({ pathname: '/import-records', params: { table: c.id } })
-                }
-              />
-            </View>
-          ) : null}
-          {(imports.get(c.id) ?? []).length > 0 ? (
-            <View style={{ gap: 6 }}>
-              <Text style={[palette.font('bodyMedium', 14), { color: palette.text }]}>
-                {t(locale, 'importBatches')}
-              </Text>
-              {imports.get(c.id)!.map((b) => (
-                <View key={b.id} testID={`import-batch-${b.id}`} style={{ gap: 4 }}>
-                  <Text style={caption}>
-                    {t(locale, 'importBatch', {
-                      date: formatTimestamp(b.createdAt, locale),
-                      file: b.fileName,
-                      n: b.present,
-                    })}
-                  </Text>
-                  <View style={{ flexDirection: 'row' }}>
-                    <Pill
-                      palette={palette}
-                      danger
-                      testID={`import-delete-${b.id}`}
-                      label={t(locale, 'importDeleteBatch')}
-                      onPress={() => deleteImport(c, b)}
-                    />
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : null}
-          {c.fields.some((f) => f.type === 'file') ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[palette.font('bodyMedium', 14), { color: palette.text }]}>
-                  {t(locale, 'readAttachmentsLabel')}
-                </Text>
-                <Text style={caption}>{t(locale, 'readAttachmentsHint')}</Text>
-              </View>
-              <Switch
-                testID={`read-attachments-${c.id}`}
-                value={c.readAttachments !== false}
-                onValueChange={(on) => void setReadAttachments(c, on)}
-                trackColor={{ true: palette.primary }}
-              />
-            </View>
-          ) : null}
-          {c.fields.some((f) => f.type === 'file') && c.readAttachments !== false ? (
-            <View style={{ gap: 6 }}>
-              <Text style={[palette.font('bodyMedium', 14), { color: palette.text }]}>
-                {t(locale, 'prefillRulesLabel')}
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                {PREFILL_RULES.map(({ rules, label }) => {
-                  const selected = c.prefillRules === rules;
-                  return (
-                    <Pressable
-                      key={label}
-                      testID={`prefill-rules-${c.id}-${rules ?? 'general'}`}
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected }}
-                      onPress={() => void setPrefillRules(c, rules)}
-                      style={{
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        borderRadius: 16,
-                        borderWidth: 1,
-                        borderColor: selected ? palette.primary : palette.border,
-                      }}>
-                      <Text
-                        style={[
-                          palette.font('bodyMedium', 14),
-                          { color: selected ? palette.primary : palette.text },
-                        ]}>
-                        {t(locale, label)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={caption}>{t(locale, 'prefillRulesHint')}</Text>
-            </View>
-          ) : null}
-        </Card>
+      {/* 标题在导航栏上，页面里不再写一遍（D-614）。 */}
+      {groups.map((g) => (
+        <Fragment key={g.key || 'home'}>
+          <SectionLabel palette={palette}>{single ? t(locale, 'dataTables') : g.name}</SectionLabel>
+          <RowGroup
+            palette={palette}
+            rows={g.tables.map((c) => ({
+              testID: `table-${c.id}`,
+              label: c.name,
+              trailing: t(locale, 'recordCount', { count: counts.get(c.id) ?? 0 }),
+              onPress: () =>
+                router.push({ pathname: '/data-table/[tableId]', params: { tableId: c.id } }),
+            }))}
+          />
+        </Fragment>
       ))}
 
-      <SectionLabel palette={palette}>{t(locale, 'appConfigTitle')}</SectionLabel>
-      <Card palette={palette} testID="app-config">
-        <Text style={caption}>{t(locale, 'appConfigHint')}</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pill
-            palette={palette}
-            testID="export-app-config"
-            label={t(locale, 'exportAppConfig')}
-            onPress={() => void exportConfig()}
-          />
-        </View>
-      </Card>
+      <RowGroup
+        palette={palette}
+        rows={[
+          // Expo Go 和测试里没有原生的打包模块，备份做不了，这一行就不出现（D-600）。
+          ...(backupAvailable()
+            ? [
+                {
+                  testID: 'data-backup',
+                  label: t(locale, 'backupTitle'),
+                  onPress: () => router.push('/data-backup'),
+                },
+              ]
+            : []),
+          {
+            testID: 'data-deleted',
+            label: t(locale, 'recentlyDeleted'),
+            trailing: t(locale, 'recordCount', { count: deleted.length }),
+            onPress: () => router.push('/data-deleted'),
+          },
+          // 没有不在界面里的表，这一行就不出现。
+          ...(orphans.length > 0
+            ? [
+                {
+                  testID: 'data-unused',
+                  label: t(locale, 'unusedTables'),
+                  trailing: String(orphans.length),
+                  onPress: () => router.push('/data-unused'),
+                },
+              ]
+            : []),
+          {
+            testID: 'data-more',
+            label: t(locale, 'dataMoreTitle'),
+            onPress: () => router.push('/data-more'),
+          },
+        ]}
+      />
 
-      <SectionLabel palette={palette}>{t(locale, 'prefillMemoryTitle')}</SectionLabel>
-      <Card palette={palette} testID="prefill-memory">
-        <Text style={[palette.font('title', 15), { color: palette.text }]}>
-          {layouts > 0 || picks === 0
-            ? layouts > 0
-              ? t(locale, 'prefillMemoryCount', { count: layouts })
-              : t(locale, 'prefillMemoryNone')
-            : null}
-          {layouts > 0 && picks > 0 ? '\n' : ''}
-          {picks > 0 ? t(locale, 'prefillMemoryPicks', { count: picks }) : null}
-        </Text>
-        <Text style={caption}>{t(locale, 'prefillMemoryHint')}</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {layouts + picks > 0 ? (
-            <Pill
-              palette={palette}
-              testID="export-prefill-memory"
-              label={t(locale, 'prefillMemoryExport')}
-              onPress={() => void exportMemory()}
-            />
-          ) : null}
-          <Pill
-            palette={palette}
-            testID="restore-prefill-memory"
-            label={t(locale, 'prefillMemoryRestore')}
-            onPress={() => void restoreMemory()}
-          />
-          {layouts + picks > 0 ? (
-            <Pill
-              palette={palette}
-              danger
-              testID="clear-prefill-memory"
-              label={t(locale, 'prefillMemoryClear')}
-              onPress={clearMemory}
-            />
-          ) : null}
-        </View>
-      </Card>
-
-      <LocalModelCard palette={palette} locale={locale} />
-
-      {orphans.length > 0 ? (
-        <>
-          <SectionLabel palette={palette}>{t(locale, 'unusedTables')}</SectionLabel>
-          <Text style={caption}>{t(locale, 'unusedTablesHint')}</Text>
-          {orphans.map((o) => (
-            <Card key={o.id} palette={palette} testID={`orphan-${o.id}`}>
-              <Text style={[palette.font('title', 16), { color: palette.text }]}>
-                {name(o.collection, o.id)}
-              </Text>
-              <Text style={caption}>{t(locale, 'recordCount', { count: o.count })}</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {o.collection ? (
-                  <Pill
-                    palette={palette}
-                    testID={`export-${o.id}`}
-                    label={t(locale, 'exportCsv')}
-                    onPress={() => void exportCsv(o.collection!)}
-                  />
-                ) : null}
-                <Pill
-                  palette={palette}
-                  danger
-                  testID={`purge-${o.id}`}
-                  label={t(locale, 'deleteForever')}
-                  onPress={() => deleteForever(o.id, name(o.collection, o.id), o.count)}
-                />
-              </View>
-            </Card>
-          ))}
-        </>
-      ) : null}
-
-      <SectionLabel palette={palette}>{t(locale, 'recentlyDeleted')}</SectionLabel>
-      <Text style={caption}>{t(locale, 'recentlyDeletedHint')}</Text>
-      {deleted.length === 0 ? (
-        <Card palette={palette}>
-          <Text style={caption}>{t(locale, 'nothingDeleted')}</Text>
-        </Card>
-      ) : (
-        deleted.map((r) => {
-          const c = known.get(r.collectionId);
-          const first = c?.fields.find((f) => f.type === 'text') ?? c?.fields[0];
-          const title = c && first ? formatRef(r, c, first.id, locale) : '';
-          return (
-            <Card key={r.id} palette={palette} testID={`deleted-${r.id}`}>
-              <Text style={[palette.font('title', 15), { color: palette.text }]}>
-                {title || '—'}
-              </Text>
-              <Text style={caption}>
-                {name(c ?? null, r.collectionId)} · {formatTimestamp(r.deletedAt!, locale)}
-              </Text>
-              <View style={{ flexDirection: 'row' }}>
-                <Pill
-                  palette={palette}
-                  testID={`restore-record-${r.id}`}
-                  label={t(locale, 'restore')}
-                  onPress={() => void actions.restore(r.id)}
-                />
-              </View>
-            </Card>
-          );
-        })
-      )}
+      <Text style={[palette.font('body', 13), { color: palette.muted }]}>
+        {t(locale, 'dataPrivacy')}
+      </Text>
     </ScrollView>
   );
 }

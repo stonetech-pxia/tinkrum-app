@@ -3,13 +3,13 @@ import { useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 
 import { t, type StringKey } from '@/i18n';
-import { Card, Pill, SectionLabel } from '@/renderer/ui';
+import { Card, Pill } from '@/renderer/ui';
 import type { Palette } from '@/renderer/theme';
 import type { FilePlatform } from '@/runtime/platform';
 import { backupAvailable, getBackup } from './index';
 import { useBackupStatus, type BackupErrorKind, type BackupStep } from './service';
 
-// 「设置 → 数据」里的「备份和恢复」（D-600）：整体导出、从压缩包恢复。流程和规则在 service.ts；
+// 「设置 → 数据 → 备份和恢复」这一页（D-600、D-615）：整体导出、从压缩包恢复。流程和规则在 service.ts；
 // 状态在 useBackupStatus 里，所以离开这一页再回来，进度还在。
 
 /** 恢复只收 zip；有的文件提供者把 zip 标成 octet-stream，也让它能选（选了不是备份会被拒绝）。 */
@@ -126,7 +126,7 @@ export function BackupCard({
 
   return (
     <>
-      <SectionLabel palette={palette}>{t(locale, 'backupTitle')}</SectionLabel>
+      {/* 标题在导航栏上（D-615）。 */}
       <Card palette={palette} testID="backup">
         <Text style={caption}>{t(locale, 'backupHint')}</Text>
         {busy ? (

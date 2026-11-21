@@ -125,7 +125,6 @@ export const fr: MessageTable = {
   modelListFetch: 'Obtenir la liste des modèles',
   modelListEmpty: 'Ce fournisseur n’a pas renvoyé de liste de modèles. Saisissez le nom du modèle.',
   byokProviderCustom: 'Personnalisé',
-  settingsMoreTitle: 'Données et stockage',
   languageValue_system: 'Suivre le système',
   languageValue_zh: '简体中文',
   languageValue_en: 'English',
@@ -465,8 +464,20 @@ export const fr: MessageTable = {
   dataTitle: 'Données',
   storageTitle: 'Stockage',
   storageRowHint: 'Photos et fichiers',
-  presetsTitle: 'Mes préréglages',
-  presetsRowHint: 'Gardez toute l’app et revenez-y quand vous voulez',
+  presetsTitle: 'Apps et préréglages',
+  presetsRowHint: 'Ajouter une app, garder ou changer de préréglage',
+  presetsAdd: 'Ajouter une app',
+  presetsSave: 'Garder l’app telle qu’elle est',
+  presetsListTitle: 'Préréglages · touchez-en un pour y passer',
+  presetsSamplesRowHint: 'S’ouvre d’abord en brouillon',
+  presetsImportRowHint: 'Du site de Tinkrum ou de quelqu’un d’autre',
+  presetsPasteRowHint: 'Un fichier d’app écrit pour vous par une IA',
+  presetsAskAi: 'Demander à une IA',
+  presetsAskAiRowHint: 'Envoyer les consignes à ChatGPT, Claude ou une autre app d’IA',
+  presetsAddUpdateNote: 'Importer une app que vous avez déjà propose de la mettre à jour.',
+  presetMore: 'Plus',
+  dataTableHome: 'Accueil',
+  dataMoreTitle: 'Plus',
   presetsHint:
     'Un préréglage garde toute l’app : tableaux, pages, actions rapides et style. Il ne contient ni entrées ni fichiers : les images et emplacements de fichier reviennent vides.',
   presetsNone: 'Aucun préréglage. Gardez l’app telle qu’elle est pour pouvoir y revenir plus tard.',
@@ -475,8 +486,6 @@ export const fr: MessageTable = {
   presetsFull:
     'Vous pouvez garder {max} préréglages au maximum. Supprimez-en un pour en ajouter un autre.',
   presetsImport: 'Importer depuis un fichier',
-  presetsImportHint:
-    'Importez un fichier, par exemple du site de Tinkrum, ou collez un fichier d’app écrit pour vous par Claude, ChatGPT ou une autre IA. Un fichier d’app devient une nouvelle app. Un préréglage complet rejoint cette liste et ne remplace votre app que si vous touchez Appliquer.',
   presetsPaste: 'Coller depuis le presse-papiers',
   presetsShareToAi: 'Envoyer à une app d’IA',
   presetsShareToAiPrompt:
@@ -542,7 +551,7 @@ export const fr: MessageTable = {
   storageDeleteUsed:
     'Il est utilisé à {n} endroits, qui indiqueront que le fichier est supprimé. Action irréversible, même en restaurant une ancienne version.',
   storageDeleteUnused: 'Action irréversible, même en restaurant une ancienne version.',
-  dataRowHint: 'Exporter, importer, supprimées récemment',
+  dataRowHint: 'Tableaux, sauvegarde, supprimées récemment',
   dataPrivacy:
     'Les entrées sont stockées uniquement sur ce téléphone. Tink voit les noms des tableaux et des champs, pas ce que vous saisissez.',
   dataTables: 'Tableaux de données',
@@ -918,7 +927,7 @@ export const fr: MessageTable = {
   buildUndoHint:
     'Les fonctions sont déjà actives. Vous pouvez les annuler dans l’historique des modifications.',
   buildPresetHint:
-    'Si cela vous plaît, enregistrez-le comme préréglage : Paramètres → Mes préréglages.',
+    'Si cela vous plaît, enregistrez-le comme préréglage : Paramètres → Apps et préréglages.',
   buildFinish: 'Terminé',
   buildFailedModel: 'Tink n’a pas répondu pour cette étape. Vous pouvez réessayer.',
   buildFailedInvalid:

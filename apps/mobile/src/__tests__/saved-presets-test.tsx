@@ -70,12 +70,14 @@ async function app(repo = new MemoryWorkspaceRepo()) {
 
 async function openPresets() {
   await fireEvent.press(await screen.findByTestId('nav-settings'));
-  await fireEvent.press(await screen.findByTestId('settings-more'));
   await fireEvent.press(await screen.findByTestId('settings-presets'));
   return screen.findByTestId('presets-screen');
 }
 
 async function saveThroughScreen(name: string) {
+  await screen.findByTestId('presets-screen');
+  if (!screen.queryByTestId('preset-name-input'))
+    await fireEvent.press(screen.getByTestId('preset-new'));
   await fireEvent.changeText(await screen.findByTestId('preset-name-input'), name);
   await fireEvent.press(screen.getByTestId('preset-save'));
 }
@@ -163,14 +165,14 @@ it('the whole path: save, change the app, apply and come back, undo, rename, del
   const alert = jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
     buttons?.find((b) => b.style === 'cancel')?.onPress?.();
   });
-  await fireEvent.press(await screen.findByTestId(`preset-${preset.id}-apply`));
+  await fireEvent.press(await screen.findByTestId(`preset-${preset.id}`));
   await waitFor(() => expect(alert).toHaveBeenCalled());
   expect(String(alert.mock.calls[0]![0])).toContain('我的笔记');
   expect(store.getState().head!.id).toBe(changedHead);
   await waitFor(() => expect(store.getState().proposal).toBeNull());
 
   acceptNextAlert();
-  await fireEvent.press(screen.getByTestId(`preset-${preset.id}-apply`));
+  await fireEvent.press(screen.getByTestId(`preset-${preset.id}`));
   await waitFor(() => expect(store.getState().head!.id).toBeGreaterThan(changedHead));
   const applied = store.getState().config!;
   expect(applied.data.tables.map((t) => t.id)).toContain('notes');
@@ -190,7 +192,14 @@ it('the whole path: save, change the app, apply and come back, undo, rename, del
   // 回到预设页改名、删除并撤销。
   await act(() => store.getState().dismissBanner());
   await openPresets();
-  await fireEvent.press(await screen.findByTestId(`preset-${preset.id}-rename`));
+  // 「⋯」里选改名、删除（D-614）。
+  const pickInMenu = async (label: string) => {
+    jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
+      buttons?.find((b) => b.text === label)?.onPress?.();
+    });
+    await fireEvent.press(await screen.findByTestId(`preset-${preset.id}-more`));
+  };
+  await pickInMenu('改名');
   await fireEvent.changeText(await screen.findByTestId('preset-rename-input'), '  ');
   await fireEvent.press(screen.getByTestId('preset-rename-save'));
   expect((await repo.getPreset(preset.id))!.name).toBe('我的笔记');
@@ -199,7 +208,7 @@ it('the whole path: save, change the app, apply and come back, undo, rename, del
   await waitFor(async () => expect((await repo.getPreset(preset.id))!.name).toBe('换个名字'));
   expect(await screen.findByText('换个名字')).toBeTruthy();
 
-  await fireEvent.press(screen.getByTestId(`preset-${preset.id}-delete`));
+  await pickInMenu('删除');
   await waitFor(async () => expect(await repo.getPreset(preset.id)).toBeNull());
   expect(await screen.findByTestId('presets-none')).toBeTruthy();
   await fireEvent.press(await screen.findByTestId('toast-undo'));
@@ -222,8 +231,9 @@ it('a table the preset does not have: its entries stay and show under Settings �
   expect(store.getState().config!.data.tables).toEqual([]);
   expect(await repo.listRecords('notes')).toHaveLength(1);
   await fireEvent.press(await screen.findByTestId('nav-settings'));
-  await fireEvent.press(await screen.findByTestId('settings-more'));
   await fireEvent.press(await screen.findByTestId('settings-data'));
+  // 不在界面里的表单独一页（D-614）。
+  await fireEvent.press(await screen.findByTestId('data-unused'));
   expect(await screen.findByTestId('orphan-notes')).toBeTruthy();
 });
 
@@ -273,7 +283,6 @@ it('while a draft is open the row asks to finish the draft first (env.locked), l
   );
   expect(store.getState().draft?.open).toBe(true);
   await fireEvent.press(await screen.findByTestId('nav-settings'));
-  await fireEvent.press(await screen.findByTestId('settings-more'));
   await fireEvent.press(await screen.findByTestId('settings-presets'));
   expect(screen.queryByTestId('presets-screen')).toBeNull();
 });
@@ -282,10 +291,12 @@ it('French: the settings row and the screen use the French words', async () => {
   const repo = new MemoryWorkspaceRepo();
   await renderToolsApp(repo, undefined, { locale: 'fr' });
   await fireEvent.press(await screen.findByTestId('nav-settings'));
-  await fireEvent.press(await screen.findByTestId('settings-more'));
-  expect(await screen.findByText('Mes préréglages')).toBeTruthy();
+  expect(await screen.findByText('Apps et préréglages')).toBeTruthy();
   await fireEvent.press(screen.getByTestId('settings-presets'));
   expect(await screen.findByTestId('presets-none')).toBeTruthy();
+  expect(screen.getByText('Ajouter une app')).toBeTruthy();
+  expect(screen.getByText('Garder l’app telle qu’elle est')).toBeTruthy();
+  await fireEvent.press(screen.getByTestId('preset-new'));
   expect(await screen.findByText('Garder l’app actuelle comme préréglage')).toBeTruthy();
 });
 
@@ -294,7 +305,10 @@ describe('保存预设时的检查', () => {
   // 路由状态是模块级的，上一个测试可能还停在预设页：直接打开。
   const openCheck = async () => {
     await act(async () => router.push('/presets'));
-    return screen.findByTestId('presets-screen');
+    const screenEl = await screen.findByTestId('presets-screen');
+    // 「保存现在的样子」点了才展开（D-614）。
+    await fireEvent.press(screen.getByTestId('preset-new'));
+    return screenEl;
   };
 
   const orphan: Op[] = [
@@ -406,6 +420,7 @@ describe('import a preset from a file', () => {
   };
   const importThroughScreen = async () => {
     await openScreen();
+    await fireEvent.press(await screen.findByTestId('preset-add'));
     await fireEvent.press(await screen.findByTestId('preset-import'));
   };
 
@@ -437,7 +452,7 @@ describe('import a preset from a file', () => {
 
     // 点「应用」：先问，确认后换，记录还在，能撤销。
     acceptNextAlert();
-    await fireEvent.press(screen.getByTestId(`preset-${preset.id}-apply`));
+    await fireEvent.press(screen.getByTestId(`preset-${preset.id}`));
     await waitFor(() => expect(store.getState().head!.id).toBeGreaterThan(head));
     expect(store.getState().config!.data.tables.map((t) => t.id)).toContain('notes');
     expect(await repo.listRecords('notes')).toHaveLength(1);
@@ -542,6 +557,7 @@ describe('import a preset from a file', () => {
     await openScreen();
     expect(await screen.findByTestId('presets-full')).toBeTruthy();
     // App 文件不占预设的名额，所以入口还在；整份配置存不下，只提示。
+    await fireEvent.press(await screen.findByTestId('preset-add'));
     expect(screen.getByTestId('preset-import')).toBeTruthy();
     pickFile(files, exported());
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -614,6 +630,7 @@ describe('import a preset from a file', () => {
       // 第一次导入时 acceptNextAlert 装的监视还在，调用记录要清掉再看这一次。
       const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       alert.mockClear();
+      await fireEvent.press(await screen.findByTestId('preset-add'));
       await fireEvent.press(await screen.findByTestId('preset-import'));
       await waitFor(() => expect(alert).toHaveBeenCalledTimes(1));
       expect(String(alert.mock.calls[0]![1])).toContain('可以更新它');
@@ -700,6 +717,7 @@ describe('import a preset from a file', () => {
     describe('pasted from the clipboard', () => {
       const paste = async () => {
         await openScreen();
+        await fireEvent.press(await screen.findByTestId('preset-add'));
         await fireEvent.press(await screen.findByTestId('preset-paste'));
       };
 
@@ -720,6 +738,7 @@ describe('import a preset from a file', () => {
         const head = store.getState().head!.id;
         const opened = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined as never);
         await openScreen();
+        await fireEvent.press(await screen.findByTestId('preset-add'));
         await fireEvent.press(await screen.findByText('用 Claude 或 ChatGPT 做一个 App'));
         expect(opened).toHaveBeenCalledWith('https://tinkrum.stonetech.dev/make.html');
         expect(store.getState().head!.id).toBe(head);
@@ -734,7 +753,8 @@ describe('import a preset from a file', () => {
           .spyOn(Share, 'share')
           .mockResolvedValue({ action: 'dismissedAction', activityType: undefined });
         await openScreen();
-        await fireEvent.press(await screen.findByText('把说明发给 AI App'));
+        await fireEvent.press(await screen.findByTestId('preset-add'));
+        await fireEvent.press(await screen.findByText('让 AI 做一个'));
         expect(shared).toHaveBeenCalledTimes(1);
         const { message } = shared.mock.calls[0]![0] as { message: string };
         expect(message).toMatch(
@@ -787,6 +807,7 @@ describe('import a preset from a file', () => {
         });
         acceptNextAlert();
         await openScreen();
+        await fireEvent.press(await screen.findByTestId('preset-add'));
         await fireEvent.press(await screen.findByTestId('preset-paste'));
         await waitFor(() => expect(store.getState().head!.id).toBeGreaterThan(installedHead));
         const after = store.getState().config!;
@@ -898,6 +919,7 @@ describe('import a preset from a file', () => {
     );
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await openScreen();
+    await fireEvent.press(await screen.findByTestId('preset-add'));
     await fireEvent.press(screen.getByTestId('preset-import'));
     await waitFor(() => expect(alert).toHaveBeenCalled());
     expect(String(alert.mock.calls[0]![1])).toContain('pas encore : hologram.');
@@ -909,6 +931,7 @@ describe('import a preset from a file', () => {
     pickFile(files, '{"hello":1}');
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await openScreen();
+    await fireEvent.press(await screen.findByTestId('preset-add'));
     expect(await screen.findByText('Importer depuis un fichier')).toBeTruthy();
     expect(screen.getByText('Coller depuis le presse-papiers')).toBeTruthy();
     expect(screen.getByText('Créer une app avec Claude ou ChatGPT')).toBeTruthy();

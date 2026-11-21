@@ -111,6 +111,7 @@ describe.each(manifest.apps.map((a) => [a.name, a] as const))('app file %s', (_n
       )
       .mockImplementationOnce((_title, _message, buttons) => void buttons?.[1]?.onPress?.());
     await act(() => router.push('/presets'));
+    await fireEvent.press(await screen.findByTestId('preset-add'));
     await fireEvent.press(await screen.findByTestId('preset-import'));
     await waitFor(() =>
       expect(
@@ -236,6 +237,7 @@ describe('restore the original look (D-485)', () => {
       .mockImplementationOnce((_t, _m, buttons) => void buttons?.[1]?.onPress?.())
       .mockImplementationOnce((_t, _m, buttons) => void buttons?.[1]?.onPress?.());
     await act(() => router.push('/presets'));
+    await fireEvent.press(await screen.findByTestId('preset-add'));
     await fireEvent.press(await screen.findByTestId('preset-import'));
     await waitFor(() => expect(store.getState().config!.nav.apps?.[0]?.id).toBe('habits'));
     const original = store.getState().config!.nav.apps![0]!;

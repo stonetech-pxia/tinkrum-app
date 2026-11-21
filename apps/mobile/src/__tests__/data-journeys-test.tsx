@@ -21,6 +21,11 @@ import { AISettingsProvider } from '../ai/context';
 import { createAISettingsStore, type SecretStore } from '../ai/settings';
 import ChangeRoute from '../app/change';
 import DataRoute from '../app/data';
+import DataBackupRoute from '../app/data-backup';
+import DataDeletedRoute from '../app/data-deleted';
+import DataMoreRoute from '../app/data-more';
+import DataTableRoute from '../app/data-table/[tableId]';
+import DataUnusedRoute from '../app/data-unused';
 import HomeRoute from '../app/index';
 import PageRoute from '../app/page/[pageId]';
 import RecordRoute from '../app/record/[collectionId]';
@@ -75,6 +80,11 @@ async function renderApp({
     'record/[collectionId]': RecordRoute,
     'table-ready/[collectionId]': TableReadyRoute,
     data: DataRoute,
+    'data-table/[tableId]': DataTableRoute,
+    'data-backup': DataBackupRoute,
+    'data-deleted': DataDeletedRoute,
+    'data-unused': DataUnusedRoute,
+    'data-more': DataMoreRoute,
   });
   return { repo, store, files };
 }
@@ -195,8 +205,8 @@ describe('user data (UI)', () => {
     // 记账页已不存在，回到外壳。
     await testRouter.back();
     await fireEvent.press(await screen.findByTestId('nav-settings'));
-    await fireEvent.press(await screen.findByTestId('settings-more'));
     await fireEvent.press(await screen.findByTestId('settings-data'));
+    await fireEvent.press(await screen.findByTestId('data-unused'));
     expect(await screen.findByTestId('orphan-expenses')).toBeTruthy();
     expect(screen.getByText('1 条记录')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('export-expenses'));
@@ -227,8 +237,8 @@ describe('user data (UI)', () => {
     await store.getState().confirm();
 
     await fireEvent.press(await screen.findByTestId('nav-settings'));
-    await fireEvent.press(await screen.findByTestId('settings-more'));
     await fireEvent.press(await screen.findByTestId('settings-data'));
+    await fireEvent.press(await screen.findByTestId('data-unused'));
     jest.spyOn(Alert, 'alert').mockImplementationOnce((_title, _message, buttons) => {
       buttons?.find((b) => b.style === 'destructive')?.onPress?.();
     });
@@ -255,10 +265,11 @@ describe('Settings → Data: app design and prefill memory', () => {
       amount: { kind: 'amount', label: '实付', offset: 0, position: 0.7, format: 'dot', hits: 1 },
     },
   });
+  // 填写记忆和 App 设计在「数据 → 更多」里（D-614）。
   const openData = async () => {
     await fireEvent.press(await screen.findByTestId('nav-settings'));
-    await fireEvent.press(await screen.findByTestId('settings-more'));
     await fireEvent.press(await screen.findByTestId('settings-data'));
+    await fireEvent.press(await screen.findByTestId('data-more'));
   };
   const answer = (pick: (buttons: AlertButton[]) => AlertButton | undefined) =>
     jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
@@ -369,8 +380,8 @@ describe('Settings → Data: app configuration', () => {
   it('only exports; importing a configuration lives under My presets (D-485)', async () => {
     await renderApp();
     await fireEvent.press(await screen.findByTestId('nav-settings'));
-    await fireEvent.press(await screen.findByTestId('settings-more'));
     await fireEvent.press(await screen.findByTestId('settings-data'));
+    await fireEvent.press(await screen.findByTestId('data-more'));
     expect(await screen.findByTestId('export-app-config')).toBeTruthy();
     expect(screen.queryByTestId('import-app-config')).toBeNull();
   });

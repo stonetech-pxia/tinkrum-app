@@ -1572,7 +1572,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     expect: {
       kind: 'reject',
       reason: 'unknown',
-      message: (m) => (m.includes('我的预设') ? null : 'should point to 设置 → 我的预设'),
+      message: (m) => (m.includes('App 和预设') ? null : 'should point to 设置 → App 和预设'),
     },
   },
   {
@@ -1584,7 +1584,8 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     expect: {
       kind: 'reject',
       reason: 'unknown',
-      message: (m) => (/my presets/i.test(m) ? null : 'should point to Settings → My presets'),
+      message: (m) =>
+        /apps and presets/i.test(m) ? null : 'should point to Settings → Apps and presets',
     },
   },
   {
