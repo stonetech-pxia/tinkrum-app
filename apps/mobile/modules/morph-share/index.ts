@@ -15,6 +15,15 @@ export interface MorphShareModule {
   /** 打开一次系统分享面板，带上全部文件（本机 file:// 地址）；面板关掉后返回。 */
   shareFiles(uris: readonly string[], mimeTypes: readonly string[]): Promise<void>;
   /**
+   * 交给别的 AI App（D-611）：和 shareFiles 一样，再带一段文字（提示词），收到的 App 把它放进输入框。
+   * 比这个功能早的开发版没有它，调用方退回只发文字。
+   */
+  shareFilesWithText?(
+    text: string,
+    uris: readonly string[],
+    mimeTypes: readonly string[],
+  ): Promise<void>;
+  /**
    * 这个快捷操作（key）会存进的文件夹的名字（D-196）：它自己记住的，没有时是最后选过的那个（D-123）；
    * 都没有、或者文件夹已经不在 / 授权被收回时为 null。
    */

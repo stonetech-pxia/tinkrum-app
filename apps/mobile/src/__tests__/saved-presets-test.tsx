@@ -15,7 +15,7 @@ import {
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
-import { Alert, Linking } from 'react-native';
+import { Alert, Linking, Share } from 'react-native';
 
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import type { SavedPreset, WorkspaceRepo } from '../storage/types';
@@ -600,7 +600,8 @@ describe('import a preset from a file', () => {
       expect(await repo.listPresets()).toEqual([]);
     });
 
-    it('the same app twice: the second is refused and says why, nothing changes', async () => {
+    // D-611：同一个 App 第二次导入不再报错，而是问要不要更新它（默认更新）；取消就什么都不变。
+    it('the same app twice: asks to update it, and cancelling changes nothing', async () => {
       const { files, store } = await starterApp();
       pickFile(files, clay(), { name: 'tinkrum-app-clay.json' });
       chooseNewApp();
@@ -613,11 +614,14 @@ describe('import a preset from a file', () => {
       // 第一次导入时 acceptNextAlert 装的监视还在，调用记录要清掉再看这一次。
       const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       alert.mockClear();
-      chooseNewApp();
       await fireEvent.press(await screen.findByTestId('preset-import'));
-      await waitFor(() => expect(alert).toHaveBeenCalledTimes(2));
-      expect(String(alert.mock.calls[1]![1])).toContain('已经添加过');
+      await waitFor(() => expect(alert).toHaveBeenCalledTimes(1));
+      expect(String(alert.mock.calls[0]![1])).toContain('可以更新它');
+      const buttons = alert.mock.calls[0]![2]!;
+      expect(buttons.map((b) => b.text)).toEqual(['更新「Clay」', '取消']);
+      buttons[1]!.onPress?.();
       expect(store.getState().head!.id).toBe(head);
+      expect(store.getState().proposal).toBeNull();
     });
 
     // 这个版本不认识的外观（D-545）：整份不导入，按文件里的位置说哪里不对，和网站、自检脚本一样（D-595）。
@@ -719,6 +723,84 @@ describe('import a preset from a file', () => {
         await fireEvent.press(await screen.findByText('用 Claude 或 ChatGPT 做一个 App'));
         expect(opened).toHaveBeenCalledWith('https://tinkrum.stonetech.dev/make.html');
         expect(store.getState().head!.id).toBe(head);
+      });
+
+      // D-609：把给别的 AI 的提示词交给系统分享面板，用户自己挑 App；只带两个网址和请求，不带这个 App 的任何内容。
+      it('sending the instructions to an AI app shares only the prompt with the guide links and writes nothing', async () => {
+        const { store } = await starterApp();
+        const head = store.getState().head!.id;
+        const config = JSON.stringify(store.getState().config);
+        const shared = jest
+          .spyOn(Share, 'share')
+          .mockResolvedValue({ action: 'dismissedAction', activityType: undefined });
+        await openScreen();
+        await fireEvent.press(await screen.findByText('把说明发给 AI App'));
+        expect(shared).toHaveBeenCalledTimes(1);
+        const { message } = shared.mock.calls[0]![0] as { message: string };
+        expect(message).toMatch(
+          /https:\/\/tinkrum\.stonetech\.dev\/assets\/agent\/tinkrum-app-guide\.md\?v=\d{8}/,
+        );
+        expect(message).toMatch(
+          /https:\/\/tinkrum\.stonetech\.dev\/assets\/agent\/tinkrum-app-patterns\.md\?v=\d{8}/,
+        );
+        expect(message).toContain('json');
+        // 不带这个 App 的表名、页名。
+        for (const name of [
+          ...store.getState().config!.data.tables.map((x) => x.name),
+          ...store.getState().config!.containers.pages.map((x) => x.title),
+        ])
+          if (name.length > 2) expect(message).not.toContain(name);
+        expect(store.getState().head!.id).toBe(head);
+        expect(JSON.stringify(store.getState().config)).toBe(config);
+      });
+
+      // D-611：别的 AI 改完交回来的同一个 App（ID 不变）：先问，默认更新它；改动照文件来，记录都留着，能撤销。
+      it('a changed file of an installed app updates that app, keeps its entries, and can be undone', async () => {
+        const { repo, files, store } = await starterApp();
+        const wallet = readFileSync(join(PORTAL, 'tinkrum-app-wallet.json'), 'utf8');
+        files.clipboard = wallet;
+        chooseNewApp();
+        acceptNextAlert();
+        await paste();
+        await waitFor(() => expect(store.getState().config!.nav.apps?.[0]?.id).toBe('wallet'));
+        await repo.insertRecord({
+          id: 'r2bbbbbb',
+          collectionId: 'wallet-categories',
+          values: { name: 'Food', budget: 300 },
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        const installedHead = store.getState().head!.id;
+        // AI 改了：首页标题、分类表的一个字段名，还加了一个字段。
+        const changed = JSON.parse(wallet) as {
+          pages: { id: string; title: string }[];
+          tables: { id: string; fields: { id: string; name: string; type: string }[] }[];
+        };
+        changed.pages.find((p) => p.id === 'wallet-home')!.title = 'My money';
+        const categories = changed.tables.find((t) => t.id === 'wallet-categories')!;
+        categories.fields.find((f) => f.id === 'budget')!.name = 'Monthly budget';
+        categories.fields.push({ id: 'note', name: 'Note', type: 'text' });
+        files.clipboard = `\`\`\`json\n${JSON.stringify(changed)}\n\`\`\``;
+        // 先问：第一个按钮是「更新『Wallet』」。
+        jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
+          buttons?.[0]?.onPress?.();
+        });
+        acceptNextAlert();
+        await openScreen();
+        await fireEvent.press(await screen.findByTestId('preset-paste'));
+        await waitFor(() => expect(store.getState().head!.id).toBeGreaterThan(installedHead));
+        const after = store.getState().config!;
+        expect(after.nav.apps!.filter((a) => a.id === 'wallet')).toHaveLength(1);
+        expect(after.containers.pages.find((p) => p.id === 'wallet-home')!.title).toBe('My money');
+        const table = after.data.tables.find((t) => t.id === 'wallet-categories')!;
+        expect(table.app).toBe('wallet');
+        expect(table.fields.find((f) => f.id === 'budget')!.name).toBe('Monthly budget');
+        expect(table.fields.map((f) => f.id)).toContain('note');
+        expect(await repo.listRecords('wallet-categories')).toHaveLength(1);
+        await act(() => store.getState().undo());
+        expect(
+          store.getState().config!.containers.pages.find((p) => p.id === 'wallet-home')!.title,
+        ).toBe('Wallet');
       });
 
       it('an empty clipboard says to copy the file first and changes nothing', async () => {

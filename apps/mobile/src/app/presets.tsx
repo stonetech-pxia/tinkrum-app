@@ -6,7 +6,10 @@ import {
   MAX_SAVED_PRESETS,
   appFileJsonText,
   appFileOps,
+  appUpdateOps,
   checkAppFileText,
+  describeAppUpdate,
+  handoffPrompt,
   missingUses,
   canSavePreset,
   checkTools,
@@ -20,7 +23,7 @@ import {
 } from '@morph/core';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { saveAppOrigin } from '@/apps/origin';
@@ -182,6 +185,20 @@ export default function PresetsRoute() {
 
   /** 导入一个 App 文件：先选「导入主页」还是「做成新 App」，再预览，确认后生效，能在改动记录里撤销（底线 5、7）。 */
   function importApp(appFile: AppFile, text: string, title: string) {
+    // 已经装了同一个 App（别的 AI 改完交回来的，D-611）：默认更新它，按 ID 接上，记录都留着。
+    const installed = (config.nav.apps ?? []).find((a) => a.id === appFile.app.id);
+    if (installed) {
+      Alert.alert(installed.name, t(locale, 'importUpdateChoose', { name: installed.name }), [
+        {
+          text: t(locale, 'importUpdateButton', { name: installed.name }),
+          style: 'default',
+          isPreferred: true,
+          onPress: () => void proceedImport(appFile, text, 'update', title),
+        },
+        { text: t(locale, 'cancel'), style: 'cancel' },
+      ]);
+      return;
+    }
     Alert.alert(appFile.app.name, t(locale, 'importAppChoose'), [
       {
         text: t(locale, 'importAppToHome'),
@@ -195,15 +212,31 @@ export default function PresetsRoute() {
     ]);
   }
 
-  async function proceedImport(appFile: AppFile, text: string, mode: ImportMode, title: string) {
-    const plan = appFileOps(appFile, config, { mode });
+  async function proceedImport(
+    appFile: AppFile,
+    text: string,
+    mode: ImportMode | 'update',
+    title: string,
+  ) {
+    const plan =
+      mode === 'update'
+        ? appUpdateOps(appFile, config, registry)
+        : appFileOps(appFile, config, { mode });
     if (!plan.ok) {
       problemsAlert(title, t(locale, 'importAppClash', { reason: '' }).trimEnd(), [plan.error]);
       return;
     }
     const result = await proposeOps(
       plan.ops,
-      t(locale, mode === 'home' ? 'importHomeSummary' : 'importAppSummary', { name: plan.name }),
+      t(
+        locale,
+        mode === 'home'
+          ? 'importHomeSummary'
+          : mode === 'update'
+            ? 'importUpdateSummary'
+            : 'importAppSummary',
+        { name: plan.name },
+      ),
       { fromAppFile: true },
     );
     if (result.kind === 'invalid') {
@@ -228,8 +261,19 @@ export default function PresetsRoute() {
     Alert.alert(
       title,
       [
-        t(locale, mode === 'home' ? 'importHomeConfirm' : 'importAppConfirm', { name: plan.name }),
-        ...result.proposal.lines,
+        t(
+          locale,
+          mode === 'home'
+            ? 'importHomeConfirm'
+            : mode === 'update'
+              ? 'importUpdateConfirm'
+              : 'importAppConfirm',
+          { name: plan.name },
+        ),
+        // 更新是先移除再装回（D-611）：逐个操作的说法会说「移除 App」，这里只列真正变了的。
+        ...(mode === 'update'
+          ? describeAppUpdate(result.proposal.before, result.proposal.after, appFile.app.id, locale)
+          : result.proposal.lines),
       ].join('\n'),
       [
         { text: t(locale, 'cancel'), style: 'cancel', onPress: () => void cancel() },
@@ -371,6 +415,19 @@ export default function PresetsRoute() {
             variant="outline"
             label={t(locale, 'presetsPaste')}
             onPress={() => void pasteFile()}
+          />
+          <Button
+            palette={palette}
+            testID="preset-share-to-ai"
+            variant="outline"
+            label={t(locale, 'presetsShareToAi')}
+            onPress={() =>
+              // 系统分享面板：用户自己挑一个 App，再自己点发送（底线 10）。
+              void Share.share(
+                { message: handoffPrompt({ kind: 'new' }, locale, new Date()) },
+                { dialogTitle: t(locale, 'presetsShareToAi') },
+              ).catch(() => {})
+            }
           />
           <Button
             palette={palette}

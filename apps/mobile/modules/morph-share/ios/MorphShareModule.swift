@@ -42,22 +42,13 @@ public class MorphShareModule: Module {
     Name("MorphShare")
 
     AsyncFunction("shareFiles") { (uris: [URL], _: [String], promise: Promise) in
-      guard !self.busy else {
-        promise.reject(SheetBusyException())
-        return
-      }
-      guard let presenter = self.appContext?.utilities?.currentViewController() else {
-        promise.reject(PresenterMissingException())
-        return
-      }
-      let sheet = UIActivityViewController(activityItems: uris, applicationActivities: nil)
-      sheet.completionWithItemsHandler = { _, _, _, _ in
-        self.busy = false
-        promise.resolve(nil)
-      }
-      Self.anchor(sheet, on: presenter)
-      self.busy = true
-      presenter.present(sheet, animated: true)
+      self.presentSheet(uris, promise: promise)
+    }
+    .runOnQueue(DispatchQueue.main)
+
+    // 交给别的 AI App（D-611）：一段文字（提示词）和文件一起放进分享面板，收到的 App 把文字放进输入框、文件作附件。
+    AsyncFunction("shareFilesWithText") { (text: String, uris: [URL], _: [String], promise: Promise) in
+      self.presentSheet([text] + uris, promise: promise)
     }
     .runOnQueue(DispatchQueue.main)
 
@@ -244,6 +235,26 @@ public class MorphShareModule: Module {
       n += 1
     }
     return url
+  }
+
+  /** 打开一次分享面板；面板关掉后返回。 */
+  private func presentSheet(_ items: [Any], promise: Promise) {
+    guard !busy else {
+      promise.reject(SheetBusyException())
+      return
+    }
+    guard let presenter = appContext?.utilities?.currentViewController() else {
+      promise.reject(PresenterMissingException())
+      return
+    }
+    let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
+    sheet.completionWithItemsHandler = { _, _, _, _ in
+      self.busy = false
+      promise.resolve(nil)
+    }
+    Self.anchor(sheet, on: presenter)
+    busy = true
+    presenter.present(sheet, animated: true)
   }
 
   /** iPad 上以弹出框显示，要给一个位置（屏幕中间）。 */

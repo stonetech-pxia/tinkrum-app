@@ -66,34 +66,45 @@ class MorphShareModule : Module() {
 
   private fun fileOf(uri: String) = File(Uri.parse(uri).path!!)
 
+  /** 打开一次系统分享面板，带上全部文件；text 不为空时也放进去（EXTRA_TEXT）。面板关掉后 promise 才返回。 */
+  private fun shareSheet(text: String?, uris: List<String>, mimeTypes: List<String>, promise: Promise) {
+    val activity = appContext.currentActivity
+    if (activity == null) {
+      promise.reject(NoActivityException())
+      return
+    }
+    if (pendingShare != null || pendingExport != null) {
+      promise.reject(SheetBusyException())
+      return
+    }
+    val authority = "${context.packageName}.MorphShareFileProvider"
+    val contentUris = ArrayList(uris.map { FileProvider.getUriForFile(context, authority, fileOf(it)) })
+    val intent = if (contentUris.size == 1) {
+      Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, contentUris[0])
+    } else {
+      Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, contentUris)
+    }
+    intent.type = commonType(mimeTypes)
+    if (text != null) intent.putExtra(Intent.EXTRA_TEXT, text)
+    // 读权限通过 ClipData 交给选中的 App（只有它，只读）。
+    val clip = ClipData.newRawUri(null, contentUris[0])
+    for (uri in contentUris.drop(1)) clip.addItem(ClipData.Item(uri))
+    intent.clipData = clip
+    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    pendingShare = promise
+    activity.startActivityForResult(Intent.createChooser(intent, null), SHARE_REQUEST)
+  }
+
   override fun definition() = ModuleDefinition {
     Name("MorphShare")
 
     AsyncFunction("shareFiles") { uris: List<String>, mimeTypes: List<String>, promise: Promise ->
-      val activity = appContext.currentActivity
-      if (activity == null) {
-        promise.reject(NoActivityException())
-        return@AsyncFunction
-      }
-      if (pendingShare != null || pendingExport != null) {
-        promise.reject(SheetBusyException())
-        return@AsyncFunction
-      }
-      val authority = "${context.packageName}.MorphShareFileProvider"
-      val contentUris = ArrayList(uris.map { FileProvider.getUriForFile(context, authority, fileOf(it)) })
-      val intent = if (contentUris.size == 1) {
-        Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, contentUris[0])
-      } else {
-        Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, contentUris)
-      }
-      intent.type = commonType(mimeTypes)
-      // 读权限通过 ClipData 交给选中的 App（只有它，只读）。
-      val clip = ClipData.newRawUri(null, contentUris[0])
-      for (uri in contentUris.drop(1)) clip.addItem(ClipData.Item(uri))
-      intent.clipData = clip
-      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-      pendingShare = promise
-      activity.startActivityForResult(Intent.createChooser(intent, null), SHARE_REQUEST)
+      shareSheet(null, uris, mimeTypes, promise)
+    }.runOnQueue(Queues.MAIN)
+
+    // 交给别的 AI App（D-611）：提示词放进 EXTRA_TEXT，和文件一起交出去；收到的 App 把文字放进输入框。
+    AsyncFunction("shareFilesWithText") { text: String, uris: List<String>, mimeTypes: List<String>, promise: Promise ->
+      shareSheet(text, uris, mimeTypes, promise)
     }.runOnQueue(Queues.MAIN)
 
     // 打开别的 App 后就返回，不等用户回来。先把文件复制进自己的缓存 preview/（用原来的文件名），再用自己的
