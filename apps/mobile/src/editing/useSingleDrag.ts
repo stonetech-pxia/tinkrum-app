@@ -23,6 +23,21 @@ export function setInnerGesture(active: boolean) {
   innerGesture = active;
 }
 
+interface Session {
+  id: string;
+  x: number;
+  y: number;
+  startX: number;
+  startY: number;
+  scrollAtStart: number;
+  scrollAtMeasure: number;
+  boxes: Map<string, ItemBox>;
+  target: DropTarget | null;
+  moved: boolean;
+  ready: Promise<void>;
+  released: boolean;
+}
+
 /** 测量的是没有 transform 的外框；UI 线程上的跟手位移不会污染落点坐标。 */
 export function useSingleDrag(
   page: Page,
@@ -37,20 +52,7 @@ export function useSingleDrag(
   const scrollRef = useRef<ScrollViewInstance>(null);
   const viewportRef = useRef<HostInstance>(null);
   const metrics = useRef({ y: 0, height: 0, content: 0, top: 0, left: 0 });
-  const session = useRef<{
-    id: string;
-    x: number;
-    y: number;
-    startX: number;
-    startY: number;
-    scrollAtStart: number;
-    scrollAtMeasure: number;
-    boxes: Map<string, ItemBox>;
-    target: DropTarget | null;
-    moved: boolean;
-    ready: Promise<void>;
-    released: boolean;
-  } | null>(null);
+  const session = useRef<Session | null>(null);
   const frame = useRef<number | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [target, setTarget] = useState<DropTarget | null>(null);
@@ -98,7 +100,10 @@ export function useSingleDrag(
     if (!current) return;
     const m = metrics.current;
     const speed = current.moved && m.height > 0 ? edgeSpeed(current.y, m.top, m.top + m.height) : 0;
-    const next = Math.max(0, Math.min(Math.max(0, m.content - m.height), m.y + speed));
+    // 只在手指拖到边上时滚。页面自己变得滚不动（进入编辑时顶栏、底栏收起，D-613）不是拖动，
+    // 不能在这里夹回去并算作移动：那样按住不动也会把组件放到别处。
+    const next =
+      speed === 0 ? m.y : Math.max(0, Math.min(Math.max(0, m.content - m.height), m.y + speed));
     if (next !== m.y) {
       m.y = next;
       scrollRef.current?.scrollTo({ y: next, animated: false });
@@ -128,14 +133,20 @@ export function useSingleDrag(
     session.current = current;
     setDraggingId(id);
     scrollShift.value = 0;
+    measureSession(current);
+  }
+  /** 量可视区和各组件在窗口里的位置；量完才找落点、开始自动滚动。 */
+  function measureSession(current: Session) {
+    const boxes = new Map<string, ItemBox>();
     current.ready = Promise.all([
       measure(viewportRef.current),
       ...[...views.current].map(async ([key, entry]) => {
         const box = await measure(entry.view);
-        if (box) current.boxes.set(key, { ...box, inCell: entry.inCell });
+        if (box) boxes.set(key, { ...box, inCell: entry.inCell });
       }),
     ]).then(([area]) => {
       if (session.current !== current) return;
+      current.boxes = boxes;
       if (area) {
         metrics.current.left = area.x;
         metrics.current.top = area.y;
@@ -175,6 +186,17 @@ export function useSingleDrag(
     const op = dropOp(latest.current.page, id, current.target.slot);
     if (op) latest.current.onMove(op);
   }
+  /**
+   * 按住期间页面布局变了（进入编辑时顶栏、底栏收起，页面变高，D-613）：原生滚动位置会被夹到新的最大值，
+   * 组件也换了位置。跟上滚动位置，再量一次，落点按现在的位置算。
+   */
+  function layoutChanged() {
+    const current = session.current;
+    if (!current || current.released) return;
+    const m = metrics.current;
+    m.y = Math.min(m.y, Math.max(0, m.content - m.height));
+    measureSession(current);
+  }
   const scroll: ScrollViewProps = {
     scrollEnabled: draggingId === null,
     removeClippedSubviews: false,
@@ -183,9 +205,11 @@ export function useSingleDrag(
     },
     onLayout: (e) => {
       metrics.current.height = e.nativeEvent.layout.height;
+      layoutChanged();
     },
     onContentSizeChange: (_w, height) => {
       metrics.current.content = height;
+      layoutChanged();
     },
   };
   return {

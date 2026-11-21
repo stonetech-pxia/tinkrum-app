@@ -695,6 +695,42 @@ describe('single-component gesture sessions', () => {
     await fireEvent.press(screen.getByTestId('single-done-welcome'));
   });
 
+  // D-613：页面滚过以后按住不动；进入编辑时顶栏、底栏收起，页面变高、内容放得下，原生滚动回到顶部。
+  // 这不是拖动：松手时组件留在原处（手机上曾被挪到上面两格）。
+  it('a still press on a scrolled page does not move the block when the page stops scrolling', async () => {
+    const { store } = await renderApp();
+    const scroll = screen.getByTestId('editable-scroll');
+    await fireEvent(scroll, 'layout', { nativeEvent: { layout: { height: 600 } } });
+    await fireEvent(scroll, 'contentSizeChange', 360, 1800);
+    await fireEvent(scroll, 'scroll', {
+      nativeEvent: {
+        contentOffset: { x: 0, y: 300 },
+        layoutMeasurement: { width: 360, height: 600 },
+        contentSize: { width: 360, height: 1800 },
+      },
+    });
+    const gesture = createGestureController('single-drag-recent-files');
+    await gestureAct(() => {
+      gesture.begin({ absoluteX: 100, absoluteY: 380 });
+      gesture.activate({ absoluteX: 100, absoluteY: 380 });
+    });
+    await gestureAct(() => gesture.update({ absoluteX: 100, absoluteY: 380 }));
+    await fireEvent(scroll, 'layout', { nativeEvent: { layout: { height: 800 } } });
+    await fireEvent(scroll, 'contentSizeChange', 360, 800);
+    await act(async () => {
+      jest.advanceTimersByTime(80);
+      jest.runAllTicks();
+    });
+    await gestureAct(() => gesture.end());
+    expect(store.getState().editing!.ops).toEqual([]);
+    expect(draftHomeOrHome(store).blocks.map((c) => c.id)).toEqual([
+      'welcome',
+      'catalog',
+      'recent-files',
+    ]);
+    await fireEvent.press(screen.getByTestId('single-done-recent-files'));
+  });
+
   it('cancellation and dropping back in place leave the draft unchanged', async () => {
     const { store } = await renderApp();
     const gesture = createGestureController('single-drag-welcome');
