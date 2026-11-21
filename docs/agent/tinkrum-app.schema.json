@@ -4542,6 +4542,10 @@
             "currency": {
               "type": "string",
               "pattern": "^[A-Z]{3}$"
+            },
+            "empty": {
+              "type": "string",
+              "const": "zero"
             }
           },
           "required": [

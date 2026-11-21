@@ -8718,6 +8718,162 @@ const PICK_CASES: readonly EvalCase[] = [
   },
 ];
 
+// 清单的勾带 also（D-617）、数字块的 latest（D-618）、公式里空着的数算 0（D-619）。
+const taskListEarlier: EvalEarlier = {
+  input:
+    'Make a to-do list: tasks with a title, a done check box and a completed date, ticked off on a checklist',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'tasks',
+        name: 'Tasks',
+        fields: [
+          { id: 'title', name: 'Task', type: 'text', required: true },
+          { id: 'done', name: 'Done', type: 'checkbox', default: false },
+          { id: 'completed', name: 'Completed on', type: 'date' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'todo',
+        title: 'To do',
+        blocks: [
+          {
+            id: 'list',
+            look: 'checklist',
+            source: { table: 'tasks', limit: 50 },
+            show: { title: 'title' },
+            tools: [{ as: 'check', do: 'toggle', table: 'tasks', field: 'done' }],
+          },
+        ],
+      },
+    },
+  ],
+};
+
+const tickRecordsDate = (c: WorkspaceConfig): string | null => {
+  const checks = recordBlocksOf(c, 'tasks')
+    .filter((b) => b.look === 'checklist')
+    .flatMap((b) => (b.tools ?? []).filter((u) => u.as === 'check')) as AnyAction[];
+  if (checks.length === 0) return 'expected the checklist of tasks to keep its check';
+  const also = checks.flatMap((u) => (Array.isArray(u.also) ? (u.also as AnyAction[]) : []));
+  return also.some((a) => a.do === 'set' && a.field === 'completed' && a.value === 'today')
+    ? null
+    : 'expected the check to carry also [{do: "set", field: "completed", value: "today"}]';
+};
+
+const weightEarlier: EvalEarlier = {
+  input: 'Make a weight log: a date and my weight in kg, with a form to add one and a list of them',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'weights',
+        name: 'Weights',
+        fields: [
+          { id: 'date', name: 'Date', type: 'date', default: 'today', required: true },
+          { id: 'kg', name: 'Weight', type: 'number', decimals: 1, unit: 'kg', required: true },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'body',
+        title: 'Body',
+        blocks: [
+          {
+            id: 'log',
+            look: 'list',
+            source: { table: 'weights', limit: 50, sort: { field: 'date', direction: 'desc' } },
+            show: { title: 'date', trailing: 'kg' },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+const latestWeight = (c: WorkspaceConfig): string | null =>
+  numbersOf(c, 'weights').some((n) => n.source.aggregate === 'latest' && n.source.field === 'kg')
+    ? null
+    : 'expected a number block on weights with aggregate "latest" and field kg';
+
+const guestEarlier: EvalEarlier = {
+  input:
+    'Make a guest list: name, coming (a check box), plus-ones, and how many people each guest brings in all',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'guests',
+        name: 'Guests',
+        fields: [
+          { id: 'name', name: 'Name', type: 'text', required: true },
+          { id: 'coming', name: 'Coming', type: 'checkbox' },
+          { id: 'plus', name: 'Plus-ones', type: 'number', decimals: 0 },
+          {
+            id: 'party',
+            name: 'Party size',
+            type: 'formula',
+            expression: '{coming} * (1 + {plus})',
+            decimals: 0,
+          },
+        ],
+      },
+    },
+  ],
+};
+
+const emptyAsZero = (c: WorkspaceConfig): string | null => {
+  const f = c.data.tables.find((t) => t.id === 'guests')?.fields.find((x) => x.id === 'party');
+  if (f?.type !== 'formula') return 'expected the party formula to stay';
+  if (f.empty !== 'zero') return 'expected empty: "zero" on the party formula';
+  return /\{plus\}/.test(f.expression) ? null : 'the formula should still use {plus}';
+};
+
+const CHECK_LATEST_EMPTY_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG47',
+    input: 'When I tick a task on my checklist, also remember the date it was done',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [taskListEarlier],
+    expect: { kind: 'ops', check: tickRecordsDate },
+  },
+  {
+    id: 'KG48',
+    input: '清单上勾完成的时候，顺便把完成日期记成今天',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [taskListEarlier],
+    expect: { kind: 'ops', check: tickRecordsDate },
+  },
+  {
+    id: 'KG49',
+    input: 'Show my current weight at the top of the page',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [weightEarlier],
+    expect: { kind: 'ops', check: latestWeight },
+  },
+  {
+    id: 'KG50',
+    input: "If a guest's plus-ones is left empty, count it as 0 in the party size",
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [guestEarlier],
+    expect: { kind: 'ops', check: emptyAsZero },
+  },
+];
+
 /** 一个工具点一下要做的几处（工具本身加 also）。 */
 const writesOf = (a: AnyAction): AnyAction[] => [
   a,
@@ -9329,6 +9485,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...CALLOUT_CASES,
   ...GRID_CASES,
   ...PICK_CASES,
+  ...CHECK_LATEST_EMPTY_CASES,
   ...RELATIVE_VALUE_CASES,
   ...TAP_ALSO_CASES,
   ...CREATE_ALL_CASES,
