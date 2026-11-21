@@ -1016,15 +1016,34 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       zh.recordCreateAllConfirm,
       fr.recordCreateAllConfirm,
       frSingular.recordCreateAllConfirm,
+      // 勾选新建（D-613）问的那一句是勾选页的按钮。
+      en.recordPickAddButton,
+      enSingular.recordPickAddButton,
+      zh.recordPickAddButton,
+      fr.recordPickAddButton,
+      frSingular.recordPickAddButton,
     ])
       expect(text).not.toMatch(/undo|撤销|annuler/i);
+  });
+
+  it('the picker’s button is the question of a pick (D-613): it says how many and into which table', () => {
+    for (const text of [
+      en.recordPickAddButton,
+      enSingular.recordPickAddButton,
+      zh.recordPickAddButton,
+      fr.recordPickAddButton,
+      frSingular.recordPickAddButton,
+    ]) {
+      expect(text).toContain('{n}');
+      expect(text).toContain('{table}');
+    }
   });
 
   it('a bulk change has no setting that skips asking first', () => {
     for (const base of [
       { do: 'setAll', table: 't', field: 'a', value: true },
       { do: 'createAll', table: 't', from: 's', values: {} },
-      // 勾选新建（D-613）：勾完照样先问。
+      // 勾选新建（D-613）：勾选页的按钮「添加 N 条到 B」就是先问的那一句（创始人 2026-11-21），配置里同样没有跳过它的设置。
       { do: 'createAll', table: 't', from: 's', pick: true, values: {} },
     ]) {
       expect(RecordToolSchema.safeParse(base).success).toBe(true);

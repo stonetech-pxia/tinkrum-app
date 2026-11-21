@@ -1,4 +1,4 @@
-import { act, fireEvent, waitFor } from '@testing-library/react-native';
+import { fireEvent, waitFor } from '@testing-library/react-native';
 import { screen } from 'expo-router/testing-library';
 import { Alert } from 'react-native';
 
@@ -6,8 +6,9 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { openPicker, put } from '../test-utils/pick-fixtures';
 
 // 勾选新建（D-613，创始人 2026-11-21「开工」）：菜谱页上「菜谱用料」列表下面的「添加食材」打开勾选页面，勾几样食材，
-// 每样建一条用料，连着这个菜谱和那样食材；已经在这个菜谱里的显示「已添加」。点「添加 N 条到…」以后照样先问
-// （底线 11），建好了回到菜谱页，提示条能撤回这一批。只勾不点什么都不写（底线 15）。
+// 每样建一条用料，连着这个菜谱和那样食材；已经在这个菜谱里的显示「已添加」。「添加 N 条到…」这个按钮写明了条数和表，
+// 它就是先问的那一句（底线 11，创始人 2026-11-21「算，去掉第二次」），点了直接建，不再弹确认；建好了回到菜谱页，
+// 提示条能撤回这一批。只勾不点什么都不写（底线 15）。
 
 async function withPantry() {
   const repo = new MemoryWorkspaceRepo();
@@ -26,13 +27,7 @@ async function withPantry() {
   return repo;
 }
 
-function answer(label: string) {
-  const spy = jest.spyOn(Alert, 'alert');
-  spy.mockImplementation((_title, _message, buttons) => {
-    buttons?.find((b) => b.text === label)?.onPress?.();
-  });
-  return spy;
-}
+const noAlert = () => jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 afterEach(() => jest.restoreAllMocks());
 
 const recipeItems = async (repo: MemoryWorkspaceRepo) =>
@@ -50,7 +45,7 @@ it('a new user with no ingredients is told to add some first, and nothing can be
   expect(screen.getByTestId('pick-records-add')).toBeDisabled();
 });
 
-it('shows what this recipe already has, then asks first and creates one entry per picked ingredient', async () => {
+it('shows what this recipe already has; the button says how many and where, and creates them with no second question', async () => {
   const repo = await withPantry();
   const router = await openPicker(repo);
   // 面粉已经在这个菜谱里：显示「已添加」，不能再勾。鸡蛋只在别的菜谱里，能勾。
@@ -64,17 +59,12 @@ it('shows what this recipe already has, then asks first and creates one entry pe
   expect(screen.getByTestId('pick-records-add')).toHaveTextContent('添加 2 条到「菜谱用料」');
   // 勾了还没点：什么都没写（底线 15）。
   expect(await repo.listRecords('recipe-items')).toHaveLength(2);
-  const alert = answer('新建');
+  const alert = noAlert();
   await fireEvent.press(screen.getByTestId('pick-records-add'));
-  expect(alert).toHaveBeenCalledWith(
-    '添加食材',
-    '将在「菜谱用料」新建 2 条记录。',
-    expect.anything(),
-    expect.anything(),
-  );
   await waitFor(() => expect(router.getPathname()).toBe('/page/recipe'));
   expect(await screen.findByTestId('toast')).toHaveTextContent(/已在「菜谱用料」新建 2 条记录/);
   expect(screen.getByTestId('toast-undo')).toBeTruthy();
+  expect(alert).not.toHaveBeenCalled();
   expect(await recipeItems(repo)).toEqual(
     [
       { recipe: 'r2', ingredient: 'egg', amount: 2 },
@@ -85,23 +75,11 @@ it('shows what this recipe already has, then asks first and creates one entry pe
   );
 });
 
-it('cancelling the question creates nothing and stays on the picker', async () => {
-  const repo = await withPantry();
-  const router = await openPicker(repo);
-  await fireEvent.press(await screen.findByTestId('pick-row-milk'));
-  answer('取消');
-  await fireEvent.press(screen.getByTestId('pick-records-add'));
-  await act(async () => {});
-  expect(await repo.listRecords('recipe-items')).toHaveLength(2);
-  expect(router.getPathname()).toBe('/pick-records');
-});
-
 it('undo removes exactly the entries this pick created', async () => {
   const repo = await withPantry();
   await openPicker(repo);
   await fireEvent.press(await screen.findByTestId('pick-row-milk'));
   await fireEvent.press(screen.getByTestId('pick-row-salt'));
-  answer('新建');
   await fireEvent.press(screen.getByTestId('pick-records-add'));
   await fireEvent.press(await screen.findByTestId('toast-undo'));
   await waitFor(async () =>
@@ -124,13 +102,8 @@ it('searches when there are many, and French uses entrée in the singular', asyn
   expect(screen.getByTestId('pick-records-add')).toHaveTextContent(
     'Ajouter 1 entrée à « 菜谱用料 »',
   );
-  const alert = answer('Créer');
+  const alert = noAlert();
   await fireEvent.press(screen.getByTestId('pick-records-add'));
-  expect(alert).toHaveBeenCalledWith(
-    '添加食材',
-    'Cela crée 1 entrée dans « 菜谱用料 ».',
-    expect.anything(),
-    expect.anything(),
-  );
   await waitFor(async () => expect(await repo.listRecords('recipe-items')).toHaveLength(3));
+  expect(alert).not.toHaveBeenCalled();
 });

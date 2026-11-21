@@ -332,7 +332,8 @@ export function useRecordActionRunner() {
 
   /**
    * 勾选新建（D-613）：用户在列表下面的「添加」里勾的几条来源，各新建一条（带上这一段的值 here）。点的那一刻再读一次
-   * 这一段，已经连着的跳过（别处刚加过的不重复）。之后和批量新建一样：先问、最多 200 条、一个事务、提示条能撤回这一批。
+   * 这一段，已经连着的跳过（别处刚加过的不重复）。勾选页的按钮「添加 N 条到 B」就是先问的那一句（底线 11，创始人
+   * 2026-11-21「算，去掉第二次」），这里不再弹确认；之后和批量新建一样：最多 200 条、一个事务、提示条能撤回这一批。
    * 建好了返回 true（勾选页面关掉）；取消、什么都没建返回 false。
    */
   async function pickCreate(
@@ -365,14 +366,19 @@ export function useRecordActionRunner() {
       target,
       planned,
       label || t(locale, 'recordPickTitle', { table: source.name }),
+      false,
     );
   }
 
-  /** 批量新建的后半段（D-567、D-613）：没有就说一声，超过上限说上限，先问，一个事务建好，提示条能撤回这一批。 */
+  /**
+   * 批量新建的后半段（D-567、D-613）：没有就说一声，超过上限说上限，先问，一个事务建好，提示条能撤回这一批。
+   * ask 为 false 只给勾选新建：用户刚在勾选页点了写明条数和表的按钮，那就是问过了。
+   */
   async function createBatch(
     target: Collection,
     planned: Record<string, unknown>[],
     label: string,
+    ask = true,
   ): Promise<boolean> {
     if (planned.length === 0) {
       showToast({ message: t(locale, 'recordCreateAllNothing') });
@@ -385,17 +391,19 @@ export function useRecordActionRunner() {
       );
       return false;
     }
-    const confirmed = await new Promise<boolean>((resolve) =>
-      Alert.alert(
-        label,
-        t(locale, 'recordCreateAllConfirm', { n: planned.length, table: target.name }),
-        [
-          { text: t(locale, 'cancel'), style: 'cancel', onPress: () => resolve(false) },
-          { text: t(locale, 'recordCreateAllConfirmButton'), onPress: () => resolve(true) },
-        ],
-        { cancelable: true, onDismiss: () => resolve(false) },
-      ),
-    );
+    const confirmed =
+      !ask ||
+      (await new Promise<boolean>((resolve) =>
+        Alert.alert(
+          label,
+          t(locale, 'recordCreateAllConfirm', { n: planned.length, table: target.name }),
+          [
+            { text: t(locale, 'cancel'), style: 'cancel', onPress: () => resolve(false) },
+            { text: t(locale, 'recordCreateAllConfirmButton'), onPress: () => resolve(true) },
+          ],
+          { cancelable: true, onDismiss: () => resolve(false) },
+        ),
+      ));
     if (!confirmed) return false;
     const counts = await repo.countRecords();
     const count = counts.find((c) => c.collectionId === target.id)?.count ?? 0;
