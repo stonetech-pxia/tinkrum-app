@@ -2,6 +2,8 @@ import {
   MAX_CREATE_ALL,
   MAX_SET_ALL,
   RECORD_LIMITS,
+  checkInput,
+  checkOverwrites,
   createAllInputs,
   createInput,
   pickCreateInputs,
@@ -305,6 +307,64 @@ export function useRecordActionRunner() {
   }
 
   /**
+   * 清单的勾带 also（D-617）：勾上时勾选框和 also 的值、取消时勾选框和清空 also 的字段，按现在存的这一条算好，一次写进这一条
+   * （同一个事务，别处刚改过就不写，说一声）。不弹撤销：取消就把勾上写的全部清空、再勾一下又写回来（底线 11）；只有勾上盖掉了
+   * 原来有的、不一样的值时弹撤销（取消只会清空，放不回那个值），撤销放回这一条原来的样子。
+   */
+  async function check(use: RecordToolUse, record: DataRecord) {
+    const row = config?.data.tables.find((c) => c.id === use.table);
+    if (!config || !row) return;
+    const stored = await repo.getRecord(record.id);
+    if (!stored || stored.deletedAt !== null || stored.collectionId !== row.id) {
+      showToast({ message: t(locale, 'recordActionGone') });
+      bump();
+      return;
+    }
+    const now = new Date();
+    const tools = tapWrites(use, row.id);
+    const reads = tools.find(toolReadsEntry);
+    const entry = reads ? await entryOf(reads, record.id, now) : undefined;
+    const input = checkInput(use, row, stored.values, { now, cal, rowId: record.id, entry });
+    if (!input) return;
+    const prepared = prepareRecordValues(row, input, stored.values, now, cal);
+    if (!prepared.ok) return void openRecord(row.id, record.id);
+    let outcome: 'applied' | 'conflict';
+    try {
+      outcome = await repo.applyRecordWrites([
+        {
+          kind: 'update',
+          id: record.id,
+          values: prepared.values,
+          updatedAt: now.getTime(),
+          expected: stored.values,
+        },
+      ]);
+    } catch {
+      return void showToast({ message: t(locale, 'recordActionFailed') });
+    }
+    if (outcome === 'conflict')
+      return void showToast({ message: t(locale, 'recordActionChangedMeanwhile') });
+    bump([row.id]);
+    if (!checkOverwrites(use, stored.values, prepared.values)) return;
+    showToast({
+      message: t(locale, 'recordCheckOverwrote'),
+      undo: {
+        writes: [
+          {
+            kind: 'update',
+            id: record.id,
+            values: stored.values,
+            updatedAt: Date.now(),
+            expected: prepared.values,
+          },
+        ],
+        tables: [row.id],
+        failed: 'recordUndoFailed',
+      },
+    });
+  }
+
+  /**
    * 批量新建（D-567）：筛出来的每一条来源各新建一条（引擎一条一条算，配置里没有循环）。没有就说一声；超过 200 条说上限、
    * 什么都不做；否则先问「将在 B 新建 N 条」，确认后在一个事务里全部建好。提示条上的「撤销」删掉这一批（每条都要求还是
    * 建好时的样子，改过就一条也不删）。存不进去的那几条（旧配置里必填项没有值）跳过。
@@ -462,6 +522,11 @@ export function useRecordActionRunner() {
   }
 
   return {
+    /** 清单上勾一下（as check，D-617）：带 also 的勾在这里一次写完；不带的仍由列表直接改那个勾选框。 */
+    runCheck(use: RecordToolUse, record: DataRecord): Promise<void> {
+      return serial(() => check(use, record));
+    },
+
     /**
      * 勾选新建（D-616）：勾选页面上点了「添加 N 条到 B」。use 是列表下面的「添加」（as addHere，pick: true），
      * here 是这一段的值，sourceIds 按勾的顺序。

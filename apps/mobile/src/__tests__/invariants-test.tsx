@@ -9,6 +9,7 @@ import {
   calendarOf,
   createDefaultWorkspace,
   dayOf,
+  localDate,
   createRegistry,
   createStarterWorkspace,
   sampleOps,
@@ -897,6 +898,39 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     await fireEvent.press(await screen.findByTestId('check-todos-1'));
     await settle();
     expect((await repo.getRecord('todos-1'))!.values.done ?? false).toBe(before);
+  });
+
+  // 清单的勾带 also（D-617）：勾上同时记下完成日期，一次写；取消把它们都清空，就是拿回勾上做的全部，所以不弹撤销。
+  it('ticking a check that also records a date shows no undo; unticking takes all of it back', async () => {
+    const config = v34('todo');
+    config.data.tables
+      .find((t) => t.id === 'todos')!
+      .fields.push({ id: 'finished', name: '完成于', type: 'date' });
+    const block = config.containers.pages
+      .find((p) => p.id === 'todo')!
+      .blocks.find((b) => b.id === 'tasks') as { tools: object[] };
+    block.tools = [
+      {
+        as: 'check',
+        do: 'toggle',
+        table: 'todos',
+        field: 'done',
+        also: [{ do: 'set', field: 'finished', value: 'today' }],
+      },
+    ];
+    const { repo } = await openPage(config, 'todo');
+    // todos 0 是勾着的：先取消（清空完成于），再勾（记下今天），再取消，回到第一次取消后的样子；都不弹撤销。
+    const press = async () => {
+      await fireEvent.press(await screen.findByTestId('check-todos-0'));
+      await settle();
+      expect(screen.queryByTestId('toast-undo')).toBeNull();
+      return (await repo.getRecord('todos-0'))!.values;
+    };
+    const unticked = await press();
+    expect([unticked.done, unticked.finished]).toEqual([false, undefined]);
+    const ticked = await press();
+    expect([ticked.done, ticked.finished]).toEqual([true, localDate(new Date())]);
+    expect(await press()).toEqual(unticked);
   });
 
   it('a tap that makes several changes shows undo, which puts the entry back', async () => {

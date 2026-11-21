@@ -25,6 +25,8 @@ import {
   smartDateOf,
   withoutPhrase,
   aggregateRecords,
+  latestNumber,
+  tapAlsoOf,
   calendarOf,
   dateOfDayNumber,
   filterRecords,
@@ -108,6 +110,7 @@ import {
 } from 'react-native';
 
 import { useLinkPick } from '../data/link-pick';
+import { useRecordActionRunner } from '../data/record-actions';
 import { useComputedRecords, useLinkResolver, useRecordActions, useRecords } from '../data/records';
 import { useSimilarCheck } from '../data/similar-records';
 import { useCalendar, useWorkspace } from '../workspace/context';
@@ -1332,11 +1335,13 @@ export const isPickAdd = (use: ToolUse | undefined): use is RecordToolUse =>
 export const addHereLabel = (use: ToolUse | undefined, fallback: string) =>
   isPickAdd(use) && use.label !== undefined ? use.label : fallback;
 
-/** 清单的勾（as check）：勾的是哪个勾选框字段。 */
-export function checkOf(block: RecordBlock): { table: string; field: string } | undefined {
+/** 清单的勾（as check）：勾的是哪个勾选框字段；use 是勾本身（带 also 时由 runCheck 一次写完，D-617）。 */
+export function checkOf(
+  block: RecordBlock,
+): { table: string; field: string; use: RecordToolUse } | undefined {
   const use = block.look === 'checklist' ? block.tools?.find((u) => u.as === 'check') : undefined;
   return use && isRecordToolUse(use) && use.do === 'toggle'
-    ? { table: use.table, field: use.field }
+    ? { table: use.table, field: use.field, use }
     : undefined;
 }
 
@@ -1942,14 +1947,16 @@ export function useRecordRows(
   const background = cardColors(palette, tone).background;
   const router = useRouter();
   const actions = useRecordActions();
+  const runner = useRecordActionRunner();
   const links = useLinkResolver(view);
   // 有附件字段的表：每条记录显示附件里第一张图片的缩略图（D-263，自动判断，组件不用设置）。
   const assetIndex = useAssetIndex();
   if (!collection || !view) return null;
   const cal = calendarOf(env.config);
   const hasFiles = collection.fields.some((f) => f.type === 'file');
-  // 勾的写在工具自己的表（关系规则 12），通常就是列表这张表。
-  const toggle = (c: { table: string; field: string }, r: DataRecord, next: boolean) => {
+  // 勾的写在工具自己的表（关系规则 12），通常就是列表这张表。带 also 的勾（D-617）连同顺带的字段一次写完。
+  const toggle = (c: NonNullable<ReturnType<typeof checkOf>>, r: DataRecord, next: boolean) => {
+    if (tapAlsoOf(c.use).length > 0) return void runner.runCheck(c.use, r);
     const table = env.config.data.tables.find((x) => x.id === c.table);
     if (table) void actions.patch(table, r.id, { [c.field]: next });
   };
@@ -2485,7 +2492,10 @@ export function Stat({
   const valueOf = (list: DataRecord[]) =>
     isSequenceAggregate(aggregate)
       ? sequenceValue(list, collection, aggregate, src.days, now, cal)
-      : { value: aggregateRecords(list, collection, aggregate as Aggregate, src.field) };
+      : aggregate === 'latest'
+        ? // 最新一条的值（D-618），和汇总字段的 latest 同一个「最新」（core 的 latestNumber）。
+          { value: table ? latestNumber(list, table, collection, src, now, cal) : null }
+        : { value: aggregateRecords(list, collection, aggregate as Aggregate, src.field) };
   // 还没读完被减的那张表时先不显示数（和自己的表没读完一样）。
   const loading = records === null || (src.minus !== undefined && minus.records === null);
   const minusOf = (value: number | null) =>
