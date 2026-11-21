@@ -435,7 +435,6 @@ export const zh: MessageTable = {
   presetMore: '更多',
   dataTableHome: '主页',
   dataMoreTitle: '更多',
-  dataMoreHint: 'App 设计、填写记忆、本机模型、已下载内容',
   presetsHint:
     '预设存的是整个 App：表、页面、快捷操作和风格，不含记录和文件。换回来时图片和文件位是空的。',
   presetsNone: '还没有预设。存一份现在的 App，以后随时能换回来。',

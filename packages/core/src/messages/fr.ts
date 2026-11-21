@@ -478,7 +478,6 @@ export const fr: MessageTable = {
   presetMore: 'Plus',
   dataTableHome: 'Accueil',
   dataMoreTitle: 'Plus',
-  dataMoreHint: 'Conception de l’app, mémoire de saisie, modèle local, téléchargements',
   presetsHint:
     'Un préréglage garde toute l’app : tableaux, pages, actions rapides et style. Il ne contient ni entrées ni fichiers : les images et emplacements de fichier reviennent vides.',
   presetsNone: 'Aucun préréglage. Gardez l’app telle qu’elle est pour pouvoir y revenir plus tard.',

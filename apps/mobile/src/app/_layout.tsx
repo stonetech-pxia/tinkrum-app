@@ -174,6 +174,7 @@ function ThemedStack() {
         <Stack.Screen name="data" options={{ title: t(locale, 'dataTitle') }} />
         {/* 数据的子页面（D-614）；一张表的标题是表名，在页面里设。 */}
         <Stack.Screen name="data-table/[tableId]" options={{ title: '' }} />
+        <Stack.Screen name="data-backup" options={{ title: t(locale, 'backupTitle') }} />
         <Stack.Screen name="data-deleted" options={{ title: t(locale, 'recentlyDeleted') }} />
         <Stack.Screen name="data-unused" options={{ title: t(locale, 'unusedTables') }} />
         <Stack.Screen name="data-more" options={{ title: t(locale, 'dataMoreTitle') }} />

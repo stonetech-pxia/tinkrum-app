@@ -37,6 +37,7 @@ async function start(locale: 'zh' | 'en' | 'fr' = 'zh') {
   const app = await renderToolsApp(new MemoryWorkspaceRepo(), files, { locale });
   await screen.findByTestId('nav-settings');
   await act(() => router.push('/data'));
+  await fireEvent.press(await screen.findByTestId('data-backup'));
   await screen.findByTestId('backup');
   return { ...app, files };
 }
@@ -273,7 +274,10 @@ describe('恢复之后的撤销提示：时长', () => {
 describe('备份和恢复：法语', () => {
   it('shows the French copy for the card, the question and the refusals', async () => {
     const { files } = await start('fr');
-    expect(screen.getByText(/sauvegarde et restauration/i)).toBeOnTheScreen();
+    // 标题是数据页上那一行的名字，也是这一页导航栏上的标题（D-615）。
+    expect(screen.getByTestId('data-backup', { includeHiddenElements: true })).toHaveTextContent(
+      /sauvegarde et restauration/i,
+    );
     expect(screen.getByTestId('backup-export')).toHaveTextContent('Tout exporter');
     const asked = answerNext('Annuler');
     await fireEvent.press(screen.getByTestId('backup-export'));

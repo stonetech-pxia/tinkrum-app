@@ -1,4 +1,4 @@
-import { applyOps, createDefaultWorkspace, type Locale, type Registry } from '@morph/core';
+import { applyOps, createDefaultWorkspace, type Locale, type Op, type Registry } from '@morph/core';
 import { act, fireEvent } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
@@ -9,7 +9,7 @@ import { renderToolsApp } from '../test-utils/render-app';
 // 设置里的「App 和预设」「数据」一屏看完（D-614）：设置页直接有三行；预设页只有两个按钮和预设列表，
 // 添加的几种方式、示例 App、保存的表单点了才展开；数据页每张表一行，表的操作在表自己的页面里。
 
-const seed = (locale: Locale, registry: Registry) => {
+const seed = (locale: Locale, registry: Registry, withApp = false) => {
   const r = applyOps(
     createDefaultWorkspace(locale),
     [
@@ -17,14 +17,29 @@ const seed = (locale: Locale, registry: Registry) => {
         op: 'addData',
         table: { id: 'notes', name: '笔记', fields: [{ id: 'title', name: '标题', type: 'text' }] },
       },
-    ],
+      // 第二个 App 和它的表：数据页按 App 分组（D-615）。
+      ...(withApp
+        ? [
+            { op: 'addContainer', app: { id: 'fit', name: '健身', icon: 'heart' } },
+            {
+              op: 'addData',
+              table: {
+                id: 'runs',
+                name: '跑步',
+                app: 'fit',
+                fields: [{ id: 'km', name: '公里', type: 'number' }],
+              },
+            },
+          ]
+        : []),
+    ] as Op[],
     { registry, locale },
   );
   if (!r.ok) throw new Error(r.error);
   return r.config;
 };
 
-async function start(locale: Locale = 'zh') {
+async function start(locale: Locale = 'zh', withApp = false) {
   const repo = new MemoryWorkspaceRepo();
   await repo.insertRecord({
     id: 'note0aaaa',
@@ -33,7 +48,10 @@ async function start(locale: Locale = 'zh') {
     createdAt: 1,
     updatedAt: 1,
   });
-  await renderToolsApp(repo, undefined, { seed, locale });
+  await renderToolsApp(repo, undefined, {
+    seed: (l: Locale, registry: Registry) => seed(l, registry, withApp),
+    locale,
+  });
   await fireEvent.press(await screen.findByTestId('nav-settings'));
   return repo;
 }
@@ -89,7 +107,10 @@ describe('Data page', () => {
     await start();
     await fireEvent.press(await screen.findByTestId('settings-data'));
     expect(await screen.findByTestId('table-notes')).toHaveTextContent(/笔记/);
-    expect(screen.getByTestId('table-notes')).toHaveTextContent(/1 条记录 · 主页/);
+    // 一行只有名字和条数；只有一个 App 时标题是「数据表」（D-615）。
+    expect(screen.getByTestId('table-notes')).toHaveTextContent(/^笔记1 条记录›$/);
+    expect(screen.getByText('数据表')).toBeTruthy();
+    expect(screen.queryByText('主页')).toBeNull();
     expect(screen.queryByTestId('export-notes')).toBeNull();
     expect(screen.queryByTestId('select-notes')).toBeNull();
     expect(screen.getByTestId('data-deleted')).toBeTruthy();
@@ -108,11 +129,20 @@ describe('Data page', () => {
     expect(await screen.findByTestId('data-deleted-screen')).toHaveTextContent(/保留 30 天/);
   });
 
+  it('with several apps the tables are grouped under each app’s name, Home first', async () => {
+    await start('zh', true);
+    await fireEvent.press(await screen.findByTestId('settings-data'));
+    await screen.findByTestId('table-runs');
+    const labels = screen.getAllByText(/^(主页|健身|数据表)$/).map((n) => n.props.children);
+    expect(labels).toEqual(['主页', '健身']);
+    expect(screen.getByTestId('table-runs')).toHaveTextContent(/^跑步0 条记录›$/);
+  });
+
   it('French: the new rows and pages use French words', async () => {
     await start('fr');
     expect(await screen.findByTestId('settings-presets')).toHaveTextContent(/Apps et préréglages/);
     await fireEvent.press(screen.getByTestId('settings-data'));
-    expect(await screen.findByTestId('table-notes')).toHaveTextContent(/1 entrée · Accueil/);
+    expect(await screen.findByTestId('table-notes')).toHaveTextContent(/1 entrée/);
     expect(screen.getByTestId('data-more')).toHaveTextContent(/Plus/);
   });
 });

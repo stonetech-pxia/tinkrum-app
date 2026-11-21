@@ -454,7 +454,6 @@ export const en = {
   presetMore: 'More',
   dataTableHome: 'Home',
   dataMoreTitle: 'More',
-  dataMoreHint: 'App design, prefill memory, local model, downloads',
   presetsHint:
     'A preset saves the whole app: tables, pages, quick actions and look. It has no entries or files, so image and file slots come back empty.',
   presetsNone: 'No presets yet. Save the app as it is now to switch back to it later.',

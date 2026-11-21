@@ -22,6 +22,7 @@ import { useDraftUi } from '../draft/ui';
 import { createAISettingsStore, type SecretStore } from '../ai/settings';
 import ChangeRoute from '../app/change';
 import DataRoute from '../app/data';
+import DataBackupRoute from '../app/data-backup';
 import DataDeletedRoute from '../app/data-deleted';
 import DataMoreRoute from '../app/data-more';
 import DataTableRoute from '../app/data-table/[tableId]';
@@ -180,6 +181,7 @@ export async function renderToolsApp(
     'ready/[workflowId]': ReadyRoute,
     data: DataRoute,
     'data-table/[tableId]': DataTableRoute,
+    'data-backup': DataBackupRoute,
     'data-deleted': DataDeletedRoute,
     'data-unused': DataUnusedRoute,
     'data-more': DataMoreRoute,
