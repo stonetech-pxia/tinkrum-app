@@ -17,10 +17,11 @@ import {
   sessionIsEmpty,
   type AppFile,
   type ImportMode,
+  type Locale,
 } from '@morph/core';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { saveAppOrigin } from '@/apps/origin';
@@ -35,6 +36,20 @@ import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/cont
 
 /** 网站上「用你自己的 AI 做 App」的页面（D-593）：写法说明、示例和 App 文件检查。只打开网页，不带任何数据。 */
 const MAKE_WITH_AI_URL = 'https://tinkrum.stonetech.dev/make.html';
+const AGENT_DOCS_URL = 'https://tinkrum.stonetech.dev/assets/agent/';
+
+/**
+ * D-609：给别的 AI App 的提示词：读网站上的指南和模板库，先问用户要什么，再给整个文件。
+ * 网址带当天日期（?v=YYYYMMDD），让 AI 不用前几天缓存的旧版。只有这两个网址和固定的话，不带这个 App 的任何内容。
+ */
+function shareToAiPrompt(locale: Locale, now = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const v = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  return t(locale, 'presetsShareToAiPrompt', {
+    guide: `${AGENT_DOCS_URL}tinkrum-app-guide.md?v=${v}`,
+    patterns: `${AGENT_DOCS_URL}tinkrum-app-patterns.md?v=${v}`,
+  });
+}
 
 /**
  * 「设置 → 我的预设」（D-410）：把整个 App 存起来，以后换回来。系统层的页面，AI 改不了（底线 8）。
@@ -371,6 +386,19 @@ export default function PresetsRoute() {
             variant="outline"
             label={t(locale, 'presetsPaste')}
             onPress={() => void pasteFile()}
+          />
+          <Button
+            palette={palette}
+            testID="preset-share-to-ai"
+            variant="outline"
+            label={t(locale, 'presetsShareToAi')}
+            onPress={() =>
+              // 系统分享面板：用户自己挑一个 App，再自己点发送（底线 10）。
+              void Share.share(
+                { message: shareToAiPrompt(locale) },
+                { dialogTitle: t(locale, 'presetsShareToAi') },
+              ).catch(() => {})
+            }
           />
           <Button
             palette={palette}

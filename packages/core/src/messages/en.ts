@@ -453,6 +453,9 @@ export const en = {
   presetsImportHint:
     'Import a file, for example one from the Tinkrum website, or paste an app file that Claude, ChatGPT or another AI wrote for you. An app file is added as a new app. A full preset joins this list and replaces your app only when you tap Apply.',
   presetsPaste: 'Paste from clipboard',
+  presetsShareToAi: 'Send to an AI app',
+  presetsShareToAiPrompt:
+    'Read these two pages in full before you start. Open the links directly; do not use search results or a cached copy:\n1. {guide}\n2. {patterns}\n\nThen help me make a Tinkrum app file. First ask me what I want to keep track of and do. Then tell me in one line which pattern you start from, and give me the whole file in one json code block.',
   presetsMakeWithAi: 'Make an app with Claude or ChatGPT',
   presetsPasteEmpty:
     'The clipboard has no text. Copy the app file first, then tap Paste from clipboard.',

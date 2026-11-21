@@ -769,6 +769,15 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     ]);
   });
 
+  // D-609：预设页把给别的 AI 的提示词交给系统分享面板（固定的话和两个网址，不带数据），用户挑 App、点发送。
+  // 文件、记录的分享走快捷操作的 out.share 和本地模块，不用 react-native 的 Share。
+  it('only the presets page hands text to the system share sheet', () => {
+    const sharers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
+      .filter((path) => /\bShare\.share\b/.test(readFileSync(path, 'utf8')))
+      .map((path) => relative(REPO, path));
+    expect(sharers).toEqual([join('apps', 'mobile', 'src', 'app', 'presets.tsx')]);
+  });
+
   // D-423：导出成 vCard 只是快捷操作的一步，只做一个文件；要离开 App 还要接 out.share（快捷操作是用户点了才运行）。
   it('records.toVCard is only a step: no block tool or reminder can run it', () => {
     const action = registry.actions.get('records.toVCard')!;

@@ -434,6 +434,9 @@ export const zh: MessageTable = {
   presetsImportHint:
     '可以导入文件，比如从 Tinkrum 网站下载的；也可以粘贴 Claude、ChatGPT 等 AI 帮你写的 App 文件。App 文件会加成一个新 App；整份预设会进这个列表，点「应用」才换上。',
   presetsPaste: '从剪贴板粘贴',
+  presetsShareToAi: '把说明发给 AI App',
+  presetsShareToAiPrompt:
+    '开始之前，请完整读完这两个网页。直接打开链接，不要用搜索结果或缓存的旧版：\n1. {guide}\n2. {patterns}\n\n然后帮我做一个 Tinkrum App 文件。先问我想记录什么、做什么。再用一句话告诉我你从哪个模式开始，最后把整个文件放在一个 json 代码块里给我。',
   presetsMakeWithAi: '用 Claude 或 ChatGPT 做一个 App',
   presetsPasteEmpty: '剪贴板里没有文字。先复制 App 文件，再点「从剪贴板粘贴」。',
   importAppFileBroken: '这个 App 文件有错，没有导入：',

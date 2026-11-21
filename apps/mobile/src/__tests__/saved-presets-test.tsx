@@ -15,7 +15,7 @@ import {
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
-import { Alert, Linking } from 'react-native';
+import { Alert, Linking, Share } from 'react-native';
 
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import type { SavedPreset, WorkspaceRepo } from '../storage/types';
@@ -719,6 +719,35 @@ describe('import a preset from a file', () => {
         await fireEvent.press(await screen.findByText('用 Claude 或 ChatGPT 做一个 App'));
         expect(opened).toHaveBeenCalledWith('https://tinkrum.stonetech.dev/make.html');
         expect(store.getState().head!.id).toBe(head);
+      });
+
+      // D-609：把给别的 AI 的提示词交给系统分享面板，用户自己挑 App；只带两个网址和请求，不带这个 App 的任何内容。
+      it('sending the instructions to an AI app shares only the prompt with the guide links and writes nothing', async () => {
+        const { store } = await starterApp();
+        const head = store.getState().head!.id;
+        const config = JSON.stringify(store.getState().config);
+        const shared = jest
+          .spyOn(Share, 'share')
+          .mockResolvedValue({ action: 'dismissedAction', activityType: undefined });
+        await openScreen();
+        await fireEvent.press(await screen.findByText('把说明发给 AI App'));
+        expect(shared).toHaveBeenCalledTimes(1);
+        const { message } = shared.mock.calls[0]![0] as { message: string };
+        expect(message).toMatch(
+          /https:\/\/tinkrum\.stonetech\.dev\/assets\/agent\/tinkrum-app-guide\.md\?v=\d{8}/,
+        );
+        expect(message).toMatch(
+          /https:\/\/tinkrum\.stonetech\.dev\/assets\/agent\/tinkrum-app-patterns\.md\?v=\d{8}/,
+        );
+        expect(message).toContain('json');
+        // 不带这个 App 的表名、页名。
+        for (const name of [
+          ...store.getState().config!.data.tables.map((x) => x.name),
+          ...store.getState().config!.containers.pages.map((x) => x.title),
+        ])
+          if (name.length > 2) expect(message).not.toContain(name);
+        expect(store.getState().head!.id).toBe(head);
+        expect(JSON.stringify(store.getState().config)).toBe(config);
       });
 
       it('an empty clipboard says to copy the file first and changes nothing', async () => {
