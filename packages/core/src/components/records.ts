@@ -380,7 +380,7 @@ function gridProblems(c: RecordBlock, ctx: CheckContext, byType: string | undefi
  * limit 是每段 / 每栏 / 每天最多几条。
  */
 export const RECORD_LOOK_DOC =
-  'source {table, filter?, sort? {field, direction: "asc"|"desc"} or a list of 1-3 of them (sorted by the first, ties by the next: "by priority, then due date"), period?: "page" (follows the period block of the page, rule 56; not on a calendar), choice?: "page" (follows the choices block of the page, rule 65), limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (a choice field: a dot in the colour of its option; on a calendar the day colour), highlight? (1-3 conditions like filter: matching entries show trailing, or the title, in the warning colour, e.g. over budget), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools?, opens? (a page for one entry, rule 48)';
+  'source {table, filter?, sort? {field, direction: "asc"|"desc"} or a list of 1-3 of them (sorted by the first, ties by the next: "by priority, then due date"), period?: "page" (follows the period block of the page, rule 56; not on a calendar), choice?: "page" (follows the choices block of the page, rule 65), limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (a choice field: a dot in the colour of its option; on a calendar the day colour), highlight? (1-3 conditions like filter: matching entries show trailing, or the title, in the warning colour, e.g. over budget), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools? (createAll only as the addHere with pick: true, rule 70), opens? (a page for one entry, rule 48)';
 
 const DOCS: Record<RecordLook, string> = {
   list: 'rows; tapping a row opens the built-in editor (or the page in opens)',
@@ -403,21 +403,21 @@ const DOCS: Record<RecordLook, string> = {
 const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
   list: {
     as: ['button', 'addHere', 'list'],
-    do: ['create', 'set', 'toggle', 'increment'],
+    do: ['create', 'set', 'toggle', 'increment', 'createAll'],
     ref: ['quickAction'],
     open: true,
     max: 7,
   },
   cards: {
     as: ['button', 'addHere', 'list'],
-    do: ['create', 'set', 'toggle', 'increment'],
+    do: ['create', 'set', 'toggle', 'increment', 'createAll'],
     ref: ['quickAction'],
     open: true,
     max: 7,
   },
   checklist: {
     as: ['check', 'button', 'addHere', 'list'],
-    do: ['create', 'set', 'toggle', 'increment'],
+    do: ['create', 'set', 'toggle', 'increment', 'createAll'],
     ref: ['quickAction'],
     open: true,
     max: 8,
@@ -425,20 +425,32 @@ const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
   tiles: { as: ['tap'], do: ['create', 'set', 'toggle', 'increment'], open: true, max: 3 },
   board: {
     as: ['drag', 'button', 'addHere'],
-    do: ['create', 'set', 'toggle', 'increment'],
+    do: ['create', 'set', 'toggle', 'increment', 'createAll'],
     open: true,
     max: 5,
   },
   calendar: {
     as: ['button', 'addHere'],
-    do: ['create', 'set', 'toggle', 'increment'],
+    do: ['create', 'set', 'toggle', 'increment', 'createAll'],
     open: true,
     max: 4,
   },
-  // 表格的格子只读（D-539）：没有每行的按钮。
-  table: { as: ['addHere', 'list'], do: ['create'], ref: ['quickAction'], open: true, max: 4 },
+  // 表格的格子只读（D-539）：没有每行的按钮。createAll 只是下面「添加」的勾选新建（D-616）。
+  table: {
+    as: ['addHere', 'list'],
+    do: ['create', 'createAll'],
+    ref: ['quickAction'],
+    open: true,
+    max: 4,
+  },
   // 图片墙（D-540）只有图片和标题：没有每张的按钮。
-  gallery: { as: ['addHere', 'list'], do: ['create'], ref: ['quickAction'], open: true, max: 4 },
+  gallery: {
+    as: ['addHere', 'list'],
+    do: ['create', 'createAll'],
+    ref: ['quickAction'],
+    open: true,
+    max: 4,
+  },
   // 打卡格（D-610）：只有点格子，在这一格加一条（$here）或删掉格子里唯一的那一条。
   grid: { as: ['tap'], do: ['create', 'remove'], max: 2 },
 };

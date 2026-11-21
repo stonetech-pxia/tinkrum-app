@@ -413,6 +413,19 @@ function everything() {
         look: 'divider',
         showIf: { table: 'items', has: 'none' },
       },
+      // D-616：下面的「添加」勾几个分组，每个建一条。
+      records('cards', 'picked', 'items', 'title', {
+        tools: [
+          {
+            as: 'addHere',
+            do: 'createAll',
+            table: 'items',
+            from: 'groups',
+            pick: true,
+            values: { group: '$row' },
+          },
+        ],
+      }),
       records('list', 'relative', 'items', 'title', {
         tools: [
           {

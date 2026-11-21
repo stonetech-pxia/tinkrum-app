@@ -125,7 +125,8 @@ describe('bulk create (D-567)', () => {
           tools: [{ as: 'button', label: 'All', ...monthly }],
         },
       ]),
-    ).toMatch(/can't have a createAll tool/);
+      // D-616 起列表下面能勾选新建，所以拒绝的话换成指向按钮块和勾选的写法；每一条上的按钮仍然不行。
+    ).toMatch(/createAll on every entry a filter selects belongs on a button block/);
   });
 
   it('works out one new entry per matching source entry, linking and copying from it', () => {

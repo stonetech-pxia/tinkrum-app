@@ -27,6 +27,7 @@ import DataDeletedRoute from '../app/data-deleted';
 import DataMoreRoute from '../app/data-more';
 import DataTableRoute from '../app/data-table/[tableId]';
 import DataUnusedRoute from '../app/data-unused';
+import PickRecordsRoute from '../app/pick-records';
 import SelectRecordsRoute from '../app/select-records';
 import ImportRecordsRoute from '../app/import-records';
 import DeskRoute from '../app/desk/[deskId]';
@@ -186,6 +187,7 @@ export async function renderToolsApp(
     'data-unused': DataUnusedRoute,
     'data-more': DataMoreRoute,
     'select-records': SelectRecordsRoute,
+    'pick-records': PickRecordsRoute,
     'import-records': ImportRecordsRoute,
     'record/[collectionId]': RecordRoute,
     'new-table': NewTableRoute,

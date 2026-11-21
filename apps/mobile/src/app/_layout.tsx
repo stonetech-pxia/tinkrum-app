@@ -179,6 +179,7 @@ function ThemedStack() {
         <Stack.Screen name="data-unused" options={{ title: t(locale, 'unusedTables') }} />
         <Stack.Screen name="data-more" options={{ title: t(locale, 'dataMoreTitle') }} />
         <Stack.Screen name="select-records" options={{ title: t(locale, 'bulkSelectTitle') }} />
+        <Stack.Screen name="pick-records" options={{ ...closable, title: '' }} />
         <Stack.Screen name="import-records" options={{ title: t(locale, 'importTitle') }} />
         <Stack.Screen name="storage" options={{ title: t(locale, 'storageTitle') }} />
         <Stack.Screen name="files" options={{ title: t(locale, 'filesAllTitle') }} />

@@ -42,6 +42,7 @@ import { t } from '../i18n';
 import type { RenderEnv } from './components';
 import {
   AddHere,
+  addHereLabel,
   addHereOf,
   openAddHere,
   useLinkedGroups,
@@ -334,7 +335,7 @@ export function Board({ block, env, tone }: { block: RecordBlock; env: RenderEnv
               {addHereOf(block) ? (
                 <AddHere
                   testID={`board-add-${key || 'none'}`}
-                  label={t(locale, 'entryFormAdd')}
+                  label={addHereLabel(addHereOf(block), t(locale, 'entryFormAdd'))}
                   palette={palette}
                   onPress={
                     env.interactive
@@ -346,6 +347,7 @@ export function Board({ block, env, tone }: { block: RecordBlock; env: RenderEnv
                             view,
                             { filter: followedFilter(block.source, env.pageChoice) },
                             column.option === null ? {} : { [field.id]: column.option },
+                            addHereOf(block),
                           )))
                       : undefined
                   }

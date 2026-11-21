@@ -1016,14 +1016,35 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       zh.recordCreateAllConfirm,
       fr.recordCreateAllConfirm,
       frSingular.recordCreateAllConfirm,
+      // 勾选新建（D-616）问的那一句是勾选页的按钮。
+      en.recordPickAddButton,
+      enSingular.recordPickAddButton,
+      zh.recordPickAddButton,
+      fr.recordPickAddButton,
+      frSingular.recordPickAddButton,
     ])
       expect(text).not.toMatch(/undo|撤销|annuler/i);
+  });
+
+  it('the picker’s button is the question of a pick (D-616): it says how many and into which table', () => {
+    for (const text of [
+      en.recordPickAddButton,
+      enSingular.recordPickAddButton,
+      zh.recordPickAddButton,
+      fr.recordPickAddButton,
+      frSingular.recordPickAddButton,
+    ]) {
+      expect(text).toContain('{n}');
+      expect(text).toContain('{table}');
+    }
   });
 
   it('a bulk change has no setting that skips asking first', () => {
     for (const base of [
       { do: 'setAll', table: 't', field: 'a', value: true },
       { do: 'createAll', table: 't', from: 's', values: {} },
+      // 勾选新建（D-616）：勾选页的按钮「添加 N 条到 B」就是先问的那一句（创始人 2026-11-21），配置里同样没有跳过它的设置。
+      { do: 'createAll', table: 't', from: 's', pick: true, values: {} },
     ]) {
       expect(RecordToolSchema.safeParse(base).success).toBe(true);
       for (const skip of [{ confirm: false }, { ask: false }, { ask: 'none' }, { silent: true }])
@@ -1361,6 +1382,80 @@ describe('底线 17：打卡格只改它显示的那张表（D-610）', () => {
     ).toBe('');
     expect(grid([{ as: 'tap', do: 'remove', table: 'habits' }])).toMatch(/table must be logs/);
     expect(grid([{ as: 'tap', do: 'create', table: 'habits', values: '$here' }])).not.toBe('');
+  });
+});
+
+describe('底线 9 / 17 / 18：勾选新建只在列表下面、只写列表那张表（D-616）', () => {
+  const config = createDefaultWorkspace('en');
+  config.data.tables.push(
+    { id: 'recipes', name: 'Recipes', fields: [{ id: 'name', name: 'Name', type: 'text' }] },
+    { id: 'foods', name: 'Foods', fields: [{ id: 'name', name: 'Name', type: 'text' }] },
+    {
+      id: 'uses',
+      name: 'Uses',
+      fields: [
+        { id: 'recipe', name: 'Recipe', type: 'link', table: 'recipes' },
+        { id: 'food', name: 'Food', type: 'link', table: 'foods' },
+        { id: 'amount', name: 'Amount', type: 'number' },
+      ],
+    },
+  );
+  config.containers.pages.push({ id: 'recipe', title: 'Recipe', of: 'recipes', blocks: [] });
+  const pick = {
+    as: 'addHere',
+    do: 'createAll',
+    table: 'uses',
+    from: 'foods',
+    pick: true,
+    values: { food: '$row' },
+  };
+  const list = (tool: object) => ({
+    id: 'l',
+    look: 'list',
+    source: {
+      table: 'uses',
+      filter: [{ field: 'recipe', op: 'is', value: '$record' }],
+      limit: 30,
+    },
+    show: { title: 'amount' },
+    tools: [tool],
+  });
+  const check = (block: object) => {
+    const copy = structuredClone(config);
+    copy.containers.pages.find((p) => p.id === 'recipe')!.blocks.push(block as never);
+    const r = validateWorkspace(copy, registry);
+    return r.ok ? '' : r.issues.map((i) => i.message).join('\n');
+  };
+
+  it('writes only the table of the list it sits under (invariant 17)', () => {
+    expect(check(list(pick))).toBe('');
+    expect(check(list({ ...pick, table: 'foods', values: {} }))).toMatch(/table must be uses/);
+    expect(check(list({ ...pick, table: 'recipes', values: {} }))).toMatch(/table must be uses/);
+  });
+
+  it('is a plain key, with no steps, branches or tool to trigger (invariant 9)', () => {
+    for (const extra of [{ tool: 'x' }, { steps: [] }, { then: {} }, { pick: 'all' }])
+      expect(check(list({ ...pick, ...extra }))).not.toBe('');
+  });
+
+  it('deleting the picked table cleans the Add up, the list stays (invariant 18)', () => {
+    const copy = structuredClone(config);
+    copy.containers.pages.find((p) => p.id === 'recipe')!.blocks.push(list(pick) as never);
+    const r = prepareOps(
+      copy,
+      [
+        { op: 'removeData', table: 'uses', field: 'food' },
+        { op: 'removeData', table: 'foods' },
+      ] as never,
+      { registry, locale: 'en', now: new Date() },
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const block = r.after.containers.pages
+      .find((p) => p.id === 'recipe')!
+      .blocks.find((b) => b.id === 'l') as { tools?: unknown[] } | undefined;
+    expect(block?.tools ?? []).toEqual([]);
+    expect(validateWorkspace(r.after, registry).ok).toBe(true);
   });
 });
 

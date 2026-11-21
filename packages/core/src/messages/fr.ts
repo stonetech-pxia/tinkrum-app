@@ -1878,6 +1878,12 @@ export const fr: MessageTable = {
   recordCreateAllTooMany:
     'Au plus {max} entrées peuvent être créées à la fois ; cela en créerait {n}.',
   recordCreateAllDone: '{n} entrées créées dans « {table} »',
+  recordPickTitle: 'Ajouter depuis « {table} »',
+  recordPickHint: 'Cochez les entrées à ajouter',
+  recordPickAddButton: 'Ajouter {n} entrées à « {table} »',
+  recordPickAdded: 'Déjà ajoutée',
+  recordPickMax: '{max} au plus à la fois.',
+  recordPickEmpty: '« {table} » n’a pas encore d’entrées. Ajoutez-en d’abord là-bas.',
   recordUndoBulkFailed: 'Certaines de ces entrées ont été modifiées depuis : rien n’a été annulé.',
   // 月历、显示格式、统计的目标和比较（D-305–D-308）
   calendarPrevMonth: 'Mois précédent',
@@ -2246,6 +2252,7 @@ export const frSingular: SingularTable = {
   recordCreateAllTooMany:
     'Au plus {max} entrées peuvent être créées à la fois ; cela en créerait {n}.',
   recordCreateAllDone: '{n} entrée créée dans « {table} »',
+  recordPickAddButton: 'Ajouter {n} entrée à « {table} »',
   calendarDayLabel: '{date}, {n} entrée',
   gridCellLabel: '{row}, {column} : {n} entrée',
   widgetDone: '{n} appui du widget enregistré',

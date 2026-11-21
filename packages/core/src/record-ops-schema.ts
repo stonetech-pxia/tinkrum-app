@@ -143,6 +143,12 @@ const createAll = {
   from: IdSchema,
   filter: filterSchema().optional(),
   values: RecordToolValuesSchema,
+  /**
+   * 勾选新建（D-616）：来源不是筛出来的每一条，而是用户这次在来源表里勾的几条（filter 只决定能勾哪些）。
+   * 只给列表下面的「添加」（as addHere）：每条新记录还带上这一段的值（"$here"：列表筛选里的等于条件、这一段），
+   * 这一段里已经连着的来源显示成「已添加」，不再建一次。照样先问、最多 MAX_CREATE_ALL 条、提示条能撤回这一批。
+   */
+  pick: z.literal(true).optional(),
 };
 
 /**
