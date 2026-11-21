@@ -305,7 +305,6 @@ describe('user journeys (UI)', () => {
     await askAi('主题换成绿色');
     // 草稿里点会真的做事的东西只提示；离开时提示一起收掉。
     await fireEvent.press(await screen.findByTestId('nav-settings'));
-    await fireEvent.press(await screen.findByTestId('settings-more'));
     await fireEvent.press(await screen.findByTestId('settings-data'));
     expect(await screen.findByTestId('toast')).toHaveTextContent(/应用之后才能用/);
     await fireEvent.press(screen.getByTestId('draft-leave'));

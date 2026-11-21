@@ -91,7 +91,7 @@ describe('提示条的撤销', () => {
     const [preset] = await repo.listPresets();
     await act(async () => router.push('/presets'));
     acceptNextAlert();
-    await fireEvent.press(await screen.findByTestId(`preset-${preset!.id}-apply`));
+    await fireEvent.press(await screen.findByTestId(`preset-${preset!.id}`));
     await waitFor(() => expect(store.getState().config!.theme.primaryColor).not.toBe('#336699'));
     await fireEvent.press(await screen.findByTestId('banner-undo'));
     await waitFor(() => expect(store.getState().config!.theme.primaryColor).toBe('#336699'));

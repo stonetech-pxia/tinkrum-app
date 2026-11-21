@@ -226,6 +226,7 @@ describe('writes whose table is not known for certain refresh every table', () =
     const other = () => tableVersion(store.getState(), 'other');
     const before = other();
     await act(() => router.push('/data'));
+    await fireEvent.press(await screen.findByTestId('table-tasks'));
     await fireEvent.press(await screen.findByTestId('select-tasks'));
     await fireEvent.press(await screen.findByTestId('select-all'));
     answerNext('删除');

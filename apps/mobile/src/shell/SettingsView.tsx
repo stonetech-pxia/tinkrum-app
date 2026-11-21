@@ -35,7 +35,6 @@ export function SettingsView({ env }: { env: RenderEnv }) {
   const { palette, locale } = env;
   const headId = useWorkspace((s) => s.head!.id);
   const router = useRouter();
-  const [moreOpen, setMoreOpen] = useState(false);
   const preference = useLanguage((s) => s.preference);
   const aiMode = useAISettings((s) => s.mode);
   const aiModel = useAISettings((s) => s.model);
@@ -246,49 +245,31 @@ export function SettingsView({ env }: { env: RenderEnv }) {
           onPress={env.locked ?? (() => router.push('/reminders'))}
         />
       ) : null}
+      {/* App 和预设、数据、存储空间各占一行，不再折叠（D-614）；已下载内容在「数据 → 更多」里。 */}
       <ListRow
         palette={palette}
-        testID="settings-more"
-        icon="folder"
-        label={t(locale, 'settingsMoreTitle')}
-        onPress={() => setMoreOpen((open) => !open)}
+        testID="settings-presets"
+        icon="bookmark"
+        label={t(locale, 'presetsTitle')}
+        value={t(locale, 'presetsRowHint')}
+        onPress={env.locked ?? (() => router.push('/presets'))}
       />
-      {/* 点开才看到：我的预设、数据、存储空间、已下载内容。 */}
-      {moreOpen ? (
-        <>
-          <ListRow
-            palette={palette}
-            testID="settings-presets"
-            icon="bookmark"
-            label={t(locale, 'presetsTitle')}
-            value={t(locale, 'presetsRowHint')}
-            onPress={env.locked ?? (() => router.push('/presets'))}
-          />
-          <ListRow
-            palette={palette}
-            testID="settings-data"
-            icon="inbox"
-            label={t(locale, 'dataTitle')}
-            value={t(locale, 'dataRowHint')}
-            onPress={env.locked ?? (() => router.push('/data'))}
-          />
-          <ListRow
-            palette={palette}
-            testID="settings-storage"
-            icon="folder"
-            label={t(locale, 'storageTitle')}
-            value={t(locale, 'storageRowHint')}
-            onPress={env.locked ?? (() => router.push('/storage'))}
-          />
-          <ListRow
-            palette={palette}
-            testID="settings-packs"
-            icon="archive"
-            label={t(locale, 'packsTitle')}
-            onPress={env.locked ?? (() => router.push('/packs'))}
-          />
-        </>
-      ) : null}
+      <ListRow
+        palette={palette}
+        testID="settings-data"
+        icon="inbox"
+        label={t(locale, 'dataTitle')}
+        value={t(locale, 'dataRowHint')}
+        onPress={env.locked ?? (() => router.push('/data'))}
+      />
+      <ListRow
+        palette={palette}
+        testID="settings-storage"
+        icon="folder"
+        label={t(locale, 'storageTitle')}
+        value={t(locale, 'storageRowHint')}
+        onPress={env.locked ?? (() => router.push('/storage'))}
+      />
       <SectionLabel palette={palette}>{t(locale, 'general')}</SectionLabel>
       <ListRow
         palette={palette}

@@ -280,9 +280,12 @@ describe('sample apps on My presets', () => {
 
   async function openPresets() {
     await fireEvent.press(await screen.findByTestId('nav-settings'));
-    await fireEvent.press(await screen.findByTestId('settings-more'));
     await fireEvent.press(await screen.findByTestId('settings-presets'));
-    return screen.findByTestId('presets-screen');
+    const screenEl = await screen.findByTestId('presets-screen');
+    // 示例 App 在「添加 App」里（D-614）。
+    await fireEvent.press(screen.getByTestId('preset-add'));
+    await fireEvent.press(screen.getByTestId('preset-samples'));
+    return screenEl;
   }
 
   it('a new user finds every sample there, and looking changes nothing', async () => {

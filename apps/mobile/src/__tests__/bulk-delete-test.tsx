@@ -38,7 +38,9 @@ async function start(titles: string[], locale: Locale = 'zh') {
   const app = await renderToolsApp(repo, undefined, { seed, locale });
   await screen.findByTestId('nav-settings');
   await act(() => router.push('/data'));
-  await screen.findByTestId('table-notes');
+  // 每张表一页（D-614）：选择删除在表的页面里。
+  await fireEvent.press(await screen.findByTestId('table-notes'));
+  await screen.findByTestId('data-table-screen');
   return app;
 }
 
@@ -122,6 +124,7 @@ it('deleted ones can be restored one by one in Settings → Data', async () => {
   await flush();
   expect(await alive(repo)).toEqual([]);
   await act(() => router.back());
+  await act(() => router.push('/data-deleted'));
   await fireEvent.press(await screen.findByTestId('restore-record-note1aaaa'));
   await flush();
   expect(await alive(repo)).toEqual(['二']);

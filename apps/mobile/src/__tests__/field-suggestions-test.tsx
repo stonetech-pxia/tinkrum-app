@@ -443,10 +443,17 @@ describe('快捷操作「记一笔」的表单（D-397）', () => {
       return config;
     };
     const { files, vision } = await render(undefined, 'zh', both);
-    await act(() => router.push('/data'));
+    // 每张表一页（D-614）：没有文件字段的表没有这个开关。
+    await act(() =>
+      router.push({ pathname: '/data-table/[tableId]', params: { tableId: 'plain' } }),
+    );
+    await screen.findByTestId('export-plain');
+    expect(screen.queryByTestId('read-attachments-plain')).toBeNull();
+    await act(() =>
+      router.push({ pathname: '/data-table/[tableId]', params: { tableId: 'receipts' } }),
+    );
     const toggle = await screen.findByTestId('read-attachments-receipts');
     expect(toggle.props.value).toBe(true);
-    expect(screen.queryByTestId('read-attachments-plain')).toBeNull();
     await fireEvent(toggle, 'valueChange', false);
     await waitFor(() =>
       expect(screen.getByTestId('read-attachments-receipts').props.value).toBe(false),
@@ -471,11 +478,17 @@ describe('快捷操作「记一笔」的表单（D-397）', () => {
       return config;
     };
     await render(undefined, 'zh', both);
-    await act(() => router.push('/data'));
+    await act(() =>
+      router.push({ pathname: '/data-table/[tableId]', params: { tableId: 'plain' } }),
+    );
+    await screen.findByTestId('export-plain');
+    expect(screen.queryByTestId('prefill-rules-plain-general')).toBeNull();
+    await act(() =>
+      router.push({ pathname: '/data-table/[tableId]', params: { tableId: 'receipts' } }),
+    );
     const selected = (id: string) => screen.getByTestId(id).props.accessibilityState.selected;
     await screen.findByTestId('prefill-rules-receipts-general');
     expect(selected('prefill-rules-receipts-general')).toBe(true);
-    expect(screen.queryByTestId('prefill-rules-plain-general')).toBeNull();
     await fireEvent.press(screen.getByTestId('prefill-rules-receipts-card'));
     await waitFor(() => expect(selected('prefill-rules-receipts-card')).toBe(true));
     expect(selected('prefill-rules-receipts-general')).toBe(false);

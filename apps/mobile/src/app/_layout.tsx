@@ -172,6 +172,11 @@ function ThemedStack() {
         <Stack.Screen name="page/[pageId]" />
         <Stack.Screen name="ai-settings" options={{ title: t(locale, 'aiSettingsTitle') }} />
         <Stack.Screen name="data" options={{ title: t(locale, 'dataTitle') }} />
+        {/* 数据的子页面（D-614）；一张表的标题是表名，在页面里设。 */}
+        <Stack.Screen name="data-table/[tableId]" options={{ title: '' }} />
+        <Stack.Screen name="data-deleted" options={{ title: t(locale, 'recentlyDeleted') }} />
+        <Stack.Screen name="data-unused" options={{ title: t(locale, 'unusedTables') }} />
+        <Stack.Screen name="data-more" options={{ title: t(locale, 'dataMoreTitle') }} />
         <Stack.Screen name="select-records" options={{ title: t(locale, 'bulkSelectTitle') }} />
         <Stack.Screen name="import-records" options={{ title: t(locale, 'importTitle') }} />
         <Stack.Screen name="storage" options={{ title: t(locale, 'storageTitle') }} />
