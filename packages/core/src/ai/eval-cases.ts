@@ -8603,6 +8603,120 @@ const GRID_CASES: readonly EvalCase[] = [
   },
 ];
 
+// 勾选新建（D-613）：菜谱页上用料列表下面的「添加」勾几样食材，每样建一条。
+const recipeEarlier: EvalEarlier = {
+  input:
+    'Make recipes, ingredients and recipe items (a recipe, an ingredient and an amount), and a page for one recipe that lists its items',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'recipes',
+        name: 'Recipes',
+        fields: [{ id: 'name', name: 'Name', type: 'text', required: true }],
+      },
+    },
+    {
+      op: 'addData',
+      table: {
+        id: 'ingredients',
+        name: 'Ingredients',
+        fields: [{ id: 'name', name: 'Name', type: 'text', required: true }],
+      },
+    },
+    {
+      op: 'addData',
+      table: {
+        id: 'recipe-items',
+        name: 'Recipe items',
+        fields: [
+          { id: 'recipe', name: 'Recipe', type: 'link', table: 'recipes', required: true },
+          { id: 'ingredient', name: 'Ingredient', type: 'link', table: 'ingredients' },
+          { id: 'amount', name: 'Amount', type: 'number' },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'recipe',
+        title: 'Recipe',
+        of: 'recipes',
+        blocks: [
+          {
+            id: 'items',
+            look: 'list',
+            source: {
+              table: 'recipe-items',
+              filter: [{ field: 'recipe', op: 'is', value: '$record' }],
+              limit: 50,
+            },
+            show: { title: 'ingredient', trailing: 'amount' },
+          },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'recipes-page',
+        title: 'Recipes',
+        blocks: [
+          {
+            id: 'all',
+            look: 'list',
+            source: { table: 'recipes', limit: 50 },
+            show: { title: 'name' },
+            opens: 'recipe',
+          },
+        ],
+      },
+    },
+  ],
+};
+
+const pickIngredients = (c: WorkspaceConfig): string | null => {
+  const page = c.containers.pages.find((p) => p.of === 'recipes');
+  const lists = (page ? allComponents(page) : []).filter(
+    (x): x is RecordBlock => isRecordBlock(x) && x.source.table === 'recipe-items',
+  );
+  if (lists.length === 0) return 'expected a list of recipe-items on the page for one recipe';
+  const picks = lists.flatMap((l) =>
+    (l.tools ?? []).filter(
+      (u) => u.as === 'addHere' && 'do' in u && u.do === 'createAll' && u.pick === true,
+    ),
+  ) as AnyAction[];
+  if (picks.length === 0) return 'expected an addHere {do: "createAll", pick: true} under the list';
+  const pick = picks[0]!;
+  if (pick.from !== 'ingredients') return `pick should go through ingredients, not ${pick.from}`;
+  const values = (pick.values ?? {}) as Record<string, unknown>;
+  if (values.ingredient !== '$row') return 'values.ingredient should be "$row"';
+  if ('recipe' in values) return 'the recipe comes from the list filter, not from values';
+  return null;
+};
+
+const PICK_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG45',
+    input:
+      "On a recipe's page, let me tick several ingredients at once to add them to the recipe; I fill in each amount afterwards",
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [recipeEarlier],
+    expect: { kind: 'ops', check: pickIngredients },
+  },
+  {
+    id: 'KG46',
+    input: '菜谱页上加食材的时候，让我一次勾好几样食材加进这道菜，用量之后再一条条填',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [recipeEarlier],
+    expect: { kind: 'ops', check: pickIngredients },
+  },
+];
+
 /** 一个工具点一下要做的几处（工具本身加 also）。 */
 const writesOf = (a: AnyAction): AnyAction[] => [
   a,
@@ -9213,6 +9327,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...MONTHLY_REMINDER_CASES,
   ...CALLOUT_CASES,
   ...GRID_CASES,
+  ...PICK_CASES,
   ...RELATIVE_VALUE_CASES,
   ...TAP_ALSO_CASES,
   ...CREATE_ALL_CASES,
