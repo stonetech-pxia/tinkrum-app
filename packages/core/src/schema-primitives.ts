@@ -117,7 +117,7 @@ export const filterSchema = (max = 5) => z.array(ConditionSchema).max(max);
 export type Filter = Condition[];
 
 /**
- * 聚合（v34 一份列表）：每个地方允许哪几种由检查定——数字块全部（除 latest），图表 count / sum / avg /
+ * 聚合（v34 一份列表）：每个地方允许哪几种由检查定——数字块全部（latest 从 D-618 起），图表 count / sum / avg /
  * distinctDays，汇总字段全部。
  */
 export const AGGREGATES = [

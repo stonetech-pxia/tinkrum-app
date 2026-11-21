@@ -386,7 +386,7 @@ const DOCS: Record<RecordLook, string> = {
   list: 'rows; tapping a row opens the built-in editor (or the page in opens)',
   cards: 'cards, one per entry',
   checklist:
-    'rows with a check box: needs one tool {as: "check", do: "toggle", table, field: <a checkbox field>}',
+    'rows with a check box: needs one tool {as: "check", do: "toggle", table, field: <a checkbox field>, also?: [{do: "set", field, value}] (1-2 fields of this entry set when ticked and cleared when unticked, rule 71)}',
   tiles:
     'a grid of big circles, one per entry, show.title under each (at most 24 shown) ("习惯做成大圆块，点一下打卡", "Streaks-style habit grid"): a tap runs the first {as: "tap", label, when?, …} tool whose when matches (rule 44; e.g. on a habits table {as: "tap", label: "Done", do: "create", table: "check-ins", values: {habit: "$row"}}, or an increment); without one a tap opens the entry. show.trailing + show.format progress (rule 46) draws a ring around the circle that fills at the goal (e.g. a rollup "done today" with goal "daily-goal"); otherwise the trailing value is shown inside. Tiles never change entries by themselves',
   board:

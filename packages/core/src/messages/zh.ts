@@ -1693,6 +1693,8 @@ export const zh: MessageTable = {
   recordActionTooLarge: '什么都没改：「{field}」不能大于 {limit}。',
   recordActionFailed: '没有修改：出了点问题，一条也没改。',
   recordUndoFailed: '这条记录之后又改过，没有撤销。',
+  // 勾上盖掉了原来有的值（D-617）：取消只会清空，所以这一次有撤销。
+  recordCheckOverwrote: '已勾上，原来填的值换掉了。',
   recordCreateAllConfirm: '将在「{table}」新建 {n} 条记录。',
   recordCreateAllConfirmButton: '新建',
   recordCreateAllNothing: '没有符合条件的记录，什么都没建。',

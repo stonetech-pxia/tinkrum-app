@@ -429,6 +429,33 @@ export async function loadComputedRecords(
   };
 }
 
+/**
+ * 「最新」的那一条的 ref 字段的值（汇总的 latest、数字块的 latest 共用一份，D-618）：按 dateRef 那个日期（日期字段、
+ * 日期时间字段或创建时间）最新的；同一天的后建的算新；没有日期或 ref 没有值的不算。records 是算好的记录，view 是换过的表。
+ */
+export function latestValue(
+  records: readonly DataRecord[],
+  view: Collection,
+  ref: string,
+  dateRef: string,
+  now: Date,
+  cal: Calendar,
+): FieldValue | undefined {
+  let best: { key: number | string; record: DataRecord; value: FieldValue } | undefined;
+  for (const record of records) {
+    const key = dateKey(record, view, dateRef, now, cal);
+    const value = recordValue(record, view, ref, now, cal);
+    if (key === undefined || value === undefined) continue;
+    const item = { key, record, value };
+    if (!best || byDate(best, item) < 0) best = item;
+  }
+  return best?.value;
+}
+
+/** 汇总和数字块的 latest 按哪个日期算：写了的（days.date），没写是存的表里第一个日期字段、日期时间字段、创建时间。 */
+export const latestDate = (table: Collection, date: string | undefined): string =>
+  dateOr(table, date);
+
 /** 一条记录的汇总值：没有可用的值时为 undefined（求和是 0、计数是 0、连续是 0）。 */
 function rollupValue(
   f: FieldOf<'rollup'>,
@@ -446,18 +473,8 @@ function rollupValue(
     case 'min':
     case 'max':
       return aggregateRecords(linked, source, f.aggregate, f.field) ?? undefined;
-    case 'latest': {
-      const ref = f.field ?? dateRef;
-      let best: { key: number | string; record: DataRecord; value: FieldValue } | undefined;
-      for (const record of linked) {
-        const key = dateKey(record, source, dateRef, now, cal);
-        const value = recordValue(record, source, ref, now, cal);
-        if (key === undefined || value === undefined) continue;
-        const item = { key, record, value };
-        if (!best || byDate(best, item) < 0) best = item;
-      }
-      return best?.value;
-    }
+    case 'latest':
+      return latestValue(linked, source, f.field ?? dateRef, dateRef, now, cal);
     default:
       // 日期 = days.date（默认同 rollupDate），unit、perUnit、skip 也在 days 里。
       return sequenceValue(linked, source, f.aggregate, f.days, now, cal).value ?? undefined;

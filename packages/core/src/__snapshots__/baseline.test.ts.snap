@@ -3390,6 +3390,7 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .data.tables[].fields[]<oneOf formula>.decimals? integer 0..4
 .data.tables[].fields[]<oneOf formula>.unit? string len 1..10
 .data.tables[].fields[]<oneOf formula>.currency? string /^[A-Z]{3}$/
+.data.tables[].fields[]<oneOf formula>.empty? "zero"
 .data.tables[].fields[]<oneOf time> object
 .data.tables[].fields[]<oneOf time>.id string /^[a-z][a-z0-9-]{0,47}$/
 .data.tables[].fields[]<oneOf time>.name string len 1..40

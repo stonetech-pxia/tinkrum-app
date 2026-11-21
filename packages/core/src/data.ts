@@ -190,30 +190,37 @@ function formulaValue(
     const ref = fieldOf(collection, id);
     return (ref && fieldDefinition(ref.type).formula) ?? null;
   };
+  // 空着的数算 0（D-619）：只在公式字段写了 empty "zero" 时；日期、时间照旧没有值。
+  const zero = field.empty === 'zero';
   const value = evaluateFormula(
     node,
     (id) => {
-      const ref = fieldOf(collection, id);
-      const kind = kindOf(id);
-      if (!ref || !kind) return undefined;
-      if (ref.type === 'formula')
-        return formulaValue(ref, record, collection, now, cal, [...using, field.id]);
-      // 日程（D-295）在公式里是它的下一次。
-      if (ref.type === 'schedule') return scheduleStatusOf(record, collection, ref, now, cal)?.next;
-      const v = readValue(ref, record.values[id]);
-      // 勾选框、单选（D-569）按字段定义换成数。
-      const def = fieldDefinition(ref.type);
-      if (def.formulaNumber) return def.formulaNumber(ref, v);
-      if (typeof v === 'number') return kind === 'number' ? v : undefined;
-      if (typeof v !== 'string') return undefined;
-      if (kind === 'date') return dayNumber(v);
-      if (kind === 'time') return minuteOfDay(v);
-      return kind === 'datetime' ? minuteNumber(v) : undefined;
+      const v = operand(id);
+      return v === undefined && zero && kindOf(id) === 'number' ? 0 : v;
     },
     todayNumber(now, cal),
     kindOf,
   );
   return value === undefined ? undefined : round(value, field.decimals ?? 2);
+
+  function operand(id: string): number | undefined {
+    const ref = fieldOf(collection, id);
+    const kind = kindOf(id);
+    if (!ref || !kind) return undefined;
+    if (ref.type === 'formula')
+      return formulaValue(ref, record, collection, now, cal, [...using, field.id]);
+    // 日程（D-295）在公式里是它的下一次。
+    if (ref.type === 'schedule') return scheduleStatusOf(record, collection, ref, now, cal)?.next;
+    const v = readValue(ref, record.values[id]);
+    // 勾选框、单选（D-569）按字段定义换成数。
+    const def = fieldDefinition(ref.type);
+    if (def.formulaNumber) return def.formulaNumber(ref, v);
+    if (typeof v === 'number') return kind === 'number' ? v : undefined;
+    if (typeof v !== 'string') return undefined;
+    if (kind === 'date') return dayNumber(v);
+    if (kind === 'time') return minuteOfDay(v);
+    return kind === 'datetime' ? minuteNumber(v) : undefined;
+  }
 }
 
 /**

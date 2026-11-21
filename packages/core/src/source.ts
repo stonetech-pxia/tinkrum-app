@@ -22,7 +22,13 @@ import { gridRead, type GridRead } from './grid-view';
 import { filterPresets, listGroups } from './list-groups';
 import { t } from './messages';
 import { currentMonth, monthDays, type MonthDay } from './month-view';
-import { computeRecords, expandCollection, relatedCollectionIds } from './related';
+import {
+  computeRecords,
+  expandCollection,
+  latestDate,
+  latestValue,
+  relatedCollectionIds,
+} from './related';
 import {
   RECORD_REF,
   type Collection,
@@ -293,11 +299,35 @@ export interface NumberRead {
   groups?: NumberGroup[];
 }
 
+/**
+ * 数字块的 latest（D-618）：最新一条的 field 的值，和汇总字段的 latest 同一个「最新」（related.ts 的 latestValue；
+ * 日期是 days.date，没写是存的表 table 里第一个日期字段）。不是数时为 null（检查只让数字类字段用）。
+ */
+export function latestNumber(
+  records: readonly DataRecord[],
+  table: Collection,
+  view: Collection,
+  source: Pick<NumberSource, 'field' | 'days'>,
+  now: Date,
+  cal: Calendar,
+): number | null {
+  if (!source.field) return null;
+  const v = latestValue(
+    records,
+    view,
+    source.field,
+    latestDate(table, source.days?.date),
+    now,
+    cal,
+  );
+  return typeof v === 'number' ? v : null;
+}
+
 /** 数字块的值（D-248、D-284、D-307、D-308、D-337）；表不存在时为 undefined。 */
 export function readNumber(source: NumberSource, ctx: SourceContext): NumberRead | undefined {
   const read = readTable(ctx, source.table);
   if (!read) return undefined;
-  const { view, records } = read;
+  const { table, view, records } = read;
   const { now } = ctx;
   const cal = calOf(ctx);
   const filter = bind(source.filter, ctx);
@@ -305,7 +335,7 @@ export function readNumber(source: NumberSource, ctx: SourceContext): NumberRead
     isSequenceAggregate(source.aggregate)
       ? sequenceValue(list, view, source.aggregate, source.days, now, cal)
       : source.aggregate === 'latest'
-        ? { value: null }
+        ? { value: latestNumber(list, table, view, source, now, cal) }
         : {
             value: aggregateRecords(list, view, source.aggregate as ValueAggregate, source.field),
           };

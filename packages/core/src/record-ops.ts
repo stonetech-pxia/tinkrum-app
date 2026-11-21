@@ -564,9 +564,10 @@ export function recordToolUseProblems(
 function alsoProblems(use: RecordToolUse, config: WorkspaceConfig, where: ToolWhere): string[] {
   const row = where.rowOf;
   const label = where.label;
+  if (use.as === 'check' && row) return checkAlsoProblems(use, config, { ...where, rowOf: row });
   if ((use.as !== 'button' && use.as !== 'tap') || !row)
     return [
-      `${label}: also only works on a button or tap on each entry (one tap, several changes to that entry)`,
+      `${label}: also only works on a button or tap on each entry, or the check of a checklist (one tap, several changes to that entry)`,
     ];
   const tool = recordToolOf(use);
   const problems: string[] = [];
@@ -609,6 +610,49 @@ function alsoProblems(use: RecordToolUse, config: WorkspaceConfig, where: ToolWh
       problems.push(`${label}: changes ${a.field} twice in one tap; write each field once`);
     fields.push(a.field);
     problems.push(...recordToolProblems({ ...a, table: row.id } as RecordTool, config, at));
+  }
+  return problems;
+}
+
+/**
+ * 清单的勾带 also（D-617，创始人 2026-11-21「做前三个」）：勾上时顺带设这一条的一两个字段（例如完成日期 = 今天），取消时
+ * 把它们清空，所以取消就是把勾上做的全部拿回来（底线 11，不弹撤销）。只能 set 这一条的字段；勾上就清空的值（null、
+ * 勾选框的 false）和必填的字段不行：取消清空以后放不回原来的值、存不进去。
+ */
+function checkAlsoProblems(
+  use: RecordToolUse,
+  config: WorkspaceConfig,
+  where: ToolWhere & { rowOf: Collection },
+): string[] {
+  const row = where.rowOf;
+  const label = where.label;
+  const problems: string[] = [];
+  const fields = use.do === 'toggle' ? [use.field] : [];
+  for (const a of tapAlsoOf(use)) {
+    if (a.do !== 'set') {
+      problems.push(
+        `${label}: a check's also can only set fields of this entry ({do: "set", field, value}); unticking clears them again`,
+      );
+      continue;
+    }
+    if (fields.includes(a.field))
+      problems.push(`${label}: changes ${a.field} twice in one tap; write each field once`);
+    fields.push(a.field);
+    const field = row.fields.find((f) => f.id === a.field);
+    if (a.value === null || (a.value === false && field?.type === 'checkbox'))
+      problems.push(
+        `${label} also: ${a.field} would be emptied by the tick, and unticking can't put the old value back; a check's also records a value (e.g. "today")`,
+      );
+    if (field && 'required' in field && field.required === true)
+      problems.push(
+        `${label} also: ${a.field} is required, and unticking clears it; make it optional or use a button`,
+      );
+    problems.push(
+      ...recordToolProblems({ ...a, table: row.id } as RecordTool, config, {
+        ...where,
+        label: `${label} also`,
+      }),
+    );
   }
   return problems;
 }
@@ -735,6 +779,53 @@ export function rowUpdateInput(
   // 时长不能是负数：减到 0 为止。
   if (field.type === 'duration') next = Math.max(0, next);
   return { [field.id]: next };
+}
+
+/**
+ * 清单的勾（D-617）：这一条要改成什么。勾上 = 勾选框 true 加上 also 的值（读「这一条」的值是空的就不写那一项）；
+ * 取消 = 勾选框 false，also 写的字段清空。一条记录一次写完（App 用 patch，同一个事务）。字段已经不在了（旧配置）返回 null。
+ * 结果再交给 prepareRecordValues。
+ */
+export function checkInput(
+  use: RecordToolUse,
+  collection: Collection,
+  values: Record<string, unknown>,
+  ctx: ActionContext,
+): Record<string, unknown> | null {
+  if (use.do !== 'toggle') return null;
+  const box = collection.fields.find((f) => f.id === use.field);
+  if (!box) return null;
+  const ticking = values[box.id] !== true;
+  const input: Record<string, unknown> = { [box.id]: ticking };
+  for (const a of tapAlsoOf(use)) {
+    if (a.do !== 'set') continue;
+    const field = collection.fields.find((f) => f.id === a.field);
+    if (!field) continue;
+    const value = actionInput(field, ticking ? a.value : null, ctx);
+    if (value !== undefined) input[field.id] = value;
+  }
+  return input;
+}
+
+const isEmptyStored = (v: unknown) =>
+  v === undefined || v === null || v === '' || v === false || (Array.isArray(v) && v.length === 0);
+
+/**
+ * 勾上时 also 盖掉了原来有的、不一样的值（D-617）：取消只会清空，放不回原来的值，所以这一次 App 弹撤销（底线 11）。
+ * before、after 是存的值（prepareRecordValues 前后）。取消不算：它清空的是勾上时写的值，再勾一下就回来。
+ */
+export function checkOverwrites(
+  use: RecordToolUse,
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): boolean {
+  if (use.do !== 'toggle' || after[use.field] !== true) return false;
+  return tapAlsoOf(use).some(
+    (a) =>
+      a.do === 'set' &&
+      !isEmptyStored(before[a.field]) &&
+      JSON.stringify(before[a.field]) !== JSON.stringify(after[a.field]),
+  );
 }
 
 /**

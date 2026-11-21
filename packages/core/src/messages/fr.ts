@@ -1872,6 +1872,8 @@ export const fr: MessageTable = {
   recordActionTooMany: 'Au plus {max} entrées peuvent changer à la fois ; cela en modifierait {n}.',
   recordActionGone: 'Cette entrée a été supprimée.',
   recordUndoFailed: 'Cette entrée a été modifiée depuis : rien n’a été annulé.',
+  // 勾上盖掉了原来有的值（D-617）：取消只会清空，所以这一次有撤销。
+  recordCheckOverwrote: 'Coché. Une valeur déjà saisie a été remplacée.',
   recordCreateAllConfirm: 'Cela crée {n} entrées dans « {table} ».',
   recordCreateAllConfirmButton: 'Créer',
   recordCreateAllNothing: 'Aucune entrée ne correspond : rien n’a été créé.',

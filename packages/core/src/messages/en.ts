@@ -1794,6 +1794,8 @@ export const en = {
   recordActionTooMany: 'At most {max} entries can change at once; this would change {n}.',
   recordActionGone: 'This entry was deleted.',
   recordUndoFailed: 'This entry has changed since: nothing was undone.',
+  // 勾上盖掉了原来有的值（D-617）：取消只会清空，所以这一次有撤销。
+  recordCheckOverwrote: 'Ticked. It replaced a value that was already there.',
   recordCreateAllConfirm: 'This creates {n} entries in “{table}”.',
   recordCreateAllConfirmButton: 'Create',
   recordCreateAllNothing: 'No entries match, so nothing was created.',

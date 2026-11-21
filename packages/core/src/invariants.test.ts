@@ -15,6 +15,7 @@ import {
   formatValue,
   perCurrencyText,
   prepareRecordValues,
+  recordValue,
   type DataRecord,
 } from './data';
 import { fieldLink } from './field-link';
@@ -26,6 +27,7 @@ import { zh } from './messages/zh';
 import { migrateWorkspace } from './migrate';
 import { ruleEngine } from './prefill/engine';
 import { applyOps, OpSchema, type Op } from './ops';
+import { checkInput, checkOverwrites } from './record-ops';
 import {
   MAX_CREATE_ALL,
   MAX_SET_ALL,
@@ -33,6 +35,7 @@ import {
   PICK_TOOLS,
   RecordToolSchema,
   ToolUseSchema,
+  type RecordToolUse,
 } from './record-ops-schema';
 import {
   allComponents,
@@ -47,6 +50,8 @@ import {
 import { planDocument } from './prefill/code-rules';
 import { IMPORT_LIMITS, importLimitProblem } from './records-import';
 import { sampleOps } from './samples';
+import { readNumber } from './source';
+import { NumberSourceSchema } from './components/number';
 import { createStarterWorkspace } from './starter';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
@@ -1077,6 +1082,83 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     expect(RecordToolSchema.safeParse({ ...done, also }).success).toBe(false);
   });
 
+  // 清单的勾带 also（D-617）：勾上时顺带设这一条的一两个字段，取消时清空它们，所以取消就是拿回勾上做的全部，不弹撤销；
+  // 只有勾上盖掉了原来有的值时弹撤销（取消放不回那个值）。点开、撤销在 mobile 的 invariants-test.tsx、check-latest-empty-test.tsx。
+  it('a check that also records something makes at most 3 changes, all set on this entry, and unticking clears them', () => {
+    const tick = {
+      as: 'check',
+      do: 'toggle',
+      table: 'tasks',
+      field: 'done',
+      also: [{ do: 'set', field: 'completed', value: 'today' }],
+    };
+    expect(ToolUseSchema.safeParse(tick).success).toBe(true);
+    for (const also of [
+      [...tick.also, { do: 'set', field: 'b', value: 1 }, { do: 'set', field: 'c', value: 2 }],
+      [{ do: 'set', table: 'other', field: 'b', value: true }],
+      [{ do: 'setAll', field: 'b', value: true }],
+    ])
+      expect(ToolUseSchema.safeParse({ ...tick, also }).success, JSON.stringify(also)).toBe(false);
+    // 没有跳过什么的设置（不问、不弹撤销、不清空）。
+    for (const skip of [{ undo: false }, { quiet: true }, { keep: true }, { clear: false }])
+      expect(ToolUseSchema.safeParse({ ...tick, ...skip }).success).toBe(false);
+    const config = createDefaultWorkspace('en');
+    config.data.tables.push(
+      {
+        id: 'tasks',
+        name: 'Tasks',
+        fields: [
+          { id: 'title', name: 'Task', type: 'text' },
+          { id: 'done', name: 'Done', type: 'checkbox' },
+          { id: 'completed', name: 'Completed', type: 'date' },
+        ],
+      },
+      {
+        id: 'logs',
+        name: 'Logs',
+        fields: [
+          { id: 'task', name: 'Task', type: 'link', table: 'tasks' },
+          { id: 'on', name: 'On', type: 'date' },
+        ],
+      },
+    );
+    const on = (check: object) => {
+      const copy = structuredClone(config);
+      copy.containers.pages[0]!.blocks.push({
+        id: 'c',
+        look: 'checklist',
+        source: { table: 'tasks', limit: 30 },
+        show: { title: 'title' },
+        tools: [check],
+      } as never);
+      const r = validateWorkspace(copy, registry);
+      return r.ok ? '' : r.issues.map((i) => i.message).join('\n');
+    };
+    expect(on(tick)).toBe('');
+    // 新建一条（另一张表）、勾上就清空：取消拿不回来，拒绝。
+    expect(
+      on({ ...tick, also: [{ do: 'create', table: 'logs', values: { task: '$row' } }] }),
+    ).not.toBe('');
+    expect(on({ ...tick, also: [{ do: 'set', field: 'completed', value: null }] })).not.toBe('');
+    const use = tick as unknown as RecordToolUse;
+    const table = config.data.tables.find((t) => t.id === 'tasks')!;
+    const now = new Date(2026, 10, 18, 9);
+    const before = { title: 'A', done: false };
+    const ticked = prepareRecordValues(
+      table,
+      checkInput(use, table, before, { now })!,
+      before,
+      now,
+    );
+    expect(ticked.ok && ticked.values).toEqual({ title: 'A', done: true, completed: '2026-11-18' });
+    const after = ticked.ok ? ticked.values : {};
+    expect(checkOverwrites(use, before, after)).toBe(false);
+    const back = prepareRecordValues(table, checkInput(use, table, after, { now })!, after, now);
+    expect(back.ok && back.values).toEqual(before);
+    // 勾上盖掉了原来的日期：这一次取消放不回它，App 弹撤销。
+    expect(checkOverwrites(use, { ...before, completed: '2026-01-05' }, after)).toBe(true);
+  });
+
   // 从表格文件导入（D-574，创始人 2026-11-16 决定 ⑦）：系统层，先给汇总、用户点「导入」才写，导完弹撤销
   // （mobile 的 import-records-test.tsx、invariants-test.tsx）。
   it('asking before an import does not promise an undo, and the import has fixed caps it never passes in part', () => {
@@ -1273,6 +1355,20 @@ describe('底线 14：数据只有一份，只在数据里', () => {
     expect(CollectionSchema.safeParse(table(formula)).success).toBe(true);
     expect(CollectionSchema.safeParse(table({ ...formula, value: 4 })).success).toBe(false);
     expect(CollectionSchema.safeParse(table({ ...formula, values: [4] })).success).toBe(false);
+    // 空着的数算 0（D-619）是一个固定的词，没有地方放值；算出来的照样不存。
+    expect(CollectionSchema.safeParse(table({ ...formula, empty: 'zero' })).success).toBe(true);
+    for (const empty of [0, 4, 'four', { value: 4 }])
+      expect(CollectionSchema.safeParse(table({ ...formula, empty })).success).toBe(false);
+    const t = CollectionSchema.parse(table({ ...formula, empty: 'zero' }));
+    const saved = prepareRecordValues(t, { f: 8 }, null, new Date());
+    expect(saved.ok && saved.values).toEqual({});
+  });
+
+  it('the latest number of a number block is read from the entries, never kept (D-618)', () => {
+    const source = { table: 't', aggregate: 'latest', field: 'kg' };
+    expect(NumberSourceSchema.safeParse(source).success).toBe(true);
+    for (const extra of [{ value: 71.8 }, { latest: 71.8 }, { cached: 71.8 }])
+      expect(NumberSourceSchema.safeParse({ ...source, ...extra }).success).toBe(false);
   });
 });
 
@@ -1336,6 +1432,50 @@ describe('底线 15：看永远不会改', () => {
       const text = readFileSync(join(__dirname, file), 'utf8');
       expect(text).not.toMatch(/insertRecord|updateRecord|deleteRecord|setMeta|commitRevision/);
     }
+  });
+
+  it('the latest number (D-618) and a formula with empty "zero" (D-619) change nothing when read', () => {
+    const config = createDefaultWorkspace('en');
+    const table = CollectionSchema.parse({
+      id: 'w',
+      name: 'W',
+      fields: [
+        { id: 'date', name: 'Date', type: 'date' },
+        { id: 'kg', name: 'Kg', type: 'number' },
+        { id: 'plus', name: 'Plus', type: 'number' },
+        { id: 'f', name: 'F', type: 'formula', expression: '{kg} + {plus}', empty: 'zero' },
+      ],
+    });
+    config.data.tables.push(table);
+    const entries: DataRecord[] = [
+      {
+        id: 'a',
+        collectionId: 'w',
+        values: { date: '2026-11-01', kg: 72 },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: 'b',
+        collectionId: 'w',
+        values: { date: '2026-11-10', kg: 71 },
+        createdAt: 2,
+        updatedAt: 2,
+      },
+    ];
+    const frozen = structuredClone(entries);
+    const configBefore = structuredClone(config);
+    const now = new Date(2026, 10, 18);
+    const read = () =>
+      readNumber(
+        { table: 'w', aggregate: 'latest', field: 'kg' },
+        { config, records: new Map([['w', entries]]), now, locale: 'en' },
+      )?.value;
+    expect(read()).toBe(71);
+    expect(read()).toBe(71);
+    expect(entries.map((r) => recordValue(r, table, 'f', now))).toEqual([72, 71]);
+    expect(entries).toEqual(frozen);
+    expect(config).toEqual(configBefore);
   });
 });
 
@@ -2071,8 +2211,39 @@ describe('底线 9：容器上的工具也是直链，不能触发别的工具�
 
 describe('底线 12：旧配置不变（D-428）', () => {
   it('stays on the same version: every addition is optional', () => {
-    // D-607 升到 40 是另一件事（多选），容器上的工具没有再改版本。
+    // D-607 升到 40 是另一件事（多选），容器上的工具没有再改版本。D-617–D-619（勾带 also、数字块 latest、
+    // 公式 empty "zero"）也不升：都是可选的写法，存的数据不变，旧 App 遇到会拒绝而不是读错。
     expect(CURRENT_SCHEMA_VERSION).toBe(40);
+  });
+
+  it.each(CONFIGS)(
+    '%s keeps every formula value: without empty "zero" an empty number still leaves it empty (D-619)',
+    (_name, config) => {
+      for (const t of config.data.tables)
+        for (const f of t.fields)
+          if (f.type === 'formula') expect((f as { empty?: unknown }).empty).toBeUndefined();
+    },
+  );
+
+  it('an old formula reads the same: one empty number leaves it empty (D-619)', () => {
+    const t = CollectionSchema.parse({
+      id: 't',
+      name: 'T',
+      fields: [
+        { id: 'a', name: 'A', type: 'number' },
+        { id: 'b', name: 'B', type: 'number' },
+        { id: 'f', name: 'F', type: 'formula', expression: '{a} * (1 + {b})' },
+      ],
+    });
+    const r = (values: Record<string, unknown>): DataRecord => ({
+      id: 'r',
+      collectionId: 't',
+      values,
+      createdAt: 0,
+      updatedAt: 0,
+    });
+    expect(recordValue(r({ a: 1 }), t, 'f', new Date())).toBeUndefined();
+    expect(recordValue(r({ a: 1, b: 2 }), t, 'f', new Date())).toBe(3);
   });
 
   it.each(CONFIGS)('%s loads with no row and no list tool made up', (_name, config) => {

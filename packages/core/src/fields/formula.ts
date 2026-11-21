@@ -20,6 +20,11 @@ const schema = z.strictObject({
     .string()
     .regex(/^[A-Z]{3}$/, 'currency must be an ISO code like CNY')
     .optional(),
+  /**
+   * 空着的数算 0（D-619）：不写时照旧，用到的字段有一个空着公式就没有值。只管数（数字、金额、评分、时长、勾选框、
+   * 单选的值、别的公式、查找和汇总来的数）；日期、时间空着照旧没有值，除以 0 照旧没有值。
+   */
+  empty: z.literal('zero').optional(),
 });
 
 const show = (f: z.infer<typeof schema>, n: number, locale: Locale) =>
@@ -47,6 +52,11 @@ export const formulaField: FieldDefinitionOf<'formula', typeof schema> = defineF
   check: (f, { collection, view }) =>
     [
       ...formulaProblems(f.id, f.expression, view),
+      ...(f.empty === 'zero' && !readsNumber(f.expression, view)
+        ? [
+            'empty "zero" only changes number fields that are empty, and this formula reads none; leave it out',
+          ]
+        : []),
       // D-429：结果标着一种货币，读的金额却每条不一样。
       ...(f.currency === undefined
         ? []
@@ -58,7 +68,7 @@ export const formulaField: FieldDefinitionOf<'formula', typeof schema> = defineF
       message: `${collection.id}.${f.id}: ${problem}`,
     })),
   ai: {
-    doc: '{expression, decimals? 0-4, unit?, currency?} (computed, never typed in: + - * / and parentheses over {fieldId} of number, money, rating, duration, checkbox (1 or 0), choice (the value of the chosen option; rule 32) or other formula fields of the same table, e.g. "{price} * {qty}"; no required/default)',
+    doc: '{expression, decimals? 0-4, unit?, currency?, empty?: "zero"} (computed, never typed in: + - * / and parentheses over {fieldId} of number, money, rating, duration, checkbox (1 or 0), choice (the value of the chosen option; rule 32) or other formula fields of the same table, e.g. "{price} * {qty}"; an empty field leaves the result empty unless empty: "zero" (rule 73); no required/default)',
   },
   example: {
     id: 'total',
@@ -69,6 +79,16 @@ export const formulaField: FieldDefinitionOf<'formula', typeof schema> = defineF
     unit: 'kg',
   },
 });
+
+/** 公式读不读数（D-619 的 empty "zero" 只管数）：引用的字段里有一个在公式里是数。 */
+function readsNumber(expression: string, collection: Collection): boolean {
+  const parsed = parseFormula(expression);
+  if (!parsed.ok) return true;
+  return parsed.refs.some((id) => {
+    const ref = collection.fields.find((f) => f.id === id);
+    return ref !== undefined && fieldDefinition(ref.type).formula === 'number';
+  });
+}
 
 function formulaProblems(fieldId: string, expression: string, collection: Collection): string[] {
   const { fields } = collection;
