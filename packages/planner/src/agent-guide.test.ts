@@ -45,7 +45,8 @@ describe('agent guide', () => {
 
   // 结构模式（D-603）：每一份都能照原样导入，没有要修的，也没有设计建议；只有英文。
   it('every pattern imports as it is, with nothing to fix and no suggestions', () => {
-    expect(AGENT_PATTERNS).toHaveLength(8);
+    // 第 9 种「连接带数据」是 D-613 加的。
+    expect(AGENT_PATTERNS).toHaveLength(9);
     for (const p of AGENT_PATTERNS) {
       const result = checkAppFileText(JSON.stringify(p.app), ctx);
       expect([p.name, result.ok && result.warnings, result.ok && result.hints]).toEqual([

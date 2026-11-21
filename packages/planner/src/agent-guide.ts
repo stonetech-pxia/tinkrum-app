@@ -38,7 +38,7 @@ const SECTIONS = [
  */
 const FEATURE_RULES: ReadonlySet<number> = new Set([
   10, 13, 32, 33, 34, 35, 38, 40, 42, 43, 44, 45, 46, 47, 48, 49, 50, 55, 56, 58, 59, 60, 61, 62,
-  63, 64, 65, 66, 67, 68, 69,
+  63, 64, 65, 66, 67, 68, 69, 70,
 ]);
 /** 讲快捷操作的几条：放进动作目录。 */
 const QUICK_ACTION_RULES: ReadonlySet<number> = new Set([15, 20, 21, 22, 28, 29, 30, 31, 54]);
@@ -157,7 +157,7 @@ const CHECK_SCRIPT_URL = 'https://tinkrum.stonetech.dev/assets/agent/tinkrum-che
 /** 动作目录（D-598）：快捷操作的步骤能用哪些动作、内置的快捷操作预设。 */
 const ACTIONS_FILE = 'tinkrum-app-actions.md';
 const ACTIONS_URL = `https://tinkrum.stonetech.dev/assets/agent/${ACTIONS_FILE}`;
-/** 结构模式（D-603）：网上模板库里常见的 8 种结构，各一份完整的 App 文件。 */
+/** 结构模式（D-603）：网上模板库里常见的 8 种结构（D-613 加了第 9 种），各一份完整的 App 文件。 */
 const PATTERNS_FILE = 'tinkrum-app-patterns.md';
 /** 功能规则（D-604）：Tink 的 Rules 里讲 App 能做什么的几条。 */
 const RULES_FILE = 'tinkrum-app-rules.md';
