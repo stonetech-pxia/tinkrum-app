@@ -22,6 +22,7 @@ import {
   isToolRefUse,
   type ToolUse,
 } from './record-ops-schema';
+import { dateFieldOf } from './sequence';
 import { statMinusProblems } from './stat-minus';
 import { expandCollection, relatedProblems } from './related';
 import type { Registry } from './registry';
@@ -30,6 +31,7 @@ import {
   HOME_PAGE_ID,
   MAX_HOME_SCREEN,
   PROTECTED_TARGETS,
+  RECORD_REF,
   appTargetId,
   WorkspaceConfigSchema,
   BACKDROP_TYPES,
@@ -732,7 +734,11 @@ function toolUseProblems(
       ...(page.of !== undefined ? { recordOf: page.of } : {}),
       ...(c.look === 'form' ? { form: true } : {}),
       ...(u.as === 'drag' && group?.by !== undefined ? { dragField: group.by } : {}),
-      ...(c.look === 'grid' ? { grid: true, hereFields: gridHereFields(c, rowOf) } : {}),
+      ...(c.look === 'grid'
+        ? { grid: true, hereFields: gridHereFields(c, rowOf) }
+        : u.as === 'addHere' && rowOf
+          ? listHere(c, rowOf)
+          : {}),
     };
     problems.push(...recordToolUseProblems(u, config, where));
   });
@@ -748,6 +754,26 @@ function gridHereFields(c: KnownComponent, table: Collection | undefined): strin
     gridDateField(table, source.across),
     ...Object.keys(filterPresets(table, source.filter)),
   ];
+}
+
+/**
+ * 列表下面的「添加」（"$here"，D-349）会填的字段（D-613 勾选新建用）：筛选里的等于条件一定填（"$record" 打开页面时
+ * 换成那一条，D-342，这里当它有值），分段、分栏、月历那天的字段不一定（有的段没有值）。
+ */
+function listHere(
+  c: KnownComponent,
+  table: Collection,
+): Pick<ToolWhere, 'hereFields' | 'hereGroup'> {
+  const source = (c as Extract<KnownComponent, { look: 'list' | 'calendar' }>).source;
+  const filter = (source.filter ?? []).map((x) =>
+    x.value === RECORD_REF ? { ...x, value: RECORD_REF.slice(1) } : x,
+  );
+  const group = source.group as { by?: string } | undefined;
+  const by = c.look === 'calendar' ? dateFieldOf(table, group?.by) : group?.by;
+  return {
+    hereFields: Object.keys(filterPresets(table, filter)),
+    ...(by !== undefined ? { hereGroup: by } : {}),
+  };
 }
 
 const KNOWN_LOOKS = new Set<string>(COMPONENTS.map((d) => d.look));

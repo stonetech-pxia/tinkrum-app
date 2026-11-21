@@ -250,7 +250,7 @@ exports[`component issues > lists every reference problem in a stable order and 
   },
   {
     "code": "data",
-    "message": "k1: board k1 addHere 2: addHere adds an entry right in this section: {as: "addHere", do: "create", table: spend, ask?: "all", values: "$here"}",
+    "message": "k1: board k1 addHere 2: addHere adds an entry right in this section: {as: "addHere", do: "create", table: spend, ask?: "all", values: "$here"}, or lets the user pick several entries of another table: {as: "addHere", do: "createAll", table: spend, from: <the table to pick from>, pick: true, filter?, values: {<a link field to it>: "$row"}}",
   },
   {
     "code": "data",

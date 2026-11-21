@@ -403,21 +403,21 @@ const DOCS: Record<RecordLook, string> = {
 const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
   list: {
     as: ['button', 'addHere', 'list'],
-    do: ['create', 'set', 'toggle', 'increment'],
+    do: ['create', 'set', 'toggle', 'increment', 'createAll'],
     ref: ['quickAction'],
     open: true,
     max: 7,
   },
   cards: {
     as: ['button', 'addHere', 'list'],
-    do: ['create', 'set', 'toggle', 'increment'],
+    do: ['create', 'set', 'toggle', 'increment', 'createAll'],
     ref: ['quickAction'],
     open: true,
     max: 7,
   },
   checklist: {
     as: ['check', 'button', 'addHere', 'list'],
-    do: ['create', 'set', 'toggle', 'increment'],
+    do: ['create', 'set', 'toggle', 'increment', 'createAll'],
     ref: ['quickAction'],
     open: true,
     max: 8,
@@ -425,20 +425,32 @@ const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
   tiles: { as: ['tap'], do: ['create', 'set', 'toggle', 'increment'], open: true, max: 3 },
   board: {
     as: ['drag', 'button', 'addHere'],
-    do: ['create', 'set', 'toggle', 'increment'],
+    do: ['create', 'set', 'toggle', 'increment', 'createAll'],
     open: true,
     max: 5,
   },
   calendar: {
     as: ['button', 'addHere'],
-    do: ['create', 'set', 'toggle', 'increment'],
+    do: ['create', 'set', 'toggle', 'increment', 'createAll'],
     open: true,
     max: 4,
   },
-  // 表格的格子只读（D-539）：没有每行的按钮。
-  table: { as: ['addHere', 'list'], do: ['create'], ref: ['quickAction'], open: true, max: 4 },
+  // 表格的格子只读（D-539）：没有每行的按钮。createAll 只是下面「添加」的勾选新建（D-613）。
+  table: {
+    as: ['addHere', 'list'],
+    do: ['create', 'createAll'],
+    ref: ['quickAction'],
+    open: true,
+    max: 4,
+  },
   // 图片墙（D-540）只有图片和标题：没有每张的按钮。
-  gallery: { as: ['addHere', 'list'], do: ['create'], ref: ['quickAction'], open: true, max: 4 },
+  gallery: {
+    as: ['addHere', 'list'],
+    do: ['create', 'createAll'],
+    ref: ['quickAction'],
+    open: true,
+    max: 4,
+  },
   // 打卡格（D-610）：只有点格子，在这一格加一条（$here）或删掉格子里唯一的那一条。
   grid: { as: ['tap'], do: ['create', 'remove'], max: 2 },
 };

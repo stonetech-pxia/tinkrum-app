@@ -89,11 +89,18 @@ export interface ToolWhere {
   grid?: boolean;
   /** 打卡格上 "$here" 一定会填的字段（这一行、这一天、筛选里的等于条件）：必填的检查算它们有值。 */
   hereFields?: readonly string[];
+  /**
+   * 列表分段、看板分栏、月历选中那天写进的字段（D-613）：在这一段勾选新建时 "$here" 可能填它（有的段没有值，
+   * 例如「未分」），所以不算必填有值，但 values 不能再写它。
+   */
+  hereGroup?: string;
 }
 
 interface ValueWhere extends ToolWhere {
   /** 是新建（create）：null 没有意义。 */
   creating?: boolean;
+  /** 新记录一定带上 "$here" 的值（勾选新建，D-613）：hereFields 算必填有值。 */
+  hereFilled?: boolean;
   /**
    * 「这一条」（D-565，换过的表：查找、汇总换成它们显示的那种字段）：抄的字段、日期的起点和加数从它读。
    * 工具作用的那一条（rowOf），没有时是记录页的那一条（recordOf）；setAll、表单和不在记录页上的按钮没有。
@@ -255,7 +262,7 @@ function valueProblem(
 function createProblems(
   tool: Extract<RecordTool, { do: 'create' }>,
   collection: Collection,
-  where: ToolWhere,
+  where: ValueWhere,
 ): string[] {
   const problems: string[] = [];
   const values = typeof tool.values === 'object' ? tool.values : undefined;
@@ -278,7 +285,8 @@ function createProblems(
   for (const f of collection.fields) {
     const def = fieldDefinition(f.type);
     if (!('required' in f) || !f.required || !def.write || values?.[f.id] !== undefined) continue;
-    if (tool.values === HERE_REF && where.hereFields?.includes(f.id)) continue;
+    if ((tool.values === HERE_REF || where.hereFilled) && where.hereFields?.includes(f.id))
+      continue;
     const hasDefault = ('default' in f && f.default !== undefined) || def.emptyNew !== undefined;
     if (!hasDefault) {
       problems.push(
@@ -436,11 +444,42 @@ function createAllProblems(
   const source = config.data.tables.find((c) => c.id === tool.from);
   if (!source) return [`${where.label}: data table ${tool.from} does not exist`];
   const view = expandCollection(config.data.tables, source);
-  const at: ValueWhere = { label: where.label, rowOf: source, entry: view };
+  const at: ValueWhere = {
+    label: where.label,
+    rowOf: source,
+    entry: view,
+    // 勾选新建（D-613）：新记录带上这一段的值，列表筛选里的等于条件算必填有值。
+    ...(tool.pick && where.hereFields ? { hereFields: where.hereFields, hereFilled: true } : {}),
+  };
   return [
+    ...(tool.pick ? pickProblems(tool, collection, where) : []),
     ...conditionProblems(tool.filter, view, where.recordOf).map((x) => `${where.label}: ${x}`),
     ...createProblems({ do: 'create', table: tool.table, values: tool.values }, collection, at),
   ];
+}
+
+/**
+ * 勾选新建（D-613）：values 里正好一个指向来源表的引用字段是 "$row"（勾的那一条；「已添加」也按它算）；
+ * 这一段会填的字段（列表筛选里的等于条件、分段的字段）不能再写，否则新的一条不在用户点的这一段里。
+ */
+function pickProblems(
+  tool: Extract<RecordTool, { do: 'createAll' }>,
+  collection: Collection,
+  where: ToolWhere,
+): string[] {
+  const problems: string[] = [];
+  const rows = pickLinkFields(tool, collection);
+  if (rows.length !== 1)
+    problems.push(
+      `${where.label}: pick: true needs exactly one link field of ${tool.table} to ${tool.from} set to "${ROW_REF}" (the entry the user picks)${rows.length > 1 ? `, not ${rows.join(', ')}` : ''}`,
+    );
+  const here = [...(where.hereFields ?? []), ...(where.hereGroup ? [where.hereGroup] : [])];
+  for (const id of Object.keys(tool.values))
+    if (here.includes(id))
+      problems.push(
+        `${where.label}: ${id} is already filled by this list (its filter or section) for every new entry; leave it out of values`,
+      );
+  return problems;
 }
 
 /** 按钮上的字最长几个字（表单的提交 30，其余 20）。 */
@@ -465,9 +504,28 @@ export function recordToolUseProblems(
     problems.push(`${where.label}: needs a label (shown on the button and read by screen readers)`);
   // $here：就地添加（这一段的值 + 列表筛选里的等于条件）；打卡格上是点的那一格（这一行、这一天，D-610）。
   const here = tool.do === 'create' && tool.values === HERE_REF;
-  if (use.as === 'addHere' && (tool.do !== 'create' || !here || (row && tool.table !== row.id)))
+  // 勾选新建（D-613）：只给列表下面的「添加」，写列表自己那张表（底线 17），新记录带上这一段的值。
+  const picking = tool.do === 'createAll' && tool.pick === true;
+  const pickShape = `{as: "addHere", do: "createAll", table: ${row?.id ?? '<the list table>'}, from: <the table to pick from>, pick: true, filter?, values: {<a link field to it>: "${ROW_REF}"}}`;
+  if (picking && use.as !== 'addHere')
     problems.push(
-      `${where.label}: addHere adds an entry right in this section: {as: "addHere", do: "create", table: ${row?.id ?? '<the block table>'}, ask?: "all", values: "${HERE_REF}"}`,
+      `${where.label}: pick: true only works as the "Add" under a list of entries: ${pickShape}`,
+    );
+  else if (picking && row && tool.table !== row.id)
+    problems.push(
+      `${where.label}: pick: true adds entries to the list it sits under, so table must be ${row.id}, not ${tool.table}`,
+    );
+  else if (tool.do === 'createAll' && !picking && row)
+    problems.push(
+      `${where.label}: createAll on every entry a filter selects belongs on a button block; under a list, let the user pick: ${pickShape}`,
+    );
+  else if (
+    use.as === 'addHere' &&
+    !picking &&
+    (tool.do !== 'create' || !here || (row && tool.table !== row.id))
+  )
+    problems.push(
+      `${where.label}: addHere adds an entry right in this section: {as: "addHere", do: "create", table: ${row?.id ?? '<the block table>'}, ask?: "all", values: "${HERE_REF}"}, or lets the user pick several entries of another table: ${pickShape}`,
     );
   else if (here && use.as !== 'addHere' && !(where.grid && use.as === 'tap'))
     problems.push(
@@ -756,6 +814,90 @@ export function createAllInputs(
         rowId: r.id,
         entry: { record: r, view: sourceView },
       }),
+    }));
+}
+
+/** 勾选新建（D-613）：values 里设成 "$row"、指向来源表的引用字段（检查保证正好一个）。 */
+export function pickLinkFields(
+  tool: Extract<RecordTool, { do: 'createAll' }>,
+  target: Collection,
+): string[] {
+  return Object.entries(tool.values)
+    .filter(
+      ([id, v]) =>
+        v === ROW_REF &&
+        target.fields.some((f) => f.id === id && f.type === 'link' && f.table === tool.from),
+    )
+    .map(([id]) => id);
+}
+
+/** 来源表里能勾的（按 tool.filter，D-613）：records 是算好的记录（筛选可以用查找来的值）。 */
+export function pickChoices(
+  tool: Extract<RecordTool, { do: 'createAll' }>,
+  sourceView: Collection,
+  sources: readonly DataRecord[],
+  ctx: Pick<ActionContext, 'now' | 'cal'>,
+): DataRecord[] {
+  const cal = ctx.cal ?? DEFAULT_CALENDAR;
+  return sources.filter((r) =>
+    (tool.filter ?? []).every((c) => matchesCondition(r, sourceView, c, ctx.now, cal)),
+  );
+}
+
+/** 一个存着的值是不是这一段的值（"$here"）：多选是都选了，勾选框没存当不勾。 */
+function sameHere(stored: unknown, here: unknown): boolean {
+  if (Array.isArray(here) && Array.isArray(stored)) return here.every((v) => stored.includes(v));
+  if (typeof here === 'boolean') return (stored === true) === here;
+  return JSON.stringify(stored ?? null) === JSON.stringify(here);
+}
+
+/**
+ * 勾选新建（D-613）：这一段里已经连着哪些来源（显示成「已添加」，不再建）。targets 是目标表现有的记录，
+ * here 是这一段的值（列表筛选里的等于条件和这一段，同 hereValues）：每个值都对得上的，才算在这一段里。
+ */
+export function pickedAlready(
+  tool: Extract<RecordTool, { do: 'createAll' }>,
+  target: Collection,
+  targets: readonly DataRecord[],
+  here: Record<string, unknown>,
+): Set<string> {
+  const [link] = pickLinkFields(tool, target);
+  const out = new Set<string>();
+  if (!link) return out;
+  for (const r of targets) {
+    if (!Object.entries(here).every(([id, v]) => sameHere(r.values[id], v))) continue;
+    const linked = r.values[link];
+    for (const id of Array.isArray(linked) ? linked : [linked])
+      if (typeof id === 'string' && id) out.add(id);
+  }
+  return out;
+}
+
+/**
+ * 勾选新建（D-613）：用户勾的每一条来源（按勾的顺序，已添加的跳过）各一份新记录的表单输入：这一段的值加上
+ * values（"$row" 是勾的那一条，抄的、日期起点也读它）。结果再交给 prepareRecordValues。
+ */
+export function pickCreateInputs(
+  tool: Extract<RecordTool, { do: 'createAll' }>,
+  target: Collection,
+  sourceView: Collection,
+  picked: readonly DataRecord[],
+  here: Record<string, unknown>,
+  already: ReadonlySet<string>,
+  ctx: ActionContext,
+): { sourceId: string; input: Record<string, unknown> }[] {
+  return picked
+    .filter((r) => !already.has(r.id))
+    .map((r) => ({
+      sourceId: r.id,
+      input: {
+        ...here,
+        ...createInput(target, tool.values, {
+          ...ctx,
+          rowId: r.id,
+          entry: { record: r, view: sourceView },
+        }),
+      },
     }));
 }
 

@@ -510,6 +510,8 @@ class Analysis {
       const from = this.uses.get(tool.from);
       if (from) this.readFilter(from, tool.filter);
       for (const id of Object.keys(tool.values)) use.written.add(id);
+      // 勾选新建（D-613）还写这一段的值（列表筛选里的等于条件、分段）。
+      if (tool.pick) for (const id of at.herePresets ?? []) use.written.add(id);
       return;
     }
     // 移到「最近删除」（D-610）不写字段。

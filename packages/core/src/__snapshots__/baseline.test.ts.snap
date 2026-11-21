@@ -2761,6 +2761,7 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 6>.tools[]<anyOf 6>.filter[] = <oneOf 0>.showIf.filter[]
 <oneOf 6>.tools[]<anyOf 6>.values object record
 <oneOf 6>.tools[]<anyOf 6>.values{} = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 6>.tools[]<anyOf 6>.pick? true
 <oneOf 6>.tools[]<anyOf 7> object
 <oneOf 6>.tools[]<anyOf 7>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
 <oneOf 6>.tools[]<anyOf 7>.label? string len 1..30
@@ -3695,6 +3696,7 @@ exports[`baseline > workspace config JSON Schema 2`] = `
 .tools[]<oneOf 1>.done<oneOf 5>.filter[] = .data.tables[].fields[]<oneOf rollup>.filter[]
 .tools[]<oneOf 1>.done<oneOf 5>.values object record
 .tools[]<oneOf 1>.done<oneOf 5>.values{} = .tools[]<oneOf 1>.done<oneOf 0>.values<anyOf 0>{}
+.tools[]<oneOf 1>.done<oneOf 5>.pick? true
 .tools[]<oneOf 1>.done<oneOf 6> object
 .tools[]<oneOf 1>.done<oneOf 6>.do "remove"
 .tools[]<oneOf 1>.done<oneOf 6>.table string /^[a-z][a-z0-9-]{0,47}$/
