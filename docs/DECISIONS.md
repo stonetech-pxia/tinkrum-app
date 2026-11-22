@@ -26,7 +26,7 @@ An entry says what was decided, why, and who decided it when. It is not the spec
 Append it to the file for its hundred (start a new file at a new hundred) in this shape:
 
 ```md
-### D-620 — What was decided, in a few words
+### D-NNN — What was decided, in a few words
 
 Two or three sentences: what was decided and its main boundary. When the founder decided or confirmed it, say where and on what day.
 
@@ -39,7 +39,7 @@ Write the decision, not the specification and not the story of building it: the 
 
 ## What happened on 2026-11-22
 
-Until then the log was one table in this file (1.4 MB) whose entries carried the full specification of each decision. It was split into `docs/decisions/` and cut to summaries (see D-new-vibe-checkup-1 in the last file). Every entry as it was written: `git show 96a978d4:docs/DECISIONS.md`.
+Until then the log was one table in this file (1.4 MB) whose entries carried the full specification of each decision. It was split into `docs/decisions/` and cut to summaries (see D-620 in the last file). Every entry as it was written: `git show 96a978d4:docs/DECISIONS.md`.
 
 Deleted, 28 entries that nothing cites: D-001–D-006, D-013, D-015–D-016, D-022, D-027, D-030, D-069, D-107, D-201, D-229, D-320, D-339, D-345, D-350, D-353, D-356, D-494–D-495, D-504–D-505, D-514, D-608.
 
