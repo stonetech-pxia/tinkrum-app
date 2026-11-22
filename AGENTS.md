@@ -118,14 +118,16 @@ The original product handoff document was deleted on 2026-11-08; the parts that 
 - **Building a release build** (it does not depend on Metro; the JS is fixed at build time):
 
   ```bash
-  cd apps/mobile && EXPO_PUBLIC_MORPH_PACKS_URL=https://morph-tools.stonetech.dev/packs \
-    npx expo prebuild --platform android --no-install
-  cd android && EXPO_PUBLIC_MORPH_API_URL=https://morph-api.stonetech.dev \
-    EXPO_PUBLIC_MORPH_TOOLS_URL=https://morph-tools.stonetech.dev \
-    EXPO_PUBLIC_MORPH_PACKS_URL=https://morph-tools.stonetech.dev/packs \
-    EXPO_PUBLIC_MORPH_CLIENT_TOKEN="$(grep '^MORPH_CLIENT_TOKEN=' ~/projects/morph-prod/.env | cut -d= -f2-)" \
-    ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a
-  adb -s <serial> install -r app/build/outputs/apk/release/app-release.apk
+  # From the repository root; keep all four exported through prebuild and Gradle.
+  export EXPO_PUBLIC_MORPH_API_URL=https://morph-api.stonetech.dev
+  export EXPO_PUBLIC_MORPH_TOOLS_URL=https://morph-tools.stonetech.dev
+  export EXPO_PUBLIC_MORPH_PACKS_URL=https://morph-tools.stonetech.dev/packs
+  export EXPO_PUBLIC_MORPH_CLIENT_TOKEN="$(grep '^MORPH_CLIENT_TOKEN=' ~/projects/morph-prod/.env | cut -d= -f2-)"
+  npm run check:mobile-env && (
+    cd apps/mobile && npx expo prebuild --platform android --no-install &&
+    cd android && ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a &&
+    adb -s <serial> install -r app/build/outputs/apk/release/app-release.apk
+  )
   ```
 
   All four environment variables are baked into the app. If one is missing, AI, tool downloads or scan flattening (D-274; when `PACKS_URL` is missing, scanning does not offer to download the flattening model, and pages still scan but are not flattened) will not work on the phone, and neither the simulator nor unit tests will notice. The token is not a secret (D-132), but do not print it into logs. Prebuild also puts the bundled file packs into the app (D-510, `plugins/with-bundled-packs.js`, cached in `node_modules/.cache/morph-bundled-packs`); without `PACKS_URL` at prebuild it leaves out flattening and layout, and the app offers them as a download again.
@@ -173,3 +175,5 @@ The original product handoff document was deleted on 2026-11-08; the parts that 
 `npm run check` passes in full; the affected evals have been run; every fix has a test that fails without it; native and UI changes have been run in the simulator; all three languages have been looked at; DECISIONS is consistent from start to end; a change to `packages/tool-office` has run `npm run test:word-regression` for the affected suite; nothing this change renamed or removed is still named in `docs/`, `README*.md`, `AGENTS.md` or a comment; no new `<Modal>` sheet, chip or date formatter was written where a shared one exists. The report has three separate parts: verified in the simulator, unit tests only, and testable only on a real device.
 
 Shared helpers: local dates use `localDate` / `localDateStamp` from core (`field-values.ts`); HTML text escaping uses `escapeHtml`; numeric bounds use `clamp(value, lower, upper)`. Pure image algorithms import `clamp` from the lightweight `@morph/core/math` subpath. The public website base is `SITE_URL`. Search for an existing helper before writing another.
+
+Release gates: run `npm run hooks:install` in each clone/worktree that will push; it installs the versioned pre-push check only for that checkout. Push from a clean checkout of the commit being sent. Relay releases and rollbacks use `scripts/deploy.sh` as documented in `docs/DEPLOY.md`; without `--apply` it only prints a plan. Never deploy or push without the founder's explicit request. The release-script regression tests are part of `npm run check`.

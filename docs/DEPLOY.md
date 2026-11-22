@@ -16,15 +16,49 @@ App ──https──► Cloudflare ──tunnel morph-prod──► Mac mini 12
 
 This tunnel is separate from simo's: restarting or changing Morph does not affect simo.
 
-## Releasing a new version
+## Local push gate
+
+After creating a clone or worktree, run `npm run hooks:install` there. It enables `.githooks/pre-push` for that checkout using Git's worktree-specific configuration; it does not change the hook path of other worktrees. Git 2.20 or later is required. The hook runs the full `npm run check` and blocks on failure. Push from a clean checkout of the commit being sent, including when pushing a tag; a different branch's working tree is not evidence that the pushed commit passes. Deletion-only pushes do not publish code and skip the check.
+
+The hook is local to an installed checkout. A new clone must enable it explicitly; it is a development gate, not a server-side security boundary. GitHub Actions is not enabled by this change.
+
+## Releasing a new relay version
+
+Deployment and pushing require the founder's explicit request. Use the script from the reviewed development checkout; `--repo` is the separate production clone. Fetch first, then pin the commit you intend to release. The script does not fetch or push automatically.
 
 ```bash
-cd ~/projects/morph-prod
-git fetch origin && git checkout --detach origin/main
-npm ci
-launchctl kickstart -k gui/$(id -u)/dev.stonetech.morph-api
-curl -s https://morph-api.stonetech.dev/health
+git -C ~/projects/morph-prod fetch origin
+# First inspect the resolved commit and plan. No --apply means no writes or restarts.
+./scripts/deploy.sh --repo ~/projects/morph-prod --ref origin/main --tag api-YYYY-MM-DD-HHMMSSZ
+# Run only for an explicitly authorised release, using the same pinned commit shown above.
+./scripts/deploy.sh --repo ~/projects/morph-prod --ref <full-commit-id> --tag api-YYYY-MM-DD-HHMMSSZ --apply
 ```
+
+The script verifies that the loaded `dev.stonetech.morph-api` job uses this clone's `apps/api` directory and that the current relay is healthy. It locks the deployment, checks the target out in a temporary worktree, runs `npm ci` and the complete `npm run check` there, and only then creates an annotated release tag. The temporary checkout contains tracked code, not production `.env` or request records. Before changing production, it rechecks that its checkout is unchanged and clean. It then checks out the validated commit in production, installs its dependencies, restarts only the relay job, and waits for `/health` to return `ok: true`. The tunnel is left running.
+
+A failed validation leaves production untouched and creates no tag. A failure after changing production attempts to restore the previous checkout, reinstall its dependencies and restart the relay, then checks health again. The command still exits unsuccessfully. A failed candidate's tag is retained for audit; it must not be treated as a successful release. Tags are never overwritten. Temporary validation worktrees and the deployment's own lock are removed on exit; an existing lock is never removed by another invocation.
+
+Deployment receipts are local Git metadata, not API request data:
+
+```bash
+git -C ~/projects/morph-prod rev-parse --git-path morph-deployments.jsonl
+# Read that file for succeeded / rolledBack, tag, commit and previous commit.
+git -C ~/projects/morph-prod tag --list 'api-*'
+```
+
+An `api-baseline-*` tag records an observed existing production commit; it is not a new deployment. Release tags and receipts remain local until the founder explicitly requests a push. If a process is forcibly killed and leaves `morph-deploy.lock`, inspect the owning process and checkout before manually removing the stale lock; do not run another deployment around it.
+
+## Rolling back the relay
+
+Choose a previously successful receipt/tag, or the recorded initial production baseline. Do not choose the newest tag blindly: a failed candidate is retained. Review its commit with `git show --no-patch <previous-tag>`.
+
+```bash
+./scripts/deploy.sh --repo ~/projects/morph-prod --ref <previous-successful-tag> --tag api-rollback-YYYY-MM-DD-HHMMSSZ
+# Only after the founder explicitly requests rollback:
+./scripts/deploy.sh --repo ~/projects/morph-prod --ref <previous-successful-tag> --tag api-rollback-YYYY-MM-DD-HHMMSSZ --apply
+```
+
+Rollback goes through the same dependency install, full validation, new audit tag, restart and health check. It never rewrites an old tag. Checkout explicitly refuses to overwrite ignored files. The production `.env` and ignored `apps/api/data/` files are retained: there is no `git clean`, account-data restore or data deletion in this procedure. If automatic recovery reports failure, inspect `launchctl print` and the relay logs below; do not restart unrelated jobs or kill processes by command-name pattern.
 
 ## When building the app
 

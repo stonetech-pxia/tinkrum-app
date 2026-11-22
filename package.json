@@ -24,11 +24,14 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "check:licenses": "node scripts/check-licenses.mjs",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm run test && npm run test:native-dsp && npm run test:native-archive && npm run check:licenses && npm run check:locales",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run test && npm run test:release && npm run test:native-dsp && npm run test:native-archive && npm run check:licenses && npm run check:locales",
     "test:native-dsp": "node scripts/test-native-dsp.mjs",
     "test:native-archive": "node scripts/test-native-archive.mjs",
     "check:locales": "node scripts/check-locales.mjs",
-    "test:word-regression": "tsx tests/word-regression/run.ts"
+    "test:word-regression": "tsx tests/word-regression/run.ts",
+    "hooks:install": "sh scripts/install-hooks.sh",
+    "check:mobile-env": "node scripts/check-mobile-env.mjs",
+    "test:release": "node --test scripts/release.test.mjs"
   },
   "dependencies": {
     "patch-package": "^8.0.1"
