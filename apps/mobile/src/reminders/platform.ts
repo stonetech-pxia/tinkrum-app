@@ -30,6 +30,8 @@ export interface NotificationPlatform {
   cancel(id: string): Promise<void>;
   /** 收起通知中心里已经出现的一条。 */
   dismiss(notificationId: string): Promise<void>;
+  /** 立刻显示一条只有文字的通知（通知上的按钮没做成时告诉用户，体检 2.5）。 */
+  alert(title: string, body: string): Promise<void>;
   /** 用户点了提醒（App 开着或从提醒冷启动）；返回取消订阅的函数。 */
   onOpen(listener: (opens: ReminderTarget) => void): () => void;
   /** 用户点了提醒上的按钮（App 开着，或者被系统在后台拉起）；返回取消订阅的函数。 */

@@ -39,6 +39,10 @@ export class FakeNotifications implements NotificationPlatform {
   async dismiss(id: string) {
     this.dismissed.push(id);
   }
+  alerts: { title: string; body: string }[] = [];
+  async alert(title: string, body: string) {
+    this.alerts.push({ title, body });
+  }
   onOpen(_listener: (opens: ReminderTarget) => void) {
     return () => {};
   }

@@ -811,7 +811,8 @@ describe('底线 15 / 16：看永远不会改；每次写入都来自用户的�
   });
 
   // 创始人 2026-10-31（对话）定的例外（D-037）：回收站里删掉超过 30 天的记录在启动时永久删除，起因是用户自己删的。
-  // 这是启动时唯一的写入。
+  // 这是启动时唯一的写入。启动兜底页的计数文件在数据库外面，是 App 自己的记账、不是数据（创始人 2026-11-22，
+  // D-new-vibe-checkup-full-test-145368-1），不在这里数。
   it('starting the app writes nothing except emptying entries deleted more than 30 days ago', async () => {
     const repo = await repoWithPrivateData();
     await repo.insertRecord({

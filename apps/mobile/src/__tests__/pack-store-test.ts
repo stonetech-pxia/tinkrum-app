@@ -67,6 +67,26 @@ describe('extension packs', () => {
     expect(fs.downloads).toEqual(['https://packs.example/dewarp/1.0.0/uvdoc.onnx']);
   });
 
+  it('treats a pack whose ready.json is half written as not installed, without losing the others', async () => {
+    const fs = new MemoryPackFs();
+    const lookup = await manifests(fs);
+    const store = new PackStore(
+      fs,
+      sha256,
+      (id) => lookup.get(id),
+      () => 1000,
+    );
+    await store.install('ocr-eng');
+    // 写 ready.json 时被杀了进程：只写下了一半。
+    const ocr = lookup.get('ocr')!;
+    await fs.writeText(`ocr/${ocr.version}/ready.json`, '{"id":"ocr","byt');
+    expect((await store.installed()).map((p) => p.id)).toEqual(['ocr-eng']);
+    expect(await store.isInstalled('ocr')).toBe(false);
+    // 再装一次就好了：清单重写，算装好。
+    await store.install('ocr');
+    expect((await store.installed()).map((p) => p.id).sort()).toEqual(['ocr', 'ocr-eng']);
+  });
+
   it('downloads a pack with its dependency, verifies every file, and works offline afterwards', async () => {
     const fs = new MemoryPackFs();
     const lookup = await manifests(fs);

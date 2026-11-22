@@ -93,8 +93,32 @@ export class PackStore {
     for (const listener of [...this.listeners]) listener();
   }
 
-  private ready(pack: PackManifest): Promise<boolean> {
-    return this.fs.exists(`${dirOf(pack)}/ready.json`);
+  /**
+   * ready.json 的内容；没有、或读不懂（写到一半被杀了进程）都当没装好，下次用到时照常再装一次，
+   * 不让一个包的坏清单把整张已安装列表一起拖垮。
+   */
+  private async readyInfo(
+    pack: PackManifest,
+  ): Promise<{ bytes: number; installedAt: number; bundled?: boolean } | null> {
+    const path = `${dirOf(pack)}/ready.json`;
+    if (!(await this.fs.exists(path))) return null;
+    try {
+      const ready: unknown = JSON.parse(await this.fs.readText(path));
+      if (
+        !ready ||
+        typeof ready !== 'object' ||
+        typeof (ready as { bytes?: unknown }).bytes !== 'number' ||
+        typeof (ready as { installedAt?: unknown }).installedAt !== 'number'
+      )
+        return null;
+      return ready as { bytes: number; installedAt: number; bundled?: boolean };
+    } catch {
+      return null;
+    }
+  }
+
+  private async ready(pack: PackManifest): Promise<boolean> {
+    return (await this.readyInfo(pack)) !== null;
   }
 
   /** App 里带着清单上的这个版本（D-510）；清单换了新版本而 App 里还是旧的，就照旧下载。 */
@@ -127,11 +151,8 @@ export class PackStore {
     for (const id of ids) {
       const pack = this.lookup(id);
       if (!pack || !(await this.isInstalled(id))) continue;
-      const ready = JSON.parse(await this.fs.readText(`${dirOf(pack)}/ready.json`)) as {
-        bytes: number;
-        installedAt: number;
-        bundled?: boolean;
-      };
+      const ready = await this.readyInfo(pack);
+      if (!ready) continue;
       out.push({
         id,
         version: pack.version,

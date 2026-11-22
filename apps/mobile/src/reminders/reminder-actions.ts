@@ -15,6 +15,7 @@ import {
   type WorkspaceConfig,
 } from '@morph/core';
 
+import { t } from '../i18n';
 import { newAssetId } from '../runtime/ids';
 import type { RecordWrite, WorkspaceRepo } from '../storage/types';
 import type { NotificationPlatform, ReminderAction } from './platform';
@@ -34,7 +35,9 @@ export interface ReminderActionDeps {
 export type ReminderActionResult =
   | { kind: 'done'; title: string }
   | { kind: 'snoozed' }
-  /** 已经处理过、提醒或记录不在了、写不进去：什么也没写。 */
+  /** 记录还在，「完成」却存不进去（表满了、旧配置里必填字段没有值）：什么也没写，要告诉用户。 */
+  | { kind: 'notSaved' }
+  /** 已经处理过、提醒或记录不在了、没有可做的：什么也没写。 */
   | { kind: 'skipped' };
 
 /** 处理过的点击（同一次点击可能从两条路送到）；存在设备上，App 重启也不会再做一遍。 */
@@ -89,10 +92,12 @@ async function handle(
   };
   // 通知到这里才收起来（Android 点了按钮通知不会自己收起来）：事情做成了、或者没有什么可做的。
   const dismiss = () => platform.dismiss(action.notificationId).catch(() => undefined);
-  const nothing = async (): Promise<ReminderActionResult> => {
+  const nothing = async (
+    kind: 'skipped' | 'notSaved' = 'skipped',
+  ): Promise<ReminderActionResult> => {
     await repo.setMeta(mark.key, mark.value);
     await dismiss();
-    return { kind: 'skipped' };
+    return { kind };
   };
 
   // 读到写之间记录被别处改了（表单、小组件）就重新读一次再算，最多三次。
@@ -147,10 +152,10 @@ async function handle(
     if (planned.kind === 'create') {
       const counts = await repo.countRecords();
       const count = counts.find((c) => c.collectionId === planned.collection.id)?.count ?? 0;
-      if (count >= RECORD_LIMITS.perCollection) return nothing();
+      if (count >= RECORD_LIMITS.perCollection) return nothing('notSaved');
       const prepared = prepareRecordValues(planned.collection, planned.input, null, at, cal);
       // 存不进去（旧配置里必填字段没有值）：后台没法打开表单，什么也不写。
-      if (!prepared.ok) return nothing();
+      if (!prepared.ok) return nothing('notSaved');
       write = {
         kind: 'insert',
         record: {
@@ -163,7 +168,7 @@ async function handle(
       };
     } else {
       const prepared = prepareRecordValues(collection, planned.input, record.values, at, cal);
-      if (!prepared.ok) return nothing();
+      if (!prepared.ok) return nothing('notSaved');
       write = {
         kind: 'update',
         id: record.id,
@@ -181,4 +186,29 @@ async function handle(
   }
   // 一直有别的写入插进来：不标记处理过，下次再送来时再做。
   throw new Error('the entry kept changing while the reminder button was handled');
+}
+
+/**
+ * 通知上的按钮从这里进（background.ts）：没做成（写不进去、出错）就立刻弹一条通知，
+ * 不让用户以为记下了（体检 2.5）。抛错时这次点击没标记处理过，用户打开 App 再来一次不会重复。
+ */
+export async function runReminderAction(
+  action: ReminderAction,
+  deps: ReminderActionDeps,
+): Promise<ReminderActionResult | null> {
+  const tell = () =>
+    deps.platform
+      .alert(
+        t(deps.locale, action.button === 'done' ? 'reminderNotSaved' : 'reminderNotSnoozed'),
+        t(deps.locale, 'reminderActionFailedBody'),
+      )
+      .catch(() => undefined);
+  try {
+    const result = await handleReminderAction(action, deps);
+    if (result.kind === 'notSaved') await tell();
+    return result;
+  } catch {
+    await tell();
+    return null;
+  }
 }

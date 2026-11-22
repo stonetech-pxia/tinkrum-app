@@ -31,7 +31,6 @@ export const fr: MessageTable = {
   shareSummary: '{n} fichiers',
   sharePhotoSummary: '{n} photos',
   loading: 'Chargement…',
-  bootFailed: 'L’espace de travail n’a pas pu être ouvert.',
 
   // 修改流程
   changeTitle: 'Modifier cette application',
@@ -1206,6 +1205,25 @@ export const fr: MessageTable = {
   reminderDoneButton: 'Fait',
   reminderSnoozeButton: 'Me le rappeler plus tard',
   reminderDoneToast: 'Enregistré : {title}',
+  rescueTitle: 'Tinkrum n’a pas pu s’ouvrir',
+  rescueBody:
+    'Vos entrées et vos fichiers sont toujours sur ce téléphone. Essayez de l’ouvrir normalement ; si cela échoue encore, revenez à la version précédente ou exportez d’abord une sauvegarde.',
+  rescueContinue: 'Ouvrir normalement',
+  rescueStepBack: 'Revenir à la version précédente',
+  rescueSteppedBack:
+    'Retour à la version du {when} ; entrées et fichiers inchangés. Touchez « Ouvrir normalement » pour essayer.',
+  rescueNoOlder: 'Il n’y a pas de version plus ancienne.',
+  rescueStepBackFailed:
+    'Impossible de revenir à la version précédente. Vous pouvez d’abord exporter une sauvegarde.',
+  rescueExport: 'Exporter une sauvegarde',
+  rescueExportFailed: 'Impossible d’exporter la sauvegarde.',
+  rescueSite: 'Chercher une nouvelle version sur le site',
+  rescueVersion: 'Version {version}',
+  rescueShareError: 'Partager le détail de l’erreur',
+  reminderNotSaved: 'Non enregistré',
+  reminderNotSnoozed: 'Rappel non reporté',
+  reminderActionFailedBody:
+    'Le bouton touché sur le rappel n’a pas fonctionné. Ouvrez Tinkrum et réessayez.',
   weekday1: 'lundi',
   weekday2: 'mardi',
   weekday3: 'mercredi',

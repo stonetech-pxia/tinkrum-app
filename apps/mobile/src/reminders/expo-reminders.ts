@@ -221,6 +221,13 @@ export function expoReminders(channelName: string): NotificationPlatform {
     async dismiss(notificationId) {
       await dismissNotificationAsync(notificationId);
     },
+    async alert(title, body) {
+      await ensureChannel(channelName);
+      await scheduleNotificationAsync({
+        content: { title, body },
+        trigger: { channelId: CHANNEL },
+      });
+    },
     onOpen(listener) {
       // 从提醒冷启动：最后一次点的那条（按钮的点击由 onAction 处理）。
       const last = getLastNotificationResponse();

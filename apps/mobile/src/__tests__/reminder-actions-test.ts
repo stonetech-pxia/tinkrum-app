@@ -14,7 +14,7 @@ import {
 } from '@morph/core';
 
 import type { ReminderAction } from '../reminders/platform';
-import { handleReminderAction } from '../reminders/reminder-actions';
+import { handleReminderAction, runReminderAction } from '../reminders/reminder-actions';
 import { syncReminders } from '../reminders/useReminders';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { SQLiteWorkspaceRepo, migrateDatabase } from '../storage/sqlite';
@@ -168,7 +168,10 @@ describe('the Done button (D-318)', () => {
     const missing = await setup({
       done: { do: 'create', table: 'checkins', values: { habit: '$row' } },
     });
-    expect(await handleReminderAction(press('done'), missing.deps)).toEqual({ kind: 'skipped' });
+    // 记录还在、却存不进去：用户以为记下了，要告诉他（见下面的 runReminderAction）。
+    expect(await handleReminderAction(press('done'), missing.deps)).toEqual({
+      kind: 'notSaved',
+    });
     expect(await missing.repo.listRecords('checkins')).toEqual([]);
   });
 
@@ -291,5 +294,51 @@ describe('a tap whose write fails is not lost (R06)', () => {
     // 已经处理过的点击（当时什么也没做）不会因为记录回来了又做一遍。
     expect(await handleReminderAction(press('done'), deps)).toEqual({ kind: 'skipped' });
     expect((await repo.getRecord('run'))!.values.last).toBeUndefined();
+  });
+});
+
+// 体检 2.5：点了通知上的按钮却没做成，不能无声无息——立刻弹一条通知，让用户打开 App 再来一次。
+describe('telling the user when a button on the reminder did not go through', () => {
+  it('the write fails: a notification says it was not logged', async () => {
+    const { repo, platform, deps } = await setup({
+      done: { do: 'increment', table: 'habits', field: 'count', by: 1 },
+    });
+    jest.spyOn(repo, 'applyRecordWrites').mockRejectedValueOnce(new Error('disk write failed'));
+    await runReminderAction(press('done'), deps);
+    expect(platform.alerts).toEqual([
+      { title: '没有记下', body: '刚才在提醒上点的按钮没有生效，请打开 Tinkrum 再试一次。' },
+    ]);
+    expect((await repo.getRecord('run'))!.values.count).toBe(2);
+  });
+
+  it('a required field would stay empty: the same notification, nothing written', async () => {
+    const { repo, platform, deps } = await setup({
+      done: { do: 'create', table: 'checkins', values: { habit: '$row' } },
+    });
+    await runReminderAction(press('done'), deps);
+    expect(platform.alerts.map((a) => a.title)).toEqual(['没有记下']);
+    expect(await repo.listRecords('checkins')).toEqual([]);
+  });
+
+  it('Remind me later cannot be scheduled: says so', async () => {
+    const { platform, deps } = await setup({
+      done: { do: 'set', table: 'habits', field: 'last', value: 'today' },
+    });
+    jest.spyOn(platform, 'snooze').mockRejectedValueOnce(new Error('cannot schedule'));
+    await runReminderAction(press('snooze'), deps);
+    expect(platform.alerts.map((a) => a.title)).toEqual(['没能稍后提醒']);
+  });
+
+  it('stays quiet when it worked, or when there was nothing to do', async () => {
+    const done = await setup({
+      done: { do: 'increment', table: 'habits', field: 'count', by: 1 },
+    });
+    expect(await runReminderAction(press('done'), done.deps)).toEqual({
+      kind: 'done',
+      title: '跑步',
+    });
+    await done.repo.deleteRecord('run', 1);
+    await runReminderAction(press('done', 'n1:2:x'), done.deps);
+    expect(done.platform.alerts).toEqual([]);
   });
 });

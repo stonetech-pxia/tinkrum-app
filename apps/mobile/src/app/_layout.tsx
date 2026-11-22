@@ -22,8 +22,8 @@ import Constants from 'expo-constants';
 import { useFonts } from 'expo-font';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AISettingsProvider } from '@/ai/context';
@@ -40,6 +40,10 @@ import { LANGUAGE_META_KEY, parseLanguage, resolveLocale, useLanguage } from '@/
 import { PackBridge } from '@/packs/bridge';
 import { expoBridgeFiles, expoPackStore, expoSha256 } from '@/packs/expo-pack-fs';
 import { PackHostProvider } from '@/packs/PackHost';
+import { rescueActions } from '@/rescue/actions';
+import { HEALTHY_AFTER_MS, markHealthy } from '@/rescue/attempts';
+import { expoAttemptStore } from '@/rescue/expo-attempts';
+import { RescueScreen } from '@/rescue/RescueScreen';
 import { onReminderAction, reminders } from '@/reminders/background';
 import {
   useReminderActionFeedback,
@@ -128,22 +132,28 @@ function Centered({ children }: { children: ReactNode }) {
 }
 
 function RootStack() {
-  const { locale } = useWorkspaceContext();
+  const { locale, store } = useWorkspaceContext();
   const status = useWorkspace((s) => s.status);
   const error = useWorkspace((s) => s.error);
   const config = useWorkspace((s) => s.config);
+  const actions = useMemo(() => rescueActions(locale), [locale]);
   useStopBuildInBackground();
-  if (status === 'error' || !config) {
+  // 读工作空间出错：兜底页（体检 6.6），「照常打开」再读一次。
+  if (status === 'error')
+    return (
+      <RescueScreen
+        locale={locale}
+        error={error ?? ''}
+        actions={actions}
+        onContinue={() => void store.getState().boot()}
+      />
+    );
+  if (!config)
     return (
       <Centered>
-        {status === 'error' ? (
-          <Text>{`${t(locale, 'bootFailed')}\n${error}`}</Text>
-        ) : (
-          <ActivityIndicator />
-        )}
+        <ActivityIndicator />
       </Centered>
     );
-  }
   return <ThemedStack />;
 }
 
@@ -290,6 +300,9 @@ export default function RootLayout() {
   const [runtime, setRuntime] = useState<Runtime | null>(null);
   const locale = resolveLocale(useLanguage((s) => s.preference));
   const [error, setError] = useState<string | null>(null);
+  // 启动出错后在兜底页点了「照常打开」：再启动一次。
+  const [bootTry, setBootTry] = useState(0);
+  const actions = useMemo(() => rescueActions(locale), [locale]);
   // 默认风格 Clay 的字体（Sora 标题、Karla 正文）。加载失败时退回系统字体，不阻塞启动。
   const [fontsLoaded, fontError] = useFonts({
     [CLAY_FONTS.heading]: Sora_700Bold,
@@ -315,7 +328,15 @@ export default function RootLayout() {
       await expoFilePlatform.removeStalePickerCopies().catch(() => undefined);
       setRuntime(booted);
     })().catch((e) => setError(String(e)));
-  }, []);
+  }, [bootTry]);
+
+  // 主页正常显示了一会儿：这次启动算成功，启动兜底从零数起（体检 6.6）。
+  const ready = Boolean(runtime) && (fontsLoaded || Boolean(fontError));
+  useEffect(() => {
+    if (!ready) return;
+    const timer = setTimeout(() => markHealthy(expoAttemptStore), HEALTHY_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [ready]);
 
   // 整体恢复和撤销（D-600）：换数据目录前关掉数据库并卸下界面（不让任何界面碰关掉的数据库），换完后重开、
   // 重建工作空间，读回来才算成功；读不回来就抛错，由备份流程换回旧数据再来一遍。
@@ -403,10 +424,22 @@ export default function RootLayout() {
     };
   }, [runtime, builtLocale, locale]);
 
-  if (!runtime || (!fontsLoaded && !fontError)) {
+  if (!runtime && error)
+    return (
+      <RescueScreen
+        locale={locale}
+        error={error}
+        actions={actions}
+        onContinue={() => {
+          setError(null);
+          setBootTry((n) => n + 1);
+        }}
+      />
+    );
+  if (!runtime || !ready) {
     return (
       <Centered>
-        {error ? <Text>{`${t(locale, 'bootFailed')}\n${error}`}</Text> : <ActivityIndicator />}
+        <ActivityIndicator />
       </Centered>
     );
   }

@@ -30,7 +30,6 @@ export const en = {
   shareSummary: '{n} files',
   sharePhotoSummary: '{n} photos',
   loading: 'Loading…',
-  bootFailed: 'The workspace could not be opened.',
 
   // 修改流程
   changeTitle: 'Change this app',
@@ -1137,6 +1136,24 @@ export const en = {
   reminderDoneButton: 'Done',
   reminderSnoozeButton: 'Remind me later',
   reminderDoneToast: 'Logged: {title}',
+  rescueTitle: 'Tinkrum could not open',
+  rescueBody:
+    'Your entries and files are still on this phone. Try opening it as usual; if that fails again, go back to the previous version or export a backup first.',
+  rescueContinue: 'Open as usual',
+  rescueStepBack: 'Go back to the previous version',
+  rescueSteppedBack:
+    'Back to the version from {when}; entries and files were not touched. Tap “Open as usual” to try it.',
+  rescueNoOlder: 'There is no older version.',
+  rescueStepBackFailed: 'Could not go back to the previous version. You can export a backup first.',
+  rescueExport: 'Export a backup',
+  rescueExportFailed: 'Could not export the backup.',
+  rescueSite: 'Check the website for a new version',
+  rescueVersion: 'Version {version}',
+  rescueShareError: 'Share the error details',
+  reminderNotSaved: 'Not logged',
+  reminderNotSnoozed: 'Could not remind you later',
+  reminderActionFailedBody:
+    'The button you tapped on the reminder did not go through. Open Tinkrum and try again.',
   weekday1: 'Monday',
   weekday2: 'Tuesday',
   weekday3: 'Wednesday',

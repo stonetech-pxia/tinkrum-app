@@ -7,7 +7,7 @@ import { getDeviceLocale, t } from '../i18n';
 import { openRepo } from '../storage/open';
 import { expoReminders, reminderActionOf, setupReminderButtons } from './expo-reminders';
 import type { ReminderAction } from './platform';
-import { handleReminderAction, type ReminderActionResult } from './reminder-actions';
+import { runReminderAction, type ReminderActionResult } from './reminder-actions';
 
 // 提醒通知上的按钮（D-318）在 App 没开着时也要能用。这个文件在入口（index.ts）最先加载，界面还没起来就
 // 开始听按钮：
@@ -42,13 +42,14 @@ async function run(action: ReminderAction) {
   busy++;
   try {
     const repo = await openRepo();
-    const result = await handleReminderAction(action, {
+    // 没做成时 runReminderAction 自己弹通知告诉用户，不会无声无息（体检 2.5）。
+    const result = await runReminderAction(action, {
       repo,
       platform: reminders,
       locale,
       now: () => new Date(),
     });
-    for (const l of listeners) l(result);
+    if (result) for (const l of listeners) l(result);
   } finally {
     busy--;
     release();
