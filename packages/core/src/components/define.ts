@@ -9,7 +9,7 @@ import { filterSchema } from '../schema-primitives';
 
 // 块的登记表（v34：容器）：每种外观（look）一份定义（新增外观的步骤见 docs/COMPONENTS.md），
 // 结构校验、引用检查、草稿说明、长按编辑、提示词都从这里读，不再各写一份按类型的 switch。
-// 每个块都是同样的几个键（NEW_FORMAT §3.1）：look 怎么画、show 这种外观自己的选项、source 读什么（只读）、
+// 每个块都是同样的几个键（D-368）：look 怎么画、show 这种外观自己的选项、source 读什么（只读）、
 // tools 引用哪些工具（会写的都在这里）、opens 点了去哪（导航，不写东西）、children（只有 group）。
 
 /** 每个块都可以有的外观设置。tone 对文字块是文字颜色，对卡片类块是底色。 */

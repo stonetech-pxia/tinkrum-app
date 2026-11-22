@@ -23,7 +23,7 @@ import {
 } from './schema-base';
 import { ConditionSchema, FieldRefSchema } from './schema-primitives';
 
-// 可变层（交接文档 §5.2）的唯一定义：v34「数据 · 容器 · 工具」（NEW_FORMAT_DRAFT，创始人 2026-10-30 定）。
+// 可变层（交接文档 §5.2）的唯一定义：v34「数据 · 容器 · 工具」（D-368，创始人 2026-10-30 定）。
 // 数据 data（表结构、日期设置），容器 containers（页面 → 块、文件房间的布局）和 nav（导航栏、浮动入口、
 // 手机桌面菜单），工具 tools（快捷操作、提醒），工具包 packages（界面上叫「工具」），主题 theme。
 // 块的外观定义在 components/（每种一个文件，见 docs/COMPONENTS.md），字段在 fields/，其余部分在 schema-base.ts。

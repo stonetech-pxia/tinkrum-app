@@ -62,7 +62,7 @@ interface V4Step {
 }
 
 /**
- * v4 → v5：工作流步骤之间改为传递有类型的值（D-060，TOOLS_DESIGN §8）。
+ * v4 → v5：工作流步骤之间改为传递有类型的值（D-060）。
  * - pdf.selectFiles {min, max} → in.files {accept: 'pdf', min, max}
  * - ui.askFileName {defaultTemplate} + file.save {nameTemplate} → file.rename（每次运行时问）+ file.save {}
  * - 只有 file.save {nameTemplate}（已去掉询问）→ file.rename {template} + file.save {}
@@ -288,7 +288,7 @@ export const migrateV31toV32: Migration = (config) => ({ ...config, schemaVersio
 export const migrateV32toV33: Migration = (config) => ({ ...config, schemaVersion: 33 });
 
 /**
- * v33 → v34：「数据 · 容器 · 工具」（NEW_FORMAT_DRAFT，创始人 2026-10-30 定）：collections → data.tables，
+ * v33 → v34：「数据 · 容器 · 工具」（D-368，创始人 2026-10-30 定）：collections → data.tables，
  * pages → containers.pages（组件 → 块：look / show / source / tools / opens），workflows 和 reminders → tools，
  * shell → nav，tools → packages，desk → containers.desk。ID 不改；见 migrate-v34.ts。
  */

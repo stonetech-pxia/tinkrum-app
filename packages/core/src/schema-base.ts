@@ -390,7 +390,7 @@ export const HomeScreenEntrySchema = z.union([
 ]);
 
 /**
- * 导航（v34 也是容器，NEW_FORMAT §3.6）：bar 导航栏（1–5，原 shell.nav）、floating 浮动入口（≤3）、
+ * 导航（v34 也是容器，D-368）：bar 导航栏（1–5，原 shell.nav）、floating 浮动入口（≤3）、
  * phoneHomeScreen 长按 Morph 图标的菜单里的快捷操作（≤4，D-271，原 workflow.homeScreen）。
  */
 export const NavSchema = z.strictObject({

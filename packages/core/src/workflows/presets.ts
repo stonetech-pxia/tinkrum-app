@@ -6,7 +6,7 @@ import type { IconName, Locale, Localized, Workflow } from '../schema';
 import type { SharedFileInfo } from '../share';
 import { speechLangFor } from '../tools/audio';
 
-// 内置的预设工作流（TOOLS_DESIGN §7，D-081）：不随版本，用户在「工作流」页点「添加」时复制进配置，
+// 内置的预设工作流（D-081）：不随版本，用户在「工作流」页点「添加」时复制进配置，
 // 之后就和用户自己的工作流一样，可以改参数、改步骤、复制、放到页面上、删除；编辑页可以「恢复预设」。
 // 预设只用登记过的动作，不要求先安装对应的工具（跨工具的用户工作流，§2）。
 

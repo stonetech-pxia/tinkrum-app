@@ -2,6 +2,7 @@
 
 This document is the design for the built-in tools (images, PDF, video, scanning, text recognition, translation, packaging, QR codes, printing) and for cross-tool workflows.
 For decision IDs see [DECISIONS.md](DECISIONS.md) (from D-060 on); for user data rules see [DATA_DESIGN.md](DATA_DESIGN.md).
+Sections 2, 7, 8 and 10 described the pre-v34 format or finished plans and were deleted on 2026-11-22; git history has them (last in commit 96a978d4). The current format: `packages/core/src/ops-schema.ts` and `docs/agent/tinkrum-app-guide.md`; the old names are listed in `docs/ARCHITECTURE.md` §11.
 
 ## 0. Principles
 
@@ -51,65 +52,6 @@ type RunValue =
 ```
 
 Intermediate results are temporary files in the cache directory `runs/<runId>/`, cleaned up when the run ends (success, cancel or failure); only the "Save" step, or the user tapping "Save" on the result page, turns them into user files (the `assets` table). `name` is the display name without the extension and travels with the value; the "Rename" step changes exactly this.
-
-## 2. Action Contract
-
-Each action declares its contract in `core` (`ActionDefinition`), and the implementation lives in a `tool-*` package or in the app runtime:
-
-```ts
-interface ActionDefinition {
-  id: string; // 'image.compress', prefixed by domain
-  label: Localized; // "Compress to size"
-  input: ValueType[]; // accepted types; [] = input action (can only be the first step)
-  rejects?: ValueType[]; // subtypes that are accepted via files but cannot be handled (D-140)
-  output: ValueType | 'same' | ((params) => ValueType); // 'same' = type unchanged (rename, save, share)
-  params: ZodType; // parameter schema, parsed once more before running (D-020)
-  fields: ParamField[]; // UI metadata for each parameter; the editor builds its form from it
-  local?: LocalStepKind; // a step that needs the user to act locally (§4)
-  pack?: PackId; // required pack (§6)
-  requires: Permission[];
-  ai?: string; // hint for the AI (English): when to use it, how to set the parameters; sent to the model with the action catalog (D-259)
-  aiRules?: { n: number; text: string }[]; // prompt rules about this action only, inserted into "## Rules" by number
-  phrases?: { match: RegExp; step?: (m, locale) => { params; ask?; table? } }[]; // step phrasings recognized by the built-in rules (D-265)
-}
-
-interface ParamField {
-  key: string; // one key of params
-  label: Localized;
-  kind: 'number' | 'choice' | 'toggle' | 'text' | 'nameTemplate' | 'color';
-  unit?: 'px' | 'KB' | 'MB' | '%' | '°' | 'mm' | 'pt';
-  min?;
-  max?;
-  step?;
-  options?: { value; label: Localized }[]; // choice
-  presets?: { label: Localized; values: Record<string, unknown> }[]; // "Passport 35×45", "4 MB"
-  ask?: boolean; // default "ask on every run"
-  private?: boolean; // text the user wrote themselves (watermark, text stamp): replaced with a placeholder before being sent to the AI
-}
-```
-
-Tests guarantee that every action's `fields` match the keys of its `params` one to one, and that every `presets` entry passes `params` validation.
-
-When adding an action, change only its own definition: its row in the action catalog (`label`, `description`, `ai`), the rules that concern only it (`aiRules`, numbered as the current last one plus 1) and the phrasings the built-in rules recognize (`phrases`; phrasings of different actions must not overlap, `ai/workflow-phrases.test.ts` checks this) are all generated from it. Quick action presets work the same way: the line in the prompt comes from `name`, `description` and the steps, the built-in rules look presets up by name, and other names go in `words`. The names of style presets are in `said` in `presets.ts` (prompt rule 11) and `aliases` (built-in rules).
-
-### Workflow (schemaVersion 5)
-
-```ts
-Workflow = { id, name, icon?, toolId?, presetId?, steps: Step[1..12] }
-Step     = { id, action, params, ask?: string[] }   // ask: these parameters are asked from the user on every run
-```
-
-- `toolId`: created when a tool is installed (the single-function workflows inside the tool and "Merge PDF") and removed together with it when the tool is uninstalled; the user can change the parameters and steps but cannot delete it separately.
-- `presetId`: copied from a preset; the edit page offers "Restore preset".
-- A workflow without `toolId` is the user's own workflow (added from a preset, duplicated or newly created).
-
-### Validation (`validateWorkspace`)
-
-1. Every step's action is registered, and its parameters pass `params`.
-2. The first step must be an input action, and an input action can only be the first step.
-3. **Adjacent steps must have types that connect**: starting from the first step's output, check step by step that the current type is accepted by the next step; `'same'` keeps the type.
-4. A key in `ask` must be a key in that action's `fields`.
-5. A tool's workflows use only the permissions that tool declared (continuing §7B); a user's cross-tool workflows no longer require every action to belong to the same tool.
 
 ## 3. Executor
 
@@ -226,99 +168,16 @@ Mechanism:
 | Vision (`VNDetectFaceRectanglesRequest`, `VNGeneratePersonSegmentationRequest`), Core Image    | built into the system           | iOS      | Apple system frameworks                    | Automatic face framing for ID photos, background color change (D-252)                    |
 | `expo-notifications` (npm package, with iOS / Android native code)                             | 58.1.6                          | Both     | MIT                                        | Reminders: local notifications (D-251), no push registration                             |
 
-## 7. Preset Workflows and Editing
-
-Presets are written in `core/src/workflows/presets.ts`, are not part of versions, and are built-in quick actions (D-236): they need no Add, run directly on the quick actions page and in the inbox, and run records are filed under the preset ID (`builtInWorkflows()` / `findWorkflow()`). Only when the user saves a change, puts one on the home page, combines two quick actions, or tells the AI "add the visa photo workflow" is `presetWorkflow()` used to store it in the config under the preset ID (one undoable version, with `presetId` and an icon, without `toolId`); after that it is the same as the user's own workflow: its parameters and steps can be changed, it can be duplicated, put on a page and deleted, and once deleted it goes back to the built-in one. A preset is a user workflow and **does not require installing any tool first**; a preset that needs a pack asks the user to confirm the download only when the first run reaches that step (§6).
-
-The "Ready-made" section of the quick actions page is grouped by everyday scenario (`PRESET_SCENARIOS`, D-130): getting papers for going abroad (visa / ID photo, print ID photos, translate Chinese documents into English), submitting documents and signing files (application packet, sign and send back, scan a document, combine documents, PDF too big to upload, translate a foreign-language PDF into Chinese, photograph foreign-language documents and translate them into Chinese), expenses and bookkeeping (receipt archive), sending photos and videos (photos for email, hide parts of screenshots and share, send many photos, video too big to send, translate screenshots) (D-146). Translation presets translate into the interface language (an English interface translates into English), and their names change with it.
-
-| id                     | Name                                   | Steps                                                                                                                                    | Pack      |
-| ---------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| `visa-photo`           | Visa / ID photo                        | pick photos → ID photo (US visa 600×600, ≤ 240 KB) → rename                                                                              |           |
-| `document-packet`      | Application packet                     | pick photos / take photos → crop → reorder (`file.order`) → A4 PDF ≤ 4 MB → rename → share                                               |           |
-| `email-photos`         | Photos for email or upload             | pick photos → long edge 1600 → compress to 500 KB → share                                                                                |           |
-| `sign-return`          | Sign and send back                     | pick PDF → fill form (skip when there are no fields) → sign → share                                                                      | pdfview   |
-| `scan-document`        | Scan a document                        | document camera scan (or take a photo and then detect edges) → clean up → PDF → rename → share                                           | scan      |
-| `combine-documents`    | Combine documents                      | pick PDFs and images → merge → select pages / reorder / rotate → rename → share                                                          |           |
-| `receipt-archive`      | Receipt archive                        | scan receipts (or take photos and then straighten) → compress to 500 KB → name by date → save to files                                   | scan      |
-| `redact-screenshots`   | Hide parts of screenshots              | pick screenshots → stitch into a long image → redact → share                                                                             |           |
-| `send-photos`          | Send many photos                       | pick photos → convert to JPG → remove location → long edge 2048 → ZIP → share                                                            |           |
-| `print-id-photos`      | ID photos to print                     | pick photos → ID photo → lay out on 4×6 paper (cut lines) → print or save                                                                |           |
-| `pdf-too-big`          | PDF too big to upload                  | pick PDF → compress PDF (default 2 MB, asked every time) → share                                                                         |           |
-| `video-too-big`        | Video too big to send                  | pick videos → compress video (default 20 MB, asked every time) → share                                                                   |           |
-| `foreign-pdf`          | Translate a PDF into English           | pick PDF → extract text → translate into Chinese → text to PDF → name "original name-Chinese" → share                                    | pdfview   |
-| `foreign-paper`        | Translate paper documents into English | document camera scan → detect edges → recognize text (language asked every time) → translate into Chinese → text to PDF → rename → share | scan, ocr |
-| `papers-to-english`    | Chinese documents into English         | document camera scan → detect edges → recognize Chinese → translate into English → text to PDF → rename → share                          | scan, ocr |
-| `screenshot-translate` | Translate screenshots                  | pick screenshots → recognize text (language asked every time) → translate into Chinese → copy text                                       | ocr       |
-
-**The "Workflows" page** (`app/workflows.tsx`, entered from the Settings page and the Tools page): My workflows (run / edit), the preset library (Add; already added ones show "Added" and can be added again as another copy), and the ones that come with tools (collapsed by default). This page is provided by the core, and the AI cannot change it.
-
-**The edit page** (`app/workflow/[id].tsx`, `run/WorkflowEditor.tsx`):
-
-- Name (1–40 characters); each step's form is generated automatically from `fields` (`ParamForm`, including the `presets` shortcut buttons), and "ask on every run" is ticked parameter by parameter.
-- "Add a step here" lists only the actions whose types connect (`insertableActions`), and a new step's parameters use `initialParams(action)`; move up / move down / delete; steps that do not connect are marked red and cannot be saved.
-- Changes go into a draft first; "Save" uses one `updateWorkflow` to produce one version (summary: Change workflow "X"), the banner can undo it, and it can be restored from the history. When the workflow is changed elsewhere (undo, the AI) and the draft has no unsaved changes, the draft updates with it.
-- "Duplicate", "Put on Home" (`addComponent` of a `workflowRunner`), "Reset to the preset" (when there is a `presetId`), "Delete" (confirmed once, files are not affected; ones that come with a tool cannot be deleted). The editor can also be entered from the result area of the run page.
-
-**New actions and parameters**:
-
-- `file.order` (local `reorder`): the user sorts the order and can drop some items; `files` / `images` of any type can connect to it.
-- `pdf.fillForm.whenNoFields`: `'stop'` (default, report an error) or `'skip'` (hand it to the next step as is; "Sign and send back" uses it to handle scans).
-- `presets` were added to the input and common actions ("Photo library, up to 30 photos", "PDF, up to 10", "240 KB / 500 KB / 1 MB / 2 MB" and so on).
-
-**Operations** (`core/src/ops.ts`, descriptions in `describe.ts`; the edit page and the AI use the same protocol):
-
-| op                                               | Notes                                                                                                                                                                 |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `addWorkflow {workflow}`                         | Cannot carry `toolId`; at most 100 workflows                                                                                                                          |
-| `removeWorkflow {workflowId}`                    | One that comes with a tool cannot be deleted; the `workflowRunner` that runs it is removed at the same time (the description says "also removes N cards")             |
-| `renameWorkflow {workflowId, name}`              |                                                                                                                                                                       |
-| `addWorkflowStep {workflowId, step, index?}`     | Without `index` it is added at the end                                                                                                                                |
-| `moveWorkflowStep {workflowId, stepId, toIndex}` |                                                                                                                                                                       |
-| `removeWorkflowStep`, `setStepParams`            | Existing (`setStepParams` includes `ask`)                                                                                                                             |
-| `updateWorkflow {workflowId, name?, steps?}`     | One save from the edit page; the private parameters the AI sees are `<user text>` placeholders, and when they are passed back unchanged the old value is kept (D-082) |
-| `setWorkflowHomeScreen {workflowId, homeScreen}` | Put on the phone home screen / remove (D-271); at most 4, and `addWorkflow` cannot carry this flag                                                                    |
-
-After every operation `validateWorkspace` (§2) runs as usual, and a workflow whose steps do not connect is not committed. The planner's prompt contains the action catalog (id, input and output types, parameter structure with enums and ranges, required packs), the preset list, and rules 20 (build a workflow) and 21 (turn records into a report).
-
-## 8. Migration (schemaVersion 4 → 5)
-
-Only the workflow step format changed:
-
-| v4                                                              | v5                                                                              |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `pdf.selectFiles {min, max}`                                    | `in.files {accept: 'pdf', min, max}`                                            |
-| `pdf.merge {}`                                                  | `pdf.merge {}` (now also accepts images)                                        |
-| `ui.askFileName {defaultTemplate}` + `file.save {nameTemplate}` | `file.rename {template: defaultTemplate}`, `ask: ['template']` + `file.save {}` |
-| Only `file.save {nameTemplate}` (asking already removed)        | `file.rename {template: nameTemplate}` + `file.save {}`                         |
-
-With v4 fixtures (default, steps simplified, asking removed) and tests. The tool page's components are untouched; features a tool gains later are added through the "Update" button in the tool catalog (`updateTool`: adds the missing workflows and the entries on the tool page, and keeps the user's changes).
-
 ## 9. Not Done Yet (needs native capabilities)
 
-Since T8 there is a development build (D-084), so the following can be done with native modules, but are not scheduled:
+Rechecked against the code on 2026-11-22; the items done since then were removed from this list. Still not done:
 
-- Filling in Chinese forms, "Open with Morph" (file type association; "Share to Morph" is done, see §11). Automatic face framing and background color change for ID photos are done (D-252).
-- Home-screen widgets, Android photo library cleanup; audio (speech-to-text, shrink / convert format, cut a segment, record, join; done by the audio tools, from D-150).
-- Video: continue processing in the background on iPhone (Android can already, D-160; from iOS 26 it can too, confirmed on a real device on 2026-10-31, D-163), record with Morph, HEVC output.
-- Edge detection for existing photos on Android (ML Kit has no such interface, so the scan pack is used for now; none of the alternatives we looked at work, see D-253).
-- PDF encryption and decryption (second batch); when compressing a PDF, use native rendering instead of the PDF preview download.
-
-## 10. Milestones
-
-| Milestone | Content                                                                                                                              |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| T0        | Merge branches; this document                                                                                                        |
-| T1        | Typed actions and executor; migrate "Merge PDF"; core input and output actions                                                       |
-| T2        | Images: convert format, resize, compress to N KB, crop UI, rotate, remove location; standalone tool pages                            |
-| T3        | PDF: images to PDF, PDF ≤ X MB, mixed merge, select / delete / reorder / rotate / split by page number, page numbers and text stamps |
-| T4        | Pack mechanism + PDF preview pack (thumbnails, signature placement) + signing + form filling                                         |
-| T5        | Scan pack (edge detection, adjust corners, enhance) + text recognition pack (downloaded per language)                                |
-| T6        | Skia: stitch into a long image, redact, watermark, ID photo layout; ZIP; QR code; generate PDF from records / print; text to PDF     |
-| T7        | Preset workflows + editor + AI changing and creating workflows (operations, planner, mock, eval)                                     |
-| T8        | Development build; iOS native text recognition and scanning (Vision, Core Image, document camera); packs kept as a fallback          |
-| T9        | Android: ML Kit text recognition and document scanning (D-087)                                                                       |
-| T10       | Share to Morph: iOS share extension + Android intent-filter, the inbox, shared files handed to workflows (§11)                       |
+- Filling in Chinese forms: `pdf.fillForm` writes with the standard PDF font and reports `unsupportedText` for text it cannot encode (`packages/tool-pdf/src/forms.ts`).
+- "Open with Morph" (file type association): the app declares no document types or view intent filters; "Share to Morph" is the way in (§11).
+- Android photo library cleanup.
+- Recording video with Morph (the camera step takes photos only) and HEVC output (D-143: output is always H.264 MP4).
+- Edge detection for existing photos on Android without the scan pack (D-253).
+- Native rendering when "Make PDF smaller" turns pages into pictures: it still uses the PDF preview download (`renderPages` in `apps/mobile/src/runtime/actions/pdf.ts`).
 
 ## 11. Share to Morph (D-114–D-118)
 

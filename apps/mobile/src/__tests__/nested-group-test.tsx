@@ -4,7 +4,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 分组里还能放一层分组（Q3，NEW_FORMAT §4）：一张卡片上面两个数字并排，下面一个按钮。
+// 分组里还能放一层分组（Q3，D-369）：一张卡片上面两个数字并排，下面一个按钮。
 
 const seed = (locale: Locale, registry: Registry) => {
   const result = applyOps(

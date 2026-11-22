@@ -20,7 +20,7 @@ export interface AssetUsage {
 }
 
 /**
- * 一段配置 JSON 里所有指向用户文件的 ID（不管在哪一层）。v34 只有四处（NEW_FORMAT §3.5）：图片块的
+ * 一段配置 JSON 里所有指向用户文件的 ID（不管在哪一层）。v34 只有四处（D-377）：图片块的
  * show.asset、卡片的 style.backdrop.assetId、页面的 backdrop.assetId、文件位的 opens.file；
  * 历史版本可能是 v33 的配置，那时都叫 assetId。
  */

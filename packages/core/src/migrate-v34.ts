@@ -1,4 +1,4 @@
-// v33 → v34（NEW_FORMAT_DRAFT §8，创始人 2026-10-30 定）：「数据 · 容器 · 工具」。
+// v33 → v34（D-368，创始人 2026-10-30 定）：「数据 · 容器 · 工具」。
 // ID 一律不改（表、字段、选项、页面、块、快捷操作；提醒只在和快捷操作撞号时改，M1）。
 // 只吃 v33 的形状（M13：更早的版本先经过前面的迁移）。纯 JSON 进、JSON 出，不依赖 v34 的结构定义，
 // 这样下载的工具包页面（tool-download.ts）、模版和样板（templates/、samples/）也能用同一套转换。
@@ -196,7 +196,7 @@ function block(base: Json, rest: Json): Json {
   return clean({ ...base, ...rest });
 }
 
-/** 一个 v33 组件 → v34 块（NEW_FORMAT §8.1 的表）。不认识的组件包成 look "$unknown"（M8）。 */
+/** 一个 v33 组件 → v34 块（docs/ARCHITECTURE.md §11 的表）。不认识的组件包成 look "$unknown"（M8）。 */
 export function migrateComponentV33(c: Json, tables: V33Tables): Json {
   if (!isObject(c) || typeof c.type !== 'string' || !V33_TYPES.has(c.type)) {
     return clean({ id: c?.id, look: '$unknown', hidden: c?.hidden, raw: c });

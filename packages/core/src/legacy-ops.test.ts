@@ -6,7 +6,7 @@ import { THEME_PRESETS } from './presets';
 import { apply, fromV33, registry, v33Fixture } from './test-helpers';
 import { DEFAULT_THEME } from './theme';
 
-// v33 的 39 个修改操作在 v34 怎么写（NEW_FORMAT_DRAFT §7.1）：每个旧操作一个例子。
+// v33 的 39 个修改操作在 v34 怎么写（D-371）：每个旧操作一个例子。
 // 写法：一份 v33 的配置 before，按 v33 那个操作的效果改出 v33 的 after（edit）；
 // 把 before 迁移到 v34 再执行 v34 的操作，结果应该和 after 迁移到 v34 一模一样。
 // 这样每个例子同时证明：新操作做到了旧操作的事，而且和迁移对得上。

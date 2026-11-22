@@ -62,7 +62,7 @@ import { presetById } from './workflows/presets';
 export * from './ops-schema';
 
 // 语义化修改操作的执行（§7D，v34 一共 14 个，结构在 ops-schema.ts）。applyOps 是纯函数，不修改输入；
-// 只负责执行和引用检查，完整合法性由 validateWorkspace 判定。删除时的连带清理（NEW_FORMAT §7.2）在这里做，
+// 只负责执行和引用检查，完整合法性由 validateWorkspace 判定。删除时的连带清理（D-371）在这里做，
 // 并写成 ApplyNote 在预览里告诉用户。
 
 /** apply 过程中系统自动做出的调整，需要在预览中告知用户。 */

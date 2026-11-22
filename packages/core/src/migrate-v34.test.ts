@@ -13,7 +13,7 @@ import {
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// v33 → v34 的迁移（NEW_FORMAT_DRAFT §8）：v33 代码存下来的每一份配置都要升成合法的 v34；
+// v33 → v34 的迁移（D-368）：v33 代码存下来的每一份配置都要升成合法的 v34；
 // 风险 M1–M13 各有一个针对性的例子。
 
 type Json = Record<string, any>;

@@ -1,7 +1,7 @@
 import { allComponents, childrenOf, type Component, type WorkspaceConfig } from './schema';
 
 // 底线 3（创始人 2026-10-31，对话）：配置里指向用户文件的地方只能由用户自己选。v34 只有四处
-// （NEW_FORMAT §3.5）：文件位的 opens.file、图片块的 show.asset、卡片的 style.backdrop.assetId、页面的
+// （D-377）：文件位的 opens.file、图片块的 show.asset、卡片的 style.backdrop.assetId、页面的
 // backdrop.assetId。发给 AI 时文件 ID 换成占位符；AI 的修改不能让任何一处多指向一个文件。
 
 /** 发给 AI 的配置里，用户文件的 ID 换成这个。 */

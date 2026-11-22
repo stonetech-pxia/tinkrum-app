@@ -41,7 +41,7 @@ import {
 
 export * from './record-ops-schema';
 
-// 一键记录工具（D-300–D-304，v34 NEW_FORMAT §5.2）：检查（validate.ts 调）、执行前算出要写的值（App 调）。
+// 一键记录工具（D-300–D-304，v34 D-370 规则 7）：检查（validate.ts 调）、执行前算出要写的值（App 调）。
 // 删字段删表时找出用到它的工具在 ops.ts。AI 只配置工具；值在用户点了以后才在本机写进记录。
 
 /** increment 能用的字段（D-302）。 */

@@ -46,7 +46,7 @@ import { useWorkspace } from '../workspace/context';
 import { Chip, ParamForm, visibleFields } from './ParamForm';
 import { confirmDelete, useWorkflowChange } from './workflow-change';
 
-// 工作流编辑页（TOOLS_DESIGN §7，D-082）：改名字和参数、哪些参数每次运行时问、加 / 删 / 移动步骤。
+// 工作流编辑页（D-082）：改名字和参数、哪些参数每次运行时问、加 / 删 / 移动步骤。
 // 改动先放在草稿里，点「保存」生成一个版本（可撤销）；只能插入类型接得上的动作，接不上的步骤会标出来。
 
 interface Draft {

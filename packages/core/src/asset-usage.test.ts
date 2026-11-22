@@ -44,7 +44,7 @@ const now = new Date(2026, 9, 27);
 const day = 24 * 3600 * 1000;
 
 describe('asset usage', () => {
-  // 配置里指向用户文件的四处（NEW_FORMAT §3.5）：文件位的 opens.file、图片块的 show.asset、
+  // 配置里指向用户文件的四处（D-377）：文件位的 opens.file、图片块的 show.asset、
   // 卡片的 style.backdrop.assetId、页面的 backdrop.assetId。
   const withSlotAndImage = config([
     {

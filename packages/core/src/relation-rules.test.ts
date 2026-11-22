@@ -5,7 +5,7 @@ import { QuickActionSchema, ReminderSchema, TOOL_KINDS, WorkflowStepSchema } fro
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 关系规则 13、14（创始人 2026-10-30 同意，NEW_FORMAT §10）：结构上已经做不到的，用测试证明它做不到；
+// 关系规则 13、14（创始人 2026-10-30 同意，D-370）：结构上已经做不到的，用测试证明它做不到；
 // 结构允许、但检查要拦的，用校验证明拦住了。规则 12 的测试在 record-ops.test.ts。
 
 const reminder = {

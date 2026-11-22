@@ -40,7 +40,7 @@ import {
 import { dateFieldOf, isSequenceAggregate, sequenceValue } from './sequence';
 import { minusValue } from './stat-minus';
 
-// 共用的读法（v34 NEW_FORMAT §2.4、§3.3）：块的 source 读出什么。记录块的 6 种外观、数字、图表、文件列表
+// 共用的读法（v34 D-370 规则 2）：块的 source 读出什么。记录块的 6 种外观、数字、图表、文件列表
 // 都从这里读，App 只负责画（以前每个组件各写一遍筛选、排序、分组）。筛选、排序、分组（Grouping）、
 // 按日子算（Days）都只有一份实现：这里把 source 交给 data.ts、list-groups.ts、board-view.ts、month-view.ts、
 // chart.ts、compare.ts、sequence.ts、stat-minus.ts 里的算法。查找、汇总、上一条的值按 related.ts 算好（只读）。

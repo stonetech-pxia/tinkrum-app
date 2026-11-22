@@ -2,7 +2,7 @@ import type { z } from 'zod';
 
 import type { Field, Locale, Localized } from '../schema';
 
-// 动作契约（docs/TOOLS_DESIGN.md §2）：每个动作声明「输入类型 → 输出类型」、参数结构和参数的界面元数据。
+// 动作契约：每个动作声明「输入类型 → 输出类型」、参数结构和参数的界面元数据。
 // 只有登记过的动作才能出现在工作流里；实现由 tool-* 包和 App 运行时提供，这里只描述契约。
 
 /**

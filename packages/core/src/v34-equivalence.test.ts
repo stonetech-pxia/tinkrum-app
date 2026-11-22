@@ -11,7 +11,7 @@ import { readChart, readNumber, readRecords, readTable, type SourceContext } fro
 import { fromV33, v33Fixture } from './test-helpers';
 import { sampleRecords, V33_NOW } from './test-records';
 
-// v33 → v34 等价（NEW_FORMAT §8.2）：fixtures/v33/ 里每份有数据表的配置，迁移成 v34，用同样的记录
+// v33 → v34 等价（D-368）：fixtures/v33/ 里每份有数据表的配置，迁移成 v34，用同样的记录
 // 经 source.ts 读出来，和 v33 代码当时算出来的（fixtures/v33/derived/）逐块比：列表的行和顺序、分段、看板、
 // 月历、数字（值、最佳、上一段、每组）、图表、算出来的字段、提醒。v33 的生成器里「未选」写的是 "none"。
 

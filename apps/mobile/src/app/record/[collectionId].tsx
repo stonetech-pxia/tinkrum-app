@@ -31,7 +31,7 @@ import { deleteUserFiles } from '@/storage/user-files';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '@/workspace/context';
 
 /**
- * 记录编辑页（docs/DATA_DESIGN.md §5）：由内核按数据表的字段生成。D-570 起表单怎么排归配置：表上的 form（分段、
+ * 记录编辑页：由内核按数据表的字段生成。D-570 起表单怎么排归配置：表上的 form（分段、
  * 只看这一条自己字段的条件显示）、字段上的 hint 和 min / max；保存、删除、附件、候选值和这一页别的部分仍归内核。
  */
 export default function RecordRoute() {

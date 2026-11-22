@@ -76,7 +76,7 @@ export const RecordSourceSchema = z.strictObject({
 });
 export type RecordSource = z.infer<typeof RecordSourceSchema>;
 
-/** 每一条的记录卡片（重复嵌套，NEW_FORMAT §4）：固定的槽位。 */
+/** 每一条的记录卡片（重复嵌套，D-369 Q4）：固定的槽位。 */
 const SlotsSchema = z.strictObject({
   title: FieldRefSchema,
   subtitles: z.array(FieldRefSchema).max(2).optional(),

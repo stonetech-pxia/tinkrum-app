@@ -572,7 +572,7 @@ function recordRowProblems(
 const AS_NAME = (as: ToolUse['as']) => (as === undefined ? 'without as' : `as "${as}"`);
 
 /**
- * 块上的工具（NEW_FORMAT §3.4）：按登记表的 tools 查出现方式（as）、一键记录的种类（do）、能引用的独立工具（ref）、
+ * 块上的工具（D-370 规则 4）：按登记表的 tools 查出现方式（as）、一键记录的种类（do）、能引用的独立工具（ref）、
  * 行上的「打开」（open）和个数（button ≤3、tap ≤3、其余每种 ≤1）；清单要正好一个打勾、看板的拖动写分栏字段；
  * 然后是每个就地工具自己的问题（record-ops.ts）。rowOf：记录块读的表（工具作用的 $row 是它的一条）。
  */

@@ -212,7 +212,7 @@ function inDocOrder<D extends { ai: { docAfter?: string } }>(
 }
 
 /**
- * 关系规则（v34 NEW_FORMAT §10，创始人 2026-10-30 同意）：配置检查执行，提示词里用 R1–R14 引用，
+ * 关系规则（v34 D-370，创始人 2026-10-30 同意）：配置检查执行，提示词里用 R1–R14 引用，
  * 和下面按编号的规则分开。
  */
 const RELATION_RULES = [

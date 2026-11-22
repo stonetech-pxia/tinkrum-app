@@ -1,7 +1,7 @@
 # Downloading new tools from the server
 
 > Status: **step one (data tools) is implemented** (D-177–D-179, §13); step two (plugin tools) has not started. The founder decided the direction on 2026-10-23 (only we write them, tools that need system capabilities still ship with app releases, two steps) and the details of section 12 on 2026-10-24.
-> UI wording follows D-112: in text shown to users, "workflow" is called "quick action", "pack" is called "downloads", and "install / uninstall" is called "add / remove"; code identifiers (`installTool`, `packs`, etc.) do not change. This document uses both wordings when describing the design; the ones in quotes are UI text.
+> UI wording follows D-112: in text shown to users, "workflow" is called "quick action", "pack" is called "downloads", and "install / uninstall" is called "add / remove"; code identifiers (`setPackage`, `packs`, etc.) do not change. This document uses both wordings when describing the design; the ones in quotes are UI text.
 > Related: [TOOLS_DESIGN.md](TOOLS_DESIGN.md) (action contract, executor, packs), [SECURITY_NOTES.md](SECURITY_NOTES.md), [DECISIONS.md](DECISIONS.md) P-011.
 
 ## 0. Goals and boundaries
@@ -10,7 +10,7 @@
 
 **Decided boundaries** (founder, 2026-10-23):
 
-1. **Tools are written only by us**, tested by us and signed and released by us. They are not opened to third parties (no tool marketplace, MVP_SCOPE §3), and the AI does not generate code on the spot from the user's words.
+1. **Tools are written only by us**, tested by us and signed and released by us. They are not opened to third parties (no tool marketplace, "Product background" §3 in [AGENTS.md](../AGENTS.md)), and the AI does not generate code on the spot from the user's words.
 2. **Actions that need system capabilities still ship with app releases**: Vision, AVFoundation, the camera, local native modules, third-party native libraries. This is fixed by App Review rule 4.7.2 (§2).
 3. **Two steps**: step one ships only **data tools** (pages, quick actions, presets, which only combine existing actions); step two ships **plugin tools** (new actions implemented in JS / WASM, run in a sandboxed WebView).
 
@@ -110,11 +110,11 @@ Built-in tools do not need rewriting and remain code; the two sources are merged
 ## 5. Install, update, uninstall, historical versions
 
 - **The registry becomes two parts**: `createRegistry([...BUILTIN_TOOLS, ...downloaded tools])`. At startup, first read the downloaded and verified tool packages on the device, then validate the workspace. The prompt is written in the app with this registry (D-193), and the server does not need to know about downloaded tools.
-- **Tool catalog page**: built-in tools and downloadable tools sit together, with the size marked on downloaded ones. "Add" = (if not yet downloaded) show the size, download and verify after the user confirms → then use the existing `installTool` operation to produce a version as usual, which can be undone. Undo only changes the config; the downloaded package stays on the device and can be deleted under Settings → Downloads (the same as today's packs).
+- **Tool catalog page**: built-in tools and downloadable tools sit together, with the size marked on downloaded ones. "Add" = (if not yet downloaded) show the size, download and verify after the user confirms → then use the existing `setPackage {do: "add"}` operation to produce a version as usual, which can be undone. Undo only changes the config; the downloaded package stays on the device and can be deleted under Settings → Downloads (the same as today's packs).
 - **AI and downloads**: the AI can propose installing a downloadable tool but **cannot download on its own** (the rule in TOOLS_DESIGN §6 is unchanged). The preview shows "Downloads X MB", and the user confirms the download when they tap apply.
-- **Update**: when the catalog has a newer version, the tool card shows "Update", for the user to tap (like today's `updateTool`: it fills in missing quick actions and entries and keeps the user's changes). No automatic updates; versions with security problems are handled by the revocation list.
+- **Update**: when the catalog has a newer version, the tool card shows "Update", for the user to tap (like `setPackage {do: "update"}`: it fills in missing quick actions and entries and keeps the user's changes). No automatic updates; versions with security problems are handled by the revocation list.
 - **Parameter compatibility**: a new version must accept all parameters of the old version (release check: take all quick actions of the previous version and validate them with the new version). For an incompatible change, use a new action id.
-- **Uninstall**: the existing `uninstallTool`, files are kept.
+- **Uninstall**: the existing `setPackage {do: "remove"}`, files are kept.
 - **Restoring a historical version**: when a historical version contains a tool that is not on the device (changed phone, deleted package), validation before restore fails with the prompt "Download “X” first" and a download button (the rule in handoff document §7E "tool code is not restored with historical versions" is unchanged).
 
 ## 6. How plugin actions run (step two)
@@ -248,7 +248,7 @@ Then upload all of `dist/tools` to R2. To revoke a version: `npm run tools -- re
 
 **Local development**: sign with `tools/dev-signing-key.txt`, serve the catalog with `python3 -m http.server --directory dist/tools`, start Metro for the app with `EXPO_PUBLIC_MORPH_TOOLS_URL=http://localhost:<port>`. Only a development build of the app (`__DEV__`) trusts the development key, and so does `npm run tools -- verify <output directory> --dev`.
 
-**Still missing before launch** (the official public keys were filled into `TOOL_SIGNING_KEYS` on 2026-10-24 and must go out with the next app version): create the R2 bucket and address, set `EXPO_PUBLIC_MORPH_TOOLS_URL` when building the app, and set `MORPH_TOOLS_URL` in the Mac mini's `.env`.
+The launch steps once listed here are done or no longer needed: the signed catalog is served from R2 at `morph-tools.stonetech.dev`, release builds set `EXPO_PUBLIC_MORPH_TOOLS_URL` ([DEPLOY.md](DEPLOY.md)), and no code reads a server-side `MORPH_TOOLS_URL`.
 
 **Differences from the design**:
 

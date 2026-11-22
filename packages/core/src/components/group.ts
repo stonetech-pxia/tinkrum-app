@@ -33,7 +33,7 @@ export const GroupChildSchema = z.discriminatedUnion('look', [
 
 const shape = { show, children: z.array(GroupChildSchema).max(GROUP_MAX_CHILDREN) };
 
-/** 分组：把若干块排成竖排、横排或网格（摆放式嵌套，NEW_FORMAT §4）。分组里还能放一层分组。 */
+/** 分组：把若干块排成竖排、横排或网格（摆放式嵌套，D-369 Q3）。分组里还能放一层分组。 */
 export const groupComponent: LookDefinitionOf<'group', typeof shape> = defineLook({
   look: 'group',
   shape,
