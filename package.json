@@ -32,7 +32,8 @@
     "test:word-regression": "tsx tests/word-regression/run.ts",
     "hooks:install": "sh scripts/install-hooks.sh",
     "check:mobile-env": "node scripts/check-mobile-env.mjs",
-    "test:release": "node --test scripts/release.test.mjs scripts/check.test.mjs"
+    "test:release": "node --test scripts/release.test.mjs scripts/check.test.mjs scripts/smoke-release-android.test.mjs",
+    "smoke:android": "node scripts/smoke-release-android.mjs"
   },
   "dependencies": {
     "patch-package": "^8.0.1"
