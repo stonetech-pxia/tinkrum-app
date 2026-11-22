@@ -11,6 +11,7 @@ This file is complete on its own. A 2026-10-25 handoff note outside the reposito
 - The current config format: `packages/core/src/ops-schema.ts`, and `docs/agent/tinkrum-app-guide.md`, generated from `packages/planner/src/agent-guide.ts` (update with `npx vitest -u` in `packages/planner`; do not edit by hand).
 - Mobile theme tokens and shared UI: see `apps/mobile/AGENTS.md`.
 - Names: the code says Morph; everything a user reads says Tinkrum (D-435).
+- Store releases (keys, versions, what the store declarations must say): `docs/RELEASE.md`; the checks by hand before each release, with the Android smoke script: `docs/RELEASE_CHECKLIST.md`; licenses of what the app includes or downloads: `THIRD_PARTY_NOTICES.md`.
 - Outdated docs are deleted, not archived or labelled (the founder, in a Claude Code session on 2026-11-22); git history keeps them.
 
 ## Invariants (D-375, provisional)
