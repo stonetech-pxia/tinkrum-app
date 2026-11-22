@@ -1,6 +1,6 @@
 # Morph: Rules for Coding Agents
 
-Read the "Product background" section of this file and `docs/TOOLS_DESIGN.md` §0 first. Do not read `docs/DECISIONS.md` whole (it is over 1 MB): search it for the D number or keyword of what you are changing; a later decision overrides an earlier one. Mobile has its own `apps/mobile/AGENTS.md`. The founder communicates in Chinese; code comments follow the surrounding code, which means Chinese.
+Read the "Product background" section of this file and `docs/TOOLS_DESIGN.md` §0 first. The decisions are in `docs/decisions/`, one heading per decision (`docs/DECISIONS.md` says how to find and add one): open the entry for the D number of what you are changing (`git grep -n "^### D-617 " docs/decisions`) and the ones its "Changed later by" line names; a later decision overrides an earlier one. An entry says what was decided, why and who decided it when; the exact rules are in the code, its tests and `docs/agent/`. Mobile has its own `apps/mobile/AGENTS.md`. The founder communicates in Chinese; code comments follow the surrounding code, which means Chinese.
 
 This file is complete on its own. A 2026-10-25 handoff note outside the repository (`~/Library/Application Support/Claude/side-session-notes/codex-handoff/CODEX_LESSONS.md`) is optional history; parts of it are out of date, and where it disagrees with this file or the code, it is wrong.
 
@@ -11,6 +11,7 @@ This file is complete on its own. A 2026-10-25 handoff note outside the reposito
 - The current config format: `packages/core/src/ops-schema.ts`, and `docs/agent/tinkrum-app-guide.md`, generated from `packages/planner/src/agent-guide.ts` (update with `npx vitest -u` in `packages/planner`; do not edit by hand).
 - Mobile theme tokens and shared UI: see `apps/mobile/AGENTS.md`.
 - Names: the code says Morph; everything a user reads says Tinkrum (D-435).
+- Outdated docs are deleted, not archived or labelled (the founder, in a Claude Code session on 2026-11-22); git history keeps them.
 
 ## Invariants (D-375, provisional)
 
@@ -162,7 +163,7 @@ The original product handoff document was deleted on 2026-11-08; the parts that 
 - Docs (Markdown) are written in English. README.zh-CN.md is the only Chinese doc and follows README.md. Code comments still follow the surrounding code (D-499).
 - Do not mark something "Decided" if it is not finished. When you change a decision, `grep` for every place that cites it and update them all. When you write "the founder confirmed", say where and on what day he confirmed it.
 - Handoff reports, test plans and measurement results do not go into git; put them in `~/Library/Application Support/Claude/side-session-notes/`.
-- Decision numbers are given at merge time. On a branch, write `D-new-<branch>-1`, `D-new-<branch>-2` … in DECISIONS, comments, tests and the prompt; when merging into main, take the next free numbers and replace them in one commit (`git grep "D-new-" -- ':!AGENTS.md'` must then return nothing). When you add a table row, no cell may be wider than the widest cell in its column (otherwise prettier re-pads the whole table).
+- Decision numbers are given at merge time. On a branch, write `D-new-<branch>-1`, `D-new-<branch>-2` … in DECISIONS, comments, tests and the prompt; when merging into main, take the next free numbers and replace them in one commit (`git grep "D-new-" -- ':!AGENTS.md'` must then return nothing). A new decision is a new heading in `docs/decisions/`, in the shape `docs/DECISIONS.md` gives; when it changes an earlier decision, add its number to that entry's "Changed later by" line.
 - When you change the planning prompt, do not break the existing rule structure; append new content at the end of the rules.
 - When you rename or remove something (an operation, a block look, a field type, an environment variable, a route, a file), `git grep` the old name in `docs/`, `README*.md`, `AGENTS.md` and code comments in the same commit, and fix every hit. A file or export nothing imports any more is deleted, with its message keys.
 - One copy. Before writing a helper, search `packages/core/src`: local dates are `localDate` in `field-values.ts`, file sizes are `formatFileSize` in `localization.ts`. A command or a fact is written in one document; other documents link to it.
