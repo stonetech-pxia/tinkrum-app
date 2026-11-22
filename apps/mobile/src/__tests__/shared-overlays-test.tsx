@@ -72,4 +72,14 @@ describe('shared overlays and pills', () => {
     await fireEvent.press(screen.getByTestId('radio'));
     expect(pick).not.toHaveBeenCalled();
   });
+
+  // 真机上发现的倒退：药丸的图标是内核界面图标（UiIcon），走配置图标组件时找不到名字，
+  // 被当成 emoji，把「palette」这个词原样画了出来。
+  it('draws a pill icon as an icon, not as its name', async () => {
+    await render(
+      <Pill palette={palette} label="Choisir un style" icon="palette" onPress={jest.fn()} />,
+    );
+    expect(screen.getByText('Choisir un style')).toBeTruthy();
+    expect(screen.queryByText('palette')).toBeNull();
+  });
 });

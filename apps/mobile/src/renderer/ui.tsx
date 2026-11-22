@@ -13,7 +13,7 @@ import {
 
 import { BackdropFill } from './Backdrop';
 import { GlassFill } from './GlassFill';
-import { Icon } from './Icon';
+import { Icon, UiIcon, type UiIconName } from './Icon';
 import { iconColors, onSurface, type Palette } from './theme';
 
 // Clay 风格的基础界面元素（对应 Docudis 的 clay_widgets）。配置渲染器和系统页面共用，
@@ -225,7 +225,8 @@ export function Pill({
   testID?: string;
   selected?: boolean;
   disabled?: boolean;
-  icon?: IconValue;
+  /** 内核界面自己的图标（UiIcon），不是配置里的图标：那一套不认识的名字会被当成 emoji 原样画出来。 */
+  icon?: UiIconName;
   radio?: boolean;
 }) {
   const selectable = selected !== undefined;
@@ -263,7 +264,7 @@ export function Pill({
             : palette.primaryTint,
         opacity: disabled ? 0.4 : pressed ? 0.6 : 1,
       })}>
-      {icon ? <Icon name={icon} size={14} color={color} /> : null}
+      {icon ? <UiIcon name={icon} size={14} color={color} /> : null}
       <Text style={[palette.font('bodyBold', 14), { color, flexShrink: 1 }]}>{label}</Text>
     </Pressable>
   );
