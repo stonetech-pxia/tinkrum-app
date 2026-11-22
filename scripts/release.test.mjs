@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -43,13 +44,19 @@ function fixture() {
   writeFileSync(join(repo, 'apps/api/main.txt'), 'first\n');
   writeFileSync(
     join(repo, 'package.json'),
-    JSON.stringify({ scripts: { check: 'node --test behavior.test.cjs' } }),
+    JSON.stringify({
+      scripts: {
+        check: 'node scripts/check.mjs --full',
+        'check:full': 'node --test behavior.test.cjs',
+      },
+    }),
   );
   writeFileSync(join(repo, 'behavior.test.cjs'), "require('node:assert/strict').equal(1, 1);\n");
   mkdirSync(join(repo, '.githooks'));
   copyFileSync(join(source, '.githooks/pre-push'), join(repo, '.githooks/pre-push'));
   mkdirSync(join(repo, 'scripts'));
   copyFileSync(join(source, 'scripts/install-hooks.sh'), join(repo, 'scripts/install-hooks.sh'));
+  copyFileSync(join(source, 'scripts/check.mjs'), join(repo, 'scripts/check.mjs'));
   git(repo, 'add', '.');
   git(repo, 'commit', '-m', 'first');
   const previous = git(repo, 'rev-parse', 'HEAD');
@@ -133,6 +140,259 @@ test('hooks are installed only for the selected worktree', () => {
     join(other, '.githooks'),
   );
   assert.equal(cmd('git', ['config', '--get', 'core.hooksPath'], f.repo).status, 1);
+});
+
+test('a second dry-run push reuses successful checks for the same clean commit', () => {
+  const f = fixture(),
+    remote = join(f.root, 'remote.git');
+  git(f.root, 'init', '--bare', remote);
+  git(f.repo, 'remote', 'add', 'fixture', remote);
+  assert.equal(cmd('sh', [join(source, 'scripts/install-hooks.sh')], f.repo).status, 0);
+  const push = () => cmd('git', ['push', '--dry-run', 'fixture', 'HEAD:main'], f.repo);
+  assert.equal(push().status, 0);
+  const result = push();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /reusing successful checks/);
+  assert.doesNotMatch(result.stdout, /running npm run check/);
+});
+
+test('full validation always reruns and its clean result can be reused by pre-push', () => {
+  const f = fixture();
+  for (let i = 0; i < 2; i++) {
+    const result = cmd('npm', ['run', 'check'], f.repo);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /running npm run check:full/);
+    assert.doesNotMatch(result.stdout, /reusing/);
+  }
+  const result = hook(f);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /reusing successful checks/);
+});
+
+function hook(f, remote = '0'.repeat(40), env = process.env, remoteRef = 'refs/heads/topic') {
+  return spawnSync('sh', [join(f.repo, '.githooks/pre-push')], {
+    cwd: f.repo,
+    encoding: 'utf8',
+    env,
+    input: `refs/heads/topic ${git(f.repo, 'rev-parse', 'HEAD')} ${remoteRef} ${remote}\n`,
+  });
+}
+
+test('environment and dependency install changes invalidate successful push checks', () => {
+  const f = fixture();
+  writeFileSync(join(f.repo, '.gitignore'), 'node_modules\n');
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'ignore dependencies');
+  assert.equal(hook(f).status, 0);
+  let result = hook(f, undefined, { ...process.env, TZ: 'Pacific/Honolulu' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /running npm run check:full/);
+  mkdirSync(join(f.repo, 'node_modules'));
+  writeFileSync(join(f.repo, 'node_modules/.package-lock.json'), '{}');
+  result = hook(f);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /running npm run check:full/);
+});
+
+test('caller tool-call metadata does not invalidate checks in an otherwise identical environment', () => {
+  const f = fixture();
+  assert.equal(hook(f, undefined, { ...process.env, CODEX_TOOL_CALL_ID: 'first-call' }).status, 0);
+  const result = hook(f, undefined, { ...process.env, CODEX_TOOL_CALL_ID: 'second-call' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /reusing successful checks/);
+});
+
+test('failed, dirty and damaged-cache runs never supply a successful receipt', () => {
+  const f = fixture();
+  writeFileSync(join(f.repo, 'behavior.test.cjs'), "require('node:assert/strict').equal(1, 2);\n");
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'failing');
+  for (let i = 0; i < 2; i++) {
+    const result = hook(f);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout, /running npm run check:full/);
+  }
+  writeFileSync(join(f.repo, 'behavior.test.cjs'), "require('node:assert/strict').equal(1, 1);\n");
+  assert.equal(cmd('npm', ['run', 'check'], f.repo).status, 0);
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'passing');
+  assert.match(hook(f).stdout, /running npm run check:full/);
+  const cache = join(f.repo, '.git/morph-checks');
+  for (const path of readdirSync(cache)) writeFileSync(join(cache, path), 'broken receipt');
+  assert.match(hook(f).stdout, /running npm run check:full/);
+});
+
+test('a checkout modified by a check blocks the push and is not cached', () => {
+  const f = fixture();
+  writeFileSync(
+    join(f.repo, 'behavior.test.cjs'),
+    "require('node:fs').writeFileSync('unexpected.txt', 'changed');\n",
+  );
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'check modifies checkout');
+  const result = hook(f);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /changed while checks were running/);
+  assert.equal(existsSync(join(f.repo, '.git/morph-checks')), false);
+});
+
+test('a failed full recheck revokes an older successful receipt for the same commit', () => {
+  const f = fixture(),
+    marker = join(f.root, 'fail-marker');
+  writeFileSync(
+    join(f.repo, 'behavior.test.cjs'),
+    "require('node:assert/strict').equal(require('node:fs').existsSync(process.env.FAIL_MARKER), false);\n",
+  );
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'transient check failure');
+  const env = { ...process.env, FAIL_MARKER: marker };
+  assert.equal(cmd('npm', ['run', 'check'], f.repo, env).status, 0);
+  assert.match(hook(f, undefined, env).stdout, /reusing successful checks/);
+  writeFileSync(marker, 'fail');
+  assert.notEqual(cmd('npm', ['run', 'check'], f.repo, env).status, 0);
+  const result = hook(f, undefined, env);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /running npm run check:full/);
+});
+
+test('deleted and renamed prose files are not passed to the formatter at their old paths', () => {
+  const f = fixture(),
+    bin = join(f.root, 'bin'),
+    trace = join(f.root, 'trace');
+  mkdirSync(bin);
+  writeFileSync(
+    join(bin, 'npm'),
+    '#!/bin/sh\nif [ "$1" = --version ]; then echo fixture; else echo "$*" >> "$TEST_TRACE"; fi\n',
+    { mode: 0o755 },
+  );
+  const env = { ...process.env, PATH: bin + ':' + process.env.PATH, TEST_TRACE: trace };
+  mkdirSync(join(f.repo, 'docs'));
+  writeFileSync(join(f.repo, 'docs/removed.md'), 'removed\n');
+  writeFileSync(join(f.repo, 'docs/renamed.md'), 'renamed\n');
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'docs before');
+  const base = git(f.repo, 'rev-parse', 'HEAD');
+  git(f.repo, 'rm', 'docs/removed.md');
+  git(f.repo, 'mv', 'docs/renamed.md', 'docs/new name.md');
+  git(f.repo, 'commit', '-m', 'docs after');
+  let result = hook(f, base, env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(readFileSync(trace, 'utf8'), /prettier.*docs\/new name.md/);
+  assert.doesNotMatch(readFileSync(trace, 'utf8'), /removed.md|renamed.md/);
+  // 即使文档缓存已通过，推送 main 或标签仍必须升级成全量。
+  result = hook(f, base, env, 'refs/heads/main');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /running npm run check:full/);
+});
+
+test('deletion-only pushes skip checks even in a dirty checkout', () => {
+  const f = fixture();
+  writeFileSync(join(f.repo, 'dirty.txt'), 'dirty\n');
+  const result = spawnSync('sh', [join(f.repo, '.githooks/pre-push')], {
+    cwd: f.repo,
+    encoding: 'utf8',
+    input: `delete ${'0'.repeat(40)} refs/heads/topic ${f.target}\n`,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+});
+
+test('push ranges include earlier commits and every ref; new, missing and rewound bases use full checks', () => {
+  const f = fixture();
+  const bin = join(f.root, 'bin'),
+    trace = join(f.root, 'trace');
+  mkdirSync(bin);
+  // npm 的选择记录用替身；其余 Git/钩子/缓存走真实路径，不安装或联网下载任何依赖。
+  writeFileSync(
+    join(bin, 'npm'),
+    '#!/bin/sh\nif [ "$1" = --version ]; then echo fixture; else echo "$*" >> "$TEST_TRACE"; fi\n',
+    { mode: 0o755 },
+  );
+  const env = { ...process.env, PATH: bin + ':' + process.env.PATH, TEST_TRACE: trace };
+  mkdirSync(join(f.repo, 'docs'));
+  writeFileSync(join(f.repo, 'docs/older.md'), 'old\n');
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'baseline docs');
+  const baseline = git(f.repo, 'rev-parse', 'HEAD');
+  writeFileSync(join(f.repo, 'unknown-source.txt'), 'earlier code commit\n');
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'earlier code');
+  const code = git(f.repo, 'rev-parse', 'HEAD');
+  writeFileSync(join(f.repo, 'docs/new.md'), 'new\n');
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'latest docs');
+  let result = hook(f, code, env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(readFileSync(trace, 'utf8'), /check:full/);
+  assert.match(readFileSync(trace, 'utf8'), /prettier.*docs\/new.md/);
+  // 同一 HEAD，另一个远端基线还包含前一个代码提交；文档检查的缓存不能当全量。
+  result = hook(f, baseline, env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /running npm run check:full/);
+  // 同时推两个 ref，不能只看最后一条文档范围。
+  rmSync(join(f.repo, '.git/morph-checks'), { recursive: true });
+  result = spawnSync('sh', [join(f.repo, '.githooks/pre-push')], {
+    cwd: f.repo,
+    env,
+    encoding: 'utf8',
+    input:
+      `refs/heads/topic ${git(f.repo, 'rev-parse', 'HEAD')} refs/heads/one ${baseline}\n` +
+      `refs/heads/topic ${git(f.repo, 'rev-parse', 'HEAD')} refs/heads/two ${code}\n`,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /running npm run check:full/);
+  for (const base of ['0'.repeat(40), '1'.repeat(40)]) {
+    rmSync(join(f.repo, '.git/morph-checks'), { recursive: true });
+    assert.match(hook(f, base, env).stdout, /running npm run check:full/);
+  }
+  // 远端不在 HEAD 的祖先链：模拟强推。
+  git(f.repo, 'checkout', '--detach', baseline);
+  writeFileSync(join(f.repo, 'docs/diverged.md'), 'diverged\n');
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'diverged');
+  assert.match(hook(f, code, env).stdout, /running npm run check:full/);
+});
+
+test('a real scoped hook invokes workspace suites and the cross-workspace core guard', () => {
+  const f = fixture(),
+    bin = join(f.root, 'bin'),
+    trace = join(f.root, 'trace');
+  mkdirSync(bin);
+  writeFileSync(
+    join(bin, 'npm'),
+    '#!/bin/sh\nif [ "$1" = --version ]; then echo fixture; else echo "$*" >> "$TEST_TRACE"; fi\n',
+    { mode: 0o755 },
+  );
+  const env = { ...process.env, PATH: bin + ':' + process.env.PATH, TEST_TRACE: trace };
+  writeFileSync(
+    join(f.repo, 'apps/api/package.json'),
+    JSON.stringify({
+      name: '@morph/api',
+      scripts: { typecheck: 'tsc', test: 'vitest' },
+    }),
+  );
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'workspace manifest');
+  const base = git(f.repo, 'rev-parse', 'HEAD');
+  writeFileSync(join(f.repo, 'apps/api/main.txt'), 'scoped code change\n');
+  git(f.repo, 'add', '.');
+  git(f.repo, 'commit', '-m', 'workspace code');
+  let result = hook(f, base, env);
+  assert.equal(result.status, 0, result.stderr);
+  const commands = readFileSync(trace, 'utf8');
+  for (const expected of [
+    'run lint',
+    'run check:locales',
+    'run typecheck --workspace @morph/api',
+    'run test --workspace @morph/api',
+    'exec --workspace @morph/core -- vitest run src/invariants.test.ts',
+  ])
+    assert.ok(commands.includes(expected), commands);
+  assert.doesNotMatch(commands, /check:full/);
+  result = hook(f, base, env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /reusing successful checks/);
+  assert.equal(readFileSync(trace, 'utf8'), commands);
 });
 
 test('pre-push refuses dirty or different-commit checkouts', () => {
