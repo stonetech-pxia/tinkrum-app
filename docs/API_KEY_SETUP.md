@@ -28,7 +28,7 @@ M3 needs a Claude API key to connect to the real AI. **Without a key the app wor
 
 Go to the [Billing page](https://platform.claude.com/settings/billing), click **Set limit** under **Spend limits**, and enter a development-period cap, for example **$10/month**.
 
-After the cap is reached, requests are rejected and no further charges are made. It resumes next month or after you raise the cap. The app automatically falls back to the mock AI.
+After the cap is reached, requests are rejected and no further charges are made. It resumes next month or after you raise the cap. The app does not fall back to the mock AI: Tink says it could not be reached and nothing was changed.
 
 ## 3. Put the key into the project
 
@@ -64,7 +64,7 @@ After starting the model relay service, the terminal shows the model in use (wit
 npm run api
 ```
 
-The default model is `claude-haiku-5-5` (P-010). To change the model, add one line to `.env` (all three models passed 22/22 in the eval):
+The default model is `claude-haiku-5-5` (P-010). To change the model, add one line to `.env` (all three models passed every case of the eval at the time):
 
 ```
 MORPH_AI_MODEL=claude-opus-5-5
@@ -78,7 +78,7 @@ npm run eval -- --model claude-haiku-5-5
 
 ## 5. Roughly how much it costs
 
-These are averages measured on 2026-10-22 with the 22 eval cases (system prompt cached):
+These are averages measured on 2026-10-22 with the eval set of that day (system prompt cached):
 
 | Model             | Input / output (per million tokens) | About per change | About per 1000 |
 | ----------------- | ----------------------------------- | ---------------- | -------------- |

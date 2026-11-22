@@ -45,7 +45,7 @@ The config does include text you wrote yourself, such as page titles and button 
 
 ## How it's built
 
-The fixed core draws 26 kinds of block, runs 97 actions and keeps your records. Everything else is the config, and the config is made of three kinds of parts:
+The fixed core draws 31 kinds of block, runs 97 actions and keeps your records. Everything else is the config, and the config is made of three kinds of parts:
 
 - **Data** is what's stored: tables and their fields. The config holds only the structure; the records themselves live in the phone's database.
 - **Containers** are what you see: pages made of blocks (a list, a chart, a calendar, a button…). A container reads data and shows it. It never stores or writes data.
@@ -99,8 +99,8 @@ Some tools you can make by combining a table, a page and a few actions:
 
 The parts:
 
-- **26 kinds of block:** lists, checklists, boards you drag between, calendars, charts, numbers, forms, file shelves, buttons, images and more.
-- **19 field types:** money, dates, ratings, files, links between tables, rollups, formulas, schedules and more. Filters, search, reminders, CSV and Excel export.
+- **31 kinds of block:** lists, checklists, boards you drag between, calendars, charts, numbers, forms, file shelves, buttons, images and more.
+- **20 field types:** money, dates, ratings, files, links between tables, rollups, formulas, schedules and more. Filters, search, reminders, CSV and Excel export.
 - **97 actions that run on the phone:** scan to PDF, Word or Excel, text recognition, PDF tools, image tools (ID photos, background removal, watermarks), video (compress to a size, trim, GIF), audio (record, speech to text, MP3, noise reduction), translation, QR codes, ZIP.
 - **Any look:** colors, fonts, card styles, backgrounds, icons, the bottom bar. Several apps in one, each with its own style.
 - **Files from anywhere:** share photos, videos or PDFs to Tinkrum and it suggests the quick actions that fit.

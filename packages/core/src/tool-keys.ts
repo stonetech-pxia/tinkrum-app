@@ -12,7 +12,7 @@ export const TOOL_SIGNING_KEYS: readonly string[] = [
 
 /**
  * 开发用的公钥：私钥就在仓库里（tools/dev-signing-key.txt），谁都能用它签名，
- * 所以只有开发版 App（__DEV__）和设置了 MORPH_TOOLS_DEV_KEY=1 的计划服务才信任它。
+ * 所以只有开发版 App（__DEV__）和带 --dev 运行的 `npm run tools -- verify` 才信任它。
  */
 export const DEV_TOOL_SIGNING_KEY = 'ar/xNDIgr1lk/vL+KkGkt9lcuPgCZs9UFDDMn5Yp9Fw=';
 

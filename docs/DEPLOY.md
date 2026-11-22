@@ -28,22 +28,9 @@ curl -s https://morph-api.stonetech.dev/health
 
 ## When building the app
 
-Set two environment variables at build time (they are bundled into the app):
+Four `EXPO_PUBLIC_*` variables are bundled into the app at build time. The complete Android release build and install command, with all four, is in [AGENTS.md](../AGENTS.md) under "Building a release build"; it is kept only there. `EXPO_PUBLIC_MORPH_CLIENT_TOKEN` is the same as `MORPH_CLIENT_TOKEN` in the server's `.env`.
 
-- `EXPO_PUBLIC_MORPH_API_URL=https://morph-api.stonetech.dev`
-- `EXPO_PUBLIC_MORPH_CLIENT_TOKEN=` the same as `MORPH_CLIENT_TOKEN` in the server's `.env`
-
-To install on an Android phone directly (the release build is signed with the debug key, so it can overwrite the development build and the data is kept):
-
-```bash
-cd apps/mobile && npx expo prebuild --platform android --no-install
-cd android && EXPO_PUBLIC_MORPH_API_URL=https://morph-api.stonetech.dev \
-  EXPO_PUBLIC_MORPH_CLIENT_TOKEN="$(grep '^MORPH_CLIENT_TOKEN=' ~/projects/morph-prod/.env | cut -d= -f2-)" \
-  ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a
-adb -s <serial> install -r app/build/outputs/apk/release/app-release.apk
-```
-
-Downloaded tools (D-177–D-179): at build time also set `EXPO_PUBLIC_MORPH_TOOLS_URL=<address of the catalog on R2>`. Scan flattening model (D-274): at build time set `EXPO_PUBLIC_MORPH_PACKS_URL=https://morph-tools.stonetech.dev/packs` (`packs/` in the R2 bucket `morph-tools`; paths carry the pack ID and version, and are only added to, never overwritten; when changing the model, update the version, size and hash in `packages/core/src/packs.ts`). The server does not need to know about downloaded tools (the prompt is written by the app, D-193); for the release steps see [TOOL_DOWNLOAD_DESIGN.md](TOOL_DOWNLOAD_DESIGN.md) §13.
+Downloaded tools (D-177–D-179): `EXPO_PUBLIC_MORPH_TOOLS_URL` is the address of the catalog on R2. Scan flattening model (D-274): `EXPO_PUBLIC_MORPH_PACKS_URL` points at `packs/` in the R2 bucket `morph-tools`; paths carry the pack ID and version, and are only added to, never overwritten; when changing the model, update the version, size and hash in `packages/core/src/packs.ts`. The server does not need to know about downloaded tools (the prompt is written by the app, D-193); for the release steps see [TOOL_DOWNLOAD_DESIGN.md](TOOL_DOWNLOAD_DESIGN.md) §13.
 
 The client token is bundled into the app and is not a secret (D-132). Changing the token makes every old app version return 401, so change it only when it is being abused.
 

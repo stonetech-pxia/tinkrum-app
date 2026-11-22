@@ -246,7 +246,7 @@ npm run tools -- verify dist/tools
 
 Then upload all of `dist/tools` to R2. To revoke a version: `npm run tools -- revoke dist/tools <id@version>`, then sign and upload again. `dist/tools` must be kept (the next build uses it to check version numbers and compatibility); it can live on R2 and be downloaded back before a release.
 
-**Local development**: sign with `tools/dev-signing-key.txt`, serve the catalog with `python3 -m http.server --directory dist/tools`, start Metro for the app with `EXPO_PUBLIC_MORPH_TOOLS_URL=http://localhost:<port>`, and give the planning service `MORPH_TOOLS_URL` and `MORPH_TOOLS_DEV_KEY=1`.
+**Local development**: sign with `tools/dev-signing-key.txt`, serve the catalog with `python3 -m http.server --directory dist/tools`, start Metro for the app with `EXPO_PUBLIC_MORPH_TOOLS_URL=http://localhost:<port>`. Only a development build of the app (`__DEV__`) trusts the development key, and so does `npm run tools -- verify <output directory> --dev`.
 
 **Still missing before launch** (the official public keys were filled into `TOOL_SIGNING_KEYS` on 2026-10-24 and must go out with the next app version): create the R2 bucket and address, set `EXPO_PUBLIC_MORPH_TOOLS_URL` when building the app, and set `MORPH_TOOLS_URL` in the Mac mini's `.env`.
 
