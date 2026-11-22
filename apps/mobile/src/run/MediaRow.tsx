@@ -1,9 +1,10 @@
 import { mediaKindOf, type Locale, type RunItem } from '@morph/core';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FullScreenModal } from '../renderer/Overlays';
 import { t } from '../i18n';
 import { Icon } from '../renderer/Icon';
 import type { Palette } from '../renderer/theme';
@@ -85,12 +86,9 @@ export function MediaRow({
         onPress={() => setOpen(true)}
       />
       {open ? (
-        <Modal
-          animationType="slide"
-          presentationStyle="overFullScreen"
-          onRequestClose={() => setOpen(false)}>
+        <FullScreenModal animationType="slide" onClose={() => setOpen(false)}>
           <Player item={item} onClose={() => setOpen(false)} palette={palette} locale={locale} />
-        </Modal>
+        </FullScreenModal>
       ) : null}
     </View>
   );

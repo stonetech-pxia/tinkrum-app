@@ -5,6 +5,7 @@ import {
   chromeStops,
   isDark,
   mix,
+  onAccent,
   resolveColors,
   resolveSurfaceColors,
   type ComponentStyle,
@@ -61,6 +62,8 @@ const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' });
 export interface Palette extends ResolvedColors {
   /** 旧名字，等同于 surface / muted。 */
   card: string;
+  /** 实色强调底上的可读文字。 */
+  onAccent: typeof onAccent;
   subtext: string;
   theme: Theme;
   radius: number;
@@ -152,6 +155,7 @@ function buildPalette(theme: Theme, colors: ResolvedColors, page: ResolvedColors
   };
   return {
     ...colors,
+    onAccent,
     card: colors.surface,
     subtext: colors.muted,
     theme,

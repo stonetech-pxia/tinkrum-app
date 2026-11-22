@@ -2,8 +2,9 @@ import { canEncodeStandardText } from '@morph/tool-pdf';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
+import { Pill } from '../../renderer/ui';
 import { t } from '../../i18n';
-import { Chip } from '../ParamForm';
+
 import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 
@@ -84,7 +85,7 @@ export function FillFormScreen({
               ) : (
                 <View style={styles.wrap}>
                   {(field.options ?? []).map((option, j) => (
-                    <Chip
+                    <Pill
                       key={option}
                       palette={palette}
                       testID={`form-option-${i}-${j}`}

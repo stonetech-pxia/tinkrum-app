@@ -22,7 +22,6 @@ import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -31,16 +30,16 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAISettings } from '../ai/context';
 import { useAfterApply } from '../draft/useApplyDraft';
 import { LivelyTink } from '../guide/LivelyTink';
 import { guideText, useGuide } from '../guide/store';
 import { t, type StringKey } from '../i18n';
-import { Icon, UiIcon } from '../renderer/Icon';
+import { BottomSheet } from '../renderer/Overlays';
+import { Icon } from '../renderer/Icon';
 import { usePalette } from '../renderer/theme';
-import { Button, Card } from '../renderer/ui';
+import { Pill, Button, Card } from '../renderer/ui';
 import { sharedAbout } from '../share/about';
 import { useIncoming } from '../share/incoming';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
@@ -84,7 +83,6 @@ export function ChangeScreen() {
   const { locale, registry, store, files } = useWorkspaceContext();
   const router = useRouter();
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
   const config = useWorkspace((s) => s.config)!;
   const draft = useWorkspace((s) => s.draft);
   const busy = useWorkspace((s) => s.busy);
@@ -595,7 +593,7 @@ export function ChangeScreen() {
                 {feedback.examples.length > 0 ? (
                   <View style={styles.chips} testID="change-feedback-examples">
                     {feedback.examples.map((example) => (
-                      <Chip
+                      <Pill
                         key={example}
                         label={example}
                         palette={palette}
@@ -687,7 +685,7 @@ export function ChangeScreen() {
           <View style={styles.chips} testID="change-examples">
             {/* 「接着改」是用户自己那句话剩下的部分（D-191），不是预设的句子。 */}
             {next && !auto ? (
-              <Chip
+              <Pill
                 testID="change-next"
                 label={next}
                 palette={palette}
@@ -696,7 +694,7 @@ export function ChangeScreen() {
             ) : null}
             {/* AI 建议的下一步（D-355）：上一次修改时 AI 给的，点了填进输入框。 */}
             {suggest.map((text, i) => (
-              <Chip
+              <Pill
                 key={text}
                 testID={`change-suggest-${i}`}
                 label={text}
@@ -713,7 +711,7 @@ export function ChangeScreen() {
                     ['change-want-cards', 'wantCardsChip'],
                   ] as const
                 ).map(([testID, key]) => (
-                  <Chip
+                  <Pill
                     key={key}
                     testID={testID}
                     label={t(locale, key)}
@@ -726,10 +724,10 @@ export function ChangeScreen() {
                   />
                 ))}
             {about && !place ? null : (
-              <Chip
+              <Pill
                 testID="change-pick-style"
                 label={t(locale, 'pickStyleChip')}
-                icon
+                icon="palette"
                 palette={palette}
                 onPress={() => setStylesOpen(true)}
               />
@@ -748,65 +746,33 @@ export function ChangeScreen() {
       </ScrollView>
 
       {/* 「换个风格」：从底部弹出风格选择（D-095），选了直接进入草稿看效果。 */}
-      <Modal
+      <BottomSheet
+        palette={palette}
+        locale={locale}
         visible={stylesOpen}
-        transparent
         animationType="slide"
-        onRequestClose={() => setStylesOpen(false)}>
-        <Pressable
-          style={styles.scrim}
-          onPress={() => setStylesOpen(false)}
-          accessibilityLabel={t(locale, 'close')}
+        onClose={() => setStylesOpen(false)}
+        backdropLabel={t(locale, 'close')}
+        bottomPadding={16}
+        testID="change-styles"
+        style={[
+          styles.sheet,
+          {
+            paddingHorizontal: palette.pad,
+            backgroundColor: palette.surface,
+          },
+        ]}>
+        <Text style={[palette.font('title', 16), { color: palette.text }]}>
+          {t(locale, 'pickStyle')}
+        </Text>
+        <StylePicker
+          locale={locale}
+          current={presetOfTheme(theme)}
+          palette={palette}
+          onPick={pickStyle}
         />
-        <View
-          testID="change-styles"
-          style={[
-            styles.sheet,
-            {
-              paddingHorizontal: palette.pad,
-              backgroundColor: palette.surface,
-              paddingBottom: insets.bottom + 16,
-            },
-          ]}>
-          <Text style={[palette.font('title', 16), { color: palette.text }]}>
-            {t(locale, 'pickStyle')}
-          </Text>
-          <StylePicker
-            locale={locale}
-            current={presetOfTheme(theme)}
-            palette={palette}
-            onPick={pickStyle}
-          />
-        </View>
-      </Modal>
+      </BottomSheet>
     </KeyboardAvoidingView>
-  );
-}
-
-function Chip({
-  label,
-  palette,
-  onPress,
-  icon,
-  testID,
-}: {
-  label: string;
-  palette: ReturnType<typeof usePalette>;
-  onPress: () => void;
-  icon?: boolean;
-  testID?: string;
-}) {
-  return (
-    <Pressable
-      testID={testID}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        { backgroundColor: palette.primaryTint, opacity: pressed ? 0.6 : 1 },
-      ]}>
-      {icon ? <UiIcon name="palette" size={14} color={palette.primaryText} /> : null}
-      <Text style={[palette.font('bodyMedium', 13), { color: palette.primaryText }]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -849,18 +815,7 @@ const styles = StyleSheet.create({
   fixText: { flex: 1, minWidth: 120 },
   sessionItem: { borderRadius: 12, paddingVertical: 8, gap: 2 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    minHeight: 34,
-  },
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)' },
   sheet: {
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
     paddingTop: 18,
     gap: 14,
   },

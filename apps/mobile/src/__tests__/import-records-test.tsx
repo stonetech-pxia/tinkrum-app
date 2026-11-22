@@ -170,9 +170,10 @@ it('a new user with an empty table: map, review, nothing is written until Import
     [4, 'paid'],
     [5, 'skip'],
   ] as const)
-    expect(screen.getByTestId(`import-map-${col}-${id}`)).toHaveProp('accessibilityState', {
-      selected: true,
-    });
+    expect(screen.getByTestId(`import-map-${col}-${id}`)).toHaveProp(
+      'accessibilityState',
+      expect.objectContaining({ selected: true, checked: true }),
+    );
   // 样例显示读成什么：日期按这一列的顺序（25 大于 12，日在前）。
   expect(screen.getAllByTestId('import-sample-2')[0]).toHaveTextContent('25/12/2026 → 2026-12-25');
   expect(screen.getAllByTestId('import-sample-1')[2]).toHaveTextContent('「ten」读不出来');
@@ -311,9 +312,10 @@ it('without a header row every row is data and nothing is matched until the user
   await openImport();
   offerCopy(files, 'names.csv', encode('Ana,1\nBo,2\n'));
   await choose();
-  expect(screen.getByTestId('import-map-0-customer')).toHaveProp('accessibilityState', {
-    selected: false,
-  });
+  expect(screen.getByTestId('import-map-0-customer')).toHaveProp(
+    'accessibilityState',
+    expect.objectContaining({ selected: false, checked: false }),
+  );
   await fireEvent(screen.getByTestId('import-header'), 'valueChange', false);
   expect(screen.getByTestId('import-continue')).toBeDisabled();
   await fireEvent.press(screen.getByTestId('import-map-0-customer'));

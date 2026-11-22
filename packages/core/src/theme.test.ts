@@ -7,6 +7,7 @@ import {
   backdropStops,
   chromeStops,
   contrast,
+  onAccent,
   contrastProblems,
   resolveSurfaceColors,
   mix,
@@ -239,5 +240,23 @@ describe('surfaceText (D-409)', () => {
     const theme = { ...forest, darkColors: { surfaceText: '#101010' } };
     expect(resolveSurfaceColors(forest, true)!.text).toBe('#2A2420');
     expect(resolveSurfaceColors(theme, true)!.text).toBe('#101010');
+  });
+});
+
+describe('overlay and accent colours', () => {
+  it.each(['#FFFFFF', '#FDE047', '#C8623A', '#777777', '#B03A2E', '#1C1815'])(
+    'keeps text readable on an arbitrary solid accent %s',
+    (accent) => {
+      expect(contrast(onAccent(accent), accent)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+  it('provides the same scrim ink in either mode, with stronger separation for dialogs', () => {
+    for (const dark of [false, true]) {
+      const colours = resolveColors(DEFAULT_THEME, dark);
+      expect(colours.scrim.slice(0, 7)).toBe(colours.scrimStrong.slice(0, 7));
+      expect(parseInt(colours.scrimStrong.slice(7), 16)).toBeGreaterThan(
+        parseInt(colours.scrim.slice(7), 16),
+      );
+    }
   });
 });

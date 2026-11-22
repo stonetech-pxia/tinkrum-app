@@ -27,7 +27,7 @@ export function Banner({ palette }: { palette: Palette }) {
   }, [banner, dismiss]);
   if (!banner) return null;
   const warn = banner.kind !== 'applied';
-  const color = warn ? '#FFFFFF' : palette.onPrimary;
+  const color = palette.onAccent(warn ? palette.danger : palette.primary);
   return (
     <View
       testID="banner"
@@ -80,11 +80,18 @@ export function DraftNotice({ palette }: { palette: Palette }) {
         { marginHorizontal: palette.pad, paddingHorizontal: palette.inset },
         { backgroundColor: palette.danger, borderRadius: palette.controlRadius },
       ]}>
-      <Text style={[styles.bannerText, palette.font('bodyMedium', 14), { color: '#FFFFFF' }]}>
+      <Text
+        style={[
+          styles.bannerText,
+          palette.font('bodyMedium', 14),
+          { color: palette.onAccent(palette.danger) },
+        ]}>
         {notice}
       </Text>
       <Pressable onPress={dismiss} hitSlop={8} accessibilityLabel={t(locale, 'close')}>
-        <Text style={[palette.font('bodyBold', 14), { color: '#FFFFFF' }]}>✕</Text>
+        <Text style={[palette.font('bodyBold', 14), { color: palette.onAccent(palette.danger) }]}>
+          ✕
+        </Text>
       </Pressable>
     </View>
   );

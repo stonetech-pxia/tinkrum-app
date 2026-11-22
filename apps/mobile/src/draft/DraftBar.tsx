@@ -5,8 +5,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  KeyboardAvoidingView,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,8 +13,8 @@ import {
   View,
   type ScrollViewInstance,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BottomSheet } from '../renderer/Overlays';
 import { t } from '../i18n';
 import { UiIcon, type UiIconName } from '../renderer/Icon';
 import { usePalette, type Palette } from '../renderer/theme';
@@ -295,7 +293,6 @@ function DraftChat({
   onClose: () => void;
 }) {
   const { locale } = useWorkspaceContext();
-  const insets = useSafeAreaInsets();
   const draft = useWorkspace((s) => s.draft);
   const busy = useWorkspace((s) => s.busy);
   const draftChange = useWorkspace((s) => s.draftChange);
@@ -334,104 +331,100 @@ function DraftChat({
   ];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      {/* Android 也要 padding：Modal 里窗口不跟着键盘缩小，三星键盘会挡住输入框（同 AskPanel）。 */}
-      <KeyboardAvoidingView style={styles.chatRoot} behavior="padding">
-        <Pressable
-          style={styles.flex}
-          onPress={onClose}
-          accessibilityLabel={t(locale, 'draftChatClose')}
+    <BottomSheet
+      palette={palette}
+      locale={locale}
+      visible={visible}
+      animationType="slide"
+      onClose={onClose}
+      backdropLabel={t(locale, 'draftChatClose')}
+      bottomPadding={12}
+      testID="draft-chat"
+      style={[
+        styles.sheet,
+        {
+          backgroundColor: palette.surface,
+          borderColor: palette.border,
+        },
+      ]}>
+      <View style={styles.replyHead}>
+        <Text style={[palette.font('title', 16), styles.flex, { color: palette.text }]}>
+          {t(locale, 'draftChatTitle')}
+        </Text>
+        <Pressable testID="draft-chat-close" hitSlop={10} onPress={onClose}>
+          <Text style={[palette.font('bodyBold', 15), { color: palette.primaryText }]}>
+            {t(locale, 'draftChatClose')}
+          </Text>
+        </Pressable>
+      </View>
+      {place ? (
+        <Text
+          testID="draft-chat-about"
+          style={[palette.font('bodyMedium', 13), { color: palette.muted }]}>
+          {place.title}
+        </Text>
+      ) : null}
+      <ScrollView
+        ref={scroll}
+        style={styles.flex}
+        contentContainerStyle={styles.messages}
+        keyboardShouldPersistTaps="handled">
+        {draft
+          ? steps.map((step: DraftStep, i) => (
+              <View key={step.changeRequestId} style={styles.turn}>
+                <View style={bubble(true)}>
+                  <Text style={[palette.font('body', 14), { color: palette.text }]}>
+                    {step.input}
+                  </Text>
+                </View>
+                <View style={bubble(false)} testID={`draft-chat-reply-${i}`}>
+                  <StepReply
+                    draft={draft}
+                    index={i}
+                    palette={palette}
+                    animate={i === steps.length - 1}
+                  />
+                </View>
+                {draft.replies
+                  .filter((r) => r.afterSteps === i + 1)
+                  .map((r, j) => (
+                    <ReplyBubble
+                      key={j}
+                      reply={r}
+                      palette={palette}
+                      style={bubble(false)}
+                      onExample={setInput}
+                    />
+                  ))}
+              </View>
+            ))
+          : null}
+      </ScrollView>
+      <View style={[styles.inputRow, { borderColor: palette.border }]}>
+        <TextInput
+          testID="draft-chat-input"
+          value={input}
+          onChangeText={setInput}
+          placeholder={t(locale, 'draftChatPlaceholder')}
+          placeholderTextColor={palette.caption}
+          multiline
+          style={[styles.input, palette.font('body', 15), { color: palette.text }]}
         />
-        <View
-          testID="draft-chat"
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: palette.surface,
-              paddingBottom: insets.bottom + 12,
-              borderColor: palette.border,
-            },
-          ]}>
-          <View style={styles.replyHead}>
-            <Text style={[palette.font('title', 16), styles.flex, { color: palette.text }]}>
-              {t(locale, 'draftChatTitle')}
-            </Text>
-            <Pressable testID="draft-chat-close" hitSlop={10} onPress={onClose}>
-              <Text style={[palette.font('bodyBold', 15), { color: palette.primaryText }]}>
-                {t(locale, 'draftChatClose')}
-              </Text>
-            </Pressable>
-          </View>
-          {place ? (
-            <Text
-              testID="draft-chat-about"
-              style={[palette.font('bodyMedium', 13), { color: palette.muted }]}>
-              {place.title}
-            </Text>
-          ) : null}
-          <ScrollView
-            ref={scroll}
-            style={styles.flex}
-            contentContainerStyle={styles.messages}
-            keyboardShouldPersistTaps="handled">
-            {draft
-              ? steps.map((step: DraftStep, i) => (
-                  <View key={step.changeRequestId} style={styles.turn}>
-                    <View style={bubble(true)}>
-                      <Text style={[palette.font('body', 14), { color: palette.text }]}>
-                        {step.input}
-                      </Text>
-                    </View>
-                    <View style={bubble(false)} testID={`draft-chat-reply-${i}`}>
-                      <StepReply
-                        draft={draft}
-                        index={i}
-                        palette={palette}
-                        animate={i === steps.length - 1}
-                      />
-                    </View>
-                    {draft.replies
-                      .filter((r) => r.afterSteps === i + 1)
-                      .map((r, j) => (
-                        <ReplyBubble
-                          key={j}
-                          reply={r}
-                          palette={palette}
-                          style={bubble(false)}
-                          onExample={setInput}
-                        />
-                      ))}
-                  </View>
-                ))
-              : null}
-          </ScrollView>
-          <View style={[styles.inputRow, { borderColor: palette.border }]}>
-            <TextInput
-              testID="draft-chat-input"
-              value={input}
-              onChangeText={setInput}
-              placeholder={t(locale, 'draftChatPlaceholder')}
-              placeholderTextColor={palette.caption}
-              multiline
-              style={[styles.input, palette.font('body', 15), { color: palette.text }]}
-            />
-            <Pressable
-              testID="draft-chat-send"
-              accessibilityRole="button"
-              accessibilityLabel={t(locale, 'send')}
-              disabled={busy}
-              onPress={() => void send(input)}
-              style={[styles.send, { backgroundColor: palette.primary }]}>
-              {busy ? (
-                <ActivityIndicator color={palette.onPrimary} />
-              ) : (
-                <UiIcon name="send" size={18} color={palette.onPrimary} />
-              )}
-            </Pressable>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+        <Pressable
+          testID="draft-chat-send"
+          accessibilityRole="button"
+          accessibilityLabel={t(locale, 'send')}
+          disabled={busy}
+          onPress={() => void send(input)}
+          style={[styles.send, { backgroundColor: palette.primary }]}>
+          {busy ? (
+            <ActivityIndicator color={palette.onPrimary} />
+          ) : (
+            <UiIcon name="send" size={18} color={palette.onPrimary} />
+          )}
+        </Pressable>
+      </View>
+    </BottomSheet>
   );
 }
 
@@ -513,12 +506,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chatRoot: { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)' },
   sheet: {
     height: '58%',
     flexShrink: 1,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 16,
     paddingTop: 16,

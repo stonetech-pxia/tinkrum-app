@@ -81,6 +81,9 @@ export interface ResolvedColors {
   onTertiaryTint: string;
   danger: string;
   shadow: string;
+  /** 弹层遮罩：底部菜单 / 居中问话框。 */
+  scrim: string;
+  scrimStrong: string;
 }
 
 const rgb = (hex: string): [number, number, number] => {
@@ -110,6 +113,11 @@ function luminance(hex: string): number {
 export function contrast(a: string, b: string): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi! + 0.05) / (lo! + 0.05);
+}
+
+/** 任意实色底上的文字：黑白取对比度最高者，供系统提示条和强调按钮共用。 */
+export function onAccent(accent: string): string {
+  return contrast('#FFFFFF', accent) >= contrast('#000000', accent) ? '#FFFFFF' : '#000000';
 }
 
 /** 让 color 在 background 上达到 min 对比度：逐步向 toward 混合。 */
@@ -151,6 +159,8 @@ function buildColors(
   const custom = Boolean(o.text || o.surface || o.background);
   return {
     dark,
+    scrim: `${CLAY.light.text}4D`,
+    scrimStrong: `${CLAY.light.text}80`,
     background,
     surface,
     text,

@@ -1,7 +1,8 @@
 import { RunError, type AskRequest, type Locale, type PackNeed } from '@morph/core';
 import { useState, type ComponentType, type ReactNode } from 'react';
-import { Alert, Modal, Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
+import { FullScreenModal } from '../renderer/Overlays';
 import { t } from '../i18n';
 import { ensureRunPacks } from '../packs/file-bundle';
 import { PackGate } from '../packs/PackGate';
@@ -104,11 +105,10 @@ export function useRunHost(palette: Palette, locale: Locale): RunHost {
         />
       ) : null}
       {local && LocalScreen ? (
-        <Modal
+        <FullScreenModal
           visible
           animationType="slide"
-          presentationStyle="overFullScreen"
-          onRequestClose={() => {
+          onClose={() => {
             local.resolve(null);
             setLocal(null);
           }}>
@@ -125,7 +125,7 @@ export function useRunHost(palette: Palette, locale: Locale): RunHost {
               setLocal(null);
             }}
           />
-        </Modal>
+        </FullScreenModal>
       ) : null}
     </>
   );

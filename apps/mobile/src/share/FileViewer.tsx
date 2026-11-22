@@ -1,18 +1,11 @@
 import type { Locale } from '@morph/core';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useState } from 'react';
-import {
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FullScreenModal } from '../renderer/Overlays';
 import { t } from '../i18n';
 import type { Palette } from '../renderer/theme';
 import { ZoomImage } from './ZoomImage';
@@ -64,7 +57,7 @@ export function FileViewer({
   // 放大看图时不翻页（单指拖动用来看局部）。
   const [zoomed, setZoomed] = useState(false);
   return (
-    <Modal animationType="fade" presentationStyle="overFullScreen" onRequestClose={onClose}>
+    <FullScreenModal animationType="fade" onClose={onClose}>
       {/* Android 的 Modal 是另一个窗口，手势要自己的根视图。 */}
       <GestureHandlerRootView style={styles.flex}>
         <View
@@ -108,7 +101,7 @@ export function FileViewer({
           />
         </View>
       </GestureHandlerRootView>
-    </Modal>
+    </FullScreenModal>
   );
 }
 

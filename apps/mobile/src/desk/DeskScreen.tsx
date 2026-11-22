@@ -1,3 +1,4 @@
+import { Dialog, BottomSheet } from '../renderer/Overlays';
 import {
   type AskRequest,
   calendarOf,
@@ -26,7 +27,6 @@ import {
   AppState,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -832,125 +832,125 @@ export function DeskScreen({ deskId }: { deskId: string }) {
       {host.elements}
 
       {text !== null ? (
-        <Modal visible transparent animationType="fade" onRequestClose={() => setText(null)}>
-          <View style={styles.backdrop}>
-            <View
-              style={[
-                styles.dialog,
-                { backgroundColor: palette.surface, borderRadius: palette.radius },
-              ]}>
-              <Text style={[palette.font('title', 18), { color: palette.text }]}>
-                {t(locale, 'deskTextTitle')}
-              </Text>
-              <ScrollView style={styles.textScroll}>
-                <Text
-                  selectable
-                  testID="desk-text"
-                  style={[palette.font('body', 15), { color: palette.text }]}>
-                  {text}
-                </Text>
-              </ScrollView>
-              <Text style={[palette.font('body', 13), { color: palette.caption }]}>
-                {t(locale, 'resultTextNote')}
-              </Text>
-              <View style={styles.actions}>
-                <HeaderButton
-                  id="desk-text-copy"
-                  text={t(locale, 'resultCopy')}
-                  palette={palette}
-                  onPress={() => void act(() => files.copyText(text))}
-                />
-                <HeaderButton
-                  id="desk-text-close"
-                  text={t(locale, 'close')}
-                  palette={palette}
-                  onPress={() => setText(null)}
-                  bold
-                />
-              </View>
-            </View>
+        <Dialog
+          palette={palette}
+          locale={locale}
+          visible
+          animationType="fade"
+          onClose={() => setText(null)}
+          backdropLabel={t(locale, 'close')}
+          style={[
+            styles.dialog,
+            { backgroundColor: palette.surface, borderRadius: palette.radius },
+          ]}>
+          <Text style={[palette.font('title', 18), { color: palette.text }]}>
+            {t(locale, 'deskTextTitle')}
+          </Text>
+          <ScrollView style={styles.textScroll}>
+            <Text
+              selectable
+              testID="desk-text"
+              style={[palette.font('body', 15), { color: palette.text }]}>
+              {text}
+            </Text>
+          </ScrollView>
+          <Text style={[palette.font('body', 13), { color: palette.caption }]}>
+            {t(locale, 'resultTextNote')}
+          </Text>
+          <View style={styles.actions}>
+            <HeaderButton
+              id="desk-text-copy"
+              text={t(locale, 'resultCopy')}
+              palette={palette}
+              onPress={() => void act(() => files.copyText(text))}
+            />
+            <HeaderButton
+              id="desk-text-close"
+              text={t(locale, 'close')}
+              palette={palette}
+              onPress={() => setText(null)}
+              bold
+            />
           </View>
-        </Modal>
+        </Dialog>
       ) : null}
 
       {sheet ? (
-        <Modal visible transparent animationType="fade" onRequestClose={() => setSheet(false)}>
-          <View style={styles.sheetRoot}>
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={() => setSheet(false)}
-              testID="desk-sheet-backdrop"
+        <BottomSheet
+          palette={palette}
+          locale={locale}
+          visible
+          animationType="fade"
+          onClose={() => setSheet(false)}
+          backdropTestID="desk-sheet-backdrop"
+          backdropLabel={t(locale, 'close')}
+          bottomPadding={8}
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.border,
+            },
+          ]}>
+          <SheetRow
+            id="desk-save"
+            label={t(locale, saved ? 'resultSaved' : 'resultSave')}
+            palette={palette}
+            disabled={saved}
+            onPress={() => void act(save)}
+          />
+          <SheetRow
+            id="desk-folder"
+            label={
+              folderSaved
+                ? t(locale, 'resultFolderDone', { name: folderName(locale, folderSaved) })
+                : t(locale, 'resultFolder')
+            }
+            palette={palette}
+            onPress={() => void act(saveToPhone)}
+          />
+          <SheetRow
+            id="desk-share"
+            label={t(locale, 'resultShare')}
+            palette={palette}
+            onPress={() => void act(shareAll)}
+          />
+          {allImages ? (
+            <SheetRow
+              id="desk-photos"
+              label={t(locale, 'resultPhotos')}
+              palette={palette}
+              onPress={() => void act(() => files.saveToPhotos(items().map((i) => i.uri)))}
             />
-            <View
-              style={[
-                styles.sheet,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                  paddingBottom: insets.bottom + 8,
-                },
-              ]}>
-              <SheetRow
-                id="desk-save"
-                label={t(locale, saved ? 'resultSaved' : 'resultSave')}
-                palette={palette}
-                disabled={saved}
-                onPress={() => void act(save)}
-              />
-              <SheetRow
-                id="desk-folder"
-                label={
-                  folderSaved
-                    ? t(locale, 'resultFolderDone', { name: folderName(locale, folderSaved) })
-                    : t(locale, 'resultFolder')
-                }
-                palette={palette}
-                onPress={() => void act(saveToPhone)}
-              />
-              <SheetRow
-                id="desk-share"
-                label={t(locale, 'resultShare')}
-                palette={palette}
-                onPress={() => void act(shareAll)}
-              />
-              {allImages ? (
-                <SheetRow
-                  id="desk-photos"
-                  label={t(locale, 'resultPhotos')}
-                  palette={palette}
-                  onPress={() => void act(() => files.saveToPhotos(items().map((i) => i.uri)))}
-                />
-              ) : null}
-              {printable ? (
-                <SheetRow
-                  id="desk-print"
-                  label={t(locale, 'resultPrint')}
-                  palette={palette}
-                  onPress={() =>
-                    void act(async () => {
-                      for (const item of items()) await files.print(item);
-                    })
-                  }
-                />
-              ) : null}
-              <SheetRow
-                id="desk-sheet-preview"
-                label={t(locale, 'deskSystemPreview')}
-                palette={palette}
-                onPress={() => {
-                  setSheet(false);
-                  systemPreview();
-                }}
-              />
-              <SheetRow
-                id="desk-sheet-cancel"
-                label={t(locale, 'cancel')}
-                palette={palette}
-                onPress={() => setSheet(false)}
-              />
-            </View>
-          </View>
-        </Modal>
+          ) : null}
+          {printable ? (
+            <SheetRow
+              id="desk-print"
+              label={t(locale, 'resultPrint')}
+              palette={palette}
+              onPress={() =>
+                void act(async () => {
+                  for (const item of items()) await files.print(item);
+                })
+              }
+            />
+          ) : null}
+          <SheetRow
+            id="desk-sheet-preview"
+            label={t(locale, 'deskSystemPreview')}
+            palette={palette}
+            onPress={() => {
+              setSheet(false);
+              systemPreview();
+            }}
+          />
+          <SheetRow
+            id="desk-sheet-cancel"
+            label={t(locale, 'cancel')}
+            palette={palette}
+            onPress={() => setSheet(false)}
+          />
+        </BottomSheet>
       ) : null}
       {inDraft ? (
         <>
@@ -1132,14 +1132,10 @@ const styles = StyleSheet.create({
   },
   cover: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#2A242055' },
   busyCard: { padding: 20, gap: 12, alignItems: 'center', minWidth: 220 },
-  backdrop: { flex: 1, backgroundColor: '#2A242080', justifyContent: 'center', padding: 24 },
   dialog: { padding: 22, gap: 14, maxHeight: '100%' },
   textScroll: { flexGrow: 0, flexShrink: 1 },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 24 },
-  sheetRoot: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.3)' },
   sheet: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
     padding: 16,
     gap: 2,
     borderWidth: StyleSheet.hairlineWidth,

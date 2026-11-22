@@ -1,7 +1,8 @@
+import { Dialog } from '../renderer/Overlays';
 import { localize, t, packById, type Locale, type PackNeed } from '@morph/core';
 
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Palette } from '../renderer/theme';
 import { formatBytes } from '../run/ResultView';
@@ -115,142 +116,140 @@ export function PackGate({
   const licenses = [...new Set(needs.map((n) => packById(n.pack)?.license ?? ''))].filter(Boolean);
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={() => onDone(null)}>
-      <View style={styles.backdrop}>
-        <View
-          testID="pack-gate"
-          style={[
-            styles.dialog,
-            { backgroundColor: palette.surface, borderRadius: palette.radius },
-          ]}>
-          {/* 第一次用到时的提示（D-112）：不出现「扩展包」这个词，只说要下载多少、之后能离线用。 */}
-          {text(
-            'title',
-            t(locale, bundle ? 'packBundleTitle' : 'PackGate_First_use_needs_a_download_3c1d7', {
-              v0: total === null ? '…' : formatBytes(total, locale),
-            }),
-          )}
-          {text(
-            'body',
-            t(
-              locale,
-              bundle ? 'packBundleBody' : 'PackGate_After_that_it_works_offline_Wi_Fi_is_r_77ca7',
-            ),
-          )}
-          {needs.map(({ pack: id, optional }) => {
-            const pack = packById(id);
-            if (!pack) return null;
-            const on = !left.includes(id);
-            const size = [...unlistedDeps(id), id].reduce((sum, d) => sum + ownSize(d), 0);
-            const about = [pack, ...unlistedDeps(id).map((d) => packById(d) ?? null)]
-              .flatMap((p) => (p ? [localize(p.description, locale)] : []))
-              .join(zh ? '' : ' ');
-            const body = (
-              <View style={styles.itemText}>
-                <Text style={[palette.font('bodyBold', 15), { color: palette.text }]}>
-                  {localize(pack.name, locale)}
-                  {have === null ? '' : ` · ${formatBytes(size, locale)}`}
-                </Text>
-                {/* 一次问完时只列名字和大小（D-456）。 */}
-                {bundle ? null : text('body', about, { fontSize: 13 })}
-                {optional && !bundle
-                  ? text('body', t(locale, 'packOptionalHint'), { fontSize: 13 })
-                  : null}
-              </View>
-            );
-            return optional ? (
-              <Pressable
-                key={id}
-                testID={`pack-item-${id}`}
-                disabled={progress !== null}
-                onPress={() => setLeft((l) => (on ? [...l, id] : l.filter((x) => x !== id)))}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: on }}
-                style={styles.item}>
-                <View
-                  testID={`pack-include-${id}`}
-                  style={[
-                    styles.box,
-                    {
-                      borderColor: on ? palette.primary : palette.border,
-                      backgroundColor: on ? palette.primary : 'transparent',
-                    },
-                  ]}>
-                  {on ? <Text style={[styles.tick, { color: palette.surface }]}>✓</Text> : null}
-                </View>
-                {body}
-              </Pressable>
-            ) : (
-              <View key={id} testID={`pack-item-${id}`} style={styles.item}>
-                {needs.some((n) => n.optional) ? <View style={styles.box} /> : null}
-                {body}
-              </View>
-            );
-          })}
-          {/* 一次问完时不列许可证，装好后在「设置 → 已下载内容」里看（D-456）。 */}
-          {bundle
-            ? null
-            : text('body', t(locale, 'PackGate_License_ff05c', { v0: licenses.join('; ') }), {
-                fontSize: 12,
-              })}
-          {progress !== null ? (
-            <View style={styles.progressRow}>
-              <ActivityIndicator />
-              <View style={[styles.bar, { backgroundColor: palette.primaryTint }]}>
-                <View
-                  style={[
-                    styles.fill,
-                    { width: `${Math.round(progress * 100)}%`, backgroundColor: palette.primary },
-                  ]}
-                />
-              </View>
+    <Dialog
+      palette={palette}
+      locale={locale}
+      visible
+      animationType="fade"
+      onClose={() => onDone(null)}
+      backdropLabel={t(locale, 'close')}
+      testID="pack-gate"
+      style={[styles.dialog, { backgroundColor: palette.surface, borderRadius: palette.radius }]}>
+      {/* 第一次用到时的提示（D-112）：不出现「扩展包」这个词，只说要下载多少、之后能离线用。 */}
+      {text(
+        'title',
+        t(locale, bundle ? 'packBundleTitle' : 'PackGate_First_use_needs_a_download_3c1d7', {
+          v0: total === null ? '…' : formatBytes(total, locale),
+        }),
+      )}
+      {text(
+        'body',
+        t(
+          locale,
+          bundle ? 'packBundleBody' : 'PackGate_After_that_it_works_offline_Wi_Fi_is_r_77ca7',
+        ),
+      )}
+      {needs.map(({ pack: id, optional }) => {
+        const pack = packById(id);
+        if (!pack) return null;
+        const on = !left.includes(id);
+        const size = [...unlistedDeps(id), id].reduce((sum, d) => sum + ownSize(d), 0);
+        const about = [pack, ...unlistedDeps(id).map((d) => packById(d) ?? null)]
+          .flatMap((p) => (p ? [localize(p.description, locale)] : []))
+          .join(zh ? '' : ' ');
+        const body = (
+          <View style={styles.itemText}>
+            <Text style={[palette.font('bodyBold', 15), { color: palette.text }]}>
+              {localize(pack.name, locale)}
+              {have === null ? '' : ` · ${formatBytes(size, locale)}`}
+            </Text>
+            {/* 一次问完时只列名字和大小（D-456）。 */}
+            {bundle ? null : text('body', about, { fontSize: 13 })}
+            {optional && !bundle
+              ? text('body', t(locale, 'packOptionalHint'), { fontSize: 13 })
+              : null}
+          </View>
+        );
+        return optional ? (
+          <Pressable
+            key={id}
+            testID={`pack-item-${id}`}
+            disabled={progress !== null}
+            onPress={() => setLeft((l) => (on ? [...l, id] : l.filter((x) => x !== id)))}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: on }}
+            style={styles.item}>
+            <View
+              testID={`pack-include-${id}`}
+              style={[
+                styles.box,
+                {
+                  borderColor: on ? palette.primary : palette.border,
+                  backgroundColor: on ? palette.primary : 'transparent',
+                },
+              ]}>
+              {on ? <Text style={[styles.tick, { color: palette.surface }]}>✓</Text> : null}
             </View>
-          ) : null}
-          {error ? (
-            <Text style={[palette.font('bodyMedium', 14), { color: palette.danger }]}>{error}</Text>
-          ) : null}
-          <View style={styles.actions}>
-            <Pressable
-              testID="pack-cancel"
-              onPress={() => onDone(anyRequired ? null : needs.map((n) => n.pack))}
-              hitSlop={8}>
-              <Text style={[palette.font('bodyBold', 16), { color: palette.muted }]}>
-                {t(
-                  locale,
-                  anyRequired ? 'PackGate_Cancel_bd576' : bundle ? 'packBundleLater' : 'packSkip',
-                )}
-              </Text>
-            </Pressable>
-            {progress !== null ? (
-              <Pressable
-                testID="pack-background"
-                onPress={() => {
-                  // 这次运行照取消处理（必需的不运行，可选的不带它继续）；下完以后用户自己再来一次。
-                  background.current = true;
-                  onDone(anyRequired ? null : needs.map((n) => n.pack));
-                }}
-                hitSlop={8}>
-                <Text style={[palette.font('bodyBold', 16), { color: palette.primaryText }]}>
-                  {t(locale, 'packBackground')}
-                </Text>
-              </Pressable>
-            ) : null}
-            {progress === null && chosen.length > 0 ? (
-              <Pressable testID="pack-download" onPress={() => void download()} hitSlop={8}>
-                <Text style={[palette.font('bodyBold', 16), { color: palette.primaryText }]}>
-                  {t(locale, error ? 'retry' : 'speechDownload')}
-                </Text>
-              </Pressable>
-            ) : null}
+            {body}
+          </Pressable>
+        ) : (
+          <View key={id} testID={`pack-item-${id}`} style={styles.item}>
+            {needs.some((n) => n.optional) ? <View style={styles.box} /> : null}
+            {body}
+          </View>
+        );
+      })}
+      {/* 一次问完时不列许可证，装好后在「设置 → 已下载内容」里看（D-456）。 */}
+      {bundle
+        ? null
+        : text('body', t(locale, 'PackGate_License_ff05c', { v0: licenses.join('; ') }), {
+            fontSize: 12,
+          })}
+      {progress !== null ? (
+        <View style={styles.progressRow}>
+          <ActivityIndicator />
+          <View style={[styles.bar, { backgroundColor: palette.primaryTint }]}>
+            <View
+              style={[
+                styles.fill,
+                { width: `${Math.round(progress * 100)}%`, backgroundColor: palette.primary },
+              ]}
+            />
           </View>
         </View>
+      ) : null}
+      {error ? (
+        <Text style={[palette.font('bodyMedium', 14), { color: palette.danger }]}>{error}</Text>
+      ) : null}
+      <View style={styles.actions}>
+        <Pressable
+          testID="pack-cancel"
+          onPress={() => onDone(anyRequired ? null : needs.map((n) => n.pack))}
+          hitSlop={8}>
+          <Text style={[palette.font('bodyBold', 16), { color: palette.muted }]}>
+            {t(
+              locale,
+              anyRequired ? 'PackGate_Cancel_bd576' : bundle ? 'packBundleLater' : 'packSkip',
+            )}
+          </Text>
+        </Pressable>
+        {progress !== null ? (
+          <Pressable
+            testID="pack-background"
+            onPress={() => {
+              // 这次运行照取消处理（必需的不运行，可选的不带它继续）；下完以后用户自己再来一次。
+              background.current = true;
+              onDone(anyRequired ? null : needs.map((n) => n.pack));
+            }}
+            hitSlop={8}>
+            <Text style={[palette.font('bodyBold', 16), { color: palette.primaryText }]}>
+              {t(locale, 'packBackground')}
+            </Text>
+          </Pressable>
+        ) : null}
+        {progress === null && chosen.length > 0 ? (
+          <Pressable testID="pack-download" onPress={() => void download()} hitSlop={8}>
+            <Text style={[palette.font('bodyBold', 16), { color: palette.primaryText }]}>
+              {t(locale, error ? 'retry' : 'speechDownload')}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
-    </Modal>
+    </Dialog>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#2A242080', justifyContent: 'center', padding: 24 },
   dialog: { padding: 22, gap: 12 },
   item: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   itemText: { flex: 1, gap: 2 },

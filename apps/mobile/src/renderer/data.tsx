@@ -94,8 +94,6 @@ import {
 import { useRouter } from 'expo-router';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
-  KeyboardAvoidingView,
-  Modal,
   ScrollView,
   Pressable,
   StyleSheet,
@@ -114,6 +112,7 @@ import { useRecordActionRunner } from '../data/record-actions';
 import { useComputedRecords, useLinkResolver, useRecordActions, useRecords } from '../data/records';
 import { useSimilarCheck } from '../data/similar-records';
 import { useCalendar, useWorkspace } from '../workspace/context';
+import { BottomSheet } from './Overlays';
 import { t } from '../i18n';
 import { AttachmentThumb, AttachmentsInput, firstImage, useAssetIndex } from './Attachments';
 import { onPicture } from './Backdrop';
@@ -2388,31 +2387,24 @@ export function RecordForm({
         style={[styles.fab, { backgroundColor: palette.primary }]}>
         <UiIcon name="add" size={28} color={palette.onPrimary} />
       </Pressable>
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <KeyboardAvoidingView style={styles.sheetRoot} behavior="padding">
-          <Pressable
-            testID={`form-${componentId}-backdrop`}
-            accessibilityRole="button"
-            accessibilityLabel={t(locale, 'close')}
-            style={styles.sheetBackdrop}
-            onPress={() => setOpen(false)}
-          />
-          <View
-            testID={`form-${componentId}-sheet`}
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: palette.surface,
-                borderTopLeftRadius: palette.radius,
-                borderTopRightRadius: palette.radius,
-                padding: palette.pad,
-                gap: palette.gap - 4,
-              },
-            ]}>
-            <InSheet.Provider value>{body}</InSheet.Provider>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <BottomSheet
+        palette={palette}
+        locale={locale}
+        visible={open}
+        animationType="slide"
+        onClose={() => setOpen(false)}
+        backdropTestID={`form-${componentId}-backdrop`}
+        backdropLabel={t(locale, 'close')}
+        testID={`form-${componentId}-sheet`}
+        style={[
+          {
+            backgroundColor: palette.surface,
+            padding: palette.pad,
+            gap: palette.gap - 4,
+          },
+        ]}>
+        <InSheet.Provider value>{body}</InSheet.Provider>
+      </BottomSheet>
     </>
   );
 }
@@ -2702,9 +2694,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 6,
   },
-  sheetRoot: { flex: 1, justifyContent: 'flex-end' },
-  sheetBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.3)' },
-  sheet: { paddingBottom: 28 },
   groupTitle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   groupAdd: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   addHere: {

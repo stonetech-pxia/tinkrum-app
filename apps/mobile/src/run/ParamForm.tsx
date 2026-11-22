@@ -7,8 +7,9 @@ import {
   type ParamField,
 } from '@morph/core';
 
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
+import { Pill } from '../renderer/ui';
 import { t } from '../i18n';
 import type { Palette } from '../renderer/theme';
 import { useWorkspace } from '../workspace/context';
@@ -95,7 +96,7 @@ export function ParamForm({
       {presets.length > 0 ? (
         <View style={styles.wrap}>
           {presets.map((p) => (
-            <Chip
+            <Pill
               key={p.id}
               palette={palette}
               testID={`${testPrefix}-preset-${p.id}`}
@@ -175,7 +176,7 @@ function FieldInput({
       return (
         <View style={styles.wrap}>
           {field.options!.map((o) => (
-            <Chip
+            <Pill
               key={String(o.value)}
               palette={palette}
               testID={`${testID}-${String(o.value)}`}
@@ -238,7 +239,7 @@ function FieldInput({
       return (
         <View style={styles.wrap}>
           {collection.fields.map((f) => (
-            <Chip
+            <Pill
               key={f.id}
               palette={palette}
               testID={`${testID}-${f.id}`}
@@ -299,7 +300,7 @@ function CollectionInput({
   return (
     <View style={styles.wrap}>
       {collections.map((c) => (
-        <Chip
+        <Pill
           key={c.id}
           palette={palette}
           testID={`${testID}-${c.id}`}
@@ -312,43 +313,6 @@ function CollectionInput({
   );
 }
 
-export function Chip({
-  palette,
-  label,
-  selected,
-  onPress,
-  testID,
-}: {
-  palette: Palette;
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-  testID?: string;
-}) {
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        {
-          borderColor: selected ? palette.primary : palette.border,
-          backgroundColor: selected ? palette.primary : palette.surface,
-          opacity: pressed ? 0.7 : 1,
-        },
-      ]}>
-      <Text
-        style={[
-          palette.font('bodyBold', 14),
-          { color: selected ? palette.onPrimary : palette.text },
-        ]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   form: { gap: 16 },
   field: { gap: 8 },
@@ -357,5 +321,4 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 12 },
   number: { minWidth: 110 },
   multiline: { minHeight: 120, textAlignVertical: 'top' },
-  chip: { borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
 });

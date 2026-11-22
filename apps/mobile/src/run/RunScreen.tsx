@@ -17,7 +17,6 @@ import { useEffect, useRef, useState, type ComponentType } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -28,6 +27,7 @@ import {
 
 import { workflowEntry } from '../shell/ai-entry';
 import { runErrorText, t } from '../i18n';
+import { FullScreenModal } from '../renderer/Overlays';
 import { Icon } from '../renderer/Icon';
 import { usePalette, type Palette } from '../renderer/theme';
 import { Button, Card } from '../renderer/ui';
@@ -779,11 +779,10 @@ export function RunScreen({
         />
       ) : null}
       {local && LocalScreen ? (
-        <Modal
+        <FullScreenModal
           visible
           animationType="slide"
-          presentationStyle="overFullScreen"
-          onRequestClose={() => {
+          onClose={() => {
             local.resolve(null);
             setLocal(null);
           }}>
@@ -800,7 +799,7 @@ export function RunScreen({
               setLocal(null);
             }}
           />
-        </Modal>
+        </FullScreenModal>
       ) : null}
     </ScrollView>
   );

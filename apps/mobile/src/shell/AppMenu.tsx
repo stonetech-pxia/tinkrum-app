@@ -1,17 +1,8 @@
 import { ICON_NAMES, isEmoji, type IconValue, type Locale } from '@morph/core';
 import { useState, type ReactNode } from 'react';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { BottomSheet } from '../renderer/Overlays';
 import { t } from '../i18n';
 import { Icon } from '../renderer/Icon';
 import type { Palette } from '../renderer/theme';
@@ -34,44 +25,37 @@ export function AppMenuSheet({
   onClose: () => void;
   children: ReactNode;
 }) {
-  const insets = useSafeAreaInsets();
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.root} behavior="padding">
-        <Pressable
-          testID="app-menu-backdrop"
-          accessibilityRole="button"
-          accessibilityLabel={t(locale, 'cancel')}
-          style={styles.backdrop}
-          onPress={onClose}
-        />
-        <View
-          testID="app-menu"
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: palette.surface,
-              borderColor: palette.border,
-              borderTopLeftRadius: palette.radius,
-              borderTopRightRadius: palette.radius,
-              padding: palette.pad,
-              paddingBottom: insets.bottom + 8,
-            },
-          ]}>
-          <Text style={[palette.font('title', 17), styles.title, { color: palette.text }]}>
-            {title}
-          </Text>
-          {children}
-          <AppMenuRow
-            id="app-menu-cancel"
-            label={t(locale, 'cancel')}
-            palette={palette}
-            onPress={onClose}
-            muted
-          />
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    <BottomSheet
+      palette={palette}
+      locale={locale}
+      visible
+      animationType="slide"
+      onClose={onClose}
+      backdropTestID="app-menu-backdrop"
+      backdropLabel={t(locale, 'cancel')}
+      bottomPadding={8}
+      testID="app-menu"
+      style={[
+        styles.sheet,
+        {
+          backgroundColor: palette.surface,
+          borderColor: palette.border,
+          padding: palette.pad,
+        },
+      ]}>
+      <Text style={[palette.font('title', 17), styles.title, { color: palette.text }]}>
+        {title}
+      </Text>
+      {children}
+      <AppMenuRow
+        id="app-menu-cancel"
+        label={t(locale, 'cancel')}
+        palette={palette}
+        onPress={onClose}
+        muted
+      />
+    </BottomSheet>
   );
 }
 
@@ -196,8 +180,6 @@ export function AppIconPicker({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.3)' },
   sheet: { gap: 2, borderWidth: StyleSheet.hairlineWidth },
   title: { paddingBottom: 6 },
   row: { minHeight: 48, justifyContent: 'center' },

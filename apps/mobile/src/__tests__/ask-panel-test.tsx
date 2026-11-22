@@ -1,9 +1,18 @@
+import type { ReactNode } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createDefaultWorkspace } from '@morph/core';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render as renderNative, screen } from '@testing-library/react-native';
 
 import { makePalette } from '../renderer/theme';
 import { AskPanel } from '../run/AskPanel';
 import { testRegistry } from '../test-utils/render-app';
+
+const metrics = {
+  frame: { x: 0, y: 0, width: 375, height: 667 },
+  insets: { top: 44, bottom: 34, left: 0, right: 0 },
+};
+const render = (children: ReactNode) =>
+  renderNative(<SafeAreaProvider initialMetrics={metrics}>{children}</SafeAreaProvider>);
 
 const idPhoto = testRegistry.actions.get('image.idPhoto')!;
 

@@ -121,44 +121,9 @@ export function SampleRows({
   });
 }
 
-export function Chip({
-  label,
-  palette,
-  onPress,
-  testID,
-}: {
-  label: string;
-  palette: Palette;
-  onPress: () => void;
-  testID: string;
-}) {
-  return (
-    <Pressable
-      testID={testID}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        {
-          borderColor: palette.primary,
-          backgroundColor: palette.primaryTint,
-          opacity: pressed ? 0.6 : 1,
-        },
-      ]}>
-      <Text style={[palette.font('bodyBold', 14), { color: palette.primaryText }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   // 左右贴着页面边距（D-454），在用的地方写。
   wrap: { paddingTop: 8 },
-  chip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    justifyContent: 'center',
-  },
   link: { alignSelf: 'flex-start', paddingVertical: 2 },
   sample: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
   sampleIcon: {

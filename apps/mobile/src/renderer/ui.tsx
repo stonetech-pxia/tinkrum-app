@@ -205,41 +205,65 @@ export function Button({
   );
 }
 
-/** 小号胶囊按钮（工具目录里的操作）。 */
+/** 小号胶囊按钮；选中、单选、危险、图标共用同一套状态和无障碍语义。 */
 export function Pill({
   palette,
   label,
   onPress,
   danger,
   testID,
+  selected,
+  disabled,
+  icon,
+  radio,
 }: {
   palette: Palette;
   label: string;
   onPress: () => void;
   danger?: boolean;
   testID?: string;
+  selected?: boolean;
+  disabled?: boolean;
+  icon?: IconValue;
+  radio?: boolean;
 }) {
+  const selectable = selected !== undefined;
+  const accent = danger ? palette.danger : palette.primary;
+  const filled = selected === true;
+  const color = filled
+    ? palette.onAccent(accent)
+    : danger
+      ? palette.danger
+      : selectable
+        ? palette.text
+        : palette.primaryText;
   return (
     <Pressable
       testID={testID}
       onPress={onPress}
+      disabled={disabled}
+      accessibilityRole={radio ? 'radio' : 'button'}
+      accessibilityState={{ selected, disabled, ...(radio ? { checked: !!selected } : {}) }}
       style={({ pressed }) => ({
-        minHeight: 36,
+        minHeight: 38,
         justifyContent: 'center',
         paddingHorizontal: 14,
+        paddingVertical: 8,
         borderRadius: 999,
         borderWidth: 1,
-        borderColor: danger ? palette.danger : palette.border,
-        backgroundColor: danger ? palette.surface : palette.primaryTint,
-        opacity: pressed ? 0.6 : 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        borderColor: danger || filled ? accent : palette.border,
+        backgroundColor: filled
+          ? accent
+          : selectable || danger
+            ? palette.surface
+            : palette.primaryTint,
+        opacity: disabled ? 0.4 : pressed ? 0.6 : 1,
       })}>
-      <Text
-        style={[
-          palette.font('bodyBold', 13),
-          { color: danger ? palette.danger : palette.primaryText },
-        ]}>
-        {label}
-      </Text>
+      {icon ? <Icon name={icon} size={14} color={color} /> : null}
+      <Text style={[palette.font('bodyBold', 14), { color, flexShrink: 1 }]}>{label}</Text>
     </Pressable>
   );
 }

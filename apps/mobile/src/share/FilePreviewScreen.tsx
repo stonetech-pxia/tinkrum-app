@@ -14,7 +14,7 @@ import {
   type DocDoc,
   type OfficeImport,
 } from '@morph/tool-office';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DeskPreview, type OfficePreview } from '../desk/DeskPreview';
@@ -23,6 +23,7 @@ import { loadDesk, placeOnDesk } from '../desk/store';
 import { folderName, runErrorText, t, type StringKey } from '../i18n';
 import { useFileBundleOffer } from '../packs/FileBundleOffer';
 import { formatSize } from '../renderer/FileList';
+import { BottomSheet } from '../renderer/Overlays';
 import { Icon, UiIcon } from '../renderer/Icon';
 import { usePalette } from '../renderer/theme';
 import { Card, SectionLabel } from '../renderer/ui';
@@ -579,74 +580,72 @@ export function FilePreviewScreen({ index }: { index?: number }) {
         </View>
       )}
       {panel ? (
-        <Modal visible transparent animationType="none" onRequestClose={() => setPanel(null)}>
-          <Pressable
-            style={styles.backdrop}
-            testID="preview-panel-backdrop"
-            onPress={() => setPanel(null)}
-          />
-          <View
-            testID={`preview-panel-${panel}`}
-            style={[
-              styles.panel,
-              { backgroundColor: palette.surface, paddingBottom: insets.bottom + 12 },
-            ]}>
-            <View style={[styles.handle, { backgroundColor: palette.border }]} />
-            <View style={styles.panelHeader}>
-              <Text style={[palette.font('title', 20), { color: palette.text }]}>
-                {t(
-                  locale,
-                  panel === 'record'
-                    ? 'previewRecord'
-                    : panel === 'share'
-                      ? 'previewShare'
-                      : 'previewMore',
-                )}
-              </Text>
-              <Pressable
-                testID="preview-panel-close"
-                accessibilityRole="button"
-                accessibilityLabel={t(locale, 'close')}
-                onPress={() => setPanel(null)}
-                style={[styles.closeButton, { backgroundColor: palette.primaryTint }]}>
-                <UiIcon name="close" size={18} color={palette.text} />
-              </Pressable>
-            </View>
-            {panel === 'more' ? (
-              <View style={styles.fileHeader} testID="preview-more-file">
-                <View style={[styles.fileIcon, { backgroundColor: palette.primaryTint }]}>
-                  <Icon name="document" size={22} color={palette.primaryText} />
-                </View>
-                <Text
-                  numberOfLines={2}
-                  style={[palette.font('bodyMedium', 16), styles.flex, { color: palette.text }]}>
-                  {shown.name}
-                </Text>
-              </View>
-            ) : null}
-            <ScrollView style={styles.panelBody}>
-              {panel === 'record' ? (
-                <Card palette={palette}>
-                  <RecordChooser
-                    count={share.files.length}
-                    files={share.files}
-                    placing={record.placing}
-                    palette={palette}
-                    locale={locale}
-                    onChoose={(choice) => void record.saveAsRecord(choice)}
-                  />
-                </Card>
-              ) : panel === 'share' ? (
-                shareRows()
-              ) : (
-                <>
-                  {moreTop()}
-                  {moreSections()}
-                </>
+        <BottomSheet
+          palette={palette}
+          locale={locale}
+          visible
+          animationType="none"
+          onClose={() => setPanel(null)}
+          backdropTestID="preview-panel-backdrop"
+          backdropLabel={t(locale, 'close')}
+          bottomPadding={12}
+          testID={`preview-panel-${panel}`}
+          style={[styles.panel, { backgroundColor: palette.surface }]}>
+          <View style={[styles.handle, { backgroundColor: palette.border }]} />
+          <View style={styles.panelHeader}>
+            <Text style={[palette.font('title', 20), { color: palette.text }]}>
+              {t(
+                locale,
+                panel === 'record'
+                  ? 'previewRecord'
+                  : panel === 'share'
+                    ? 'previewShare'
+                    : 'previewMore',
               )}
-            </ScrollView>
+            </Text>
+            <Pressable
+              testID="preview-panel-close"
+              accessibilityRole="button"
+              accessibilityLabel={t(locale, 'close')}
+              onPress={() => setPanel(null)}
+              style={[styles.closeButton, { backgroundColor: palette.primaryTint }]}>
+              <UiIcon name="close" size={18} color={palette.text} />
+            </Pressable>
           </View>
-        </Modal>
+          {panel === 'more' ? (
+            <View style={styles.fileHeader} testID="preview-more-file">
+              <View style={[styles.fileIcon, { backgroundColor: palette.primaryTint }]}>
+                <Icon name="document" size={22} color={palette.primaryText} />
+              </View>
+              <Text
+                numberOfLines={2}
+                style={[palette.font('bodyMedium', 16), styles.flex, { color: palette.text }]}>
+                {shown.name}
+              </Text>
+            </View>
+          ) : null}
+          <ScrollView style={styles.panelBody}>
+            {panel === 'record' ? (
+              <Card palette={palette}>
+                <RecordChooser
+                  count={share.files.length}
+                  files={share.files}
+                  placing={record.placing}
+                  palette={palette}
+                  locale={locale}
+                  onChoose={(choice) => void record.saveAsRecord(choice)}
+                />
+              </Card>
+            ) : panel === 'share' ? (
+              shareRows()
+            ) : (
+              <>
+                {moreTop()}
+                {moreSections()}
+              </>
+            )}
+          </ScrollView>
+        </BottomSheet>
       ) : null}
       {bundle.element}
     </View>
@@ -679,11 +678,8 @@ const styles = StyleSheet.create({
   sheetClip: { flex: 1, overflow: 'hidden' },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 4 },
   toolLabel: { textAlign: 'center' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   panel: {
     maxHeight: '90%',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
     padding: 16,
     gap: 8,
   },

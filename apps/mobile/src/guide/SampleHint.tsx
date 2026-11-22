@@ -5,9 +5,8 @@ import { create } from 'zustand';
 
 import { t } from '../i18n';
 import type { Palette } from '../renderer/theme';
-import { Card } from '../renderer/ui';
+import { Pill, Card } from '../renderer/ui';
 import { useWorkspaceContext } from '../workspace/context';
-import { Chip } from './GuideCard';
 
 // 样板 App 应用之后（D-260）：回到它的主页面，顶部照常有「已改好 · 撤销」，下面一张小卡片提示可以用 AI 接着改。
 // 只在这次打开 App 时显示，不存盘；点「用 AI 接着改」把一句开头填进 AI 输入框，由用户自己写完、发送。
@@ -50,7 +49,7 @@ export function SampleHint({ pageId, palette }: { pageId: string; palette: Palet
           {t(locale, 'sampleReadyBody')}
         </Text>
         <View style={styles.actions}>
-          <Chip
+          <Pill
             testID="sample-hint-change"
             label={t(locale, 'sampleReadyChange')}
             palette={palette}

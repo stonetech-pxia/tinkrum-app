@@ -1,3 +1,4 @@
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DEFAULT_THEME, PREFILL_MODEL_PACK, type Locale } from '@morph/core';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Alert, type AlertButton } from 'react-native';
@@ -27,7 +28,15 @@ function fakeStore(installed: boolean) {
   return store;
 }
 const show = async (locale: Locale = 'zh') => {
-  await render(<LocalModelCard palette={palette} locale={locale} />);
+  await render(
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 375, height: 667 },
+        insets: { top: 0, bottom: 0, left: 0, right: 0 },
+      }}>
+      <LocalModelCard palette={palette} locale={locale} />
+    </SafeAreaProvider>,
+  );
 };
 
 describe('本机模型的设置项（D-396）', () => {

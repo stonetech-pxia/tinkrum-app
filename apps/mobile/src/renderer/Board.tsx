@@ -15,7 +15,6 @@ import {
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,7 +29,6 @@ import Animated, {
   useSharedValue,
   type SharedValue,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { useRecordActionRunner } from '../data/record-actions';
@@ -38,6 +36,7 @@ import { useLinkResolver } from '../data/records';
 import { edgeSpeed } from '../editing/edge-speed';
 import { setInnerGesture } from '../editing/useSingleDrag';
 import { LONG_PRESS_MS } from '../editing/entry';
+import { BottomSheet } from './Overlays';
 import { t } from '../i18n';
 import type { RenderEnv } from './components';
 import {
@@ -528,64 +527,59 @@ function MoveMenu({
   onPick: (key: string) => void;
   onClose: () => void;
 }) {
-  const insets = useSafeAreaInsets();
   return (
-    <Modal transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        testID="board-menu-backdrop"
-        accessibilityLabel={t(locale, 'cancel')}
-        style={styles.backdrop}
-        onPress={onClose}
-      />
-      <View
-        testID="board-menu"
-        style={[
-          styles.sheet,
-          {
-            backgroundColor: palette.surface,
-            borderTopLeftRadius: palette.radius,
-            borderTopRightRadius: palette.radius,
-            paddingBottom: 12 + insets.bottom,
-          },
-        ]}>
-        <Text
-          numberOfLines={2}
-          style={[palette.font('title', 16), styles.sheetTitle, { color: palette.text }]}>
-          {title}
-        </Text>
-        <ScrollView style={styles.sheetList}>
-          {options.map((o) => (
-            <Pressable
-              key={o.key}
-              testID={`board-menu-${o.key}`}
-              accessibilityRole="button"
-              onPress={() => onPick(o.key)}
-              style={({ pressed }) => [
-                styles.sheetRow,
-                { borderColor: palette.border, opacity: pressed ? 0.6 : 1 },
-              ]}>
-              <Text
-                numberOfLines={1}
-                style={[palette.font('bodyMedium', 16), { color: palette.primaryText }]}>
-                {o.label}
-              </Text>
-            </Pressable>
-          ))}
+    <BottomSheet
+      palette={palette}
+      locale={locale}
+      animationType="fade"
+      onClose={onClose}
+      backdropTestID="board-menu-backdrop"
+      bottomPadding={12}
+      backdropLabel={t(locale, 'cancel')}
+      testID="board-menu"
+      style={[
+        styles.sheet,
+        {
+          backgroundColor: palette.surface,
+        },
+      ]}>
+      <Text
+        numberOfLines={2}
+        style={[palette.font('title', 16), styles.sheetTitle, { color: palette.text }]}>
+        {title}
+      </Text>
+      <ScrollView style={styles.sheetList}>
+        {options.map((o) => (
           <Pressable
-            testID="board-menu-cancel"
+            key={o.key}
+            testID={`board-menu-${o.key}`}
             accessibilityRole="button"
-            onPress={onClose}
+            onPress={() => onPick(o.key)}
             style={({ pressed }) => [
               styles.sheetRow,
               { borderColor: palette.border, opacity: pressed ? 0.6 : 1 },
             ]}>
-            <Text style={[palette.font('body', 16), { color: palette.muted }]}>
-              {t(locale, 'cancel')}
+            <Text
+              numberOfLines={1}
+              style={[palette.font('bodyMedium', 16), { color: palette.primaryText }]}>
+              {o.label}
             </Text>
           </Pressable>
-        </ScrollView>
-      </View>
-    </Modal>
+        ))}
+        <Pressable
+          testID="board-menu-cancel"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={({ pressed }) => [
+            styles.sheetRow,
+            { borderColor: palette.border, opacity: pressed ? 0.6 : 1 },
+          ]}>
+          <Text style={[palette.font('body', 16), { color: palette.muted }]}>
+            {t(locale, 'cancel')}
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </BottomSheet>
   );
 }
 
@@ -618,7 +612,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
   },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: { paddingTop: 16, paddingHorizontal: 16, maxHeight: '70%' },
   sheetTitle: { paddingHorizontal: 4, paddingBottom: 8 },
   sheetList: { flexGrow: 0 },

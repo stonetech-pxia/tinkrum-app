@@ -1,3 +1,4 @@
+import { BottomSheet } from '../renderer/Overlays';
 import {
   FILE_LIMITS,
   allComponents,
@@ -13,18 +14,7 @@ import {
   type Page,
 } from '@morph/core';
 import { useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { t, type StringKey } from '../i18n';
 import { BACKDROP_SIDE } from '../renderer/Backdrop';
@@ -32,7 +22,7 @@ import { chooseSlotFile } from '../renderer/FileSlot';
 import { pickPicture } from '../renderer/pictures';
 import { importSlotFile } from '../renderer/slot-file';
 import type { Palette } from '../renderer/theme';
-import { Button, SectionLabel } from '../renderer/ui';
+import { Pill, Button, SectionLabel } from '../renderer/ui';
 import { usePlaceWidget } from '../widgets/usePlaceWidget';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { useEditActions } from './actions';
@@ -55,44 +45,6 @@ const STYLE_TITLES: Record<StyleKey, StringKey> = {
   align: 'editAlign',
   size: 'editSize',
 };
-
-function Chip({
-  palette,
-  label,
-  selected,
-  onPress,
-  danger,
-  disabled,
-  testID,
-}: {
-  palette: Palette;
-  label: string;
-  selected?: boolean;
-  onPress: () => void;
-  danger?: boolean;
-  disabled?: boolean;
-  testID?: string;
-}) {
-  const color = danger ? palette.danger : selected ? palette.onPrimary : palette.text;
-  return (
-    <Pressable
-      testID={testID}
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityState={{ selected, disabled }}
-      style={({ pressed }) => [
-        styles.chip,
-        {
-          borderColor: danger ? palette.danger : selected ? palette.primary : palette.border,
-          backgroundColor: selected ? palette.primary : palette.surface,
-          opacity: disabled ? 0.4 : pressed ? 0.6 : 1,
-        },
-      ]}>
-      <Text style={[palette.font('bodyBold', 14), { color }]}>{label}</Text>
-    </Pressable>
-  );
-}
 
 function TextForm({
   component,
@@ -220,14 +172,14 @@ function BackdropSection({
     <View style={styles.section}>
       <SectionLabel palette={palette}>{title}</SectionLabel>
       <View style={styles.chips}>
-        <Chip
+        <Pill
           palette={palette}
           testID={`${prefix}-choose`}
           label={t(locale, backdrop?.assetId ? 'backdropReplace' : 'backdropChoose')}
           onPress={() => void choose()}
         />
         {backdrop?.assetId ? (
-          <Chip
+          <Pill
             palette={palette}
             testID={`${prefix}-remove`}
             label={t(locale, 'backdropRemove')}
@@ -235,7 +187,7 @@ function BackdropSection({
           />
         ) : null}
         {backdrop ? (
-          <Chip
+          <Pill
             palette={palette}
             testID={`${prefix}-off`}
             label={t(locale, 'backdropOff')}
@@ -250,7 +202,7 @@ function BackdropSection({
           </Text>
           <View style={styles.chips}>
             {(['light', 'medium', 'strong'] as const).map((level) => (
-              <Chip
+              <Pill
                 key={level}
                 palette={palette}
                 testID={`${prefix}-overlay-${level}`}
@@ -280,7 +232,6 @@ export function EditSheet({
   const { locale, repo, files } = useWorkspaceContext();
   const bumpAssets = useWorkspace((s) => s.bumpAssets);
   const { edit, label } = useEditActions(page);
-  const insets = useSafeAreaInsets();
   const [editingText, setEditingText] = useState(false);
   const widget = usePlaceWidget();
   const component = componentId ? allComponents(page).find((c) => c.id === componentId) : undefined;
@@ -348,190 +299,177 @@ export function EditSheet({
   const down = moveStepOp(page, id, 'down');
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={close}>
-      <KeyboardAvoidingView behavior="padding" style={styles.flex}>
-        <Pressable
-          style={styles.backdrop}
-          onPress={close}
-          accessibilityLabel={t(locale, 'close')}
-        />
-        <View
-          testID="edit-sheet"
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: palette.background,
-              borderTopLeftRadius: palette.radius,
-              borderTopRightRadius: palette.radius,
-              paddingBottom: insets.bottom + 16,
-            },
-          ]}>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={[styles.content, { padding: palette.pad }]}>
-            <Text style={[palette.font('title', 18), { color: palette.text }]} numberOfLines={2}>
-              {label(id)}
-            </Text>
-            {editingText && known ? (
-              <TextForm
-                component={known}
-                fields={caps.text}
+    <BottomSheet
+      palette={palette}
+      locale={locale}
+      visible
+      animationType="slide"
+      onClose={close}
+      backdropLabel={t(locale, 'close')}
+      bottomPadding={16}
+      testID="edit-sheet"
+      style={[
+        styles.sheet,
+        {
+          backgroundColor: palette.background,
+        },
+      ]}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.content, { padding: palette.pad }]}>
+        <Text style={[palette.font('title', 18), { color: palette.text }]} numberOfLines={2}>
+          {label(id)}
+        </Text>
+        {editingText && known ? (
+          <TextForm
+            component={known}
+            fields={caps.text}
+            palette={palette}
+            onCancel={() => setEditingText(false)}
+            onSave={(props) => {
+              if (Object.keys(props).length === 0) close();
+              else apply([update({ show: props })]);
+            }}
+          />
+        ) : (
+          <>
+            {caps.text.length > 0 ? (
+              <Button
                 palette={palette}
-                onCancel={() => setEditingText(false)}
-                onSave={(props) => {
-                  if (Object.keys(props).length === 0) close();
-                  else apply([update({ show: props })]);
-                }}
+                testID="edit-text"
+                variant="outline"
+                label={t(locale, 'editText')}
+                onPress={() => setEditingText(true)}
               />
-            ) : (
-              <>
-                {caps.text.length > 0 ? (
-                  <Button
-                    palette={palette}
-                    testID="edit-text"
-                    variant="outline"
-                    label={t(locale, 'editText')}
-                    onPress={() => setEditingText(true)}
-                  />
-                ) : null}
-                {caps.asset === 'file' ? (
-                  <View style={styles.section}>
-                    <SectionLabel palette={palette}>{t(locale, 'fileSlotSection')}</SectionLabel>
-                    <View style={styles.chips}>
-                      <Chip
-                        palette={palette}
-                        testID="edit-file-choose"
-                        label={t(locale, assetId ? 'fileSlotReplace' : 'fileSlotChoose')}
-                        onPress={() => void chooseFile()}
-                      />
-                      {assetId ? (
-                        <Chip
-                          palette={palette}
-                          testID="edit-file-remove"
-                          label={t(locale, 'fileSlotRemove')}
-                          onPress={() => apply([update({ opens: { file: null } })])}
-                        />
-                      ) : null}
-                    </View>
-                  </View>
-                ) : null}
-                {caps.backdrop && known ? (
-                  <BackdropSection
-                    title={t(locale, 'backdropSection')}
-                    backdrop={known.style?.backdrop}
-                    side={BACKDROP_SIDE.card}
-                    prefix="edit-backdrop"
-                    palette={palette}
-                    onChange={(backdrop, keepOpen) =>
-                      apply([update({ style: { backdrop } })], {
-                        keepOpen,
-                      })
-                    }
-                  />
-                ) : null}
-                {caps.style.map((key) => (
-                  <View key={key} style={styles.section}>
-                    <SectionLabel palette={palette}>{t(locale, STYLE_TITLES[key])}</SectionLabel>
-                    <View style={styles.chips}>
-                      {STYLE_VALUES[key].map((value) => (
-                        <Chip
-                          key={value}
-                          palette={palette}
-                          testID={`edit-${key}-${value}`}
-                          label={t(locale, `${key}_${value}` as StringKey)}
-                          selected={(known?.style?.[key] ?? DEFAULTS[key]) === value}
-                          onPress={() => setStyle(key, value)}
-                        />
-                      ))}
-                    </View>
-                  </View>
-                ))}
-                {page.backdrop ? (
-                  <BackdropSection
-                    title={t(locale, 'pageBackdropSection')}
-                    backdrop={page.backdrop}
-                    side={BACKDROP_SIDE.page}
-                    prefix="edit-page-backdrop"
-                    palette={palette}
-                    onChange={(backdrop, keepOpen) =>
-                      apply([{ op: 'updateContainer', page: page.id, changes: { backdrop } }], {
-                        keepOpen,
-                      })
-                    }
-                  />
-                ) : null}
-                <View style={[styles.chips, styles.section]}>
-                  <Chip
-                    palette={palette}
-                    testID="edit-up"
-                    label={`↑ ${t(locale, 'moveUp')}`}
-                    disabled={!up}
-                    onPress={() => up && apply([up])}
-                  />
-                  <Chip
-                    palette={palette}
-                    testID="edit-down"
-                    label={`↓ ${t(locale, 'moveDown')}`}
-                    disabled={!down}
-                    onPress={() => down && apply([down])}
-                  />
-                </View>
+            ) : null}
+            {caps.asset === 'file' ? (
+              <View style={styles.section}>
+                <SectionLabel palette={palette}>{t(locale, 'fileSlotSection')}</SectionLabel>
                 <View style={styles.chips}>
-                  {known ? (
-                    <Chip
-                      palette={palette}
-                      testID="edit-hide"
-                      label={t(locale, known.hidden ? 'show' : 'hide')}
-                      onPress={() => apply([update({ hidden: !known.hidden })])}
-                    />
-                  ) : null}
-                  {widget.available ? (
-                    <Chip
-                      palette={palette}
-                      testID="edit-widget"
-                      label={t(locale, widget.isPlaced(id) ? 'widgetRemove' : 'widgetAdd')}
-                      selected={widget.isPlaced(id)}
-                      onPress={() => void widget.toggle(component)}
-                    />
-                  ) : null}
-                  <Chip
+                  <Pill
                     palette={palette}
-                    testID="edit-delete"
-                    label={t(locale, 'delete')}
-                    danger
-                    onPress={confirmDelete}
+                    testID="edit-file-choose"
+                    label={t(locale, assetId ? 'fileSlotReplace' : 'fileSlotChoose')}
+                    onPress={() => void chooseFile()}
                   />
+                  {assetId ? (
+                    <Pill
+                      palette={palette}
+                      testID="edit-file-remove"
+                      label={t(locale, 'fileSlotRemove')}
+                      onPress={() => apply([update({ opens: { file: null } })])}
+                    />
+                  ) : null}
                 </View>
-                <Button
+              </View>
+            ) : null}
+            {caps.backdrop && known ? (
+              <BackdropSection
+                title={t(locale, 'backdropSection')}
+                backdrop={known.style?.backdrop}
+                side={BACKDROP_SIDE.card}
+                prefix="edit-backdrop"
+                palette={palette}
+                onChange={(backdrop, keepOpen) =>
+                  apply([update({ style: { backdrop } })], {
+                    keepOpen,
+                  })
+                }
+              />
+            ) : null}
+            {caps.style.map((key) => (
+              <View key={key} style={styles.section}>
+                <SectionLabel palette={palette}>{t(locale, STYLE_TITLES[key])}</SectionLabel>
+                <View style={styles.chips}>
+                  {STYLE_VALUES[key].map((value) => (
+                    <Pill
+                      key={value}
+                      palette={palette}
+                      testID={`edit-${key}-${value}`}
+                      label={t(locale, `${key}_${value}` as StringKey)}
+                      selected={(known?.style?.[key] ?? DEFAULTS[key]) === value}
+                      onPress={() => setStyle(key, value)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ))}
+            {page.backdrop ? (
+              <BackdropSection
+                title={t(locale, 'pageBackdropSection')}
+                backdrop={page.backdrop}
+                side={BACKDROP_SIDE.page}
+                prefix="edit-page-backdrop"
+                palette={palette}
+                onChange={(backdrop, keepOpen) =>
+                  apply([{ op: 'updateContainer', page: page.id, changes: { backdrop } }], {
+                    keepOpen,
+                  })
+                }
+              />
+            ) : null}
+            <View style={[styles.chips, styles.section]}>
+              <Pill
+                palette={palette}
+                testID="edit-up"
+                label={`↑ ${t(locale, 'moveUp')}`}
+                disabled={!up}
+                onPress={() => up && apply([up])}
+              />
+              <Pill
+                palette={palette}
+                testID="edit-down"
+                label={`↓ ${t(locale, 'moveDown')}`}
+                disabled={!down}
+                onPress={() => down && apply([down])}
+              />
+            </View>
+            <View style={styles.chips}>
+              {known ? (
+                <Pill
                   palette={palette}
-                  testID="edit-close"
-                  variant="text"
-                  label={t(locale, 'cancel')}
-                  onPress={close}
+                  testID="edit-hide"
+                  label={t(locale, known.hidden ? 'show' : 'hide')}
+                  onPress={() => apply([update({ hidden: !known.hidden })])}
                 />
-              </>
-            )}
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+              ) : null}
+              {widget.available ? (
+                <Pill
+                  palette={palette}
+                  testID="edit-widget"
+                  label={t(locale, widget.isPlaced(id) ? 'widgetRemove' : 'widgetAdd')}
+                  selected={widget.isPlaced(id)}
+                  onPress={() => void widget.toggle(component)}
+                />
+              ) : null}
+              <Pill
+                palette={palette}
+                testID="edit-delete"
+                label={t(locale, 'delete')}
+                danger
+                onPress={confirmDelete}
+              />
+            </View>
+            <Button
+              palette={palette}
+              testID="edit-close"
+              variant="text"
+              label={t(locale, 'cancel')}
+              onPress={close}
+            />
+          </>
+        )}
+      </ScrollView>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  backdrop: { flex: 1, backgroundColor: '#2A242066' },
   sheet: { maxHeight: '85%' },
   content: { gap: 14 },
   section: { gap: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    minHeight: 38,
-    justifyContent: 'center',
-  },
   form: { gap: 14 },
   field: { gap: 6 },
   input: { borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },

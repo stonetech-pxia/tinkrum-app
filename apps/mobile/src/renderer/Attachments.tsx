@@ -9,7 +9,7 @@ import {
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { placeAssetOnDesk } from '../desk/saved-source';
 import { placeOnDesk } from '../desk/store';
@@ -19,6 +19,7 @@ import type { AssetRecord } from '../storage/types';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { applyDeskReturn, holdDeskReturn } from './attachment-desk';
 import type { RenderEnv } from './components';
+import { BottomSheet } from './Overlays';
 import { Icon } from './Icon';
 import {
   importUserFiles,
@@ -183,31 +184,30 @@ function SourceChoice({
     </Pressable>
   );
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
+    <BottomSheet
+      palette={palette}
+      locale={locale}
+      visible
+      animationType="fade"
+      onClose={onCancel}
+      backdropTestID="attachment-source-backdrop"
+      backdropLabel={t(locale, 'cancel')}
+      testID="attachment-source"
+      style={[styles.sheet, { backgroundColor: palette.surface, borderRadius: palette.radius }]}>
+      <Text style={[palette.font('title', 17), { color: palette.text }]}>{title}</Text>
+      {option('camera', 'attachmentTakePhoto', 'camera')}
+      {option('photos', 'fileSlotFromPhotos', 'photos')}
+      {option('files', 'fileSlotFromFiles', 'files')}
       <Pressable
-        testID="attachment-source-backdrop"
-        style={styles.backdrop}
+        testID="attachment-source-cancel"
+        accessibilityRole="button"
         onPress={onCancel}
-        accessibilityLabel={t(locale, 'cancel')}
-      />
-      <View
-        testID="attachment-source"
-        style={[styles.sheet, { backgroundColor: palette.surface, borderRadius: palette.radius }]}>
-        <Text style={[palette.font('title', 17), { color: palette.text }]}>{title}</Text>
-        {option('camera', 'attachmentTakePhoto', 'camera')}
-        {option('photos', 'fileSlotFromPhotos', 'photos')}
-        {option('files', 'fileSlotFromFiles', 'files')}
-        <Pressable
-          testID="attachment-source-cancel"
-          accessibilityRole="button"
-          onPress={onCancel}
-          style={styles.option}>
-          <Text style={[palette.font('bodyBold', 16), { color: palette.muted }]}>
-            {t(locale, 'cancel')}
-          </Text>
-        </Pressable>
-      </View>
-    </Modal>
+        style={styles.option}>
+        <Text style={[palette.font('bodyBold', 16), { color: palette.muted }]}>
+          {t(locale, 'cancel')}
+        </Text>
+      </Pressable>
+    </BottomSheet>
   );
 }
 
@@ -483,7 +483,6 @@ const styles = StyleSheet.create({
   list: { gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   flex: { flex: 1 },
-  backdrop: { flex: 1, backgroundColor: '#2A242080' },
-  sheet: { position: 'absolute', left: 16, right: 16, bottom: 24, padding: 16, gap: 4 },
+  sheet: { marginHorizontal: 16, marginBottom: 24, padding: 16, gap: 4 },
   option: { minHeight: 48, justifyContent: 'center' },
 });

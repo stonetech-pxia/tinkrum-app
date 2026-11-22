@@ -20,14 +20,14 @@ import {
 } from '@morph/core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { readSpreadsheet, spreadsheetKind } from '@/data/import-file';
 import { tableVersion } from '@/data/records';
 import { t } from '@/i18n';
-import { Button, Card } from '@/renderer/ui';
-import { usePalette, type Palette } from '@/renderer/theme';
+import { Pill, Button, Card } from '@/renderer/ui';
+import { usePalette } from '@/renderer/theme';
 import { newAssetId } from '@/runtime/ids';
 import { Toast } from '@/shell/Toast';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '@/workspace/context';
@@ -285,7 +285,8 @@ export default function ImportRecordsRoute() {
           <View style={styles.chips}>
             <Text style={caption}>{t(locale, 'importSheet')}</Text>
             {loaded.sheets.map((s, i) => (
-              <Chip
+              <Pill
+                radio
                 key={i}
                 palette={palette}
                 testID={`import-sheet-${i}`}
@@ -325,7 +326,8 @@ export default function ImportRecordsRoute() {
                 </Text>
               ))}
               <View style={styles.chips}>
-                <Chip
+                <Pill
+                  radio
                   palette={palette}
                   testID={`import-map-${col}-skip`}
                   label={t(locale, 'importSkip')}
@@ -333,7 +335,8 @@ export default function ImportRecordsRoute() {
                   onPress={() => setField(col, null)}
                 />
                 {targets.map((f) => (
-                  <Chip
+                  <Pill
+                    radio
                     key={f.id}
                     palette={palette}
                     testID={`import-map-${col}-${f.id}`}
@@ -346,7 +349,8 @@ export default function ImportRecordsRoute() {
               {isDate && settings.ambiguous[col] ? (
                 <View style={styles.chips}>
                   {(['dmy', 'mdy'] as const).map((order) => (
-                    <Chip
+                    <Pill
+                      radio
                       key={order}
                       palette={palette}
                       testID={`import-order-${col}-${order}`}
@@ -424,41 +428,9 @@ function sample(
   return `${cell.text} → ${formatValue(field, written.value, locale)}`;
 }
 
-function Chip({
-  palette,
-  label,
-  selected,
-  onPress,
-  testID,
-}: {
-  palette: Palette;
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-  testID: string;
-}) {
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={[styles.chip, { borderColor: selected ? palette.primary : palette.border }]}>
-      <Text
-        style={[
-          palette.font('bodyMedium', 14),
-          { color: selected ? palette.primary : palette.text },
-        ]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, borderWidth: 1 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   buttons: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
 });

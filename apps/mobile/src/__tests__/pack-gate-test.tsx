@@ -1,3 +1,4 @@
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createDefaultWorkspace, formatFileSize, packById, type PackNeed } from '@morph/core';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
@@ -16,13 +17,19 @@ async function setup(needs: PackNeed[]) {
   const palette = makePalette(createDefaultWorkspace('zh').theme, false);
   const done: (string[] | null)[] = [];
   const gate = (n: PackNeed[]) => (
-    <PackGate
-      needs={n}
-      store={store}
-      palette={palette}
-      locale="zh"
-      onDone={(left) => done.push(left)}
-    />
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 375, height: 667 },
+        insets: { top: 0, bottom: 0, left: 0, right: 0 },
+      }}>
+      <PackGate
+        needs={n}
+        store={store}
+        palette={palette}
+        locale="zh"
+        onDone={(left) => done.push(left)}
+      />
+    </SafeAreaProvider>
   );
   const view = await render(gate(needs));
   return { store, done, view, gate };
@@ -126,13 +133,19 @@ describe('first-use download prompt', () => {
     const ended: { ids: string[]; ok: boolean }[] = [];
     store.onBackgroundEnd((e) => ended.push(e));
     await render(
-      <PackGate
-        needs={[{ pack: 'ocr', optional: false }]}
-        store={store}
-        palette={palette}
-        locale="zh"
-        onDone={(left) => done.push(left)}
-      />,
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 375, height: 667 },
+          insets: { top: 0, bottom: 0, left: 0, right: 0 },
+        }}>
+        <PackGate
+          needs={[{ pack: 'ocr', optional: false }]}
+          store={store}
+          palette={palette}
+          locale="zh"
+          onDone={(left) => done.push(left)}
+        />
+      </SafeAreaProvider>,
     );
     expect(screen.queryByTestId('pack-background')).toBeNull();
     await fireEvent.press(await screen.findByTestId('pack-download'));

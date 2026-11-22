@@ -1,3 +1,4 @@
+import { BottomSheet } from '../renderer/Overlays';
 import {
   type ActionDefinition,
   allComponents,
@@ -27,23 +28,14 @@ import {
 
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import {
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { HomeScreenCard } from '../home-screen/HomeScreenCard';
 import type { Palette } from '../renderer/theme';
 import { Button, Card, Pill } from '../renderer/ui';
 import { Banner } from '../shell/Shell';
 import { useWorkspace } from '../workspace/context';
-import { Chip, ParamForm, visibleFields } from './ParamForm';
+import { ParamForm, visibleFields } from './ParamForm';
 import { confirmDelete, useWorkflowChange } from './workflow-change';
 
 // 工作流编辑页（D-082）：改名字和参数、哪些参数每次运行时问、加 / 删 / 移动步骤。
@@ -305,7 +297,7 @@ export function WorkflowEditor({
                     </Text>
                     <View style={styles.wrap}>
                       {fields.map((f) => (
-                        <Chip
+                        <Pill
                           key={f.key}
                           palette={palette}
                           testID={`step-${i}-ask-${f.key}`}
@@ -468,47 +460,46 @@ export function WorkflowEditor({
       </ScrollView>
 
       {inserting !== null ? (
-        <Modal visible transparent animationType="slide" onRequestClose={() => setInserting(null)}>
-          <View style={styles.backdrop}>
-            <View
-              testID="step-picker"
-              style={[styles.sheet, { backgroundColor: palette.background }]}>
-              <View style={styles.stepHead}>
-                <Text style={[palette.font('title', 17), styles.flex, { color: palette.text }]}>
-                  {t(locale, 'WorkflowEditor_Add_a_step_40731')}
-                </Text>
-                <Pressable
-                  testID="step-picker-close"
-                  onPress={() => setInserting(null)}
-                  hitSlop={8}>
-                  <Text style={[palette.font('bodyBold', 16), { color: palette.muted }]}>
-                    {t(locale, 'WorkflowEditor_Cancel_bd576')}
-                  </Text>
-                </Pressable>
-              </View>
-              <ScrollView contentContainerStyle={{ gap: 8, paddingBottom: 40 }}>
-                {insertableActions(draft.steps, inserting, registry).length === 0 ? (
-                  <Text style={caption}>{t(locale, 'WorkflowEditor_No_step_fits_here_303a6')}</Text>
-                ) : null}
-                {insertableActions(draft.steps, inserting, registry).map((a) => (
-                  <Card
-                    key={a.id}
-                    palette={palette}
-                    testID={`step-pick-${a.id}`}
-                    onPress={() => {
-                      insert(inserting, a);
-                      setInserting(null);
-                    }}>
-                    <Text style={[palette.font('title', 15), { color: palette.text }]}>
-                      {localize(a.label, locale)}
-                    </Text>
-                    <Text style={caption}>{localize(a.description, locale)}</Text>
-                  </Card>
-                ))}
-              </ScrollView>
-            </View>
+        <BottomSheet
+          palette={palette}
+          locale={locale}
+          visible
+          animationType="slide"
+          onClose={() => setInserting(null)}
+          backdropLabel={t(locale, 'close')}
+          testID="step-picker"
+          style={[styles.sheet, { backgroundColor: palette.background }]}>
+          <View style={styles.stepHead}>
+            <Text style={[palette.font('title', 17), styles.flex, { color: palette.text }]}>
+              {t(locale, 'WorkflowEditor_Add_a_step_40731')}
+            </Text>
+            <Pressable testID="step-picker-close" onPress={() => setInserting(null)} hitSlop={8}>
+              <Text style={[palette.font('bodyBold', 16), { color: palette.muted }]}>
+                {t(locale, 'WorkflowEditor_Cancel_bd576')}
+              </Text>
+            </Pressable>
           </View>
-        </Modal>
+          <ScrollView contentContainerStyle={{ gap: 8, paddingBottom: 40 }}>
+            {insertableActions(draft.steps, inserting, registry).length === 0 ? (
+              <Text style={caption}>{t(locale, 'WorkflowEditor_No_step_fits_here_303a6')}</Text>
+            ) : null}
+            {insertableActions(draft.steps, inserting, registry).map((a) => (
+              <Card
+                key={a.id}
+                palette={palette}
+                testID={`step-pick-${a.id}`}
+                onPress={() => {
+                  insert(inserting, a);
+                  setInserting(null);
+                }}>
+                <Text style={[palette.font('title', 15), { color: palette.text }]}>
+                  {localize(a.label, locale)}
+                </Text>
+                <Text style={caption}>{localize(a.description, locale)}</Text>
+              </Card>
+            ))}
+          </ScrollView>
+        </BottomSheet>
       ) : null}
     </View>
   );
@@ -529,12 +520,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   insert: { alignSelf: 'center', paddingVertical: 4 },
-  backdrop: { flex: 1, backgroundColor: '#2A242080', justifyContent: 'flex-end' },
   sheet: {
     maxHeight: '80%',
     padding: 20,
     gap: 12,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
   },
 });

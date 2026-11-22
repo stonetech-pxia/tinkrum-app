@@ -1,7 +1,7 @@
 import { MAX_PICK, sharedSizeProblem } from '@morph/core';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text } from 'react-native';
 
 import { runErrorText, t } from '../i18n';
 import { mimeOf } from '../runtime/actions/helpers';
@@ -10,6 +10,7 @@ import { useGuide } from '../guide/store';
 import { keepIncomingFiles } from '../storage/keep-files';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import type { RenderEnv } from './components';
+import { Dialog } from './Overlays';
 import { IconButton } from './IconButton';
 import { Button } from './ui';
 
@@ -87,18 +88,18 @@ export function FilePick({
     }
   }
   const progress = saving ? (
-    <Modal visible transparent animationType="fade">
-      <View style={styles.dim}>
-        <View
-          testID="file-pick-progress"
-          style={[styles.card, { backgroundColor: env.palette.surface }]}>
-          <ActivityIndicator color={env.palette.primary} />
-          <Text style={[env.palette.font('body', 15), { color: env.palette.text }]}>
-            {t(env.locale, 'importSaving', { done: saving.done, total: saving.total })}
-          </Text>
-        </View>
-      </View>
-    </Modal>
+    <Dialog
+      palette={env.palette}
+      locale={env.locale}
+      visible
+      animationType="fade"
+      testID="file-pick-progress"
+      style={[styles.card, { backgroundColor: env.palette.surface }]}>
+      <ActivityIndicator color={env.palette.primary} />
+      <Text style={[env.palette.font('body', 15), { color: env.palette.text }]}>
+        {t(env.locale, 'importSaving', { done: saving.done, total: saving.total })}
+      </Text>
+    </Dialog>
   ) : null;
   const onPress = env.interactive
     ? () => (source === 'open' ? choose() : void pick(source))
@@ -139,18 +140,11 @@ export function FilePick({
 }
 
 const styles = StyleSheet.create({
-  dim: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.25)',
-  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderRadius: 16,
   },
 });
