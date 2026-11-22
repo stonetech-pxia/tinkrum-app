@@ -3,6 +3,7 @@ import {
   type AIProvider,
   BUILTIN_TOOLS,
   createMockAIProvider,
+  createDefaultWorkspace,
   createRegistry,
   quickActionsOf,
   THEME_PRESETS,
@@ -25,6 +26,7 @@ import ReadyRoute from '../app/ready/[workflowId]';
 import RunRoute from '../app/run/[workflowId]';
 import ToolsRoute from '../app/tools';
 import WorkflowsRoute from '../app/workflows';
+import { makePalette } from '../renderer/theme';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, makePdf } from '../test-utils/fake-files';
 import { APPLIED_BANNER_MS } from '../shell/Shell';
@@ -127,7 +129,10 @@ describe('user journeys (UI)', () => {
     // 修改内容是右上角 Tink 的气泡（D-526）：显示时界面淡下去，Tink 在动；点「我知道了」缩成三个点，
     // 不再淡化，点三个点能再打开。
     expect(screen.getByTestId('tink-lively')).toBeTruthy();
-    expect(screen.getByTestId('draft-dim')).toBeTruthy();
+    // 淡化层和其他弹层同一种遮罩色，不再自写纯黑。
+    expect(screen.getByTestId('draft-dim')).toHaveStyle({
+      backgroundColor: makePalette(createDefaultWorkspace('zh').theme, false).scrim,
+    });
     await fireEvent.press(screen.getByTestId('draft-reply-hide'));
     expect(screen.queryByTestId('draft-reply')).toBeNull();
     expect(screen.queryByTestId('draft-dim')).toBeNull();

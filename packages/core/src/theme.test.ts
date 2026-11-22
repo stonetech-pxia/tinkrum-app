@@ -244,12 +244,34 @@ describe('surfaceText (D-409)', () => {
 });
 
 describe('overlay and accent colours', () => {
-  it.each(['#FFFFFF', '#FDE047', '#C8623A', '#777777', '#B03A2E', '#1C1815'])(
+  // 实色底上的字是粗体或控件文字，按 3:1；白字够 3:1 就保留白字（创始人 2026-11-22 选定）。
+  it.each(['#FFFFFF', '#FDE047', '#C8623A', '#777777', '#B03A2E', '#1C1815', '#F0794F'])(
     'keeps text readable on an arbitrary solid accent %s',
     (accent) => {
-      expect(contrast(onAccent(accent), accent)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(onAccent(accent), accent)).toBeGreaterThanOrEqual(3);
     },
   );
+  // 按钮、提示条、选中的 Pill、步骤圆点用同一条规则：同一个底色上不会一处白字一处黑字。
+  it.each([
+    '#C8623A',
+    '#007AFF',
+    '#8B5CF6',
+    '#FF5C39',
+    '#5B6CFF',
+    '#6366F1',
+    '#FF3EA5',
+    '#C2562E',
+    '#22D3EE',
+  ])(
+    'gives the primary button the same text colour as any other accent surface on %s',
+    (primaryColor) => {
+      const colours = resolveColors({ ...DEFAULT_THEME, primaryColor }, false);
+      expect(colours.onPrimary).toBe(onAccent(primaryColor));
+    },
+  );
+  it('keeps white text on the default Clay terracotta', () => {
+    expect(onAccent('#C8623A')).toBe('#FFFFFF');
+  });
   it('provides the same scrim ink in either mode, with stronger separation for dialogs', () => {
     for (const dark of [false, true]) {
       const colours = resolveColors(DEFAULT_THEME, dark);

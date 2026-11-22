@@ -113,7 +113,7 @@ export function DialHost({
           accessibilityRole="button"
           accessibilityLabel={t(locale, 'dialClose')}
           onPress={() => setOpen(false)}
-          style={[StyleSheet.absoluteFill, styles.dim]}>
+          style={[StyleSheet.absoluteFill, styles.dim, { backgroundColor: palette.scrimStrong }]}>
           <View style={[styles.items, { bottom: bottom + 8, right: palette.pad }]}>
             {items.slice(1).map((item, i) => (
               <Pressable
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     minHeight: 52,
   },
-  dim: { backgroundColor: 'rgba(0,0,0,0.45)', zIndex: 20 },
+  dim: { zIndex: 20 },
   items: { position: 'absolute', gap: 12, alignItems: 'flex-end' },
   item: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   itemLabel: { paddingHorizontal: 12, paddingVertical: 8, maxWidth: 240 },

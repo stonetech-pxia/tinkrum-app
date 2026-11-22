@@ -68,7 +68,7 @@ export interface ResolvedColors {
   caption: string;
   border: string;
   primary: string;
-  /** 主色上的文字颜色（黑或白，取对比度高的一个）。 */
+  /** 主色上的文字颜色，等于 onAccent(primary)。 */
   onPrimary: string;
   /** 用作文字（链接、选中的导航项）时的主色；在背景上不够清楚时会自动调深或调浅。 */
   primaryText: string;
@@ -115,9 +115,13 @@ export function contrast(a: string, b: string): number {
   return (hi! + 0.05) / (lo! + 0.05);
 }
 
-/** 任意实色底上的文字：黑白取对比度最高者，供系统提示条和强调按钮共用。 */
+/**
+ * 任意实色底上的文字（主按钮、提示条、选中的 Pill、步骤圆点共用这一条）：
+ * 白字对比度够 3:1（粗体和控件文字的要求）就用白字，否则用深色。
+ * 中等亮度的主色（如 Clay 的陶土色）因此保留白字（创始人 2026-11-22 选定）。
+ */
 export function onAccent(accent: string): string {
-  return contrast('#FFFFFF', accent) >= contrast('#000000', accent) ? '#FFFFFF' : '#000000';
+  return contrast('#FFFFFF', accent) >= 3 ? '#FFFFFF' : '#1A1714';
 }
 
 /** 让 color 在 background 上达到 min 对比度：逐步向 toward 混合。 */
@@ -168,7 +172,7 @@ function buildColors(
     caption: derive ? mix(text, surface, 0.45) : base.caption,
     border: derive ? mix(surface, text, 0.12) : base.border,
     primary,
-    onPrimary: contrast('#FFFFFF', primary) >= 3 ? '#FFFFFF' : '#1A1714',
+    onPrimary: onAccent(primary),
     primaryText: readable(primary, readOn, text, 3),
     primaryTint: mix(primary, surface, tintAmount),
     secondary,

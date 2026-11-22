@@ -93,7 +93,7 @@ export function DraftBar({
         <Pressable
           testID="draft-dim"
           accessibilityLabel={t(locale, 'draftReplyHide')}
-          style={[StyleSheet.absoluteFill, styles.dim]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: palette.scrim }]}
           onPress={() => markSeen(last.changeRequestId)}
         />
       ) : null}
@@ -495,7 +495,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     minWidth: 68,
   },
-  dim: { backgroundColor: 'rgba(0,0,0,0.35)' },
   replyHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   stepReply: { gap: 5 },
   step: { flexDirection: 'row', alignItems: 'center', gap: 8 },

@@ -1066,7 +1066,9 @@ function BusyCover({
         })}`
       : '';
   return (
-    <View testID="desk-busy" style={[StyleSheet.absoluteFill, styles.cover]}>
+    <View
+      testID="desk-busy"
+      style={[StyleSheet.absoluteFill, styles.cover, { backgroundColor: palette.scrim }]}>
       <View
         style={[
           styles.busyCard,
@@ -1130,7 +1132,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     maxWidth: 200,
   },
-  cover: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#2A242055' },
+  cover: { alignItems: 'center', justifyContent: 'center' },
   busyCard: { padding: 20, gap: 12, alignItems: 'center', minWidth: 220 },
   dialog: { padding: 22, gap: 14, maxHeight: '100%' },
   textScroll: { flexGrow: 0, flexShrink: 1 },

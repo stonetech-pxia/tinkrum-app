@@ -1,5 +1,6 @@
 import {
   applyOps,
+  createDefaultWorkspace,
   createStarterWorkspace,
   sampleOps,
   type Locale,
@@ -11,6 +12,7 @@ import { screen } from 'expo-router/testing-library';
 import { Linking } from 'react-native';
 
 import { useGuide } from '../guide/store';
+import { makePalette } from '../renderer/theme';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
@@ -126,6 +128,10 @@ describe('new user', () => {
     await fireEvent.press(await screen.findByTestId('dial-toggle'));
     // 真机上看到的：不认识的图标名会显示成文字（图标名是 plus，不是 add）。
     expect(screen.queryByText('add')).toBeNull();
+    // 展开的按钮压在较深的共用遮罩上（和居中问话框同一种），不再自写纯黑。
+    expect(screen.getByTestId('dial-backdrop')).toHaveStyle({
+      backgroundColor: makePalette(createDefaultWorkspace('en').theme, false).scrimStrong,
+    });
     await fireEvent.press(screen.getByTestId('dial-item-0'));
     expect(screen.queryByTestId('dial-backdrop')).toBeNull();
     await fireEvent.changeText(await screen.findByTestId('editor-name'), 'Ann');

@@ -418,32 +418,22 @@ export function RunScreen({
                         (failedAt !== null && i < failedAt)
                       ? 'done'
                       : 'pending';
+              const dot =
+                state === 'current'
+                  ? palette.primary
+                  : state === 'failed'
+                    ? palette.danger
+                    : state === 'done'
+                      ? palette.secondary
+                      : palette.primaryTint;
+              const onDot = state === 'pending' ? palette.primaryText : palette.onAccent(dot);
               return (
                 <View key={s.id} style={styles.step} testID={`run-step-${s.id}`}>
-                  <View
-                    style={[
-                      styles.dot,
-                      {
-                        backgroundColor:
-                          state === 'current'
-                            ? palette.primary
-                            : state === 'failed'
-                              ? palette.danger
-                              : state === 'done'
-                                ? palette.secondary
-                                : palette.primaryTint,
-                      },
-                    ]}>
+                  <View style={[styles.dot, { backgroundColor: dot }]}>
                     {state === 'done' ? (
-                      <Icon name="check" size={14} color="#FFFFFF" />
+                      <Icon name="check" size={14} color={onDot} />
                     ) : (
-                      <Text
-                        style={[
-                          palette.font('bodyBold', 12),
-                          { color: state === 'pending' ? palette.primaryText : '#FFFFFF' },
-                        ]}>
-                        {i + 1}
-                      </Text>
+                      <Text style={[palette.font('bodyBold', 12), { color: onDot }]}>{i + 1}</Text>
                     )}
                   </View>
                   <Text
