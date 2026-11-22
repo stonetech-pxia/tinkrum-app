@@ -6,7 +6,7 @@ import {
   fontSizeOf,
   mergeTextRegions,
   type DocLeaf,
-} from './doc';
+} from './doc-support';
 import { cleanRegions, lineShareIn, type LayoutRegion } from './layout';
 import type { Box, OcrBox, RgbaImage } from './types';
 

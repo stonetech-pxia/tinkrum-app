@@ -50,3 +50,9 @@ The models must be the ones the app downloads (their SHA-256 is in `packages/cor
 Suites group the pages by theme so a failure points at the area: `text-flow` (paragraphs, columns, reading order, headings, lists), `tables`, `forms` (labels, fields, boxes), `graphics` (figures, native drawings, backgrounds), `geometry` (paper size, margins, rotation, blank pages), `languages` (French, German, accents, CJK).
 
 A case that currently fails and is waiting for a fix is marked `knownFailure: '<why>'`; the runner reports it without failing, and says so when it starts passing.
+
+## Converter stages
+
+`packages/tool-office/src/doc.ts` keeps the public document model exports and `buildDocPage` entry point. `doc-build.ts` sequences preparation, ruled tables, text lines, borderless tables/barcodes, region assignment, typography, paragraphs, page composition, figure preservation and margins. Each stage lives in its corresponding `doc-*.ts` file; its input names only the preceding outputs it uses. Recursive rebuilds are passed as a callback, so a stage never imports the orchestrator. Early returns preserve the existing whole-page fallback paths.
+
+`doc-support.ts` holds the existing shared model types, measurements and layout helpers. Word and Excel table analysis import these helpers directly, without loading the Word build pipeline. The package's public exports and serialized DocDoc format are unchanged.

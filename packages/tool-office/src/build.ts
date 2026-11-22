@@ -7,7 +7,7 @@ import {
   type RuleLine,
   type TableLines,
 } from './lines';
-import { BOLD_RATIO, CHOP_MIN, CHOP_SHARE, isRuleGrid, strokeRatio } from './doc';
+import { BOLD_RATIO, CHOP_MIN, CHOP_SHARE, isRuleGrid, strokeRatio } from './doc-support';
 import { lineShareIn, type LayoutRegion } from './layout';
 import { bodySizeOf, layoutRegions, planRest, tableSizeOf } from './sheet-arrange';
 import { findTextTables, levelLines } from './text-table';
