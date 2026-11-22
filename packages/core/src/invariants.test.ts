@@ -774,7 +774,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
 
   // 预设页（系统层，D-593）也能打开一个网页：固定的网址（网站上「用你自己的 AI 做 App」），用户点了才开，
   // 不带任何数据。创始人 2026-11-19 在对话里选了「允许，加进白名单」（D-596）。
-  // 启动兜底页（D-new-vibe-checkup-full-test-145368-1）的「去官网看看有没有新版本」同样是固定网址、用户点了才开、不带数据。
+  // 启动兜底页（D-621）的「去官网看看有没有新版本」同样是固定网址、用户点了才开、不带数据。
   it('only the record page, rich text, the presets page and the rescue page link to the site can open something outside the app', () => {
     const openers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
       .filter((path) => /\bLinking\.openURL\b/.test(readFileSync(path, 'utf8')))
@@ -790,7 +790,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
   // D-609：预设页把给别的 AI 的提示词交给系统分享面板（固定的话和两个网址，不带数据），用户挑 App、点发送。
   // D-611：交给别的 AI App 改一个 App 时，没有原生分享（Expo Go）的退路也只发文字（提示词和 App 文件）。
   // 文件、记录的分享走快捷操作的 out.share 和本地模块，不用 react-native 的 Share。
-  // D-new-vibe-checkup-full-test-145368-1：启动兜底页把错误信息（版本号和错误文字，用户先在页面上看得到）交给系统分享面板，用户点了、自己挑发给谁；
+  // D-621：启动兜底页把错误信息（版本号和错误文字，用户先在页面上看得到）交给系统分享面板，用户点了、自己挑发给谁；
   // 创始人 2026-11-22 选了这种做法，不做自动上报。
   it('only the presets page, the hand-off fallback and the rescue page hand text to the system share sheet', () => {
     const sharers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))

@@ -1,5 +1,5 @@
 // 入口：先加载提醒按钮的后台处理（D-318，App 没开着时也要能用），再启动 Expo Router。
-// 根组件外面套一层启动兜底（体检 6.6，D-new-vibe-checkup-full-test-145368-1）：连续两次没能正常打开时
+// 根组件外面套一层启动兜底（体检 6.6，D-621）：连续两次没能正常打开时
 // 先显示兜底页，app/ 下的路由（主流程）等用户点「照常打开」才加载。写法照 Expo Router 的自定义入口。
 import './src/reminders/background';
 import '@expo/metro-runtime';
