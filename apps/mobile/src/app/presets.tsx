@@ -1,4 +1,5 @@
 import {
+  SITE_URL,
   APP_FILE_FORMAT,
   HOME_PAGE_ID,
   MAX_APP_CONFIG_SIZE,
@@ -48,7 +49,7 @@ import type { SavedPreset } from '@/storage/types';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
 
 /** 网站上「用你自己的 AI 做 App」的页面（D-593）：写法说明、示例和 App 文件检查。只打开网页，不带任何数据。 */
-const MAKE_WITH_AI_URL = 'https://tinkrum.stonetech.dev/make.html';
+const MAKE_WITH_AI_URL = `${SITE_URL}/make.html`;
 
 /**
  * 「设置 → 我的预设」（D-410）：把整个 App 存起来，以后换回来。系统层的页面，AI 改不了（底线 8）。

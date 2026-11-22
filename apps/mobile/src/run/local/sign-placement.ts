@@ -1,3 +1,4 @@
+import { clamp } from '@morph/core';
 // 签名放在页面上哪里、多大（页面比例坐标，左上角为原点）。
 // 2026-11-09 用户测试：原来默认放在右下角、宽度是页宽的 32%，A4 上约 80 磅高，合同里一行才十几磅，一放就压住两行；
 // 只能拖，不能点一下放到那一行上。现在点哪一行就放在哪一行上，没自己挑大小时高度照那一行字定。
@@ -33,8 +34,6 @@ function widthFor(lineHeight: number, page: Size, aspect: number): number {
   const width = (SIGNATURE_LINES * lineHeight * aspect) / page.width;
   return Math.min(0.45, Math.max(0.08, width));
 }
-
-const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 export function initialPlacement(page: Size, aspect: number): SignPlacement {
   const width = widthFor(bodyLineHeight(page), page, aspect);

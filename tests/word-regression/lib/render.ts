@@ -1,3 +1,4 @@
+import { escapeHtml } from '@morph/core';
 // LibreOffice 把转出的 docx 画成图，和原页并排放进一个 HTML 页面，给人看。
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';
@@ -31,8 +32,7 @@ export function renderDocx(dir: string): string[] {
     .sort();
 }
 
-export const escapeHtml = (s: string) =>
-  s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
+export { escapeHtml } from '@morph/core';
 
 export interface Row {
   /** 相对 index.html 的目录。 */

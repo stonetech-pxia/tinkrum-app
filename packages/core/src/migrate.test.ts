@@ -124,55 +124,156 @@ describe('migrateWorkspace', () => {
     const kept = migrateWorkspace(custom, undefined, 20);
     expect(kept.ok && (kept.config as { workflows: unknown[] }).workflows).toEqual([picked]);
   });
-  it('v35 → v36 (surfaceText, D-409) only raises the version; old themes keep every color', () => {
-    const previous = { ...v33Default(), schemaVersion: 35 };
-    expect(migrateWorkspace(previous, undefined, 36)).toEqual({
+  it.each([
+    {
+      from: 35,
+      to: 36,
+      seed: v33Default,
+      prepare: false,
+      title: 'v35 → v36 (surfaceText, D-409) only raises the version; old themes keep every color',
+    },
+    {
+      from: 32,
+      to: 33,
+      seed: v33WithPdf,
+      prepare: true,
+      title:
+        'v32 → v33 (file room layout, D-358) only raises the version; the room uses its default layout',
+    },
+    {
+      from: 31,
+      to: 32,
+      seed: v33WithPdf,
+      prepare: false,
+      title: 'v31 → v32 (board by a link, sheet quick add, D-351–D-352) only raises the version',
+    },
+    {
+      from: 30,
+      to: 31,
+      seed: v33WithPdf,
+      prepare: false,
+      title:
+        'v30 → v31 (schedule time, list sections, calendar on a schedule, add here, D-346–D-349) only raises the version',
+    },
+    {
+      from: 29,
+      to: 30,
+      seed: v33WithPdf,
+      prepare: false,
+      title:
+        'v29 → v30 (once, countEarly, record pages, form presets and smartDate, D-340–D-344) only raises the version',
+    },
+    {
+      from: 28,
+      to: 29,
+      seed: v33WithPdf,
+      prepare: false,
+      title:
+        'v28 → v29 (group by link, stat minus, create with form, D-336–D-338) only raises the version',
+    },
+    {
+      from: 26,
+      to: 27,
+      seed: v33WithPdf,
+      prepare: true,
+      title: 'v26 → v27 (tiles and board lists, D-311–D-314) only raises the version',
+    },
+    {
+      from: 25,
+      to: 26,
+      seed: v33WithPdf,
+      prepare: true,
+      title:
+        'v25 → v26 (calendar list, trailing formats, stat goal and compare, D-305–D-309) only raises the version',
+    },
+    {
+      from: 24,
+      to: 25,
+      seed: v33WithPdf,
+      prepare: true,
+      title: 'v24 → v25 (one-tap record actions, D-300–D-304) only raises the version',
+    },
+    {
+      from: 23,
+      to: 24,
+      seed: v33WithPdf,
+      prepare: true,
+      title: 'v23 → v24 (schedule fields and the due filter, D-292–D-296) only raises the version',
+    },
+    {
+      from: 22,
+      to: 23,
+      seed: v33WithPdf,
+      prepare: true,
+      title: 'v22 → v23 (lookup, rollup and previous fields, D-287–D-289) only raises the version',
+    },
+    {
+      from: 21,
+      to: 22,
+      seed: v33WithPdf,
+      prepare: true,
+      title:
+        'v21 → v22 (day-based aggregates, new periods and calendar, D-284–D-286) only raises the version',
+    },
+    {
+      from: 20,
+      to: 21,
+      seed: v33WithPdf,
+      prepare: true,
+      title: 'v20 → v21 (time fields and formula upgrade, D-279–D-281) only raises the version',
+    },
+    {
+      from: 17,
+      to: 18,
+      seed: v33Default,
+      prepare: true,
+      title: 'v17 → v18 (picture backgrounds, D-258) only raises the version',
+    },
+    {
+      from: 16,
+      to: 17,
+      seed: v33Default,
+      prepare: false,
+      title: 'v16 → v17 (buttons open quick actions, D-256) only raises the version',
+    },
+    {
+      from: 15,
+      to: 16,
+      seed: v33Default,
+      prepare: false,
+      title: 'v15 → v16 (reminders, D-251) only raises the version',
+    },
+    {
+      from: 14,
+      to: 15,
+      seed: v33Default,
+      prepare: false,
+      title: 'v14 → v15 (link field, D-250) only raises the version',
+    },
+    {
+      from: 13,
+      to: 14,
+      seed: v33Default,
+      prepare: false,
+      title: 'v13 → v14 (chart, D-249) only raises the version',
+    },
+    {
+      from: 12,
+      to: 13,
+      seed: v33Default,
+      prepare: true,
+      title: 'v12 → v13 (stat groupBy, D-248) only raises the version',
+    },
+  ])('$title', ({ from, to, seed, prepare }) => {
+    const previous = { ...seed(), schemaVersion: from };
+    expect(migrateWorkspace(previous, undefined, to)).toEqual({
       ok: true,
-      config: { ...previous, schemaVersion: 36 },
-      fromVersion: 35,
+      config: { ...previous, schemaVersion: to },
+      fromVersion: from,
     });
+    if (prepare) expect(prepareSnapshot(previous, registry).ok).toBe(true);
   });
-  it('v32 → v33 (file room layout, D-358) only raises the version; the room uses its default layout', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 32 };
-    expect(migrateWorkspace(previous, undefined, 33)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 33 },
-      fromVersion: 32,
-    });
-    expect(prepareSnapshot(previous, registry).ok).toBe(true);
-  });
-  it('v31 → v32 (board by a link, sheet quick add, D-351–D-352) only raises the version', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 31 };
-    expect(migrateWorkspace(previous, undefined, 32)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 32 },
-      fromVersion: 31,
-    });
-  });
-  it('v30 → v31 (schedule time, list sections, calendar on a schedule, add here, D-346–D-349) only raises the version', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 30 };
-    expect(migrateWorkspace(previous, undefined, 31)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 31 },
-      fromVersion: 30,
-    });
-  });
-  it('v29 → v30 (once, countEarly, record pages, form presets and smartDate, D-340–D-344) only raises the version', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 29 };
-    expect(migrateWorkspace(previous, undefined, 30)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 30 },
-      fromVersion: 29,
-    });
-  });
-  it('v28 → v29 (group by link, stat minus, create with form, D-336–D-338) only raises the version', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 28 };
-    expect(migrateWorkspace(previous, undefined, 29)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 29 },
-      fromVersion: 28,
-    });
-  });
+
   it('v27 → v28 (reminders per entry, D-316–D-318) only raises the version and keeps reminders', () => {
     const daily = {
       id: 'log',
@@ -194,69 +295,6 @@ describe('migrateWorkspace', () => {
     });
     expect(prepareSnapshot(previous, registry).ok).toBe(true);
   });
-  it('v26 → v27 (tiles and board lists, D-311–D-314) only raises the version', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 26 };
-    expect(migrateWorkspace(previous, undefined, 27)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 27 },
-      fromVersion: 26,
-    });
-    expect(prepareSnapshot(previous, registry).ok).toBe(true);
-  });
-  it('v25 → v26 (calendar list, trailing formats, stat goal and compare, D-305–D-309) only raises the version', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 25 };
-    expect(migrateWorkspace(previous, undefined, 26)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 26 },
-      fromVersion: 25,
-    });
-    expect(prepareSnapshot(previous, registry).ok).toBe(true);
-  });
-  it('v24 → v25 (one-tap record actions, D-300–D-304) only raises the version', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 24 };
-    expect(migrateWorkspace(previous, undefined, 25)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 25 },
-      fromVersion: 24,
-    });
-    expect(prepareSnapshot(previous, registry).ok).toBe(true);
-  });
-  it('v23 → v24 (schedule fields and the due filter, D-292–D-296) only raises the version', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 23 };
-    expect(migrateWorkspace(previous, undefined, 24)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 24 },
-      fromVersion: 23,
-    });
-    expect(prepareSnapshot(previous, registry).ok).toBe(true);
-  });
-  it('v22 → v23 (lookup, rollup and previous fields, D-287–D-289) only raises the version', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 22 };
-    expect(migrateWorkspace(previous, undefined, 23)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 23 },
-      fromVersion: 22,
-    });
-    expect(prepareSnapshot(previous, registry).ok).toBe(true);
-  });
-  it('v21 → v22 (day-based aggregates, new periods and calendar, D-284–D-286) only raises the version', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 21 };
-    expect(migrateWorkspace(previous, undefined, 22)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 22 },
-      fromVersion: 21,
-    });
-    expect(prepareSnapshot(previous, registry).ok).toBe(true);
-  });
-  it('v20 → v21 (time fields and formula upgrade, D-279–D-281) only raises the version', () => {
-    const previous = { ...v33WithPdf(), schemaVersion: 20 };
-    expect(migrateWorkspace(previous, undefined, 21)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 21 },
-      fromVersion: 20,
-    });
-    expect(prepareSnapshot(previous, registry).ok).toBe(true);
-  });
   it('v18 → v19 (quick actions on the phone home screen, D-271) only raises the version', () => {
     const previous = { ...v33WithPdf(), schemaVersion: 18 };
     expect((previous as Json).workflows.length).toBeGreaterThan(0);
@@ -269,57 +307,6 @@ describe('migrateWorkspace', () => {
     expect(prepared.ok).toBe(true);
     // 升级后没有哪个快捷操作在桌面上：用户没说过的不会出现在手机桌面。
     if (prepared.ok) expect(prepared.after.nav.phoneHomeScreen).toBeUndefined();
-  });
-  it('v17 → v18 (picture backgrounds, D-258) only raises the version', () => {
-    const previous = { ...v33Default(), schemaVersion: 17 };
-    expect(migrateWorkspace(previous, undefined, 18)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 18 },
-      fromVersion: 17,
-    });
-    expect(prepareSnapshot(previous, registry).ok).toBe(true);
-  });
-  it('v16 → v17 (buttons open quick actions, D-256) only raises the version', () => {
-    const previous = { ...v33Default(), schemaVersion: 16 };
-    expect(migrateWorkspace(previous, undefined, 17)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 17 },
-      fromVersion: 16,
-    });
-  });
-  it('v15 → v16 (reminders, D-251) only raises the version', () => {
-    const previous = { ...v33Default(), schemaVersion: 15 };
-    expect(migrateWorkspace(previous, undefined, 16)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 16 },
-      fromVersion: 15,
-    });
-  });
-  it('v14 → v15 (link field, D-250) only raises the version', () => {
-    const previous = { ...v33Default(), schemaVersion: 14 };
-    expect(migrateWorkspace(previous, undefined, 15)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 15 },
-      fromVersion: 14,
-    });
-  });
-  it('v13 → v14 (chart, D-249) only raises the version', () => {
-    const previous = { ...v33Default(), schemaVersion: 13 };
-    expect(migrateWorkspace(previous, undefined, 14)).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 14 },
-      fromVersion: 13,
-    });
-  });
-  it('v12 → v13 (stat groupBy, D-248) only raises the version', () => {
-    const previous = { ...v33Default(), schemaVersion: 12 };
-    const migrated = migrateWorkspace(previous, undefined, 13);
-    expect(migrated).toEqual({
-      ok: true,
-      config: { ...previous, schemaVersion: 13 },
-      fromVersion: 12,
-    });
-    expect(prepareSnapshot(previous, registry).ok).toBe(true);
   });
   it('v9 → v10 preserves the existing home without adding file pickers', () => {
     const previous = { ...v33Default(), schemaVersion: 9 };
@@ -426,27 +413,15 @@ describe('migrateWorkspace', () => {
       { id: 'save', action: 'file.save', params: {} },
     ]);
   });
-
-  it('v5 → v6: only bumps the version', () => {
-    const v5 = { ...v33Default(), schemaVersion: 5 };
-    const result = prepareSnapshot(v5, registry);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.after).toEqual(workspace());
-  });
-
-  it('v6 → v7: only bumps the version; file lists can now show one kind of file', () => {
-    const v6 = { ...v33Default(), schemaVersion: 6 };
-    const result = prepareSnapshot(v6, registry);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.after).toEqual(workspace());
-  });
-
-  it('v8 → v9: only bumps the version; tool grids are new', () => {
-    const v8 = { ...v33Default(), schemaVersion: 8 };
-    const result = prepareSnapshot(v8, registry);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.after).toEqual(workspace());
-  });
+  it.each([5, 6, 8])(
+    'v%i: version-only additions preserve the workspace through all later migrations',
+    (schemaVersion) => {
+      const previous = { ...v33Default(), schemaVersion };
+      const result = prepareSnapshot(previous, registry);
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.after).toEqual(workspace());
+    },
+  );
 
   it('refuses snapshots it cannot migrate', () => {
     const v0 = { ...v1Snapshot, schemaVersion: 0 };

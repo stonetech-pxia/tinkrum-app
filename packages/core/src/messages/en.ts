@@ -631,10 +631,6 @@ export const en = {
   suggestionsWorking: 'Looking for values in the attachments…',
   suggestionsNeedDownload: 'To suggest values from the attachments, a one-time download is needed.',
   suggestionsDownload: 'Suggest values',
-  dataModelDownloadAsk: 'Download date and amount recognition?',
-  dataModelDownloadBody:
-    'Google needs to download the recognition model for this language first. Recognition runs on this phone and the text is not uploaded; after the download it works offline. Without it, Tinkrum still prefills using its own rules.',
-  dataModelDownload: 'Download',
 
   // 直接编辑（长按一块、调整顺序）
   editText: 'Edit text',

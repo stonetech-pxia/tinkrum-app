@@ -1,6 +1,7 @@
+import { SearchInput } from '../../renderer/ui';
 import { recordTitle } from '@morph/core';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { t } from '../../i18n';
 import { useCalendar } from '../../workspace/context';
@@ -47,22 +48,13 @@ export function RecordPickScreen({
       onDone={() => selected !== null && onDone({ recordId: selected })}
       avoidKeyboard>
       {rows.length > SEARCH_FROM ? (
-        <TextInput
+        <SearchInput
+          palette={palette}
           testID="pick-search"
           value={query}
           onChangeText={setQuery}
           placeholder={t(locale, 'recordPickSearch')}
-          placeholderTextColor={palette.caption}
-          autoCorrect={false}
-          style={[
-            palette.font('body', 16),
-            styles.search,
-            {
-              color: palette.text,
-              borderColor: palette.border,
-              borderRadius: palette.controlRadius,
-            },
-          ]}
+          style={{ marginHorizontal: 20, marginBottom: 8 }}
         />
       ) : null}
       {shown.length === 0 ? (
@@ -110,13 +102,6 @@ export function RecordPickScreen({
 }
 
 const styles = StyleSheet.create({
-  search: {
-    borderWidth: 1,
-    marginHorizontal: 20,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
   none: { textAlign: 'center', padding: 24 },
   list: { paddingHorizontal: 20, paddingBottom: 12, gap: 8 },
   row: { borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },

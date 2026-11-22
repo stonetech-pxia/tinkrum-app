@@ -1,55 +1,36 @@
+import { useRunHost } from '../desk/useRunHost';
 import {
   calendarOf,
   stepLabel,
-  RunError,
   isFileValue,
   type AskedAnswer,
-  type AskRequest,
   type HandedFiles,
-  type PackNeed,
   type RunResult,
   type RunValue,
   type Workflow,
 } from '@morph/core';
 
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useRef, useState, type ComponentType } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { workflowEntry } from '../shell/ai-entry';
 import { runErrorText, t } from '../i18n';
-import { FullScreenModal } from '../renderer/Overlays';
 import { Icon } from '../renderer/Icon';
 import { usePalette, type Palette } from '../renderer/theme';
 import { Button, Card } from '../renderer/ui';
 import { saveItems } from '../runtime/actions/io';
-import type { LocalKind, LocalSteps, LocalUi } from '../runtime/local';
+import type { LocalKind, LocalSteps } from '../runtime/local';
 import { granteeOf, isBackgroundAction, newAssetId, startRun, type Run } from '../runtime/runner';
-import { ensureRunPacks } from '../packs/file-bundle';
-import { useFileBundleOffer } from '../packs/FileBundleOffer';
-import { PackGate } from '../packs/PackGate';
-import { copyResults, releaseShare, useIncoming, type IncomingShare } from '../share/incoming';
 import { usePacks } from '../packs/PackHost';
+import { useFileBundleOffer } from '../packs/FileBundleOffer';
+import { copyResults, releaseShare, useIncoming, type IncomingShare } from '../share/incoming';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '../workspace/context';
 import { clearDesk, placeResultsOnDesk } from '../desk/store';
-import { AskPanel } from './AskPanel';
 import { ChainCard } from './ChainCard';
 import { HabitCard } from './HabitCard';
-import { LOCAL_SCREENS } from './local';
 import { canEditTable, canEditWord } from './office-items';
 import { ResultView } from './ResultView';
-
-/** 问话框淡出要多久（毫秒）。 */
-const ASK_DISMISS_MS = 400;
 
 // 运行页面（TOOLS_DESIGN §3）：每一步的进度、取消、运行时询问、本地操作界面、结果预览。
 // 打开即开始运行；关闭时取消并删除本次的临时文件。
@@ -61,14 +42,6 @@ export interface LocalScreenProps<K extends LocalKind> {
   onDone: (out: LocalSteps[K]['out']) => void;
   onCancel: () => void;
 }
-
-interface Pending<T> {
-  resolve: (value: T) => void;
-}
-
-type LocalPending = {
-  [K in LocalKind]: { kind: K; input: LocalSteps[K]['in'] } & Pending<LocalSteps[K]['out'] | null>;
-}[LocalKind];
 
 /** 运行页面弹出动画的时长（iOS 模态约 350 毫秒）。 */
 const START_DELAY_MS = 450;
@@ -117,15 +90,9 @@ export function RunScreen({
     index: 0,
   });
   const [outcome, setOutcome] = useState<RunResult | null>(null);
-  const [ask, setAsk] = useState<(AskRequest & Pending<Record<string, unknown> | null>) | null>(
-    null,
-  );
-  const [local, setLocal] = useState<LocalPending | null>(null);
+  const host = useRunHost(palette, locale);
   const packs = usePacks();
   const bundle = useFileBundleOffer(palette, locale);
-  const [packAsk, setPackAsk] = useState<
-    ({ needs: readonly PackNeed[] } & Pending<string[] | null>) | null
-  >(null);
   const alive = useRef(true);
   const transferring = useRef(false);
   const [transferBusy, setTransferBusy] = useState(false);
@@ -143,35 +110,6 @@ export function RunScreen({
     incoming && index === 0
       ? t(locale, 'shareInputStep', { n: incoming.files.length })
       : (stepLabel(registry.actions.get(action), shown.steps[index]?.params, locale) ?? action);
-
-  const ui: LocalUi = {
-    confirm: (title, ok, cancel, message) =>
-      new Promise((resolve) =>
-        Alert.alert(
-          title,
-          message,
-          [
-            { text: cancel, style: 'cancel', onPress: () => resolve(false) },
-            { text: ok, onPress: () => resolve(true) },
-          ],
-          { cancelable: false },
-        ),
-      ),
-    choose: (title, message, options) =>
-      new Promise((resolve) =>
-        Alert.alert(
-          title,
-          message,
-          [
-            ...options.map((text, i) => ({ text, onPress: () => resolve(i) })),
-            { text: t(locale, 'cancel'), style: 'cancel' as const, onPress: () => resolve(null) },
-          ],
-          { cancelable: false },
-        ),
-      ),
-    open: (kind, input) =>
-      new Promise((resolve) => setLocal({ kind, input, resolve } as unknown as LocalPending)),
-  };
 
   /**
    * 当前这一步的进度文字（D-276）：按百分比报的写百分比；处理多个文件、进度按文件数报时写「第 n/N 张」
@@ -210,39 +148,17 @@ export function RunScreen({
       locale,
       now: () => new Date(),
       newId: newAssetId,
-      ui,
+      ui: host.ui,
       collections,
       calendar: calendarOf({ data: { tables: [], calendar: calendarSettings } }),
-      packs: packs
-        ? { runtime: packs.bridge, isInstalled: (id) => packs.store.isInstalled(id) }
-        : null,
-      // 需要扩展包时先问用户（D-064）；已安装就直接继续。第一次要时一次问完这次运行要的（D-299）。
-      ensurePacks: async (needs) => {
-        if (!packs) throw new RunError('packFailed', { detail: needs[0]?.pack });
-        // 可选的没装就跳过，只为必需的弹框（D-456）。
-        return ensureRunPacks(
-          packs.store,
-          needs,
-          (ask) => new Promise((resolve) => setPackAsk({ needs: ask, resolve })),
-        );
-      },
-      ensurePack: async (packId, options) => {
-        if (!packs) throw new RunError('packFailed', { detail: packId });
-        if (await packs.store.isInstalled(packId)) return true;
-        // 可选的没装就不用它，不在运行时问（D-456）。
-        if (options?.optional === true) return false;
-        const left = await new Promise<string[] | null>((resolve) =>
-          setPackAsk({ needs: [{ pack: packId, optional: options?.optional === true }], resolve }),
-        );
-        return left !== null && !left.includes(packId);
-      },
+      packs: host.packs,
+      ensurePacks: host.ensurePacks,
+      ensurePack: host.ensurePack,
       signal: signal.current,
       incoming: incoming?.files ?? null,
       handed: handed ?? null,
       askParams: async (request) => {
-        const answer = await new Promise<Record<string, unknown> | null>((resolve) =>
-          setAsk({ ...request, resolve }),
-        );
+        const answer = await host.askParams(request);
         if (answer) {
           // 密码不留下来（D-194）。
           const secret = (k: string) =>
@@ -438,10 +354,6 @@ export function RunScreen({
     // 只在「要转进预览页」变成真时做一次。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forwarding]);
-
-  const LocalScreen = local
-    ? (LOCAL_SCREENS[local.kind] as ComponentType<LocalScreenProps<LocalKind>> | undefined)
-    : undefined;
 
   if (scanCancelled) return <View testID="run-screen" />;
 
@@ -750,57 +662,8 @@ export function RunScreen({
         </>
       )}
 
-      {ask ? (
-        <AskPanel
-          request={ask}
-          palette={palette}
-          locale={locale}
-          now={new Date()}
-          onAnswer={(answer) => {
-            setAsk(null);
-            // 问完马上打开系统选择器（第一步问「从文件选 / 录音」时）：iOS 上问话框还在淡出，
-            // 这时弹出的选择器会被系统悄悄丢掉、运行卡住。等它关完再继续。
-            if (Platform.OS === 'ios') setTimeout(() => ask.resolve(answer), ASK_DISMISS_MS);
-            else ask.resolve(answer);
-          }}
-        />
-      ) : null}
+      {host.elements}
       {bundle.element}
-      {packAsk && packs ? (
-        <PackGate
-          needs={packAsk.needs}
-          store={packs.store}
-          palette={palette}
-          locale={locale}
-          onDone={(left) => {
-            packAsk.resolve(left);
-            setPackAsk(null);
-          }}
-        />
-      ) : null}
-      {local && LocalScreen ? (
-        <FullScreenModal
-          visible
-          animationType="slide"
-          onClose={() => {
-            local.resolve(null);
-            setLocal(null);
-          }}>
-          <LocalScreen
-            input={local.input}
-            palette={palette}
-            locale={locale}
-            onDone={(out) => {
-              (local.resolve as (v: unknown) => void)(out);
-              setLocal(null);
-            }}
-            onCancel={() => {
-              local.resolve(null);
-              setLocal(null);
-            }}
-          />
-        </FullScreenModal>
-      ) : null}
     </ScrollView>
   );
 }

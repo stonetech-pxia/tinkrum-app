@@ -596,10 +596,6 @@ export const zh: MessageTable = {
   suggestionsWorking: '正在从附件里找可以填的内容…',
   suggestionsNeedDownload: '要从附件里找出可以填的内容，需要先下载一次。',
   suggestionsDownload: '找可以填的内容',
-  dataModelDownloadAsk: '下载日期和金额识别？',
-  dataModelDownloadBody:
-    'Google 需要先下载这种语言的识别模型。识别在这台手机上进行，文字不会上传；下载后没网也能用。不下载也能预填，只用 Tinkrum 自带的规则。',
-  dataModelDownload: '下载',
 
   // 直接编辑（长按一块、调整顺序）
   editText: '改文字',

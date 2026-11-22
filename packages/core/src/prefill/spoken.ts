@@ -1,3 +1,4 @@
+import { localDate } from '../field-values';
 import type { Field } from '../schema';
 import { categoryByLexicon, categoryPromptOptions, type ChoiceField } from './category';
 import { squash } from './check';
@@ -254,7 +255,7 @@ export function planSpoken(input: SuggestInput): SpokenPlan {
         const times = found.filter((v) => v.kind === 'time' && !claimed.has(v));
         if (times.length === 0) continue;
         const day =
-          dates.length === 1 ? dates[0]!.values[0]! : dates.length === 0 ? isoDay(today) : null;
+          dates.length === 1 ? dates[0]!.values[0]! : dates.length === 0 ? localDate(today) : null;
         if (day === null) continue;
         const sure =
           same.length === 1 &&
@@ -354,9 +355,6 @@ export function planSpoken(input: SuggestInput): SpokenPlan {
   }
   return { code, asks, types };
 }
-
-const isoDay = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /** 代码的候选加上模型答过的（模型的在前），每个字段最多 MAX_SUGGESTIONS 个；两个文字字段截到同一段时都不算有把握。 */
 export function mergeSpoken(

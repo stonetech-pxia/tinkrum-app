@@ -48,7 +48,7 @@ export function cleanXmlText(text: string): string {
   return out;
 }
 
-const escapeXml = (text: string) =>
+export const escapeXml = (text: string) =>
   cleanXmlText(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

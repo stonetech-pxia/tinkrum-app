@@ -1,3 +1,5 @@
+import { localDateStamp } from './field-values';
+import { SITE_URL } from './site';
 import { t } from './messages';
 import type { Locale } from './schema';
 
@@ -5,7 +7,7 @@ import type { Locale } from './schema';
 // 自己点发送（底线 10）。只有网站上指南的网址、固定的话，和这个 App、这一页的名字和 ID（Tink 看到的上下文也是
 // 这些）；不带记录、文件名、文件内容（底线 1、2）。每段是一整句话，三种语言各写各的。
 
-export const AGENT_DOCS_URL = 'https://tinkrum.stonetech.dev/assets/agent/';
+export const AGENT_DOCS_URL = `${SITE_URL}/assets/agent/`;
 
 /** 给别的 AI 自检用的脚本在分享时叫什么（打包在 App 里，D-611）。 */
 export const CHECKER_FILE_NAME = 'tinkrum-check.js';
@@ -27,8 +29,7 @@ export interface HandoffOptions {
 
 /** 网址带当天日期（?v=YYYYMMDD），让 AI 不用前几天缓存的旧版。 */
 function docsLinks(now: Date) {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const v = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  const v = localDateStamp(now);
   return {
     guide: `${AGENT_DOCS_URL}tinkrum-app-guide.md?v=${v}`,
     patterns: `${AGENT_DOCS_URL}tinkrum-app-patterns.md?v=${v}`,

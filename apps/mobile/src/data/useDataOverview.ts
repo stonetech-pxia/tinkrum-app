@@ -1,4 +1,5 @@
 import {
+  localDate,
   appConfigFile,
   appConfigFileName,
   LAYOUT_STORE_KEY,
@@ -125,8 +126,6 @@ export function useDataOverview() {
   }
 
   /** 文件名里的日期（本地时间），导出几次不会互相覆盖。 */
-  const today = (now: Date) =>
-    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   async function exportConfig() {
     const now = new Date();
@@ -138,7 +137,7 @@ export function useDataOverview() {
     const store = parseLayoutStore(await repo.getMeta(LAYOUT_STORE_KEY));
     const tapped = parsePickStore(await repo.getMeta(PICK_STORE_KEY));
     await files.shareText(
-      `tinkrum-prefill-memory-${today(now)}.json`,
+      `tinkrum-prefill-memory-${localDate(now)}.json`,
       layoutStoreFile(store, now, tapped),
       'application/json',
     );

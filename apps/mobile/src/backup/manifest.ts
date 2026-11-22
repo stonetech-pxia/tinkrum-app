@@ -9,8 +9,6 @@ export const DB_ENTRY = 'database/morph.db';
 /** 压缩包里 files/ 下的目录，名字和 Documents 下的目录一样。 */
 export const FILE_DIRS = ['assets', 'desk', 'signatures', 'tools'] as const;
 export type FileDir = (typeof FILE_DIRS)[number];
-/** 一份压缩包里最多这么多条目（和原生一致的量级，防止乱七八糟的包把界面卡死）。 */
-export const MAX_ENTRIES = 2_000_000;
 
 export interface BackupManifest {
   format: typeof BACKUP_FORMAT;

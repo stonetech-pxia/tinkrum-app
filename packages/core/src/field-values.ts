@@ -16,6 +16,9 @@ export function localDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** 设备本地日期 YYYYMMDD，供文件名和指南版本参数共用。 */
+export const localDateStamp = (d: Date): string => localDate(d).replace(/-/g, '');
+
 export function isValidDate(s: string): boolean {
   if (!DATE_PATTERN.test(s)) return false;
   const [y, m, d] = s.split('-').map(Number) as [number, number, number];

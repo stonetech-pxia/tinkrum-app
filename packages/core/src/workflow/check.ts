@@ -43,15 +43,6 @@ export function handedValueType(
   return handed === 'files' ? handedFileTypeOf(first) : handed;
 }
 
-/** 解析参数；失败时返回 null。 */
-export function parseStepParams(
-  action: ActionDefinition,
-  params: Record<string, unknown>,
-): Record<string, unknown> | null {
-  const parsed = action.params.safeParse(params);
-  return parsed.success ? parsed.data : null;
-}
-
 /**
  * 每一步执行之后的值类型（下标 i = 第 i 步的输出）。遇到无法确定的步骤（未登记或类型接不上）之后为 null。
  */

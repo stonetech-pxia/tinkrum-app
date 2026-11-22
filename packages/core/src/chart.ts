@@ -1,3 +1,4 @@
+import { pad } from './field-values';
 import {
   DEFAULT_CALENDAR,
   dateOfDayNumber,
@@ -18,11 +19,6 @@ import { CHART_COLOR_FAMILIES, OPTION_COLORS, type OptionColor } from './option-
 import { rangeStarts, rangeUnit, type DayRange } from './page-period';
 import type { Collection, GroupUnit } from './schema';
 import { dateFieldOf, distinctDays } from './sequence';
-
-// 图表（D-249）：一张表的记录按时间段（日 / 周 / 月）或单选、引用字段分组聚合（v34 的 Grouping）。
-// 这里是纯逻辑：分组、数值和画图用的几何（SVG 路径字符串，Skia 的 Path 直接认），App 只负责画。
-
-export const CHART_KINDS = ['bar', 'line', 'pie'] as const;
 
 /** 不写 group.last 时显示最近几段：7 天、8 周、6 个月。 */
 export const DEFAULT_PERIODS: Record<GroupUnit, number> = {
@@ -80,8 +76,6 @@ export interface ChartPoint {
  * 没有 unit 时按单选或引用字段 by 分（D-336）；distinctDays 在按字段分时按 days.date 数日子。
  */
 export type ChartSpec = Pick<ChartSource, 'aggregate' | 'field' | 'group' | 'days'>;
-
-const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
  * 最近 n 段的开始日期（从早到晚，最后一段包含今天）。今天和一周的第一天按 cal（D-286），和数据筛选一样。

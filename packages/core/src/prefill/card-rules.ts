@@ -998,39 +998,6 @@ export function looseEmails(doc: CardDoc): ValueSuggestion[] {
   return out.slice(0, 3).map((o) => vs(o.v, 1.3, o.relY));
 }
 
-// ---------- 地址：没有标签时按格式认（门牌、路名词；中文的市区路段号） ----------
-const ADM = /[市縣县區区鄉鎮镇]/;
-const ROAD = /[路街道段巷弄]/;
-const NUMM = /[號号樓楼室]/;
-export function addressByFormat(doc: CardDoc): ValueSuggestion[] {
-  const out: { v: string; s: number; relY: number; row: number }[] = [];
-  const seen = new Set<string>();
-  for (const u of doc.units) {
-    if (u.src !== 'cell') continue;
-    const t = u.text
-      .trim()
-      .replace(/^[\s:：|·•-]+/, '')
-      .replace(/^[^\d:：]{1,16}[:：]\s*/, '');
-    if (t.length < 6 || t.length > 70 || /@|https?:|www\./i.test(t)) continue;
-    let sc = 0;
-    if (/[\u3400-\u9fff]/.test(t)) {
-      const cls = (ADM.test(t) ? 1 : 0) + (ROAD.test(t) ? 1 : 0) + (NUMM.test(t) ? 1 : 0);
-      if (cls >= 2 && /\d/.test(t) && !jobCjk(t)) sc = 2 + (cls === 3 ? 0.5 : 0);
-    } else if (/\d/.test(t) && ADDRESS_WORD.test(fold(t)) && !/^[\s\d()+.\-]+$/.test(t)) {
-      // 门牌号 + 街名词；整行不是电话
-      const digits = (t.match(/\d/g) ?? []).length;
-      if (digits <= 0.5 * t.length && /[a-z]{3,}/i.test(t)) sc = 2;
-    }
-    if (sc === 0) continue;
-    const k = squash(t);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push({ v: t, s: sc, relY: u.relY, row: u.row });
-  }
-  out.sort((a, b) => b.s - a.s || a.row - b.row);
-  return out.slice(0, 3).map((o) => vs(o.v, o.s, o.relY));
-}
-
 /** 这份文字像不像名片：行不多、有联系方式、没有明细和合计这类单据字样。 */
 export function cardLike(doc: CardDoc, strict = false): boolean {
   const cells = doc.units.filter((u) => u.src === 'cell');

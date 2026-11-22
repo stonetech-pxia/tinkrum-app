@@ -1,3 +1,4 @@
+import { escapeHtml } from '@morph/core';
 import {
   A4_WIDTH_PT,
   imageExt,
@@ -77,10 +78,7 @@ export interface SwapButton {
   border: string;
 }
 
-const escape = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-const textHtml = (s: string) => escape(s).replace(/\n/g, '<br>');
+const textHtml = (s: string) => escapeHtml(s).replace(/\n/g, '<br>');
 
 /** 一截字：粗体、斜体、下划线写成标签，字号和整块不同时写成 span（页面里的脚本按同样的写法读回来）。 */
 function runsHtml(
@@ -327,7 +325,7 @@ export function wordPageHtml(
     const [pre = '', post = ''] = (block.format ?? '%1.').split('%1');
     const name = `l${lists.length}`;
     lists.push(
-      `.${name}>li::before{content:"${escape(pre)}" counter(n) "${escape(post)}"}`.replace(
+      `.${name}>li::before{content:"${escapeHtml(pre, { apostrophes: false })}" counter(n) "${escapeHtml(post, { apostrophes: false })}"}`.replace(
         /&quot;/g,
         '\\"',
       ),

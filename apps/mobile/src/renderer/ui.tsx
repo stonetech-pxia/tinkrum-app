@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type StyleProp,
   type ViewStyle,
@@ -265,6 +266,46 @@ export function Pill({
       {icon ? <Icon name={icon} size={14} color={color} /> : null}
       <Text style={[palette.font('bodyBold', 14), { color, flexShrink: 1 }]}>{label}</Text>
     </Pressable>
+  );
+}
+
+/** 选记录的搜索输入；容器只决定外边距和底色。 */
+export function SearchInput({
+  palette,
+  value,
+  onChangeText,
+  placeholder,
+  testID,
+  style,
+}: {
+  palette: Palette;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  testID?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      testID={testID}
+      placeholderTextColor={palette.caption}
+      autoCorrect={false}
+      style={[
+        palette.font('body', 16),
+        {
+          borderWidth: 1,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          color: palette.text,
+          borderColor: palette.border,
+          borderRadius: palette.controlRadius,
+        },
+        style,
+      ]}
+    />
   );
 }
 

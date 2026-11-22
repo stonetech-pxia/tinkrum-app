@@ -1,3 +1,4 @@
+import { clamp } from '@morph/core/math';
 // 扫描件增强的纯算法（D-266）：在缩小的分析图上估计纸张背景、黑白两端、彩色还是灰度、文字倾斜角，
 // 黑白模式再算局部阈值要用的均值和标准差。全分辨率的逐像素运算交给 App 里的 Skia 着色器，
 // 这里只处理小图，在 Node 里可以直接测试。去噪点是唯一在全分辨率上跑的部分（只看黑点）。
@@ -79,10 +80,6 @@ export const SAUVOLA_K = 0.3;
 const SAUVOLA_WINDOW_SHARE = 1 / 24;
 
 const luma = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b;
-
-function clamp(v: number, min: number, max: number) {
-  return v < min ? min : v > max ? max : v;
-}
 
 /** 第 i 个格子覆盖的像素范围 [start, end)：格子均匀分布，和着色器按格子中心采样一致。 */
 function cellRange(i: number, cells: number, size: number): [number, number] {

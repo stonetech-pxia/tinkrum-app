@@ -666,10 +666,6 @@ export const fr: MessageTable = {
   suggestionsNeedDownload:
     'Pour proposer des valeurs tirées des pièces jointes, un téléchargement unique est nécessaire.',
   suggestionsDownload: 'Proposer des valeurs',
-  dataModelDownloadAsk: 'Télécharger la reconnaissance des dates et des montants ?',
-  dataModelDownloadBody:
-    'Google doit d’abord télécharger le modèle de reconnaissance pour cette langue. La reconnaissance se fait sur ce téléphone et le texte n’est pas envoyé ; après le téléchargement, elle fonctionne hors ligne. Sans ce modèle, Tinkrum pré-remplit quand même avec ses propres règles.',
-  dataModelDownload: 'Télécharger',
 
   // 直接编辑（长按一块、调整顺序）
   editText: 'Modifier le texte',

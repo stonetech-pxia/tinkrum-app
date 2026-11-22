@@ -1,3 +1,4 @@
+import { clamp } from '@morph/core/math';
 // 尺寸与裁剪的纯计算。结果都是整数像素，App 直接交给 expo-image-manipulator。
 
 export interface Size {
@@ -23,10 +24,6 @@ const MIN_CROP = 16;
 
 function assertPositive(...values: number[]): void {
   for (const v of values) if (!(v > 0) || !Number.isFinite(v)) throw new RangeError(String(v));
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 /** 只缩放不裁剪：保持宽高比，默认不放大。 */

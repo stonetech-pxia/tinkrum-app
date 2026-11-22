@@ -162,7 +162,6 @@ export const QuickActionSchema = z.strictObject({
 export type QuickAction = z.infer<typeof QuickActionSchema>;
 /** v33 的名字（同一个东西）。 */
 export type Workflow = QuickAction;
-export const WorkflowSchema = QuickActionSchema;
 
 /** 一天里的时间 HH:mm（设备本地时间）。 */
 export const TimeOfDaySchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time like 09:00');
@@ -321,7 +320,6 @@ export const quickActionsOf = (config: Pick<WorkspaceConfig, 'tools'>): QuickAct
 /** 提醒（tools[] 里 kind 是 reminder 的，按原顺序）。 */
 export const remindersOf = (config: Pick<WorkspaceConfig, 'tools'>): Reminder[] =>
   config.tools.filter((t): t is Reminder => t.kind === 'reminder');
-export const pagesOf = (config: WorkspaceConfig): Page[] => config.containers.pages;
 export const tablesOf = (config: Pick<WorkspaceConfig, 'data'>) => config.data.tables;
 
 /** 块的子块（分组的 children；别的块没有）。 */

@@ -17,7 +17,7 @@ import {
 } from './doc';
 import { splitRuns } from './doc-runs';
 import { imageExt } from './docx-import';
-import { cleanXmlText } from './xlsx';
+import { escapeXml } from './xlsx';
 
 // 写 docx（D-328）：自己写最少的 OOXML，用 fflate 的同步 API 打包（和写 xlsx 一样，D-272）。
 // 无衬线的默认字体（D-330），段落（标题用加粗的 Heading1 / Heading2 样式，首行缩进）、run 的粗体 / 颜色 / 字号、编号列表（numbering.xml）、
@@ -83,13 +83,6 @@ export interface DocxImage {
   width: number;
   height: number;
 }
-
-const escapeXml = (text: string) =>
-  cleanXmlText(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 
 /** 标题样式比正文大多少（Heading1、Heading2）。 */
 const HEADING_SCALE: Record<string, number> = { Heading1: 1.6, Heading2: 1.3 };

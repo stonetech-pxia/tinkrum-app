@@ -1,3 +1,4 @@
+import { localDate } from './field-values';
 import { usesOf } from './file-uses';
 import { CURRENT_SCHEMA_VERSION, type WorkspaceConfig } from './schema';
 
@@ -24,8 +25,7 @@ export function appConfigFile(config: WorkspaceConfig, now: Date): string {
 
 /** 文件名带日期（本地时间），导出几次不会互相覆盖。 */
 export function appConfigFileName(now: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `tinkrum-config-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.json`;
+  return `tinkrum-config-${localDate(now)}.json`;
 }
 
 /**

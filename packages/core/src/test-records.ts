@@ -1,3 +1,4 @@
+import { localDate, pad } from './field-values';
 // 仅供测试使用（不从 index.ts 导出）：v34 等价测试用的确定的记录。照搬 v33 生成器
 // （git show 611d201:packages/core/src/v33-golden.gen.test.ts 的 sampleRecords），只把引用字段的
 // collectionId 改成 table；字段顺序、随机数的调用次数都不变，所以生成的记录和 v33 那次一模一样。
@@ -19,10 +20,9 @@ function rng(seed: string) {
   };
 }
 
-const pad = (n: number) => String(n).padStart(2, '0');
 const dayString = (offset: number) => {
   const d = new Date(V33_NOW.getFullYear(), V33_NOW.getMonth(), V33_NOW.getDate() + offset);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return localDate(d);
 };
 
 const WORDS = ['alpha', 'beta', 'gamma', 'delta', 'omega', 'kappa', 'sigma'];

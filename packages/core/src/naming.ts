@@ -1,3 +1,4 @@
+import { pad } from './field-values';
 // 文件命名模板（§7C）：只允许白名单占位符，不支持任何表达式。
 //   {date}         = {date:YYYY-MM-DD}
 //   {date:FORMAT}  FORMAT 只能由 YYYY MM DD HH mm ss 和 - _ . 组成，使用设备本地时间
@@ -50,8 +51,6 @@ export interface NameContext {
 export function templateReads(template: string): { ocr: boolean; qr: boolean } {
   return { ocr: /\{ocr:[^{}]*\}/.test(template), qr: /\{qr:[^{}]*\}/.test(template) };
 }
-
-const pad = (n: number) => String(n).padStart(2, '0');
 
 function formatDate(format: string, d: Date): string {
   return format.replace(/YYYY|MM|DD|HH|mm|ss/g, (token) => {

@@ -1,3 +1,4 @@
+import { localDate } from '@morph/core';
 import { create } from 'zustand';
 
 import {
@@ -145,9 +146,6 @@ const ITEMS = [
   ...FILE_DIRS.map((d) => ({ live: d, staged: `files/${d}` })),
 ];
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const dateStamp = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-
 /** 原生错误（带 code）换成我们的种类。名字不安全、不认识的压缩方式都算「不是备份」。 */
 export function nativeToBackupError(e: unknown): BackupError {
   if (e instanceof BackupError) return e;
@@ -240,7 +238,7 @@ export function createBackupService(env: BackupEnv) {
         database: { userVersion: info.userVersion, schemaVersion: info.schemaVersion },
         contains: { records: info.records, files: scan.files, bytes: scan.bytes },
       });
-      const name = `tinkrum-backup-${dateStamp(now)}.zip`;
+      const name = `tinkrum-backup-${localDate(now)}.zip`;
       const dest = `${exportDir}${name}`;
       set({ step: 'write', done: 0, total: scan.bytes });
       const written = await track(() =>

@@ -1,4 +1,4 @@
-import { formatDuration } from '../field-values';
+import { localDate, formatDuration } from '../field-values';
 
 // 说出来的一句话里的值（D-575）：金额、数字、日期、时间、时长、评分，中文、英文、法语。
 // 语音转出来的字常常是汉字数字或英文、法文的数词（「二十三块五」「twelve fifty」「quarante-deux euros」），
@@ -306,7 +306,6 @@ function normalize(text: string): Normalized {
 // ---------- 第二步：按种类找 ----------
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
-const isoDay = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const money = (n: number) => String(Math.round(n * 100) / 100);
 const num = (s: string) => Number(s.replace(',', '.'));
@@ -432,7 +431,7 @@ const DATE_FINDERS: Finder[] = [
         昨晚: -1,
         前天: -2,
       };
-      return { kind: 'date', values: [isoDay(addDays(today, map[m[0]]!))] };
+      return { kind: 'date', values: [localDate(addDays(today, map[m[0]]!))] };
     }),
   // 下周五、这个星期三、周日、上礼拜一。
   (n, today) =>
@@ -448,7 +447,7 @@ const DATE_FINDERS: Finder[] = [
             : p
               ? 'this'
               : 'coming';
-      return { kind: 'date', values: [isoDay(dayOfWeek(today, day, which))] };
+      return { kind: 'date', values: [localDate(dayOfWeek(today, day, which))] };
     }),
   // 2026年3月5日、3月5号、下个月5号、5号。
   (n, today) =>
@@ -464,7 +463,7 @@ const DATE_FINDERS: Finder[] = [
         if (mo > 11) [y, mo] = [y + 1, mo - 12];
         if (mo < 0) [y, mo] = [y - 1, mo + 12];
         const d = validDay(y, mo, Number(m[4] ?? m[5]));
-        return d ? { kind: 'date', values: [isoDay(d)] } : null;
+        return d ? { kind: 'date', values: [localDate(d)] } : null;
       },
     ),
   // 英文。
@@ -486,7 +485,7 @@ const DATE_FINDERS: Finder[] = [
               : w === 'yesterday' || w === 'last night'
                 ? -1
                 : 0;
-        return { kind: 'date', values: [isoDay(addDays(today, shift))] };
+        return { kind: 'date', values: [localDate(addDays(today, shift))] };
       },
     ),
   (n, today) =>
@@ -495,7 +494,7 @@ const DATE_FINDERS: Finder[] = [
       const p = (m[1] ?? '').toLowerCase();
       const which =
         p === 'next' ? 'next' : p === 'last' ? 'before' : p === 'this' ? 'this' : 'coming';
-      return { kind: 'date', values: [isoDay(dayOfWeek(today, day, which))] };
+      return { kind: 'date', values: [localDate(dayOfWeek(today, day, which))] };
     }),
   // March 3rd, 3 March, the 3rd of March（可以带年）。
   (n, today) =>
@@ -508,7 +507,7 @@ const DATE_FINDERS: Finder[] = [
       (m) => {
         const mo = monthIndex(m[1] ?? m[4]!);
         const d = validDay(m[5] ? Number(m[5]) : today.getFullYear(), mo, Number(m[2] ?? m[3]));
-        return d ? { kind: 'date', values: [isoDay(d)] } : null;
+        return d ? { kind: 'date', values: [localDate(d)] } : null;
       },
     ),
   // 法语。
@@ -530,7 +529,7 @@ const DATE_FINDERS: Finder[] = [
               : w === 'hier'
                 ? -1
                 : 0;
-        return { kind: 'date', values: [isoDay(addDays(today, shift))] };
+        return { kind: 'date', values: [localDate(addDays(today, shift))] };
       },
     ),
   (n, today) =>
@@ -544,20 +543,20 @@ const DATE_FINDERS: Finder[] = [
         const mo = monthIndex(m[2]!.replace(/^aout$/i, 'août'));
         const day = m[1] === '1er' ? 1 : Number(m[1]);
         const d = validDay(m[3] ? Number(m[3]) : today.getFullYear(), mo, day);
-        return d ? { kind: 'date', values: [isoDay(d)] } : null;
+        return d ? { kind: 'date', values: [localDate(d)] } : null;
       },
     ),
   (n, today) =>
     scan(n, new RegExp(`${B}(${FR_DAYS.join('|')})(?:\\s+(prochain|dernier))?${E}`, 'iu'), (m) => {
       const day = FR_DAYS.indexOf(m[1]!.toLowerCase()) + 1;
       const which = m[2] === 'prochain' ? 'after' : m[2] === 'dernier' ? 'before' : 'coming';
-      return { kind: 'date', values: [isoDay(dayOfWeek(today, day, which))] };
+      return { kind: 'date', values: [localDate(dayOfWeek(today, day, which))] };
     }),
   // 2026-03-05。
   (n) =>
     scan(n, /(\d{4})-(\d{2})-(\d{2})/u, (m) => {
       const d = validDay(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-      return d ? { kind: 'date', values: [isoDay(d)] } : null;
+      return d ? { kind: 'date', values: [localDate(d)] } : null;
     }),
 ];
 

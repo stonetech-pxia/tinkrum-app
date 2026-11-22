@@ -59,6 +59,7 @@ export {
   formatTimestamp,
   localDate,
   localDateTime,
+  localDateStamp,
   normalizeTime,
   type FieldValue,
   type LinkResolver,

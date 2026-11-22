@@ -1,3 +1,4 @@
+import { clamp } from '@morph/core';
 import type { ImageAnnotation, AnnotationPoint } from '../../runtime/annotations';
 
 export type AnnotationTool = ImageAnnotation['kind'] | 'note';
@@ -93,7 +94,6 @@ export function annotationLayout(box: Size, size: Size) {
     top: (box.height - size.height * scale) / 2,
   };
 }
-const clamp = (x: number, max: number) => Math.max(0, Math.min(max, x));
 export function reduceAnnotations(
   state: AnnotationState,
   action: AnnotationAction,
@@ -183,8 +183,8 @@ export function reduceAnnotations(
     case 'grant': {
       if (!scale) return state;
       const point = {
-        x: clamp(action.x / scale, size.width),
-        y: clamp(action.y / scale, size.height),
+        x: clamp(action.x / scale, 0, size.width),
+        y: clamp(action.y / scale, 0, size.height),
       };
       const texty = state.tool === 'text' || state.tool === 'note';
       const hit = texty || state.selected != null ? hitText(point) : -1;
@@ -216,8 +216,8 @@ export function reduceAnnotations(
         const mark: TextMark = {
           kind: 'text',
           point: {
-            x: clamp(point.x, Math.max(0, size.width - box.width)),
-            y: clamp(point.y - box.height, Math.max(0, size.height - box.height)),
+            x: clamp(point.x, 0, Math.max(0, size.width - box.width)),
+            y: clamp(point.y - box.height, 0, Math.max(0, size.height - box.height)),
           },
           text,
           fontSize,
@@ -263,8 +263,8 @@ export function reduceAnnotations(
         // 起点是按下时的位置：这里用「按下时文字的位置 + 手指移动」，所以先还原按下时的位置。
         const origin = state.dragFrom ?? sel.mark.point;
         const point = {
-          x: clamp(origin.x + action.dx / scale, Math.max(0, size.width - box.width)),
-          y: clamp(origin.y + action.dy / scale, Math.max(0, size.height - box.height)),
+          x: clamp(origin.x + action.dx / scale, 0, Math.max(0, size.width - box.width)),
+          y: clamp(origin.y + action.dy / scale, 0, Math.max(0, size.height - box.height)),
         };
         return {
           ...state,
@@ -274,8 +274,8 @@ export function reduceAnnotations(
       }
       if (!state.start || !state.draft || !scale) return state;
       const point = {
-        x: clamp(state.start.x + action.dx / scale, size.width),
-        y: clamp(state.start.y + action.dy / scale, size.height),
+        x: clamp(state.start.x + action.dx / scale, 0, size.width),
+        y: clamp(state.start.y + action.dy / scale, 0, size.height),
       };
       const points =
         state.draft.kind === 'pen' || state.draft.kind === 'highlight'

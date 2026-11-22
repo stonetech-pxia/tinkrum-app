@@ -1,3 +1,4 @@
+import { clamp } from '@morph/core/math';
 // 扫描页面展平（D-274）的纯几何计算：四角拉正之后，UVDoc 模型估计纸面的弯曲（45×31 的变形网格），
 // 再按文字行精修（整页去倾斜 + 逐行拉直），三步合成一张三角网格，App 里用 Skia 的 drawVertices 只重采样一次。
 // 跑模型、画图在 App 里（ONNX Runtime、Skia），这里只处理小图和坐标，在 Node 里可以直接测。
@@ -30,8 +31,6 @@ export const SHIFT_LIMIT_SHARE = 0.02;
 const MESH_CELLS_LONG = 190;
 /** 一张网格最多这么多个顶点（索引是 16 位）。 */
 const MAX_VERTICES = 65_000;
-
-const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
 /** 补边的宽度（像素，四周一样宽）。 */
 export function padMargin(page: Size): number {

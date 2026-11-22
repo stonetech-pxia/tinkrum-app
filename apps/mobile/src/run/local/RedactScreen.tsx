@@ -1,3 +1,4 @@
+import { clamp } from '@morph/core';
 import type { Rect } from '@morph/tool-image';
 import { Image } from 'expo-image';
 import { useReducer, useState } from 'react';
@@ -39,8 +40,6 @@ function layoutOf(box: Size, size: Size) {
   };
 }
 
-const clamp = (v: number, max: number) => Math.min(Math.max(0, v), max);
-
 function reduce(state: State, action: Action, sizes: Size[]): State {
   const size = sizes[state.index]!;
   const { scale, offset } = layoutOf(state.box, size);
@@ -52,15 +51,15 @@ function reduce(state: State, action: Action, sizes: Size[]): State {
       return {
         ...state,
         start: {
-          x: clamp((action.x - offset.x) / scale, size.width),
-          y: clamp((action.y - offset.y) / scale, size.height),
+          x: clamp((action.x - offset.x) / scale, 0, size.width),
+          y: clamp((action.y - offset.y) / scale, 0, size.height),
         },
         draft: null,
       };
     case 'move': {
       if (!state.start || !scale) return state;
-      const x2 = clamp(state.start.x + action.dx / scale, size.width);
-      const y2 = clamp(state.start.y + action.dy / scale, size.height);
+      const x2 = clamp(state.start.x + action.dx / scale, 0, size.width);
+      const y2 = clamp(state.start.y + action.dy / scale, 0, size.height);
       return {
         ...state,
         draft: {

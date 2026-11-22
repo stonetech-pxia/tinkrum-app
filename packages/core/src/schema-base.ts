@@ -254,7 +254,6 @@ export const CollectionSchema = z.strictObject({
   form: EntryFormSchema.optional(),
 });
 export type Collection = z.infer<typeof CollectionSchema>;
-export const TableSchema = CollectionSchema;
 export type Table = Collection;
 
 /**

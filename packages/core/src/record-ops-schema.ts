@@ -59,7 +59,6 @@ export const RecordToolValueSchema = z.union([
 export type RecordToolValue = z.infer<typeof RecordToolValueSchema>;
 /** v33 的名字（同一个东西）。 */
 export type RecordActionValue = RecordToolValue;
-export const RecordActionValueSchema = RecordToolValueSchema;
 
 /** 字段 ID → 预设值（≤20；表单 ≤10，检查在 record-ops.ts）。 */
 export const RecordToolValuesSchema = z

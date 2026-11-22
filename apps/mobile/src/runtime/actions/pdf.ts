@@ -1,4 +1,5 @@
 import {
+  localDate,
   FILE_LIMITS,
   RunCancelled,
   RunError,
@@ -206,9 +207,6 @@ function stampBox(
     width: box.width / page.width,
   };
 }
-
-const today = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /**
  * 走 PDF 预览包（WebView + pdf.js）的动作要把整份文件塞进 WebView：模拟器里实测内存约是文件的 20–30 倍
@@ -728,7 +726,7 @@ export const PDF_IMPLS: Record<string, Impl> = {
       opacity: number;
       angle: 0 | 45 | -45;
     };
-    const text = String(params.text).replace(/\{date\}/g, today(ctx.now()));
+    const text = String(params.text).replace(/\{date\}/g, localDate(ctx.now()));
     return eachPdf(input, ctx, async (bytes) => {
       const info = await pageInfo(bytes);
       const pages = resolvePageRule(ruleOf(params), info.length);

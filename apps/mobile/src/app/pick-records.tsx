@@ -10,7 +10,7 @@ import {
 } from '@morph/core';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useRecordActionRunner } from '@/data/record-actions';
@@ -18,7 +18,7 @@ import { useComputedRecords } from '@/data/records';
 import { t } from '@/i18n';
 import { Icon } from '@/renderer/Icon';
 import { usePalette } from '@/renderer/theme';
-import { Button } from '@/renderer/ui';
+import { SearchInput, Button } from '@/renderer/ui';
 import { Toast } from '@/shell/Toast';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '@/workspace/context';
 
@@ -110,23 +110,13 @@ export default function PickRecordsRoute() {
           rows && rows.length > 0 ? (
             <View style={{ gap: 8 }}>
               {rows.length > SEARCH_FROM ? (
-                <TextInput
+                <SearchInput
+                  palette={palette}
                   testID="pick-records-search"
                   value={query}
                   onChangeText={setQuery}
                   placeholder={t(locale, 'recordPickSearch')}
-                  placeholderTextColor={palette.caption}
-                  autoCorrect={false}
-                  style={[
-                    palette.font('body', 16),
-                    styles.search,
-                    {
-                      color: palette.text,
-                      borderColor: palette.border,
-                      borderRadius: palette.controlRadius,
-                      backgroundColor: palette.surface,
-                    },
-                  ]}
+                  style={{ backgroundColor: palette.surface }}
                 />
               ) : null}
               <Text style={caption}>
@@ -220,7 +210,6 @@ export default function PickRecordsRoute() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  search: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

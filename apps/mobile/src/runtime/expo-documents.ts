@@ -1,3 +1,4 @@
+import { escapeHtml } from '@morph/core';
 import { countPages } from '@morph/tool-pdf';
 import { File } from 'expo-file-system';
 
@@ -15,9 +16,6 @@ const MARGIN = 36;
 
 const unreadable = (detail: string) =>
   Object.assign(new Error(`unreadable: ${detail}`), { code: 'ERR_DOC_UNREADABLE' });
-
-const escapeHtml = (text: string) =>
-  text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** mammoth 只给正文结构，排版自己定：系统字体、表格加边框、图片不超过页宽。 */
 export function wordPage(body: string, title: string): string {

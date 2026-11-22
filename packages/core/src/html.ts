@@ -9,7 +9,7 @@ import {
   type LinkResolver,
   perCurrencyText,
 } from './data';
-import { attachmentIds } from './field-values';
+import { attachmentIds, localDate } from './field-values';
 import { DEFAULT_CALENDAR, type Calendar } from './calendar';
 import { fieldDefinition, type Collection, type Field, type Locale } from './schema';
 
@@ -17,13 +17,13 @@ import { fieldDefinition, type Collection, type Field, type Locale } from './sch
 // 用户的文字和记录值一律先转义再在本机填进去；AI 只能选模板、标题和字段名（D-042）。
 // 模板里没有脚本、没有外部资源。
 
-export function escapeHtml(text: string): string {
-  return text
+export function escapeHtml(text: string, { apostrophes = true } = {}): string {
+  const escaped = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/"/g, '&quot;');
+  return apostrophes ? escaped.replace(/'/g, '&#39;') : escaped;
 }
 
 export type PageSize = 'a4' | 'letter';
@@ -107,7 +107,7 @@ export function recordsToHtml(
   };
   const cell = (r: DataRecord, ref: string) =>
     escapeHtml(formatRef(r, collection, ref, locale, opts.links));
-  const date = `${opts.now.getFullYear()}-${String(opts.now.getMonth() + 1).padStart(2, '0')}-${String(opts.now.getDate()).padStart(2, '0')}`;
+  const date = localDate(opts.now);
   const header = `<header><h1>${escapeHtml(opts.title || collection.name)}</h1>
 <div class="meta">${escapeHtml(collection.name)} · ${t(locale, 'html_records_3f794', { v0: records.length })} · ${date}</div>${(opts.notes ?? []).map((n) => `<p class="note">${escapeHtml(n)}</p>`).join('')}</header>`;
 
