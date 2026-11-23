@@ -169,7 +169,7 @@ function ThemedStack() {
   useReminderActionFeedback(onReminderAction);
   const palette = usePalette(theme);
   const closable = { presentation: 'modal', ...closeButtonOption(palette) } as const;
-  // 画出来的图标（D-new-extensibility-2）：正式版本和草稿里的都放进去，草稿开着时推入的页面画正式版本也有。
+  // 画出来的图标（D-625）：正式版本和草稿里的都放进去，草稿开着时推入的页面画正式版本也有。
   const savedIcons = useWorkspace((s) => s.config?.icons);
   const shownIcons = useWorkspace((s) => shownConfig(s)?.icons);
   const icons = useMemo(() => ({ ...savedIcons, ...shownIcons }), [savedIcons, shownIcons]);

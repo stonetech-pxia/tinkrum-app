@@ -22,7 +22,7 @@ import { registry } from './test-helpers';
 import { ToolManifestSchema } from './tool-download';
 import { validateWorkspace } from './validate';
 
-// 画出来的图标放进配置（D-new-extensibility-2）：图标库、my:<id> 引用、setTheme 的补丁、功能和外观怎么分、
+// 画出来的图标放进配置（D-625）：图标库、my:<id> 引用、setTheme 的补丁、功能和外观怎么分、
 // App 文件带着走、预设带着走。
 
 const ctx = { registry, locale: 'en' as const, now: new Date('2026-11-23T10:00:00Z') };

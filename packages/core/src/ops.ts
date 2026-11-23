@@ -1329,7 +1329,7 @@ function moveTool(config: WorkspaceConfig, op: OpOf<'moveTool'>): void {
 function setTheme(config: WorkspaceConfig, op: OpOf<'setTheme'>): void {
   // 不写 app 改主页的风格；写了改这个 app 自己的风格（D-485）。
   const holder: { theme: Theme } = op.app === undefined ? config : getApp(config, op.app);
-  // 图标库（D-new-extensibility-2）：整个工作区一份，写没写 app 都一样；空了就不存。
+  // 图标库（D-625）：整个工作区一份，写没写 app 都一样；空了就不存。
   if (op.icons) {
     const icons = { ...config.icons };
     for (const [id, icon] of Object.entries(op.icons)) {
@@ -1361,7 +1361,7 @@ function setTheme(config: WorkspaceConfig, op: OpOf<'setTheme'>): void {
   for (const [key, value] of Object.entries(tokens)) {
     if (value !== undefined) (holder.theme as Record<string, unknown>)[key] = value;
   }
-  // 自定义卡片（D-new-extensibility-1）：null 去掉；只换 cardStyle 时也去掉，选了哪种样式就是哪种样式。
+  // 自定义卡片（D-624）：null 去掉；只换 cardStyle 时也去掉，选了哪种样式就是哪种样式。
   if (card) holder.theme.card = card;
   else if (card === null || op.cardStyle !== undefined) delete holder.theme.card;
   const setColors = (target: ThemeColors, changes: typeof colors) => {

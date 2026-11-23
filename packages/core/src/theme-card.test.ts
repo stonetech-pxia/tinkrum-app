@@ -14,7 +14,7 @@ import {
 } from './theme';
 import { validateWorkspace } from './validate';
 
-// 卡片的边框和阴影用参数写（D-new-extensibility-1）：theme.card 替换 cardStyle 的边框和阴影，底色仍跟 cardStyle；
+// 卡片的边框和阴影用参数写（D-624）：theme.card 替换 cardStyle 的边框和阴影，底色仍跟 cardStyle；
 // 颜色只能是角色；只换 cardStyle 时 card 一起去掉。
 
 const BRUTAL_LIKE: ThemeCard = {
@@ -24,7 +24,7 @@ const BRUTAL_LIKE: ThemeCard = {
 
 const themeWith = (card: unknown) => ({ ...DEFAULT_THEME, cardStyle: 'flat', card });
 
-describe('theme.card schema (D-new-extensibility-1)', () => {
+describe('theme.card schema (D-624)', () => {
   it('accepts a border, shadows or both', () => {
     expect(ThemeSchema.safeParse(themeWith(BRUTAL_LIKE)).success).toBe(true);
     expect(
@@ -64,7 +64,7 @@ describe('theme.card schema (D-new-extensibility-1)', () => {
   });
 });
 
-describe('setTheme card (D-new-extensibility-1)', () => {
+describe('setTheme card (D-624)', () => {
   it('sets it, removes it with null, and a cardStyle-only change removes it too', () => {
     const custom = apply(workspace(), [{ op: 'setTheme', cardStyle: 'flat', card: BRUTAL_LIKE }]);
     expect(custom.theme).toMatchObject({ cardStyle: 'flat', card: BRUTAL_LIKE });
@@ -111,7 +111,7 @@ describe('setTheme card (D-new-extensibility-1)', () => {
   });
 });
 
-describe('customCardParts (D-new-extensibility-1)', () => {
+describe('customCardParts (D-624)', () => {
   it('builds the border and a CSS box-shadow from roles, in light and dark', () => {
     for (const dark of [false, true]) {
       const c = resolveColors(DEFAULT_THEME, dark);
@@ -162,7 +162,7 @@ describe('customCardParts (D-new-extensibility-1)', () => {
   });
 });
 
-describe('theme.card elsewhere (D-new-extensibility-1)', () => {
+describe('theme.card elsewhere (D-624)', () => {
   it('does not change the contrast check: border and shadow leave the fill alone', () => {
     for (const cardStyle of ['flat', 'glass', 'chrome'] as const) {
       const theme = {

@@ -73,7 +73,7 @@ function withoutApp(config: WorkspaceConfig, appId: string): unknown {
     data: { ...config.data, tables: config.data.tables.filter((t) => t.app !== appId) },
     tools: config.tools.filter((t) => t.app !== appId),
   };
-  // 图标库是整个工作区一份（D-new-extensibility-2）：app 里能加图标、改只有自己用的，别处用着的不能动。
+  // 图标库是整个工作区一份（D-625）：app 里能加图标、改只有自己用的，别处用着的不能动。
   const used = new Set(drawnIconUses(rest).map((u) => u.id));
   const { icons, ...others } = rest;
   const kept = Object.entries(icons ?? {}).filter(([id]) => used.has(id));

@@ -104,7 +104,7 @@ export function AppIconPicker({
 }) {
   const [emoji, setEmoji] = useState('');
   const [invalid, setInvalid] = useState(false);
-  // 配置里画出来的图标（D-new-extensibility-2）排在列表后面。
+  // 配置里画出来的图标（D-625）排在列表后面。
   const drawn = Object.keys(useDrawnIcons()).map((id): IconValue => `my:${id}`);
   const applyEmoji = () => {
     const icon = emoji.trim();

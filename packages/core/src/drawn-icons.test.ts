@@ -11,7 +11,7 @@ import {
   renameDrawnIcons,
 } from './drawn-icons';
 
-// 画出来的图标的路径语法（D-new-extensibility-2）：只收 SVG path 的几何命令和普通的数。
+// 画出来的图标的路径语法（D-625）：只收 SVG path 的几何命令和普通的数。
 
 describe('pathDataProblem', () => {
   it('accepts real icon paths, with arcs, relative commands, implicit repeats and compact numbers', () => {

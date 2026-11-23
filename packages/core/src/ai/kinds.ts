@@ -20,7 +20,7 @@ function newQuickActionIds(ops: readonly Op[]): Set<string> {
   );
 }
 
-/** 只加、换、去画出来的图标的 setTheme（D-new-extensibility-2）：哪边都不算，跟着这一批里的别的修改走。 */
+/** 只加、换、去画出来的图标的 setTheme（D-625）：哪边都不算，跟着这一批里的别的修改走。 */
 const onlyIcons = (op: Op): boolean =>
   op.op === 'setTheme' && Object.keys(op).every((k) => k === 'op' || k === 'app' || k === 'icons');
 

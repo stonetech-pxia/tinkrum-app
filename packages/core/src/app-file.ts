@@ -35,7 +35,7 @@ export interface AppFile {
   pages: Page[];
   tables: Collection[];
   tools: Tool[];
-  /** 内容用到的画出来的图标（D-new-extensibility-2）；没用到就不写。 */
+  /** 内容用到的画出来的图标（D-625）；没用到就不写。 */
   icons?: Record<string, DrawnIcon>;
 }
 
@@ -92,7 +92,7 @@ export function appFileOfApp(
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** 内容用到的画出来的图标，从图标库里取（D-new-extensibility-2）；一个都没有返回空对象，调用的人不写这个键。 */
+/** 内容用到的画出来的图标，从图标库里取（D-625）；一个都没有返回空对象，调用的人不写这个键。 */
 function iconsUsedBy(
   content: unknown,
   library: WorkspaceConfig['icons'],
@@ -204,7 +204,7 @@ export function appFileOps(
   file = icons.file;
   const owner = mode === 'app' ? { app: id } : {};
   const ops: Op[] = [];
-  // 画出来的图标先加进图标库（D-new-extensibility-2）：后面的表、页面、快捷操作要用。
+  // 画出来的图标先加进图标库（D-625）：后面的表、页面、快捷操作要用。
   if (Object.keys(icons.add).length > 0) ops.push({ op: 'setTheme', icons: icons.add });
   if (mode === 'app')
     ops.push({
@@ -263,7 +263,7 @@ export function appFileOps(
 }
 
 /**
- * 文件里的图标怎么进图标库（D-new-extensibility-2）：内容用到的 my:<id> 文件里必须有；ID 已经在而且一样的直接用；
+ * 文件里的图标怎么进图标库（D-625）：内容用到的 my:<id> 文件里必须有；ID 已经在而且一样的直接用；
  * 不一样的，工作区里别处已经没人用就换成文件里的（更新、恢复同一个 App 时就是这样），还有人用就给文件里的改名
  * （-2、-3…），文件内容里的引用一起改。
  */

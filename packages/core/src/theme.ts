@@ -297,7 +297,7 @@ export function rgba(hex: string, alpha: number): string {
 }
 
 /**
- * 自定义卡片里的颜色角色 → 这个模式下的颜色（D-new-extensibility-1）。colors 是卡片这份配色，page 是页面那份：
+ * 自定义卡片里的颜色角色 → 这个模式下的颜色（D-624）。colors 是卡片这份配色，page 是页面那份：
  * text 取页面上的文字色（和新粗野的边框、硬阴影一样），border / shadow 取卡片配色的分隔线色和阴影色。
  */
 export function cardRoleColors(
@@ -316,7 +316,7 @@ export function cardRoleColors(
   };
 }
 
-/** 自定义卡片的边框和阴影（D-new-extensibility-1）：渲染器把它盖在 cardStyle 的底色上。 */
+/** 自定义卡片的边框和阴影（D-624）：渲染器把它盖在 cardStyle 的底色上。 */
 export interface CardParts {
   borderWidth?: number;
   borderColor?: string;

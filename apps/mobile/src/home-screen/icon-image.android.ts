@@ -78,7 +78,7 @@ function line(text: string, color: string, fonts?: SkTypefaceFontProvider) {
 }
 
 /**
- * 配置里画出来的图标（D-new-extensibility-2）：24×24 的路径缩放到图标那一块（和别的图标同样大小、同一种颜色），
+ * 配置里画出来的图标（D-625）：24×24 的路径缩放到图标那一块（和别的图标同样大小、同一种颜色），
  * 填满的合成一条按 even-odd 画，只画线的 2 宽、圆头圆角。有一条读不了就抛错（调用方不带图）。
  */
 function drawPaths(canvas: SkCanvas, icon: DrawnIcon, color: string) {

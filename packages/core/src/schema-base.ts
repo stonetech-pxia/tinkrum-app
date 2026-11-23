@@ -91,7 +91,7 @@ export const ListedIconValueSchema = z.union([
   IconSchema,
   z.string().refine(isEmoji, { message: 'icon must be a listed icon name or a single emoji' }),
 ]);
-/** 配置里的图标：白名单里的名字、一个 emoji，或者图标库里画出来的 "my:<id>"（D-new-extensibility-2）。 */
+/** 配置里的图标：白名单里的名字、一个 emoji，或者图标库里画出来的 "my:<id>"（D-625）。 */
 export const IconValueSchema = z.union([
   IconSchema,
   z.string().refine((s) => isEmoji(s) || isDrawnIconRef(s), {
@@ -154,7 +154,7 @@ export const ThemeColorsSchema = z.strictObject({
 export type ThemeColors = z.infer<typeof ThemeColorsSchema>;
 
 /**
- * 自定义卡片边框和阴影里的颜色（D-new-extensibility-1）：只能是角色，不能写色值；渲染时按主题配色取，深色模式跟着变。
+ * 自定义卡片边框和阴影里的颜色（D-624）：只能是角色，不能写色值；渲染时按主题配色取，深色模式跟着变。
  * text = 页面上的文字色，border / shadow = 配色里的分隔线色和阴影色（内置卡片样式用的同一组）。
  */
 export const CARD_COLOR_ROLES = [
@@ -179,7 +179,7 @@ export const CARD_OPACITY = { min: 0.05, max: 1 } as const;
 const cardOpacity = z.number().min(CARD_OPACITY.min).max(CARD_OPACITY.max);
 
 /**
- * 卡片的边框和阴影用参数写（D-new-extensibility-1）：写了就替换 cardStyle 自己的边框和阴影，底色仍跟 cardStyle
+ * 卡片的边框和阴影用参数写（D-624）：写了就替换 cardStyle 自己的边框和阴影，底色仍跟 cardStyle
  * （毛玻璃的半透明底、金属的渐变）。浅色和深色用同一组参数；opacity 不写是 1。
  */
 export const ThemeCardSchema = z
@@ -239,7 +239,7 @@ export const ThemeSchema = z.strictObject({
     'glow',
     'chrome',
   ]),
-  /** 卡片的边框和阴影用参数写，替换 cardStyle 的边框和阴影（D-new-extensibility-1）。 */
+  /** 卡片的边框和阴影用参数写，替换 cardStyle 的边框和阴影（D-624）。 */
   card: ThemeCardSchema.optional(),
   /** 页面背景：纯色（默认）、主色到辅助色的渐变、三色极光。颜色都从主题配色算出，深色模式自动跟着变。 */
   backdrop: z.enum(['plain', 'gradient', 'aurora']).optional(),

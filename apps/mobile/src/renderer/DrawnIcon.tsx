@@ -3,7 +3,7 @@ import { Canvas, Group, Path, Skia, type SkPath } from '@shopify/react-native-sk
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { Platform, View } from 'react-native';
 
-// 画出来的图标（D-new-extensibility-2）：配置里 icons 的路径数据，用 Skia 按 24×24 的画布缩放画成一种颜色。
+// 画出来的图标（D-625）：配置里 icons 的路径数据，用 Skia 按 24×24 的画布缩放画成一种颜色。
 // 图标库从这里的 context 来，Icon 的调用处不用改；正在显示的配置（正式版本和草稿）由根布局放进来。
 
 const DrawnIconsContext = createContext<DrawnIcons>({});

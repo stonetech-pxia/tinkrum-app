@@ -153,7 +153,7 @@ export function Icon({
       />
     );
   }
-  // 配置里画出来的图标（D-new-extensibility-2）：从图标库取路径，用 Skia 画。
+  // 配置里画出来的图标（D-625）：从图标库取路径，用 Skia 画。
   if (isDrawnIconRef(name)) return <DrawnIconView name={name} size={size} color={color} />;
   if (name in CUSTOM_IMAGES) {
     return (

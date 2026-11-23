@@ -73,9 +73,9 @@ export const USES_FEATURES = [
   'fieldRange',
   /** 记录块、数字、图表的 source.choice "page"：跟着页面上的一排选项（D-573）。 */
   'blocksFollowPageChoice',
-  /** 主题上的 card：卡片的边框和阴影用参数写（D-new-extensibility-1）。 */
+  /** 主题上的 card：卡片的边框和阴影用参数写（D-624）。 */
   'themeCard',
-  /** 画出来的图标：顶层的 icons，图标写 "my:<id>"（D-new-extensibility-2）。 */
+  /** 画出来的图标：顶层的 icons，图标写 "my:<id>"（D-625）。 */
   'drawnIcons',
 ] as const;
 
@@ -196,7 +196,7 @@ export function usesOf(content: unknown): FileUses {
     }
     // 表上的 form（D-570）：有 fields 的那一层是表。
     if (Array.isArray(node.fields) && node.form !== undefined) found.features.add('entryForm');
-    // 主题上的 card（D-new-extensibility-1）：有 cardStyle 的那一层是主题。
+    // 主题上的 card（D-624）：有 cardStyle 的那一层是主题。
     if (typeof node.cardStyle === 'string' && node.card !== undefined)
       found.features.add('themeCard');
     if (node.kind === 'reminder' && node.app !== undefined) found.features.add('reminderInApp');

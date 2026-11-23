@@ -176,7 +176,7 @@ function buildPalette(theme: Theme, colors: ResolvedColors, page: ResolvedColors
     cardStyle: (background = colors.surface) => {
       const base: ViewStyle = { backgroundColor: background, borderRadius: radius };
       if (theme.card) {
-        // 自定义边框和阴影（D-new-extensibility-1）：底色仍跟 cardStyle（毛玻璃的半透明底、金属的渐变），
+        // 自定义边框和阴影（D-624）：底色仍跟 cardStyle（毛玻璃的半透明底、金属的渐变），
         // 边框和阴影全换成参数里的。
         const roles = cardRoleColors(colors, page);
         const parts = customCardParts(theme.card, (role) => roles[role]);

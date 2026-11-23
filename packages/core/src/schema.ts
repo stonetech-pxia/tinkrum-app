@@ -307,7 +307,7 @@ export const WorkspaceConfigSchema = z.strictObject({
   containers: ContainersSchema,
   tools: ToolsSchema,
   packages: z.array(PackageSchema),
-  /** 画出来的图标（D-new-extensibility-2）：用的地方写 "my:<id>"。空的不存。 */
+  /** 画出来的图标（D-625）：用的地方写 "my:<id>"。空的不存。 */
   icons: DrawnIconsSchema.optional(),
 });
 type ParsedConfig = z.infer<typeof WorkspaceConfigSchema>;

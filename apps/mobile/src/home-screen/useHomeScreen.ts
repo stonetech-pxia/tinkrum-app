@@ -15,7 +15,7 @@ import type { HomeScreenEntry, HomeScreenPlatform } from './platform';
 export function homeScreenEntries(config: WorkspaceConfig): HomeScreenEntry[] {
   return homeScreenItems(config).map((item) => {
     const symbol = iosSymbolName(item.icon);
-    // 画出来的图标（D-new-extensibility-2）带上路径，Android 桌面图标照着画。
+    // 画出来的图标（D-625）带上路径，Android 桌面图标照着画。
     const id = drawnIconId(item.icon);
     const drawn = id !== null ? config.icons?.[id] : undefined;
     return {

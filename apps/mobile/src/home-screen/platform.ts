@@ -8,7 +8,7 @@ export interface HomeScreenArt {
   icon: IconValue;
   background: string;
   foreground: string;
-  /** icon 是 my:<id> 时它的路径（D-new-extensibility-2）；图标库里没有就不写，只画底色。 */
+  /** icon 是 my:<id> 时它的路径（D-625）；图标库里没有就不写，只画底色。 */
   drawn?: DrawnIcon;
 }
 

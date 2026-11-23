@@ -58,7 +58,7 @@ describe('card styles', () => {
   });
 });
 
-describe('custom card border and shadow (D-new-extensibility-1)', () => {
+describe('custom card border and shadow (D-624)', () => {
   const custom: NonNullable<Theme['card']> = {
     border: { width: 3, color: 'primary', opacity: 0.5 },
     shadows: [{ x: 4, y: 4, blur: 0, color: 'text' }],

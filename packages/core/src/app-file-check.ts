@@ -38,7 +38,7 @@ export const AppFileSchema = z.object({
   pages: z.array(PageSchema).min(1),
   tables: z.array(CollectionSchema),
   tools: z.array(ToolSchema),
-  /** 画出来的图标（D-new-extensibility-2）：内容里写 "my:<id>" 的，定义在这里。 */
+  /** 画出来的图标（D-625）：内容里写 "my:<id>" 的，定义在这里。 */
   icons: DrawnIconsSchema.optional(),
 });
 

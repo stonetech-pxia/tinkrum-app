@@ -66,7 +66,7 @@ describe('prompt baseline', () => {
     expect(numbers).toEqual(numbers.map((_, i) => i + 1));
   });
 
-  it('the drawn icon examples of the rules parse (D-new-extensibility-2)', () => {
+  it('the drawn icon examples of the rules parse (D-625)', () => {
     const rule = buildSystemPrompt(registry)
       .split('\n')
       .find((line) => line.includes('Drawing an icon'))!;

@@ -4686,7 +4686,7 @@ const LOOK_CASES: EvalCase[] = [
     mock: false,
     expect: { kind: 'ops', check: quickActionListOn('video') },
   },
-  // 卡片的边框和阴影用参数写（D-new-extensibility-1）：没有现成样式时写 card；回到某个样式时 card 要去掉。
+  // 卡片的边框和阴影用参数写（D-624）：没有现成样式时写 card；回到某个样式时 card 要去掉。
   {
     id: 'LK6',
     input: '卡片加一圈主色的粗边框，不要阴影',
@@ -4735,7 +4735,7 @@ const LOOK_CASES: EvalCase[] = [
           : `expected outline without card, got ${c.theme.cardStyle} ${JSON.stringify(c.theme.card)}`,
     },
   },
-  // 画出来的图标（D-new-extensibility-2）：列表里没有的图标画成路径放进 icons，用 my:<id>；去掉时不能留下悬空的引用。
+  // 画出来的图标（D-625）：列表里没有的图标画成路径放进 icons，用 my:<id>；去掉时不能留下悬空的引用。
   {
     id: 'IC1',
     input: '给宠物表画一个猫爪图标',
