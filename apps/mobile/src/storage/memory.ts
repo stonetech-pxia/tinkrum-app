@@ -258,7 +258,12 @@ export class MemoryWorkspaceRepo implements WorkspaceRepo {
         if (range.by === 'createdAt' || range.by === 'updatedAt')
           return r[range.by] >= range.fromMs && r[range.by] < range.untilMs;
         const v = r.values[range.by];
-        return typeof v === 'string' && v >= range.from && v < range.until;
+        const end = range.endBy ? r.values[range.endBy] : undefined;
+        return (
+          typeof v === 'string' &&
+          v < range.until &&
+          (v >= range.from || (typeof end === 'string' && end >= range.from))
+        );
       })
       .map(({ deletedAt: _, ...rest }) => rest);
   }

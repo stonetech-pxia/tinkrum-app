@@ -25,9 +25,9 @@ export function ChartPlot({
   children,
 }: {
   kind: 'bar' | 'line';
-  values: readonly number[];
+  values: readonly (number | null)[];
   /** 上一期（D-439）：和 values 一一对应；折线画成虚线，柱状图画成淡色的宽柱子垫在后面。 */
-  previous?: readonly number[] | undefined;
+  previous?: readonly (number | null)[] | undefined;
   selected: number;
   color: string;
   mutedColor: string;
@@ -39,7 +39,7 @@ export function ChartPlot({
   const font = useFont(KARLA, 11);
   const [width, setWidth] = useState(0);
   const n = values.length;
-  const data = values.map((v, i) => ({ i, v, p: previous?.[i] ?? 0 }));
+  const data = values.map((v, i) => ({ i, v, p: previous?.[i] ?? null }));
   return (
     <View style={{ height: PLOT_HEIGHT }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       {width > 0 && n > 0 ? (
@@ -51,7 +51,11 @@ export function ChartPlot({
             padding={{ top: 8, bottom: 0, left: 0, right: 0 }}
             domain={{
               x: [-0.5, n - 0.5],
-              y: chartYDomain(previous ? [...values, ...previous] : values),
+              y: chartYDomain(
+                (previous ? [...values, ...previous] : values).filter(
+                  (v): v is number => v !== null,
+                ),
+              ),
             }}
             axisOptions={{
               font,
@@ -68,7 +72,7 @@ export function ChartPlot({
                 <>
                   {previous ? (
                     <Bar
-                      points={points.p}
+                      points={points.p.filter((p) => p.y !== null)}
                       chartBounds={chartBounds}
                       color={mutedColor}
                       opacity={0.35}
@@ -77,7 +81,7 @@ export function ChartPlot({
                     />
                   ) : null}
                   <Bar
-                    points={points.v.filter((_, i) => i !== selected)}
+                    points={points.v.filter((p, i) => i !== selected && p.y !== null)}
                     chartBounds={chartBounds}
                     color={color}
                     opacity={0.55}
@@ -85,7 +89,7 @@ export function ChartPlot({
                     roundedCorners={{ topLeft: 4, topRight: 4 }}
                   />
                   <Bar
-                    points={points.v.filter((_, i) => i === selected)}
+                    points={points.v.filter((p, i) => i === selected && p.y !== null)}
                     chartBounds={chartBounds}
                     color={color}
                     barWidth={(width / n) * (previous ? 0.62 : 0.8)}
@@ -101,6 +105,7 @@ export function ChartPlot({
                       strokeWidth={2}
                       strokeJoin="round"
                       strokeCap="round"
+                      connectMissingData={false}
                       curveType="linear">
                       <DashPathEffect intervals={[6, 6]} />
                     </Line>
@@ -111,6 +116,7 @@ export function ChartPlot({
                     strokeWidth={2}
                     strokeJoin="round"
                     strokeCap="round"
+                    connectMissingData={false}
                     curveType="linear"
                   />
                   {points.v[selected]?.y != null ? (

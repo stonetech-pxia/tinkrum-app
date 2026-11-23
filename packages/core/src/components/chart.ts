@@ -11,12 +11,14 @@ import { type LookDefinitionOf, defineLook, isSystemField, NUMERIC_FIELD_TYPES }
 export const ChartSourceSchema = z.strictObject({
   table: IdSchema,
   // v33 结构里的 streak / daysSince / avgInterval 在合法配置里不可能出现（E3），v34 去掉。
-  aggregate: z.enum(['count', 'sum', 'avg', 'distinctDays']),
+  aggregate: z.enum(['count', 'sum', 'avg', 'min', 'max', 'latest', 'distinctDays']),
   field: IdSchema.optional(),
   filter: filterSchema().optional(),
   /** distinctDays 按哪个日期算（按单选分组时）；按时间分组时就是 group.by。 */
   days: z.strictObject({ date: DaysSchema.shape.date }).optional(),
   group: GroupingSchema,
+  running: z.enum(['shown', 'all']).optional(),
+  split: z.strictObject({ by: IdSchema }).optional(),
   /** 和上一期比（D-439）：画上一个同样长的时间段，只有时间分组的柱状图和折线图。 */
   compare: z.literal('previous').optional(),
   /** 跟着页面上的时间范围（D-440）：同一页要有一个 period 块；按选的范围画，group.unit 和 last 不再用（按范围长短自己选按天、周、月）。 */
@@ -54,14 +56,44 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
   layer: 'table',
   reads: 'table',
   writes: false,
-  refs: { 'source.table': { to: 'table' }, 'source.filter': { to: 'filter' } },
+  refs: {
+    'source.table': { to: 'table' },
+    'source.filter': { to: 'filter' },
+    'source.split.by': { to: 'field', types: ['choice'], one: true },
+  },
   // D-249：求和、平均要数字字段；按单选分时要单选字段；按时间分时用日期字段；饼图只能按单选分。
   check: (c, { collection, page }) => {
     const problems: string[] = [...followChoiceProblems(c.source, page)];
+    if (c.source.group?.until) problems.push('source.group.until only applies to a calendar');
     if (c.source.period !== undefined && !page.blocks.some((b) => b.look === 'period'))
       problems.push('source.period "page" needs a period block on the same page');
     const field = (id: string) => collection!.fields.find((f) => f.id === id);
     const { aggregate, group } = c.source;
+    if (c.show.kind === 'pie' && ['latest', 'min', 'max'].includes(aggregate))
+      problems.push('a pie chart cannot use latest, min or max');
+    if (c.source.running) {
+      if (!group.unit || c.show.kind === 'pie' || !['count', 'sum'].includes(aggregate))
+        problems.push('running needs a time-grouped bar or line with count or sum');
+      if (c.source.running === 'all' && c.source.compare)
+        problems.push('running all cannot combine with compare; use shown');
+    }
+    if (c.source.split) {
+      const by = field(c.source.split.by);
+      if (!group.unit || c.show.kind === 'pie')
+        problems.push('split needs a time-grouped bar or line');
+      if (by?.type !== 'choice' || isMultipleChoice(by))
+        problems.push('split.by needs a single-choice field');
+      if (c.show.kind === 'bar' && !['count', 'sum'].includes(aggregate))
+        problems.push('stacked bars need count or sum');
+      if (c.source.running || c.source.compare)
+        problems.push('split cannot combine with running or compare');
+      if (
+        c.source.choice &&
+        page.blocks.some((b) => b.look === 'choices' && b.source.field === c.source.split!.by)
+      )
+        problems.push('split cannot follow page choice on the same field');
+    }
+
     if (aggregate !== 'count' && aggregate !== 'distinctDays') {
       const f = c.source.field ? field(c.source.field) : undefined;
       if (!f || !NUMERIC_FIELD_TYPES.includes(f.type))
@@ -133,7 +165,7 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
   describe: (c, _config, ctx) => t(ctx.locale, 'describeChart', { v0: c.show.title }),
   edit: { text: [{ prop: 'title', max: 60 }], style: ['tone'] },
   ai: {
-    doc: 'show {kind: "bar"|"line"|"pie", title}, source {table, aggregate: "count"|"sum"|"avg"|"distinctDays" (days with at least one entry), field? (number, money, rating, duration or formula; only for sum and avg), filter?, group: {unit: "day"|"week"|"month", by? (a date or datetime field or "createdAt"; default: the first date field), last? (2-31; default 7 days, 8 weeks, 6 months)} or {by: a choice field, or a link field for one point per entry of the linked table}}: a pie chart needs group {by: a choice or link field} (rule 33); compare?: "previous" (only with a time group, bar or line, and no inPeriod filter) also draws the period before, shifted onto the same positions: a dashed line, or pale bars behind ("compared with last month", "和上个月比"); pickPeriod?: true (bar or line grouped by time, not following the page range: tapping a bar or point sets the time range of the page to that day, week or month, so the number blocks, lists and charts that follow the range change with it; the page needs a period block with custom: true), period?: "page" follows the time range picked in the period block on the same page (the chart then covers that range, by day, week or month depending on its length; group.unit and last are ignored; a pie follows it too); choice?: "page" draws only the entries with the option picked in the choices block on the same page (rule 65)',
+    doc: 'show {kind: "bar"|"line"|"pie", title}, source {table, aggregate: "count"|"sum"|"avg"|"min"|"max"|"latest"|"distinctDays" (days with at least one entry), field? (number, money, rating, duration or formula; for numeric aggregates; latest reads the newest entry in each bucket), filter?, group: {unit: "day"|"week"|"month", by? (a date or datetime field or "createdAt"; default: the first date field), last? (2-31; default 7 days, 8 weeks, 6 months)} or {by: a choice field, or a link field for one point per entry of the linked table}}: a pie chart needs group {by: a choice or link field} (rule 33); compare?: "previous" (only with a time group, bar or line, and no inPeriod filter) also draws the period before, shifted onto the same positions: a dashed line, or pale bars behind ("compared with last month", "和上个月比"); pickPeriod?: true (bar or line grouped by time, not following the page range: tapping a bar or point sets the time range of the page to that day, week or month, so the number blocks, lists and charts that follow the range change with it; the page needs a period block with custom: true), period?: "page" follows the time range picked in the period block on the same page (the chart then covers that range, by day, week or month depending on its length; group.unit and last are ignored; a pie follows it too); running?: "shown"|"all" (time-grouped count/sum: running from zero at the visible edge, or including matching entries before it; compare supports shown only), split?: {by: a single-choice field} (time-grouped stacked bars with count/sum or separate lines with any chart aggregate; no running or compare; at most 8 series, rule 76); choice?: "page" draws only the entries with the option picked in the choices block on the same page (rule 65)',
   },
   example: {
     show: { kind: 'bar', title: 'Spending by month' },

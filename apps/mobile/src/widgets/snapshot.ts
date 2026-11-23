@@ -18,6 +18,7 @@ import {
   sortRecords,
   isKnownComponent,
   readNumber,
+  calculatedText,
   type BlockOf,
   type Calendar,
   type Component,
@@ -125,6 +126,7 @@ async function statView(c: BlockOf<'number'>, ctx: Ctx): Promise<WidgetView | nu
   if (!read) return null;
   const field = source.field ? read.view.fields.find((f) => f.id === source.field) : undefined;
   const text = (v: number | null) =>
+    calculatedText(v, source.calc, locale) ??
     statText(v, source.aggregate, field, locale, source.days?.unit);
   const goal = (v: number | null) => {
     const p = source.goal === undefined ? undefined : progressOf(v ?? 0, source.goal);

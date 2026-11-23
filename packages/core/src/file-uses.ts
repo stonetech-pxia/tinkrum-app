@@ -20,6 +20,13 @@ export interface FileUses {
 
 /** v39 以后加的、更早的版本会拒绝的键和取值（不是新外观、新字段类型、新动作、新图标的那些）。 */
 export const USES_FEATURES = [
+  'numberCalc',
+  'chartExtrema',
+  'chartRunning',
+  'chartSplit',
+  'calendarDayValue',
+  'calendarWeek',
+  'calendarUntil',
   /** 筛选条件 is 的值是几个选项（D-538）。 */
   'filterAnyOf',
   /** 时间段 next7days / next30days / next90days（D-537）。 */
@@ -152,8 +159,21 @@ export function usesOf(content: unknown): FileUses {
         if (show.color !== undefined && RECORD_LOOK_SET.has(node.look) && node.look !== 'calendar')
           found.features.add('showColorAnyLook');
       }
+      if (isObject(show) && node.look === 'calendar') {
+        if (show.day !== undefined) found.features.add('calendarDayValue');
+        if (show.span !== undefined) found.features.add('calendarWeek');
+      }
       const source = node.source;
       if (isObject(source)) {
+        if (node.look === 'number' && source.calc !== undefined) found.features.add('numberCalc');
+        if (node.look === 'chart') {
+          if (['latest', 'min', 'max'].includes(String(source.aggregate)))
+            found.features.add('chartExtrema');
+          if (source.running !== undefined) found.features.add('chartRunning');
+          if (source.split !== undefined) found.features.add('chartSplit');
+        }
+        if (node.look === 'calendar' && isObject(source.group) && source.group.until !== undefined)
+          found.features.add('calendarUntil');
         if (node.look === 'single' && source.record !== undefined)
           found.features.add('singleOpenedRecord');
         if (Array.isArray(source.sort)) found.features.add('sortMany');

@@ -155,6 +155,7 @@ export type GroupUnit = (typeof GROUP_UNITS)[number];
  * filter：引用分组时先筛被引用的表，决定要哪几组（原 groupFilter）。
  */
 export const GroupingSchema = z.strictObject({
+  until: IdSchema.optional(),
   by: FieldRefSchema.optional(),
   unit: z.enum(GROUP_UNITS).optional(),
   last: z.number().int().min(2).max(31).optional(),

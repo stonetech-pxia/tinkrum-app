@@ -543,15 +543,26 @@ export class SQLiteWorkspaceRepo implements WorkspaceRepo {
             range.fromMs,
             range.untilMs,
           )
-        : await this.db.getAllAsync<RecordRow>(
-            // 字段 ID 只有小写字母、数字和 -，放进 JSON 路径时加引号。
-            `${base} AND json_extract(values_json, ?) >= ? AND json_extract(values_json, ?) < ?`,
-            collectionId,
-            `$."${range.by}"`,
-            range.from,
-            `$."${range.by}"`,
-            range.until,
-          );
+        : range.endBy
+          ? await this.db.getAllAsync<RecordRow>(
+              `${base} AND json_extract(values_json, ?) < ? AND (json_extract(values_json, ?) >= ? OR json_extract(values_json, ?) >= ?)`,
+              collectionId,
+              `$."${range.by}"`,
+              range.until,
+              `$."${range.by}"`,
+              range.from,
+              `$."${range.endBy}"`,
+              range.from,
+            )
+          : await this.db.getAllAsync<RecordRow>(
+              // 字段 ID 只有小写字母、数字和 -，放进 JSON 路径时加引号。
+              `${base} AND json_extract(values_json, ?) >= ? AND json_extract(values_json, ?) < ?`,
+              collectionId,
+              `$."${range.by}"`,
+              range.from,
+              `$."${range.by}"`,
+              range.until,
+            );
     return rows.map(toStoredRecord);
   }
 

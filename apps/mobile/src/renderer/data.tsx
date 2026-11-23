@@ -89,7 +89,8 @@ import {
   type FieldType,
   type FieldValue,
   type Backdrop,
-  minusValue,
+  calculatedNumber,
+  calculatedText,
 } from '@morph/core';
 import { useRouter } from 'expo-router';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -2459,6 +2460,21 @@ export function Stat({
     env.config.data.tables.find((c) => c.id === src.minus?.table),
     cal,
   );
+  const extra0 = useComputedRecords(
+    env.config.data.tables,
+    env.config.data.tables.find((t) => t.id === src.calc?.with[0]?.table),
+    cal,
+  );
+  const extra1 = useComputedRecords(
+    env.config.data.tables,
+    env.config.data.tables.find((t) => t.id === src.calc?.with[1]?.table),
+    cal,
+  );
+  const extra2 = useComputedRecords(
+    env.config.data.tables,
+    env.config.data.tables.find((t) => t.id === src.calc?.with[2]?.table),
+    cal,
+  );
   if (!collection) return null;
   const now = new Date();
   // 页面上选的时间范围（D-440）：source.period 是 "page" 且页面有 period 块时，筛选里的 inPeriod 不再用，按选的范围算；
@@ -2489,12 +2505,31 @@ export function Stat({
           { value: table ? latestNumber(list, table, collection, src, now, cal) : null }
         : { value: aggregateRecords(list, collection, aggregate as Aggregate, src.field) };
   // 还没读完被减的那张表时先不显示数（和自己的表没读完一样）。
-  const loading = records === null || (src.minus !== undefined && minus.records === null);
-  const minusOf = (value: number | null) =>
-    src.minus && minus.view && minus.records
-      ? minusValue(value, src.minus, minus.view, minus.records, now, cal)
-      : value;
+  const extras = [extra0, extra1, extra2];
+  const loading =
+    records === null ||
+    (src.minus !== undefined && minus.records === null) ||
+    (src.calc?.with.some((_, i) => extras[i]!.records === null) ?? false);
+  const calculated = () =>
+    calculatedNumber(
+      { ...src, filter },
+      { table: table!, view: collection, records: records ?? [] },
+      (id) => {
+        const total =
+          src.minus?.table === id
+            ? minus
+            : extras[src.calc?.with.findIndex((t) => t.table === id) ?? -1];
+        const stored = env.config.data.tables.find((t) => t.id === id);
+        return total?.view && stored
+          ? { table: stored, view: total.view, records: total.records ?? [] }
+          : undefined;
+      },
+      now,
+      cal,
+      follow ? choiceRange(follow, now, cal) : undefined,
+    );
   const text = (v: { value: number | null }) =>
+    calculatedText(v.value, src.calc, env.locale) ??
     statText(v.value, aggregate, field, env.locale, src.days?.unit);
   // 每笔自己选货币（D-429）：按货币分开显示，不把不同货币加在一起。
   const listText = (list: DataRecord[]) =>
@@ -2624,8 +2659,7 @@ export function Stat({
       </Card>
     );
   }
-  const own = loading ? { value: null } : valueOf(matched);
-  const v = src.minus ? { value: minusOf(own.value) } : own;
+  const v = loading ? { value: null } : calculated();
   const best = loading ? null : bestText(v);
   const progress = goalProgress(v);
   const compareLine = loading ? null : compareText(v.value);

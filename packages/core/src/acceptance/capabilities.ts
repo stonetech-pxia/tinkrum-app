@@ -500,6 +500,7 @@ function allConditions(v: AppView): Condition[] {
           filter?: Condition[];
           group?: { filter?: Condition[] };
           minus?: { filter?: Condition[] };
+          calc?: { with: { filter?: Condition[] }[] };
         };
       }
     ).source;
@@ -507,6 +508,7 @@ function allConditions(v: AppView): Condition[] {
       ...(source?.filter ?? []),
       ...(source?.group?.filter ?? []),
       ...(source?.minus?.filter ?? []),
+      ...(source?.calc?.with.flatMap((t) => t.filter ?? []) ?? []),
     );
     for (const u of toolsOf(block)) out.push(...(u.when ?? []));
   }
@@ -877,6 +879,20 @@ export const CAPABILITIES: readonly Capability[] = [
   ),
   cap('read.chart.choice', 'read', (v) =>
     chartBlocks(v).some((b) => b.source.choice !== undefined),
+  ),
+  cap('read.number.calc', 'read', (v) => numberBlocks(v).some((b) => b.source.calc !== undefined)),
+  cap('read.chart.running', 'read', (v) =>
+    chartBlocks(v).some((b) => b.source.running !== undefined),
+  ),
+  cap('read.chart.split', 'read', (v) => chartBlocks(v).some((b) => b.source.split !== undefined)),
+  cap('read.calendar.day', 'read', (v) =>
+    recordBlocks(v).some((b) => b.look === 'calendar' && b.show.day !== undefined),
+  ),
+  cap('read.calendar.week', 'read', (v) =>
+    recordBlocks(v).some((b) => b.look === 'calendar' && b.show.span === 'week'),
+  ),
+  cap('read.calendar.until', 'read', (v) =>
+    recordBlocks(v).some((b) => b.look === 'calendar' && b.source.group?.until !== undefined),
   ),
   cap('read.number.minus', 'read', (v) =>
     numberBlocks(v).some((b) => b.source.minus !== undefined),

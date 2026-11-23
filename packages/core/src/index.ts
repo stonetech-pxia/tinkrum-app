@@ -122,6 +122,7 @@ export * from './messages';
 
 export * from './localization';
 export * from './stat-minus';
+export { numberTotal, calculatedNumber, calculatedText } from './stat-calc';
 
 export * from './site';
 export * from './math';

@@ -44,6 +44,7 @@ import {
   ReminderSchema,
   WorkflowStepSchema,
   WorkspaceConfigSchema,
+  type Collection,
   type Workflow,
   type WorkspaceConfig,
 } from './schema';
@@ -1656,6 +1657,39 @@ function danglingRefs(config: WorkspaceConfig): string[] {
         )
           out.push(`${at}.${key}: ${o.table}.${o[key]}`);
     }
+
+    if (typeof o.look === 'string' && o.source && typeof o.source === 'object') {
+      const source = o.source as Json,
+        show = (o.show ?? {}) as Json;
+      const fields = typeof source.table === 'string' ? tables.get(source.table) : undefined;
+      const check = (id: unknown) => {
+        if (
+          typeof id === 'string' &&
+          fields &&
+          !fields.has(id) &&
+          !['createdAt', 'updatedAt'].includes(id)
+        )
+          out.push(`${at}: ${id}`);
+      };
+      check((source.split as Json | undefined)?.by);
+      check((source.group as Json | undefined)?.until);
+      check((show.day as Json | undefined)?.field);
+      for (const total of ((source.calc as Json | undefined)?.with ?? []) as Json[]) {
+        const own = typeof total.table === 'string' ? tables.get(total.table) : undefined;
+        for (const f of [
+          total.field,
+          (total.days as Json | undefined)?.date,
+          ...((total.filter ?? []) as Json[]).map((c) => c.field),
+        ])
+          if (
+            typeof f === 'string' &&
+            own &&
+            !own.has(f) &&
+            !['createdAt', 'updatedAt'].includes(f)
+          )
+            out.push(`${at}.calc: ${f}`);
+      }
+    }
     // 表上的 recordRow（D-428）：字段是这张表的。
     if (Array.isArray(o.recordRow) && Array.isArray(o.fields)) {
       const own = new Set((o.fields as Json[]).map((f) => f.id));
@@ -1784,6 +1818,88 @@ describe('底线 18：删掉新设置引用的表和字段（D-424）', () => {
 });
 
 describe('底线 18：配置永远自洽', () => {
+  it('new summary references are cleaned up or their deletion is refused', () => {
+    const initial = createDefaultWorkspace('en');
+    const table = (id: string): Collection => ({
+      id,
+      name: id,
+      fields: [
+        { id: 'n', name: 'N', type: 'number' },
+        { id: 'date', name: 'Date', type: 'date' },
+        { id: 'end', name: 'End', type: 'date' },
+        { id: 'cat', name: 'Cat', type: 'choice', options: [{ id: 'one', label: 'One' }] },
+      ],
+    });
+    const blocks = [
+      {
+        id: 'calc',
+        look: 'number',
+        show: { label: 'Ratio' },
+        source: {
+          table: 'a',
+          aggregate: 'sum',
+          field: 'n',
+          calc: {
+            with: [
+              {
+                id: 'other',
+                table: 'b',
+                aggregate: 'latest',
+                field: 'n',
+                days: { date: 'date' },
+                filter: [{ field: 'cat', op: 'is', value: 'one' }],
+              },
+            ],
+            formula: '{total} / {other}',
+          },
+        },
+      },
+      {
+        id: 'split',
+        look: 'chart',
+        show: { title: 'Split', kind: 'bar' },
+        source: {
+          table: 'a',
+          aggregate: 'count',
+          group: { unit: 'day', by: 'date' },
+          split: { by: 'cat' },
+        },
+      },
+      {
+        id: 'span',
+        look: 'calendar',
+        show: { title: 'date', day: { aggregate: 'count' } },
+        source: { table: 'a', limit: 30, group: { unit: 'day', by: 'date', until: 'end' } },
+      },
+      {
+        id: 'sum',
+        look: 'calendar',
+        show: { title: 'date', day: { aggregate: 'sum', field: 'n' } },
+        source: { table: 'a', limit: 30, group: { unit: 'day', by: 'date' } },
+      },
+    ];
+    const built = prepareOps(
+      initial,
+      [
+        { op: 'addData', table: table('a') },
+        { op: 'addData', table: table('b') },
+        ...blocks.map((block) => ({ op: 'addContainer', page: 'home', block })),
+      ] as Op[],
+      ctx,
+    );
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    for (const tableId of ['a', 'b'])
+      for (const field of [undefined, 'n', 'date', 'end', 'cat']) {
+        const result = prepareOps(
+          built.after,
+          [{ op: 'removeData', table: tableId, ...(field ? { field } : {}) }],
+          ctx,
+        );
+        if (result.ok) expect(danglingRefs(result.after)).toEqual([]);
+      }
+  });
+
   it('every frozen config starts without a dangling reference (the checker itself)', () => {
     for (const [name, config] of CONFIGS)
       expect({ name, refs: danglingRefs(config) }).toEqual({ name, refs: [] });

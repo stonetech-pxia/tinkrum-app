@@ -1,3 +1,5 @@
+import type { NumberSource } from './components/number';
+import { totalFormulaText } from './stat-calc-text';
 import { countFileRefs } from './file-refs';
 import { localize } from './localization';
 import { t, pairText, type StringKey } from './messages';
@@ -419,7 +421,12 @@ function createBlockDescriptions(names: DescribeNames) {
   };
 
   /** 块读什么（source）的一个键。 */
-  const sourceChange = (k: string, v: unknown, table: string | undefined): string => {
+  const sourceChange = (
+    k: string,
+    v: unknown,
+    table: string | undefined,
+    numberSource?: NumberSource,
+  ): string => {
     const off = v === null;
     switch (k) {
       case 'table':
@@ -463,6 +470,17 @@ function createBlockDescriptions(names: DescribeNames) {
           : t(ctx.locale, 'describeSourceGoal', { n: Number(v) });
       case 'compare':
         return t(ctx.locale, off ? 'describeSourceCompareOff' : 'describeSourceCompare');
+      case 'calc': {
+        if (off) return t(ctx.locale, 'describeSourceCalcOff');
+        const formula = numberSource && totalFormulaText(numberSource, known, ctx.locale);
+        return formula
+          ? t(ctx.locale, 'describeSourceCalcFormula', { formula })
+          : t(ctx.locale, 'describeSourceCalc');
+      }
+      case 'running':
+        return t(ctx.locale, 'describeSourceRunning');
+      case 'split':
+        return t(ctx.locale, 'describeSourceSplit');
       case 'minus':
         return t(ctx.locale, off ? 'describeSourceMinusOff' : 'describeSourceMinus');
       case 'kind':
@@ -587,8 +605,18 @@ function createBlockDescriptions(names: DescribeNames) {
       }
       parts.push((isRecords ? recordShowChange(k, v, table) : null) ?? propChange(k, v));
     }
+    const numberSource =
+      current && isKnownComponent(current) && current.look === 'number'
+        ? ({
+            ...current.source,
+            ...changes.source,
+            calc: changes.source?.calc
+              ? { ...current.source.calc, ...(changes.source.calc as object) }
+              : current.source.calc,
+          } as NumberSource)
+        : undefined;
     for (const [k, v] of Object.entries(changes.source ?? {}))
-      parts.push(sourceChange(k, v, table));
+      parts.push(sourceChange(k, v, table, numberSource));
     if (changes.tools !== undefined)
       parts.push(
         ...(changes.tools === null

@@ -18,6 +18,8 @@ import type { ChartSource } from './components/chart';
 import { CHART_COLOR_FAMILIES, OPTION_COLORS, type OptionColor } from './option-colors';
 import { rangeStarts, rangeUnit, type DayRange } from './page-period';
 import type { Collection, GroupUnit } from './schema';
+import { latestValue } from './related';
+import { t } from './messages';
 import { dateFieldOf, distinctDays } from './sequence';
 
 /** 不写 group.last 时显示最近几段：7 天、8 周、6 个月。 */
@@ -62,6 +64,17 @@ export function optionColor(
   return (k >= 0 ? free[k] : undefined) ?? grey;
 }
 
+/** 饼图和拆分图共用字段中的选项顺序；筛掉前面的选项不能让颜色换位。 */
+export function chartOptionColor(
+  key: string | null,
+  options: readonly { id: string; color?: OptionColor | undefined }[],
+  dark: boolean,
+  fallbackIndex = -1,
+): string {
+  const index = options.findIndex((o) => o.id === key);
+  return optionColor(options[index], options.length ? index : fallbackIndex, dark, options);
+}
+
 export interface ChartPoint {
   /** 时间段的开始日期（YYYY-MM-DD）或选项 ID；「其他」和「未选」是 null。 */
   key: string | null;
@@ -69,13 +82,18 @@ export interface ChartPoint {
   value: number;
   /** 这一段有没有可统计的数（平均值没有数时 value 是 0，但显示「—」）。 */
   empty: boolean;
+  /** 同一时间段按单选拆分的部分；所有时间段保持相同的顺序。 */
+  parts?: ChartPoint[];
 }
 
 /**
  * 图表怎么算（图表块的 source 去掉表和筛选）：group 有 unit 时按时间分（by 是日期字段，不写用 dateFieldOf 的默认），
  * 没有 unit 时按单选或引用字段 by 分（D-336）；distinctDays 在按字段分时按 days.date 数日子。
  */
-export type ChartSpec = Pick<ChartSource, 'aggregate' | 'field' | 'group' | 'days'>;
+export type ChartSpec = Pick<
+  ChartSource,
+  'aggregate' | 'field' | 'group' | 'days' | 'running' | 'split'
+>;
 
 /**
  * 最近 n 段的开始日期（从早到晚，最后一段包含今天）。今天和一周的第一天按 cal（D-286），和数据筛选一样。
@@ -124,49 +142,124 @@ export function chartSeries(
   linked?: LinkedGroups,
   previous = false,
   range?: DayRange,
+  otherLabel: string = t('en', 'chartOther'),
 ): ChartPoint[] {
   const { group } = spec;
   const unit = group.unit;
   const dateRef = dateFieldOf(collection, unit ? group.by : spec.days?.date);
   const point = (key: string | null, label: string, list: DataRecord[]): ChartPoint => {
     const value =
-      spec.aggregate === 'distinctDays'
-        ? distinctDays(list, collection, { dateField: dateRef, now, cal })
-        : aggregateRecords(list, collection, spec.aggregate, spec.field);
+      spec.aggregate === 'latest'
+        ? (() => {
+            const v = spec.field && latestValue(list, collection, spec.field, dateRef, now, cal);
+            return typeof v === 'number' ? v : null;
+          })()
+        : spec.aggregate === 'distinctDays'
+          ? distinctDays(list, collection, { dateField: dateRef, now, cal })
+          : aggregateRecords(list, collection, spec.aggregate, spec.field);
     return { key, label, value: value ?? 0, empty: value === null };
   };
-  if (!unit) {
-    if (!group.by) return [];
-    return groupRecords(records, collection, group.by, noChoice, linked).map((g) =>
-      point(g.optionId, g.label, g.records),
-    );
+  const compute = () => {
+    if (!unit) {
+      if (!group.by) return [];
+      return groupRecords(records, collection, group.by, noChoice, linked).map((g) =>
+        point(g.optionId, g.label, g.records),
+      );
+    }
+    if (range) return rangeSeries(records, collection, range, point, dateRef, now, cal);
+    const n = Math.min(MAX_PERIODS, group.last ?? DEFAULT_PERIODS[unit]);
+    const shift = previous ? n : 0;
+    const starts = periodStarts(unit, n, now, cal, shift).map(localDate);
+    // 上一期结束在最近 n 段开始的前一天。
+    const end = previous
+      ? (() => {
+          const [y, m, d] = localDate(periodStarts(unit, n, now, cal)[0]!)
+            .split('-')
+            .map(Number) as [number, number, number];
+          return localDate(new Date(y, m - 1, d - 1));
+        })()
+      : dateOfDayNumber(todayNumber(now, cal));
+    const buckets = starts.map(() => [] as DataRecord[]);
+    for (const r of records) {
+      const v = recordDay(r, collection, dateRef, now, cal);
+      if (v === undefined || v < starts[0]! || v > end) continue;
+      // 落在最后一个开始日期不晚于它的那一段。
+      let i = starts.length - 1;
+      while (i > 0 && starts[i]! > v) i--;
+      buckets[i]!.push(r);
+    }
+    return starts.map((start, i) => {
+      const [y, m, d] = start.split('-').map(Number) as [number, number, number];
+      return point(start, periodLabel(unit, new Date(y, m - 1, d)), buckets[i]!);
+    });
+  };
+  const points = compute();
+  if (spec.running && unit && points.length) {
+    const edge = range?.start ?? points[0]!.key!;
+    let value =
+      spec.running === 'all'
+        ? point(
+            null,
+            '',
+            records.filter((r) => {
+              const day = recordDay(r, collection, dateRef, now, cal);
+              return day !== undefined && day < edge;
+            }),
+          ).value
+        : 0;
+    for (const p of points) {
+      value += p.value;
+      p.value = value;
+      p.empty = false;
+    }
   }
-  if (range) return rangeSeries(records, collection, range, point, dateRef, now, cal);
-  const n = Math.min(MAX_PERIODS, group.last ?? DEFAULT_PERIODS[unit]);
-  const shift = previous ? n : 0;
-  const starts = periodStarts(unit, n, now, cal, shift).map(localDate);
-  // 上一期结束在最近 n 段开始的前一天。
-  const end = previous
-    ? (() => {
-        const [y, m, d] = localDate(periodStarts(unit, n, now, cal)[0]!)
-          .split('-')
-          .map(Number) as [number, number, number];
-        return localDate(new Date(y, m - 1, d - 1));
-      })()
-    : dateOfDayNumber(todayNumber(now, cal));
-  const buckets = starts.map(() => [] as DataRecord[]);
-  for (const r of records) {
-    const v = recordDay(r, collection, dateRef, now, cal);
-    if (v === undefined || v < starts[0]! || v > end) continue;
-    // 落在最后一个开始日期不晚于它的那一段。
-    let i = starts.length - 1;
-    while (i > 0 && starts[i]! > v) i--;
-    buckets[i]!.push(r);
+  if (spec.split && unit && points.length) {
+    const f = collection.fields.find((f) => f.id === spec.split!.by);
+    if (f?.type === 'choice') {
+      const end = range?.end ?? dateOfDayNumber(todayNumber(now, cal));
+      const start = range?.start ?? points[0]!.key!;
+      const visible = records.filter((r) => {
+        const d = recordDay(r, collection, dateRef, now, cal);
+        return d !== undefined && d >= start && d <= end;
+      });
+      const groups = groupRecords(visible, collection, f.id, noChoice).filter((g) => g.count > 0);
+      const ranked = [...groups].sort(
+        (a, b) =>
+          Math.abs(point(b.optionId, b.label, b.records).value) -
+          Math.abs(point(a.optionId, a.label, a.records).value),
+      );
+      const kept =
+        groups.length <= MAX_PIE_SLICES
+          ? groups
+          : groups.filter((g) => ranked.slice(0, MAX_PIE_SLICES - 1).includes(g));
+      const rest = groups.filter((g) => !kept.includes(g));
+      const series = [
+        ...kept.map((g) => ({ key: g.optionId, label: g.label, records: g.records })),
+        ...(rest.length
+          ? [{ key: '$other', label: otherLabel, records: rest.flatMap((g) => g.records) }]
+          : []),
+      ];
+      for (const p of points) p.parts = [];
+      for (const group of series) {
+        const part = chartSeries(
+          group.records,
+          collection,
+          { ...spec, split: undefined },
+          now,
+          noChoice,
+          cal,
+          undefined,
+          previous,
+          range,
+          otherLabel,
+        );
+        points.forEach((p, i) =>
+          p.parts!.push({ ...part[i]!, key: group.key, label: group.label }),
+        );
+      }
+    }
   }
-  return starts.map((start, i) => {
-    const [y, m, d] = start.split('-').map(Number) as [number, number, number];
-    return point(start, periodLabel(unit, new Date(y, m - 1, d)), buckets[i]!);
-  });
+  return points;
 }
 
 /** 页面上选了时间范围（D-440）：范围里每一段（天 / 周 / 月，按范围长短）一个点；范围外的记录不算，第一段和最后一段可能只有一部分。 */
