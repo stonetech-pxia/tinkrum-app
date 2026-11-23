@@ -753,7 +753,7 @@ describe('import a preset from a file', () => {
         await fireEvent.press(await screen.findByTestId('preset-add'));
         await fireEvent.press(await screen.findByText('让 AI 做一个'));
         await waitFor(() => expect(files.aiShares).toHaveLength(1));
-        const { text: message, files: attachments } = files.aiShares[0]!;
+        const { request: message, files: attachments } = files.aiShares[0]!;
         expect(message).toContain('tinkrum-app-guide.md');
         expect(message).toContain('tinkrum-app-patterns.md');
         expect(message).not.toContain('https://');

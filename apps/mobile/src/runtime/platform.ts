@@ -662,6 +662,8 @@ export interface FilePlatform {
   shareWithAi(input: {
     file?: { name: string; text: string };
     prompt: (how: { attached: boolean; checker: boolean; docs?: boolean }) => string;
+    /** 有文件时分享的文字：提示词本身放进 tinkrum-request.md 附件，文字只是指一下它。 */
+    pointer: string;
   }): Promise<void>;
   /**
    * 读用户从「文件」选的一个文字文件（恢复预填记忆的备份用）。读完删掉选择器放在 App 缓存里的副本

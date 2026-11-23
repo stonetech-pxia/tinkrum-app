@@ -481,6 +481,7 @@ export const zh: MessageTable = {
     '改文件的规矩：\n- 已有的 ID 一个都不改：App、表、字段、选项、页面和块。我的记录是靠表和字段的 ID 挂上去的，ID 一改就对不上了。\n- 我没说要删，就不删表和字段。删了的话，它们的记录还在我手机上，只是看不到了。\n- 把整个文件放在一个 json 代码块里给我。',
   handoffCheck: '对文件运行 node tinkrum-check.js，直到它输出 OK。',
   handoffAsk: '先问我想改什么。',
+  handoffSeeRequest: '请先阅读附件 {file}，并照它去做。',
   handoffButton: '交给别的 AI App 改',
   presetsMakeWithAi: '用 Claude 或 ChatGPT 做一个 App',
   presetsPasteEmpty: '剪贴板里没有文字。先复制 App 文件，再点「从剪贴板粘贴」。',

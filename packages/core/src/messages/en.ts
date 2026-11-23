@@ -504,6 +504,7 @@ export const en = {
     'Rules for changing my file:\n- Keep every id that is already there: the app, tables, fields, choice options, pages and blocks. My entries are linked to table and field ids; a changed id loses them.\n- Do not remove a table or a field unless I ask. Their entries stay on my phone but are hidden.\n- Give me the whole file in one json code block.',
   handoffCheck: 'Run node tinkrum-check.js on the file until it prints OK.',
   handoffAsk: 'First ask me what I want to change.',
+  handoffSeeRequest: 'Please read the attached {file} first and follow it.',
   handoffButton: 'Change it with another AI app',
   presetsMakeWithAi: 'Make an app with Claude or ChatGPT',
   presetsPasteEmpty:

@@ -314,14 +314,17 @@ describe('hand the app to another AI app (D-611)', () => {
     ]);
     const sent = JSON.parse(shared!.files[0]!.text) as { app: { id: string }; tables: unknown[] };
     expect(sent.app.id).toBe('wallet');
-    expect(shared!.text).toContain('tinkrum-app-guide.md');
-    expect(shared!.text).not.toContain('https://');
-    expect(shared!.text).toContain('「Wallet」');
-    expect(shared!.text).toContain('id "wallet-home"');
-    expect(shared!.text).toMatch(/先改这一页/);
-    expect(shared!.text).toContain('node tinkrum-check.js');
-    expect(shared!.text).toContain('把标题改成我的钱包');
-    expect(shared!.text).not.toContain('先问我想改什么');
+    // Claude 收到多个文件时会丢掉分享的文字：提示词在 tinkrum-request.md 里，文字只指一下它。
+    expect(shared!.text).toBe('请先阅读附件 tinkrum-request.md，并照它去做。');
+    expect(shared!.text).not.toContain('把标题改成我的钱包');
+    expect(shared!.request).toContain('tinkrum-app-guide.md');
+    expect(shared!.request).not.toContain('https://');
+    expect(shared!.request).toContain('「Wallet」');
+    expect(shared!.request).toContain('id "wallet-home"');
+    expect(shared!.request).toMatch(/先改这一页/);
+    expect(shared!.request).toContain('node tinkrum-check.js');
+    expect(shared!.request).toContain('把标题改成我的钱包');
+    expect(shared!.request).not.toContain('先问我想改什么');
   });
 
   it('home offers both new app and whole setup, carrying the typed request', async () => {
@@ -346,13 +349,13 @@ describe('hand the app to another AI app (D-611)', () => {
     await fireEvent.changeText(await screen.findByTestId('change-input'), 'REQUEST_SENTINEL');
     await fireEvent.press(await screen.findByTestId('change-handoff-new'));
     await waitFor(() => expect(files.aiShares).toHaveLength(1));
-    expect(files.aiShares[0]!.text).toContain('REQUEST_SENTINEL');
+    expect(files.aiShares[0]!.request).toContain('REQUEST_SENTINEL');
     expect(files.aiShares[0]!.files.some((f) => f.name.endsWith('.json'))).toBe(false);
     await fireEvent.press(screen.getByTestId('change-handoff-setup'));
     await waitFor(() => expect(files.aiShares).toHaveLength(2));
     const sent = files.aiShares[1]!;
-    expect(sent.text).toContain('REQUEST_SENTINEL');
-    expect(sent.text).toContain('morph-app-config');
+    expect(sent.request).toContain('REQUEST_SENTINEL');
+    expect(sent.request).toContain('morph-app-config');
     expect(JSON.parse(sent.files[0]!.text)).toMatchObject({ format: 'morph-app-config' });
     expect(sent.files[0]!.text).toContain('wallet');
     expect(JSON.stringify(sent)).not.toContain('PRIVATE_FILE_SENTINEL');

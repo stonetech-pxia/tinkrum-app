@@ -530,6 +530,7 @@ export const fr: MessageTable = {
     'Règles pour modifier mon fichier :\n- Garde tous les id qui existent déjà : l’app, les tableaux, les champs, les options, les pages et les blocs. Mes entrées sont liées aux id des tableaux et des champs ; un id changé les perd.\n- Ne supprime ni tableau ni champ sauf si je le demande. Leurs entrées restent sur mon téléphone mais sont masquées.\n- Donne-moi le fichier complet dans un seul bloc de code json.',
   handoffCheck: 'Lance node tinkrum-check.js sur le fichier jusqu’à ce qu’il affiche OK.',
   handoffAsk: 'Demande-moi d’abord ce que je veux changer.',
+  handoffSeeRequest: 'Lis d’abord le fichier joint {file} et suis-le.',
   handoffButton: 'Modifier avec une autre app d’IA',
   presetsMakeWithAi: 'Créer une app avec Claude ou ChatGPT',
   presetsPasteEmpty:

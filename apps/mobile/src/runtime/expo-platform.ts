@@ -1,4 +1,4 @@
-import { CHECKER_FILE_NAME, HANDOFF_DOC_FILES, RunError } from '@morph/core';
+import { CHECKER_FILE_NAME, HANDOFF_DOC_FILES, HANDOFF_REQUEST_FILE, RunError } from '@morph/core';
 import { getStringAsync, setStringAsync } from 'expo-clipboard';
 import { getDocumentAsync } from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
@@ -348,7 +348,7 @@ export const expoFilePlatform: FilePlatform = {
     });
   },
 
-  async shareWithAi({ file, prompt }) {
+  async shareWithAi({ file, prompt, pointer }) {
     const send = MorphShare?.shareFilesWithText?.bind(MorphShare);
     if (!send) {
       // Expo Go、比这个功能早的开发版：只发文字，App 文件写在后面。
@@ -398,12 +398,12 @@ export const expoFilePlatform: FilePlatform = {
       // 老的开发版没有指南时，提示词退回带当天版本的网址，不声称有附件。
       if (__DEV__) console.warn('[share] no bundled guide', e);
     }
-    if (uris.length === 0) {
-      // 没有任何文件可带（新 App、老的开发版没有打包检查器和指南）：Android 的分享面板不收空列表，退回只发文字。
-      await Share.share({ message: prompt({ attached: false, checker: false }) });
-      return;
-    }
-    await send(prompt({ attached: file !== undefined, checker, docs }), uris, types);
+    // 提示词做成第一个附件：Claude 收到多个文件时丢掉分享的文字（真机 2026-11-23），文件不会丢；
+    // 分享的文字只是指一下它，ChatGPT 这类收文字的 App 里也看得见。
+    const request = new File(dir, HANDOFF_REQUEST_FILE);
+    request.create();
+    await request.write(prompt({ attached: file !== undefined, checker, docs }));
+    await send(pointer, [request.uri, ...uris], ['text/markdown', ...types]);
   },
 
   async share(path, mimeType) {

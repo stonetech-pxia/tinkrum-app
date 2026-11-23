@@ -42,6 +42,9 @@ function docsLinks(now: Date) {
   };
 }
 
+/** 提示词存成这个文件一起分享：有的 App（Claude）收到多个文件时会丢掉分享的文字，文件不会丢。 */
+export const HANDOFF_REQUEST_FILE = 'tinkrum-request.md';
+
 export function handoffPrompt(
   scope: HandoffScope,
   locale: Locale,

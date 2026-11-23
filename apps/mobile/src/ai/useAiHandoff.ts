@@ -3,6 +3,7 @@ import {
   appConfigFileName,
   appFileOfApp,
   appFileText,
+  HANDOFF_REQUEST_FILE,
   handoffPrompt,
   presetSnapshot,
   type HandoffScope,
@@ -32,6 +33,7 @@ export function useAiHandoff() {
     try {
       await files.shareWithAi({
         ...(file ? { file } : {}),
+        pointer: t(locale, 'handoffSeeRequest', { file: HANDOFF_REQUEST_FILE }),
         prompt: (how) =>
           handoffPrompt(scope, locale, now, { ...how, fileName: file?.name, request }),
       });
