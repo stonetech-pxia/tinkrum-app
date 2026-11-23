@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { APP_FILE_FORMAT, appFileOps, readAppFile, type AppFile } from './app-file';
 import { explainProblems } from './app-file-explain';
 import { designHints } from './design-hints';
+import { DrawnIconsSchema } from './drawn-icons';
 import { prepareOps } from './change';
 import type { Registry } from './registry';
 import {
@@ -37,6 +38,8 @@ export const AppFileSchema = z.object({
   pages: z.array(PageSchema).min(1),
   tables: z.array(CollectionSchema),
   tools: z.array(ToolSchema),
+  /** 画出来的图标（D-new-extensibility-2）：内容里写 "my:<id>" 的，定义在这里。 */
+  icons: DrawnIconsSchema.optional(),
 });
 
 export interface AppFileSummary {

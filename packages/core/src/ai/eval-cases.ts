@@ -1,4 +1,5 @@
 import { createDefaultWorkspace } from '../defaults';
+import { drawnIconId } from '../drawn-icons';
 import { applyOps, type Op } from '../ops';
 import type { Registry } from '../registry';
 import type { NumberSource } from '../components';
@@ -4684,6 +4685,141 @@ const LOOK_CASES: EvalCase[] = [
     setup: 'default',
     mock: false,
     expect: { kind: 'ops', check: quickActionListOn('video') },
+  },
+  // 卡片的边框和阴影用参数写（D-new-extensibility-1）：没有现成样式时写 card；回到某个样式时 card 要去掉。
+  {
+    id: 'LK6',
+    input: '卡片加一圈主色的粗边框，不要阴影',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const card = c.theme.card;
+        if (!card?.border) return `expected theme.card with a border, got ${JSON.stringify(card)}`;
+        if (card.border.color !== 'primary') return `border color ${card.border.color}`;
+        if (card.border.width < 2) return `border width ${card.border.width}`;
+        return card.shadows?.some((x) => !x.inset)
+          ? `expected no outer shadow: ${JSON.stringify(card.shadows)}`
+          : null;
+      },
+    },
+  },
+  {
+    id: 'LK7',
+    input: 'Go back to plain outlined cards',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [
+      {
+        input: 'Give the cards a thick primary border and a hard offset shadow',
+        ops: [
+          {
+            op: 'setTheme',
+            cardStyle: 'flat',
+            card: {
+              border: { width: 3, color: 'primary' },
+              shadows: [{ x: 4, y: 4, blur: 0, color: 'primary' }],
+            },
+          },
+        ],
+      },
+    ],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        c.theme.cardStyle === 'outline' && c.theme.card === undefined
+          ? null
+          : `expected outline without card, got ${c.theme.cardStyle} ${JSON.stringify(c.theme.card)}`,
+    },
+  },
+  // 画出来的图标（D-new-extensibility-2）：列表里没有的图标画成路径放进 icons，用 my:<id>；去掉时不能留下悬空的引用。
+  {
+    id: 'IC1',
+    input: '给宠物表画一个猫爪图标',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [
+      {
+        input: '建一个宠物表，记名字',
+        ops: [
+          {
+            op: 'addData',
+            table: {
+              id: 'pets',
+              name: '宠物',
+              fields: [{ id: 'name', name: '名字', type: 'text' }],
+            },
+          },
+        ],
+      },
+    ],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const icon = c.data.tables.find((t) => t.id === 'pets')?.icon;
+        const id = drawnIconId(icon);
+        if (id === null) return `expected the pets table to use a drawn icon, got ${icon}`;
+        return Object.keys(c.icons ?? {}).length === 1 && c.icons?.[id]
+          ? null
+          : `expected one drawn icon ${id}, got ${JSON.stringify(Object.keys(c.icons ?? {}))}`;
+      },
+    },
+  },
+  {
+    id: 'IC2',
+    input: 'Draw a coffee cup icon for the home page',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        // 「首页的图标」可以是页面自己的图标，也可以是首页上一个块的图标（标题块等）：两种都算用上了。
+        const home = c.containers.pages.find((p) => p.id === 'home');
+        const used = [
+          home?.icon,
+          ...(home ? allComponents(home) : []).map(
+            (b) => (b as { show?: { icon?: string } }).show?.icon,
+          ),
+        ];
+        const id = used.map(drawnIconId).find((x) => x !== null);
+        if (!id) return `expected a drawn icon on the home page, got ${JSON.stringify(used)}`;
+        return c.icons?.[id] ? null : `icon ${id} is not in icons`;
+      },
+    },
+  },
+  {
+    id: 'IC3',
+    input: 'Remove the cup icon I drew',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [
+      {
+        input: 'Draw a coffee cup icon for the home page',
+        ops: [
+          {
+            op: 'setTheme',
+            icons: {
+              cup: { paths: ['M5 8h11v6a5 5 0 0 1-10 0zM16 9h2a2 2 0 0 1 0 4h-2'], stroke: true },
+            },
+          },
+          { op: 'updateContainer', page: 'home', changes: { icon: 'my:cup' } },
+        ],
+      },
+    ],
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        if (c.icons?.cup) return 'the cup icon is still in icons';
+        const icon = c.containers.pages.find((p) => p.id === 'home')?.icon;
+        return icon === 'my:cup' ? 'the home page still uses my:cup' : null;
+      },
+    },
   },
 ];
 // 新手引导第 1 步（D-231）：空白首页上加两个文件入口。中英文走内置规则，法语交给模型。

@@ -219,7 +219,8 @@ function MiniPhone({
 }
 
 function miniCard(p: Palette): ViewStyle {
-  const glow = p.theme.cardStyle === 'glow';
+  // 自定义卡片（D-new-extensibility-1）换掉了发光，样张也不画发光。
+  const glow = p.theme.cardStyle === 'glow' && !p.theme.card;
   return {
     backgroundColor: p.surface,
     borderRadius: 8,

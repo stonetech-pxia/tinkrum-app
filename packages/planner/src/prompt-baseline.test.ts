@@ -8,6 +8,7 @@ import {
   createDefaultWorkspace,
   createRegistry,
   type Locale,
+  pathDataProblem,
 } from '@morph/core';
 import { describe, expect, it } from 'vitest';
 
@@ -63,6 +64,15 @@ describe('prompt baseline', () => {
     const section = buildSystemPrompt(registry).split('## Rules\n')[1]!.split('\n\n')[0]!;
     const numbers = section.split('\n').map((line) => parseInt(line, 10));
     expect(numbers).toEqual(numbers.map((_, i) => i + 1));
+  });
+
+  it('the drawn icon examples of the rules parse (D-new-extensibility-2)', () => {
+    const rule = buildSystemPrompt(registry)
+      .split('\n')
+      .find((line) => line.includes('Drawing an icon'))!;
+    const paths = [...rule.matchAll(/paths: \["([^"]+)"\]/g)].map((m) => m[1]!);
+    expect(paths.length).toBeGreaterThanOrEqual(2);
+    for (const d of paths) expect(pathDataProblem(d), d).toBeNull();
   });
 
   for (const locale of ['en', 'zh', 'fr'] as Locale[]) {

@@ -2,6 +2,9 @@ import {
   SITE_URL,
   AppFileSchema,
   CURRENT_SCHEMA_VERSION,
+  MAX_DRAWN_ICON_CHARS,
+  MAX_DRAWN_ICON_PATHS,
+  MAX_DRAWN_ICONS,
   MAX_PAGE_BLOCKS,
   MAX_PAGES,
   MAX_TABLES,
@@ -222,7 +225,7 @@ This guide is for an AI assistant (Claude, ChatGPT or any other) that a person a
 - \`app.id\`: the same, at most 20 characters (for example \`"plants"\`).
 - **Every page, table, quick action and reminder id starts with the app id and a dash** (\`"plants-home"\`, \`"plants-care"\`). The person's phone already has pages such as \`home\`, \`toolbox\` and \`files\`; an id that is already taken stops the import. Block ids only need to be unique within their page; field ids within their table; option ids within their field.
 - \`app.bar\`: 1–5 entries, each \`"page:<page id>"\` of this file or \`"ai"\` (Tink, the in-app assistant; put it last). The first entry is the page the app opens on. Settings and other system screens are not allowed in an app's bar; the person reaches them from the main Tinkrum home.
-- \`app.icon\` and page/table icons: an icon name from the list in the reference, or one emoji.
+- \`app.icon\` and page/table icons: an icon name from the list in the reference, one emoji, or \`"my:<id>"\` of an icon you draw in the file's \`icons\` (see **Drawing icons**).
 - \`app.theme\` is a **complete** theme object. Required keys: ${requiredThemeKeys()
     .map((k) => `\`${k}\``)
     .join(', ')}. \`colors\` may be \`{}\`. See **Theme** in the reference.
@@ -234,6 +237,15 @@ This guide is for an AI assistant (Claude, ChatGPT or any other) that a person a
 - A \`single\` block shows 1–8 fields; for more, put a second \`single\` block below it.
 - A list cannot be sorted by a \`link\` field (\`source.sort\`, \`show.browse.sort\`). To sort by the linked entry's name, add a \`lookup\` field of that name and sort by it; grouping by a link field works.
 - Give every table that a page lists an empty state: a \`notice\` block with \`showIf: {"table": "<id>", "has": "none"}\` that says how to add the first entry.
+
+## Drawing icons
+
+When no listed icon fits and the person wants the app's own icons (a paw for pets), draw them in a top-level \`icons\` object next to \`pages\`: \`"icons": {"paw": {"paths": ["…"]}}\`, and write \`"icon": "my:paw"\` where it goes. Every \`"my:<id>"\` must be defined in \`icons\`, or the import stops.
+
+- Ids: lowercase letters, digits and "-", starting with a letter, at most 24 characters; at most ${MAX_DRAWN_ICONS} icons.
+- Canvas 24 by 24, (0,0) at the top left; 1–${MAX_DRAWN_ICON_PATHS} paths, at most ${MAX_DRAWN_ICON_CHARS} characters in all, starting with M; only the path commands M L H V C S Q T A Z and plain numbers (no exponents, no \`<svg>\`, styles or links).
+- Filled (even-odd: a shape inside another is a hole) or \`"stroke": true\` (lines 2 wide, round ends). One colour, taken from where it is used. One clear silhouette, about 2 units of margin; never a real brand's logo.
+- Examples: a drop \`{"paths": ["M12 3C9 7 6 10.5 6 14a6 6 0 0 0 12 0c0-3.5-3-7-6-11z"]}\`; a dumbbell \`{"paths": ["M6 8v8M18 8v8M3 10v4M21 10v4M6 12h12"], "stroke": true}\`.
 
 ## How to read the reference
 

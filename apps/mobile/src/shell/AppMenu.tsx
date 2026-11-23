@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 
 import { BottomSheet } from '../renderer/Overlays';
 import { t } from '../i18n';
+import { useDrawnIcons } from '../renderer/DrawnIcon';
 import { Icon } from '../renderer/Icon';
 import type { Palette } from '../renderer/theme';
 import { Button } from '../renderer/ui';
@@ -103,6 +104,8 @@ export function AppIconPicker({
 }) {
   const [emoji, setEmoji] = useState('');
   const [invalid, setInvalid] = useState(false);
+  // 配置里画出来的图标（D-new-extensibility-2）排在列表后面。
+  const drawn = Object.keys(useDrawnIcons()).map((id): IconValue => `my:${id}`);
   const applyEmoji = () => {
     const icon = emoji.trim();
     if (isEmoji(icon)) onPick(icon);
@@ -151,7 +154,7 @@ export function AppIconPicker({
       ) : null}
       <ScrollView style={styles.gridScroll} keyboardShouldPersistTaps="handled">
         <View style={styles.grid}>
-          {ICON_NAMES.map((name) => {
+          {[...ICON_NAMES, ...drawn].map((name) => {
             const selected = name === current;
             return (
               <Pressable

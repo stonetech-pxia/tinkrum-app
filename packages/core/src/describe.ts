@@ -129,7 +129,10 @@ const FIELD_TYPE_NAMES: Record<string, [string, string]> = Object.fromEntries(
   FIELDS.map((d) => [d.type, d.label]),
 );
 
-type ThemeTokenKey = Exclude<keyof Theme, 'primaryColor' | 'mode' | 'colors' | 'darkColors'>;
+type ThemeTokenKey = Exclude<
+  keyof Theme,
+  'primaryColor' | 'mode' | 'colors' | 'darkColors' | 'card'
+>;
 
 /** 主题 token 的名字和取值说明。 */
 function describeToken(key: ThemeTokenKey, value: unknown, locale: Locale): string {
@@ -1112,9 +1115,15 @@ const OP_DESCRIPTIONS: OpDescriptions = {
   },
   setTheme: (op, state) => {
     const { lines, ctx, appName, modeLabel, colorNames } = state;
+    // 画出来的图标（D-new-extensibility-2）：一个图标一行；图标库整个工作区一份，在 app 里改也一样说。
+    const iconLines = Object.entries(op.icons ?? {}).map(([id, icon]) =>
+      t(ctx.locale, icon ? 'describeDrawnIconSet' : 'describeDrawnIconRemoved', { id }),
+    );
 
     if (op.app !== undefined) {
-      lines.push(t(ctx.locale, 'appDescTheme', { v0: appName(op.app) }));
+      if (Object.keys(op).some((k) => k !== 'op' && k !== 'app' && k !== 'icons'))
+        lines.push(t(ctx.locale, 'appDescTheme', { v0: appName(op.app) }));
+      lines.push(...iconLines);
       return;
     }
     if (op.preset) {
@@ -1164,6 +1173,10 @@ const OP_DESCRIPTIONS: OpDescriptions = {
     ] as const) {
       if (op[key] !== undefined) lines.push(describeToken(key, op[key], ctx.locale));
     }
+    // 自定义卡片（D-new-extensibility-1）。
+    if (op.card) lines.push(t(ctx.locale, 'describeThemeCardSet'));
+    else if (op.card === null) lines.push(t(ctx.locale, 'describeThemeCardRemoved'));
+    lines.push(...iconLines);
     return;
   },
   setPackage: (op, state) => {

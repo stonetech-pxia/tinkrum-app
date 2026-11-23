@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { DrawnIconsPatchSchema } from './drawn-icons';
 import { THEME_PRESET_IDS } from './presets';
 import {
   AppBarTargetSchema,
@@ -19,6 +20,7 @@ import {
   PinSchema,
   QuickActionSchema,
   ReminderSchema,
+  ThemeCardSchema,
   ThemeSchema,
   WorkflowStepSchema,
   boundedText,
@@ -292,9 +294,19 @@ export const OpSchema = z.discriminatedUnion('op', [
       radius: ThemeSchema.shape.radius.optional(),
       density: ThemeSchema.shape.density.optional(),
       cardStyle: ThemeSchema.shape.cardStyle.optional(),
+      /**
+       * 卡片的边框和阴影（D-new-extensibility-1）；null 去掉。只改 cardStyle 不带 card 时也去掉，
+       * 选一种卡片样式就看到那种样式。
+       */
+      card: ThemeCardSchema.nullable().optional(),
       navStyle: ThemeSchema.shape.navStyle.optional(),
       backdrop: ThemeSchema.shape.backdrop,
       iconStyle: ThemeSchema.shape.iconStyle,
+      /**
+       * 图标库（D-new-extensibility-2）：写了的加上或换掉，null 去掉。整个工作区一份，写不写 app 都改它；
+       * preset、reset 不动它。
+       */
+      icons: DrawnIconsPatchSchema.optional(),
     })
     .refine(
       (o) => {

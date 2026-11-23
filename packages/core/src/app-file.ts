@@ -1,3 +1,4 @@
+import { drawnIconUses, renameDrawnIcons, type DrawnIcon } from './drawn-icons';
 import { clearFileRefs } from './file-refs';
 import { usesOf } from './file-uses';
 import { homeScreenOp } from './home-screen';
@@ -34,6 +35,8 @@ export interface AppFile {
   pages: Page[];
   tables: Collection[];
   tools: Tool[];
+  /** 内容用到的画出来的图标（D-new-extensibility-2）；没用到就不写。 */
+  icons?: Record<string, DrawnIcon>;
 }
 
 /** 写 App 文件。外层带「用到了什么」（D-556），读的版本能说出自己缺什么；它不是 App 的一部分，导入时不读进配置。 */
@@ -70,7 +73,7 @@ export function appFileOfApp(
         const { app: _app, ...rest } = item;
         return rest as T;
       });
-  return {
+  const content = {
     schemaVersion: config.schemaVersion,
     app: {
       id: app.id,
@@ -83,10 +86,24 @@ export function appFileOfApp(
     tables: own(clean.data.tables),
     tools: own(clean.tools),
   };
+  return { ...content, ...withIcons(iconsUsedBy(content, config.icons)) };
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** 内容用到的画出来的图标，从图标库里取（D-new-extensibility-2）；一个都没有返回空对象，调用的人不写这个键。 */
+function iconsUsedBy(
+  content: unknown,
+  library: WorkspaceConfig['icons'],
+): Record<string, DrawnIcon> {
+  const out: Record<string, DrawnIcon> = {};
+  for (const { id } of drawnIconUses(content)) if (library?.[id]) out[id] = library[id];
+  return out;
+}
+
+const withIcons = (icons: Record<string, DrawnIcon>) =>
+  Object.keys(icons).length > 0 ? { icons } : {};
 
 /** 借整份配置的外壳（只有 App 的这几样），走一遍迁移，再拆开。 */
 function wrap(file: AppFile): Record<string, unknown> {
@@ -112,8 +129,9 @@ export function readAppFile(text: string): AppFile | null {
     return null;
   }
   if (!isObject(data) || data.format !== APP_FILE_FORMAT) return null;
-  const { app, pages, tables, tools, schemaVersion } = data;
+  const { app, pages, tables, tools, schemaVersion, icons } = data;
   if (
+    (icons !== undefined && !isObject(icons)) ||
     !isObject(app) ||
     typeof app.id !== 'string' ||
     typeof app.name !== 'string' ||
@@ -181,8 +199,13 @@ export function appFileOps(
       new Set(config.tools.map((t) => t.id)),
     );
   if (clash) return { ok: false, error: clash };
+  const icons = importedIcons(file, config);
+  if (!icons.ok) return icons;
+  file = icons.file;
   const owner = mode === 'app' ? { app: id } : {};
   const ops: Op[] = [];
+  // 画出来的图标先加进图标库（D-new-extensibility-2）：后面的表、页面、快捷操作要用。
+  if (Object.keys(icons.add).length > 0) ops.push({ op: 'setTheme', icons: icons.add });
   if (mode === 'app')
     ops.push({
       op: 'addContainer',
@@ -237,6 +260,61 @@ export function appFileOps(
   }
   // 步数不设上限（D-554）：大小由配置的上限管，用的时候带 fromAppFile 走 prepareOps。
   return { ok: true, ops, name: file.app.name };
+}
+
+/**
+ * 文件里的图标怎么进图标库（D-new-extensibility-2）：内容用到的 my:<id> 文件里必须有；ID 已经在而且一样的直接用；
+ * 不一样的，工作区里别处已经没人用就换成文件里的（更新、恢复同一个 App 时就是这样），还有人用就给文件里的改名
+ * （-2、-3…），文件内容里的引用一起改。
+ */
+function importedIcons(
+  file: AppFile,
+  config: WorkspaceConfig,
+): { ok: true; file: AppFile; add: Record<string, DrawnIcon> } | { ok: false; error: string } {
+  const library = file.icons ?? {};
+  const content = { app: file.app, pages: file.pages, tables: file.tables, tools: file.tools };
+  const missing = drawnIconUses(content).filter((u) => !library[u.id]);
+  if (missing.length > 0)
+    return {
+      ok: false,
+      error: missing
+        .map((u) => `${u.where}: icon my:${u.id} is not defined in the file's icons`)
+        .join('; '),
+    };
+  const have = config.icons ?? {};
+  // 文件要接回去的表（同 ID）不算别人在用：它们本来就是这个 App 的。
+  const retaken = new Set(file.tables.map((t) => t.id));
+  const others = {
+    ...config,
+    data: { ...config.data, tables: config.data.tables.filter((t) => !retaken.has(t.id)) },
+  };
+  const used = new Set(drawnIconUses(others).map((u) => u.id));
+  const taken = new Set([...Object.keys(have), ...Object.keys(library)]);
+  const renames = new Map<string, string>();
+  const add: Record<string, DrawnIcon> = {};
+  for (const [iconId, icon] of Object.entries(library)) {
+    const existing = have[iconId];
+    if (existing && same(existing, icon)) continue;
+    if (!existing || !used.has(iconId)) {
+      add[iconId] = icon;
+      continue;
+    }
+    const to = freeIconId(iconId, taken);
+    taken.add(to);
+    renames.set(iconId, to);
+    add[to] = icon;
+  }
+  if (renames.size === 0) return { ok: true, file, add };
+  return { ok: true, file: { ...file, ...renameDrawnIcons(content, renames) }, add };
+}
+
+/** 图标 ID 撞了：加 -2、-3…，太长先截短（ID 最多 24 个字符）。 */
+function freeIconId(base: string, taken: ReadonlySet<string>): string {
+  for (let n = 2; ; n++) {
+    const suffix = `-${n}`;
+    const id = `${base.slice(0, 24 - suffix.length).replace(/-+$/, '')}${suffix}`;
+    if (!taken.has(id)) return id;
+  }
 }
 
 /**
@@ -491,7 +569,7 @@ export function appFileFromWorkspace(
     const { app: _app, ...rest } = item;
     return rest as T;
   };
-  return {
+  const content = {
     schemaVersion: config.schemaVersion,
     app: {
       id: meta.id,
@@ -506,4 +584,5 @@ export function appFileFromWorkspace(
       .filter((t) => t.package === undefined)
       .map((t) => strip(withId(t, map.tools))),
   };
+  return { ...content, ...withIcons(iconsUsedBy(content, config.icons)) };
 }

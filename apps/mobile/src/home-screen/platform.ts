@@ -1,4 +1,4 @@
-import type { IconValue } from '@morph/core';
+import type { DrawnIcon, IconValue } from '@morph/core';
 
 // 手机桌面（D-271）：长按 Morph 图标的菜单和 Android 桌面上单独的图标。App 里由本地模块 MorphShortcuts
 // 实现（native.ts），测试里换成假的。
@@ -8,6 +8,8 @@ export interface HomeScreenArt {
   icon: IconValue;
   background: string;
   foreground: string;
+  /** icon 是 my:<id> 时它的路径（D-new-extensibility-2）；图标库里没有就不写，只画底色。 */
+  drawn?: DrawnIcon;
 }
 
 export interface HomeScreenEntry {

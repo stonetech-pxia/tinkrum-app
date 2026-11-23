@@ -1,4 +1,4 @@
-import { homeScreenItems, type WorkspaceConfig } from '@morph/core';
+import { drawnIconId, homeScreenItems, type WorkspaceConfig } from '@morph/core';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 
@@ -15,11 +15,16 @@ import type { HomeScreenEntry, HomeScreenPlatform } from './platform';
 export function homeScreenEntries(config: WorkspaceConfig): HomeScreenEntry[] {
   return homeScreenItems(config).map((item) => {
     const symbol = iosSymbolName(item.icon);
+    // 画出来的图标（D-new-extensibility-2）带上路径，Android 桌面图标照着画。
+    const id = drawnIconId(item.icon);
+    const drawn = id !== null ? config.icons?.[id] : undefined;
     return {
       id: item.id,
       title: item.title,
       ...(symbol ? { symbol } : {}),
-      ...(item.colors ? { art: { icon: item.icon, ...item.colors } } : {}),
+      ...(item.colors
+        ? { art: { icon: item.icon, ...item.colors, ...(drawn ? { drawn } : {}) } }
+        : {}),
     };
   });
 }

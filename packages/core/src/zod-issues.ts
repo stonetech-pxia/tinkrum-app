@@ -100,7 +100,10 @@ const strings = (values: readonly unknown[]) => values.filter((v) => typeof v ==
 const looksLikeText = (value: string) =>
   /\s|[^\x00-\x7f]/.test(value) || /^[A-Z][a-z]*$/.test(value);
 const ID_RULE = 'lowercase letters, digits and -, starting with a letter';
-const ICON_MESSAGE = 'icon must be a listed icon name or a single emoji';
+const ICON_MESSAGES = new Set([
+  'icon must be a listed icon name or a single emoji',
+  'icon must be a listed icon name, a single emoji or my:<id> of a drawn icon',
+]);
 
 /**
  * 有文件原文时（检查别的 AI 写的 App 文件，D-597）：说出写的是什么、该怎么改。照着改不了的照旧（undefined）。
@@ -136,7 +139,7 @@ function withFix(line: Line, where: string, value: unknown): string | undefined 
     return `${line.message}; remove it, it does not belong here`;
   if (value === undefined || (typeof value === 'object' && value !== null)) return undefined;
   const guess =
-    line.message === ICON_MESSAGE && typeof value === 'string'
+    ICON_MESSAGES.has(line.message) && typeof value === 'string'
       ? closest(value, ICON_NAMES)
       : undefined;
   return `${line.message} (got ${show(value)}${guess ? `; did you mean ${show(guess)}?` : ''})`;

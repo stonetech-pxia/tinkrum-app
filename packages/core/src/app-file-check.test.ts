@@ -154,7 +154,7 @@ describe('checkAppFileText says how to fix it', () => {
     d.pages[1].blocks[1].source.sort.direction = 'descending';
     d.pages[1].icon = 'calendar-days';
     expect(problems(d)).toEqual([
-      'pages.1.icon: icon must be a listed icon name or a single emoji (got "calendar-days"; did you mean "calendar"?)',
+      'pages.1.icon: icon must be a listed icon name, a single emoji or my:<id> of a drawn icon (got "calendar-days"; did you mean "calendar"?)',
       'pages.1.blocks.1.source.sort.direction: "descending" is not allowed here; use one of "asc"|"desc" (did you mean "desc"?)',
     ]);
   });

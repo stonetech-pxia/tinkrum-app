@@ -7,6 +7,7 @@ import {
   type CheckProblem,
 } from './components/define';
 import { conditionProblems } from './conditions';
+import { drawnIconUses } from './drawn-icons';
 import { MULTIPLE_CHOICE_NOT_ONE } from './fields';
 import { entryFormProblems } from './entry-form';
 import { FILES_COLLECTION, FILES_TABLE } from './files-table';
@@ -115,6 +116,11 @@ export function validateWorkspace(
   for (const id of duplicates(config.tools.map((t) => t.id)))
     issue('duplicate', `quick action or reminder ${id}`);
   if (!pageIds.has(HOME_PAGE_ID)) issue('missing-home', 'home page is required');
+
+  // ---- 画出来的图标（D-new-extensibility-2）：用到的 my:<id> 必须在图标库里（底线 18）----
+  for (const use of drawnIconUses(config))
+    if (!config.icons?.[use.id])
+      issue('unknown-icon', `${use.where}: icon my:${use.id} is not in the icon library (icons)`);
 
   // ---- 导航与受保护元素（§5.1）----
   const entries = [...config.nav.bar, ...config.nav.floating];

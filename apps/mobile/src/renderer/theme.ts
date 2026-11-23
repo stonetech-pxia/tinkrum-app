@@ -2,12 +2,15 @@ import {
   AURORA_ALPHA,
   GLASS_OPACITY,
   backdropStops,
+  cardRoleColors,
   chromeStops,
+  customCardParts,
   isDark,
   mix,
   onAccent,
   resolveColors,
   resolveSurfaceColors,
+  rgba,
   type ComponentStyle,
   type ResolvedColors,
   type Theme,
@@ -49,11 +52,6 @@ const WEIGHTS: Record<FontRole, TextStyle['fontWeight']> = {
   body: '400',
   bodyMedium: '500',
   bodyBold: '700',
-};
-
-const rgba = (hex: string, alpha: number) => {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 };
 
 const SERIF = Platform.select({ ios: 'Georgia', default: 'serif' });
@@ -126,6 +124,10 @@ function backdropImage(theme: Theme, c: ResolvedColors): string | undefined {
   return undefined;
 }
 
+/** 金属卡片的渐变：上亮下暗、中段由亮转暗。 */
+const chromeImage = (top: string, mid: string, low: string, bottom: string) =>
+  `linear-gradient(180deg, ${top} 0%, ${mid} 42%, ${low} 60%, ${bottom} 100%)`;
+
 export function makePalette(theme: Theme, systemDark: boolean): Palette {
   const dark = isDark(theme, systemDark);
   const page = resolveColors(theme, dark);
@@ -173,6 +175,28 @@ function buildPalette(theme: Theme, colors: ResolvedColors, page: ResolvedColors
     font: (role, size) => ({ ...family(role), fontSize: Math.round(size * theme.fontScale) }),
     cardStyle: (background = colors.surface) => {
       const base: ViewStyle = { backgroundColor: background, borderRadius: radius };
+      if (theme.card) {
+        // 自定义边框和阴影（D-new-extensibility-1）：底色仍跟 cardStyle（毛玻璃的半透明底、金属的渐变），
+        // 边框和阴影全换成参数里的。
+        const roles = cardRoleColors(colors, page);
+        const parts = customCardParts(theme.card, (role) => roles[role]);
+        if (theme.cardStyle === 'glass')
+          return {
+            ...base,
+            backgroundColor: rgba(background, GLASS_OPACITY),
+            overflow: 'hidden',
+            ...parts,
+          };
+        if (theme.cardStyle === 'chrome') {
+          const [top, mid, low, bottom] = chromeStops(background, colors.dark);
+          return {
+            ...base,
+            backgroundImage: chromeImage(top, mid, low, bottom),
+            ...parts,
+          };
+        }
+        return { ...base, ...parts };
+      }
       if (theme.cardStyle === 'outline')
         return { ...base, borderWidth: 1, borderColor: colors.border };
       if (theme.cardStyle === 'flat') return base;
@@ -214,7 +238,7 @@ function buildPalette(theme: Theme, colors: ResolvedColors, page: ResolvedColors
         const [top, mid, low, bottom] = chromeStops(background, colors.dark);
         return {
           ...base,
-          backgroundImage: `linear-gradient(180deg, ${top} 0%, ${mid} 42%, ${low} 60%, ${bottom} 100%)`,
+          backgroundImage: chromeImage(top, mid, low, bottom),
           borderWidth: 1,
           borderColor: mix(background, '#000000', colors.dark ? 0.45 : 0.3),
           boxShadow: [

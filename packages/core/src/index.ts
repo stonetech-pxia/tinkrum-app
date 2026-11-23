@@ -27,6 +27,7 @@ export * from './grouping';
 export * from './grid-view';
 export * from './describe';
 export * from './desk';
+export * from './drawn-icons';
 export * from './habits';
 export * from './home-entry';
 export * from './home-screen';

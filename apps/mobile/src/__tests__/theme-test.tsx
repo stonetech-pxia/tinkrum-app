@@ -58,6 +58,54 @@ describe('card styles', () => {
   });
 });
 
+describe('custom card border and shadow (D-new-extensibility-1)', () => {
+  const custom: NonNullable<Theme['card']> = {
+    border: { width: 3, color: 'primary', opacity: 0.5 },
+    shadows: [{ x: 4, y: 4, blur: 0, color: 'text' }],
+  };
+
+  it('flat: the plain fill with only the given border and shadow', () => {
+    const style = card({ cardStyle: 'flat', primaryColor: '#22D3EE', card: custom });
+    expect(style).toEqual({
+      backgroundColor: '#FFFCF8',
+      borderRadius: DEFAULT_THEME.radius,
+      borderWidth: 3,
+      borderColor: 'rgba(34, 211, 238, 0.5)',
+      boxShadow: '4px 4px 0px rgba(42, 36, 32, 1)',
+    });
+  });
+
+  it('replaces the named style border and shadow, also the classic shadow props', () => {
+    const style = card({ cardStyle: 'shadow', card: { shadows: [custom.shadows![0]!] } });
+    expect(style).not.toHaveProperty('shadowRadius');
+    expect(style).not.toHaveProperty('elevation');
+    expect(style).not.toHaveProperty('borderWidth');
+    expect(card({ cardStyle: 'brutal', card: { border: custom.border } })).not.toHaveProperty(
+      'boxShadow',
+    );
+  });
+
+  it('glass keeps its translucent fill and clipping; chrome keeps its gradient', () => {
+    const glass = card({ cardStyle: 'glass', card: custom });
+    expect(String(glass.backgroundColor)).toMatch(/^rgba\(.*, 0\.4\)$/);
+    expect(glass).toMatchObject({ overflow: 'hidden', borderWidth: 3 });
+    expect(glass.borderColor).not.toContain('255, 255, 255');
+    const chrome = card({ cardStyle: 'chrome', colors: { surface: '#D9DEE5' }, card: custom });
+    expect(chrome.backgroundImage).toMatch(
+      /^linear-gradient\(180deg, #[0-9A-F]{6} 0%, #D9DEE5 42%/,
+    );
+    expect(chrome.boxShadow).toBe('4px 4px 0px rgba(42, 36, 32, 1)');
+  });
+
+  it('dark mode uses the same parameters with dark colors', () => {
+    const style = makePalette(
+      { ...DEFAULT_THEME, mode: 'dark', cardStyle: 'flat', card: custom },
+      false,
+    ).cardStyle();
+    expect(style.boxShadow).toBe('4px 4px 0px rgba(243, 236, 228, 1)');
+  });
+});
+
 describe('page backdrop', () => {
   it('plain themes keep a solid background', () => {
     const palette = makePalette(DEFAULT_THEME, false);

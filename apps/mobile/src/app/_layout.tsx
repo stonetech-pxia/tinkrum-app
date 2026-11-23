@@ -52,6 +52,7 @@ import {
 } from '@/reminders/useReminders';
 import { expoFilePlatform } from '@/runtime/expo-platform';
 import { closeButtonOption, stackScreenOptions } from '@/shell/header';
+import { DrawnIconsProvider } from '@/renderer/DrawnIcon';
 import { CLAY_FONTS, usePalette } from '@/renderer/theme';
 import { useIncomingShare } from '@/share/useIncomingShare';
 import { ToolDownloadsProvider } from '@/tool-download/context';
@@ -70,7 +71,7 @@ import {
   useAppTheme,
 } from '@/workspace/context';
 import { createNeedSender, createRemoteAIProvider } from '@/workspace/remote-ai';
-import { createWorkspaceStore, type WorkspaceStore } from '@/workspace/store';
+import { createWorkspaceStore, shownConfig, type WorkspaceStore } from '@/workspace/store';
 import { WidgetProvider } from '@/widgets/context';
 import { nativeWidgets } from '@/widgets/native';
 import { WidgetBridge } from '@/widgets/useWidgets';
@@ -168,8 +169,12 @@ function ThemedStack() {
   useReminderActionFeedback(onReminderAction);
   const palette = usePalette(theme);
   const closable = { presentation: 'modal', ...closeButtonOption(palette) } as const;
+  // 画出来的图标（D-new-extensibility-2）：正式版本和草稿里的都放进去，草稿开着时推入的页面画正式版本也有。
+  const savedIcons = useWorkspace((s) => s.config?.icons);
+  const shownIcons = useWorkspace((s) => shownConfig(s)?.icons);
+  const icons = useMemo(() => ({ ...savedIcons, ...shownIcons }), [savedIcons, shownIcons]);
   return (
-    <>
+    <DrawnIconsProvider icons={icons}>
       <StatusBar style={palette.dark ? 'light' : 'dark'} />
       {/* 手机桌面（D-271）：长按 Morph 图标的菜单跟着配置变；从菜单或桌面图标打开时直接开始那个快捷操作。 */}
       <HomeScreenBridge platform={nativeHomeScreen} />
@@ -236,7 +241,7 @@ function ThemedStack() {
       </Stack>
       {/* 草稿模式的聊天框只放一个（D-190）：外壳每改一步会重新挂载，推入的页面也要用它。 */}
       <DraftChatSheet />
-    </>
+    </DrawnIconsProvider>
   );
 }
 

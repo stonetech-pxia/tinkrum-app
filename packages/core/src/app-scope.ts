@@ -1,3 +1,4 @@
+import { drawnIconUses } from './drawn-icons';
 import type { Op } from './ops-schema';
 import type { Registry } from './registry';
 import { referenceProblems } from './reference-checks';
@@ -62,7 +63,7 @@ function withoutApp(config: WorkspaceConfig, appId: string): unknown {
     nav.apps = nav.apps.filter((a) => a.id !== appId);
     if (nav.apps.length === 0) delete nav.apps;
   }
-  return {
+  const rest = {
     ...config,
     nav,
     containers: {
@@ -72,6 +73,11 @@ function withoutApp(config: WorkspaceConfig, appId: string): unknown {
     data: { ...config.data, tables: config.data.tables.filter((t) => t.app !== appId) },
     tools: config.tools.filter((t) => t.app !== appId),
   };
+  // 图标库是整个工作区一份（D-new-extensibility-2）：app 里能加图标、改只有自己用的，别处用着的不能动。
+  const used = new Set(drawnIconUses(rest).map((u) => u.id));
+  const { icons, ...others } = rest;
+  const kept = Object.entries(icons ?? {}).filter(([id]) => used.has(id));
+  return kept.length > 0 ? { ...others, icons: Object.fromEntries(kept) } : others;
 }
 
 /** 只留这个 app 和主页的东西（其他 app 的页面、表、快捷操作、app 本身拿掉）。 */

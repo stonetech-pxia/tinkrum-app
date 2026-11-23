@@ -1,6 +1,14 @@
-import type { CustomIconName, IconName, IconValue, ToolIconName } from '@morph/core';
+import {
+  isDrawnIconRef,
+  type CustomIconName,
+  type IconName,
+  type IconValue,
+  type ToolIconName,
+} from '@morph/core';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { Image, Text } from 'react-native';
+
+import { DrawnIconView } from './DrawnIcon';
 
 // 图标白名单（core 的 ICON_NAMES）→ 系统图标：iOS 用 SF Symbols，Android 用 Material Symbols。
 
@@ -145,6 +153,8 @@ export function Icon({
       />
     );
   }
+  // 配置里画出来的图标（D-new-extensibility-2）：从图标库取路径，用 Skia 画。
+  if (isDrawnIconRef(name)) return <DrawnIconView name={name} size={size} color={color} />;
   if (name in CUSTOM_IMAGES) {
     return (
       <Image

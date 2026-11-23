@@ -9,7 +9,7 @@ import { applyOps } from './ops';
 import type { Registry, ToolDefinition } from './registry';
 import {
   IconSchema,
-  IconValueSchema,
+  ListedIconValueSchema,
   IdSchema,
   WorkflowStepSchema,
   type Locale,
@@ -110,7 +110,7 @@ export const ToolManifestSchema = z.strictObject({
       z.strictObject({
         id: IdSchema,
         name: localized(40),
-        icon: IconValueSchema.optional(),
+        icon: ListedIconValueSchema.optional(),
         steps: z.array(WorkflowStepSchema).min(1),
       }),
     )

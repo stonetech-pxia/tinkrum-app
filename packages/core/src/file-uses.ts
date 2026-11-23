@@ -1,4 +1,5 @@
 import { COMPONENTS, RECORD_LOOKS } from './components';
+import { isDrawnIconRef } from './drawn-icons';
 import { FIELDS } from './fields';
 import { parseFormula } from './formula';
 import type { Registry } from './registry';
@@ -72,6 +73,10 @@ export const USES_FEATURES = [
   'fieldRange',
   /** 记录块、数字、图表的 source.choice "page"：跟着页面上的一排选项（D-573）。 */
   'blocksFollowPageChoice',
+  /** 主题上的 card：卡片的边框和阴影用参数写（D-new-extensibility-1）。 */
+  'themeCard',
+  /** 画出来的图标：顶层的 icons，图标写 "my:<id>"（D-new-extensibility-2）。 */
+  'drawnIcons',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -191,6 +196,9 @@ export function usesOf(content: unknown): FileUses {
     }
     // 表上的 form（D-570）：有 fields 的那一层是表。
     if (Array.isArray(node.fields) && node.form !== undefined) found.features.add('entryForm');
+    // 主题上的 card（D-new-extensibility-1）：有 cardStyle 的那一层是主题。
+    if (typeof node.cardStyle === 'string' && node.card !== undefined)
+      found.features.add('themeCard');
     if (node.kind === 'reminder' && node.app !== undefined) found.features.add('reminderInApp');
     if (node.kind === 'reminder' && isObject(node.when)) {
       if (node.when.before !== undefined && node.when.minutes !== undefined)
@@ -200,12 +208,14 @@ export function usesOf(content: unknown): FileUses {
       if (node.when.every === 'month') found.features.add('reminderMonthly');
     }
     for (const [k, v] of Object.entries(node)) {
-      // 图标：白名单里的名字（emoji 不算，哪个版本都认）。
+      // 图标：白名单里的名字（emoji 不算，哪个版本都认）；画出来的 my:<id> 算一项功能，不算图标名。
       if (k === 'icon' && typeof v === 'string' && ICON_NAME.test(v)) found.icons.add(v);
+      if (k === 'icon' && isDrawnIconRef(v)) found.features.add('drawnIcons');
       walk(v, k);
     }
   };
   walk(content, null);
+  if (isObject(content) && isObject(content.icons)) found.features.add('drawnIcons');
   const out: FileUses = {};
   for (const [k, set] of Object.entries(found))
     if (set.size > 0) out[k as keyof FileUses] = [...set].sort();

@@ -8,6 +8,7 @@ import {
   type ComponentOf,
 } from './components';
 import { DeskLayoutSchema } from './desk/layout';
+import { DrawnIconsSchema } from './drawn-icons';
 import { RecordToolSchema } from './record-ops-schema';
 import {
   BackdropSchema,
@@ -306,6 +307,8 @@ export const WorkspaceConfigSchema = z.strictObject({
   containers: ContainersSchema,
   tools: ToolsSchema,
   packages: z.array(PackageSchema),
+  /** 画出来的图标（D-new-extensibility-2）：用的地方写 "my:<id>"。空的不存。 */
+  icons: DrawnIconsSchema.optional(),
 });
 type ParsedConfig = z.infer<typeof WorkspaceConfigSchema>;
 export type WorkspaceConfig = Omit<ParsedConfig, 'containers'> & {

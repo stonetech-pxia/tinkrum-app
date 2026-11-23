@@ -1,5 +1,5 @@
 import type { Theme } from './schema';
-import type { Backdrop, ThemeColors } from './schema-base';
+import type { Backdrop, CardColorRole, ThemeCard, ThemeColors } from './schema-base';
 
 // 默认风格「Clay」（来自 Docudis 的设计 token：沙色背景、奶油卡片、陶土橙主色、鼠尾草绿次色），
 // 以及根据主题计算最终配色的纯函数。App 渲染和校验器（对比度检查）共用这里的结果。
@@ -288,6 +288,60 @@ export function chromeStops(base: string, dark: boolean): [string, string, strin
     mix(base, '#000000', dark ? 0.25 : 0.14),
     mix(base, '#FFFFFF', dark ? 0.1 : 0.35),
   ];
+}
+
+/** #RRGGBB 加不透明度 → CSS 的 rgba(...)。 */
+export function rgba(hex: string, alpha: number): string {
+  const [r, g, b] = rgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * 自定义卡片里的颜色角色 → 这个模式下的颜色（D-new-extensibility-1）。colors 是卡片这份配色，page 是页面那份：
+ * text 取页面上的文字色（和新粗野的边框、硬阴影一样），border / shadow 取卡片配色的分隔线色和阴影色。
+ */
+export function cardRoleColors(
+  colors: ResolvedColors,
+  page: ResolvedColors,
+): Record<CardColorRole, string> {
+  return {
+    text: page.text,
+    primary: colors.primary,
+    secondary: colors.secondary,
+    tertiary: colors.tertiary,
+    border: colors.border,
+    shadow: colors.shadow,
+    white: '#FFFFFF',
+    black: '#000000',
+  };
+}
+
+/** 自定义卡片的边框和阴影（D-new-extensibility-1）：渲染器把它盖在 cardStyle 的底色上。 */
+export interface CardParts {
+  borderWidth?: number;
+  borderColor?: string;
+  /** CSS box-shadow，几层用逗号连起来。 */
+  boxShadow?: string;
+}
+
+export function customCardParts(
+  card: ThemeCard,
+  color: (role: CardColorRole) => string,
+): CardParts {
+  const parts: CardParts = {};
+  if (card.border) {
+    parts.borderWidth = card.border.width;
+    parts.borderColor = rgba(color(card.border.color), card.border.opacity ?? 1);
+  }
+  if (card.shadows) {
+    parts.boxShadow = card.shadows
+      .map(
+        (s) =>
+          `${s.inset ? 'inset ' : ''}${s.x}px ${s.y}px ${s.blur}px ${rgba(color(s.color), s.opacity ?? 1)}`,
+      )
+      .join(', ');
+  }
+  return parts;
 }
 
 export const MIN_TEXT_CONTRAST = 4.5;

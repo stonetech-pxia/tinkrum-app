@@ -20,12 +20,18 @@ function newQuickActionIds(ops: readonly Op[]): Set<string> {
   );
 }
 
+/** 只加、换、去画出来的图标的 setTheme（D-new-extensibility-2）：哪边都不算，跟着这一批里的别的修改走。 */
+const onlyIcons = (op: Op): boolean =>
+  op.op === 'setTheme' && Object.keys(op).every((k) => k === 'op' || k === 'app' || k === 'icons');
+
 /**
  * 是不是功能类操作（ops-schema.ts 的 isFunctionOp：数据、独立工具、工具包、手机桌面）。
- * 新快捷操作的运行块（look action）跟着它一起应用：不然做好了却找不到。
+ * 新快捷操作的运行块（look action）跟着它一起应用：不然做好了却找不到。只改图标库的 setTheme 在有功能操作时
+ * 跟着功能（表、快捷操作的图标要用它），没有时是外观。
  */
-function goesWithFunction(op: Op, added: ReadonlySet<string>): boolean {
+function goesWithFunction(op: Op, added: ReadonlySet<string>, withFunction: boolean): boolean {
   if (isFunctionOp(op)) return true;
+  if (onlyIcons(op)) return withFunction;
   if (op.op !== 'addContainer' || op.block?.look !== 'action') return false;
   const use = op.block.tools[0];
   return use !== undefined && 'tool' in use && added.has(use.tool);
@@ -34,8 +40,10 @@ function goesWithFunction(op: Op, added: ReadonlySet<string>): boolean {
 /** 把一批操作分成功能和外观两部分，各自保持原来的顺序。 */
 export function splitOps(ops: readonly Op[]): { function: Op[]; look: Op[] } {
   const added = newQuickActionIds(ops);
+  const withFunction = ops.some(isFunctionOp);
   const result: { function: Op[]; look: Op[] } = { function: [], look: [] };
-  for (const op of ops) result[goesWithFunction(op, added) ? 'function' : 'look'].push(op);
+  for (const op of ops)
+    result[goesWithFunction(op, added, withFunction) ? 'function' : 'look'].push(op);
   return result;
 }
 
@@ -95,7 +103,7 @@ export function splitDraftOnlyOps(
     if (applied.ok) {
       config = applied.config;
       kept.push(op);
-    } else if (goesWithFunction(op, added)) return null;
+    } else if (goesWithFunction(op, added, true)) return null;
     else skipped.push(op);
   }
   return skipped.length > 0 ? { kept, skipped } : null;

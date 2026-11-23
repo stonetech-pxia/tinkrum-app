@@ -101,7 +101,7 @@ describe('validation of rich content', () => {
     bad.containers.pages[0].blocks.at(-2).show.text = '[点我](http://evil.example)';
     bad.containers.pages[0].icon = '房子';
     expect(issues(bad)).toEqual([
-      'containers.pages.0.icon: icon must be a listed icon name or a single emoji',
+      'containers.pages.0.icon: icon must be a listed icon name, a single emoji or my:<id> of a drawn icon',
       'containers.pages.0.blocks.3.show.text: links must be https:// or mailto: addresses',
     ]);
   });
