@@ -137,7 +137,12 @@ export interface LocalSteps {
   };
   /** 放进已有的记录（D-443）：从这张表现有的记录里选一条（只显示每条的标题）。取消返回 null。 */
   recordPick: {
-    in: { collection: Collection; records: DataRecord[] };
+    in: {
+      collection: Collection;
+      records: DataRecord[];
+      /** 只是选一条（记录填入模板），不是放进它：确定键写「选择」。 */
+      select?: boolean;
+    };
     out: { recordId: string };
   };
   /**

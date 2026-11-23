@@ -1388,6 +1388,7 @@ export const zh: MessageTable = {
   similarRecordBack: '回到表单',
   similarRecordSave: '仍然保存',
   recordPickChoose: '放进这条记录',
+  recordPickSelect: '选择',
   recordPickSearch: '搜索记录',
   recordPickNone: '没有匹配的记录。',
   html_Total_08322: '合计',

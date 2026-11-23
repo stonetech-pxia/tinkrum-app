@@ -32,7 +32,11 @@ export const fillRecord: Impl = async (input, params, ctx) => {
   let record = input.records[0]!;
   // records 仍是原有的类型；多条时由用户亲手选一条，不在配置上拒绝能串的动作。
   if (input.records.length > 1) {
-    const chosen = await ctx.services.ui.open('recordPick', { collection, records: input.records });
+    const chosen = await ctx.services.ui.open('recordPick', {
+      collection,
+      records: input.records,
+      select: true,
+    });
     if (!chosen) throw new RunCancelled();
     const selected = input.records.find((r) => r.id === chosen.recordId);
     if (!selected) throw new RunError('invalidWorkflow');
@@ -67,6 +71,7 @@ export const fillRecord: Impl = async (input, params, ctx) => {
     const chosen = await ctx.services.ui.open('recordPick', {
       collection: templates,
       records: candidates,
+      select: true,
     });
     if (!chosen) throw new RunCancelled();
     const selected = candidates.find((r) => r.id === chosen.recordId);

@@ -1470,6 +1470,7 @@ export const en = {
   similarRecordBack: 'Back to the form',
   similarRecordSave: 'Save anyway',
   recordPickChoose: 'Add to this entry',
+  recordPickSelect: 'Select',
   recordPickSearch: 'Search entries',
   recordPickNone: 'No entry matches.',
   html_Total_08322: 'Total',

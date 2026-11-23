@@ -1543,6 +1543,7 @@ export const fr: MessageTable = {
   similarRecordBack: 'Retour au formulaire',
   similarRecordSave: 'Enregistrer quand même',
   recordPickChoose: 'Ajouter à cette entrée',
+  recordPickSelect: 'Choisir',
   recordPickSearch: 'Rechercher une entrée',
   recordPickNone: 'Aucune entrée ne correspond.',
   html_Total_08322: 'Total',
