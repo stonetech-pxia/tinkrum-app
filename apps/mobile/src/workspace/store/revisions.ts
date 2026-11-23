@@ -6,6 +6,7 @@ import {
   migrateWorkspace,
   type Op,
   PlanSchema,
+  keepChosenFiles,
   preparePreset,
   prepareOps,
   prepareSnapshot,
@@ -148,13 +149,19 @@ export function createRevisions(
   }
 
   /** 换成一个保存的预设（D-410）：和恢复历史版本同一个流程，先预览，确认后生成新版本，能撤销。 */
-  async function presetProposal(presetId: string): Promise<ProposeResult> {
+  async function presetProposal(
+    presetId: string,
+    options?: { keepFiles?: boolean },
+  ): Promise<ProposeResult> {
     const preset = await repo.getPreset(presetId);
     if (!preset) return { kind: 'invalid', issues: [msg('presetGone')] };
-    return configProposal(preset.config, preset.name, `preset ${presetId}`, {
-      kind: 'preset',
-      presetId,
-    });
+    return configProposal(
+      preset.config,
+      preset.name,
+      `preset ${presetId}`,
+      { kind: 'preset', presetId },
+      options?.keepFiles === true,
+    );
   }
 
   async function configProposal(
@@ -162,6 +169,7 @@ export function createRevisions(
     name: string,
     input: string,
     plan: Record<string, unknown>,
+    keepFiles = false,
   ): Promise<ProposeResult> {
     const { config, head } = get();
     if (!config || !head) throw new Error('workspace not loaded');
@@ -178,11 +186,14 @@ export function createRevisions(
       });
       return { kind: 'invalid', issues: prepared.issues };
     }
+    // 整套设置从别的 AI App 交回来：文件引用在发出去时清掉了，用户自己选的文件放回同一个位置（底线 3 不变）。
+    // 从预设列表换预设照旧清空（D-410）。
+    const after = keepFiles ? keepChosenFiles(config, prepared.after) : prepared.after;
     return recordPreview(input, plan, head, {
       kind: 'restore',
       before: config,
-      after: prepared.after,
-      lines: describePresetApply(config, prepared.after, name, { registry, locale }),
+      after,
+      lines: describePresetApply(config, after, name, { registry, locale }),
       source: 'restore',
       summary: msg('presetApplySummary', { name }),
       focusPageId: 'home',

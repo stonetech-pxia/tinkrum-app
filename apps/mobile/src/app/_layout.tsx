@@ -42,6 +42,8 @@ import { expoBridgeFiles, expoPackStore, expoSha256 } from '@/packs/expo-pack-fs
 import { PackHostProvider } from '@/packs/PackHost';
 import { rescueActions } from '@/rescue/actions';
 import { HEALTHY_AFTER_MS, markHealthy } from '@/rescue/attempts';
+import { attachReturnStore } from '@/ai/return';
+import { expoReturnStore } from '@/ai/expo-return';
 import { expoAttemptStore } from '@/rescue/expo-attempts';
 import { RescueScreen } from '@/rescue/RescueScreen';
 import { onReminderAction, reminders } from '@/reminders/background';
@@ -335,6 +337,12 @@ export default function RootLayout() {
       setRuntime(booted);
     })().catch((e) => setError(String(e)));
   }, [bootTry]);
+
+  // 上次交给别的 AI App 后留下的「等结果」标记（只读文件，不写）：Android 在用户离开时把进程杀掉也不丢。
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    attachReturnStore(expoReturnStore);
+  }, []);
 
   // 主页正常显示了一会儿：这次启动算成功，启动兜底从零数起（体检 6.6）。
   const ready = Boolean(runtime) && (fontsLoaded || Boolean(fontError));

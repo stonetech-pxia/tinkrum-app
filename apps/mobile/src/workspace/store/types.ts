@@ -312,7 +312,7 @@ export interface WorkspaceState {
   propose(input: string, planner?: AIProvider, about?: PlanAbout): Promise<ProposeResult>;
   proposeRestore(revisionId: number): Promise<ProposeResult>;
   /** 换成一个保存的预设（D-410）：和恢复历史版本一样先预览，确认才生效，能撤销。 */
-  proposePreset(presetId: string): Promise<ProposeResult>;
+  proposePreset(presetId: string, options?: { keepFiles?: boolean }): Promise<ProposeResult>;
   /** 把当前的 App 存成预设（D-410）：不带记录和文件引用，不产生新版本。 */
   savePreset(name: string): Promise<SavePresetResult>;
   /**

@@ -72,6 +72,51 @@ export function clearFileRefs(config: WorkspaceConfig): WorkspaceConfig {
 }
 
 /**
+ * 整套设置交回来后（D-new-codex-review-1）：发出去时每一处文件引用都清掉了（底线 3），换回来的配置里
+ * 这些位置是空的。同一处（同一个块的同一个位置、同一个页面背景）在当前配置里原来有用户自己选的文件、
+ * 而交回来的配置里是空的，就把那个文件放回去：不新增任何文件引用（newFileRefs 为空），
+ * AI 既不能选文件，也不能换成另一个文件；原来没有的、已经有别的值的、原来指向不止一个文件的，都不动。
+ */
+export function keepChosenFiles(before: WorkspaceConfig, after: WorkspaceConfig): WorkspaceConfig {
+  const old = new Map<string, FileRef>();
+  const ambiguous = new Set<string>();
+  for (const r of fileRefs(before)) {
+    if (old.has(r.place) && old.get(r.place)!.id !== r.id) ambiguous.add(r.place);
+    old.set(r.place, r);
+  }
+  for (const place of ambiguous) old.delete(place);
+  if (old.size === 0) return after;
+  const copy = JSON.parse(JSON.stringify(after)) as WorkspaceConfig;
+  const roots = new Map<string, unknown>();
+  for (const page of copy.containers.pages) {
+    roots.set(`page:${page.id}`, page);
+    for (const c of allComponents(page)) {
+      const own: Component = childrenOf(c).length > 0 ? ({ ...c, children: [] } as Component) : c;
+      if (!roots.has(`block:${c.id}`)) roots.set(`block:${c.id}`, { own, original: c });
+    }
+  }
+  for (const [place, ref] of old) {
+    const m = /^(page:[^.]+|block:[^.]+)(\..*)$/.exec(place);
+    if (!m) continue;
+    const root = roots.get(m[1]!);
+    if (!root) continue;
+    // 块：路径从块本身起，children 不在其中（分组的子块单独算）。
+    let node: unknown = m[1]!.startsWith('block:')
+      ? (root as { original: unknown }).original
+      : root;
+    const path = m[2]!.slice(1).split('.');
+    const key = path.pop()!;
+    for (const seg of path) {
+      node = node && typeof node === 'object' ? (node as Record<string, unknown>)[seg] : undefined;
+    }
+    if (!node || typeof node !== 'object') continue;
+    const holder = node as Record<string, unknown>;
+    if (holder[key] === undefined || holder[key] === null) holder[key] = ref.id;
+  }
+  return copy;
+}
+
+/**
  * AI 把占位符原样写回来时（例如整块重写 opens），换回修改前同一处的文件 ID。同一处原来没有文件、
  * 或有不止一个，就留着占位符（后面的检查会拒绝）。
  */

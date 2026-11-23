@@ -940,3 +940,28 @@ describe('import a preset from a file', () => {
     expect(await repo.listPresets()).toEqual([]);
   });
 });
+
+it('a whole setup coming back from another AI keeps the user’s own pictures in place; the list still empties them', async () => {
+  const { repo, store } = await app();
+  // 整套设置发出去时文件引用清掉了（存成预设就是这样）；换回来时，同一个位置原来用户选的文件放回去。
+  await repo.insertPreset({
+    id: 'fromai01',
+    name: 'AI 改好的',
+    createdAt: 5,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    config: {
+      ...store.getState().config!,
+      theme: { ...store.getState().config!.theme, radius: 8 },
+    },
+  });
+  const keep = await store.getState().proposePreset('fromai01', { keepFiles: true });
+  expect(keep.kind).toBe('preview');
+  expect(JSON.stringify(store.getState().proposal!.after)).toContain(FILE);
+  expect(store.getState().proposal!.after.theme.radius).toBe(8);
+  await store.getState().cancel();
+  // 从预设列表换预设：照旧清空（D-410）。
+  const list = await store.getState().proposePreset('fromai01');
+  expect(list.kind).toBe('preview');
+  expect(JSON.stringify(store.getState().proposal!.after)).not.toContain(FILE);
+  await store.getState().cancel();
+});

@@ -37,7 +37,7 @@ export function useAiHandoff() {
       });
     } catch {
       if (useAiReturn.getState().pending?.id === pending.id)
-        useAiReturn.setState({ pending: previous });
+        useAiReturn.getState().restore(previous);
       Alert.alert(t(locale, 'presetsShareToAi'), t(locale, 'handoffFailed'));
     }
   };

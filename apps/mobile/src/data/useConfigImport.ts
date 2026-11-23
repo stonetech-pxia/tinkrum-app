@@ -101,7 +101,8 @@ export function useConfigImport(previewPreset = false) {
       Alert.alert(title, t(locale, 'presetsFull', { max: MAX_SAVED_PRESETS }));
     else if (result.kind === 'saved') {
       useAiReturn.getState().dismiss(pending?.id);
-      if (previewPreset) await apply(result.preset);
+      // 整套设置从别的 AI App 交回来（点了卡片、打开链接，或刚交出去一套设置）：直接预览，用户选的图片留在原处。
+      if (previewPreset || pending?.scope === 'setup') await apply(result.preset, true);
     }
   }
 
@@ -245,8 +246,8 @@ export function useConfigImport(previewPreset = false) {
     );
   }
 
-  async function apply(preset: SavedPreset) {
-    const result = await proposePreset(preset.id);
+  async function apply(preset: SavedPreset, fromAi = false) {
+    const result = await proposePreset(preset.id, { keepFiles: fromAi });
     if (result.kind !== 'preview') {
       Alert.alert(
         t(locale, 'invalidPlan'),

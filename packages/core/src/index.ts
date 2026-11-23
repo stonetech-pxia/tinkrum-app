@@ -102,6 +102,7 @@ export * from './prefill';
 export * from './config-file';
 export * from './file-uses';
 export * from './saved-presets';
+export { keepChosenFiles } from './file-refs';
 export * from './theme';
 export * from './tools';
 export * from './tools/io';
