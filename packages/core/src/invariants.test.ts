@@ -1896,6 +1896,7 @@ describe('底线 18：配置永远自洽', () => {
     );
     expect(built.ok).toBe(true);
     if (!built.ok) return;
+    const outcomes: Record<string, string> = {};
     for (const tableId of ['a', 'b'])
       for (const field of [undefined, 'n', 'date', 'end', 'cat']) {
         const result = prepareOps(
@@ -1903,8 +1904,27 @@ describe('底线 18：配置永远自洽', () => {
           [{ op: 'removeData', table: tableId, ...(field ? { field } : {}) }],
           ctx,
         );
-        if (result.ok) expect(danglingRefs(result.after)).toEqual([]);
+        outcomes[`${tableId}${field ? `.${field}` : ''}`] = result.ok ? 'cleaned' : 'refused';
+        if (result.ok) {
+          expect(danglingRefs(result.after)).toEqual([]);
+        } else {
+          // 拒绝时要说清是哪个块在用它，不能因为别的原因被拒而蒙混过关。
+          expect(result.issues.join('\n')).toMatch(/calc|split|span|sum|block|used|uses/i);
+        }
       }
+    // 确定的结果：删表整个清理（连同用它的块），删被引用的字段一律拒绝，没被任何块引用的 b.end 清理。
+    expect(outcomes).toEqual({
+      a: 'cleaned',
+      b: 'cleaned',
+      'a.n': 'refused',
+      'a.date': 'refused',
+      'a.end': 'refused',
+      'a.cat': 'refused',
+      'b.n': 'refused',
+      'b.date': 'refused',
+      'b.cat': 'refused',
+      'b.end': 'cleaned',
+    });
   });
 
   it('every frozen config starts without a dangling reference (the checker itself)', () => {

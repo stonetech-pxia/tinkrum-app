@@ -137,4 +137,18 @@ describe('agent guide', () => {
     const guide = buildAgentGuide(registry, example);
     expect(guide).toContain('https://tinkrum.stonetech.dev/assets/agent/tinkrum-app-rules.md');
   });
+
+  it('the rules a look doc cites for what an app can do are in the rules file', async () => {
+    // 外部 AI 看不到的规则会让它不知道某个写法（D-604）：登记表里的「(rule N)」都要在规则文件或动作目录里。
+    const guide = await buildAgentGuide(registry, example);
+    const given = new Set<number>();
+    for (const doc of [buildRulesDoc(registry), buildActionCatalog(registry)])
+      for (const line of doc.split('\n')) {
+        const n = /^(\d+)\. /.exec(line);
+        if (n) given.add(Number(n[1]));
+      }
+    // 讲 Tink 对话或整台手机的规则不放；指南里说看不到就忽略。这里只查本次新增的汇总类写法。
+    for (const n of [77, 78, 79]) expect(given.has(n)).toBe(true);
+    expect(guide).toContain('rule 78');
+  });
 });
