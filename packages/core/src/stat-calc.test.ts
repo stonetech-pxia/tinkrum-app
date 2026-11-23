@@ -183,3 +183,22 @@ it('describes formulas with table and field names instead of internal total ids'
     expect(lines).toContain('Earnings');
   }
 });
+
+it('formats tiny finite formula results in every language without losing the computed value', async () => {
+  const { calculatedText } = await import('./stat-calc');
+  for (const locale of ['en', 'zh', 'fr'] as const) {
+    expect(calculatedText(1e-9, { ...calc, with: [...calc.with], as: 'number' }, locale)).toBe(
+      locale === 'fr' ? '0' : '0.0000',
+    );
+    expect(calculatedText(1e-10, { ...calc, with: [...calc.with], as: 'percent' }, locale)).toBe(
+      locale === 'fr' ? '0 %' : '0.0000%',
+    );
+  }
+  const own = {
+    ...calc,
+    formula: '{total} / {income} / 1000000000',
+    with: [...calc.with],
+    as: 'number',
+  };
+  expect(readNumber(source({ calc: own }), ctx)?.value).toBeGreaterThan(0);
+});

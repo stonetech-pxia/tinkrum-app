@@ -100,7 +100,11 @@ export function formatNumber(n: number, decimals?: number, locale: Locale = 'en'
       maximumFractionDigits: decimals ?? 4,
     }).format(n);
   if (decimals !== undefined) return groupThousands(n, decimals);
-  return groupThousands(n, Number.isInteger(n) ? 0 : Math.min(4, String(n).split('.')[1]!.length));
+  // 科学计数法可能没有小数点，仍按最多四位显示；数值本身不变。
+  return groupThousands(
+    n,
+    Number.isInteger(n) ? 0 : Math.min(4, String(n).split('.')[1]?.length ?? 4),
+  );
 }
 
 /**
