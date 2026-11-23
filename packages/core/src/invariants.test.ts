@@ -787,29 +787,36 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     ]);
   });
 
-  // D-609：预设页把给别的 AI 的提示词交给系统分享面板（固定的话和两个网址，不带数据），用户挑 App、点发送。
+  // D-new-send-to-ai-simplify-1：预设页、AI 页共用主动分享入口；原生接口不在时才走系统文字分享。
   // D-611：交给别的 AI App 改一个 App 时，没有原生分享（Expo Go）的退路也只发文字（提示词和 App 文件）。
   // 文件、记录的分享走快捷操作的 out.share 和本地模块，不用 react-native 的 Share。
   // D-621：启动兜底页把错误信息（版本号和错误文字，用户先在页面上看得到）交给系统分享面板，用户点了、自己挑发给谁；
   // 创始人 2026-11-22 选了这种做法，不做自动上报。
-  it('only the presets page, the hand-off fallback and the rescue page hand text to the system share sheet', () => {
+  it('only the hand-off fallback and the rescue page hand text to the system share sheet', () => {
     const sharers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
       .filter((path) => /\bShare\.share\b/.test(readFileSync(path, 'utf8')))
       .map((path) => relative(REPO, path));
     expect(sharers.sort()).toEqual([
-      join('apps', 'mobile', 'src', 'app', 'presets.tsx'),
       join('apps', 'mobile', 'src', 'rescue', 'actions.ts'),
       join('apps', 'mobile', 'src', 'runtime', 'expo-platform.ts'),
     ]);
   });
 
-  // D-611：把一个 App 的文件（只有结构，文件引用清空）和提示词交给别的 AI App，只有 AI 页上用户点了按钮才做。
-  it('only the AI page hands an app to another AI app', () => {
+  // D-new-send-to-ai-simplify-1：只有这一个共用函数调用分享平台，用户点击 AI 页或预设页的按钮才调用它。
+  it('only the explicit handoff helper hands structure to another AI app', () => {
     const callers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
       .filter((path) => /\.shareWithAi\(|\.shareFilesWithText\b/.test(readFileSync(path, 'utf8')))
       .map((path) => relative(REPO, path));
     expect(callers.sort()).toEqual([
+      join('apps', 'mobile', 'src', 'ai', 'useAiHandoff.ts'),
       join('apps', 'mobile', 'src', 'runtime', 'expo-platform.ts'),
+    ]);
+    const entries = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
+      .filter((path) => /\buseAiHandoff\(/.test(readFileSync(path, 'utf8')))
+      .map((path) => relative(REPO, path));
+    expect(entries.sort()).toEqual([
+      join('apps', 'mobile', 'src', 'ai', 'useAiHandoff.ts'),
+      join('apps', 'mobile', 'src', 'app', 'presets.tsx'),
       join('apps', 'mobile', 'src', 'shell', 'ChangeScreen.tsx'),
     ]);
   });

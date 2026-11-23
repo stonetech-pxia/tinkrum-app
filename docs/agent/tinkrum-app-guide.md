@@ -74,13 +74,17 @@ Ignore what the reference says about plans, rejections, notes, drafts, earlier r
 
 ## Changing an existing file
 
-The person may send you the app they already use (Tinkrum's AI page has "Change it with another AI app", which attaches the app file and often the checker) and ask you to change it. Their entries are not in the file, but they are linked to its ids, so:
+The person may send an existing file to change. Entries stay on the phone, linked to ids:
 
 - **Keep every id that is already there**: the app, tables, fields, choice options, pages, blocks, quick actions and reminders. Add new things with new ids. A changed id is a new thing: the old table's entries stay on the phone but no longer show in this app.
 - Do not remove a table, a field or a choice option unless the person asks. Their entries keep the values, hidden.
 - A field's type can change only between `number` and `money`, or between `text` and `note`. For any other change (text to date, choice to number…), add a new field with a new id and leave the old one, or remove it only if the person asks.
 - When the message says which page the person came from, a request that does not name a place ("make the title bigger", "add a button") is about that page.
-- Change only what was asked; keep the rest of the file as it is, and give back the **whole** file. When the person pastes it in Tinkrum, Tinkrum sees it is the same app and offers to update it; the update can be undone.
+- Change only what was asked; return the **whole** file. Tinkrum offers to update the same app by id, with undo.
+
+## Whole setups and returning files
+
+A `morph-app-config` file wraps the whole workspace in `config`. Keep its wrapper, ids and unrequested parts; do not extract a sub-app. The checker accepts both formats. After OK, put its exact `Open in Tinkrum` URL first as a clickable link; never build or shorten it. Also return the whole JSON block. Tinkrum previews before applying.
 
 ## A complete example
 

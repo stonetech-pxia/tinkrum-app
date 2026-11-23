@@ -447,8 +447,27 @@ export const zh: MessageTable = {
   presetsImport: '从文件导入',
   presetsPaste: '从剪贴板粘贴',
   presetsShareToAi: '把说明发给 AI App',
-  presetsShareToAiPrompt:
-    '开始之前，请完整读完这两个网页。直接打开链接，不要用搜索结果或缓存的旧版：\n1. {guide}\n2. {patterns}\n\n然后帮我做一个 Tinkrum App 文件。先问我想记录什么、做什么。再用一句话告诉我你从哪个模式开始，最后把整个文件放在一个 json 代码块里给我。',
+  handoffReadAttached: '开始前，请完整阅读附件 tinkrum-app-guide.md 和 tinkrum-app-patterns.md。',
+  handoffNew:
+    '帮我做一个新的 Tinkrum App 文件。先用一句话说从哪个模式开始，再把完整文件放在一个 json 代码块里给我。',
+  handoffSetup:
+    '我想修改整份 Tinkrum 设置，包括主页和所有 App。请返回完整的 morph-app-config 文件，保留原来的格式和版本。',
+  handoffSetupAttached: '附件是我的整份 Tinkrum 设置（{file}）。',
+  handoffSetupInline: '我的整份 Tinkrum 设置在这条消息的最后。',
+  handoffRequest: '我想要：{request}\n\n请照这个要求做；不清楚的地方先问我。',
+  handoffAskNew: '先问我想记录什么、做什么。',
+  handoffLink:
+    '把检查器输出的 “Open in Tinkrum” 链接作为可点击的链接放在回答最上面。同时把完整文件放在一个 json 代码块里给我。',
+  handoffNewButton: '交给别的 AI App 做新 App',
+  handoffSetupButton: '交给别的 AI App 改整个 Tinkrum',
+  handoffPaste: '粘贴 AI 改好的 App',
+  handoffPasteHint: '在 AI 里复制完整文件，再粘贴到这里查看改动。',
+  handoffDismiss: '关闭粘贴卡片',
+  handoffFailed: '未能打开分享面板，请重试。',
+  appLinkTitle: '在 Tinkrum 中打开',
+  appLinkReview: '查看这个 App 文件',
+  appLinkHint: '先查看改动，点「应用」后才生效。记录都留着。',
+  appLinkInvalid: '这个链接不完整或无法读取。请在 AI 里复制完整 App 文件，再到「我的预设」粘贴。',
   handoffRead:
     '开始之前，请完整读完这两个网页。直接打开链接，不要用搜索结果或缓存的旧版：\n1. {guide}\n2. {patterns}',
   handoffAttached:

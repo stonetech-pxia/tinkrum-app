@@ -15,7 +15,10 @@ export function CloseButton({ palette }: { palette: Palette }) {
       accessibilityRole="button"
       hitSlop={10}
       style={styles.button}
-      onPress={() => router.back()}>
+      onPress={() => {
+        if (router.canGoBack()) router.back();
+        else router.replace('/');
+      }}>
       <Text style={[palette.font('bodyBold', 16), { color: palette.primaryText }]}>
         {t(locale, 'close')}
       </Text>

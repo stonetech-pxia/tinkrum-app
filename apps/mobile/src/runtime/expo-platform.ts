@@ -1,4 +1,4 @@
-import { CHECKER_FILE_NAME, RunError } from '@morph/core';
+import { CHECKER_FILE_NAME, HANDOFF_DOC_FILES, RunError } from '@morph/core';
 import { getStringAsync, setStringAsync } from 'expo-clipboard';
 import { getDocumentAsync } from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
@@ -353,7 +353,9 @@ export const expoFilePlatform: FilePlatform = {
     if (!send) {
       // Expo Go、比这个功能早的开发版：只发文字，App 文件写在后面。
       await Share.share({
-        message: `${prompt({ attached: false, checker: false })}\n\n\`\`\`json\n${file.text}\n\`\`\``,
+        message:
+          prompt({ attached: false, checker: false }) +
+          (file ? `\n\n\`\`\`json\n${file.text}\n\`\`\`` : ''),
       });
       return;
     }
@@ -361,11 +363,15 @@ export const expoFilePlatform: FilePlatform = {
     const dir = new Directory(Paths.cache, 'share');
     if (dir.exists) dir.delete();
     dir.create({ intermediates: true, idempotent: true });
-    const app = new File(dir, file.name);
-    app.create();
-    await app.write(file.text);
-    const uris = [app.uri];
-    const types = ['application/json'];
+    const uris: string[] = [];
+    const types: string[] = [];
+    if (file) {
+      const app = new File(dir, file.name);
+      app.create();
+      await app.write(file.text);
+      uris.push(app.uri);
+      types.push('application/json');
+    }
     let checker = false;
     try {
       // prebuild 时打包进 App 的检查器（plugins/with-agent-checker.js）；没有（老的开发版）就不带。
@@ -377,7 +383,22 @@ export const expoFilePlatform: FilePlatform = {
     } catch (e) {
       if (__DEV__) console.warn('[share] no bundled checker', e);
     }
-    await send(prompt({ attached: true, checker }), uris, types);
+    let docs = false;
+    try {
+      const copies: string[] = [];
+      for (const name of HANDOFF_DOC_FILES) {
+        const copy = new File(dir, name);
+        await new File(Paths.bundle, 'agent', name).copy(copy);
+        copies.push(copy.uri);
+      }
+      uris.push(...copies);
+      types.push(...copies.map(() => 'text/plain'));
+      docs = true;
+    } catch (e) {
+      // 老的开发版没有指南时，提示词退回带当天版本的网址，不声称有附件。
+      if (__DEV__) console.warn('[share] no bundled guide', e);
+    }
+    await send(prompt({ attached: file !== undefined, checker, docs }), uris, types);
   },
 
   async share(path, mimeType) {

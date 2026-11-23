@@ -10,9 +10,12 @@ import {
   readAppFile,
   templateOps,
   type PlanAbout,
+  type WorkspaceConfig,
 } from '@morph/core';
 import { act, fireEvent, waitFor, within } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
+import { useAiReturn, AI_RETURN_TTL } from '../ai/return';
 import { screen } from 'expo-router/testing-library';
 
 import { placeOnDesk } from '../desk/store';
@@ -272,7 +275,7 @@ describe('the AI entry at the top right of a page (D-406)', () => {
 });
 
 // D-611：在一个子 App 里，AI 页可以把这个 App 交给别的 AI App 改：App 文件（只有结构）和提示词一起交给分享面板，
-// 从哪一页进来的写进提示词。主页（不属于哪个 App）没有这个按钮。
+// 从哪一页进来的写进提示词。主页提供做新 App 和改整份设置两个入口。
 describe('hand the app to another AI app (D-611)', () => {
   const walletText = readFileSync(
     join(__dirname, '../../../../packages/core/src/fixtures/portal-apps/tinkrum-app-wallet.json'),
@@ -299,26 +302,121 @@ describe('hand the app to another AI app (D-611)', () => {
     const { store, files } = await renderWithWallet();
     await act(async () => store.getState().enterApp('wallet'));
     await fireEvent.press(await screen.findByTestId('page-ai'));
+    await fireEvent.changeText(await screen.findByTestId('change-input'), '把标题改成我的钱包');
     await fireEvent.press(await screen.findByTestId('change-handoff'));
     await waitFor(() => expect(files.aiShares).toHaveLength(1));
     const [shared] = files.aiShares;
     expect(shared!.files.map((f) => f.name)).toEqual([
       'tinkrum-app-wallet.json',
       'tinkrum-check.js',
+      'tinkrum-app-guide.md',
+      'tinkrum-app-patterns.md',
     ]);
     const sent = JSON.parse(shared!.files[0]!.text) as { app: { id: string }; tables: unknown[] };
     expect(sent.app.id).toBe('wallet');
-    expect(shared!.text).toContain('tinkrum-app-guide.md?v=');
+    expect(shared!.text).toContain('tinkrum-app-guide.md');
+    expect(shared!.text).not.toContain('https://');
     expect(shared!.text).toContain('「Wallet」');
     expect(shared!.text).toContain('id "wallet-home"');
     expect(shared!.text).toMatch(/先改这一页/);
     expect(shared!.text).toContain('node tinkrum-check.js');
+    expect(shared!.text).toContain('把标题改成我的钱包');
+    expect(shared!.text).not.toContain('先问我想改什么');
   });
 
-  it('on the home there is no hand-off button', async () => {
-    await renderWithWallet();
+  it('home offers both new app and whole setup, carrying the typed request', async () => {
+    const { files, store, repo } = await renderWithWallet();
+    const config = JSON.parse(JSON.stringify(store.getState().config!)) as WorkspaceConfig;
+    const home = config.containers.pages.find((p) => p.id === 'home')!;
+    home.blocks.push({
+      id: 'private-picture',
+      look: 'image',
+      show: { asset: 'PRIVATE_FILE_SENTINEL', aspect: 'square', fit: 'contain' },
+    });
+    store.setState({ config });
+    const table = config.data.tables.find((t) => t.app === 'wallet')!;
+    await repo.insertRecord({
+      id: 'private-record',
+      collectionId: table.id,
+      values: { [table.fields[0]!.id]: 'RECORD_CONTENT_SENTINEL' },
+      createdAt: 1,
+      updatedAt: 1,
+    });
     await fireEvent.press(await screen.findByTestId('page-ai'));
-    await screen.findByTestId('change-input');
-    expect(screen.queryByTestId('change-handoff')).toBeNull();
+    await fireEvent.changeText(await screen.findByTestId('change-input'), 'REQUEST_SENTINEL');
+    await fireEvent.press(await screen.findByTestId('change-handoff-new'));
+    await waitFor(() => expect(files.aiShares).toHaveLength(1));
+    expect(files.aiShares[0]!.text).toContain('REQUEST_SENTINEL');
+    expect(files.aiShares[0]!.files.some((f) => f.name.endsWith('.json'))).toBe(false);
+    await fireEvent.press(screen.getByTestId('change-handoff-setup'));
+    await waitFor(() => expect(files.aiShares).toHaveLength(2));
+    const sent = files.aiShares[1]!;
+    expect(sent.text).toContain('REQUEST_SENTINEL');
+    expect(sent.text).toContain('morph-app-config');
+    expect(JSON.parse(sent.files[0]!.text)).toMatchObject({ format: 'morph-app-config' });
+    expect(sent.files[0]!.text).toContain('wallet');
+    expect(JSON.stringify(sent)).not.toContain('PRIVATE_FILE_SENTINEL');
+    expect(JSON.stringify(sent)).not.toContain('RECORD_CONTENT_SENTINEL');
+  });
+
+  it('only a tap on the return card reads the clipboard, then update, preview, apply and undo keep entries', async () => {
+    const { store, files, repo } = await renderWithWallet();
+    const read = jest.spyOn(files, 'readClipboardText');
+    const alerts = jest.spyOn(Alert, 'alert');
+    const before = store.getState().config!;
+    const head = store.getState().head!.id;
+    const table = before.data.tables.find((t) => t.app === 'wallet')!;
+    const entry = {
+      id: 'kept-entry',
+      collectionId: table.id,
+      values: { [table.fields[0]!.id]: 'Lunch' },
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    await repo.insertRecord(entry);
+    const changed = JSON.parse(walletText);
+    changed.pages[0].title = 'UPDATED';
+    await files.copyText(JSON.stringify(changed));
+    await fireEvent.press(await screen.findByTestId('page-ai'));
+    expect(screen.queryByTestId('ai-return-card')).toBeNull();
+    await fireEvent.press(await screen.findByTestId('change-handoff-setup'));
+    expect(await screen.findByTestId('ai-return-card')).toBeTruthy();
+    expect(read).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('ai-return-paste'));
+    await waitFor(() => expect(alerts).toHaveBeenCalled());
+    let buttons = alerts.mock.calls.at(-1)![2]!;
+    expect(buttons[0]!.text).toMatch(/更新/);
+    expect(store.getState().head!.id).toBe(head);
+    await act(() => buttons[0]!.onPress!());
+    await waitFor(() => expect(alerts.mock.calls.at(-1)![1]).toContain('UPDATED'));
+    expect(store.getState().head!.id).toBe(head);
+    buttons = alerts.mock.calls.at(-1)![2]!;
+    await act(() => buttons.find((b) => b.text === '应用')!.onPress!());
+    await waitFor(() =>
+      expect(store.getState().config!.containers.pages.some((p) => p.title === 'UPDATED')).toBe(
+        true,
+      ),
+    );
+    expect(useAiReturn.getState().pending).toBeNull();
+    expect(screen.queryByTestId('ai-return-card')).toBeNull();
+    await act(() => store.getState().undo());
+    expect(store.getState().config).toEqual(before);
+    expect(await repo.listRecords(table.id)).toEqual([entry]);
+    expect(await repo.listPresets()).toEqual([]);
+  });
+
+  it('return card is also on home, can be dismissed, and expires after 24 hours', async () => {
+    await renderWithWallet();
+    await screen.findByTestId('page-ai');
+    await act(() => {
+      useAiReturn.getState().start('new');
+    });
+    expect(await screen.findByTestId('ai-return-card')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('ai-return-dismiss'));
+    expect(screen.queryByTestId('ai-return-card')).toBeNull();
+    await act(() => {
+      useAiReturn.getState().start('setup', Date.now() - AI_RETURN_TTL);
+    });
+    expect(screen.queryByTestId('ai-return-card')).toBeNull();
   });
 });

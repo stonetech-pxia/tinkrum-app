@@ -1,10 +1,7 @@
 import {
   allComponents,
-  appFileOfApp,
-  appFileText,
   appViewOf,
   createMockAIProvider,
-  handoffPrompt,
   isKnownComponent,
   openItems,
   pageTarget,
@@ -31,6 +28,8 @@ import {
   View,
 } from 'react-native';
 
+import { AiReturnCard } from '../ai/AiReturnCard';
+import { useAiHandoff } from '../ai/useAiHandoff';
 import { useAISettings } from '../ai/context';
 import { useAfterApply } from '../draft/useApplyDraft';
 import { LivelyTink } from '../guide/LivelyTink';
@@ -80,7 +79,7 @@ const PROGRESS_TEXT: Record<PlanProgress | 'start', readonly [StringKey, StringK
  */
 
 export function ChangeScreen() {
-  const { locale, registry, store, files } = useWorkspaceContext();
+  const { locale, registry, store } = useWorkspaceContext();
   const router = useRouter();
   const navigation = useNavigation();
   const config = useWorkspace((s) => s.config)!;
@@ -149,13 +148,13 @@ export function ChangeScreen() {
     return aboutFromParams(params, config);
   });
   const place = aboutPlace(about, config, locale);
-  // 交给别的 AI App 改（D-611）：在一个子 App 里才有；从它的某一页进来的，提示词里写明这一页。
+  // 子 App 带上页面上下文；主页和未归属的页面则提供新 App / 整份设置两个入口。
   const handoff = useMemo(() => {
     const from =
       about?.kind === 'page'
         ? config.containers.pages.find((p) => p.id === about.pageId)
         : undefined;
-    const id = from?.app ?? appId;
+    const id = from ? from.app : appId;
     const app = id ? config.nav.apps?.find((a) => a.id === id) : undefined;
     if (!app) return null;
     return {
@@ -165,25 +164,14 @@ export function ChangeScreen() {
     };
   }, [about, appId, config]);
 
-  /** 把这个 App 的文件和提示词交给分享面板，用户自己挑 App、点发送（底线 10）；只有结构（底线 1、2、3）。 */
+  const sendToAi = useAiHandoff();
   async function handOff() {
     if (!handoff) return;
-    const file = appFileOfApp(config, handoff.id);
-    if (!file) return;
-    const now = new Date();
-    const name = `tinkrum-app-${handoff.id}.json`;
-    const scope = {
-      kind: 'app' as const,
-      app: handoff.name,
-      ...(handoff.page ? { page: handoff.page } : {}),
-    };
-    await files
-      .shareWithAi({
-        file: { name, text: appFileText(file, now) },
-        prompt: ({ attached, checker }) =>
-          handoffPrompt(scope, locale, now, { attached, checker, fileName: name }),
-      })
-      .catch(() => {});
+    await sendToAi(
+      { kind: 'app', app: handoff.name, ...(handoff.page ? { page: handoff.page } : {}) },
+      input,
+      handoff.id,
+    );
   }
   const aboutName =
     about?.kind === 'workflow'
@@ -413,6 +401,7 @@ export function ChangeScreen() {
       <ScrollView
         contentContainerStyle={[styles.page, { padding: palette.pad, gap: palette.gap - 2 }]}
         keyboardShouldPersistTaps="handled">
+        {!guide && !planBusy ? <AiReturnCard palette={palette} /> : null}
         {build && !guide ? (
           <BuildPanel
             build={build}
@@ -734,14 +723,33 @@ export function ChangeScreen() {
             )}
           </View>
         )}
-        {handoff && !guide && !planBusy ? (
-          <Button
-            palette={palette}
-            testID="change-handoff"
-            variant="text"
-            label={t(locale, 'handoffButton')}
-            onPress={() => void handOff()}
-          />
+        {!guide && !planBusy ? (
+          handoff ? (
+            <Button
+              palette={palette}
+              testID="change-handoff"
+              variant="text"
+              label={t(locale, 'handoffButton')}
+              onPress={() => void handOff()}
+            />
+          ) : (
+            <>
+              <Button
+                palette={palette}
+                testID="change-handoff-new"
+                variant="text"
+                label={t(locale, 'handoffNewButton')}
+                onPress={() => void sendToAi({ kind: 'new' }, input)}
+              />
+              <Button
+                palette={palette}
+                testID="change-handoff-setup"
+                variant="text"
+                label={t(locale, 'handoffSetupButton')}
+                onPress={() => void sendToAi({ kind: 'setup' }, input)}
+              />
+            </>
+          )
         ) : null}
       </ScrollView>
 

@@ -1,3 +1,4 @@
+import { useAiReturn } from '../ai/return';
 import {
   BUILTIN_TOOLS,
   applyOps,
@@ -33,6 +34,7 @@ import ImportRecordsRoute from '../app/import-records';
 import DeskRoute from '../app/desk/[deskId]';
 import FilePreviewRoute from '../app/file-preview';
 import HomeRoute from '../app/index';
+import OpenRoute from '../app/open';
 import PageRoute from '../app/page/[pageId]';
 import LanguageRoute from '../app/language';
 import PresetsRoute from '../app/presets';
@@ -68,6 +70,7 @@ import { FakeFiles } from './fake-files';
 // 工具和工作流旅程测试共用：真实路由 + 内存存储 + 假文件平台。
 
 // 草稿模式的界面状态是模块级的（D-190）：每个测试从关着的聊天框开始。
+afterEach(() => useAiReturn.setState({ pending: null }));
 afterEach(() => useDraftUi.setState({ chatOpen: false, seenStep: null }));
 
 export const testRegistry = createRegistry(BUILTIN_TOOLS);
@@ -164,6 +167,7 @@ export async function renderToolsApp(
       </GestureHandlerRootView>
     ),
     index: HomeRoute,
+    open: OpenRoute,
     change: ChangeRoute,
     'page/[pageId]': PageRoute,
     'run/[workflowId]': RunRoute,

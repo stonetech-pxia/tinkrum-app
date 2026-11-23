@@ -1,3 +1,4 @@
+import { appLinkPayload } from '@morph/core';
 import { isShareLink } from '@/share/useIncomingShare';
 
 /**
@@ -6,6 +7,8 @@ import { isShareLink } from '@/share/useIncomingShare';
  */
 export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {
   try {
+    const payload = appLinkPayload(path);
+    if (payload !== null) return `/open?a=${encodeURIComponent(payload)}`;
     if (isShareLink(path)) return initial ? '/' : null;
   } catch {
     // 出错时按普通地址处理（这里抛错会让 App 崩溃）。

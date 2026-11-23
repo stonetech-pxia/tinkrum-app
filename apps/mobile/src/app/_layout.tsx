@@ -200,6 +200,7 @@ function ThemedStack() {
         <Stack.Screen name="files" options={{ title: t(locale, 'filesAllTitle') }} />
         <Stack.Screen name="packs" options={{ title: t(locale, 'packsTitle') }} />
         <Stack.Screen name="presets" options={{ title: t(locale, 'presetsTitle') }} />
+        <Stack.Screen name="open" options={{ ...closable, title: t(locale, 'appLinkTitle') }} />
         {/* 标题在页面里（放在导航栏时也要），这里不再写一遍。 */}
         <Stack.Screen name="history" options={{ title: '' }} />
         <Stack.Screen name="tools" options={{ title: '' }} />

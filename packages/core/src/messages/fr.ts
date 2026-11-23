@@ -492,8 +492,31 @@ export const fr: MessageTable = {
   presetsImport: 'Importer depuis un fichier',
   presetsPaste: 'Coller depuis le presse-papiers',
   presetsShareToAi: 'Envoyer à une app d’IA',
-  presetsShareToAiPrompt:
-    'Lis ces deux pages en entier avant de commencer. Ouvre les liens directement, sans passer par une recherche ni une copie en cache :\n1. {guide}\n2. {patterns}\n\nAide-moi ensuite à créer un fichier d’app Tinkrum. Demande-moi d’abord ce que je veux suivre et faire. Dis-moi ensuite en une ligne de quel modèle tu pars, puis donne-moi le fichier complet dans un seul bloc de code json.',
+  handoffReadAttached:
+    'Lis entièrement les pièces jointes tinkrum-app-guide.md et tinkrum-app-patterns.md avant de commencer.',
+  handoffNew:
+    'Aide-moi à créer un nouveau fichier d’app Tinkrum. Dis en une ligne de quel modèle tu pars, puis donne-moi le fichier entier dans un seul bloc de code json.',
+  handoffSetup:
+    'Je veux modifier toute ma configuration Tinkrum, y compris l’accueil et toutes mes apps. Renvoie le fichier morph-app-config entier, en conservant son format et sa version.',
+  handoffSetupAttached: 'En pièce jointe : toute ma configuration Tinkrum ({file}).',
+  handoffSetupInline: 'Toute ma configuration Tinkrum est à la fin de ce message.',
+  handoffRequest:
+    'Ce que je veux : {request}\n\nFais cette modification. Si quelque chose n’est pas clair, demande-moi d’abord.',
+  handoffAskNew: 'Demande-moi d’abord ce que je veux suivre et faire.',
+  handoffLink:
+    'Place le lien « Open in Tinkrum » affiché par le vérificateur tout en haut de ta réponse, sous forme de lien cliquable. Donne-moi aussi le fichier entier dans un seul bloc de code json.',
+  handoffNewButton: 'Créer une app avec une autre app d’IA',
+  handoffSetupButton: 'Modifier tout Tinkrum avec une autre app d’IA',
+  handoffPaste: 'Coller l’app reçue de l’IA',
+  handoffPasteHint:
+    'Copie le fichier entier depuis ton IA, puis colle-le ici pour examiner les modifications.',
+  handoffDismiss: 'Masquer la carte de collage',
+  handoffFailed: 'Impossible d’ouvrir le partage. Réessaie.',
+  appLinkTitle: 'Ouvrir dans Tinkrum',
+  appLinkReview: 'Examiner ce fichier d’app',
+  appLinkHint: 'Examine les modifications avant de les appliquer. Tes entrées sont conservées.',
+  appLinkInvalid:
+    'Ce lien est incomplet ou illisible. Copie le fichier d’app entier depuis ton IA, puis colle-le dans Mes préréglages.',
   handoffRead:
     'Lis ces deux pages en entier avant de commencer. Ouvre les liens directement, sans passer par une recherche ni une copie en cache :\n1. {guide}\n2. {patterns}',
   handoffAttached:

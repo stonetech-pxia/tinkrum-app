@@ -1,5 +1,5 @@
 // 给别的 AI 自检用的检查器（D-611）：prebuild 时把 scripts/agent-kit/check-cli.ts 打成一个文件 tinkrum-check.js
-// （和网站上的同一个，D-594），放进 App 的 agent/：iOS 是 .app 里的文件夹（folder reference），Android 是
+// （和网站上的同一个，D-594），连同指南与 patterns 放进 App 的 agent/：iOS 是 .app 里的文件夹（folder reference），Android 是
 // app/src/main/assets/agent。交给别的 AI App 时复制一份和 App 文件一起分享。检查的就是这个版本的 App 能导入什么。
 const fs = require('node:fs');
 const path = require('node:path');
@@ -27,6 +27,9 @@ async function buildChecker(projectRoot, dest) {
     outfile: path.join(dest, 'tinkrum-check.js'),
     logLevel: 'warning',
   });
+  // 和检查器一起打包，说明和手机实际能导入的格式保持同一版本。
+  for (const file of ['tinkrum-app-guide.md', 'tinkrum-app-patterns.md'])
+    fs.copyFileSync(path.join(repo, 'docs', 'agent', file), path.join(dest, file));
   const size = fs.statSync(path.join(dest, 'tinkrum-check.js')).size;
   console.log(`[with-agent-checker] ${(size / 1024 / 1024).toFixed(1)} MB in ${dest}`);
 }

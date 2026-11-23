@@ -33,6 +33,8 @@ export * from './home-entry';
 export * from './home-screen';
 export * from './app-view';
 export * from './ai-handoff';
+export * from './app-link';
+export * from './handoff-file-check';
 export * from './app-file';
 export * from './app-file-check';
 export { hiddenIdsForAI, opsForApp, scopedViewForAI } from './app-scope';

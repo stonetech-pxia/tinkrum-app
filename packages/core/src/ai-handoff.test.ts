@@ -1,68 +1,96 @@
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 
-import { handoffPrompt } from './ai-handoff';
+import { handoffPrompt, type HandoffScope } from './ai-handoff';
 
-// 交给别的 AI App 的提示词（D-609、D-611）。
-const NOW = new Date(2026, 10, 21, 9, 30);
-const GUIDE = 'https://tinkrum.stonetech.dev/assets/agent/tinkrum-app-guide.md?v=20261121';
-const PATTERNS = 'https://tinkrum.stonetech.dev/assets/agent/tinkrum-app-patterns.md?v=20261121';
+const NOW = new Date(2026, 10, 23, 9, 30);
+const scopes: HandoffScope[] = [
+  { kind: 'new' },
+  { kind: 'setup' },
+  { kind: 'app', app: 'Books' },
+  { kind: 'app', app: 'Books', page: { id: 'books-home', title: 'Shelf' } },
+];
 
-describe('handoffPrompt', () => {
-  it('every prompt carries both guide links with today as the version, in every language', () => {
-    for (const locale of ['en', 'zh', 'fr'] as const)
-      for (const scope of [
-        { kind: 'new' as const },
-        { kind: 'app' as const, app: 'Books' },
-        { kind: 'app' as const, app: 'Books', page: { id: 'books-home', title: 'Shelf' } },
-      ]) {
-        const text = handoffPrompt(scope, locale, NOW, {
-          attached: true,
-          checker: true,
-          fileName: 'x.json',
-        });
-        expect(text).toContain(GUIDE);
-        expect(text).toContain(PATTERNS);
-      }
+it('puts the typed request after the rules, and asks for clarification instead of asking again', () => {
+  for (const locale of ['en', 'zh', 'fr'] as const)
+    for (const scope of scopes) {
+      const empty = handoffPrompt(scope, locale, NOW);
+      const typed = handoffPrompt(scope, locale, NOW, {
+        attached: true,
+        checker: true,
+        request: 'USER_REQUEST_SENTINEL',
+      });
+      expect(empty).not.toContain('USER_REQUEST_SENTINEL');
+      expect(typed).toContain('USER_REQUEST_SENTINEL');
+      expect(typed.indexOf('USER_REQUEST_SENTINEL')).toBeGreaterThan(typed.indexOf('json'));
+      expect(typed).not.toContain(empty.split('\n\n').at(-1));
+      expect(handoffPrompt(scope, locale, NOW, { attached: false, request: '  ' })).toBe(empty);
+    }
+});
+
+it('names the app and the originating page and preserves ids', () => {
+  const text = handoffPrompt(scopes[3]!, 'en', NOW, {
+    attached: true,
+    checker: true,
+    fileName: 'books.json',
   });
+  expect(text).toContain('“Shelf” (id "books-home")');
+  expect(text).toContain('“Books”');
+  expect(text).toContain('change this page first');
+  expect(text).toContain('Keep every id');
+  expect(text).toContain('books.json');
+  expect(text).toContain('node tinkrum-check.js');
+});
 
-  it('from a page: names the page and its id, and says to change that page first', () => {
-    const text = handoffPrompt(
-      { kind: 'app', app: 'Books', page: { id: 'books-home', title: 'Shelf' } },
-      'en',
-      NOW,
-      { attached: true, checker: true, fileName: 'tinkrum-app-books.json' },
-    );
-    expect(text).toContain('“Shelf” (id "books-home")');
-    expect(text).toContain('“Books”');
-    expect(text).toMatch(/change this page first/);
-    expect(text).toMatch(/Keep every id/);
-    expect(text).toContain('tinkrum-app-books.json');
-    expect(text).toContain('node tinkrum-check.js');
+it('describes the whole setup without inventing an app or page', () => {
+  const text = handoffPrompt({ kind: 'setup' }, 'en', NOW, {
+    attached: true,
+    checker: true,
+    fileName: 'setup.json',
   });
+  expect(text).toContain('whole Tinkrum setup');
+  expect(text).toContain('morph-app-config');
+  expect(text).toContain('setup.json');
+  expect(text).toContain('Keep every id');
+});
 
-  it('for the whole app: names the app, not a page', () => {
-    const text = handoffPrompt({ kind: 'app', app: 'Books' }, 'zh', NOW, {
-      attached: true,
-      checker: true,
-      fileName: 'tinkrum-app-books.json',
-    });
-    expect(text).toContain('「Books」');
-    expect(text).not.toMatch(/先改这一页/);
-    expect(text).toMatch(/已有的 ID 一个都不改/);
-  });
+it('uses attached guide and patterns when available and versioned URLs for older builds', () => {
+  for (const locale of ['en', 'zh', 'fr'] as const)
+    for (const scope of scopes) {
+      const attached = handoffPrompt(scope, locale, NOW, {
+        attached: scope.kind !== 'new',
+        checker: true,
+        docs: true,
+      });
+      expect(attached).toContain('tinkrum-app-guide.md');
+      expect(attached).toContain('tinkrum-app-patterns.md');
+      expect(attached).not.toContain('https://');
+      expect(attached).toContain('Open in Tinkrum');
+      const fallback = handoffPrompt(scope, locale, NOW);
+      expect(fallback).toContain('tinkrum-app-guide.md?v=20261123');
+      expect(fallback).toContain('tinkrum-app-patterns.md?v=20261123');
+      expect(fallback).not.toContain('node tinkrum-check.js');
+    }
+});
 
-  it('with the app file but no checker it does not ask to run the checker', () => {
-    const text = handoffPrompt({ kind: 'app', app: 'Books' }, 'en', NOW, {
-      attached: true,
-      fileName: 'tinkrum-app-books.json',
-    });
-    expect(text).toContain('Attached is my current Tinkrum app file (tinkrum-app-books.json).');
-    expect(text).not.toContain('tinkrum-check.js');
+it('an app without page context names only the app, in Chinese too', () => {
+  const text = handoffPrompt({ kind: 'app', app: 'Books' }, 'zh', NOW, {
+    attached: true,
+    fileName: 'books.json',
   });
+  expect(text).toContain('「Books」');
+  expect(text).toContain('已有的 ID 一个都不改');
+  expect(text).not.toContain('先改这一页');
+  expect(text).not.toContain('tinkrum-check.js');
+});
 
-  it('without attachments it says the file follows and does not ask to run the checker', () => {
-    const text = handoffPrompt({ kind: 'app', app: 'Books' }, 'fr', NOW, { attached: false });
-    expect(text).toMatch(/à la fin de ce message/);
-    expect(text).not.toContain('tinkrum-check.js');
+it('fallback copy describes the file honestly when there is no checker or no attachment', () => {
+  const attached = handoffPrompt({ kind: 'app', app: 'Books' }, 'en', NOW, {
+    attached: true,
+    fileName: 'books.json',
   });
+  expect(attached).toContain('Attached is my current Tinkrum app file (books.json).');
+  expect(attached).not.toContain('node tinkrum-check.js');
+  const inline = handoffPrompt({ kind: 'app', app: 'Books' }, 'fr', NOW);
+  expect(inline).toContain('à la fin de ce message');
+  expect(inline).not.toContain('tinkrum-check.js');
 });

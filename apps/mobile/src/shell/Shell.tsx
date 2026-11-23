@@ -1,3 +1,4 @@
+import { AiReturnCard } from '../ai/AiReturnCard';
 import {
   HOME_PAGE_ID,
   appViewOf,
@@ -240,6 +241,12 @@ export function Shell() {
       ) : null}
       {/* Tink 那一行以下的内容包进 BlurTargetView：引导气泡出现时整片轻微虚化（Android 需要它才真模糊）。 */}
       <BlurTargetView ref={blurTarget} style={styles.content}>
+        {appId === null && pageId === HOME_PAGE_ID && !editing && !inDraft ? (
+          <AiReturnCard
+            palette={palette}
+            style={{ marginHorizontal: palette.pad, marginBottom: palette.gap }}
+          />
+        ) : null}
         {inDraft ? null : <BannerAnchor palette={palette} />}
         <DraftNotice palette={palette} />
         {pageId === HOME_PAGE_ID && !editing && !inDraft ? <GuideCard palette={palette} /> : null}

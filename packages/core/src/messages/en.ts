@@ -467,8 +467,30 @@ export const en = {
   presetsImport: 'Import from a file',
   presetsPaste: 'Paste from clipboard',
   presetsShareToAi: 'Send to an AI app',
-  presetsShareToAiPrompt:
-    'Read these two pages in full before you start. Open the links directly; do not use search results or a cached copy:\n1. {guide}\n2. {patterns}\n\nThen help me make a Tinkrum app file. First ask me what I want to keep track of and do. Then tell me in one line which pattern you start from, and give me the whole file in one json code block.',
+  handoffReadAttached:
+    'Read the attached tinkrum-app-guide.md and tinkrum-app-patterns.md in full before you start.',
+  handoffNew:
+    'Help me make a new Tinkrum app file. Tell me in one line which pattern you start from, and give me the whole file in one json code block.',
+  handoffSetup:
+    'I want to change my whole Tinkrum setup, including the home page and all my apps. Return the whole morph-app-config file, keeping its format and version.',
+  handoffSetupAttached: 'Attached is my whole Tinkrum setup ({file}).',
+  handoffSetupInline: 'My whole Tinkrum setup is at the end of this message.',
+  handoffRequest:
+    'What I want: {request}\n\nMake this change. Ask me first if anything is unclear.',
+  handoffAskNew: 'First ask me what I want to keep track of and do.',
+  handoffLink:
+    'Put the checker’s “Open in Tinkrum” link at the very top of your answer as a clickable link. Also give me the whole file in one json code block.',
+  handoffNewButton: 'Make a new app with another AI app',
+  handoffSetupButton: 'Change all of Tinkrum with another AI app',
+  handoffPaste: 'Paste the app from your AI',
+  handoffPasteHint: 'Copy the whole file from your AI, then paste it here to review it.',
+  handoffDismiss: 'Dismiss the paste card',
+  handoffFailed: 'Could not open the share sheet. Please try again.',
+  appLinkTitle: 'Open in Tinkrum',
+  appLinkReview: 'Review this app file',
+  appLinkHint: 'Review the changes before applying them. Your entries stay.',
+  appLinkInvalid:
+    'This link is incomplete or cannot be read. Copy the whole app file from your AI and paste it in My presets.',
   handoffRead:
     'Read these two pages in full before you start. Open the links directly; do not use search results or a cached copy:\n1. {guide}\n2. {patterns}',
   handoffAttached:

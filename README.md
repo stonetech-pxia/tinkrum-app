@@ -8,9 +8,10 @@
 
 For one small feature, people often have to download a little app full of ads, or find it costs money they don't want to spend. Many people now build their own tools with AI, but most people can't, and making a tool on a phone and getting it running there is a hassle anyway.
 
-Tinkrum tries a different route: you talk to AI, the AI edits a JSON config, and the config puts together tools already built into the app to make the tool you want. The app is a fixed core plus that config. The core knows how to draw pages, run file tools and keep records; the pages, buttons, lists, forms, bottom bar, colors and the quick action behind each button are all written in the config. There are two ways to make a tool:
+Tinkrum tries a different route: you talk to AI, the AI edits a JSON config, and the config puts together tools already built into the app to make the tool you want. The app is a fixed core plus that config. The core knows how to draw pages, run file tools and keep records; the pages, buttons, lists, forms, bottom bar, colors and the quick action behind each button are all written in the config. There are three ways to make a tool:
 
 - **Talk to Tink**, the assistant inside the app: "add a page for the books I read, with a rating", "add a button that scans to Word", "make the cards flatter".
+- **Use your own AI app**: write what you want on the AI page and share it with ChatGPT, Claude or another app. From home, choose a new app or the whole setup; from a sub-app, share that app. The matching guide, patterns and checker go with it. Paste the result from the return card, or use the checker’s import link when the website is available; review before applying.
 - **Start from a preset**: import an app file someone else made (Wallet, Habits, Trip…) and change it from there. You can save your own app as a preset too.
 
 Because Tink only edits the config, whatever it builds is made of parts the core already knows how to run. It works offline, every change can be undone, and nothing Tink does can reach your data.

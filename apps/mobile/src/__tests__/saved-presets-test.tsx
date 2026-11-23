@@ -15,7 +15,7 @@ import {
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
-import { Alert, Linking, Share } from 'react-native';
+import { Alert, Linking } from 'react-native';
 
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import type { SavedPreset, WorkspaceRepo } from '../storage/types';
@@ -744,27 +744,25 @@ describe('import a preset from a file', () => {
         expect(store.getState().head!.id).toBe(head);
       });
 
-      // D-609：把给别的 AI 的提示词交给系统分享面板，用户自己挑 App；只带两个网址和请求，不带这个 App 的任何内容。
-      it('sending the instructions to an AI app shares only the prompt with the guide links and writes nothing', async () => {
-        const { store } = await starterApp();
+      // 新 App 不带工作区内容；附带的指南、patterns 和检查器也不含用户数据。
+      it('sending instructions shares the version-matched kit and changes no workspace data', async () => {
+        const { store, files } = await starterApp();
         const head = store.getState().head!.id;
         const config = JSON.stringify(store.getState().config);
-        const shared = jest
-          .spyOn(Share, 'share')
-          .mockResolvedValue({ action: 'dismissedAction', activityType: undefined });
         await openScreen();
         await fireEvent.press(await screen.findByTestId('preset-add'));
         await fireEvent.press(await screen.findByText('让 AI 做一个'));
-        expect(shared).toHaveBeenCalledTimes(1);
-        const { message } = shared.mock.calls[0]![0] as { message: string };
-        expect(message).toMatch(
-          /https:\/\/tinkrum\.stonetech\.dev\/assets\/agent\/tinkrum-app-guide\.md\?v=\d{8}/,
-        );
-        expect(message).toMatch(
-          /https:\/\/tinkrum\.stonetech\.dev\/assets\/agent\/tinkrum-app-patterns\.md\?v=\d{8}/,
-        );
+        await waitFor(() => expect(files.aiShares).toHaveLength(1));
+        const { text: message, files: attachments } = files.aiShares[0]!;
+        expect(message).toContain('tinkrum-app-guide.md');
+        expect(message).toContain('tinkrum-app-patterns.md');
+        expect(message).not.toContain('https://');
         expect(message).toContain('json');
-        // 不带这个 App 的表名、页名。
+        expect(attachments.map((f) => f.name)).toEqual([
+          'tinkrum-check.js',
+          'tinkrum-app-guide.md',
+          'tinkrum-app-patterns.md',
+        ]);
         for (const name of [
           ...store.getState().config!.data.tables.map((x) => x.name),
           ...store.getState().config!.containers.pages.map((x) => x.title),

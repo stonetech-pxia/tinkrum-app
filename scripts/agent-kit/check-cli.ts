@@ -3,7 +3,13 @@
 // 输出第一行是 OK / NOT OK，退出码 0 = 能导入，1 = 有问题，2 = 用法不对。
 import { readFileSync } from 'node:fs';
 
-import { BUILTIN_TOOLS, checkAppFileText, createRegistry } from '@morph/core';
+import {
+  BUILTIN_TOOLS,
+  appFileJsonText,
+  appLink,
+  checkHandoffFileText,
+  createRegistry,
+} from '@morph/core';
 
 const USAGE = 'usage: node tinkrum-check.js <app-file.json>   (or - to read from stdin)';
 
@@ -22,7 +28,7 @@ function main(): number {
     console.error(`cannot read ${path}: ${e instanceof Error ? e.message : String(e)}`);
     return 2;
   }
-  const check = checkAppFileText(text, {
+  const check = checkHandoffFileText(text, {
     registry: createRegistry(BUILTIN_TOOLS),
     locale: 'en',
     now: new Date(),
@@ -53,6 +59,7 @@ function main(): number {
     );
     for (const h of check.hints) console.log(`- ${h}`);
   }
+  console.log(`Open in Tinkrum: ${appLink(appFileJsonText(text))}`);
   return 0;
 }
 

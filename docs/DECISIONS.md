@@ -8,7 +8,7 @@ The decisions are in [`docs/decisions/`](decisions/), one file per hundred numbe
 - [D-300-399.md](decisions/D-300-399.md): D-300 to D-399, 94 decisions
 - [D-400-499.md](decisions/D-400-499.md): D-400 to D-499, 98 decisions
 - [D-500-599.md](decisions/D-500-599.md): D-500 to D-599, 90 decisions
-- [D-600-699.md](decisions/D-600-699.md): D-600 to D-619, 19 decisions
+- [D-600-699.md](decisions/D-600-699.md): D-600 onward, including branch decisions awaiting merge numbers
 - [P.md](decisions/P.md): 50 questions awaiting the founder (P items), each with the default applied meanwhile
 
 An entry says what was decided, why, and who decided it when. It is not the specification: the exact rules, limits and steps are in the code, its tests and the generated guide in `docs/agent/`. Where an entry and the code disagree about a detail, read the code; where they disagree about what was decided, the entry wins and the code has a bug.

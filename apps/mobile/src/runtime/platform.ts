@@ -660,8 +660,8 @@ export interface FilePlatform {
    * 没有原生分享（Expo Go）时只发文字，App 文件写在提示词后面。App 文件只有结构（底线 1、2、3）。
    */
   shareWithAi(input: {
-    file: { name: string; text: string };
-    prompt: (how: { attached: boolean; checker: boolean }) => string;
+    file?: { name: string; text: string };
+    prompt: (how: { attached: boolean; checker: boolean; docs?: boolean }) => string;
   }): Promise<void>;
   /**
    * 读用户从「文件」选的一个文字文件（恢复预填记忆的备份用）。读完删掉选择器放在 App 缓存里的副本
