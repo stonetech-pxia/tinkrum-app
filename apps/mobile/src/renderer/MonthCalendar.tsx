@@ -1,6 +1,7 @@
 import {
   optionColor,
   axisTickText,
+  formatNumber,
   weekStartOf,
   calendarOf,
   dateFieldOf,
@@ -243,7 +244,7 @@ export function MonthCalendar({
                     block.show.day
                       ? t(locale, 'calendarDayValue', {
                           date: dayTitle(d, locale),
-                          value: axisTickText(value),
+                          value: formatNumber(value, undefined, locale),
                         })
                       : t(locale, 'calendarDayLabel', { date: dayTitle(d, locale), n: count })
                   }

@@ -1,7 +1,13 @@
 import { deflateSync, strToU8 } from 'fflate';
 import { expect, it } from 'vitest';
 
-import { appLink, appLinkPayload, readAppLink } from './app-link';
+import {
+  MAX_CHAT_LINK_LENGTH,
+  appLink,
+  appLinkPayload,
+  chatAppLink,
+  readAppLink,
+} from './app-link';
 import { MAX_APP_CONFIG_SIZE } from './config-file';
 
 it('round trips Unicode, punctuation and a large file with the payload only in the fragment', () => {
@@ -41,4 +47,16 @@ it('only extracts recognized import links; never changes unrelated routes or sha
   expect(appLinkPayload('/open#a=abc')).toBe('abc');
   expect(appLinkPayload('/open?a=abc')).toBe('abc');
   expect(appLinkPayload('https://tinkrum.stonetech.dev/open#a=abc')).toBe('abc');
+});
+
+it('gives the chat a link only when it is short enough to survive being pasted', () => {
+  expect(chatAppLink('{"name":"small"}')).toBe(appLink('{"name":"small"}'));
+  // 随机内容压不小：压缩后一定超过上限。
+  let seed = 7;
+  const noise = Array.from({ length: 20000 }, () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return String.fromCharCode(97 + (seed % 26));
+  }).join('');
+  expect(appLink(noise).length).toBeGreaterThan(MAX_CHAT_LINK_LENGTH);
+  expect(chatAppLink(noise)).toBeNull();
 });

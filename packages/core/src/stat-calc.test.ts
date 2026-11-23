@@ -187,11 +187,9 @@ it('describes formulas with table and field names instead of internal total ids'
 it('formats tiny finite formula results in every language without losing the computed value', async () => {
   const { calculatedText } = await import('./stat-calc');
   for (const locale of ['en', 'zh', 'fr'] as const) {
-    expect(calculatedText(1e-9, { ...calc, with: [...calc.with], as: 'number' }, locale)).toBe(
-      locale === 'fr' ? '0' : '0.0000',
-    );
+    expect(calculatedText(1e-9, { ...calc, with: [...calc.with], as: 'number' }, locale)).toBe('0');
     expect(calculatedText(1e-10, { ...calc, with: [...calc.with], as: 'percent' }, locale)).toBe(
-      locale === 'fr' ? '0 %' : '0.0000%',
+      locale === 'fr' ? '0 %' : '0%',
     );
   }
   const own = {
@@ -201,4 +199,19 @@ it('formats tiny finite formula results in every language without losing the com
     as: 'number',
   };
   expect(readNumber(source({ calc: own }), ctx)?.value).toBeGreaterThan(0);
+});
+
+it('shows float noise as a clean number: 0.29 is 29%, not 29.0000%', async () => {
+  const { calculatedText } = await import('./stat-calc');
+  for (const locale of ['en', 'zh'] as const) {
+    expect(calculatedText(0.29, { ...calc, with: [...calc.with], as: 'percent' }, locale)).toBe(
+      '29%',
+    );
+    expect(calculatedText(0.07, { ...calc, with: [...calc.with], as: 'percent' }, locale)).toBe(
+      '7%',
+    );
+    expect(calculatedText(10.1 - 10, { ...calc, with: [...calc.with], as: 'number' }, locale)).toBe(
+      '0.1',
+    );
+  }
 });

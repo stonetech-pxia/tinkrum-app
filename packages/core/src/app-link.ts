@@ -32,6 +32,15 @@ export function appLink(text: string): string {
   return `${APP_LINK_BASE}#a=${base64url(deflateSync(bytes))}`;
 }
 
+/** 聊天里一条超过这个长度的链接多半会被截断或点不开（单个 App 实测 1.2–3.5 KB，整套设置可到几十 KB）。 */
+export const MAX_CHAT_LINK_LENGTH = 8000;
+
+/** 检查器给 AI 放进回答的链接：太长就不给，让 AI 只交 JSON 代码块（复制是退路）。 */
+export function chatAppLink(text: string): string | null {
+  const link = appLink(text);
+  return link.length <= MAX_CHAT_LINK_LENGTH ? link : null;
+}
+
 /** 不依赖 Node Buffer、浏览器 atob、TextDecoder；Hermes、Node 和网页同一条路。 */
 export function readAppLink(payload: string): string {
   if (

@@ -281,7 +281,7 @@ The person may send an existing file to change. Entries stay on the phone, linke
 
 ## Whole setups and returning files
 
-A \`morph-app-config\` file wraps the whole workspace in \`config\`. Keep its wrapper, ids and unrequested parts; do not extract a sub-app. After OK, put its exact \`Open in Tinkrum\` URL first as a clickable link; never build or shorten it. Also return the whole JSON block. Tinkrum previews before applying.
+A \`morph-app-config\` file wraps the whole workspace in \`config\`. Keep its wrapper, ids and unrequested parts; do not extract a sub-app. After OK, put its exact \`Open in Tinkrum\` URL (if it prints one) first as a clickable link; never build or shorten it. Also return the whole JSON block. Tinkrum previews before applying.
 
 ## A complete example
 

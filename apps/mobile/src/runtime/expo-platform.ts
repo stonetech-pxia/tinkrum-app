@@ -398,6 +398,11 @@ export const expoFilePlatform: FilePlatform = {
       // 老的开发版没有指南时，提示词退回带当天版本的网址，不声称有附件。
       if (__DEV__) console.warn('[share] no bundled guide', e);
     }
+    if (uris.length === 0) {
+      // 没有任何文件可带（新 App、老的开发版没有打包检查器和指南）：Android 的分享面板不收空列表，退回只发文字。
+      await Share.share({ message: prompt({ attached: false, checker: false }) });
+      return;
+    }
     await send(prompt({ attached: file !== undefined, checker, docs }), uris, types);
   },
 

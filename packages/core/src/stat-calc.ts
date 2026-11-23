@@ -161,9 +161,11 @@ export function calculatedText(
 ): string | undefined {
   if (!calc?.as) return undefined;
   if (value === null) return '—';
+  // 浮点误差（0.29 * 100 = 28.999999999999996）不能显示成 29.0000；显示最多四位，这里先取到六位。
+  const shown = (n: number) => Math.round(n * 1e6) / 1e6;
   return calc.as === 'percent'
-    ? t(locale, 'statPercent', { value: formatNumber(value * 100, undefined, locale) })
-    : formatNumber(value, undefined, locale);
+    ? t(locale, 'statPercent', { value: formatNumber(shown(value * 100), undefined, locale) })
+    : formatNumber(shown(value), undefined, locale);
 }
 
 function hasTimeNode(node: FormulaNode): boolean {

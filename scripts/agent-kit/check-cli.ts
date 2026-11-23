@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import {
   BUILTIN_TOOLS,
   appFileJsonText,
-  appLink,
+  chatAppLink,
   checkHandoffFileText,
   createRegistry,
 } from '@morph/core';
@@ -59,7 +59,12 @@ function main(): number {
     );
     for (const h of check.hints) console.log(`- ${h}`);
   }
-  console.log(`Open in Tinkrum: ${appLink(appFileJsonText(text))}`);
+  const link = chatAppLink(appFileJsonText(text));
+  if (link) console.log(`Open in Tinkrum: ${link}`);
+  else
+    console.log(
+      'No Open in Tinkrum link: the file is too long for one. Give only the JSON code block.',
+    );
   return 0;
 }
 
