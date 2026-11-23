@@ -21,7 +21,7 @@ export function RecordPickScreen({
   onDone,
   onCancel,
 }: LocalScreenProps<'recordPick'>) {
-  const { collection, records } = input;
+  const { collection, records, select } = input;
   const cal = useCalendar();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function RecordPickScreen({
       palette={palette}
       title={collection.name}
       cancelLabel={t(locale, 'cancel')}
-      doneLabel={t(locale, 'recordPickChoose')}
+      doneLabel={t(locale, select ? 'recordPickSelect' : 'recordPickChoose')}
       doneDisabled={selected === null}
       onCancel={onCancel}
       onDone={() => selected !== null && onDone({ recordId: selected })}

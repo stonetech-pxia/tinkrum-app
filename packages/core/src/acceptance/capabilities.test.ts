@@ -277,6 +277,14 @@ function everything() {
     }),
     addTool(scanInto('scan-item', 'items')),
     addTool(
+      quickAction('fill-item', [
+        [
+          'records.fill',
+          { collectionId: 'items', templatesTable: 'items', kind: 'text', body: ['body'] },
+        ],
+      ]),
+    ),
+    addTool(
       quickAction('vcard-items', [
         ['in.records', { collectionId: 'items', period: 'all' }],
         ['records.toVCard', {}],

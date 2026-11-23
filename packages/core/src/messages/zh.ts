@@ -2,6 +2,10 @@
 import type { MessageTable } from './en';
 
 export const zh: MessageTable = {
+  exportAttachments: '附件文件',
+  templateMissingTitle: '部分占位符未填写',
+  templateMissingMessage: '找不到这些字段名，或有同名字段：{fields}。对应占位符保留原样。',
+
   trustNote:
     '没有广告。文件都在这台手机上处理，不用账号。Tink 是这个 App 里的 AI，默认由 Anthropic 的 Claude 提供，能看到你说的话和 App 的结构，看不到文件和记录。',
   resultContinue: '接着处理',
@@ -1384,6 +1388,7 @@ export const zh: MessageTable = {
   similarRecordBack: '回到表单',
   similarRecordSave: '仍然保存',
   recordPickChoose: '放进这条记录',
+  recordPickSelect: '选择',
   recordPickSearch: '搜索记录',
   recordPickNone: '没有匹配的记录。',
   html_Total_08322: '合计',

@@ -45,7 +45,7 @@ function hasEncryptedPackage(bytes: Uint8Array): boolean {
 }
 
 /** 部分的文字：UTF-8（带不带 BOM 都行），UTF-16 要有 BOM。 */
-function decodeText(bytes: Uint8Array): string {
+export function decodeOfficeXml(bytes: Uint8Array): string {
   if (bytes[0] === 0xff && bytes[1] === 0xfe) return utf16(bytes, true);
   if (bytes[0] === 0xfe && bytes[1] === 0xff) return utf16(bytes, false);
   return strFromU8(bytes);
@@ -149,7 +149,7 @@ export function openPackage(
       if (name === undefined) return undefined;
       if (!parsed.has(name)) {
         try {
-          parsed.set(name, parseXml(decodeText(files[name]!)));
+          parsed.set(name, parseXml(decodeOfficeXml(files[name]!)));
         } catch {
           throw new OfficeImportFailure('damaged');
         }

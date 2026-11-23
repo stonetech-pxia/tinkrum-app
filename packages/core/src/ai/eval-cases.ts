@@ -9417,7 +9417,165 @@ const MULTI_CHOICE_CASES: readonly EvalCase[] = [
   },
 ];
 
+const TEMPLATE_TABLES_EARLIER: EvalEarlier = {
+  input:
+    'I created an empty Templates table and added an email field to expenses; I will write all template content myself.',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'templates',
+        name: 'Templates',
+        fields: [
+          { id: 'title', name: 'Title', type: 'text' },
+          { id: 'body', name: 'Body', type: 'note' },
+          { id: 'subject', name: 'Subject', type: 'text' },
+          { id: 'document', name: 'Word file', type: 'file' },
+        ],
+      },
+    },
+    {
+      op: 'addData',
+      table: 'expenses',
+      field: { id: 'email', name: 'Email', type: 'text', format: 'email' },
+    },
+  ],
+};
+
+const RECORD_EXPORT_TEMPLATE_CASES: readonly EvalCase[] = [
+  {
+    id: 'EXPORTCOL1',
+    locale: 'en',
+    setup: 'budget',
+    mock: false,
+    next: true,
+    input:
+      'Add a button above my expenses list to export only the amount then date, in that order, to Excel, with copies of attachments, zip the results and share. Only export the entries currently shown by the list.',
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const q = quickActionsOf(c).find(
+          (w) =>
+            w.steps[0]?.action === 'records.toExcel' &&
+            w.steps[0].params.collectionId === 'expenses' &&
+            sameValue(w.steps[0].params.fields, ['amount', 'date']) &&
+            w.steps[0].params.attachments === true &&
+            w.steps.some((s) => s.action === 'zip.create') &&
+            w.steps.some((s) => s.action === 'out.share'),
+        );
+        return q &&
+          c.containers.pages
+            .flatMap((p) => allComponents(p))
+            .some(
+              (b) =>
+                'tools' in b &&
+                b.tools?.some((u) => 'tool' in u && u.as === 'list' && u.tool === q.id),
+            )
+          ? null
+          : 'expected a bound list export of amount then date, attachments, zip and share';
+      },
+    },
+  },
+  {
+    id: 'FILLCHAIN1',
+    locale: 'en',
+    setup: 'budget',
+    mock: false,
+    earlier: [TEMPLATE_TABLES_EARLIER],
+    input:
+      'Add a quick action that first reads all expenses, lets me choose exactly one entry, then fills a template I select from Templates. Use Body and Subject and this expense’s Email field to open one email draft, then copy the filled body to the clipboard. I write the templates myself. Do not send automatically or generate a draft for every expense.',
+    expect: {
+      kind: 'ops',
+      check: hasWorkflow(['in.records', 'records.fill', 'text.copy'], (steps) => {
+        const fill = steps.find((s) => s.action === 'records.fill')?.params;
+        return fill?.kind === 'email' &&
+          fill.collectionId === 'expenses' &&
+          fill.templatesTable === 'templates'
+          ? null
+          : 'expected a bound email template step between reading records and copying its output';
+      }),
+    },
+  },
+  {
+    id: 'FILLPICK1',
+    locale: 'en',
+    setup: 'budget',
+    mock: false,
+    earlier: [TEMPLATE_TABLES_EARLIER],
+    input:
+      'Add a quick action to the expenses list that takes the entries currently shown, lets me select one of them, fills a Word template I choose from Templates using Word file, then shares that one Word document. Do not make a document for every entry.',
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const q = quickActionsOf(c).find(
+          (w) =>
+            w.steps[0]?.action === 'records.fill' &&
+            w.steps[0].params.kind === 'word' &&
+            w.steps[0].params.collectionId === 'expenses' &&
+            w.steps[0].params.templatesTable === 'templates' &&
+            w.steps.some((s) => s.action === 'out.share'),
+        );
+        return q &&
+          c.containers.pages
+            .flatMap((p) => allComponents(p))
+            .some(
+              (b) =>
+                'tools' in b &&
+                b.tools?.some((u) => 'tool' in u && u.as === 'list' && u.tool === q.id),
+            )
+          ? null
+          : 'expected a Word template fill on the expenses list';
+      },
+    },
+  },
+  ...(['text', 'word', 'email'] as const).map((kind): EvalCase => ({
+    id: `FILL${kind.toUpperCase()}1`,
+    locale: 'en',
+    setup: 'budget',
+    mock: false,
+    earlier: [TEMPLATE_TABLES_EARLIER],
+    input:
+      kind === 'word'
+        ? 'Add a button on each expense entry page that fills this one entry into a Word template I choose from Templates, using its Word file field. Share the filled Word file. Keep the template layout.'
+        : kind === 'email'
+          ? 'Add a button on each expense entry page to choose one of my Templates and open a draft email to this entry’s Email field, with Subject and Body filled using this entry’s fields. I write the templates myself; never send automatically.'
+          : 'Add a button on each expense entry page that fills this one entry into a template I choose from Templates, using its Body field, then copies the resulting text. I write the templates myself.',
+    expect: {
+      kind: 'ops',
+      check: (c) => {
+        const q = quickActionsOf(c).find(
+          (w) => w.steps[0]?.action === 'records.fill' && w.steps[0].params.kind === kind,
+        );
+        if (!q) return 'expected records.fill as the first step';
+        const p = q.steps[0]!.params;
+        if (p.collectionId !== 'expenses' || p.templatesTable !== 'templates')
+          return 'expected source and template table bindings';
+        const named = (key: string, id: string) => sameValue(p[key], [id]);
+        if (kind === 'word' ? !named('document', 'document') : !named('body', 'body'))
+          return 'wrong template content field';
+        if (kind === 'email' && (!named('subject', 'subject') || !named('recipient', 'email')))
+          return 'email must configure recipient and subject';
+        if (
+          !c.data.tables
+            .find((t) => t.id === 'expenses')
+            ?.recordRow?.some((u) => u.tool === q.id) &&
+          !c.containers.pages.some(
+            (p) =>
+              p.of === 'expenses' &&
+              allComponents(p).some(
+                (b) => b.look === 'single' && b.tools?.some((u) => 'tool' in u && u.tool === q.id),
+              ),
+          )
+        )
+          return 'expected the action on the expense entry page';
+        return null;
+      },
+    },
+  })),
+];
+
 export const EVAL_CASES: readonly EvalCase[] = [
+  ...RECORD_EXPORT_TEMPLATE_CASES,
   ...FIX_CASES,
   ...MULTI_CHOICE_CASES,
   ...PAGE_ENTRY_CASES,

@@ -70,36 +70,49 @@ function cellOf(
   return { kind: 'text', text };
 }
 
-/** 第一行是字段名，后面每条记录一行。 */
+/** 第一行是字段名；省略选项时和旧版完全相同。 */
 export function recordsToSheet(
   collection: Collection,
   records: readonly DataRecord[],
   locale: Locale,
   links?: LinkResolver,
+  options: { fields?: readonly string[] } = {},
 ): SheetValue[][] {
   const head = (text: string): SheetValue => ({ kind: 'text', text });
-  // 金额格子只有数字：货币写在表头。每笔自己选货币时（D-429）货币本来就是一列。
-  const header = [
-    ...collection.fields.map((f) =>
-      head(f.type === 'money' && !f.currencyField ? `${f.name} (${f.currency})` : f.name),
-    ),
-    head(t(locale, 'data_Created_1626a')),
-  ];
-  const rows = records.map((r) => {
-    const at = new Date(r.createdAt);
-    const value = serial(
-      at.getFullYear(),
-      at.getMonth() + 1,
-      at.getDate(),
-      at.getHours(),
-      at.getMinutes(),
+  const ids = options.fields?.length
+    ? options.fields
+    : [...collection.fields.map((f) => f.id), 'createdAt'];
+  const fields = ids.map((id) => collection.fields.find((f) => f.id === id));
+  const header = ids.map((id, i) => {
+    const f = fields[i];
+    if (!f && id !== 'createdAt' && id !== 'updatedAt')
+      throw new Error(`Unknown export field: ${id}`);
+    return head(
+      f
+        ? f.type === 'money' && !f.currencyField
+          ? `${f.name} (${f.currency})`
+          : f.name
+        : t(locale, id === 'updatedAt' ? 'html_Updated_74f0c' : 'data_Created_1626a'),
     );
-    const text = formatTimestamp(r.createdAt, locale);
-    const created: SheetValue =
-      value === null
-        ? { kind: 'text', text }
-        : { kind: 'number', value, format: DATE_TIME_FORMAT, text };
-    return [...collection.fields.map((f) => cellOf(f, r, collection, locale, links)), created];
   });
+  const rows = records.map((r) =>
+    ids.map((id, i): SheetValue => {
+      const f = fields[i];
+      if (f) return cellOf(f, r, collection, locale, links);
+      const stamp = id === 'updatedAt' ? r.updatedAt : r.createdAt;
+      const at = new Date(stamp);
+      const value = serial(
+        at.getFullYear(),
+        at.getMonth() + 1,
+        at.getDate(),
+        at.getHours(),
+        at.getMinutes(),
+      );
+      const text = formatTimestamp(stamp, locale);
+      return value === null
+        ? head(text)
+        : { kind: 'number', value, format: DATE_TIME_FORMAT, text };
+    }),
+  );
   return [header, ...rows];
 }

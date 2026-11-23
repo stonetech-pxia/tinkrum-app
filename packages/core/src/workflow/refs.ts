@@ -1,6 +1,6 @@
 import type { Registry } from '../registry';
 import type { Collection, QuickAction, WorkspaceConfig } from '../schema';
-import { handedInput, handedValueType } from './check';
+import { handedValueType } from './check';
 import { outputTypeOf, type ValueType } from './contract';
 
 // 步骤参数里引用配置的地方（CHAIN_AUDIT A3，创始人 2026-10-31）。动作目录的 ParamField.kind 就是声明：
@@ -40,13 +40,15 @@ export function stepRefs(wf: QuickAction, registry: Registry): StepRef[] {
     for (const f of action.fields) {
       const v = step.params[f.key];
       if (f.kind !== 'collection' || typeof v !== 'string') continue;
-      own = v;
+      if (f.bindsInput || action.fields.filter((p) => p.kind === 'collection').length === 1)
+        own = v;
       refs.push({ index, key: f.key, table: v, ...(f.receives ? { receives: value } : {}) });
     }
     for (const f of action.fields) {
       const v = step.params[f.key];
-      const table = own ?? recordsTable;
-      if (f.kind !== 'fields' || !Array.isArray(v) || table === null) continue;
+      const table =
+        (f.collectionKey ? step.params[f.collectionKey] : undefined) ?? own ?? recordsTable;
+      if (f.kind !== 'fields' || !Array.isArray(v) || typeof table !== 'string') continue;
       for (const id of v)
         if (typeof id === 'string' && !BUILT_IN_FIELDS.has(id))
           refs.push({ index, key: f.key, table, field: id });
@@ -69,17 +71,44 @@ export function stepRefProblems(
   registry: Registry,
 ): string[] {
   const problems: string[] = [];
-  // 容器交来的记录（D-428）是哪张表要到运行时才知道，所以不能写字段：不写就是全部字段。
-  if (handedInput(wf.steps, registry) !== null)
-    for (const step of wf.steps) {
-      for (const f of registry.actions.get(step.action)?.fields ?? []) {
-        const named = step.params[f.key];
-        if (f.kind === 'fields' && Array.isArray(named) && named.length > 0)
-          problems.push(
-            `${wf.id}/${step.id}: ${f.key} must be empty: the records are handed over by the container, so the table is not known here (empty = all fields)`,
-          );
+  let recordsTable: string | null = null;
+  for (const step of wf.steps) {
+    const action = registry.actions.get(step.action);
+    if (!action) continue;
+    const binding = action.fields.find((f) => f.bindsInput);
+    const bound = binding ? step.params[binding.key] : undefined;
+    if (typeof bound === 'string') {
+      if (recordsTable && recordsTable !== bound)
+        problems.push(`${wf.id}/${step.id}: input table must be ${recordsTable}, not ${bound}`);
+      recordsTable = bound;
+    }
+    for (const f of action.fields) {
+      const named = step.params[f.key];
+      if (f.kind !== 'fields' || !Array.isArray(named) || !named.length) continue;
+      const tableId = (f.collectionKey ? step.params[f.collectionKey] : undefined) ?? recordsTable;
+      if (typeof tableId !== 'string') {
+        problems.push(
+          `${wf.id}/${step.id}: ${f.key} must be empty: the records are handed over by the container, so the table is not known here (empty = all fields)`,
+        );
+        continue;
+      }
+      const table = config.data.tables.find((t) => t.id === tableId);
+      for (const id of named) {
+        const field = table?.fields.find((p) => p.id === id);
+        if (f.textFormat && field && (field.type !== 'text' || field.format !== f.textFormat))
+          problems.push(`${wf.id}/${step.id}: ${String(id)} needs format ${f.textFormat}`);
+        if (field && f.fieldTypes && !f.fieldTypes.includes(field.type))
+          problems.push(`${wf.id}/${step.id}: ${String(id)} has the wrong field type for ${f.key}`);
       }
     }
+    const next = outputTypeOf(action, step.params, 'records');
+    if (next !== 'records') recordsTable = null;
+    else if (!recordsTable) {
+      const source = action.fields.find((f) => f.kind === 'collection' && !f.receives);
+      const id = source && step.params[source.key];
+      if (typeof id === 'string') recordsTable = id;
+    }
+  }
   for (const ref of stepRefs(wf, registry)) {
     const at = `${wf.id}/${wf.steps[ref.index]!.id}`;
     const table = config.data.tables.find((c) => c.id === ref.table);
@@ -111,4 +140,22 @@ export function missingPlace(
   return table.fields.some((f) => f.type === 'file')
     ? null
     : 'an attachment (file) field for the files';
+}
+
+/** 入口必须给出快捷操作绑定的表。 */
+export function handedRecordProblems(
+  wf: QuickAction,
+  tableId: string | undefined,
+  registry: Registry,
+): string[] {
+  const problems: string[] = [];
+  for (const step of wf.steps) {
+    const action = registry.actions.get(step.action);
+    for (const f of action?.fields ?? []) {
+      const id = step.params[f.key];
+      if (f.bindsInput && typeof id === 'string' && id !== tableId)
+        problems.push(`${wf.id}: input table must be ${id}, not ${tableId ?? 'unknown'}`);
+    }
+  }
+  return problems;
 }

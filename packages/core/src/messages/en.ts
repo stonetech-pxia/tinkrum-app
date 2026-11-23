@@ -2,6 +2,11 @@
 // 新文案三份一起加，写完整的句子；带数量的再在下面的 enSingular / frSingular 各加单数写法。
 
 export const en = {
+  exportAttachments: 'Attachment files',
+  templateMissingTitle: 'Some placeholders were not filled',
+  templateMissingMessage:
+    'These field names were not found or are ambiguous: {fields}. Their placeholders stay as written.',
+
   trustNote:
     'No ads. Your files are processed on this phone, with no account. Tink is this app’s AI, provided by Anthropic’s Claude by default. It sees what you say and how the app is built, not your files or entries.',
   resultContinue: 'Continue processing',
@@ -1465,6 +1470,7 @@ export const en = {
   similarRecordBack: 'Back to the form',
   similarRecordSave: 'Save anyway',
   recordPickChoose: 'Add to this entry',
+  recordPickSelect: 'Select',
   recordPickSearch: 'Search entries',
   recordPickNone: 'No entry matches.',
   html_Total_08322: 'Total',

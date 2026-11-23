@@ -422,6 +422,14 @@ export async function runWorkflow<S>(opts: RunOptions<S>): Promise<RunResult> {
         }
         params = action.params.parse({ ...params, ...rest });
       }
+      for (const f of action.fields) {
+        if (
+          f.bindsInput &&
+          typeof params[f.key] === 'string' &&
+          (value?.type !== 'records' || value.collectionId !== params[f.key])
+        )
+          throw new RunError('invalidWorkflow');
+      }
       // 先问参数再确认扩展包：文字识别的语言包由本次选的语言决定。
       const needs = packNeeds(action, params, value);
       if (needs.length && opts.ensurePacks && !askedAll) {

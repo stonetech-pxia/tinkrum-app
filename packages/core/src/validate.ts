@@ -59,7 +59,7 @@ import { contrastProblems } from './theme';
 import { findWorkflowTarget, presetById } from './workflows/presets';
 import { handedInput, workflowProblems } from './workflow/check';
 import type { HandedType } from './workflow/contract';
-import { stepRefProblems } from './workflow/refs';
+import { handedRecordProblems, stepRefProblems } from './workflow/refs';
 import { issueLines } from './zod-issues';
 
 // 变更校验（§7D）：结构 → 引用 → 受保护元素 → 可读性 → 工具与权限 → 快捷操作的数据流。
@@ -550,6 +550,8 @@ function recordRowProblems(
         `${where}: this quick action chooses its own input; a button on the entry page must start with a step that takes text, records or files (e.g. out.call, records.toVCard, pdf.compress)`,
       );
     else if (takes === 'records') {
+      const wf = findWorkflowTarget(quickActionsOf(config), item.tool, 'en');
+      if (wf) problems.push(...handedRecordProblems(wf, table.id, registry));
       if (item.field !== undefined)
         problems.push(`${where}: its first step takes the whole entry: leave field out`);
     } else {
@@ -635,6 +637,13 @@ function toolUseProblems(
           // 列表交它选出的记录，单条记录块交这一条（D-428）；别的块没有值可交。
           const hands = u.as === 'list' || c.look === 'single';
           const takes = handedBy(config, u.tool, registry);
+          if (hands && takes === 'records') {
+            const wf = findWorkflowTarget(quickActionsOf(config), u.tool, 'en');
+            const tableId =
+              rowOf?.id ??
+              (c.look === 'dial' ? pageBrowseLists(page)[0]?.source?.table : undefined);
+            if (wf) problems.push(...handedRecordProblems(wf, tableId, registry));
+          }
           if (hands && takes === 'files') {
             // 这张表第一个附件字段里的文件（D-442）；分开的浮动按钮没有自己的表，不交文件。
             if (c.look === 'dial' || !rowOf || !attachmentField(rowOf))

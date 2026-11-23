@@ -1152,15 +1152,176 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     id: 'records.toExcel',
     label: { en: 'Records to Excel', zh: '记录生成 Excel', fr: 'Entrées en Excel' },
     description: {
-      en: 'Make one Excel file (.xlsx) from the records, named after the table: one column per field, with the field names on the first row. Numbers, money and dates are real numbers and dates; everything else is text. The values are filled in on the device; there are no settings.',
-      zh: '把记录做成一个 Excel 文件（.xlsx），用表名命名：每个字段一列，第一行是字段名。数字、金额、日期是真的数字和日期，别的都是文字。记录内容在本机填进去，没有设置。',
-      fr: 'Créez un fichier Excel (.xlsx) à partir des entrées, au nom du tableau : une colonne par champ, avec les noms des champs sur la première ligne. Les nombres, montants et dates sont de vrais nombres et dates ; le reste est du texte. Les valeurs sont remplies sur l’appareil ; il n’y a aucun réglage.',
+      en: 'Make one Excel file (.xlsx) from the records, named after the table: one column per field, with the field names on the first row. Numbers, money and dates are real numbers and dates; everything else is text. Choose columns in selection order and optionally include attachment copies. Values stay on the device.',
+      zh: '把记录做成一个 Excel 文件（.xlsx），用表名命名：每个字段一列，第一行是字段名。数字、金额、日期是真的数字和日期，别的都是文字。可按顺序选列、同时导出附件副本；记录内容只在本机处理。',
+      fr: 'Créez un fichier Excel (.xlsx) à partir des entrées, au nom du tableau : une colonne par champ, avec les noms des champs sur la première ligne. Les nombres, montants et dates sont de vrais nombres et dates ; le reste est du texte. Choisissez les colonnes dans l’ordre souhaité et joignez au besoin des copies des pièces jointes. Les valeurs restent sur l’appareil.',
     },
-    ai: '"Export to Excel", "导出成表格" → in.records, this, out.share (the user taps to send it).',
+    ai: '"Export to Excel", "导出成表格" → in.records, this, out.share. fields is an ordered list of field IDs (createdAt allowed; updatedAt is not supported); empty or missing preserves all columns. Bind collectionId for handed records when selecting fields. attachments returns the Excel plus attachment copies, optionally chain zip.create. No charts or pivots.',
     input: ['records'],
     output: 'files',
-    params: z.strictObject({}),
-    fields: [],
+    params: z.strictObject({
+      collectionId: IdSchema.optional(),
+      fields: z
+        .array(z.union([IdSchema, z.literal('createdAt')]))
+        .max(31)
+        .refine((ids) => new Set(ids).size === ids.length, 'duplicate fields')
+        .optional(),
+      attachments: z.boolean().optional(),
+    }),
+    fields: [
+      {
+        key: 'collectionId',
+        kind: 'collection',
+        bindsInput: true,
+        ask: false,
+        label: { en: 'Entry table', zh: '记录所在表', fr: 'Tableau des entrées' },
+      },
+      {
+        key: 'fields',
+        kind: 'fields',
+        collectionKey: 'collectionId',
+        builtInCreated: true,
+        ask: false,
+        label: {
+          en: 'Columns in selection order (empty = all)',
+          zh: '按选择顺序导出的列（留空为全部）',
+          fr: 'Colonnes dans l’ordre de sélection (vide = toutes)',
+        },
+      },
+      {
+        key: 'attachments',
+        kind: 'toggle',
+        ask: false,
+        label: {
+          en: 'Include attachment copies',
+          zh: '同时导出附件副本',
+          fr: 'Joindre les copies des pièces jointes',
+        },
+      },
+    ],
     requires: [],
+  },
+  {
+    id: 'records.fill',
+    aiRules: [
+      {
+        n: 74,
+        text: 'Entry templates are user-written data, never config: you may create their table and configure records.fill but must not compose, store in config, read or request the subject, body, Word content or entry values. records.fill binds collectionId and templatesTable; kind is fixed as text, word or email. It accepts records from recordRow, single blocks, lists or in.records; if several entries arrive, the user selects exactly one before filling. Email opens one draft and returns the filled body as text, which can chain into further text actions. Bulk entry export uses records.toExcel. Excel fields are ordered field IDs (empty or omitted keeps old columns, createdAt allowed); handed records with chosen fields bind collectionId and cannot attach to another table. attachments returns Excel plus copies; use zip.create for one archive. No totals option and no new filename placeholders.',
+      },
+    ],
+    label: {
+      en: 'Fill an entry into a template',
+      zh: '记录填入模板',
+      fr: 'Remplir un modèle avec une entrée',
+    },
+    description: {
+      en: 'Fill a user-written text, Word or email template with exactly one entry, on this device.',
+      zh: '把一条记录填入用户写好的文字、Word 或邮件模板，只在本机处理。',
+      fr: 'Remplir un modèle de texte, Word ou e-mail écrit par l’utilisateur avec une seule entrée, sur cet appareil.',
+    },
+    input: ['records'],
+    output: (p) => (p.kind === 'word' ? 'files' : 'text'),
+    params: z
+      .strictObject({
+        collectionId: IdSchema,
+        templatesTable: IdSchema,
+        kind: z.enum(['text', 'word', 'email']),
+        body: z.array(IdSchema).length(1).optional(),
+        subject: z.array(IdSchema).length(1).optional(),
+        document: z.array(IdSchema).length(1).optional(),
+        recipient: z.array(IdSchema).length(1).optional(),
+      })
+      .refine(
+        (p) => (p.kind === 'word' ? !!p.document : !!p.body),
+        'choose the template content field',
+      )
+      .refine(
+        (p) => p.kind !== 'email' || (!!p.subject && !!p.recipient),
+        'choose subject and recipient fields',
+      ),
+    fields: [
+      {
+        key: 'collectionId',
+        kind: 'collection',
+        bindsInput: true,
+        ask: false,
+        fixed: true,
+        label: { en: 'Entry table', zh: '记录所在表', fr: 'Tableau de l’entrée' },
+      },
+      {
+        key: 'kind',
+        kind: 'choice',
+        ask: false,
+        fixed: true,
+        label: { en: 'Output kind', zh: '输出种类', fr: 'Type de sortie' },
+        options: [
+          { value: 'text', label: { en: 'Text', zh: '文字', fr: 'Texte' } },
+          { value: 'word', label: { en: 'Word', zh: 'Word', fr: 'Word' } },
+          { value: 'email', label: { en: 'Email', zh: '邮件', fr: 'E-mail' } },
+        ],
+      },
+      {
+        key: 'templatesTable',
+        kind: 'collection',
+        ask: false,
+        fixed: true,
+        label: { en: 'Templates table', zh: '模板表', fr: 'Tableau des modèles' },
+      },
+      {
+        key: 'body',
+        kind: 'fields',
+        collectionKey: 'templatesTable',
+        fieldTypes: ['text', 'note'],
+        single: true,
+        ask: false,
+        fixed: true,
+        showIf: { key: 'kind', equals: ['text', 'email'] },
+        label: { en: 'Template body field', zh: '模板正文栏', fr: 'Champ du corps du modèle' },
+      },
+      {
+        key: 'subject',
+        kind: 'fields',
+        collectionKey: 'templatesTable',
+        fieldTypes: ['text', 'note'],
+        single: true,
+        ask: false,
+        fixed: true,
+        showIf: { key: 'kind', equals: ['email'] },
+        label: { en: 'Template subject field', zh: '模板主题栏', fr: 'Champ de l’objet du modèle' },
+      },
+      {
+        key: 'document',
+        kind: 'fields',
+        collectionKey: 'templatesTable',
+        fieldTypes: ['file'],
+        single: true,
+        ask: false,
+        fixed: true,
+        showIf: { key: 'kind', equals: ['word'] },
+        label: {
+          en: 'Word template attachment field',
+          zh: 'Word 模板附件栏',
+          fr: 'Champ de la pièce jointe Word',
+        },
+      },
+      {
+        key: 'recipient',
+        kind: 'fields',
+        collectionKey: 'collectionId',
+        fieldTypes: ['text'],
+        textFormat: 'email',
+        single: true,
+        ask: false,
+        fixed: true,
+        showIf: { key: 'kind', equals: ['email'] },
+        label: {
+          en: 'Recipient email field',
+          zh: '收件邮箱栏',
+          fr: 'Champ de l’adresse e-mail du destinataire',
+        },
+      },
+    ],
+    requires: [],
+    ai: 'Bind collectionId. Accept records from recordRow, single blocks, lists or in.records. If several entries arrive, ask the user to select exactly one, then fill once; never generate Word files or emails in bulk. Templates are ordinary entries written by the user in templatesTable: configure body/subject/document as one-element field ID arrays; recipient names one email-format field in collectionId. Never compose template content or see it. User placeholders are {Field name}, replaced locally. kind is fixed, not asked at run time: text → text, word → files, email → text: opens one email draft and returns the filled body; further text actions may follow. Only Excel exports many entries at once; template filling always works on one entry selected by the user. Names use the template entry title and existing file.rename; no new naming placeholders.',
   },
 ];

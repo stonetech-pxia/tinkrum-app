@@ -3,6 +3,11 @@
 import type { MessageTable, SingularTable } from './en';
 
 export const fr: MessageTable = {
+  exportAttachments: 'Fichiers joints',
+  templateMissingTitle: 'Certains espaces réservés ne sont pas remplis',
+  templateMissingMessage:
+    'Ces noms de champs sont introuvables ou ambigus : {fields}. Les espaces réservés restent tels quels.',
+
   trustNote:
     'Sans publicité. Vos fichiers sont traités sur ce téléphone, sans compte. Tink est l’IA de cette application, fournie par défaut par Claude d’Anthropic. Tink voit ce que vous dites et la structure de l’application, pas vos fichiers ni vos entrées.',
   resultContinue: 'Continuer le traitement',
@@ -1538,6 +1543,7 @@ export const fr: MessageTable = {
   similarRecordBack: 'Retour au formulaire',
   similarRecordSave: 'Enregistrer quand même',
   recordPickChoose: 'Ajouter à cette entrée',
+  recordPickSelect: 'Choisir',
   recordPickSearch: 'Rechercher une entrée',
   recordPickNone: 'Aucune entrée ne correspond.',
   html_Total_08322: 'Total',

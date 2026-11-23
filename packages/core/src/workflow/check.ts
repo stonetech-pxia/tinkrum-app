@@ -142,6 +142,8 @@ export function workflowProblems(wf: Workflow, registry: Registry): StepProblem[
     }
     const keys = new Set(action.fields.map((f) => f.key));
     for (const key of step.ask ?? []) {
+      if (action.fields.some((f) => f.key === key && (f.bindsInput || f.fixed)))
+        problem('ask', `${key} is fixed in the quick action settings`);
       if (!keys.has(key)) problem('ask', `${key} is not a parameter of ${action.id}`);
     }
     if (isSourceAction(action)) {

@@ -90,3 +90,10 @@ describe('recordsToSheet', () => {
     expect(row[4]!.kind).toBe('text');
   });
 });
+
+it('exports chosen columns in order, including Created', () => {
+  const rows = recordsToSheet(table, [full, full], 'en', links, {
+    fields: ['cost', 'name', 'day', 'createdAt', 'qty'],
+  });
+  expect(rows[0]!.map((c) => c.text)).toEqual(['Cost (EUR)', 'Name', 'Day', 'Created', 'Qty']);
+});
