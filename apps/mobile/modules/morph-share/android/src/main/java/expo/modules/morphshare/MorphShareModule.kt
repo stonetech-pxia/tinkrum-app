@@ -185,6 +185,15 @@ class MorphShareModule : Module() {
       activity.startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), FOLDER_REQUEST)
     }.runOnQueue(Queues.MAIN)
 
+    // 分享目标选了 Tinkrum 自己时，系统把分享交回同一个界面，分享面板的返回结果不会送到（真机日志：选 Gmail 或按返回
+    // 都有 onActivityResult，只有选 Tinkrum 没有）。回到前台时 pendingShare 还在就说明面板已经关了：放掉它，
+    // 不然之后每一次分享、保存都报「Another share or save sheet is open」，直到把 App 划掉。
+    // 正常关闭时结果在回到前台之前就到了，这里 pendingShare 已经是空的。
+    OnActivityEntersForeground {
+      pendingShare?.resolve(null)
+      pendingShare = null
+    }
+
     OnActivityResult { _, payload ->
       when (payload.requestCode) {
         SHARE_REQUEST -> {
