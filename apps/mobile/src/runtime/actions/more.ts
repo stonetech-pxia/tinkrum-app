@@ -48,6 +48,9 @@ import {
 } from '@morph/tool-qr';
 import { textToDocDoc, writeDocx, writeRowsXlsx } from '@morph/tool-office';
 
+import { copyExcelAttachments, requireRecordTable } from './record-export';
+import { fillRecord } from './record-fill';
+
 import { openFieldLink } from '../../renderer/open-link';
 import { collectAttachments, mergeReport, type CollectedAttachments } from './report-attachments';
 import {
@@ -234,7 +237,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
   'out.website': openLinkAction('url'),
 
   // D-427：和 vCard 一样只做一个文件，要离开 App 还要接 out.share（底线 10）。列和 CSV 一样。
-  async 'records.toExcel'(input, _params, ctx) {
+  async 'records.toExcel'(input, params, ctx) {
     if (!input || input.type !== 'records') {
       throw new RunError('unexpected', { detail: 'no records' });
     }
@@ -248,14 +251,27 @@ export const MORE_IMPLS: Record<string, Impl> = {
       linkedCollectionIds(collection),
       ctx.locale,
     );
-    const rows = recordsToSheet(collection, input.records, ctx.locale, links);
+    requireRecordTable(input, params.collectionId);
+    const attachments =
+      params.attachments === true
+        ? await copyExcelAttachments(ctx, collection, input.records)
+        : null;
+    const rows = recordsToSheet(collection, input.records, ctx.locale, links, {
+      fields: params.fields as string[] | undefined,
+    });
+    if (attachments) {
+      rows[0]!.push({ kind: 'text', text: t(ctx.locale, 'exportAttachments') });
+      attachments.rows.forEach((text, i) => rows[i + 1]!.push({ kind: 'text', text }));
+    }
     const item = await writeItem(ctx.services, writeRowsXlsx(table.name, rows), {
       name: table.name,
       ext: 'xlsx',
       mimeType: OFFICE_MIME_BY_EXT.xlsx!,
     });
-    return { type: 'files', items: [item] };
+    return { type: 'files', items: [item, ...(attachments?.items ?? [])] };
   },
+
+  'records.fill': fillRecord,
 
   async 'text.toPdf'(input, params, ctx) {
     const value = textOf(input);

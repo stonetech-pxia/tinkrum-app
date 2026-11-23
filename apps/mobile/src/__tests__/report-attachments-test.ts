@@ -332,6 +332,49 @@ describe('records.toExcel (D-427)', () => {
     expect(strFromU8(zip['xl/workbook.xml']!)).toContain('name="报销"');
   });
 
+  it('selects columns in order and exports uniquely named copies with skipped files noted on their row', async () => {
+    const wf = structuredClone(excel);
+    wf.steps[1]!.params = { fields: ['amount', 'note'], attachments: true };
+    const s = setup(wf);
+    await s.addPhoto('a', 'receipt.jpg');
+    await s.addPhoto('b', 'receipt.jpg');
+    await s.addRecord('r1', { note: 'First', amount: 12, receipt: ['a', 'missing'] });
+    await s.addRecord('r2', { note: 'Second', amount: 3, receipt: ['b', 'a'] });
+    const result = await s.run();
+    if (result.status !== 'succeeded' || !result.value || !('items' in result.value))
+      throw new Error(JSON.stringify(result));
+    expect(result.value.items.map((i) => `${i.name}.${i.ext}`)).toEqual([
+      '报销.xlsx',
+      'receipt.jpg',
+      'receipt-2.jpg',
+    ]);
+    const parts = unzipSync(s.files.disk.get(result.value.items[0]!.uri)!);
+    const strings = strFromU8(parts['xl/sharedStrings.xml']!);
+    expect(strings.indexOf('金额')).toBeLessThan(strings.indexOf('备注'));
+    expect(strings).toContain('receipt-2.jpg');
+    expect(strings).toContain('missing');
+    expect(await s.repo.getAsset('a')).toBeTruthy();
+  });
+
+  it('stops copying at the shared attachment count limit', async () => {
+    const wf = structuredClone(excel);
+    wf.steps[1]!.params = { attachments: true };
+    const s = setup(wf);
+    for (let i = 0; i < REPORT_ATTACHMENT_LIMITS.maxCount + 1; i++) {
+      await s.addFile(`a${i}`, `a${i}.txt`, 'text/plain', new Uint8Array([1]));
+      await s.addRecord(`r${i}`, { note: `Row ${i}`, receipt: [`a${i}`] });
+    }
+    const result = await s.run();
+    if (result.status !== 'succeeded' || !result.value || !('items' in result.value))
+      throw new Error(JSON.stringify(result));
+    expect(result.value.items).toHaveLength(REPORT_ATTACHMENT_LIMITS.maxCount + 1);
+    const strings = strFromU8(
+      unzipSync(s.files.disk.get(result.value.items[0]!.uri)!)['xl/sharedStrings.xml']!,
+    );
+    expect(strings).toContain(`a${REPORT_ATTACHMENT_LIMITS.maxCount}.txt`);
+    expect(strings).toContain('40');
+  });
+
   it('says so when the table has no records', async () => {
     const s = setup(excel);
     const result = await s.run();

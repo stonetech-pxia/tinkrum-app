@@ -925,6 +925,12 @@ export const CAPABILITIES: readonly Capability[] = [
       v.pages.some((p) => p.of !== undefined) && recordBlocks(v).some((b) => b.opens !== undefined),
   ),
   cap('read.openEditor', 'read', usesOpen),
+  cap('read.action.records.toExcel', 'read', (v) =>
+    quickActionsOf(v.config).some((q) => q.steps.some((s) => s.action === 'records.toExcel')),
+  ),
+  cap('read.action.records.fill', 'read', (v) =>
+    quickActionsOf(v.config).some((q) => q.steps.some((s) => s.action === 'records.fill')),
+  ),
   cap('read.action.in.records', 'read', (v) =>
     quickActionsOf(v.config).some((q) => q.steps.some((s) => s.action === 'in.records')),
   ),

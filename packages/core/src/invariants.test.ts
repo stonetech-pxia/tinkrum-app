@@ -2077,6 +2077,14 @@ describe('底线 19：用户要的事都能做到', () => {
   const paramsOf = (a: ActionDefinition) => {
     const p = { ...(defaultParams(a) ?? initialParams(a)) };
     if ('collectionId' in p) p.collectionId = 'notes';
+    if (a.id === 'records.fill')
+      Object.assign(p, {
+        templatesTable: 'templates',
+        body: ['body'],
+        subject: ['subject'],
+        document: ['document'],
+        recipient: ['email'],
+      });
     return p;
   };
 

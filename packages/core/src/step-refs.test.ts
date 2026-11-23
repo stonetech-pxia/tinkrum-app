@@ -143,7 +143,12 @@ describe('one check for every action that names a table or its fields', () => {
     const named = [...registry.actions.values()].filter((a) =>
       a.fields.some((f) => f.kind === 'collection'),
     );
-    expect(named.map((a) => a.id).sort()).toEqual(['in.records', 'out.addRecord']);
+    expect(named.map((a) => a.id).sort()).toEqual([
+      'in.records',
+      'out.addRecord',
+      'records.fill',
+      'records.toExcel',
+    ]);
     const bad = config([
       {
         ...snap,

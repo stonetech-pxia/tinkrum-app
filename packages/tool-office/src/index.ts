@@ -18,3 +18,5 @@ export * from './text-doc';
 export * from './types';
 export * from './xlsx';
 export * from './xlsx-import';
+
+export * from './template-fill';

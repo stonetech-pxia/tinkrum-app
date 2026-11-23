@@ -118,6 +118,15 @@ export interface ParamField {
    * 文字要有长文本或文字字段。
    */
   receives?: boolean;
+  /** 此表约束传进来的记录；不能从别的表交入。 */
+  bindsInput?: boolean;
+  /** fields 参数引用哪一个 collection 参数；不写沿用输入记录的表。 */
+  collectionKey?: string;
+  /** 字段选择器允许的类型；单字段选择也仍保存为字段 ID 数组。 */
+  fieldTypes?: readonly Field['type'][];
+  single?: boolean;
+  textFormat?: 'email' | 'phone' | 'url';
+  builtInCreated?: boolean;
   /** 多行文字（文字转 PDF、二维码内容）。 */
   multiline?: boolean;
   unit?: ParamUnit;
@@ -136,6 +145,8 @@ export interface ParamField {
    * 参数都是 false 就直接跑、不弹参数面板（D-363，desk/tools.ts 的 deskToolAsks）。
    */
   ask?: boolean;
+  /** 必须在快捷操作的设置里确定，不能在运行时改输出种类或配置引用。 */
+  fixed?: boolean;
   /** 用户自己写的文字（水印、文字戳）：发给 AI 前替换成占位符（D-065）。 */
   private?: boolean;
   /** secret 要输两遍、一样才行（给 PDF 加密码，D-194）。 */

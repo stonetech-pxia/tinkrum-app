@@ -122,6 +122,7 @@ export function ParamForm({
             locale={locale}
             testID={`${testPrefix}-${field.key}`}
             collection={collection}
+            tableId={field.collectionKey ? values[field.collectionKey] : undefined}
           />
           {field.kind === 'secret' && field.confirm ? (
             <>
@@ -152,6 +153,7 @@ function FieldInput({
   locale,
   testID,
   collection,
+  tableId,
 }: {
   field: ParamField;
   value: unknown;
@@ -160,6 +162,7 @@ function FieldInput({
   locale: Locale;
   testID: string;
   collection?: Collection | undefined;
+  tableId?: unknown;
 }) {
   const input = [
     styles.input,
@@ -227,34 +230,29 @@ function FieldInput({
       return (
         <CollectionInput value={value} onChange={onChange} palette={palette} testID={testID} />
       );
-    case 'fields': {
-      const chosen = Array.isArray(value) ? (value as string[]) : [];
-      if (!collection) {
-        return (
-          <Text style={[palette.font('body', 14), { color: palette.muted }]}>
-            {t(locale, 'ParamForm_Choose_a_data_table_first_b5c9a')}
-          </Text>
-        );
-      }
-      return (
-        <View style={styles.wrap}>
-          {collection.fields.map((f) => (
-            <Pill
-              key={f.id}
-              palette={palette}
-              testID={`${testID}-${f.id}`}
-              label={f.name}
-              selected={chosen.includes(f.id)}
-              onPress={() =>
-                onChange(
-                  chosen.includes(f.id) ? chosen.filter((x) => x !== f.id) : [...chosen, f.id],
-                )
-              }
-            />
-          ))}
-        </View>
+    case 'fields':
+      return field.collectionKey ? (
+        <BoundFieldSelection
+          field={field}
+          value={value}
+          onChange={onChange}
+          palette={palette}
+          locale={locale}
+          testID={testID}
+          collection={collection}
+          tableId={tableId}
+        />
+      ) : (
+        <FieldSelection
+          field={field}
+          value={value}
+          onChange={onChange}
+          palette={palette}
+          locale={locale}
+          testID={testID}
+          collection={collection}
+        />
       );
-    }
     case 'secret':
       return (
         <TextInput
@@ -282,6 +280,78 @@ function FieldInput({
         />
       );
   }
+}
+
+type FieldSelectionProps = {
+  field: ParamField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  palette: Palette;
+  locale: Locale;
+  testID: string;
+  collection?: Collection | undefined;
+};
+function BoundFieldSelection(props: FieldSelectionProps & { tableId?: unknown }) {
+  const collection = useWorkspace((s) => s.config?.data.tables.find((c) => c.id === props.tableId));
+  return (
+    <FieldSelection
+      {...props}
+      collection={props.tableId === undefined ? props.collection : collection}
+    />
+  );
+}
+function FieldSelection({
+  field,
+  value,
+  onChange,
+  palette,
+  locale,
+  testID,
+  collection,
+}: FieldSelectionProps) {
+  const chosen = Array.isArray(value) ? (value as string[]) : [];
+  if (!collection) {
+    return (
+      <Text style={[palette.font('body', 14), { color: palette.muted }]}>
+        {t(locale, 'ParamForm_Choose_a_data_table_first_b5c9a')}
+      </Text>
+    );
+  }
+  return (
+    <View style={styles.wrap}>
+      {[
+        ...collection.fields.filter(
+          (f) =>
+            (!field.fieldTypes || field.fieldTypes.includes(f.type)) &&
+            (!field.textFormat || (f.type === 'text' && f.format === field.textFormat)),
+        ),
+        ...(field.builtInCreated
+          ? [{ id: 'createdAt', name: t(locale, 'data_Created_1626a') }]
+          : []),
+      ].map((f) => (
+        <Pill
+          key={f.id}
+          palette={palette}
+          testID={`${testID}-${f.id}`}
+          label={
+            chosen.includes(f.id) && !field.single
+              ? `${chosen.indexOf(f.id) + 1}. ${f.name}`
+              : f.name
+          }
+          selected={chosen.includes(f.id)}
+          onPress={() =>
+            onChange(
+              chosen.includes(f.id)
+                ? chosen.filter((x) => x !== f.id)
+                : field.single
+                  ? [f.id]
+                  : [...chosen, f.id],
+            )
+          }
+        />
+      ))}
+    </View>
+  );
 }
 
 /** 选一张数据表（选项来自当前配置）。 */
