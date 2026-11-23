@@ -209,7 +209,11 @@ export function FilePreviewScreen({ index }: { index?: number }) {
       await files.previewFile({ uri: file.uri, mimeType: info.mimeType, name: file.name });
     } catch (e) {
       const code = (e as { code?: string }).code;
-      setError(code ? runErrorText(locale, code) : String(e));
+      setError(
+        code
+          ? runErrorText(locale, code, (e as { detail?: Record<string, string> }).detail)
+          : String(e),
+      );
     }
   };
 
@@ -311,7 +315,11 @@ export function FilePreviewScreen({ index }: { index?: number }) {
     } catch (e) {
       const code = (e as { code?: string }).code;
       setPanel(null);
-      setError(code ? runErrorText(locale, code) : String(e));
+      setError(
+        code
+          ? runErrorText(locale, code, (e as { detail?: Record<string, string> }).detail)
+          : String(e),
+      );
     }
   }
   async function saveToPhone() {

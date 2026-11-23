@@ -426,7 +426,7 @@ export class FakeFiles implements FilePlatform {
     this.shared.push(...items.map((i) => i.uri));
   }
   /** 下一次选文件夹时用户怎么做：选好、取消、选了写不进去的文件夹（写不进去对记住的文件夹也生效）。 */
-  folderChoice: 'pick' | 'cancel' | 'notWritable' = 'pick';
+  folderChoice: 'pick' | 'cancel' | 'notWritable' | 'saveFailed' = 'pick';
   /** 用户在选择器里选的文件夹名。 */
   nextFolder = 'MorphOut';
   /** 最后选过的文件夹（D-123）。 */
@@ -446,6 +446,8 @@ export class FakeFiles implements FilePlatform {
       folder = this.nextFolder;
     }
     if (this.folderChoice === 'notWritable') throw new RunError('folderNotWritable');
+    if (this.folderChoice === 'saveFailed')
+      throw new RunError('saveFailed', { detail: 'disk full' });
     if (!kept) this.remembered = folder;
     this.rememberedBy.set(key, folder);
     const files = this.folders.get(folder) ?? new Map<string, Uint8Array>();

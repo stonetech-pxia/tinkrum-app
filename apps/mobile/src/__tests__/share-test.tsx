@@ -703,6 +703,17 @@ describe('share journeys (UI)', () => {
     expect(screen.queryByText(/已把/)).toBeNull();
   });
 
+  // 三星真机（2026-11-23）：存到手机失败时预览页写着「保存失败：{detail}」，占位符没替换。
+  it('a failed save from the preview says why, with the detail filled in', async () => {
+    const { files } = await renderToolsApp();
+    files.folderChoice = 'saveFailed';
+    await share([files.offerShared('报告.pdf', await makePdf(1))]);
+    await fireEvent.press(await screen.findByTestId('preview-share'));
+    await fireEvent.press(await screen.findByTestId('preview-share-folder'));
+    expect(await screen.findByText('保存失败：disk full')).toBeTruthy();
+    expect(screen.queryByText(/\{detail\}/)).toBeNull();
+  });
+
   it('a to-Word run that fails shows the full run page with the error and the steps (D-457)', async () => {
     const { files } = await renderToolsApp();
     const pdf = files.offerShared('报告.pdf', await makePdf(1));

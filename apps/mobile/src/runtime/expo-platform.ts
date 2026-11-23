@@ -172,7 +172,8 @@ const SHARE: ShareDeps = {
     if (first && dir.exists) dir.delete();
     if (!dir.exists) dir.create({ intermediates: true });
     const target = new File(dir, name);
-    new File(uri).copy(target);
+    // copy 在 Android 上是异步的：不等它复制完就交给分享目标，对方打开时文件还不在（Gmail「无法添加附件」）。
+    await new File(uri).copy(target);
     return target.uri;
   },
   remembered: null,
