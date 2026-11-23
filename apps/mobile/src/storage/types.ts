@@ -250,6 +250,8 @@ export interface RecordImport {
 
 /** listRecordsInRange 的范围（core 的 monthQueryRange 加上按哪个字段）。 */
 export interface RecordRange {
+  /** 跨日记录：只要起止与范围重叠就读取。 */
+  endBy?: string | undefined;
   by: string;
   from: string;
   until: string;

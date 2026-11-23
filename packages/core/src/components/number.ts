@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { t } from '../messages';
+import { totalFormulaText } from '../stat-calc-text';
 import { hasRecordCurrency } from '../money-currency';
 import {
   AGGREGATES,
@@ -14,9 +15,27 @@ import {
 import { followChoiceProblems } from './choices';
 import { type LookDefinitionOf, defineLook, NUMERIC_FIELD_TYPES } from './define';
 
+export const TotalSourceSchema = z.strictObject({
+  table: IdSchema,
+  aggregate: z.enum(['count', 'sum', 'avg', 'min', 'max', 'latest', 'distinctDays']),
+  field: IdSchema.optional(),
+  filter: filterSchema().optional(),
+  days: z.strictObject({ date: DaysSchema.shape.date }).optional(),
+});
+
 /** 汇总读法（数字块、图表共用）：一张表筛出来的记录算一个数，或者按组每组一个数。 */
 export const NumberSourceSchema = z.strictObject({
   table: IdSchema,
+  calc: z
+    .strictObject({
+      with: z
+        .array(TotalSourceSchema.extend({ id: IdSchema }))
+        .min(1)
+        .max(3),
+      formula: boundedText(1, 500),
+      as: z.enum(['percent', 'number']).optional(),
+    })
+    .optional(),
   aggregate: z.enum(AGGREGATES),
   field: IdSchema.optional(),
   filter: filterSchema().optional(),
@@ -77,6 +96,7 @@ export const numberComponent: LookDefinitionOf<'number', typeof shape> = defineL
   check: (c, { collection, page }) => {
     const { aggregate, field, days, group } = c.source;
     const problems: string[] = [...followChoiceProblems(c.source, page)];
+    if (c.source.group?.until) problems.push('source.group.until only applies to a calendar');
     if (c.source.period !== undefined) {
       if (!page.blocks.some((b) => b.look === 'period'))
         problems.push('source.period "page" needs a period block on the same page');
@@ -138,10 +158,15 @@ export const numberComponent: LookDefinitionOf<'number', typeof shape> = defineL
       );
     return problems;
   },
-  describe: (c, _config, ctx) => t(ctx.locale, 'describe_stat_c1587', { v0: c.show.label }),
+  describe: (c, config, ctx) => {
+    const formula = totalFormulaText(c.source, config, ctx.locale);
+    return formula
+      ? t(ctx.locale, 'describeCalculatedNumber', { label: c.show.label, formula })
+      : t(ctx.locale, 'describe_stat_c1587', { v0: c.show.label });
+  },
   edit: { text: [], style: ['tone', 'size'], backdrop: true },
   ai: {
-    doc: 'show {label}, source {table, aggregate: "count"|"sum"|"avg"|"min"|"max"|"latest"|"streak"|"daysSince"|"avgInterval"|"distinctDays", field? (a number, money, rating, duration or formula field; only for sum, avg, min, max and latest: the value on the newest entry, rule 72), filter?, group? {by: a choice or link field} (one row per option, e.g. spending per category), days? {date? (for the day-based aggregates and latest: a date or datetime field or "createdAt"; default: the first date field), unit?: "day"|"week"|"month", perUnit? (1-50), skip? {field, option}} (unit, perUnit and skip: streak only), goal? (a number: shows "3 / 5" and progress), compare?: "previous", period?: "page" (follows the time range picked in the period block on the same page: an inPeriod in the filter is then ignored, and compare works without one), choice?: "page" (counts only the entries with the option picked in the choices block on the same page, rule 65; minus is not narrowed), minus? ({table, aggregate: "count"|"sum", field?, filter?}: shows this total minus that one)} (rule 33)',
+    doc: 'show {label}, source {table, aggregate: "count"|"sum"|"avg"|"min"|"max"|"latest"|"streak"|"daysSince"|"avgInterval"|"distinctDays", field? (a number, money, rating, duration or formula field; only for sum, avg, min, max and latest: the value on the newest entry, rule 72), filter?, group? {by: a choice or link field} (one row per option, e.g. spending per category), days? {date? (for the day-based aggregates and latest: a date or datetime field or "createdAt"; default: the first date field), unit?: "day"|"week"|"month", perUnit? (1-50), skip? {field, option}} (unit, perUnit and skip: streak only), goal? (a number: shows "3 / 5" and progress), compare?: "previous", period?: "page" (follows the time range of the period block on the same page; an inPeriod in the filter is ignored, compare works without one), choice?: "page" (counts only the entries with the option picked in the choices block on the same page, rule 65; minus and calc.with totals are not narrowed), minus? ({table, aggregate: "count"|"sum", field?, filter?}: shows this total minus that one; both follow the page time range), calc? {with: [{id, table, aggregate (as above except streak, daysSince, avgInterval), field?, filter?, days? {date?}}] (1-3, unique ids except total), formula: an existing numeric formula using {total} and {id}, as?: "percent"|"number"} (rule 77)} (rule 33)',
     rule: {
       n: 33,
       text: 'Summaries of a table are number and chart blocks (their source is written as in their look docs); you only choose how they are built and never see the values. Totals per category ("how much per category", "每个分类花了多少") → a number block with source.group {by: that choice field}: one row per option and a "not set" row. A link field works too (D-336): one row per entry of the linked table, as a summary block of its own. When the value belongs on each entry of that linked table instead ("for each habit show …", "每个客户显示…", a streak on each habit when habits are their own table), it is a rollup field on that table, shown in its list (rule 42), not a number block grouped by the link. A number block can\'t be grouped by other fields. Charts ("a chart of spending per month", "pie chart by category") → a chart block on the page that shows the table: amounts over time are kind "bar" or "line" grouped by unit, with last = how many recent days / weeks / months (12 for "the last year by month"); shares of a whole are kind "pie" grouped by a choice field. Use aggregate "sum" with the money field for spending, "count" for how many entries; a single total or a per-category list without a picture is a number block. Habits and "how long since" ("给每个习惯显示连续天数", "days since I last watered each plant", "average cycle length") → a number block with a day-based aggregate: "streak" (current run of days in a row, with the best run under it; today not logged yet does not break it), "daysSince" (days since the latest entry), "avgInterval" (average days between entry days), "distinctDays" (days with at least one entry). One row per habit / plant / car → source.group {by: the choice field that names it} (when they are their own table: the rollup above). "3 times a week" → days {unit: "week", perUnit: 3}. An option meaning "skipped" or "rest day" → days.skip {field, option}: such days neither break nor add. A chart can only use "distinctDays"; the others are number blocks. A goal ("喝水显示今天的进度，目标 8 杯" → sum or count, filter inPeriod "today", goal 8) shows "value / goal" with progress. compare: "previous" ("本月支出和上月比", "vs last week") needs exactly one inPeriod filter; it shows the previous value for the same days so far and ↑/↓ with the percent; not for streak, daysSince or avgInterval. One total minus another ("还剩多少钱可以分配", "balance = income − spending", "stock = in − out") → source.minus: the block\'s own total minus that one, which may come from another table; both aggregates count or sum, the same currency, and no group or compare. Without a period filter both totals cover all entries, so money not spent stays counted month after month (a zero-based budget: categories with assignments and spending as linked tables, "available" = a rollup of everything assigned minus a rollup of everything spent, rule 42).',

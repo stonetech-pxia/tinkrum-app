@@ -1,5 +1,5 @@
 import { boardColumns, boardField, MAX_TILES, type BoardColumn } from './board-view';
-import { calendarOf, dateOfDayNumber, type Calendar } from './calendar';
+import { calendarOf, dateOfDayNumber, todayNumber, weekStartOf, type Calendar } from './calendar';
 import { chartSeries, type ChartPoint } from './chart';
 import { previousFilter } from './compare';
 import type { ChartSource } from './components/chart';
@@ -22,13 +22,7 @@ import { gridRead, type GridRead } from './grid-view';
 import { filterPresets, listGroups } from './list-groups';
 import { t } from './messages';
 import { currentMonth, monthDays, type MonthDay } from './month-view';
-import {
-  computeRecords,
-  expandCollection,
-  latestDate,
-  latestValue,
-  relatedCollectionIds,
-} from './related';
+import { computeRecords, expandCollection, relatedCollectionIds } from './related';
 import {
   RECORD_REF,
   type Collection,
@@ -38,7 +32,9 @@ import {
   type WorkspaceConfig,
 } from './schema';
 import { dateFieldOf, isSequenceAggregate, sequenceValue } from './sequence';
-import { minusValue } from './stat-minus';
+import { calculatedNumber, latestNumber } from './stat-calc';
+import { recordsInRange, type DayRange } from './page-period';
+export { latestNumber } from './stat-calc';
 
 // 共用的读法（v34 D-370 规则 2）：块的 source 读出什么。记录块的 6 种外观、数字、图表、文件列表
 // 都从这里读，App 只负责画（以前每个组件各写一遍筛选、排序、分组）。筛选、排序、分组（Grouping）、
@@ -56,6 +52,8 @@ export interface SourceContext {
   locale: Locale;
   /** 给一条记录用的页面（page.of，D-342）打开的那一条：筛选里的 "$record" 换成它。 */
   recordId?: string;
+  /** 页面选中的范围（不写时桌面小组件使用自己的筛选）。 */
+  range?: DayRange;
 }
 
 /** 一张表读出来的样子：存的表（改记录用）、显示用的表（查找、汇总换成它们显示的字段）、算好的记录。 */
@@ -111,10 +109,15 @@ function linkedOf(
 
 /**
  * 读这个 source 要哪些表的记录（App 先读它们再调用这里的函数）：这张表和它的查找、汇总要的表，
- * 按引用字段分组时被引用的表，minus 的表。
+ * 按引用字段分组时被引用的表，minus 和 calc.with 的表。
  */
 export function sourceTableIds(
-  source: { table: string; group?: { by?: string }; minus?: { table: string } },
+  source: {
+    table: string;
+    group?: { by?: string | undefined } | undefined;
+    minus?: { table: string } | undefined;
+    calc?: { with: readonly { table: string }[] } | undefined;
+  },
   config: WorkspaceConfig,
 ): string[] {
   const tables = config.data.tables;
@@ -129,6 +132,7 @@ export function sourceTableIds(
   const link = own && by !== undefined ? fieldOf(own, by) : undefined;
   if (link?.type === 'link') add(link.table);
   add(source.minus?.table);
+  for (const total of source.calc?.with ?? []) add(total.table);
   return [...ids];
 }
 
@@ -144,7 +148,7 @@ export interface SourceGroup {
   records: DataRecord[];
 }
 
-/** 月历一个月：每天的记录（不截 limit，选中那天用 dayShown），记录最多的那天有几条。 */
+/** 月历的月份或日范围：每天的记录（不截 limit），max 是最多的条数或每日数值的最大绝对值。 */
 export interface MonthRead {
   month: string;
   days: Map<number, MonthDay>;
@@ -179,11 +183,13 @@ export function readRecords(
     source: RecordSource;
     show?: {
       color?: string | undefined;
+      day?: { aggregate: 'count' | 'sum'; field?: string | undefined } | undefined;
+      span?: 'month' | 'week' | undefined;
       format?: { kind: string; goal?: number | string } | undefined;
     };
   },
   ctx: SourceContext,
-  options: { month?: string; page?: number } = {},
+  options: { month?: string; page?: number; range?: DayRange } = {},
 ): RecordsRead | undefined {
   const { source, look } = block;
   const read = readTable(ctx, source.table);
@@ -218,12 +224,18 @@ export function readRecords(
   if (look === 'calendar') {
     const date = dateFieldOf(view, group.by);
     const month = options.month ?? currentMonth(now, cal);
+    const start = weekStartOf(todayNumber(now, cal), cal);
+    const range =
+      options.range ??
+      (block.show?.span === 'week'
+        ? { start: dateOfDayNumber(start), end: dateOfDayNumber(start + 6) }
+        : undefined);
     // 同一天的先后由 monthDays 定（不跟着排序）。
     const { days, max } = monthDays(
       filtered,
       view,
-      { date, color: block.show?.color },
-      month,
+      { date, color: block.show?.color, until: group.until, day: block.show?.day },
+      range ?? month,
       now,
       cal,
     );
@@ -287,7 +299,7 @@ export interface NumberGroup {
 
 export interface NumberRead {
   view: Collection;
-  /** 减过 minus 的值；没有可算的为 null。 */
+  /** 算过 minus / calc 的值；没有可算的为 null。 */
   value: number | null;
   /** 每笔自己选货币时（D-429）按货币分开写好的文字；有它就显示它。 */
   text?: string;
@@ -303,26 +315,6 @@ export interface NumberRead {
  * 数字块的 latest（D-618）：最新一条的 field 的值，和汇总字段的 latest 同一个「最新」（related.ts 的 latestValue；
  * 日期是 days.date，没写是存的表 table 里第一个日期字段）。不是数时为 null（检查只让数字类字段用）。
  */
-export function latestNumber(
-  records: readonly DataRecord[],
-  table: Collection,
-  view: Collection,
-  source: Pick<NumberSource, 'field' | 'days'>,
-  now: Date,
-  cal: Calendar,
-): number | null {
-  if (!source.field) return null;
-  const v = latestValue(
-    records,
-    view,
-    source.field,
-    latestDate(table, source.days?.date),
-    now,
-    cal,
-  );
-  return typeof v === 'number' ? v : null;
-}
-
 /** 数字块的值（D-248、D-284、D-307、D-308、D-337）；表不存在时为 undefined。 */
 export function readNumber(source: NumberSource, ctx: SourceContext): NumberRead | undefined {
   const read = readTable(ctx, source.table);
@@ -339,24 +331,49 @@ export function readNumber(source: NumberSource, ctx: SourceContext): NumberRead
         : {
             value: aggregateRecords(list, view, source.aggregate as ValueAggregate, source.field),
           };
-  const matched = filterRecords(records, view, filter, now, cal);
-  const own = valueOf(matched);
+  const range = source.period === 'page' ? ctx.range : undefined;
+  const based = filterRecords(
+    records,
+    view,
+    range ? filter.filter((c) => c.op !== 'inPeriod') : filter,
+    now,
+    cal,
+  );
+  const date =
+    filter.find((c) => c.op === 'inPeriod')?.field ?? dateFieldOf(table, source.days?.date);
+  const matched = range ? recordsInRange(based, view, date, range, now, cal) : based;
+  const own = calculatedNumber(
+    {
+      ...source,
+      filter,
+      ...(source.minus
+        ? { minus: { ...source.minus, filter: bind(source.minus.filter, ctx) } }
+        : {}),
+      ...(source.calc
+        ? {
+            calc: {
+              ...source.calc,
+              with: source.calc.with.map((total) => ({
+                ...total,
+                filter: bind(total.filter, ctx),
+              })),
+            },
+          }
+        : {}),
+    },
+    read,
+    (id) => {
+      const other = readTable(ctx, id);
+      return other;
+    },
+    now,
+    cal,
+    range,
+  );
   const out: NumberRead = { view, value: own.value };
   const split = perCurrencyText(matched, view, source.aggregate, source.field, ctx.locale);
   if (split !== null) out.text = split;
   if (own.best !== undefined) out.best = own.best;
-  const minus = source.minus;
-  const other = minus && readTable(ctx, minus.table);
-  if (minus && other) {
-    out.value = minusValue(
-      own.value,
-      { ...minus, filter: bind(minus.filter, ctx) },
-      other.view,
-      other.records,
-      now,
-      cal,
-    );
-  }
   const previous = source.compare ? previousFilter(filter, now, cal) : null;
   const before = previous && filterRecords(records, view, previous.filter, now, cal);
   if (previous && before) out.previous = { period: previous.period, value: valueOf(before).value };
@@ -400,16 +417,31 @@ export function readChart(
   if (!read) return undefined;
   const { view, records } = read;
   const cal = calOf(ctx);
-  const matched = filterRecords(records, view, bind(source.filter, ctx), ctx.now, cal);
+  const range = source.period === 'page' ? ctx.range : undefined;
+  const filter = bind(source.filter, ctx);
+  const matched = filterRecords(
+    records,
+    view,
+    range ? filter.filter((c) => c.op !== 'inPeriod') : filter,
+    ctx.now,
+    cal,
+  );
   const linked = source.group.unit ? undefined : linkedOf(ctx, view, source.group.by);
+  const scoped =
+    range && !source.group.unit
+      ? recordsInRange(matched, view, dateFieldOf(view, source.days?.date), range, ctx.now, cal)
+      : matched;
   const points = chartSeries(
-    matched,
+    scoped,
     view,
     source,
     ctx.now,
     t(ctx.locale, 'statNoChoice'),
     cal,
     linked,
+    false,
+    source.group.unit ? range : undefined,
+    t(ctx.locale, 'chartOther'),
   );
   return { view, points };
 }

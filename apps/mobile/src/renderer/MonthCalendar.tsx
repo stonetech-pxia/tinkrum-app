@@ -1,5 +1,7 @@
 import {
   optionColor,
+  axisTickText,
+  weekStartOf,
   calendarOf,
   dateFieldOf,
   contrast,
@@ -14,6 +16,7 @@ import {
   monthTitle,
   monthWeeks,
   shiftMonth,
+  shortDate,
   sortRecords,
   todayNumber,
   weekdayLabels,
@@ -40,7 +43,7 @@ import { Card } from './ui';
 
 // 记录列表的月历外观（D-305）：一个月的格子，每天按记录条数分深浅，或者按一个单选字段上色（这一天最后一条的
 // 选项）；左右翻月，点某一天在下面列出当天的记录（和普通列表一样的行，点记录打开编辑页）。
-// 只读这个月的记录（useMonthRecords）。格子至少 44 高、日期 16 号字；今天加粗并在数字下面画一道主色的线，
+// 只读显示的月份或周范围，跨日记录按重叠读取（useMonthRecords）。格子至少 44 高、日期 16 号字；今天加粗并在数字下面画一道主色的线，
 // 选中的那天有一圈文字色的框，深色模式下颜色从同一套分类色的深色版里取。
 
 /** 深浅四档：表面色往主色混多少。 */
@@ -68,6 +71,10 @@ export function MonthCalendar({
   const thisMonth = currentMonth(now, cal);
   const today = todayNumber(now, cal);
   const [month, setMonth] = useState(thisMonth);
+  const [weekStart, setWeekStart] = useState(weekStartOf(today, cal));
+  const weekly = block.show.span === 'week';
+  const week = Array.from({ length: 7 }, (_, i) => weekStart + i);
+  const weekRange = { start: dateOfDayNumber(weekStart), end: dateOfDayNumber(weekStart + 6) };
   const [picked, setPicked] = useState<number | null>(today);
   const dateRef = collection ? dateFieldOf(collection, block.source.group?.by) : 'createdAt';
   const { view, records } = useMonthRecords(
@@ -76,6 +83,7 @@ export function MonthCalendar({
     dateRef,
     month,
     cal,
+    { ...(weekly ? { range: weekRange } : {}), until: block.source.group?.until },
   );
   const rows = useRecordRows(block, env, tone, collection, view);
   const router = useRouter();
@@ -95,8 +103,13 @@ export function MonthCalendar({
   const { days, max } = monthDays(
     matched,
     view,
-    { date: dateRef, color: block.show.color },
-    month,
+    {
+      date: dateRef,
+      color: block.show.color,
+      day: block.show.day,
+      until: block.source.group?.until,
+    },
+    weekly ? weekRange : month,
     now,
     cal,
   );
@@ -107,18 +120,32 @@ export function MonthCalendar({
     const i = id === null ? -1 : options.findIndex((o) => o.id === id);
     return optionColor(options[i], i, palette.dark, options);
   };
-  const fillOf = (count: number, optionId: string | null) => {
+  const fillOf = (value: number, optionId: string | null, count: number) => {
     if (count === 0) return undefined;
     if (color) return colorOfOption(optionId);
-    return mix(palette.surface, palette.primary, HEAT[heatLevel(count, max)]!);
+    return mix(palette.surface, palette.primary, HEAT[heatLevel(value, max)]!);
   };
-  const inMonth = (d: number) => dateOfDayNumber(d).slice(0, 7) === month;
+  const inMonth = (d: number) =>
+    weekly ? d >= weekStart && d <= weekStart + 6 : dateOfDayNumber(d).slice(0, 7) === month;
   const selected = picked !== null && inMonth(picked) ? picked : null;
   const go = (delta: number) => {
+    if (weekly) {
+      setWeekStart(weekStart + 7 * delta);
+      setPicked(null);
+      return;
+    }
     const next = shiftMonth(month, delta);
     setMonth(next);
     setPicked(next === thisMonth ? today : null);
   };
+  const thisWeek = weekStartOf(today, cal);
+  const atToday = weekly ? weekStart === thisWeek : month === thisMonth;
+  const title = weekly
+    ? t(locale, 'calendarWeekTitle', {
+        start: shortDate(weekStart, today, locale),
+        end: shortDate(weekStart + 6, today, locale),
+      })
+    : monthTitle(month, locale);
   const background = rows.background;
   const navButton = (
     id: string,
@@ -147,18 +174,24 @@ export function MonthCalendar({
     <View style={{ gap: palette.gap - 4 }}>
       <Card palette={palette} background={background} style={styles.card}>
         <View style={styles.header}>
-          {navButton('prev', 'chevronLeft', t(locale, 'calendarPrevMonth'), -1)}
+          {navButton(
+            'prev',
+            'chevronLeft',
+            t(locale, weekly ? 'calendarPrevWeek' : 'calendarPrevMonth'),
+            -1,
+          )}
           <Text
             accessibilityRole="header"
             style={[styles.title, palette.font('title', 17), { color: palette.text }]}>
-            {monthTitle(month, locale)}
+            {title}
           </Text>
-          {month !== thisMonth ? (
+          {!atToday ? (
             <Pressable
               testID={`calendar-${componentId}-today`}
               accessibilityRole="button"
               onPress={() => {
                 setMonth(thisMonth);
+                setWeekStart(thisWeek);
                 setPicked(today);
               }}
               hitSlop={6}
@@ -168,7 +201,12 @@ export function MonthCalendar({
               </Text>
             </Pressable>
           ) : null}
-          {navButton('next', 'chevronRight', t(locale, 'calendarNextMonth'), 1)}
+          {navButton(
+            'next',
+            'chevronRight',
+            t(locale, weekly ? 'calendarNextWeek' : 'calendarNextMonth'),
+            1,
+          )}
         </View>
         <View style={styles.week}>
           {weekdayLabels(cal, locale).map((w, i) => (
@@ -179,13 +217,14 @@ export function MonthCalendar({
             </Text>
           ))}
         </View>
-        {monthWeeks(month, cal).map((week) => (
+        {(weekly ? [week] : monthWeeks(month, cal)).map((week) => (
           <View key={week[0]} style={styles.week}>
             {week.map((d) => {
               if (!inMonth(d)) return <View key={d} style={styles.cell} />;
               const info = days.get(d);
               const count = info?.count ?? 0;
-              const fill = fillOf(count, info?.optionId ?? null);
+              const value = block.show.day ? (info?.value ?? 0) : count;
+              const fill = fillOf(Math.abs(value), info?.optionId ?? null, count);
               const isToday = d === today;
               const isPicked = d === selected;
               const text = fill ? readable(fill) : palette.text;
@@ -200,10 +239,14 @@ export function MonthCalendar({
                   key={d}
                   testID={`calendar-${componentId}-day-${date}`}
                   accessibilityRole="button"
-                  accessibilityLabel={t(locale, 'calendarDayLabel', {
-                    date: dayTitle(d, locale),
-                    n: count,
-                  })}
+                  accessibilityLabel={
+                    block.show.day
+                      ? t(locale, 'calendarDayValue', {
+                          date: dayTitle(d, locale),
+                          value: axisTickText(value),
+                        })
+                      : t(locale, 'calendarDayLabel', { date: dayTitle(d, locale), n: count })
+                  }
                   accessibilityHint={optionLabel}
                   accessibilityState={{ selected: isPicked }}
                   onPress={env.interactive ? () => setPicked(d) : undefined}
@@ -225,7 +268,13 @@ export function MonthCalendar({
                       style={[styles.todayMark, { backgroundColor: fill ? text : palette.primary }]}
                     />
                   ) : null}
-                  {color && count > 1 ? (
+                  {block.show.day ? (
+                    <Text
+                      testID={`calendar-${componentId}-value-${date}`}
+                      style={[styles.count, palette.font('bodyBold', 10), { color: text }]}>
+                      {axisTickText(value)}
+                    </Text>
+                  ) : color && count > 1 ? (
                     <Text style={[styles.count, palette.font('bodyBold', 10), { color: text }]}>
                       {count}
                     </Text>

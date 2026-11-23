@@ -25,6 +25,9 @@ function fieldProblems(config: WorkspaceConfig): string[] {
     for (const c of allComponents(page)) {
       if (!isKnownComponent(c) || (c.look !== 'number' && c.look !== 'chart')) continue;
       check(c.id, c.source.table, c.source.field);
+      if (c.look === 'number')
+        for (const total of c.source.calc?.with ?? [])
+          check(`${c.id} calc`, total.table, total.field);
       if (c.look === 'number' && c.source.minus)
         check(`${c.id} minus`, c.source.minus.table, c.source.minus.field);
     }

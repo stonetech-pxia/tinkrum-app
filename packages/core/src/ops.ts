@@ -774,7 +774,7 @@ function pruneShowIf(config: WorkspaceConfig, table: string, notes: ApplyNote[])
 }
 
 /** 这几种聚合读 source.field；别的（计数、按日子算）不读，校验器不要求它。 */
-const READS_FIELD = ['sum', 'avg', 'min', 'max'];
+const READS_FIELD = ['sum', 'avg', 'min', 'max', 'latest'];
 
 /**
  * 删字段后，数字块、图表、minus 上不读字段的聚合写着的 field 跟着去掉（底线 18）。
@@ -793,6 +793,7 @@ function pruneAggregateFields(config: WorkspaceConfig, gone: Required<Gone>): vo
     if (!isKnownComponent(c) || (c.look !== 'number' && c.look !== 'chart')) continue;
     prune(c.source);
     if (c.look === 'number' && c.source.minus) prune(c.source.minus);
+    if (c.look === 'number') for (const total of c.source.calc?.with ?? []) prune(total);
   }
 }
 
@@ -996,7 +997,10 @@ function removeData(
     config,
     (c) =>
       componentCollection(c) === op.table ||
-      (isKnownComponent(c) && c.look === 'number' && c.source.minus?.table === op.table),
+      (isKnownComponent(c) &&
+        c.look === 'number' &&
+        (c.source.minus?.table === op.table ||
+          (c.source.calc?.with.some((total) => total.table === op.table) ?? false))),
   );
   if (count > 0) notes.push({ kind: 'removedDataComponents', table: op.table, count });
   pruneRecordTools(config, { table: op.table }, notes);

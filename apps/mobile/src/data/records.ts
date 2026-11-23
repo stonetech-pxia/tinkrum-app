@@ -5,6 +5,8 @@ import {
   loadComputedRecords,
   loadLinkResolver,
   monthQueryRange,
+  dayQueryRange,
+  type DayRange,
   prepareRecordValues,
   relatedCollectionIds,
   type Calendar,
@@ -182,7 +184,7 @@ export function useComputedRecords(
 }
 
 /**
- * 月历（D-305）一个月的记录：只读这个月（多读一天，见 monthQueryRange）。表里有查找、汇总、上一条时，
+ * 月历（D-305）的记录：按月份或周的日范围读取（多读一天，见 monthQueryRange / dayQueryRange），跨日记录按重叠读取。表里有查找、汇总、上一条时，
  * 要别的记录才能算，就读整张表再算（和 useComputedRecords 一样）；dateField 不是存着的日期、日期时间或系统字段时
  * 也读整张表。落在哪天、筛选由调用方按 recordDay 再精确地分。
  */
@@ -192,6 +194,7 @@ export function useMonthRecords(
   dateField: string,
   month: string,
   cal: Calendar,
+  options?: { range?: DayRange; until?: string | undefined },
 ): { view: Collection | undefined; records: DataRecord[] | null } {
   const { repo } = useWorkspaceContext();
   const version = [...useTableVersions(useRelatedIds(collections, collection)).values()].join(',');
@@ -201,7 +204,9 @@ export function useMonthRecords(
     records: DataRecord[];
   } | null>(null);
   const calKey = JSON.stringify(cal);
-  const key = `${month}|${dateField}`;
+  const rangeKey = options?.range ? `${options.range.start}|${options.range.end}` : '';
+  const endBy = options?.until;
+  const key = `${month}|${dateField}|${rangeKey}|${endBy ?? ''}`;
   useEffect(() => {
     if (!collection) return;
     let alive = true;
@@ -217,7 +222,12 @@ export function useMonthRecords(
       collection.fields.some(
         (f) => f.type === 'lookup' || f.type === 'rollup' || f.type === 'previous',
       );
-    const range = { by: dateField, ...monthQueryRange(month) };
+    const [start, end] = rangeKey.split('|');
+    const range = {
+      by: dateField,
+      ...(start && end ? dayQueryRange({ start, end }) : monthQueryRange(month)),
+      endBy,
+    };
     void loadComputedRecords(
       (id) =>
         whole || id !== collection.id ? repo.listRecords(id) : repo.listRecordsInRange(id, range),
@@ -229,7 +239,7 @@ export function useMonthRecords(
     return () => {
       alive = false;
     };
-  }, [repo, collections, collection, calKey, version, key, dateField, month]);
+  }, [repo, collections, collection, calKey, version, key, dateField, month, rangeKey, endBy]);
   const view = useMemo(
     () => collection && expandCollection(collections, collection),
     [collections, collection],

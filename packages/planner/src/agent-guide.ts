@@ -42,7 +42,7 @@ const SECTIONS = [
  */
 const FEATURE_RULES: ReadonlySet<number> = new Set([
   10, 13, 32, 33, 34, 35, 38, 40, 42, 43, 44, 45, 46, 47, 48, 49, 50, 55, 56, 58, 59, 60, 61, 62,
-  63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
+  63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 75, 76, 77,
 ]);
 /** 讲快捷操作的几条：放进动作目录。 */
 const QUICK_ACTION_RULES: ReadonlySet<number> = new Set([15, 20, 21, 22, 28, 29, 30, 31, 54]);
@@ -197,12 +197,12 @@ export function buildAgentGuide(registry: Registry, example: string): string {
 
 # Making a Tinkrum app file
 
-This guide is for an AI assistant (Claude, ChatGPT or any other) that a person asks to build an app for **Tinkrum**, a phone app people reshape themselves. You write one JSON file, a **Tinkrum app file**; the person imports it in Tinkrum and gets a new app next to what they already have. Nothing they have is replaced, and they can undo the import.
+This guide is for an AI assistant (Claude, ChatGPT or any other) that a person asks to build an app for **Tinkrum**, a phone app people reshape themselves. You write one JSON file, a **Tinkrum app file**; the person imports it in Tinkrum and gets a new app next to what they already have. They can undo the import.
 
 ## What you write, and what you never write
 
 - You write **structure only**: tables (the fields of a list of entries), pages of blocks, the app's bottom bar, its style, quick actions and reminders.
-- You never write **entries** (records). Tables start empty; the person fills them in on the phone. Do not put their data, names, amounts or notes into the file, even if they told you about them; use them only to decide the structure (for example which choice options a field has).
+- You never write **entries** (records). Tables start empty; the person fills them in on the phone. Do not put their data, names, amounts or notes into the file, even if they told you about them; use them only to decide the structure.
 - You never point at **files or pictures**: a file slot is \`{"file": null}\`, an image block has no \`asset\`, a picture background is left out. The person picks those on the phone. A table may still have a field of type \`file\` (photos or files on each entry): you only declare the field.
 - You never write **code**. Everything is declarative JSON that Tinkrum draws with its own fixed blocks. Anything not described here does not exist.
 
@@ -224,7 +224,7 @@ This guide is for an AI assistant (Claude, ChatGPT or any other) that a person a
 - **Every id** (the app, pages, blocks, tables, fields, choice options, quick actions, their steps, reminders) is lowercase letters, digits and "-", starts with a letter and has at most 48 characters: \`"due-date"\`, not \`"dueDate"\`, \`"due_date"\` or \`"Due date"\`. The name people see goes in \`name\`, \`title\` or \`label\`.
 - \`app.id\`: the same, at most 20 characters (for example \`"plants"\`).
 - **Every page, table, quick action and reminder id starts with the app id and a dash** (\`"plants-home"\`, \`"plants-care"\`). The person's phone already has pages such as \`home\`, \`toolbox\` and \`files\`; an id that is already taken stops the import. Block ids only need to be unique within their page; field ids within their table; option ids within their field.
-- \`app.bar\`: 1–5 entries, each \`"page:<page id>"\` of this file or \`"ai"\` (Tink, the in-app assistant; put it last). The first entry is the page the app opens on. Settings and other system screens are not allowed in an app's bar; the person reaches them from the main Tinkrum home.
+- \`app.bar\`: 1–5 entries, each \`"page:<page id>"\` of this file or \`"ai"\` (Tink, the in-app assistant; put it last). The first entry is the page the app opens on. Settings and other system screens are not allowed in an app's bar.
 - \`app.icon\` and page/table icons: an icon name from the list in the reference, one emoji, or \`"my:<id>"\` of an icon you draw in the file's \`icons\` (see **Drawing icons**).
 - \`app.theme\` is a **complete** theme object. Required keys: ${requiredThemeKeys()
     .map((k) => `\`${k}\``)
@@ -232,7 +232,7 @@ This guide is for an AI assistant (Claude, ChatGPT or any other) that a person a
 - \`tables\`: the app's tables (see **Data**). \`pages\`: its pages (see **Containers**); there is no page \`home\` in an app file. \`tools\`: its quick actions and reminders (see **Tools**).
 - Limits: at most ${MAX_PAGE_BLOCKS} top-level blocks on a page; the person's whole phone holds at most ${MAX_PAGES} pages and ${MAX_TABLES} tables, so keep an app small (2–5 pages, 1–6 tables).
 - Every page needs a way in: put it in \`app.bar\`, or have an \`entry\` or \`button\` block open it, or (for a page with \`of\`, a page for one entry) have a record block's \`opens\` point at it.
-- A date that comes back (a subscription that renews every month, a monthly bill, a yearly check-up) should not be a plain \`date\` field the person has to move on by hand: use a \`schedule\` field (a repeat rule each entry keeps, with \`lastDone\` pointing at the date it was last done) or a \`dateOffset\` field computed from the last date (for example the next payment = the last payment + 1 month). See **Data**, and pattern 5 in \`${PATTERNS_FILE}\`. A reminder some days before (\`when.before\`) only watches a \`date\` or \`dateOffset\` field, never a \`schedule\` (a reminder on a schedule, \`when.each\`, comes on the due day itself): when the person wants a warning days ahead ("remind me 3 days before each bill"), keep the next due day in a \`date\` field and let the row button that marks it paid move it on, as pattern 5 shows.
+- A date that comes back (a monthly bill, a yearly check-up) should not be a plain \`date\` field the person moves on by hand: use a \`schedule\` field (a repeat rule each entry keeps, with \`lastDone\` pointing at the date it was last done) or a \`dateOffset\` field computed from the last date (the next payment = the last payment + 1 month). See **Data**, and pattern 5 in \`${PATTERNS_FILE}\`. A reminder some days before (\`when.before\`) only watches a \`date\` or \`dateOffset\` field, never a \`schedule\` (\`when.each\` comes on the due day itself): for a warning days ahead, keep the next due day in a \`date\` field and let the row button that marks it paid move it on, as pattern 5 shows.
 - Values a filter on a \`schedule\` field takes with \`"op": "due"\`: \`today\` (overdue included), \`overdue\`, \`thisWeek\` or \`pending\`, nothing else. "Due this month" is \`{"op": "inPeriod", "value": "thisMonth"}\` on the same field, which reads its next date.
 - A \`single\` block shows 1–8 fields; for more, put a second \`single\` block below it.
 - A list cannot be sorted by a \`link\` field (\`source.sort\`, \`show.browse.sort\`). To sort by the linked entry's name, add a \`lookup\` field of that name and sort by it; grouping by a link field works.
@@ -245,7 +245,7 @@ When no listed icon fits and the person wants the app's own icons (a paw for pet
 - Ids: lowercase letters, digits and "-", starting with a letter, at most 24 characters; at most ${MAX_DRAWN_ICONS} icons.
 - Canvas 24 by 24, (0,0) at the top left; 1–${MAX_DRAWN_ICON_PATHS} paths, at most ${MAX_DRAWN_ICON_CHARS} characters in all, starting with M; only the path commands M L H V C S Q T A Z and plain numbers (no exponents, no \`<svg>\`, styles or links).
 - Filled (even-odd: a shape inside another is a hole) or \`"stroke": true\` (lines 2 wide, round ends). One colour, taken from where it is used. One clear silhouette, about 2 units of margin; never a real brand's logo.
-- Examples: a drop \`{"paths": ["M12 3C9 7 6 10.5 6 14a6 6 0 0 0 12 0c0-3.5-3-7-6-11z"]}\`; a dumbbell \`{"paths": ["M6 8v8M18 8v8M3 10v4M21 10v4M6 12h12"], "stroke": true}\`.
+- Example, a dumbbell in lines: \`{"paths": ["M6 8v8M18 8v8M3 10v4M21 10v4M6 12h12"], "stroke": true}\`.
 
 ## How to read the reference
 
@@ -258,16 +258,16 @@ The reference below is shared with Tink, the assistant inside Tinkrum, which cha
 - \`nav.bar\` → \`app.bar\` (with the limits above).
 - \`setPackage\`, \`nav.floating\`, \`nav.phoneHomeScreen\`, \`data.calendar\` and \`containers.desk\` belong to the whole phone, not to an app file: leave them out.
 
-Ignore what the reference says about plans, rejections, notes, drafts, earlier requests, "the user's current config", Settings and the home page: those are about Tink's conversation. Rule numbers ("rule 45") refer to Tink's rules: the ones about what an app can do are in \`${RULES_FILE}\` (${RULES_URL}), the ones about quick actions in \`${ACTIONS_FILE}\`. Read a rule there when you need it, for example for a progress bar or a timer on a list row, a date that repeats, one tap that changes two things, or the days left until a date. Rules about Tink's conversation and about the whole phone are left out: when a line mentions a rule you cannot find, ignore that mention.
+Ignore what the reference says about plans, rejections, notes, drafts, earlier requests, "the user's current config", Settings and the home page: they are about Tink's conversation. Rule numbers ("rule 45") refer to Tink's rules: the ones about what an app can do are in \`${RULES_FILE}\` (${RULES_URL}), the ones about quick actions in \`${ACTIONS_FILE}\`. Read a rule there when you need it (a progress bar, a timer, a date that repeats, one tap that changes two things). Rules about Tink's conversation and the whole phone are left out: ignore a mention of a rule you cannot find.
 
 ## How to work
 
-1. Ask what the person wants to keep track of and do, in their words, if it is not clear. Do not ask for their actual data.
-2. **Start from a pattern.** \`${PATTERNS_FILE}\` (${PATTERNS_URL}) holds eight proven structures, each a complete app file that imports cleanly: a log with totals by period, a category budget against spending, a goal against progress, check-ins and streaks, recurring due items, a status pipeline, a collection with a wishlist, and a parent with child logs. Pick the one closest to what the person wants (or combine two), keep its structure, and change the names, fields and wording to fit; give every id your own app's prefix. If you cannot get the file, follow the example below.
-3. Write the file. Prefer fewer, well-made pages to many thin ones. Use the person's language for every name, label and text in the app.
-4. **Check the file before you give it.** If you can run code with Node.js 18 or newer, run the Tinkrum checker: \`node tinkrum-check.js app.json\` (or pipe the text in: \`node tinkrum-check.js -\`). It is the same check Tinkrum runs when it imports a file, it is one file that needs nothing else, and it does not use the network. Your code environment usually cannot download it, so ask the person to attach it; they get it from ${CHECK_SCRIPT_URL}. The first line of its output is \`OK\` or \`NOT OK\`. Fix every problem it lists and run it again until it says \`OK\`; lines after \`OK\` are parts that will not work yet, so fix those too. It may then list suggestions to make the app easier to use: apply them unless the person asked for it this way. If you cannot run Node but can run Python with \`jsonschema\`, validate the file against \`tinkrum-app.schema.json\`: that only checks the shape, so tell the person the file was not fully checked. If you cannot run code, say so and point the person to the checker page, ${MAKE_PAGE_URL}.
-5. Reply with the **whole file in one \`\`\`json code block**, and tell the person how to import it: copy it, then in Tinkrum open **Settings → Apps and presets**, tap **Add an app** and choose **Paste from clipboard** (or save it as a \`.json\` file and choose **Import from a file**).
-6. The person may come back with a list of problems from Tinkrum or from the Tinkrum app-file checker, such as \`pages.0.blocks.2.look: "banner" is not a valid look; use one of …\` or \`pages.1.blocks.3 (block "log"): show.subtitles type is not a field of plants-care; fields of plants-care: plant, what, date, note\`. A path counts from the top of the file (\`pages.0\` is the first page); a bare name is a block, page, table or tool id. Most problems say what to write instead. Fix every problem and send the whole file again.
+1. If it is not clear, ask what the person wants to keep track of and do. Never ask for their data.
+2. **Start from a pattern.** \`${PATTERNS_FILE}\` (${PATTERNS_URL}) holds eight proven structures, each a complete app file that imports cleanly: a log with totals by period, a category budget against spending, a goal against progress, check-ins and streaks, recurring due items, a status pipeline, a collection with a wishlist, and a parent with child logs. Pick the closest (or combine two), keep its structure, change the names, fields and wording, and give every id your own app's prefix. If you cannot get the file, follow the example below.
+3. Write the file. Prefer fewer, well-made pages to many thin ones, in the person's language.
+4. **Check the file before you give it.** If you can run code with Node.js 18 or newer, run the Tinkrum checker: \`node tinkrum-check.js app.json\` (or pipe the text in: \`node tinkrum-check.js -\`). It is the same check Tinkrum runs on import, is one file that needs nothing else and does not use the network. Your environment usually cannot download it, so ask the person to attach it; they get it from ${CHECK_SCRIPT_URL}. The first line of its output is \`OK\` or \`NOT OK\`. Fix every problem it lists and run it again until it says \`OK\`; lines after \`OK\` will not work yet, so fix those too, and its suggestions: apply them unless the person asked for it this way. Without Node but with Python and \`jsonschema\`, validate against \`tinkrum-app.schema.json\` (shape only: tell the person the file was not fully checked). If you cannot run code, say so and point the person to the checker page, ${MAKE_PAGE_URL}.
+5. Reply with the **whole file in one \`\`\`json code block** and tell the person how to import it: copy it, then in Tinkrum open **Settings → Apps and presets**, tap **Add an app** and **Paste from clipboard** (or save a \`.json\` file and choose **Import from a file**).
+6. The person may come back with a list of problems from Tinkrum or the checker, such as \`pages.0.blocks.2.look: "banner" is not a valid look; use one of …\`. A path counts from the top of the file (\`pages.0\` is the first page); a bare name is a block, page, table or tool id. Most problems say what to write instead. Fix every problem and send the whole file again.
 
 ## Changing an existing file
 
@@ -275,13 +275,13 @@ The person may send an existing file to change. Entries stay on the phone, linke
 
 - **Keep every id that is already there**: the app, tables, fields, choice options, pages, blocks, quick actions and reminders. Add new things with new ids. A changed id is a new thing: the old table's entries stay on the phone but no longer show in this app.
 - Do not remove a table, a field or a choice option unless the person asks. Their entries keep the values, hidden.
-- A field's type can change only between \`number\` and \`money\`, or between \`text\` and \`note\`. For any other change (text to date, choice to number…), add a new field with a new id and leave the old one, or remove it only if the person asks.
+- A field's type can change only between \`number\` and \`money\`, or between \`text\` and \`note\`. For any other change (text to date, choice to number…), add a new field with a new id and leave the old one.
 - When the message says which page the person came from, a request that does not name a place ("make the title bigger", "add a button") is about that page.
 - Change only what was asked; return the **whole** file. Tinkrum offers to update the same app by id, with undo.
 
 ## Whole setups and returning files
 
-A \`morph-app-config\` file wraps the whole workspace in \`config\`. Keep its wrapper, ids and unrequested parts; do not extract a sub-app. The checker accepts both formats. After OK, put its exact \`Open in Tinkrum\` URL first as a clickable link; never build or shorten it. Also return the whole JSON block. Tinkrum previews before applying.
+A \`morph-app-config\` file wraps the whole workspace in \`config\`. Keep its wrapper, ids and unrequested parts; do not extract a sub-app. After OK, put its exact \`Open in Tinkrum\` URL first as a clickable link; never build or shorten it. Also return the whole JSON block. Tinkrum previews before applying.
 
 ## A complete example
 

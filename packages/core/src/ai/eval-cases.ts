@@ -8971,6 +8971,206 @@ const emptyAsZero = (c: WorkspaceConfig): string | null => {
   return /\{plus\}/.test(f.expression) ? null : 'the formula should still use {plus}';
 };
 
+const summaryEarlier: EvalEarlier = {
+  input:
+    'Create a metrics log with date, end date, amount, income, category, and a list on its own page',
+  ops: [
+    {
+      op: 'addData',
+      table: {
+        id: 'metrics',
+        name: 'Metrics',
+        fields: [
+          { id: 'date', name: 'Date', type: 'date' },
+          { id: 'end', name: 'End date', type: 'date' },
+          { id: 'amount', name: 'Amount', type: 'number' },
+          { id: 'income', name: 'Income', type: 'number' },
+          {
+            id: 'category',
+            name: 'Category',
+            type: 'choice',
+            options: [
+              { id: 'a', label: 'A' },
+              { id: 'b', label: 'B' },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      op: 'addContainer',
+      page: {
+        id: 'metrics',
+        title: 'Metrics',
+        blocks: [
+          {
+            id: 'entries',
+            look: 'list',
+            source: { table: 'metrics', limit: 30 },
+            show: { title: 'date', trailing: 'amount' },
+          },
+        ],
+      },
+    },
+    { op: 'updateContainer', nav: { bar: ['page:metrics', 'settings'] } },
+  ],
+};
+const summaryBlocks = (c: WorkspaceConfig) =>
+  c.containers.pages.flatMap((p) => allComponents(p)).filter(isKnownComponent);
+const SUMMARY_CASES: readonly EvalCase[] = [
+  {
+    id: 'KG51',
+    input: '在 Metrics 页面显示储蓄率：收入合计减去金额合计，再除以收入合计，显示百分比',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [summaryEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        summaryBlocks(c).some(
+          (b) =>
+            b.look === 'number' &&
+            b.source.calc?.as === 'percent' &&
+            b.source.calc.with.some((t) => t.field === 'income' || b.source.field === 'income'),
+        )
+          ? null
+          : 'expected named totals and a percent calculation',
+    },
+  },
+  {
+    id: 'KG52',
+    input: 'Add a line chart of the latest amount on each day, using date',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [summaryEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        summaryBlocks(c).some(
+          (b) =>
+            b.look === 'chart' &&
+            b.show.kind === 'line' &&
+            b.source.aggregate === 'latest' &&
+            b.source.group.unit === 'day',
+        )
+          ? null
+          : 'expected a latest-per-day line',
+    },
+  },
+  {
+    id: 'KG53',
+    input:
+      'Show amount as a running total by day, starting from zero at the left edge of the chart',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [summaryEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        summaryBlocks(c).some((b) => b.look === 'chart' && b.source.running === 'shown')
+          ? null
+          : 'expected running shown',
+    },
+  },
+  {
+    id: 'KG54',
+    input:
+      'Show a running balance of amount by day, including all older amounts before the chart begins',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [summaryEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        summaryBlocks(c).some((b) => b.look === 'chart' && b.source.running === 'all')
+          ? null
+          : 'expected running all',
+    },
+  },
+  {
+    id: 'KG55',
+    input: '画每天金额的堆叠柱状图，按 Category 拆分',
+    locale: 'zh',
+    setup: 'default',
+    mock: false,
+    earlier: [summaryEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        summaryBlocks(c).some(
+          (b) =>
+            b.look === 'chart' &&
+            b.show.kind === 'bar' &&
+            b.source.split?.by === 'category' &&
+            b.source.aggregate === 'sum',
+        )
+          ? null
+          : 'expected stacked time chart',
+    },
+  },
+  {
+    id: 'KG56',
+    input: 'Add a month calendar, with the sum of amount written inside each day cell',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [summaryEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        summaryBlocks(c).some(
+          (b) =>
+            b.look === 'calendar' &&
+            b.show.day?.aggregate === 'sum' &&
+            b.show.day.field === 'amount',
+        )
+          ? null
+          : 'expected day sum',
+    },
+  },
+  {
+    id: 'KG57',
+    input:
+      'Ajoute un calendrier sur une seule semaine de sept jours, avec les entrées du jour sélectionné en dessous',
+    locale: 'fr',
+    setup: 'default',
+    mock: false,
+    earlier: [summaryEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        summaryBlocks(c).some((b) => b.look === 'calendar' && b.show.span === 'week')
+          ? null
+          : 'expected week calendar',
+    },
+  },
+  {
+    id: 'KG58',
+    input:
+      'Add a calendar where each entry appears on every day from Date through End date, including both',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    earlier: [summaryEarlier],
+    expect: {
+      kind: 'ops',
+      check: (c) =>
+        summaryBlocks(c).some(
+          (b) =>
+            b.look === 'calendar' &&
+            b.source.group?.by === 'date' &&
+            b.source.group.until === 'end',
+        )
+          ? null
+          : 'expected inclusive date span',
+    },
+  },
+];
+
 const CHECK_LATEST_EMPTY_CASES: readonly EvalCase[] = [
   {
     id: 'KG47',
@@ -9780,6 +9980,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...GRID_CASES,
   ...PICK_CASES,
   ...CHECK_LATEST_EMPTY_CASES,
+  ...SUMMARY_CASES,
   ...RELATIVE_VALUE_CASES,
   ...TAP_ALSO_CASES,
   ...CREATE_ALL_CASES,

@@ -406,6 +406,18 @@ class Analysis {
             inputs: this.statInputs(c),
           });
       }
+      if (c.look === 'number')
+        for (const total of c.source.calc?.with ?? []) {
+          tables.add(total.table);
+          const other = this.uses.get(total.table);
+          if (other) {
+            other.readers.push({ via: `${where} (calc)`, reachable });
+            if (total.field) other.read.add(total.field);
+            if (total.days?.date) other.read.add(total.days.date);
+            this.readFilter(other, total.filter);
+          }
+        }
+      if (c.look === 'chart' && c.source.split && use) use.read.add(c.source.split.by);
       const minus = c.look === 'number' ? c.source.minus : undefined;
       if (minus) {
         const other = this.uses.get(minus.table);
@@ -416,6 +428,12 @@ class Analysis {
           this.readFilter(other, minus.filter);
         }
       }
+    }
+    if (isRecordLook(c)) {
+      const record = c as Extract<KnownComponent, { look: 'calendar' }>;
+      const use = this.uses.get(record.source.table);
+      if (record.source.group?.until) use?.read.add(record.source.group.until);
+      if (record.show.day?.field) use?.read.add(record.show.day.field);
     }
     const sourceTable = isRecordLook(c) ? (c as { source: { table: string } }).source.table : null;
     for (const u of usesOf(c)) {
@@ -465,6 +483,9 @@ class Analysis {
       inputs.push(of(dateFieldOf(table, days?.date)));
     const minus = c.look === 'number' ? c.source.minus : undefined;
     if (minus?.field) inputs.push({ table: minus.table, field: minus.field, soft: true });
+    if (c.look === 'number')
+      for (const total of c.source.calc?.with ?? [])
+        if (total.field) inputs.push({ table: total.table, field: total.field, soft: true });
     return inputs;
   }
 

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { fieldDefinition } from '../fields';
 import { GROUP_BY_TYPES } from '../list-groups-schema';
 import { t } from '../messages';
+import { hasRecordCurrency } from '../money-currency';
 import { ToolUseSchema } from '../record-ops-schema';
 import {
   boundedText,
@@ -78,6 +79,10 @@ export type RecordSource = z.infer<typeof RecordSourceSchema>;
 
 /** 每一条的记录卡片（重复嵌套，D-369 Q4）：固定的槽位。 */
 const SlotsSchema = z.strictObject({
+  span: z.enum(['month', 'week']).optional(),
+  day: z
+    .strictObject({ aggregate: z.enum(['count', 'sum']), field: IdSchema.optional() })
+    .optional(),
   title: FieldRefSchema,
   subtitles: z.array(FieldRefSchema).max(2).optional(),
   /** 显示在右侧的字段，例如金额。 */
@@ -139,6 +144,8 @@ type RecordBlock = z.infer<z.ZodObject<typeof shape>> & {
 
 const refs = {
   'source.table': { to: 'table' },
+  'source.group.until': { to: 'field', types: ['date', 'datetime'] },
+  'show.day.field': { to: 'field', types: ['number', 'money', 'rating', 'duration', 'formula'] },
   'show.title': { to: 'field' },
   'show.subtitles': { to: 'field', role: 'subtitleField' },
   'show.trailing': { to: 'field', role: 'trailingField' },
@@ -230,6 +237,31 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
       problems.push(
         `show.format goal ${format.goal} must be a number or a number field of ${collection!.id}`,
       );
+  }
+  if (c.look !== 'calendar' && (c.show.day || c.show.span || c.source.group?.until))
+    problems.push('show.day, show.span and group.until only apply to a calendar');
+  if (c.look === 'calendar') {
+    const day = c.show.day;
+    const f = field(day?.field ?? '');
+    if (
+      day?.aggregate === 'sum' &&
+      (!f || !NUMERIC_FIELD_TYPES.includes(f.type) || hasRecordCurrency(f))
+    )
+      problems.push('show.day sum needs a numeric field with one fixed currency');
+    if (day?.aggregate === 'count' && day.field)
+      problems.push('show.day count does not read a field');
+    const until = c.source.group?.until;
+    if (until) {
+      if (
+        !['date', 'datetime'].includes(field(until)?.type ?? '') ||
+        !['date', 'datetime'].includes(field(c.source.group?.by ?? '')?.type ?? '')
+      )
+        problems.push('group.until needs explicit date or datetime start and end fields');
+      if (day?.aggregate === 'sum')
+        problems.push(
+          'show.day sum cannot combine with group.until: it would count the same amount on every day',
+        );
+    }
   }
   const group = c.source.group;
   const by = group?.by;
@@ -392,7 +424,7 @@ const DOCS: Record<RecordLook, string> = {
   board:
     'a board with one column per option of source.group.by (a choice or link field; link: rule 45) plus "not set"; dragging a card needs {as: "drag", do: "set", table, field: <the same field>, value: "$group"}, without it the board is read-only (rule 45)',
   calendar:
-    'a month calendar: source.group {unit: "day", by?: a date, datetime, dateOffset or schedule field}, show.color? a choice field (rule 45)',
+    'a month or week calendar: source.group {unit: "day", by?: a date, datetime, dateOffset or schedule field, until?: an end date/datetime field (explicit date/datetime by required; inclusive multi-day entries)}, show.color? a choice field, show.span?: "month"|"week" (default month), show.day?: {aggregate: "count"|"sum", field? (sum: numeric with fixed currency; not together with until)} (rules 45, 79)',
   table:
     'a spreadsheet-like table, one row per entry under a header of field names: show.title is the first column (kept in view), show.columns? (1-7 fields) the others (default: subtitles and trailing); scrolls sideways; read-only cells, tapping a row opens the entry',
   gallery:

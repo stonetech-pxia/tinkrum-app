@@ -605,6 +605,52 @@ function everything() {
         ],
       }),
     ]),
+    addPage('summaries', [
+      {
+        id: 'formula-total',
+        look: 'number',
+        show: { label: 'Formula' },
+        source: {
+          table: 'items',
+          aggregate: 'sum',
+          field: 'qty',
+          calc: {
+            with: [{ id: 'other', table: 'items', aggregate: 'count' }],
+            formula: '{total} / {other}',
+            as: 'number',
+          },
+        },
+      },
+      {
+        id: 'running-chart',
+        look: 'chart',
+        show: { title: 'Running', kind: 'line' },
+        source: {
+          table: 'items',
+          aggregate: 'sum',
+          field: 'qty',
+          group: { unit: 'day', by: 'date' },
+          running: 'shown',
+        },
+      },
+      {
+        id: 'split-chart',
+        look: 'chart',
+        show: { title: 'Split', kind: 'bar' },
+        source: {
+          table: 'items',
+          aggregate: 'count',
+          group: { unit: 'day', by: 'date' },
+          split: { by: 'status' },
+        },
+      },
+      {
+        id: 'week-calendar',
+        look: 'calendar',
+        show: { title: 'title', span: 'week', day: { aggregate: 'count' } },
+        source: { table: 'items', limit: 30, group: { unit: 'day', by: 'date', until: 'at' } },
+      },
+    ]),
     addTool(reminder('r-day', { every: 'day', at: '09:00' }, 'page:views')),
     addTool(
       reminder('r-day-unless', { every: 'day', at: '21:00' }, 'page:views', {

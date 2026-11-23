@@ -24,6 +24,7 @@ import {
   type ToolUse,
 } from './record-ops-schema';
 import { dateFieldOf } from './sequence';
+import { statCalcProblems } from './stat-calc';
 import { statMinusProblems } from './stat-minus';
 import { expandCollection, relatedProblems } from './related';
 import type { Registry } from './registry';
@@ -451,7 +452,11 @@ function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
       );
   }
   // 数字相减（D-337）：被减的那张表和它的筛选。
-  if (c.look === 'number') problems.push(...statMinusProblems(c, collection, config, page.of));
+  if (c.look === 'number')
+    problems.push(
+      ...statMinusProblems(c, collection, config, page.of),
+      ...statCalcProblems(c, collection, config, page.of),
+    );
   // 记录块上的工具作用在 source 表的一条上（$row）；表单的提交写自己那张表（关系规则 12）。
   // 表单（提交时新建）和提示卡（D-580，按钮不绑定某一条）的工具不作用在读的表的某一行上。
   problems.push(

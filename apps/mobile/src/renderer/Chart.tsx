@@ -1,6 +1,6 @@
 import {
   CHART_COLORS,
-  optionColor,
+  chartOptionColor,
   calendarOf,
   chartSeries,
   choiceRange,
@@ -25,6 +25,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useComputedRecords } from '../data/records';
 import { t } from '../i18n';
 import type { RenderEnv } from './components';
+import { SplitChartPlot } from './SplitChartPlot';
 import { ChartPlot, PLOT_HEIGHT } from './ChartPlot';
 import { statText, useLinkedGroups } from './data';
 import { cardColors } from './theme';
@@ -86,6 +87,7 @@ export function Chart({
     linked ?? undefined,
     false,
     timed ? range : undefined,
+    t(locale, 'chartOther'),
   );
   const points = show.kind === 'pie' ? pieSlices(series, t(locale, 'chartOther')) : series;
   // 上一期（D-439）：只有时间分组、柱状图和折线图（配置检查保证），和最近几段一一对应。
@@ -105,7 +107,15 @@ export function Chart({
             choice ? previousFullRange(choice, now, cal) : undefined,
           );
           return choice
-            ? series.map((_, i) => before[i] ?? { key: null, label: '', value: 0, empty: false })
+            ? series.map(
+                (_, i) =>
+                  before[i] ?? {
+                    key: null,
+                    label: '',
+                    value: 0,
+                    empty: !['count', 'sum', 'distinctDays'].includes(source.aggregate),
+                  },
+              )
             : before;
         })()
       : null;
@@ -117,11 +127,25 @@ export function Chart({
           value: valueText(p),
           previous: valueText(before),
         })
-      : t(locale, 'chartPoint', { label: p.label, value: valueText(p) });
+      : [
+          t(locale, 'chartPoint', { label: p.label, value: valueText(p) }),
+          ...(p.parts ?? []).map((part) =>
+            t(locale, 'chartPoint', { label: part.label, value: valueText(part) }),
+          ),
+        ].join(' · ');
   };
   const valueText = (p: ChartPoint) =>
     p.empty ? '—' : statText(p.value, source.aggregate, field, locale);
-  const nothing = records !== null && linked !== null && points.every((p) => p.value === 0);
+  const nothing =
+    records !== null &&
+    linked !== null &&
+    points.every(
+      (p) =>
+        p.empty ||
+        (['count', 'sum', 'distinctDays'].includes(source.aggregate) &&
+          p.value === 0 &&
+          !p.parts?.some((part) => part.value !== 0)),
+    );
   // 默认显示最后一段（时间）或最大的一块（单选）。
   // 时间分组：今天所在的那一段（选了页面范围时，范围里还没到的日子在后面，不默认显示它们）。
   const today = todayText(now, cal);
@@ -147,6 +171,11 @@ export function Chart({
     rangePicked >= 0 ? rangePicked : picked !== null && picked < points.length ? picked : fallback;
   const current = points[selected];
 
+  const splitField = collection.fields.find((f) => f.id === source.split?.by);
+  const splitOptions = splitField?.type === 'choice' ? splitField.options : [];
+  const parts = points[0]?.parts ?? [];
+  const splitColors = parts.map((p) => chartOptionColor(p.key, splitOptions, palette.dark));
+
   const header = (
     <View style={styles.header}>
       <Text style={[palette.font('title', 16), { color: palette.text }]}>{show.title}</Text>
@@ -160,6 +189,13 @@ export function Chart({
     </View>
   );
 
+  const pickPoint = (p: ChartPoint, i: number) => {
+    setPicked(i);
+    // 点图只改变页面上的时间选择，不写记录（底线 15）。
+    if (show.pickPeriod && unit && p.key && env.pageRange)
+      env.pageRange.set(unitRange(p.key, unit));
+  };
+
   // 每个点一格可以点的区域（盖在图上，比柱子和点本身大）：读屏、点一下看数值都靠它。
   const slots = (prefix: 'bar' | 'point') => (
     <View style={[StyleSheet.absoluteFill, styles.bars]}>
@@ -170,12 +206,7 @@ export function Chart({
           accessibilityRole="button"
           accessibilityLabel={pointText(p, i)}
           disabled={!env.interactive}
-          onPress={() => {
-            setPicked(i);
-            // 点一根柱子，页面的时间范围改成它那一段（D-585）；只改页面上的选择，什么都不写（底线 15）。
-            if (show.pickPeriod && unit && p.key && env.pageRange)
-              env.pageRange.set(unitRange(p.key, unit));
-          }}
+          onPress={() => pickPoint(p, i)}
           onLongPress={env.onLongPress}
           style={styles.barSlot}
         />
@@ -190,13 +221,23 @@ export function Chart({
         {records === null ? ' ' : t(locale, 'chartEmpty')}
       </Text>
     );
-  } else if (show.kind === 'bar' && points.every((p) => p.value >= 0)) {
+  } else if (source.split) {
+    plot = (
+      <SplitChartPlot
+        kind={show.kind === 'bar' ? 'bar' : 'line'}
+        points={points}
+        colors={splitColors}
+        palette={palette}>
+        {slots(show.kind === 'bar' ? 'bar' : 'point')}
+      </SplitChartPlot>
+    );
+  } else if (show.kind === 'bar' && [...points, ...(previous ?? [])].every((p) => p.value >= 0)) {
     // 没有负数：Victory 画（柱子从 0 画起）；有负数的用下面原来的画法，Victory 的柱子只会画到图的底边。
     plot = (
       <ChartPlot
         kind="bar"
-        values={points.map((p) => p.value)}
-        previous={previous?.map((p) => p.value)}
+        values={points.map((p) => (p.empty ? null : p.value))}
+        previous={previous?.map((p) => (p.empty ? null : p.value))}
         selected={selected}
         color={palette.primary}
         mutedColor={palette.caption}
@@ -207,7 +248,7 @@ export function Chart({
     );
   } else if (show.kind === 'bar') {
     const scale = lineScale(
-      points.map((p) => p.value),
+      [...points.map((p) => p.value), ...(previous?.map((p) => p.value) ?? [])],
       1,
       PLOT_HEIGHT,
       0,
@@ -222,16 +263,31 @@ export function Chart({
               key={p.key ?? `none-${i}`}
               testID={`chart-bar-${i}`}
               accessibilityRole="button"
-              accessibilityLabel={t(locale, 'chartPoint', { label: p.label, value: valueText(p) })}
+              accessibilityLabel={pointText(p, i)}
               disabled={!env.interactive}
-              onPress={() => setPicked(i)}
+              onPress={() => pickPoint(p, i)}
               onLongPress={env.onLongPress}
               style={styles.barSlot}>
+              {previous?.[i] && !previous[i]!.empty ? (
+                <View
+                  testID={`chart-previous-${i}`}
+                  style={{
+                    position: 'absolute',
+                    left: 1,
+                    right: 1,
+                    top: Math.min(scale.y(previous[i]!.value), scale.zero),
+                    height: Math.abs(scale.zero - scale.y(previous[i]!.value)),
+                    backgroundColor: palette.caption,
+                    opacity: 0.35,
+                    borderRadius: 4,
+                  }}
+                />
+              ) : null}
               <View
                 style={{
                   position: 'absolute',
-                  left: 1,
-                  right: 1,
+                  left: previous ? '18%' : 1,
+                  right: previous ? '18%' : 1,
                   top,
                   height,
                   borderTopLeftRadius: p.value >= 0 ? 4 : 0,
@@ -251,8 +307,8 @@ export function Chart({
     plot = (
       <ChartPlot
         kind="line"
-        values={points.map((p) => p.value)}
-        previous={previous?.map((p) => p.value)}
+        values={points.map((p) => (p.empty ? null : p.value))}
+        previous={previous?.map((p) => (p.empty ? null : p.value))}
         selected={selected}
         color={palette.primary}
         mutedColor={palette.caption}
@@ -263,16 +319,16 @@ export function Chart({
     );
   } else {
     const total = points.reduce((s, p) => s + p.value, 0);
-    // 按单选分组时，写了颜色的选项用它的颜色（D-568）；别的照旧按块的顺序取分类色，「其他」和「未选」是灰；
+    // 按单选分组时，颜色由字段里的选项顺序决定（D-568），和拆分图一致；「其他」和「未选」是灰；
     // 有选项写了颜色时，没写的避开那些颜色的色系（D-571）。
     const groupBy = byChoice ? collection.fields.find((f) => f.id === source.group.by) : undefined;
     const options = groupBy?.type === 'choice' ? groupBy.options : [];
     const colorOf = (p: ChartPoint, i: number) =>
-      optionColor(
-        options.find((o) => o.id === p.key),
-        p.key === null ? -1 : i % CHART_COLORS.light.length,
-        palette.dark,
+      chartOptionColor(
+        p.key,
         options,
+        palette.dark,
+        p.key === null ? -1 : i % CHART_COLORS.light.length,
       );
     const size = PLOT_HEIGHT;
     const paths = piePaths(
@@ -338,6 +394,21 @@ export function Chart({
     <Card palette={palette} background={tone ? cardColors(palette, tone).background : undefined}>
       {header}
       {plot}
+      {source.split ? (
+        <View style={styles.legend}>
+          {(current?.parts ?? parts).map((part, i) => (
+            <View key={part.key ?? 'none'} style={styles.legendRow}>
+              <View style={[styles.swatch, { backgroundColor: splitColors[i] }]} />
+              <Text style={[styles.flex, palette.font('body', 13), { color: palette.text }]}>
+                {part.label}
+              </Text>
+              <Text style={[palette.font('body', 13), { color: palette.muted }]}>
+                {valueText(part)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
       {show.kind !== 'pie' && !nothing && points.length > 1 ? (
         // 只标第一段和最后一段，中间的点一下才看。
         <View style={styles.axis}>

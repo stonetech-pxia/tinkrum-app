@@ -1,5 +1,6 @@
 import { dateOfDayNumber, todayNumber, weekStartOf, type Calendar } from './calendar';
 import {
+  aggregateRecords,
   fieldOf,
   readValue,
   recordDay,
@@ -10,6 +11,7 @@ import {
 import { dayNumber } from './formula';
 import { localeTag } from './localization';
 import { scheduleOccurrences, type ScheduleRule } from './schedule';
+import type { DayRange } from './page-period';
 import type { Collection, Locale } from './schema';
 
 // 记录列表的月历外观（D-305）：一个月的格子，每天有几条记录、按一个单选字段上什么颜色。
@@ -30,12 +32,18 @@ function daysOf(
   last: number,
   now: Date,
   cal: Calendar,
+  until?: string,
 ): number[] {
   const field = fieldOf(collection, dateField);
   if (field?.type !== 'schedule') {
     const date = recordDay(record, collection, dateField, now, cal);
     const n = date === undefined ? undefined : dayNumber(date);
-    return n === undefined || n < first || n > last ? [] : [n];
+    if (n === undefined) return [];
+    const endText = until ? recordDay(record, collection, until, now, cal) : undefined;
+    const end = endText === undefined ? n : Math.max(n, dayNumber(endText) ?? n);
+    const from = Math.max(n, first),
+      to = Math.min(end, last);
+    return from > to ? [] : Array.from({ length: to - from + 1 }, (_, i) => from + i);
   }
   const rule = readValue(field, record.values[field.id]) as ScheduleRule | undefined;
   const today = todayNumber(now, cal);
@@ -92,8 +100,13 @@ export function monthQueryRange(month: string): {
   untilMs: number;
 } {
   const [, last] = monthBounds(month);
-  const from = `${month}-01`;
-  const until = dateOfDayNumber(last + 2);
+  return dayQueryRange({ start: `${month}-01`, end: dateOfDayNumber(last) });
+}
+
+/** 精确日范围的数据库读取边界；末尾多读一天以覆盖 dayStart。 */
+export function dayQueryRange(range: DayRange) {
+  const from = range.start;
+  const until = dateOfDayNumber(dayNumber(range.end)! + 2);
   const ms = (s: string) => {
     const [y, m, d] = s.split('-').map(Number) as [number, number, number];
     return new Date(y, m - 1, d).getTime();
@@ -103,6 +116,7 @@ export function monthQueryRange(month: string): {
 
 export interface MonthDay {
   count: number;
+  value?: number;
   /** 上色的单选字段在这一天最后一条记录上的选项；null 是没选（或选项已删掉）。没有上色字段时也是 null。 */
   optionId: string | null;
   /** 这一天的记录，最晚的在前（按日期时间，再按创建时间）。 */
@@ -113,12 +127,20 @@ export interface MonthDay {
 export function monthDays(
   records: readonly DataRecord[],
   collection: Collection,
-  spec: { date: string; color?: string | undefined },
-  month: string,
+  spec: {
+    date: string;
+    color?: string | undefined;
+    until?: string | undefined;
+    day?: { aggregate: 'count' | 'sum'; field?: string | undefined } | undefined;
+  },
+  month: string | DayRange,
   now: Date,
   cal: Calendar,
 ): { days: Map<number, MonthDay>; max: number } {
-  const [first, last] = monthBounds(month);
+  const [first, last] =
+    typeof month === 'string'
+      ? monthBounds(month)
+      : [dayNumber(month.start)!, dayNumber(month.end)!];
   const color = spec.color ? fieldOf(collection, spec.color) : undefined;
   const byDay = new Map<number, { record: DataRecord; key: string }[]>();
   for (const record of records) {
@@ -131,7 +153,7 @@ export function monthDays(
           ? (raw as { time: string }).time
           : '';
     const key = `${at}|${String(record.createdAt).padStart(15, '0')}`;
-    for (const n of daysOf(record, collection, spec.date, first, last, now, cal)) {
+    for (const n of daysOf(record, collection, spec.date, first, last, now, cal, spec.until)) {
       const list = byDay.get(n);
       if (list) list.push({ record, key });
       else byDay.set(n, [{ record, key }]);
@@ -143,12 +165,22 @@ export function monthDays(
     list.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
     const latest = list[0]!.record;
     const option = color?.type === 'choice' ? readValue(color, latest.values[color.id]) : undefined;
+    const value =
+      spec.day?.aggregate === 'sum'
+        ? (aggregateRecords(
+            list.map((x) => x.record),
+            collection,
+            'sum',
+            spec.day.field,
+          ) ?? 0)
+        : list.length;
     days.set(n, {
+      ...(spec.day ? { value } : {}),
       count: list.length,
       optionId: typeof option === 'string' ? option : null,
       records: list.map((x) => x.record),
     });
-    max = Math.max(max, list.length);
+    max = Math.max(max, Math.abs(value));
   }
   return { days, max };
 }
