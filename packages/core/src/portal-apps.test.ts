@@ -220,41 +220,46 @@ const run = (config: WorkspaceConfig, ops: Parameters<typeof prepareOps>[1]) => 
   return result.after;
 };
 
-describe.each(manifest.apps.map((a) => [a.name, a] as const))('Import home page %s', (_name, entry) => {
-  const file = load(entry);
+describe.each(manifest.apps.map((a) => [a.name, a] as const))(
+  'Import home page %s',
+  (_name, entry) => {
+    const file = load(entry);
 
-  it('changes the home style and puts the pages in the bar, without making an app', () => {
-    const before = starter();
-    const after = importApp(before, file, 'home');
-    expect(after.nav.apps).toBeUndefined();
-    expect(after.theme).toEqual(file.app.theme);
-    expect(after.nav.bar.length).toBeLessThanOrEqual(5);
-    // Pages that fit were entered into the navigation bar; the original Home, Tink, and Settings remain.
-    const added = after.nav.bar.filter((t) => t.startsWith('page:') && t !== 'page:home');
-    expect(added.length).toBeGreaterThan(0);
-    expect(after.nav.bar).toContain('page:home');
-    expect(after.nav.bar).toContain('settings');
-    // Pages, tables, quick actions, and reminders belong to the home page (no app property).
-    expect(after.containers.pages.filter((p) => p.app !== undefined)).toEqual([]);
-    expect(after.data.tables.filter((t) => t.app !== undefined)).toEqual([]);
-    expect(after.data.tables.length).toBe(before.data.tables.length + entry.tables.length);
-    expect(remindersOf(after)).toHaveLength(entry.reminders);
-  });
+    it('changes the home style and puts the pages in the bar, without making an app', () => {
+      const before = starter();
+      const after = importApp(before, file, 'home');
+      expect(after.nav.apps).toBeUndefined();
+      expect(after.theme).toEqual(file.app.theme);
+      expect(after.nav.bar.length).toBeLessThanOrEqual(5);
+      // Pages that fit were entered into the navigation bar; the original Home, Tink, and Settings remain.
+      const added = after.nav.bar.filter((t) => t.startsWith('page:') && t !== 'page:home');
+      expect(added.length).toBeGreaterThan(0);
+      expect(after.nav.bar).toContain('page:home');
+      expect(after.nav.bar).toContain('settings');
+      // Pages, tables, quick actions, and reminders belong to the home page (no app property).
+      expect(after.containers.pages.filter((p) => p.app !== undefined)).toEqual([]);
+      expect(after.data.tables.filter((t) => t.app !== undefined)).toEqual([]);
+      expect(after.data.tables.length).toBe(before.data.tables.length + entry.tables.length);
+      expect(remindersOf(after)).toHaveLength(entry.reminders);
+    });
 
-  it('keeps every page reachable and the workspace consistent (invariant 18)', () => {
-    const before = starter();
-    const after = importApp(before, file, 'home');
-    expect(referenceProblems(after, registry)).toEqual([]);
-    expect(newFileRefs(before, after)).toEqual([]);
-    expect(checkTools(after, registry).issues.filter((i) => i.severity === 'blocker')).toEqual([]);
-  });
+    it('keeps every page reachable and the workspace consistent (invariant 18)', () => {
+      const before = starter();
+      const after = importApp(before, file, 'home');
+      expect(referenceProblems(after, registry)).toEqual([]);
+      expect(newFileRefs(before, after)).toEqual([]);
+      expect(checkTools(after, registry).issues.filter((i) => i.severity === 'blocker')).toEqual(
+        [],
+      );
+    });
 
-  it('cannot be imported into the home twice', () => {
-    const once = importApp(starter(), file, 'home');
-    const again = appFileOps(file, once, { mode: 'home' });
-    expect(again.ok).toBe(false);
-  });
-});
+    it('cannot be imported into the home twice', () => {
+      const once = importApp(starter(), file, 'home');
+      const again = appFileOps(file, once, { mode: 'home' });
+      expect(again.ok).toBe(false);
+    });
+  },
+);
 
 describe('Reconnect existing tables and restore initial appearance', () => {
   const entry = manifest.apps.find((a) => a.id === 'habits')!;

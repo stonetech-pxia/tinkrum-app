@@ -75,25 +75,28 @@ describe('Build plan', () => {
     ['zh', '前面已经做好了'],
     ['en', 'Already done in an earlier step'],
     ['fr', 'Déjà fait à une étape précédente'],
-  ] as const)('A preceding completed step has its own description (%s), while other steps do not', async (locale, text) => {
-    const { store } = await openChange(locale);
-    await act(async () =>
-      store.setState({
-        build: {
-          summary: 'x',
-          origin: { kind: 'chat' } as never,
-          phase: 'finished',
-          steps: [
-            { id: 'a', kind: 'record', title: 'A', request: 'a', status: 'done' },
-            { id: 'b', kind: 'look', title: 'B', request: 'b', status: 'done', already: true },
-          ],
-        },
-      }),
-    );
-    expect(await screen.findByTestId('build-step-already-b')).toHaveTextContent(text);
-    expect(screen.queryByTestId('build-step-already-a')).toBeNull();
-    expect(screen.getByTestId('build-check')).toBeTruthy();
-  });
+  ] as const)(
+    'A preceding completed step has its own description (%s), while other steps do not',
+    async (locale, text) => {
+      const { store } = await openChange(locale);
+      await act(async () =>
+        store.setState({
+          build: {
+            summary: 'x',
+            origin: { kind: 'chat' } as never,
+            phase: 'finished',
+            steps: [
+              { id: 'a', kind: 'record', title: 'A', request: 'a', status: 'done' },
+              { id: 'b', kind: 'look', title: 'B', request: 'b', status: 'done', already: true },
+            ],
+          },
+        }),
+      );
+      expect(await screen.findByTestId('build-step-already-b')).toHaveTextContent(text);
+      expect(screen.queryByTestId('build-step-already-a')).toBeNull();
+      expect(screen.getByTestId('build-check')).toBeTruthy();
+    },
+  );
 
   it('Small modifications (color change) do not trigger plan', async () => {
     const { store } = await openChange();

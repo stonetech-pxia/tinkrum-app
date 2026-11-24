@@ -154,23 +154,26 @@ describe('draft fields', () => {
 });
 
 describe.each([...FILE_RECORD_PRESETS, ...HIDDEN_RECORD_PRESETS])('preset %s', (preset) => {
-  it.each(['en', 'zh', 'fr'] as const)('%s: can build both fully and after removing fields (invariant 18)', (locale) => {
-    const config = createDefaultWorkspace(locale);
-    const table = draftTable(preset, config, locale);
-    const whole = applyOps(config, draftTableOps(table, preset, config, locale), {
-      registry,
-      locale,
-    });
-    expect(whole.ok).toBe(true);
-    const removed = table.fields.find((f) => f.type !== 'file')!;
-    const smaller = removeDraftField(table, removed.id);
-    const part = applyOps(config, draftTableOps(smaller, preset, config, locale), {
-      registry,
-      locale,
-    });
-    expect(part.ok).toBe(true);
-    expect(table.fields.some((f) => f.type === 'file')).toBe(true);
-  });
+  it.each(['en', 'zh', 'fr'] as const)(
+    '%s: can build both fully and after removing fields (invariant 18)',
+    (locale) => {
+      const config = createDefaultWorkspace(locale);
+      const table = draftTable(preset, config, locale);
+      const whole = applyOps(config, draftTableOps(table, preset, config, locale), {
+        registry,
+        locale,
+      });
+      expect(whole.ok).toBe(true);
+      const removed = table.fields.find((f) => f.type !== 'file')!;
+      const smaller = removeDraftField(table, removed.id);
+      const part = applyOps(config, draftTableOps(smaller, preset, config, locale), {
+        registry,
+        locale,
+      });
+      expect(part.ok).toBe(true);
+      expect(table.fields.some((f) => f.type === 'file')).toBe(true);
+    },
+  );
 });
 
 describe('Hidden preset', () => {

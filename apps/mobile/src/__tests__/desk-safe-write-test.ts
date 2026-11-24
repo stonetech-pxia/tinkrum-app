@@ -93,7 +93,7 @@ describe('Desk manifest writing', () => {
     expect(text(files, `${MAIN}.bak`)).toBe(good);
   });
 
-  it('Manifests from other desks placed at this desk\'s location are ignored (ID mismatch)', async () => {
+  it("Manifests from other desks placed at this desk's location are ignored (ID mismatch)", async () => {
     const { files, desk } = await setup();
     await saveDesk(files, { ...desk, touchedAt: 2000 });
     files.disk.set(MAIN, new TextEncoder().encode(JSON.stringify({ ...desk, id: 'other' })));

@@ -123,7 +123,7 @@ function sourceFiles(dir: string, exts = ['.ts', '.tsx']): string[] {
 // Data and Privacy
 // ---------------------------------------------------------------------------------------------
 
-describe('Invariant 1: The user\'s data never leaves the phone', () => {
+describe("Invariant 1: The user's data never leaves the phone", () => {
   // Actual requests (with keys, Tinkrum server, inbox page) are tested using sentinel strings in mobile's invariants-test.tsx.
 
   it('the app has no telemetry, crash-report or analytics library', () => {
@@ -239,7 +239,7 @@ describe('Invariants 1 / 2 / 14: Saved presets are not in the config (D-410)', (
   });
 });
 
-describe('Invariant 2: On-device model reads file text only for suggestions, and only the user\'s spoken sentence for this entry is filled directly (D-396, D-575)', () => {
+describe("Invariant 2: On-device model reads file text only for suggestions, and only the user's spoken sentence for this entry is filled directly (D-396, D-575)", () => {
   const fields = [
     { id: 'title', name: '事项', type: 'text' as const },
     { id: 'due', name: '截止日期', type: 'date' as const },
@@ -743,7 +743,7 @@ describe('Invariant 9: A tool cannot trigger a tool; no branches or loops', () =
   });
 });
 
-describe('Invariant 10: Data leaves the app only by the user\'s own tap, every time', () => {
+describe("Invariant 10: Data leaves the app only by the user's own tap, every time", () => {
   // D-428 (superseding D-422's "not a step", decided by the founder in conversation on 2026-11-04):
   // making phone calls, sending SMS, sending emails, and opening websites are four steps that only
   // accept text provided by the container; block tools and reminders cannot run them, nor can
@@ -1566,7 +1566,7 @@ describe('Invariant 17: Check-in grid only modifies the table it displays (D-610
   });
 });
 
-describe('Invariants 9 / 17 / 18: Checkbox creation is only below the list and writes only to the list\'s table (D-616)', () => {
+describe("Invariants 9 / 17 / 18: Checkbox creation is only below the list and writes only to the list's table (D-616)", () => {
   const config = createDefaultWorkspace('en');
   config.data.tables.push(
     { id: 'recipes', name: 'Recipes', fields: [{ id: 'name', name: 'Name', type: 'text' }] },

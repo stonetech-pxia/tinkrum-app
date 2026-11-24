@@ -311,7 +311,7 @@ describe('record tools: 4 issues', () => {
     expect(codes(r, 'blocker')).toEqual(['view-missing']);
   });
 
-  it('only \'new\' button on individual rows: first entry cannot be added', () => {
+  it("only 'new' button on individual rows: first entry cannot be added", () => {
     const rowAdd = list('l', 't', {
       tools: [{ as: 'button', label: 'Add', do: 'create', table: 't', ask: 'all' }],
     });
@@ -319,7 +319,7 @@ describe('record tools: 4 issues', () => {
     expect(codes(r, 'blocker')).toEqual(['add-needs-existing-row']);
   });
 
-  it('\'new\' button on rows of another table ($row) counts as an add entry point; inline add also counts', () => {
+  it("'new' button on rows of another table ($row) counts as an add entry point; inline add also counts", () => {
     const habits = table('habits', [text('title')]);
     const checkins = table('checkins', [
       { id: 'habit', name: 'habit', type: 'link', table: 'habits' } as Collection['fields'][number],
@@ -344,7 +344,7 @@ describe('record tools: 4 issues', () => {
     expect(codes(r, 'blocker')).toEqual([]);
   });
 
-  it('tables with attachment fields lacking add entry points can add entries via inbox \'Save as record\', warns only', () => {
+  it("tables with attachment fields lacking add entry points can add entries via inbox 'Save as record', warns only", () => {
     const r = check(
       workspace({
         tables: [
@@ -541,7 +541,7 @@ describe('record tools: warnings', () => {
     expect(codes(r, 'blocker')).toEqual([]);
   });
 
-  it('\'done\' writes to table A, \'dismiss\' reads table B: clicking done still triggers warning', () => {
+  it("'done' writes to table A, 'dismiss' reads table B: clicking done still triggers warning", () => {
     const r = check(
       workspace({
         tables: [plants, table('logs', [text('title')])],
@@ -558,7 +558,7 @@ describe('record tools: warnings', () => {
     expect(codes(r, 'blocker')).toContain('reminder-done-wrong-table');
   });
 
-  it('\'done\' and \'dismiss\' target the same table: no warning', () => {
+  it("'done' and 'dismiss' target the same table: no warning", () => {
     const r = check(
       workspace({
         tables: [plants, table('logs', [text('title')])],
@@ -761,7 +761,7 @@ describe('fields', () => {
     expect(r.issues.filter((i) => i.code === 'field-unused').map((i) => i.target)).toEqual([]);
   });
 
-  it('fields used as \'last completed\' by schedule fields are not considered unused', () => {
+  it("fields used as 'last completed' by schedule fields are not considered unused", () => {
     const r = check(
       workspace({
         tables: [
@@ -933,7 +933,7 @@ describe('user-specified numbers and terms map to parameters', () => {
         expect(run(input, locale, with_(compress({ maxKB: 300 })))).toEqual(['param-size']);
     });
 
-    it('New quick action\'s target size, but missing compression step: should report', () => {
+    it("New quick action's target size, but missing compression step: should report", () => {
       const wf = quick('n', [
         ['in.photos', { source: 'library', min: 1, max: 5 }],
         ['out.share', {}],

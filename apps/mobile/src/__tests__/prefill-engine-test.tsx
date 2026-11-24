@@ -110,7 +110,7 @@ describe('Prefill engine (D-398)', () => {
     expect(result.current.suggestions).toEqual(later);
   });
 
-  it('Candidates whose positions cannot be found in the text: tapping them does nothing, and the field\'s original memory remains', async () => {
+  it("Candidates whose positions cannot be found in the text: tapping them does nothing, and the field's original memory remains", async () => {
     const good = { label: 'Total', relY: 0.5 };
     await mockContext.repo!.setMeta(
       PICK_STORE_KEY,

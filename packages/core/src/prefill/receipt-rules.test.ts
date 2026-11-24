@@ -97,7 +97,7 @@ describe('Total', () => {
     expect(r.total.map(Number)).toEqual([3620.84]);
   });
 
-  it('A row of \'label + three numbers\' A + B = C: C is the total', async () => {
+  it("A row of 'label + three numbers' A + B = C: C is the total", async () => {
     const r = await run(['Shop', '03/11/2025', 'Net Tax Total 100.00 8.00 108.00']);
     expect(n(r.total[0])).toBe(108);
   });
@@ -186,12 +186,12 @@ describe('Tax amount', () => {
     expect(n(r.tax[0])).toBe(14);
   });
 
-  it('In a \'label + three numbers\' row, the middle one is the tax amount', async () => {
+  it("In a 'label + three numbers' row, the middle one is the tax amount", async () => {
     const r = await run(['Shop', 'Subtotal Tax Total', '100.00 8.00 108.00']);
     expect(n(r.tax[0])).toBe(8);
   });
 
-  it('Amounts where \'tax amount + X = maximum amount in text\' enter candidates even without a tax label', async () => {
+  it("Amounts where 'tax amount + X = maximum amount in text' enter candidates even without a tax label", async () => {
     const r = await run(['Shop', 'Items 50.00', 'Surcharge 4.00', 'Total 54.00', 'VAT included']);
     expect(n(r.tax[0])).toBe(4);
   });
@@ -248,7 +248,7 @@ describe('Date', () => {
     expect(r.date[0]).toBe('2026-04-03');
   });
 
-  it('When the document has explicit evidence like \'25/12/2025\', obey it (regardless of UI language)', async () => {
+  it("When the document has explicit evidence like '25/12/2025', obey it (regardless of UI language)", async () => {
     const r = await run(['Shop', 'Date 03/04/2026', 'Ref 25/12/2025', 'Total $5.00']);
     expect(r.date.indexOf('2026-04-03')).toBeGreaterThanOrEqual(0);
     expect(r.date.indexOf('2026-04-03')).toBeLessThan(
@@ -303,7 +303,7 @@ describe('Date', () => {
     expect(r.date).toEqual([]);
   });
 
-  it('\'Date sent\' is not invoice date', async () => {
+  it("'Date sent' is not invoice date", async () => {
     const r = await run(['Shop', 'Date sent: 2026-01-02', 'Order date: 2026-01-01', 'Total 5.00']);
     expect(r.date[0]).toBe('2026-01-01');
   });
@@ -323,7 +323,7 @@ describe('Date', () => {
 });
 
 describe('Store name', () => {
-  it('Document name \'SALES RECEIPT\' is not a store name', async () => {
+  it("Document name 'SALES RECEIPT' is not a store name", async () => {
     const r = await run(['SALES RECEIPT', 'Joes Diner', 'Total 5.00']);
     expect(r.merchant).toEqual(['Joes Diner']);
   });
@@ -336,12 +336,12 @@ describe('Store name', () => {
     expect(r.merchant[0]).toBe('株式会社ファミリー商事');
   });
 
-  it('\'Store: Downtown Branch\' is a branch; store name is at the top', async () => {
+  it("'Store: Downtown Branch' is a branch; store name is at the top", async () => {
     const r = await run(['JOES DINER', 'Store: Downtown Branch', 'Total 5.00']);
     expect(r.merchant).toEqual(['JOES DINER']);
   });
 
-  it('Short word in previous row (Pago) just happens to look like \'store\', not a store name label', async () => {
+  it("Short word in previous row (Pago) just happens to look like 'store', not a store name label", async () => {
     const r = await run(
       [
         'Ropa Outdoor Norte',
@@ -357,7 +357,7 @@ describe('Store name', () => {
     expect(r.merchant[0]).toBe('Ropa Outdoor Norte');
   });
 
-  it('Strip \'Welcome to\'', async () => {
+  it("Strip 'Welcome to'", async () => {
     const r = await run(['Welcome to Joes Diner', 'Total 5.00']);
     expect(r.merchant).toEqual(['Joes Diner']);
   });
@@ -367,19 +367,19 @@ describe('Store name', () => {
     expect(r.merchant).toEqual(['Foo Bar Trading Pty']);
   });
 
-  it('Store names containing \'Supermarket\' or \'Street\' are not excluded for looking like addresses', async () => {
+  it("Store names containing 'Supermarket' or 'Street' are not excluded for looking like addresses", async () => {
     const zh = await run(['大润发超市', '合计 12.00'], { currency: 'CNY', locale: 'zh' });
     expect(zh.merchant).toEqual(['大润发超市']);
     const en = await run(['12 Main Street Cafe', 'Total 12.00']);
     expect(en.merchant).toEqual(['12 Main Street Cafe']);
   });
 
-  it('\'Powered by\' is not a store name', async () => {
+  it("'Powered by' is not a store name", async () => {
     const r = await run(['Powered by Toast', 'Joes Diner', 'Total 5.00']);
     expect(r.merchant).toEqual(['Joes Diner']);
   });
 
-  it('In the row below \'Seller: Client:\' header, the left cell is the seller', async () => {
+  it("In the row below 'Seller: Client:' header, the left cell is the seller", async () => {
     const r = await run([
       'INVOICE',
       'Invoice No 77',

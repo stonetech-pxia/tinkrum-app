@@ -192,7 +192,7 @@ describe('Preview page and inbox page -> Save as record', () => {
     });
   });
 
-  it('Selected shopping vouchers and changed table name: do not use full receipt suite, build according to preset\'s own pages (D-479)', async () => {
+  it("Selected shopping vouchers and changed table name: do not use full receipt suite, build according to preset's own pages (D-479)", async () => {
     const { files, store } = await render();
     await openShare(files, ['IMG_1.jpg']);
     await choose('new');
@@ -298,7 +298,7 @@ describe('Preview page and inbox page -> Save as record', () => {
     expect(files.disk.has(photo!.uri)).toBe(true);
   });
 
-  it('New user hasn\'t finished reading introduction: recording causes shell to remount, file remains, welcome page not pushed again', async () => {
+  it("New user hasn't finished reading introduction: recording causes shell to remount, file remains, welcome page not pushed again", async () => {
     // On real device (2026-10-31): home screen pushed welcome page, inbox page covered it; after table creation, shell remounted with new version and pushed again.
     const repo = new MemoryWorkspaceRepo();
     await act(() => useGuide.getState().load(repo));

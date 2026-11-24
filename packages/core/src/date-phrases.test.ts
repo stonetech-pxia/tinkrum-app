@@ -95,7 +95,7 @@ describe('Chinese times', () => {
     ['十点开会', '十点', '10:00'],
   ])('%s', (text, said, t) => expect(find(text)).toEqual({ said, value: time(t) }));
 
-  it('25 o\'clock and 24:00 are not times', () => {
+  it("25 o'clock and 24:00 are not times", () => {
     expect(find('25点')).toBeUndefined();
     expect(find('24:00')).toBeUndefined();
   });

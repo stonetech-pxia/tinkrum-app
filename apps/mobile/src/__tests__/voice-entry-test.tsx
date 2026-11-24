@@ -262,7 +262,7 @@ describe('Form pre-fills directly based on what was said (D-575)', () => {
     expect(screen.queryByText('按你说的填的')).toBeNull();
   });
 
-  it('Values submitted upon saving are the pre-filled ones (saving is still triggered by the user\'s tap)', async () => {
+  it("Values submitted upon saving are the pre-filled ones (saving is still triggered by the user's tap)", async () => {
     const { onDone } = await openForm(expenses, '午饭花了二十三块五');
     expect(onDone).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('local-done'));

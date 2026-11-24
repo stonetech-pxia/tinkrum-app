@@ -138,7 +138,7 @@ describe('Category field candidates', () => {
     expect(plan.fields[0]!.code[0]?.value).toBe('transport');
   });
 
-  it('Lexicon uncertain: ask the model, answers are in candidates, and grammar is restricted to the current table\'s options only', async () => {
+  it("Lexicon uncertain: ask the model, answers are in candidates, and grammar is restricted to the current table's options only", async () => {
     const m = fakeModel('grocery');
     const out = await modelEngine(m.open)(run(PLAIN));
     expect(out.category?.map((s) => s.value)).toEqual(['grocery']);

@@ -827,11 +827,14 @@ describe.each(SCENARIOS.map((s) => [s.id, s] as const))('%s', (_id, s) => {
     expect(r.blockers).toEqual([]);
   });
 
-  it.each(Object.entries(plan.builds).slice(1))('Alternative construction methods are also valid: %s', (_name, build) => {
-    const r = score(s, build());
-    expect(r.missingCore).toEqual([]);
-    expect(r.qualified).toBe(true);
-  });
+  it.each(Object.entries(plan.builds).slice(1))(
+    'Alternative construction methods are also valid: %s',
+    (_name, build) => {
+      const r = score(s, build());
+      expect(r.missingCore).toEqual([]);
+      expect(r.qualified).toBe(true);
+    },
+  );
 
   it.each(s.requirements.map((r) => [r.id, r] as const))('Fails if %s is missing', (id, r) => {
     const config = first();

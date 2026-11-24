@@ -63,7 +63,7 @@ describe('No.: generic No does not consume other numbers (item 1)', () => {
     expect(invoiceNoByKey(['Ticket No 12345678'])).toBe('12345678');
   });
 
-  it('OCR on real receipts joins multiple boxes into a single line: look only at No\'s own segment (SIBR)', () => {
+  it("OCR on real receipts joins multiple boxes into a single line: look only at No's own segment (SIBR)", () => {
     expect(invoiceNoByKey(['业务流水号： 医疗类型： NO. 2007092215'])).toBe('2007092215');
     expect(invoiceNoByKey(['业务流水号： NO 2038022056'])).toBe('2038022056');
     expect(invoiceNoByKey(['备流水号 U9649201 医疗类型城市医保 NO 7912778710'])).toBe('7912778710');
@@ -132,7 +132,7 @@ describe('Arithmetic: payment and subtotal do not precede total (item 2)', () =>
 });
 
 describe('Hotel latest date determination (item 3)', () => {
-  it('\'room\' must be a single word: Mushroom Cafe is not a hotel', async () => {
+  it("'room' must be a single word: Mushroom Cafe is not a hotel", async () => {
     const rows = ['Mushroom Cafe', 'Departure board', 'Date 2026-01-01', 'Next visit 2026-03-01'];
     expect(await first(DATE, rows)).toBe('2026-01-01');
   });
@@ -202,7 +202,7 @@ describe('Amount in words must be checked from that row (item 4)', () => {
     expect(two?.sure ?? false).toBe(false);
   });
 
-  it('Recognized even when \'Total (in words)\' and the amount in words are split into two rows (SIBR)', () => {
+  it("Recognized even when 'Total (in words)' and the amount in words are split into two rows (SIBR)", () => {
     expect(upperAmount(['金额合计（大写）：', '收款： 肆拾肆元肆角伍分', '44.45'])).toEqual({
       value: 44.45,
       sure: true,
@@ -213,7 +213,7 @@ describe('Amount in words must be checked from that row (item 4)', () => {
     });
   });
 
-  it('Form\'s first candidate is not the amount in words for deposits or received amounts', async () => {
+  it("Form's first candidate is not the amount in words for deposits or received amounts", async () => {
     expect(
       Number(await first(money('金额'), ['押金伍元整', '押金 5.00', '合计 88.00'], 'zh')),
     ).toBe(88);
@@ -227,7 +227,7 @@ describe('Amount in words must be checked from that row (item 4)', () => {
   });
 });
 
-describe('Amount verification checks the entire number (item 6, D-396 \'verifiable\')', () => {
+describe("Amount verification checks the entire number (item 6, D-396 'verifiable')", () => {
   it.each([
     ['8.90', ['Total 28.90']],
     ['1.25', ['Total 11.25']],
@@ -367,9 +367,12 @@ describe('Value memory must have boundaries (item 9)', () => {
 
 describe('Product line items are not store names (model response)', () => {
   const rows = ['MUSHROOM CAFE', 'Latte 4.50', 'A4 CLR COPY 8 0.53 4.24 SR', 'BAKERY 24'];
-  it.each(['Latte 4.50', 'Latte', 'A4 CLR COPY 8 0.53 4.24 SR'])('%s is not a store name', (answer) => {
-    expect(checkAnswer(MERCHANT, answer, rows, 'en')).toBeNull();
-  });
+  it.each(['Latte 4.50', 'Latte', 'A4 CLR COPY 8 0.53 4.24 SR'])(
+    '%s is not a store name',
+    (answer) => {
+      expect(checkAnswer(MERCHANT, answer, rows, 'en')).toBeNull();
+    },
+  );
   it('Real store name remains, other text fields are unaffected', () => {
     expect(checkAnswer(MERCHANT, 'MUSHROOM CAFE', rows, 'en')).toBe('MUSHROOM CAFE');
     expect(checkAnswer(MERCHANT, 'BAKERY 24', rows, 'en')).toBe('BAKERY 24');
@@ -378,7 +381,7 @@ describe('Product line items are not store names (model response)', () => {
 });
 
 describe('Strip labels (item 10)', () => {
-  it('12:30 is not \'label: value\'', () => {
+  it("12:30 is not 'label: value'", () => {
     expect(checkAnswer(NOTE_TIME, '12:30', ['Open 12:30'], 'en')).toBe('12:30');
   });
 
