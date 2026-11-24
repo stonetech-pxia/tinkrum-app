@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { PdfError, countPages, mergePdfs } from './index';
 
-/** 生成真实 PDF：每页宽度不同，用来验证合并顺序。 */
+/** Generate a real PDF: each page has a different width, used to verify merge order. */
 async function makePdf(widths: number[]): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   for (const width of widths) doc.addPage([width, 800]);

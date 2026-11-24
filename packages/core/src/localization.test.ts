@@ -45,7 +45,7 @@ describe('French behavior', () => {
   it('does not group digits in French numbers', () => {
     expect(t('fr', 'shareSummary', { n: 12345 })).toBe('12345 fichiers');
   });
-  // Hermes（App 的 JS 引擎）没有 Intl.PluralRules：t() 不能依赖它。
+  // Hermes (app's JS engine) lacks Intl.PluralRules: t() cannot depend on it.
   it('works without Intl.PluralRules', () => {
     const intl = Intl as { PluralRules?: unknown };
     const saved = intl.PluralRules;

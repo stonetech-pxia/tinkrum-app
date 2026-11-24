@@ -1,6 +1,8 @@
-// iOS 桌面小组件（D-321）：WidgetKit 扩展，由 @bacons/apple-targets 在 prebuild 时生成 target。
-// 只读 App Group 里 App 算好的画面（snapshot.json），点一下把操作写进 queue/，App 下次打开时执行。
-// 点一下要 App Intents（iOS 17），所以扩展的最低版本是 17.0；主 App 不变。
+// iOS desktop widget (D-321): WidgetKit extension, generated at prebuild time by
+// `@bacons/apple-targets`. Reads only the views computed by the app in the App Group
+// (`snapshot.json`), writes operations to `queue/` on tap to be executed the next time the app
+// opens. Tapping requires App Intents (iOS 17), so the minimum extension version is 17.0; the main
+// app remains unchanged.
 /** @type {import('@bacons/apple-targets/app.plugin').Config} */
 module.exports = {
   type: 'widget',

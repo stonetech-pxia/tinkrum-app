@@ -16,8 +16,10 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeVision } from '../test-utils/fake-files';
 
-// 扫描件转 Excel（D-272）的执行：找线用的像素只解码一次（PP-OCRv6 在同一张图上认时共用），
-// 有增强前的图时在它上面认、框换算回来（D-267）；结果是一个 xlsx，旁边存一份 TableDoc。
+// Execution of scan-to-Excel (D-272): decode pixels used for line finding only once (shared during
+// PP-OCRv6 recognition on the same image); when a pre-enhancement image is available, perform
+// recognition on it and map coordinates back (D-267); result is an xlsx with a TableDoc stored
+// alongside.
 
 jest.mock('expo-localization', () => ({ getLocales: jest.fn(() => []) }));
 
@@ -25,7 +27,7 @@ const registry = createRegistry(BUILTIN_TOOLS);
 const XS = [100, 300, 500, 700, 900];
 const YS = [100, 160, 220, 280];
 
-/** 每格中间一行字，坐标按 k 倍放大（识别时的图比找线的图大）。 */
+/** A single line of text in the middle of each cell, coordinates scaled by k (the recognition image is larger than the line-finding image). */
 function cellLines(k = 1): RecognizedLine[] {
   const out: RecognizedLine[] = [];
   for (let r = 0; r < 3; r++) {
@@ -92,7 +94,7 @@ describe('ocr.toExcel (D-272)', () => {
     files.nextPhotos = [files.offerImage('发票明细.jpg', 2000, 1400)];
     const page = renderPage(1000, 700, gridRects(XS, YS));
     vision.tableImages = [page];
-    // 识别时的图是找线那张的 2 倍大：框按比例换算回来。
+    // The recognition image is 2x the size of the line-finding image: coordinates are scaled back proportionally.
     vision.layers = [{ width: 2000, height: 1400, lines: cellLines(2) }];
     const item = resultItem(await run());
     expect(item).toMatchObject({
@@ -101,21 +103,21 @@ describe('ocr.toExcel (D-272)', () => {
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     expect(vision.calls.filter((c) => c.method === 'tablePixels')).toHaveLength(1);
-    // 认字用的是找线时解码的同一份像素。
+    // Text recognition uses the exact same pixel data decoded during line finding.
     expect(vision.linePixels).toEqual([page]);
     const read = await unpack(files, item);
     expect(read('xl/workbook.xml')).toContain('<sheet name="第 1 页"');
     expect(read('xl/sharedStrings.xml')).toContain('<t>列1</t>');
-    // 数字写成数字类型。
+    // Write numbers as numeric type.
     expect(read('xl/worksheets/sheet1.xml')).toMatch(/<c r="D3" s="\d+"><v>203<\/v><\/c>/);
-    // TableDoc 存在运行目录里，只对这个 xlsx 有效。
+    // TableDoc resides in the run directory and is valid only for this xlsx.
     expect(item.tableDoc?.for).toBe(item.uri);
     expect(item.tableDoc?.uri.startsWith('runs/')).toBe(true);
     expect(item.tableDoc?.pagesWithoutTables).toBeUndefined();
     const doc = parseTableDoc(decodeUtf8(await files.readUri(item.tableDoc!.uri)))!;
     const table = doc.pages[0]!.blocks[0] as TableBlock;
     expect([table.rows, table.cols]).toEqual([3, 4]);
-    // 截原图用的是找线那张图。
+    // Cropping the original image uses the line-finding image.
     expect(doc.pages[0]!.source).toBe(vision.calls.find((c) => c.method === 'tablePixels')!.uri);
   });
 
@@ -131,7 +133,7 @@ describe('ocr.toExcel (D-272)', () => {
     vision.layers = [{ width: 1000, height: 700, lines: cellLines() }];
     const item = resultItem(await run());
     const lineCalls = vision.calls.filter((c) => c.method === 'recognizeLines');
-    // 找线用增强后的图，认字用增强前的图（运行目录里复制进来的那张）。
+    // Line finding uses the enhanced image, while text recognition uses the pre-enhanced image (copied into the run directory).
     const tableCall = vision.calls.find((c) => c.method === 'tablePixels')!;
     expect(lineCalls).toHaveLength(1);
     expect(lineCalls[0]!.uri).not.toBe(tableCall.uri);
@@ -168,7 +170,7 @@ describe('ocr.toExcel (D-272)', () => {
   });
 
   it('names the workbook by date when the photo name is a machine id or there are several pages', async () => {
-    // 2026-10-29 真机：分享进来的照片名字是一串编号，表格就叫 b02fdc9e-9ebd-…-1_all_3391.xlsx。
+    // 2026-10-29 real device test: shared photo names are a string of numbers, so the table is named b02fdc9e-9ebd-...-1_all_3391.xlsx.
     const one = setup([pick, excel()]);
     one.files.nextPhotos = [
       one.files.offerImage('b02fdc9e-9ebd-4c1a-8e0f-3a9d2b7c6e51-1_all_3391.jpg', 1000, 700),
@@ -177,7 +179,7 @@ describe('ocr.toExcel (D-272)', () => {
     one.vision.layers = [{ width: 1000, height: 700, lines: cellLines() }];
     expect(resultItem(await one.run())).toMatchObject({ name: '表格-2026-10-28', ext: 'xlsx' });
 
-    // 几页合成一个文件：不用第一页的名字（看起来像只有那一页）。
+    // Multiple pages combined into a single file: do not use the first page's name (which looks as if only that page exists).
     const two = setup([pick, excel()]);
     two.files.nextPhotos = [
       two.files.offerImage('账单1.jpg', 1000, 700),
@@ -221,7 +223,7 @@ describe('ocr.toExcel (D-272)', () => {
         'ja-JP',
         'en-US',
       ]);
-      // 手机是俄文、系统也认不了：说清楚不支持，不去下载文字识别包（它不给每行的位置）。
+      // Phone language is Russian and system cannot recognize it either: state clearly that it is not supported, and do not download the text recognition package (which does not provide line coordinates).
       phone('ru-RU');
       const ru = setup([pick, excel('all', 'auto')]);
       ru.vision.unsupported.add('ru');
@@ -236,7 +238,7 @@ describe('ocr.toExcel (D-272)', () => {
   });
 
   describe('figures from the layout model (D-520)', () => {
-    // 表格下面有一个图表区域（原图是找线那张的 2 倍大）。
+    // There is a chart area below the table (the original image is 2x the size of the line-finding image).
     const figure = {
       kind: 'image' as const,
       label: 'chart',
@@ -260,7 +262,7 @@ describe('ocr.toExcel (D-272)', () => {
       expect(Object.keys(zip)).toEqual(
         expect.arrayContaining(['xl/drawings/drawing1.xml', 'xl/media/image1.jpg']),
       );
-      // 剪的是原图上的位置（2 倍），四周多留一点边。
+      // The crop region is on the original image (at 2x scale), with a little extra margin around the edges.
       const encoded = files.encodes.at(-1)!;
       expect(encoded.format).toBe('jpeg');
       const crop = (

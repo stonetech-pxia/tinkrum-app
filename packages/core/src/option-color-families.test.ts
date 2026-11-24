@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { CHART_COLORS, optionColor } from './chart';
 import { CHART_COLOR_FAMILIES, OPTION_COLORS, type OptionColor } from './option-colors';
 
-// D-571：一个单选字段里有选项写了颜色时，没写颜色的选项不拿和这些颜色同一色系的分类色（模拟器检查 QA_BATCH3 P1：
-// 支出红、收入绿，没写颜色的「转账」拿到青绿，和收入分不清）。一个都没写时和以前完全一样。
+// D-571: when a single-choice field has options with explicit colors, uncolored options avoid
+// picking category colors from the same color family (Simulator QA checklist P1: expense red,
+// income green, uncolored "transfer" gets teal, avoiding confusion with income). Behaves exactly as
+// before when zero options have colors.
 
 type Option = { id: string; color?: OptionColor };
 const options: Option[] = [
@@ -27,7 +29,7 @@ describe('option colours avoid the hue families named in the same field', () => 
       expect(families.length).toBeGreaterThan(0);
       for (const f of families) expect(Object.keys(OPTION_COLORS)).toContain(f);
     }
-    // 青绿和绿是同一色系（P1 的那一对）。
+    // Teal and green belong to the same color family (the P1 pair).
     expect(CHART_COLOR_FAMILIES[2]).toContain('green');
   });
 
@@ -39,13 +41,13 @@ describe('option colours avoid the hue families named in the same field', () => 
         expect(familiesOf(hex, dark)).not.toContain('green');
         expect(familiesOf(hex, dark)).not.toContain('red');
       }
-      // 没写颜色的两个也互相分得开，named 的照旧。
+      // Two uncolored options remain distinct from each other, while named ones behave as usual.
       expect(transfer).not.toBe(refund);
       expect(optionColor(options[0], 0, dark, options)).toBe(
         OPTION_COLORS.red[dark ? 'dark' : 'light'],
       );
     }
-    // 第一个没写颜色的拿剩下的第一色（蓝）。
+    // The first uncolored option gets the remaining first color (blue).
     expect(optionColor(options[2], 2, false, options)).toBe(CHART_COLORS.light[0]);
   });
 

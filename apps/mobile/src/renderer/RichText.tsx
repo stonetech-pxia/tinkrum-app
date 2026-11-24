@@ -4,8 +4,9 @@ import { Linking, StyleSheet, Text, View, type TextStyle } from 'react-native';
 import type { RenderEnv } from './components';
 import { confirmOpenLink } from './open-link';
 
-// 富文本渲染（D-044）：粗体、斜体、链接、列表。只有数据，没有可执行内容。
-// 链接只可能是 https / mailto（schema 已校验），打开前还要用户确认目标地址。
+// Rich text rendering (D-044): bold, italic, links, lists. Data only, no executable content. Links
+// can only be https or mailto (validated by schema), and require user confirmation of the target
+// address before opening.
 
 export function RichText({
   source,

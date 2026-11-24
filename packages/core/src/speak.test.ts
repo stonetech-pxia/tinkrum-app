@@ -16,7 +16,7 @@ import { AUDIO_ACTIONS, audioWorkflows } from './tools/audio';
 import { workflowProblems } from './workflow/check';
 import { presetById, presetWorkflow } from './workflows/presets';
 
-// 文字转语音（D-270）：参数、分段、自动选语言，以及预设和步骤说法接得上。
+// Text-to-speech (D-270): Parameters, segmentation, automatic language selection, and alignment with preset and step terminology.
 
 const action = AUDIO_ACTIONS.find((a) => a.id === 'audio.fromText')!;
 
@@ -34,7 +34,7 @@ describe('audio.fromText params', () => {
     expect(ok({ lang: 'klingon', rate: 1, format: 'm4a' })).toBe(false);
     expect(ok({ lang: 'en', rate: 0.4, format: 'm4a' })).toBe(false);
     expect(ok({ lang: 'en', rate: 2.1, format: 'm4a' })).toBe(false);
-    // MP3 要再编码一遍，朗读用不着；要 MP3 可以接「音频转格式」。
+    // MP3 requires re-encoding and is unnecessary for text-to-speech; use "Convert Audio Format" if MP3 is required.
     expect(ok({ lang: 'en', rate: 1, format: 'mp3' })).toBe(false);
     expect(ok({ lang: 'en', rate: 1 })).toBe(false);
     expect(ok({ lang: 'en', rate: 1, format: 'm4a', voice: 'Siri' })).toBe(false);
@@ -74,7 +74,7 @@ describe('splitForSpeech', () => {
       expect(s.length).toBeLessThanOrEqual(300);
       expect(s).toMatch(/\.$/);
     }
-    // 字一个不少（只差空白）。
+    // Not a single character is lost (differing only in whitespace).
     expect(segments.join(' ').replace(/\s+/g, '')).toBe(text.replace(/\s+/g, ''));
   });
 
@@ -155,7 +155,7 @@ describe('estimateSpeechBytes', () => {
     const zh = estimateSpeechBytes('今'.repeat(1000));
     const en = estimateSpeechBytes('a'.repeat(1000));
     expect(zh).toBeGreaterThan(en);
-    // 1000 个汉字约 200 秒：24 kHz 16 位单声道约 9.6 MB。
+    // 1,000 Chinese characters take approximately 200 seconds: 24 kHz 16-bit mono is about 9.6 MB.
     expect(zh).toBeGreaterThan(9_000_000);
     expect(zh).toBeLessThan(10_000_000);
     expect(estimateSpeechBytes('今'.repeat(1000), 2)).toBeLessThan(zh);
@@ -190,7 +190,7 @@ describe('text to speech in quick actions', () => {
     ]) {
       expect(parseStepPhrase(phrase, 'zh')?.action).toBe('audio.fromText');
     }
-    // 「转成文字」仍是语音转文字，「转成 MP3」仍是转格式。
+    // "Transcribe to text" remains speech-to-text, and "Convert to MP3" remains format conversion.
     expect(parseStepPhrase('转成文字', 'zh')?.action).toBe('audio.transcribe');
     expect(parseStepPhrase('转成 MP3', 'zh')?.action).toBe('audio.convert');
     const steps = stepsFrom(

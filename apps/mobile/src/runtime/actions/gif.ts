@@ -10,13 +10,14 @@ import type { GifOutput, MediaPlatform } from '../platform';
 import { displayName, fileItems, freshName, type RunServices } from './helpers';
 import { mediaError } from './video';
 
-// 动图（D-184）：视频转 GIF、几张图片做成动图。编码在原生模块 morph-media 里
-// （iOS ImageIO，Android 自己写的 GifEncoder）；Expo Go 里没有，报 needsFullApp。
+// GIFs (D-184): video to GIF, multiple images to animated GIF. Encoding is handled in the native
+// module morph-media (iOS ImageIO, custom Android GifEncoder); unavailable in Expo Go, throws
+// needsFullApp.
 
 type Impl = ActionImpl<RunServices>;
 type Ctx = Parameters<Impl>[2];
 
-/** 时长比上限多一点点（剪的时候差几帧）也放行。 */
+/** Allow duration slightly exceeding the upper limit (minor frame discrepancies during trimming). */
 const GIF_SLACK_MS = 500;
 
 function mediaOf(ctx: Ctx): MediaPlatform {

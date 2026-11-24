@@ -33,7 +33,7 @@ import { singleComponent } from './single';
 import { spacerComponent } from './spacer';
 import { textComponent } from './text';
 
-/** 可以放进分组的外观（30 种，加上 group 本身共 31 种；choices 和 period 一样只能在页面上，校验拦；dial 要固定在页面下方，进不了分组，校验拦）。新外观加在最后（顺序就是 JSON Schema 里的顺序）。 */
+/** Appearances that can be placed inside groups (30 types, plus group itself makes 31 types; choices and period can only be on the page, validation bar; dial must be fixed at the bottom of the page, cannot enter groups, validation bar). New appearances are added at the end (the order matches the JSON Schema). */
 export const LEAF_COMPONENTS = [
   headerComponent,
   textComponent,

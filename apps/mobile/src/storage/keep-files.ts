@@ -5,13 +5,18 @@ import { copyUserFiles } from './copy-files';
 import type { WorkspaceRepo } from './types';
 
 /**
- * 打开、分享进来的文件都存进文档库（D-455）：每个文件存一份副本（缩略图在存的时候画好），记下 assetId，
- * 后面存成记录等直接用它。同名、同大小、内容也一样（SHA-256，原生边读边算）、也是打开进来的文件已经在文档库里时不再存一份；
- * 名字和大小一样但内容不同的是另一个文件，各存各的（R01）。算不出内容摘要时当成新文件，宁可多存一份也不关联错。
- * 存不下（太大、空间不够、复制失败）的文件照样进收件页面，只是不进文档库。文字由 copyUserFiles 在后面读（不等）。
- * 原件不动（底线 4）；这是用户打开、分享这一次操作的一部分（底线 16）。
+ * Files opened or shared into the app are all stored in the document library (D-455): a copy is
+ * stored for each file (thumbnails generated upon saving), recording their assetId for direct use
+ * when saved as records later. Files with identical name, size, and content digest (SHA-256,
+ * computed natively on the fly) that were already opened into the document library are not
+ * duplicated; files with the same name and size but different content are treated as distinct
+ * files and stored separately (R01). When content digest cannot be computed, treat as a new file,
+ * preferring to store an extra copy rather than link incorrectly. Files that fail to store (too
+ * large, insufficient space, copy failure) still enter the inbox page, just not the document
+ * library. Text is read asynchronously by copyUserFiles (non-blocking). Originals remain
+ * untouched (invariant 4); this is part of the user's open/share operation (invariant 16).
  */
-/** 文档库里已经有的、和这个文件是同一份的：名字、大小一样，内容的摘要也一样。 */
+/** Already existing in the document library and identical to this file: same name, size, and content digest. */
 async function findSameFile(file: PickedFile, files: FilePlatform, repo: WorkspaceRepo) {
   if (file.size === null) return undefined;
   const name = sanitizeFileName(file.name);
@@ -32,7 +37,7 @@ export async function keepIncomingFiles(
   picked: readonly PickedFile[],
   files: FilePlatform,
   repo: WorkspaceRepo,
-  /** 存好了几个（一次打开很多张照片时显示进度）。 */
+  /** Number of files successfully stored (displays progress when opening many photos at once). */
   onProgress?: (done: number, total: number) => void,
 ): Promise<PickedFile[]> {
   const kept: PickedFile[] = [];

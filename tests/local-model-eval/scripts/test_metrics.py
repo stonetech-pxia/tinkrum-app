@@ -1,4 +1,4 @@
-"""评分和约束 schema 的关键边界检查。"""
+"""Key boundary checks for scoring and constraint schemas."""
 import json
 import unittest
 

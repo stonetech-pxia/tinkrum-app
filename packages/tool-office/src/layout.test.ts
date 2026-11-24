@@ -31,7 +31,7 @@ const region = (
 
 describe('layoutInput', () => {
   it('resizes to side × side without keeping the aspect ratio and normalises each channel (CHW)', () => {
-    // 左半边纯红、右半边纯白的 200×100 图。
+    // 200x100 image with pure red left half and pure white right half.
     const width = 200;
     const height = 100;
     const data = new Uint8Array(width * height * 4);
@@ -44,10 +44,10 @@ describe('layoutInput', () => {
     const t = layoutInput({ width, height, data }, side);
     expect(t.length).toBe(3 * side * side);
     const plane = side * side;
-    // 左上角：红 → R 通道 (1 − 0.485) / 0.229，G 通道 (0 − 0.456) / 0.224。
+    // Top-left: red -> R channel (1 - 0.485) / 0.229, G channel (0 - 0.456) / 0.224.
     expect(t[0]).toBeCloseTo((1 - 0.485) / 0.229, 3);
     expect(t[plane]).toBeCloseTo((0 - 0.456) / 0.224, 3);
-    // 右上角：白（宽被压缩一半，不保持宽高比）。
+    // Top-right: white (width compressed by half, aspect ratio not preserved).
     expect(t[plane + side - 1]).toBeCloseTo((1 - 0.456) / 0.224, 3);
     expect(t[2 * plane + (side - 1) * side + side - 1]).toBeCloseTo((1 - 0.406) / 0.225, 3);
   });
@@ -57,21 +57,21 @@ describe('parseLayout', () => {
   it('maps model boxes back to the image, keeps useful classes and drops weak detections', () => {
     const size = { width: 960, height: 1920 };
     const out = [
-      // 正文：480 输入里 (48, 48)–(240, 96) → 原图 x × 2，y × 4。
+      // Body text: 480 input (48, 48)-(240, 96) -> original image x * 2, y * 4.
       label('text'),
       0.8,
       48,
       48,
       240,
       96,
-      // 低分的正文（0.3 以下）不要。
+      // Discard low-scoring body text (below 0.3).
       label('text'),
       0.2,
       0,
       0,
       100,
       100,
-      // 图片要 0.45 以上：0.4 的不要。
+      // Images require 0.45 or above: discard 0.4.
       label('image'),
       0.4,
       10,
@@ -90,7 +90,7 @@ describe('parseLayout', () => {
       460,
       250,
       470,
-      // NMS 补的空行（类别 −1）。
+      // Empty line added by NMS (category -1).
       -1,
       0,
       0,
@@ -109,9 +109,9 @@ describe('parseLayout', () => {
   });
 });
 
-describe('parseLayout: 一张图的分数被拆给几个类别 (D-524)', () => {
+describe('parseLayout: image score split across multiple categories (D-524)', () => {
   const size = { width: 960, height: 960 };
-  // 模型输出（480 输入）：类别、分数、框。
+  // Model output (480 input): category, score, box.
   const det = (name: (typeof LAYOUT_LABELS)[number], score: number, box: number[]) => [
     label(name),
     score,
@@ -120,7 +120,7 @@ describe('parseLayout: 一张图的分数被拆给几个类别 (D-524)', () => {
   const slide = [100, 150, 300, 270];
 
   it('keeps a figure whose score is split over image / chart / header_image on the same box', () => {
-    // 真实输出（s-slides-en）：chart 0.40、image 0.35、header_image 0.16 都在同一个框上，单看都不到 0.45。
+    // Actual output (s-slides-en): chart 0.40, image 0.35, and header_image 0.16 all share the same bounding box, none reaching 0.45 individually.
     const out = [
       ...det('chart', 0.4, slide),
       ...det('image', 0.35, slide),
@@ -176,7 +176,7 @@ describe('parseLayout: three-class figure corroboration', () => {
       box: { x: 200, y: 300, width: 400, height: 240 },
     });
     expect(cleanRegions(parsed, [], size)).toEqual(parsed);
-    // 弱证据不能吞字；一个短字段也会拒收。
+    // Weak evidence must not swallow text; even a short field can be rejected.
     expect(cleanRegions(parsed, [line('Total', 250, 350, 120)], size)).toEqual([]);
   });
 
@@ -194,7 +194,7 @@ describe('parseLayout: three-class figure corroboration', () => {
   });
 
   it('requires tighter geometry for low-score support than legacy fusion', () => {
-    // IoU 约 0.82：旧融合接受的邻框，不能用于这条更弱的恢复路径。
+    // IoU approximately 0.82: neighbor boxes accepted by old fusion cannot be used for this weaker recovery path.
     expect(
       parseLayout(
         [
@@ -241,7 +241,7 @@ describe('cleanRegions', () => {
   });
 
   it('keeps a stamp as a picture although its ring of text reads as several lines (D-463)', () => {
-    // 处方右下角的印章：一圈机构名、地址认成 4 行乱字，应该原样剪成图片，不写成乱字。
+    // Prescription stamp in bottom right: a circle of institution name and address recognized as 4 lines of garbled text; should be cropped as an image as-is rather than written as garbled text.
     const lines = [
       line('Centre médical & dentaire', 820, 1200, 250, 40),
       line('WPANTIMN', 840, 1250, 200, 40),
@@ -251,26 +251,26 @@ describe('cleanRegions', () => {
     const seal = { ...region('image', 800, 1180, 300, 200), label: 'seal' };
     const logo = region('image', 800, 1180, 300, 200);
     expect(cleanRegions([seal], lines, size)).toEqual([seal]);
-    // 同样多的字在普通的图片区域里：是认错了的正文。
+    // Same amount of text in a normal image region: misrecognized body text.
     expect(cleanRegions([logo], lines, size)).toEqual([]);
   });
 
   it('a page-sized "image" does not swallow the real figure inside it as a duplicate (D-524)', () => {
-    // 手机拍的 PPT（s-slides-en-photo）：整张照片被认成图片，里面的图表也认出来了。
+    // Phone-captured PPT (s-slides-en-photo): entire photo recognized as an image, with charts inside also detected.
     const whole = region('image', 40, 50, 940, 1300, 0.61);
     const chart = region('image', 300, 300, 400, 190, 0.5);
     expect(cleanRegions([whole, chart], [], size)).toEqual([chart]);
   });
 
   it('a figure kept only by adding up classes is dropped when any text sits inside it (D-524)', () => {
-    // 表单里一格一格的字段：短字加框线，像示意图，但分数是几个类别凑出来的，不信。
+    // Grid-based form fields: short text with borders resembling a schematic, but scores are combined from multiple categories and untrustworthy.
     const lines = Array.from({ length: 6 }, (_, i) => line(`Field ${i}`, 120, 300 + i * 40, 150));
     const strong = region('image', 100, 280, 500, 300, 0.6);
     const fused = { ...region('image', 100, 280, 500, 300, 0.5), fused: true };
     const ink = { width: 1000, height: 1400, data: new Uint8Array(1000 * 1400 * 4).fill(0) };
     expect(cleanRegions([strong], lines, size, ink)).toEqual([strong]);
     expect(cleanRegions([fused], lines, size, ink)).toEqual([]);
-    // 一个短标志字也不行（字会被吞进图里）；没有字的留下。
+    // Even a short label word is not allowed (text would be swallowed into the image); unlabeled parts remain.
     expect(cleanRegions([fused], [line('Form 9465', 120, 300, 150)], size)).toEqual([]);
     expect(cleanRegions([fused], [], size)).toEqual([fused]);
   });
@@ -294,7 +294,7 @@ describe('assignLines', () => {
       line('title', 100, 20, 300),
       line('body', 100, 200, 300),
       line('outside', 100, 800, 300),
-      // 只有一小半在区域里：不算。
+      // Only a small fraction inside the region: excluded.
       line('edge', 100, 490, 300),
     ];
     expect(assignLines(lines, regions)).toEqual([1, 0, -1, -1]);
@@ -327,7 +327,7 @@ describe('readingOrder', () => {
   });
 
   it('reads a framed form’s column captions as one row before the items below (EU sample 016)', () => {
-    // 表单框里的列标题「CONCEPTO  BASE  TIPO  APORTACIÓN / EMPRESA」：右边两栏下面只有填写线，没有字。
+    // Column headers in form box ("CONCEPTO BASE TIPO APORTACIÓN / EMPRESA"): the two rightmost columns have only fill lines below them, with no text.
     const items = [
       item('concepto', 327, 376, 124, 24),
       item('base', 741, 377, 64, 26),
@@ -351,7 +351,7 @@ describe('readingOrder', () => {
   });
 
   it('does not loop when every block is in the caption row (EU sample 077)', () => {
-    // 两栏都只有一块，矮的一栏整块在「表头」那一排里，高的一栏的底也在那一排的空隙以内：没有剩下的字。
+    // Both columns contain only a single block; the shorter column's block is entirely within the header row, and the taller column's bottom is also within the gap of that row: no remaining text.
     const items = [item('left', 0, 0, 50, 25), item('right', 100, 0, 50, 40)];
     expect(readingOrder(items, 20, 10).map((i) => i.id)).toEqual(['left', 'right']);
   });

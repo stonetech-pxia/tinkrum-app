@@ -53,12 +53,14 @@ import { ColorDot, recordMarks } from './record-marks';
 import { openRow } from './open-row';
 import { cardColors, type Palette } from './theme';
 
-// 记录列表的看板外观（D-313）：按一个单选字段分栏，每个选项一栏，再加「未分」；栏横向滚动。
-// 长按卡片拖到另一栏 = 改这个字段（一键操作的 set，D-314），弹提示条（不带撤销，D-385）。
-// 不用拖也能移：点卡片弹出「打开 / 移到…」，读屏可以直接用「移到…」操作（给读屏和手不方便的人用）。
+// Kanban appearance for record list (D-313): columns split by a single-select field, each option
+// gets a column, plus an "Unassigned" column; columns scroll horizontally. Long press card to drag
+// to another column = update this field (quick action set, D-314), shows toast notification
+// (without undo, D-385). Movable without dragging: tapping card pops up "Open / Move to...", screen
+// readers can directly use "Move to..." action (for screen readers and accessibility users).
 
 const COLUMN_WIDTH = 248;
-/** 拖动要比页面的长按编辑（LONG_PRESS_MS）先开始，否则长按会先打开组件的操作面板。 */
+/** Dragging must start before the page's long-press edit (LONG_PRESS_MS), otherwise the long-press will first open the component action panel. */
 const DRAG_DELAY = LONG_PRESS_MS - 150;
 
 const columnKey = (c: BoardColumn) => c.option ?? '';
@@ -85,7 +87,7 @@ export function Board({ block, env, tone }: { block: RecordBlock; env: RenderEnv
   const [menu, setMenu] = useState<{ record: DataRecord; from: string | null } | null>(null);
   const [dragging, setDragging] = useState<{ id: string; from: string } | null>(null);
   const [hover, setHover] = useState<string | null>(null);
-  // 拖动时的测量和自动横向滚动（拖到看不见的栏）。
+  // Measurement and automatic horizontal scrolling during drag (dragging to an invisible column).
   const scrollRef = useRef<ScrollViewInstance>(null);
   const viewport = useRef<HostInstance>(null);
   const columnViews = useRef(new Map<string, HostInstance>());
@@ -114,9 +116,9 @@ export function Board({ block, env, tone }: { block: RecordBlock; env: RenderEnv
   const group = block.source.group;
   const linkedAll = useLinkedGroups(env, view, group?.by);
   const field = collection ? boardField(collection, group?.by) : undefined;
-  // 拖到另一栏是块上的拖动工具（as drag）；没有它看板只能看（v33 迁移来的看板都有）。
+  // Dragging to another column is the drag tool on the block (as drag); without it, the board is read-only (all boards migrated from v33 have this).
   const drag = boardDragTool(block.tools);
-  // 引用字段分栏（D-351）要等被引用的表读出来；groupFilter 先筛出要哪几栏。
+  // Reference field column grouping (D-351) requires waiting for the referenced table to be read; groupFilter first filters which columns are needed.
   if (!collection || !view || !field || linkedAll === null) return null;
   const linked = linkedAll && {
     ...linkedAll,
@@ -134,7 +136,7 @@ export function Board({ block, env, tone }: { block: RecordBlock; env: RenderEnv
   const now = new Date();
   const marks = recordMarks(block.show, view, env, now);
   const columnLabel = (c: BoardColumn) => c.label ?? t(locale, 'boardNotSet');
-  // 单组件编辑选中了某个组件时不能拖（那时长按拖的是组件本身）。
+  // Cannot drag when a specific component is selected for single-component editing (at that time, long-pressing drags the component itself).
   const canDrag = env.interactive && !env.focus?.selectedId && drag !== undefined;
 
   function move(record: DataRecord, to: BoardColumn) {
@@ -243,7 +245,7 @@ export function Board({ block, env, tone }: { block: RecordBlock; env: RenderEnv
         }}
         onLayout={(e) => void (content.current.viewport = e.nativeEvent.layout.width)}
         onContentSizeChange={(w) => void (content.current.width = w)}
-        // 底下留出栏的阴影，不被横向滚动的边界切掉。
+        // Leave space at the bottom for the column shadow so it is not clipped by the horizontal scroll bounds.
         style={styles.scroll}
         contentContainerStyle={{ gap: palette.gap - 4, paddingRight: 4, paddingBottom: 12 }}>
         {columns.map((column) => {
@@ -258,7 +260,7 @@ export function Board({ block, env, tone }: { block: RecordBlock; env: RenderEnv
               testID={`board-column-${key || 'none'}`}
               collapsable={false}
               ref={(v) => {
-                // 必填字段不能拖进「未分」：不登记它的位置，拖过去不会亮。
+                // Required fields cannot be dragged into "Uncategorized": its position is not recorded, and dragging there will not highlight.
                 if (v && (column.option !== null || !field.required))
                   columnViews.current.set(key, v);
                 else columnViews.current.delete(key);
@@ -404,7 +406,7 @@ function BoardCard({
 }: {
   record: DataRecord;
   title: string;
-  /** 按值上色和警示色（D-541）。 */
+  /** Coloring by value and warning colors (D-541). */
   color: string | undefined;
   warn: boolean;
   subtitle: string;
@@ -426,13 +428,13 @@ function BoardCard({
     testID: `board-drag-${record.id}`,
     enabled: canDrag,
     activateAfterLongPress: DRAG_DELAY,
-    // 长按前手指先移动超过 8pt 就放弃，交给横向和页面滚动。
+    // Abort if the finger moves more than 8pt before the long-press, handing over to horizontal and page scrolling.
     failOffsetX: [-8, 8],
     failOffsetY: [-8, 8],
     maxPointers: 1,
     cancelsTouchesInView: true,
     cancelsJSResponder: true,
-    // 拖卡片比页面的长按编辑（D-235）先开始；外层的手势照样会激活，由 setInnerGesture 让它不选中组件。
+    // Dragging a card starts before the page's long-press edit (D-235); the outer gesture will still activate, and setInnerGesture prevents it from selecting the component.
     onFinalize: () => {
       scheduleOnRN(setInnerGesture, false);
     },
@@ -511,7 +513,7 @@ function BoardCard({
   );
 }
 
-/** 点卡片弹出的菜单：打开、移到某一栏、取消；每行至少 44 高。 */
+/** Menu popped up when tapping a card: open, move to a column, cancel; minimum row height of 44. */
 function MoveMenu({
   palette,
   locale,

@@ -6,7 +6,7 @@ import { applyOps, type Op } from './ops';
 import type { Collection, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// 「设置 → 存储空间」（D-264）：每个用户文件用在哪里，哪些现在没有地方在用。
+// "Settings -> Storage" (D-264): where each user file is used, and which ones are currently not in use anywhere.
 
 const receipts: Collection = {
   id: 'expenses',
@@ -44,8 +44,8 @@ const now = new Date(2026, 9, 27);
 const day = 24 * 3600 * 1000;
 
 describe('asset usage', () => {
-  // 配置里指向用户文件的四处（D-377）：文件位的 opens.file、图片块的 show.asset、
-  // 卡片的 style.backdrop.assetId、页面的 backdrop.assetId。
+  // Four places in the config pointing to user files (D-377): opens.file for file slots, show.asset
+  // for image blocks, style.backdrop.assetId for cards, and backdrop.assetId for pages.
   const withSlotAndImage = config([
     {
       op: 'addContainer',
@@ -110,13 +110,13 @@ describe('asset usage', () => {
       records: [
         record('r1', { receipt: ['a1', 'a2'] }),
         record('r2', { receipt: 'a3' }),
-        // 最近删除：30 天内的还算在用，更早的不算。
+        // Recently deleted: items within 30 days are still considered in use, older ones are not.
         record('r3', { receipt: ['a4'] }, now.getTime() - 3 * day),
         record('r4', { receipt: ['none'] }, now.getTime() - 31 * day),
-        // 文字字段里碰巧是同样的字不算。
+        // Coincidentally matching words in text fields do not count.
         record('r5', { item: 'a1x' }),
       ],
-      // 历史版本可能还是 v33 的配置（assetId），也可能是 v34 的（show.asset、opens.file）。
+      // Historical versions might still use v33 config (assetId) or v34 config (show.asset, opens.file).
       revisions: [
         { pages: [{ components: [{ props: { assetId: 'oldpic' } }] }] },
         { containers: { pages: [{ blocks: [{ show: { asset: 'oldpic2' } }] }] } },

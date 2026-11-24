@@ -38,12 +38,12 @@ export function ChainCard({
           if (live) setSuggest(ready);
         })
         .catch(() => {
-          /* 统计失败不阻塞结果。 */
+          /* Stat failure does not block the result. */
         });
     return () => {
       live = false;
     };
-    // 每次成功运行只记一次，不在 UI 重绘时重复记。
+    // Recorded only once per successful run, not repeated during UI re-renders.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   if (!valid || !suggest) return null;
@@ -59,7 +59,7 @@ export function ChainCard({
           label={t(locale, 'chainMake')}
           onPress={async () => {
             void dismissChain(repo, first, second).catch(() => undefined);
-            // AI 只看得到配置里的快捷操作：内设的先存进去（D-236）。
+            // AI sees only quick actions in the config: built-in ones are stored first (D-236).
             const builtIn = (first.id === second.id ? [first] : [first, second]).filter(
               (w) => !workflows.some((x) => x.id === w.id),
             );

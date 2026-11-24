@@ -13,7 +13,7 @@ import { WORKFLOW_PRESETS, presetWorkflow } from '../workflows/presets';
 import { createMockAIProvider } from './mock';
 import type { Plan, PlanAbout } from './types';
 
-// AI 只改 App（D-113）：办事类请求的拒绝（D-128），和从快捷操作打开时「这个」指的是它（D-124）。
+// AI only modifies the app (D-113): rejection of operational service requests (D-128), and resolving "this" to refer to the quick action when opened from one (D-124).
 
 const ai = createMockAIProvider();
 const now = new Date(2026, 9, 23, 9, 0);
@@ -29,7 +29,7 @@ const withVisa = () =>
   apply(workspace('zh', { withPdf: true }), [
     { op: 'addTool', tool: presetWorkflow(WORKFLOW_PRESETS[0]!, 'zh', 'visa-photo') },
   ]);
-/** 首页上运行这个快捷操作的块（look action）。 */
+/** Home screen block running this quick action (look action). */
 const runs = (c: Component, id: string) =>
   isKnownComponent(c) && c.look === 'action' && c.tools.some((u) => 'tool' in u && u.tool === id);
 const aboutVisa: PlanAbout = { kind: 'workflow', workflowId: 'visa-photo' };
@@ -48,7 +48,7 @@ describe('mock AI — errands (D-113)', () => {
     if (p.kind !== 'reject') return;
     expect(p.message).toContain('只会修改这个 App');
     expect(p.examples.length).toBeGreaterThan(0);
-    // 例子都是内置规则认得的句子。
+    // Examples are sentences recognized by built-in rules.
     for (const example of p.examples) {
       expect((await plan(example, workspace('zh'))).kind).toBe('ops');
     }
@@ -91,7 +91,7 @@ describe('mock AI — opened from a quick action (D-124)', () => {
     return prepared.after;
   }
 
-  it('reads 这个 / 它 as that quick action', async () => {
+  it('reads this / it as that quick action', async () => {
     const size = await change('把这个的大小改成 200KB');
     const photo = quickActionsOf(size).find((w) => w.id === 'visa-photo')!.steps[1]!;
     expect(photo.params).toMatchObject({ maxKB: 200 });
@@ -103,7 +103,7 @@ describe('mock AI — opened from a quick action (D-124)', () => {
     expect(home.containers.pages[0]!.blocks.some((c) => runs(c, 'visa-photo'))).toBe(true);
   });
 
-  it('needs the context to know what 这个 is', async () => {
+  it('needs the context to know what this is', async () => {
     const p = await plan('把这个改名为美签照片', withVisa());
     expect(p.kind).toBe('reject');
   });

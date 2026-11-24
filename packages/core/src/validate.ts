@@ -64,9 +64,11 @@ import type { HandedType } from './workflow/contract';
 import { handedRecordProblems, stepRefProblems } from './workflow/refs';
 import { issueLines } from './zod-issues';
 
-// 变更校验（§7D）：结构 → 引用 → 受保护元素 → 可读性 → 工具与权限 → 快捷操作的数据流。
-// 任何配置在保存或渲染之前都必须通过这里。v34「数据 · 容器 · 工具」：块的引用按登记表里的路径查（refs），
-// 块上能挂哪些工具按登记表的 tools 查（as、do、ref、open、个数），关系规则 12–14 见各处的注释。
+// Change validation (§7D): structure → references → protected elements → readability → tools and
+// permissions → quick action data flow. Any configuration must pass through here before saving or
+// rendering. v34 "Data · Containers · Tools": block references are checked against registry paths
+// (refs), and allowed tools on blocks are checked against registry tools (as, do, ref, open,
+// count); see comments everywhere for relation rules 12–14.
 
 export interface ValidationIssue {
   code: string;
@@ -78,9 +80,12 @@ export type ValidationResult =
 
 export interface ValidateOptions {
   /**
-   * 这个版本不认识的块（D-254，更新的 App 加的外观，或 v33 迁移来的 look "$unknown"）。不写：一律当作结构错误。
-   * 'keep'：原样保留（读取已存的配置、恢复历史版本）。一份配置：只保留这份配置里原样就有的
-   * （传 AI 或长按编辑修改前的配置：修改可以移动、删除它们，不能新加或改动）。
+   * Blocks unrecognized by this version (D-254, look added by a newer app version, or look
+   * "$unknown" migrated from v33). Omitted: treated entirely as a structural error. 'keep':
+   * preserved as-is (reading stored configurations, restoring historical versions). A
+   * configuration: preserves only items present as-is in that configuration (configurations
+   * before AI submission or long-press edit modification: modifications can move or delete them,
+   * but cannot add or modify new ones).
    */
   unknownComponents?: 'keep' | WorkspaceConfig;
 }
@@ -104,7 +109,7 @@ export function validateWorkspace(
   const pages = config.containers.pages;
   const tables = config.data.tables;
 
-  // ---- 唯一性 ----
+  // ---- Uniqueness ----
   const pageIds = new Set(pages.map((p) => p.id));
   for (const id of duplicates(pages.map((p) => p.id))) issue('duplicate', `page ${id}`);
   for (const page of pages) {
@@ -113,17 +118,17 @@ export function validateWorkspace(
     }
   }
   for (const id of duplicates(config.packages.map((t) => t.id))) issue('duplicate', `tool ${id}`);
-  // 快捷操作和提醒是同一个 ID 空间（tools[]，tool:<id> 和运行记录都按 ID 找）。
+  // Quick actions and reminders share the same ID space (tools[], tool:<id> and run logs resolve by ID).
   for (const id of duplicates(config.tools.map((t) => t.id)))
     issue('duplicate', `quick action or reminder ${id}`);
   if (!pageIds.has(HOME_PAGE_ID)) issue('missing-home', 'home page is required');
 
-  // ---- 画出来的图标（D-625）：用到的 my:<id> 必须在图标库里（底线 18）----
+  // ---- Drawn icons (D-625): referenced my:<id> must exist in the icon library (invariant 18) ----
   for (const use of drawnIconUses(config))
     if (!config.icons?.[use.id])
       issue('unknown-icon', `${use.where}: icon my:${use.id} is not in the icon library (icons)`);
 
-  // ---- 导航与受保护元素（§5.1）----
+  // ---- Navigation and protected elements (§5.1) ----
   const entries = [...config.nav.bar, ...config.nav.floating];
   for (const target of duplicates(entries)) issue('duplicate', `nav entry ${target}`);
   for (const target of entries) {
@@ -135,7 +140,7 @@ export function validateWorkspace(
     if (tool !== null && handedBy(config, tool, registry))
       issue('needs-container', needsContainer(tool, `nav entry ${target}`));
   }
-  // ---- app（D-485）：结构自洽。引用归属（谁能指向谁）只在修改时查，不在这里，旧快照要能打开（底线 12）----
+  // ---- App (D-485): self-consistent structure. Reference ownership (who can point to whom) is checked only during modification, not here, to allow opening old snapshots (invariant 12) ----
   const apps = config.nav.apps ?? [];
   const appIds = new Set(apps.map((a) => a.id));
   for (const id of duplicates(apps.map((a) => a.id))) issue('duplicate', `app ${id}`);
@@ -177,7 +182,7 @@ export function validateWorkspace(
     for (const problem of contrastProblems(app.theme))
       issue('contrast', `app ${app.id} theme: ${problem}`);
   }
-  // ---- 给一条记录用的页面（D-342，page.of）----
+  // ---- Page for a single record (D-342, page.of) ----
   for (const page of pages) {
     if (page.of === undefined) continue;
     if (page.id === HOME_PAGE_ID) issue('record-page', 'the home page cannot have of');
@@ -195,10 +200,10 @@ export function validateWorkspace(
     }
   }
 
-  // ---- 可读性：主题改坏之后用户必须仍能找到设置（§5.1）----
+  // ---- Readability: the user must still be able to find settings if the theme is broken (§5.1) ----
   for (const problem of contrastProblems(config.theme)) issue('contrast', `theme: ${problem}`);
 
-  // ---- 工具包（界面上叫「工具」）：每个工具包拥有自己的页面 ----
+  // ---- Tool packs (called "Tools" in the UI): each tool pack owns its own page ----
   const installed = new Map(config.packages.map((t) => [t.id, t]));
   for (const pkg of config.packages) {
     if (!registry.tools.has(pkg.id)) issue('unknown-tool', `tool ${pkg.id}`);
@@ -213,7 +218,7 @@ export function validateWorkspace(
     }
   }
 
-  // ---- 块：引用（登记表里的 refs）、工具（登记表里的 tools）、各外观自己的检查、读的数据 ----
+  // ---- Blocks: references (refs in the registry), tools (tools in the registry), look-specific checks, read data ----
   const blockIssue = (c: Component, problem: CheckProblem) =>
     typeof problem === 'string'
       ? issue('data', `${c.id}: ${problem}`)
@@ -225,20 +230,20 @@ export function validateWorkspace(
       : undefined;
   for (const page of deskPage ? [...pages, deskPage] : pages) {
     for (const { block: c, parent } of withParents(page)) {
-      // 不认识的块（D-254）原样保留，没有可以检查的引用。
+      // Unknown blocks (D-254) are preserved as-is with no checkable references.
       if (!isKnownComponent(c)) continue;
       const ctx: CheckContext = { config, registry, page, ...(parent ? { parent } : {}) };
       for (const p of blockProblems(c, ctx)) blockIssue(c, p);
     }
   }
 
-  // ---- 数据表结构（docs/DATA_DESIGN.md）----
+  // ---- Table structure (docs/DATA_DESIGN.md) ----
   for (const id of duplicates(tables.map((c) => c.id))) issue('duplicate', `collection ${id}`);
   for (const collection of tables) {
     for (const id of duplicates(collection.fields.map((f) => f.id))) {
       issue('duplicate', `field ${id} in ${collection.id}`);
     }
-    // 每种字段自己的检查（公式能算、引用的表存在、选项不重复……），见 fields/<type>.ts。
+    // Field-specific validation (formulas compute correctly, referenced tables exist, unique options, etc.) is in fields/<type>.ts.
     const view = expandCollection(tables, collection);
     for (const field of collection.fields) {
       for (const problem of fieldDefinition(field.type).check?.(field, {
@@ -247,16 +252,16 @@ export function validateWorkspace(
         view,
       }) ?? [])
         issue(problem.code, problem.message);
-      // 查找、汇总、上一条（D-287–D-290）：定义对不对、会不会绕回自己、叠得太深。
+      // Lookup, rollup, previous entry (D-287–D-290): definition correctness, circular references, and excessive nesting depth.
       for (const problem of relatedProblems(field, { config, collection, view }))
         issue(problem.code, problem.message);
     }
     for (const message of recordRowProblems(collection, config, registry)) issue('data', message);
-    // 记录表单的分段和条件（D-570）。
+    // Record form sections and conditions (D-570).
     for (const message of entryFormProblems(collection)) issue('data', message);
   }
 
-  // ---- 手机桌面（D-271）：长按 Morph 图标的菜单最多放 MAX_HOME_SCREEN 个快捷操作 ----
+  // ---- Home Screen (D-271): The menu for long-pressing the Morph icon holds at most MAX_HOME_SCREEN quick actions ----
   const onHomeScreen = config.nav.phoneHomeScreen ?? [];
   const quickActions = quickActionsOf(config);
   const quickActionIds = new Set(quickActions.map((w) => w.id));
@@ -271,7 +276,7 @@ export function validateWorkspace(
   for (const id of onHomeScreen) {
     const appId = id.startsWith('app:') ? id.slice('app:'.length) : null;
     if (appId !== null) {
-      // 放在桌面菜单里的 App（D-485）：必须存在。
+      // Apps placed in the home screen menu (D-485): must exist.
       if (!(config.nav.apps ?? []).some((a) => a.id === appId))
         issue('unknown-app', `nav.phoneHomeScreen: ${id} is not an app`);
     } else if (!quickActionIds.has(id))
@@ -283,16 +288,16 @@ export function validateWorkspace(
       issue('needs-container', needsContainer(id, 'nav.phoneHomeScreen'));
   }
 
-  // ---- 提醒（D-251）----
+  // ---- Reminders (D-251) ----
   for (const r of remindersOf(config)) {
     for (const problem of reminderProblems(r, config)) issue('reminder', problem);
-    // 提醒只打开、不运行（关系规则 14）；要容器交值的快捷操作打开了也跑不了。
+    // Reminders only open and do not execute (Relation Rule 14); quick actions requiring container values cannot run even if opened.
     const opened = toolTargetId(r.opens);
     if (opened !== null && handedBy(config, opened, registry))
       issue('needs-container', needsContainer(opened, `reminder ${r.id}`));
   }
 
-  // ---- 快捷操作：动作登记、参数、权限、相邻两步的类型（§7B、§7C、D-060）----
+  // ---- Quick actions: action registration, parameters, permissions, adjacent-step types (§7B, §7C, D-060) ----
   for (const wf of quickActions) {
     let toolDef = undefined;
     if (wf.package !== undefined) {
@@ -309,7 +314,7 @@ export function validateWorkspace(
       issue('duplicate', `step ${id} in ${wf.id}`);
     for (const problem of workflowProblems(wf, registry)) issue(problem.code, problem.message);
     for (const message of stepRefProblems(wf, config, registry)) issue('data', message);
-    // 工具包自带的快捷操作只能用该工具包声明过的权限；用户自己的快捷操作由用户逐步确认。
+    // Quick actions bundled with a pack can only use permissions declared by that pack; user quick actions are confirmed step by step by the user.
     if (!toolDef) continue;
     for (const step of wf.steps) {
       for (const permission of registry.actions.get(step.action)?.requires ?? []) {
@@ -326,7 +331,7 @@ export function validateWorkspace(
   return issues.length > 0 ? { ok: false, issues } : { ok: true, config };
 }
 
-/** 页面上的块和它外层的分组（两层，按显示顺序）。 */
+/** Blocks on the page and their outer group containers (two levels, in display order). */
 function withParents(page: Page): { block: Component; parent?: { id: string; look: 'group' } }[] {
   const walk = (list: readonly Component[], parent?: { id: string; look: 'group' }) =>
     list.flatMap((c): { block: Component; parent?: { id: string; look: 'group' } }[] => [
@@ -337,8 +342,9 @@ function withParents(page: Page): { block: Component; parent?: { id: string; loo
 }
 
 /**
- * 一个块的问题，顺序固定（文字发给 AI）：图片背景 → 打开的目标、工具包 → 读的数据（表、字段、外观自己的检查、
- * 筛选）→ 块上的工具。不读表的块的外观检查在工具之前。
+ * Block-level validation problems, in a fixed order (texts sent to AI): image background ->
+ * target to open, pack -> data read (table, field, component-specific checks, filters) -> tools
+ * on the block. Appearance checks for non-table blocks run before tools.
  */
 function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
   const { config, registry, page } = ctx;
@@ -353,7 +359,7 @@ function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
   if (c.showIf && !config.data.tables.some((x) => x.id === c.showIf!.table))
     problems.push(`showIf: data table ${c.showIf.table} does not exist`);
   else if (c.showIf?.filter?.length) {
-    // D-579：筛选读的是这张表算好的值（汇总、查找），所以按显示用的表检查字段，和列表的筛选一样。
+    // D-579: Filters read precomputed values (rollups, lookups) from this table, so fields are validated against the display table just like list filters.
     const table = config.data.tables.find((x) => x.id === c.showIf!.table)!;
     problems.push(
       ...conditionProblems(c.showIf.filter, expandCollection(config.data.tables, table)).map(
@@ -361,7 +367,7 @@ function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
       ),
     );
   }
-  // 固定区属于页面（创始人 2026-11-04 定）：分组里的块不能固定。
+  // Pinned sections belong to the page (decided by founder 2026-11-04): blocks inside groups cannot be pinned.
   if (c.pin !== undefined && ctx.parent)
     problems.push(
       `a block inside group ${ctx.parent.id} can't have pin; pin only top-level blocks`,
@@ -400,7 +406,7 @@ function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
   }
   const table = config.data.tables.find((x) => x.id === tableId);
   if (!table) return [...problems, `data table ${tableId} does not exist`];
-  // 查找、汇总、上一条按它们显示的那种字段检查（D-287–D-289）。
+  // Lookup, rollup, and previous entry checked via their displayed field types (D-287–D-289).
   const collection = expandCollection(config.data.tables, table);
   let filter: Condition[] | undefined;
   for (const [path, ref] of Object.entries(def.refs ?? {})) {
@@ -430,13 +436,13 @@ function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
   }
   problems.push(...(def.check?.(c, { ...ctx, collection }) ?? []));
   problems.push(...conditionProblems(filter, collection, page.of));
-  // 记录块的警示色条件（D-541）和筛选一样检查。
+  // Record block highlight color conditions (D-541) are validated the same way as filters.
   const highlight = (c as { show?: { highlight?: Condition[] } }).show?.highlight;
   if (highlight)
     problems.push(
       ...conditionProblems(highlight, collection, page.of).map((p) => `show.highlight: ${p}`),
     );
-  // 看板按引用分栏（D-351）：source.group.filter 筛的是被引用的那张表。
+  // Kanban split by reference (D-351): source.group.filter filters the referenced table.
   const group = (c as { source?: { group?: { by?: string; filter?: Condition[] } } }).source?.group;
   if (group?.filter && group.by !== undefined) {
     const link = collection.fields.find((f) => f.id === group.by);
@@ -451,21 +457,22 @@ function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
         ).map((p) => `source.group.filter: ${p}`),
       );
   }
-  // 数字相减（D-337）：被减的那张表和它的筛选。
+  // Number subtraction (D-337): the subtracted table and its filter.
   if (c.look === 'number')
     problems.push(
       ...statMinusProblems(c, collection, config, page.of),
       ...statCalcProblems(c, collection, config, page.of),
     );
-  // 记录块上的工具作用在 source 表的一条上（$row）；表单的提交写自己那张表（关系规则 12）。
-  // 表单（提交时新建）和提示卡（D-580，按钮不绑定某一条）的工具不作用在读的表的某一行上。
+  // Tools on record blocks operate on a single row of the source table ($row); form submissions
+  // write to their own table (Relation Rule 12). Forms (created on submit) and prompt cards (D-580,
+  // buttons not bound to a specific row) do not operate on a specific row of the read table.
   problems.push(
     ...toolUseProblems(c, ctx, c.look === 'form' || c.look === 'callout' ? undefined : table),
   );
   return problems;
 }
 
-/** 文件列表读系统表 $files（Q2）：筛选、排序只能用它的自动字段。 */
+/** File lists read the system table $files (Q2): filters and sorting can only use its automatic fields. */
 function filesProblems(c: Extract<KnownComponent, { look: 'files' }>): string[] {
   const problems = conditionProblems(c.source.filter, FILES_COLLECTION).map(
     (p) => `${FILES_TABLE} ${p}`,
@@ -477,8 +484,10 @@ function filesProblems(c: Extract<KnownComponent, { look: 'files' }>): string[] 
 }
 
 /**
- * opens 的目标（导航，关系规则 6）：页面要在、不能是给一条记录用的页面；tool:<id> 是配置里的快捷操作
- * 或内设快捷操作的预设 ID（只摆出来，不运行；提醒不能被打开，关系规则 13）；package:<id> 要已添加。
+ * Opens target (navigation, Relation Rule 6): the page must exist and cannot be a page intended
+ * for a single record; tool:<id> is a preset ID for a config quick action or built-in quick
+ * action (display-only, not executable; reminders cannot be opened, Relation Rule 13);
+ * package:<id> must be added.
  */
 function targetProblems(
   config: WorkspaceConfig,
@@ -517,15 +526,16 @@ function targetProblems(
 }
 
 /**
- * 块引用的快捷操作（opens tool:<id>、{tool: <id>}）：tools[] 里的快捷操作，或者内设快捷操作的预设 ID
- * （D-236、D-256、D-259，不用添加）。提醒不是能从块上打开、运行的工具（关系规则 13）。没问题时为 null。
+ * Quick actions referenced by blocks (opens tool:<id>, {tool: <id>}): quick actions in tools[] or
+ * preset IDs of built-in quick actions (D-236, D-256, D-259, no need to add). Reminders are not
+ * executable tools openable from blocks (Relation Rule 13). Null when there are no issues.
  */
 function handedBy(config: WorkspaceConfig, id: string, registry: Registry): HandedType | null {
   const wf = findWorkflowTarget(quickActionsOf(config), id, 'en');
   return wf ? handedInput(wf.steps, registry) : null;
 }
 
-/** 这个快捷操作要容器交值（D-428）：只能放在记录页和记录块上，别的地方点了没有值可交。 */
+/** Quick action requires container values (D-428): can only be placed on record pages and record blocks; tapping elsewhere provides no values to pass. */
 const needsContainer = (id: string, where: string) =>
   `${where}: ${id} takes a record, a value or attachments from where it sits, so it can't run from here; put it in a table's recordRow or on a records block`;
 
@@ -537,7 +547,7 @@ function quickActionRefProblem(config: WorkspaceConfig, id: string): string | nu
     : `missing quick action ${id}`;
 }
 
-/** 记录页顶部的按钮（D-428，底线 18）：快捷操作在、第一步收值、记录或文件；收值和文件的要写一个字段（文件的要是附件字段），收记录的不写。 */
+/** Buttons at the top of record pages (D-428, Invariant 18): quick action exists, first step receives values, record or file; value-receiving and file actions must target a field (files require an attachment field), record-receiving actions do not target a field. */
 function recordRowProblems(
   table: Collection,
   config: WorkspaceConfig,
@@ -566,7 +576,7 @@ function recordRowProblems(
       if (item.field !== undefined)
         problems.push(`${where}: its first step takes the whole entry: leave field out`);
     } else {
-      // 文字、文件：交一个字段的值，要写字段（D-442：字段交什么看字段的类型）。
+      // Text, files: pass a field value, requires a target field (D-442: field value type determines what is passed).
       const field = table.fields.find((f) => f.id === item.field);
       if (item.field === undefined)
         problems.push(`${where}: its first step takes ${takes}: name a field`);
@@ -585,9 +595,11 @@ function recordRowProblems(
 const AS_NAME = (as: ToolUse['as']) => (as === undefined ? 'without as' : `as "${as}"`);
 
 /**
- * 块上的工具（D-370 规则 4）：按登记表的 tools 查出现方式（as）、一键记录的种类（do）、能引用的独立工具（ref）、
- * 行上的「打开」（open）和个数（button ≤3、tap ≤3、其余每种 ≤1）；清单要正好一个打勾、看板的拖动写分栏字段；
- * 然后是每个就地工具自己的问题（record-ops.ts）。rowOf：记录块读的表（工具作用的 $row 是它的一条）。
+ * Tools on blocks (D-370 Rule 4): check appearance mode (as) against registration tools, one-tap
+ * record types (do), independent tools referenced (ref), row-level opens (open), and counts
+ * (button ≤3, tap ≤3, others ≤1 each); lists must have exactly one checkbox, kanban drag must
+ * specify a grouping field, followed by individual in-situ tool checks (record-ops.ts). rowOf:
+ * table read by the record block ($row is a row of this table).
  */
 function toolUseProblems(
   c: KnownComponent,
@@ -597,7 +609,7 @@ function toolUseProblems(
   const meta = componentDefinition(c.look).tools;
   const uses = ((c as { tools?: ToolUse[] }).tools ?? []) as ToolUse[];
   const problems: CheckProblem[] = [];
-  // 按钮：打开一个地方，或者做一个一键记录工具（v33 的 target / action 二选一）。
+  // Button: opens a destination or executes a one-tap record tool (v33 target / action mutually exclusive).
   if (c.look === 'button' && c.opens === undefined && uses.length === 0)
     problems.push('a button needs opens (to open something) or tools (one record tool)');
   if (!meta) return problems;
@@ -629,7 +641,7 @@ function toolUseProblems(
     }
     if (isToolRefUse(u)) {
       const pick = (PICK_TOOLS as readonly string[]).includes(u.tool);
-      // 记录块上只有列表上方的按钮运行快捷操作（D-428）；每一条上的按钮只做一键记录。
+      // On record blocks, only buttons above the list run quick actions (D-428); buttons on individual rows only perform one-tap records.
       const blockRuns = c.look === 'dial' || !meta.as.includes('list') || u.as === 'list';
       if (!meta.ref?.includes(pick ? 'pick' : 'quickAction') || !blockRuns) {
         problems.push(
@@ -645,7 +657,7 @@ function toolUseProblems(
             message: `component ${c.id} runs ${problem}`,
           });
         else {
-          // 列表交它选出的记录，单条记录块交这一条（D-428）；别的块没有值可交。
+          // Lists pass their selected records, single-record blocks pass the current row (D-428); other blocks have no values to pass.
           const hands = u.as === 'list' || c.look === 'single';
           const takes = handedBy(config, u.tool, registry);
           if (hands && takes === 'records') {
@@ -656,7 +668,7 @@ function toolUseProblems(
             if (wf) problems.push(...handedRecordProblems(wf, tableId, registry));
           }
           if (hands && takes === 'files') {
-            // 这张表第一个附件字段里的文件（D-442）；分开的浮动按钮没有自己的表，不交文件。
+            // File in the first attachment field of this table (D-442); standalone floating buttons have no table of their own and pass no files.
             if (c.look === 'dial' || !rowOf || !attachmentField(rowOf))
               problems.push(
                 `${label}: ${u.tool} starts with a step that takes files, so the block must read a table with an attachment field${c.look === 'dial' ? ' (a dial has no table of its own)' : ''}`,
@@ -667,7 +679,7 @@ function toolUseProblems(
             );
           else if (!hands && takes !== null)
             problems.push({ code: 'needs-container', message: needsContainer(u.tool, label) });
-          // 分开的浮动按钮交的是页面上列表现在选出的记录：页面上要正好有一个能选的列表。
+          // Standalone floating buttons pass records currently selected in the page list: the page must have exactly one selectable list.
           if (c.look === 'dial' && u.as === 'list' && pageBrowseLists(page).length !== 1)
             problems.push(
               `${label}: as "list" hands over what a list on this page selects: page ${page.id} needs exactly one top-level list with show.browse`,
@@ -688,7 +700,7 @@ function toolUseProblems(
         return;
       }
       if (c.look === 'dial') {
-        // 分开的浮动按钮上打开一个普通页面（不是给一条记录用的）。
+        // Standalone floating button opens a standard page (not a single-record page).
         const target = config.containers.pages.find((p) => p.id === u.opens);
         if (!target) problems.push(`${label}: opens ${u.opens} is not a page`);
         else if (target.of !== undefined)
@@ -765,7 +777,7 @@ function toolUseProblems(
   return problems;
 }
 
-/** 打卡格（D-610）上 "$here" 一定会填的字段：分行的字段、分列的日期字段和筛选里的等于条件（grid-view.ts 的 gridHereValues）。 */
+/** Fields required for "$here" on a check-in grid (D-610): row-splitting field, column-splitting date field, and equality conditions in filters (gridHereValues in grid-view.ts). */
 function gridHereFields(c: KnownComponent, table: Collection | undefined): string[] {
   const source = (c as Extract<KnownComponent, { look: 'grid' }>).source;
   if (!table || !source.across) return [];
@@ -777,8 +789,10 @@ function gridHereFields(c: KnownComponent, table: Collection | undefined): strin
 }
 
 /**
- * 列表下面的「添加」（"$here"，D-349）会填的字段（D-616 勾选新建用）：筛选里的等于条件一定填（"$record" 打开页面时
- * 换成那一条，D-342，这里当它有值），分段、分栏、月历那天的字段不一定（有的段没有值）。
+ * Fields filled by "Add" ("$here", D-349) below a list (for check-in creation in D-616): equality
+ * conditions in filters are always filled ("$record" is substituted with that row when opening
+ * the page, D-342, treated as having a value here); section, grouping, and calendar date fields
+ * are optional (some sections have no value).
  */
 function listHere(
   c: KnownComponent,
@@ -804,7 +818,7 @@ const isObject = (v: unknown): v is Json =>
 const isUnknownBlock = (v: unknown): v is Json & { look: string } =>
   isObject(v) && typeof v.look === 'string' && !KNOWN_LOOKS.has(v.look);
 
-/** 一份配置里所有不认识的块（D-254），按 JSON 文本。 */
+/** All unknown blocks in a configuration (D-254), represented by JSON text. */
 function unknownBlockTexts(config: WorkspaceConfig): Set<string> {
   return new Set(
     config.containers.pages.flatMap((p) =>
@@ -814,8 +828,10 @@ function unknownBlockTexts(config: WorkspaceConfig): Set<string> {
 }
 
 /**
- * 允许保留的不认识的块（D-254）先换成同 ID 的分隔线做结构校验（其余问题的文字和位置都不变），
- * 通过以后再换回原来的 JSON。不允许的照常校验，报结构错误。分组里的、里层分组里的也一样。
+ * Allowed unknown blocks (D-254) are temporarily replaced with dividers of the same ID for
+ * structural validation (other problem texts and positions remain unchanged), then swapped back
+ * to the original JSON upon passing. Disallowed ones are validated as usual and reported as
+ * structural errors. Same for blocks inside groups or nested groups.
  */
 function setAsideUnknown(
   input: unknown,
@@ -827,7 +843,7 @@ function setAsideUnknown(
   const allowed = allow === 'keep' ? null : unknownBlockTexts(allow);
   const isAllowed = (c: unknown): c is Json =>
     isUnknownBlock(c) && (allowed === null || allowed.has(JSON.stringify(c)));
-  /** 块在哪：页面下标，然后一串 blocks / children 的下标。 */
+  /** Block location: page index, followed by a sequence of blocks / children indices. */
   const kept: { page: number; path: number[]; raw: Json }[] = [];
   const walk = (list: unknown[], page: number, path: number[]) =>
     list.forEach((c, i) => {
@@ -866,8 +882,9 @@ function setAsideUnknown(
 }
 
 /**
- * 给一条记录用的页面（D-342，page.of）不能直接打开：不知道是哪一条。导航栏、按钮、入口、提醒打开它时报错，
- * 文字发给 AI（改用这张表的记录块的 opens）。
+ * Single-record pages (D-342, page.of) cannot be opened directly: the specific record is unknown.
+ * Navigation bars, buttons, entry points, and reminders throw an error when trying to open them,
+ * with text sent to the AI (use record block opens on this table instead).
  */
 export function recordPageTargetProblem(
   config: WorkspaceConfig,

@@ -12,7 +12,7 @@ import { GlassFill } from '../renderer/GlassFill';
 import { Icon } from '../renderer/Icon';
 import { usePalette, type Palette } from '../renderer/theme';
 
-// 风格选择器（D-095）：在 AI 修改页直接点选内置风格预设，不用打字。每格是该风格的缩略样张，跟随系统深浅色。
+// Style picker (D-095): directly tap and select built-in style presets on the AI modification page without typing. Each cell is a thumbnail sample of the style, adapting to system light/dark mode.
 
 function Swatch({
   id,
@@ -24,13 +24,13 @@ function Swatch({
   id: ThemePresetId;
   locale: Locale;
   current: boolean;
-  /** 修改页本身的配色，用于名字和选中框。 */
+  /** Palette of the modification page itself, used for the name and selection box. */
   palette: Palette;
   onPress: () => void;
 }) {
   const preset = THEME_PRESETS[id];
   const sample = usePalette(preset.theme);
-  // 缩略图里圆角按比例缩小，否则 28pt 的圆角在小卡片上就成了圆。
+  // Corner radii in thumbnails are scaled down proportionally, otherwise a 28pt radius would become a full circle on small cards.
   const radius = Math.round(sample.radius * 0.45);
   return (
     <Pressable

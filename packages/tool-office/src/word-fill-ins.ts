@@ -1,65 +1,69 @@
 import type { PageLines, RuleLine } from './lines';
 import type { Box, OcrBox, RgbaImage } from './types';
 
-// 表单里留着填写的地方（EU 样本 021、030）：标签后面的一串点（「Name ……………」）、标签右边的一条横线
-// （L 形的答题线、一格一格的号码框的底线）。识别不出它们（点读成「...」或者干脆没有），转出来只剩标签，
-// 没地方写；空出来的一大段还让标签和下面居中的说明像两栏，顺序全乱。
-// 找出来以后接在同一排的标签后面，写成一串「.」（点）或「_」（横线），和原来差不多长：Word 里看得出要填，
-// 也能直接改。这一排因此是整行宽的，不会被当成窄的标签列；接了填写处的行是一行一行的，不和下一行接成一段。
+// Fill-in areas left in forms (EU samples 021, 030): a string of dots following a label ("Name
+// ……………"), or a horizontal line to the right of a label (L-shaped answer lines, baseline of boxed
+// character grids). When OCR fails to detect them (dots read as "..." or omitted entirely), only
+// the label remains, leaving no space to write; large blank gaps also cause the label and centered
+// notes below to look like two columns, completely messing up the reading order. Once detected,
+// they are appended after the row's label as a string of "." (dots) or "_" (underscores) matching
+// their original length: Word recognizes them as fillable and editable directly. This row thus
+// spans the full line width and is not treated as a narrow label column; lines with attached
+// fill-ins remain single lines and do not merge into the following paragraph.
 
 export interface FillIn extends Box {
   kind: 'dots' | 'rule';
 }
 
-/** 点：连通的一小块墨，长宽都不超过这么多个行高。 */
+/** Dot: connected ink blob whose dimensions do not exceed this many line heights in width and height. */
 const DOT_MAX = 0.3;
-/** 相邻两个点的中心最远隔这么多个行高；同一排的点上下差不超过这么多个行高。 */
+/** Maximum distance between centers of two adjacent dots in line heights; vertical offset between dots in the same row must not exceed this many line heights. */
 const DOT_PITCH = 0.7;
 const DOT_ROW = 0.15;
-/** 一串点的宽高比（中位数）不超过这么多。 */
+/** Aspect ratio (median) of a dot sequence does not exceed this value. */
 const DOT_ROUND = 1.8;
-/** 一串点至少这么多个、至少这么多个行高长。 */
+/** A dot sequence contains at least this many dots and spans at least this many line heights in length. */
 const DOTS_MIN = 6;
 const FILL_MIN = 2.5;
-/** 一串点上下这么多个行高以内不能有比点大的墨（字的笔画）：不是 i 上面的点、字里的句号。 */
+/** No ink larger than a dot (character strokes) may appear within this many line heights above or below the dot sequence: excludes dots above 'i' or periods within text. */
 const DOT_CLEAR = 0.25;
-/** 横线至少这么多个行高长（再短的多半是图形、水印字的一笔）。 */
+/** Horizontal lines must be at least this many line heights long (shorter lines are mostly graphics or watermark strokes). */
 const RULE_MIN = 4;
-/** 横线：不粗过这么多个行高。 */
+/** Horizontal line: thickness does not exceed this many line heights. */
 const RULE_MAX_THICKNESS = 0.3;
-/** 填写处上面这么多个行高（的八成）里，至少这么多的点是白的。 */
+/** At least this fraction of points in the specified vertical range (80% of this many line heights) above the fill-in area must be white. */
 const BLANK_ABOVE = 0.8;
 const BLANK_SHARE = 0.9;
-/** 横线两头连着这么长（行高）以上的竖线，是框的边。 */
+/** Vertical lines of at least this length (line heights) connected to both ends of a horizontal line indicate a frame border. */
 const FRAME_SIDE = 1.5;
-/** 一头连着框边的横线，左头离同一排的标签不超过这么多个行高时，是画到框边的填写线。 */
+/** A horizontal line connected to a frame border at one end is considered a fill-in line extending to the border when its left end is within this many line heights of the label in the same row. */
 const LAST_FILL_GAP = 2;
-/** 横线上至少这么多的地方比线的上下两边深 LINE_CONTRAST 以上（0–255）。 */
+/** At least this proportion of the horizontal line is darker than its upper and lower surroundings by more than LINE_CONTRAST (0-255). */
 const RULE_INK_SHARE = 0.6;
 const LINE_CONTRAST = 30;
-/** 横线上有墨的部分至少占这么多（实线）。 */
+/** Proportion of ink-containing segments along the horizontal line must be at least this high (solid line). */
 const RULE_SOLID = 0.9;
-/** 横线左边的标签最远隔这么多个行高（表单的标签一列、填写处一列，短的标签离得远）。 */
+/** Maximum distance to the label on the left of the horizontal line in line heights (form labels in one column, fill-in areas in another; short labels are further apart). */
 const LABEL_GAP = 16;
-/** 一串「.」「_」比原来的点、线短一点：Word 里字号放大、换了字体时也不折到下一行。 */
+/** A sequence of "." or "_" is slightly shorter than the original dots/lines to prevent wrapping to the next line when font size is enlarged or font is changed in Word. */
 const FILL_SLACK = 0.85;
-/** 字号（像素）≈ 识别框的高 × 这个比例（和 doc.ts 的 BOX_TO_FONT 一样）。 */
+/** Font size (pixels) ≈ OCR box height × this ratio (same as BOX_TO_FONT in doc.ts). */
 const BOX_TO_FONT = 0.9;
-/** Arial 里「.」「_」的宽（em）。「…」在 LibreOffice 里单独成段时会换成中文字体，不用。 */
+/** Width (in em) of '.' and '_' in Arial. '…' is replaced by a Chinese font when standing as its own paragraph in LibreOffice, so it is not used. */
 const RUN_EM = { dots: 0.278, rule: 0.556 } as const;
 const RUN_CHAR = { dots: '.', rule: '_' } as const;
-/** 文字里属于点线本身的字符（识别把点读成「...」「…」、空格）。 */
+/** Characters belonging to the dot/line fill-in itself (OCR reads dots as '...', '...', spaces). */
 const LEADER_CHAR = /^[\s.…·_]$/u;
-/** 一行字以一串填写处结尾（paragraphsOf：这样的行是一行一行的，不接下一行）。 */
+/** A line ending with a run of fill-in slots (paragraphsOf: such lines are individual lines, not concatenated with the next line). */
 export const ENDS_WITH_FILL = /(?:\.{4,}|_{4,})\s*$/u;
-/** 一串填写处（比较两次排版的字时不算字）。 */
+/** A run of fill-in slots (ignored as text when comparing font layout across two passes). */
 export const FILL_RUN = /(?:\.{4,}|_{4,})/gu;
 
-/** 连通的墨块（4 邻接），只要框和点数。 */
+/** Connected ink components (4-adjacency), keeping only bounding box and pixel count. */
 function components(image: RgbaImage): { box: Box; count: number }[] {
   const { width, height, data } = image;
   const label = new Int32Array(width * height).fill(-1);
-  // 4 邻接时临时编号最多是点数的一半（棋盘格）。
+  // Temporary labels during 4-adjacency numbering are at most half the pixel count (checkerboard).
   const parent = new Int32Array((width * height) / 2 + 2);
   let next = 0;
   const find = (i: number): number => {
@@ -113,8 +117,10 @@ function components(image: RgbaImage): { box: Box; count: number }[] {
 const dotsCache = new WeakMap<RgbaImage, Map<number, { dots: FillIn[]; erased: RgbaImage }>>();
 
 /**
- * 一页上的点线，和抹掉点线的图（找表格线用：点线会被当成浅的横线，几条对齐的点线连成一张假的表）。
- * 同一张图、同一个行高只算一次（转 Word 会对同一页重建好几次），抹掉的图也是同一个（找线按图缓存）。
+ * Dot lines on a page, and the image with dot lines erased (used for finding table lines: dot
+ * lines would otherwise be treated as light horizontal rules, and several aligned dot lines merge
+ * into a fake table). Calculated once per image and line height (converting to Word rebuilds the
+ * same page several times); erased image is also cached per image for line detection.
  */
 export function leaderDots(
   image: RgbaImage,
@@ -125,7 +131,7 @@ export function leaderDots(
   if (!byHeight) dotsCache.set(image, (byHeight = new Map()));
   let found = byHeight.get(lineHeight);
   if (!found) {
-    // 识别在这串「点」的位置上读出了字母、数字的，是字（扫描件里很小的字也是一个个小墨块），不是点线。
+    // Recognized letters or numbers at the position of these dot lines are treated as text (very small text in scans appears as tiny ink blobs), not as dot lines.
     const dots = findDots(image, lineHeight).filter((d) => !readAsText(d, lines, lineHeight));
     let erased = image;
     if (dots.length) {
@@ -144,8 +150,9 @@ export function leaderDots(
 }
 
 /**
- * 一条细线（不是色块的边）：线上的每一列比线上面、下面隔开一点的地方都深一截的列占多少。
- * 浅灰的填写线（EU 样本 001）两边都是白纸；浅色底纹的边只有一边浅。
+ * Thin line score (not a block edge): the ratio of columns where every point along the line is
+ * darker than points slightly above and below. Light fill-in lines (EU sample 001) have white
+ * paper on both sides; edges of light shading have only one light side.
  */
 function lineShare(image: RgbaImage, box: Box): number {
   const ink = (x: number, y: number) => {
@@ -166,7 +173,7 @@ function lineShare(image: RgbaImage, box: Box): number {
   return x1 > x0 ? thin / (x1 - x0) : 0;
 }
 
-/** 框里浅色（三个通道都亮）的点占多少。 */
+/** Ratio of light pixels (all three channels bright) inside the box. */
 function lightShare(image: RgbaImage, box: Box): number {
   const x0 = Math.max(0, Math.round(box.x));
   const x1 = Math.min(image.width, Math.round(box.x + box.width));
@@ -184,7 +191,7 @@ function lightShare(image: RgbaImage, box: Box): number {
   return all ? light / all : 0;
 }
 
-/** 和一串点同一排、盖住它的识别行里，落在它上面的字有两成以上是字母、数字。 */
+/** More than 20% of the recognized characters overlapping this dot run on the same row are letters or numbers. */
 function readAsText(d: FillIn, lines: readonly OcrBox[], lineHeight: number): boolean {
   let letters = 0;
   let all = 0;
@@ -200,13 +207,13 @@ function readAsText(d: FillIn, lines: readonly OcrBox[], lineHeight: number): bo
   return letters > 0.2 * all;
 }
 
-/** 一串点（引导线）：同一排、间距差不多的小墨点，中间没有字。 */
+/** A run of dots (leader line): small ink dots on the same row with similar spacing and no text in between. */
 function findDots(image: RgbaImage, lineHeight: number): FillIn[] {
   const all = components(image);
   const max = DOT_MAX * lineHeight;
-  // 挨得近的两个点在图里常常连成一块（扁的），也算点；整串是不是圆点在下面按中位数看。
+  // Two closely spaced dots often merge into a single blob in the image (flattened), which is still counted as a dot; whether the entire run consists of circular dots is determined below via the median.
   const small = all.filter((c) => c.count >= 2 && c.box.width <= max && c.box.height <= max);
-  // 字：比点高的墨。
+  // Text: ink taller than a dot.
   const big = all.filter((c) => c.count >= 2 && c.box.height > max).map((c) => c.box);
   const cx = (b: Box) => b.x + b.width / 2;
   const cy = (b: Box) => b.y + b.height / 2;
@@ -228,13 +235,13 @@ function findDots(image: RgbaImage, lineHeight: number): FillIn[] {
     const x0 = chain[0]!.x;
     const x1 = chain.at(-1)!.x + chain.at(-1)!.width;
     if (x1 - x0 < FILL_MIN * lineHeight) continue;
-    // 间距大致一样（八成的间距在中位数的一半到一倍半之间）。
+    // Roughly uniform spacing (80% of spacings fall between half and 1.5 times the median).
     const pitches = chain
       .slice(1)
       .map((b, i) => cx(b) - cx(chain[i]!))
       .sort((a, b) => a - b);
     const p = pitches[pitches.length >> 1]!;
-    // 圆点（虚线的短划是扁的：小票、表格里的分隔线，不是填写处）。
+    // Circular dots (short dashed lines in a ticket or table separator are flattened and are not fill-in slots).
     const aspects = chain.map((b) => b.width / b.height).sort((a, b) => a - b);
     if (aspects[aspects.length >> 1]! > DOT_ROUND) continue;
     if (pitches.filter((d) => d >= 0.5 * p && d <= 1.6 * p).length < 0.8 * pitches.length) continue;
@@ -254,8 +261,9 @@ function findDots(image: RgbaImage, lineHeight: number): FillIn[] {
 }
 
 /**
- * 页面上留着填写的地方：一串点（leaderDots），或者一条不在表格里的细横线（左边同一排有标签、上面没有字压着：
- * 不是字的下划线、分隔线）。boxes 里的（表格、图片）不要。
+ * Fill-in areas left on the page: a dot run (leaderDots) or a thin horizontal line not inside a
+ * table (with a label on the same row to the left and no text pressing down from above,
+ * distinguishing it from underlines or separators). Exclude items in boxes (tables, images).
  */
 export function findFillIns(
   image: RgbaImage,
@@ -274,7 +282,7 @@ export function findFillIns(
         b.y + b.height / 2 <= e.y + e.height + 0.5 * lineHeight,
     );
   const t = Math.tan((rules.skew * Math.PI) / 180);
-  // 同一条线上断开的几段先接起来（拍歪的小票上的分隔线断成几截，中间一截不能单独当填写处）。
+  // Disconnected segments of the same line are joined first (separators on skewed receipts break into pieces; an intermediate piece cannot be treated as a standalone fill-in slot).
   const joined: RuleLine[] = [];
   for (const h of [...rules.horizontal]
     .filter((h) => !h.band && h.thickness <= RULE_MAX_THICKNESS * lineHeight)
@@ -291,11 +299,11 @@ export function findFillIns(
     .filter(
       (h) =>
         h.to - h.from >= RULE_MIN * lineHeight &&
-        // 实线（虚线多半是小票、表格里的分隔线）。
+        // Solid line (dashed lines are mostly separators in receipts or tables).
         h.spans.reduce((n, [a, b]) => n + b - a, 0) >= RULE_SOLID * (h.to - h.from),
     )
     .map((h) => {
-      // 拉正后的坐标换回原图（线不长，按中点的位置换）。
+      // Map straightened coordinates back to the original image (lines are short, conversion uses the midpoint).
       const mid = (h.from + h.to) / 2;
       const y = h.pos + mid * t;
       const x = h.from - y * t;
@@ -308,8 +316,9 @@ export function findFillIns(
       };
     })
     .filter((r) => {
-      // 框的一条边（两头连着长的竖线：表单一节的外框，标题压在框的上边上）不是填写处；
-      // L 形答题线、号码框的竖线都很短。
+      // An edge of a box connected at both ends to long vertical lines (outer border of a form
+      // section, with the title pressing down on the top edge) is not a fill-in slot; L-shaped
+      // answer lines and number box vertical lines are very short.
       const ends = [r.x, r.x + r.width];
       const framedAt = ends.map((e) =>
         rules.vertical.some((v) => {
@@ -322,8 +331,10 @@ export function findFillIns(
           );
         }),
       );
-      // 只有右头连着框边、左边紧挨着同一排的标签：一排里最后一个标签后面的填写线一直画到框的右边
-      // （EU 样本 046 的「Provincia ……」「E-mail ……」），不是框的边。
+      // Only when the right end connects to the box border and the left side directly abuts a
+      // same-row label: the fill line after the last label in a row extends all the way to the
+      // right border of the box (e.g., 'Provincia ...', 'E-mail ...' in EU sample 046), rather than
+      // being a box border.
       const afterLabel =
         !framedAt[0] &&
         lines.some(
@@ -333,8 +344,9 @@ export function findFillIns(
             r.x - (l.x + l.width) <= LAST_FILL_GAP * lineHeight,
         );
       if (framedAt.some(Boolean) && !afterLabel) return false;
-      // 压着字的不算：字的下划线、填好了的答案（字在线上面一个多行高以内），
-      // 粗体字的笔画连成的「线」（线在字的框里）。
+      // Exclude lines overlaid by text: underlines of text, completed answers (text within about
+      // one line height above the line), and 'lines' formed by connected bold text strokes (where
+      // the line lies inside the text box).
       const covered = lines.some(
         (l) =>
           Math.min(l.x + l.width, r.x + r.width) - Math.max(l.x, r.x) > lineHeight &&
@@ -343,7 +355,7 @@ export function findFillIns(
       );
       return !covered;
     });
-  // 点线也会被找线当成一条浅的线：和一串点重合的线不要。
+  // Dot lines are also detected as light lines by line finding: discard lines that overlap with a dot run.
   const lone = solid.filter(
     (r) =>
       !dots.some(
@@ -352,7 +364,7 @@ export function findFillIns(
           Math.min(d.x + d.width, r.x + r.width) - Math.max(d.x, r.x) > 0.5 * r.width,
       ),
   );
-  // 填写处上面是空白的纸（深色底上、压着字的不是）。
+  // Blank paper above the fill-in slot (excluded if on a dark background or overlaid by text).
   const blank = (f: FillIn) =>
     lightShare(image, {
       x: f.x,
@@ -360,7 +372,7 @@ export function findFillIns(
       width: f.width,
       height: 0.8 * BLANK_ABOVE * lineHeight,
     }) >= BLANK_SHARE;
-  // 横线要是一条细线：浅色底纹的边找线时也会当成很浅的线（EU 样本 025 的账单表）。
+  // Horizontal lines must be thin: borders of light-shaded areas are also detected as very faint lines during line finding (e.g., bill table in EU sample 025).
   const inked = (f: FillIn) =>
     f.kind === 'dots' ||
     lineShare(image, { x: f.x, y: f.y, width: f.width, height: Math.max(1, f.height) }) >=
@@ -369,24 +381,28 @@ export function findFillIns(
 }
 
 /**
- * 和这条填写处同一排的字：填写处的底边落在字的下面三分之一到字下面不到一个行高之间
- * （在字的半腰的横线是压着标题的框边）。
+ * Text on the same row as this fill-in slot: the bottom edge of the fill-in slot falls between
+ * the lower third of the text and less than one line height below it (horizontal lines across the
+ * middle of characters are form borders pressing on titles).
  */
 const sameRow = (l: OcrBox, f: Box, lineHeight: number) => {
   const base = f.y + f.height;
   return base >= l.y + 0.65 * l.height && base <= l.y + l.height + 0.8 * lineHeight;
 };
 
-/** 一串多长：按这一行的字号估，比原来的短一点。 */
+/** Run length estimation: estimated based on the font size of the current line, slightly shorter than the original. */
 function runOf(kind: FillIn['kind'], width: number, fontPx: number): string {
   const n = Math.max(4, Math.floor((width / (RUN_EM[kind] * fontPx)) * FILL_SLACK));
   return RUN_CHAR[kind].repeat(n);
 }
 
 /**
- * 把填写处接进识别行：在同一排、标签后面的接到标签那一行里（点在一行字中间的，替换掉识别读成的点、空格），
- * 一排里没有字的一串点自成一行。横线要有标签（左边同一排、不远），不然可能是分隔线，不要。
- * 返回新的行，和新行 → 原来的识别行（量笔画、颜色、下划线还是看原来的框）。
+ * Merge fill-in slots into recognized lines: same-row slots following a label are merged into the
+ * label's line (dots in the middle of a line of text replace OCR-detected dots and spaces); dot
+ * runs without text on a row form their own line. Horizontal lines must have a nearby label to
+ * the left, otherwise they might be separators and are ignored. Returns new lines, along with
+ * mapping from new lines to original recognized lines (stroke measurements, colors, and
+ * underlines still reference the original box).
  */
 export function withFillIns(
   input: readonly OcrBox[],
@@ -394,7 +410,7 @@ export function withFillIns(
   lineHeight: number,
 ): { lines: OcrBox[]; source: Map<OcrBox, OcrBox> } {
   const source = new Map<OcrBox, OcrBox>();
-  // 先去掉识别从点线里读出来的「...」「…」（落在点线上的点、空格）；整行都是这些的不要。
+  // First remove OCR-detected '...' and '…' originating from dot lines (dots and spaces landing on dot lines); discard lines consisting entirely of these.
   const cleaned = input.flatMap((l): OcrBox[] => {
     const on = fills.filter(
       (f) =>
@@ -412,13 +428,14 @@ export function withFillIns(
   const lines = cleaned;
   const owned = new Map<OcrBox, FillIn[]>();
   const alone: FillIn[] = [];
-  // 从左到右：同一排的第二条线接在已经接上第一条的标签后面。
+  // Left-to-right progression: the second line on the same row attaches after the label that has already attached to the first line.
   const reach = new Map<OcrBox, number>();
   const right = (l: OcrBox) => reach.get(l) ?? l.x + l.width;
   for (const f of [...fills].sort((a, b) => a.x - b.x)) {
     const row = lines.filter((l) => sameRow(l, f, lineHeight));
-    // 点在一行字的框里（「od ……… do」），或者点线从字的末尾开始。
-    // 横线只接在左边的标签后面（压着字的线上面已经去掉了）。
+    // Owner: dots within a line of text box ('od ... do'), or dot lines starting from the end of
+    // text. Horizontal lines only attach to labels on their left (lines overlaid by text have
+    // already been removed).
     let owner =
       f.kind === 'dots'
         ? row.find((l) => f.x > l.x && f.x + 0.5 * f.width > l.x && f.x < right(l))
@@ -430,7 +447,7 @@ export function withFillIns(
           f.x - right(l) <= LABEL_GAP * lineHeight &&
           !row.some((m) => m !== l && m.x >= right(l) && m.x < f.x),
       );
-      // 两行的标签：接在底边离填写处最近的那一行（横线画在第二行的底下）。
+      // Two-line labels: attach to the line whose bottom edge is closest to the fill-in slot (horizontal lines drawn under the second line).
       const base = f.y + f.height;
       const far = (l: OcrBox) => Math.abs(l.y + l.height - base);
       owner = left.sort((a, b) => far(a) - far(b) || right(b) - right(a))[0];
@@ -462,15 +479,16 @@ export function withFillIns(
   return { lines: out, source };
 }
 
-/** 一行的字（没有字的位置时按字数均匀分）。 */
+/** Characters of a line (evenly distributed by character count when character positions are unavailable). */
 const charsOf = (line: OcrBox) =>
   line.chars?.length === [...line.text].length
     ? line.chars
     : [...line.text].map((ch, i, all) => ({ text: ch, at: (i + 0.5) / all.length }));
 
 /**
- * 哪些字是点线本身：落在点线上（前后宽出 0.3 个行高）的点、空格，再往两边连着的点、空格
- * （识别读出来的「...」常常比点线的头靠前一点）。
+ * Identify which characters belong to the dot line itself: dots and spaces falling on the dot
+ * line (extending 0.3 line heights on either side), and contiguous dots and spaces outward
+ * (OCR-detected '...' often starts slightly ahead of the dot line start).
  */
 function leaderChars(
   chars: readonly { x: number; text: string }[],
@@ -488,7 +506,9 @@ function leaderChars(
 }
 
 /**
- * 去掉落在点线上的点、空格（识别读成的「...」）：框缩到剩下的字。剩下的没有字母、数字时 null，没有要去的时原样返回。
+ * Remove dots and spaces falling on dot lines (OCR-detected '...'): shrink box to remaining
+ * characters. Returns null if no letters or numbers remain, or returns the original if nothing
+ * needed removal.
  */
 function withoutLeader(line: OcrBox, fills: readonly FillIn[], lineHeight: number): OcrBox | null {
   const all = charsOf(line).map((c) => ({ ...c, x: line.x + c.at * line.width }));
@@ -499,7 +519,7 @@ function withoutLeader(line: OcrBox, fills: readonly FillIn[], lineHeight: numbe
   while (kept.at(-1) && !kept.at(-1)!.text.trim()) kept.pop();
   if (!kept.some((c) => /[\p{L}\p{N}]/u.test(c.text))) return null;
   const half = line.width / Math.max(1, all.length) / 2;
-  // 只在去掉了字的那一头缩。
+  // Shrink only on the end where text was removed.
   const x = kept[0] === all[0] ? line.x : Math.max(line.x, kept[0]!.x - half);
   const end =
     kept.at(-1) === all.at(-1)
@@ -518,13 +538,13 @@ function withoutLeader(line: OcrBox, fills: readonly FillIn[], lineHeight: numbe
 const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 
-/** 一行字和接在它里面、后面的几串填写处合成一行：框只往右伸，上下不变（字号按原来的行高算）。 */
+/** Merge a line of text with several fill-in slots embedded within or attached to it: the box expands only to the right, keeping top and bottom unchanged (font size calculated from original line height). */
 function mergeFills(line: OcrBox, fills: readonly FillIn[], lineHeight: number): OcrBox {
   const fontPx = BOX_TO_FONT * line.height;
   const chars = charsOf(line);
   const end = line.x + line.width;
   const used = fills.filter((f) => f.width >= FILL_MIN * lineHeight);
-  // 每个字在原图里的中心；落在点线里的点、空格是点线本身（识别读成的「...」），去掉。
+  // Center of each character in the original image; dots and spaces falling within dot lines are part of the dot line itself (OCR-detected '...') and are removed.
   const placed = chars.map((c) => ({ x: line.x + c.at * line.width, text: c.text }));
   const junk = leaderChars(
     placed,
@@ -536,7 +556,7 @@ function mergeFills(line: OcrBox, fills: readonly FillIn[], lineHeight: number):
   tokens.sort((a, b) => a.x - b.x);
   const x = Math.min(line.x, ...fills.map((f) => f.x));
   const width = Math.max(end, ...fills.map((f) => f.x + f.width)) - x;
-  // 字之间照原样接；填写处前后各一个空格，它的字均匀铺满原来点线的位置（按列线切开时用）。
+  // Join characters between gaps as-is; add a space before and after each fill-in slot, with its characters evenly distributing across the original dot line positions (used when splitting along column lines).
   const out: { text: string; at: number }[] = [];
   const space = (at: number) => {
     if (out.length && out.at(-1)!.text !== ' ') out.push({ text: ' ', at });
@@ -565,27 +585,31 @@ function mergeFills(line: OcrBox, fills: readonly FillIn[], lineHeight: number):
   };
 }
 
-/** 一块要填的底色：至少这么多个行高宽，占两段字中间空隙的这么多。 */
+/** Shaded fill-in block: at least this many line heights wide, occupying this proportion of the gap between two text segments. */
 const BOX_MIN = 1.5;
 const BOX_SHARE = 0.5;
-/** 两段字中间的空隙最多这么多个行高。 */
+/** Maximum number of line heights for the gap between two text segments. */
 const BOX_GAP_MAX = 12;
-/** 空隙里一列算底色：这一列（行的中间那一截）至少这么多的点和底色差不多。 */
+/** Shaded column definition: at least this fraction of points in the column (middle section of the row) match the shading color. */
 const BOX_FILLED = 0.85;
-/** 和底色差多少以内（0–255，每个通道）算同一个颜色。 */
+/** Color tolerance (0–255 per channel) to be considered the same color. */
 const BOX_TOLERANCE = 40;
-/** 两段字底下有这么多是这个底色：字压在底纹上，不是空格。 */
+/** Shading coverage: at least this proportion under two text segments has this shading color (indicating text lies on shading, not in a gap). */
 const ON_FILL = 0.3;
-/** 底色最多这么多个行高高：上下两行的空格对齐时会挨成一块（EU 样本 082），再高是整片的色块。 */
+/** Maximum height of shading in line heights: gaps in upper and lower rows merge when aligned (EU sample 082); taller blocks are solid color regions. */
 const BOX_MAX_HEIGHT = 2.3;
-/** 比这更亮（每个通道都是）的是白纸，不是底色。 */
+/** Brighter than this (in every channel) is white paper, not shading color. */
 const PAPER = 235;
 
 /**
- * 句子中间要填的地方是一块底色（合同模板里青色、灰色的空格，Word 的表单域打成 PDF，EU 样本 082）：识别在那里断开，
- * 一行成了好几段，后面一段还可能比第一段高一点、排序时跑到整段前面，或者几段被当成并排的几栏、几格。
- * 同一排、隔着这样一块底色的几段接成一行，底色那里写一串「_」（和横线的填写处一样，Word 里看得出要填）。
- * 底色只有一行高：整片的色块（栏的底色）上面隔开的两段不接。
+ * Fill-in regions in the middle of sentences represented by background shading (cyan or grey
+ * blanks in contract templates, Word form fields exported to PDF, EU sample 082): OCR splits
+ * there, turning one line into multiple segments. Subsequent segments might be taller than the
+ * first, sorting to the front of the entire block, or segments might be treated as side-by-side
+ * columns/cells. Segments on the same row separated by such shading are merged into a single
+ * line, inserting a run of '_' where the shading is (same as line fill-in slots, indicating
+ * required input in Word). Shading only one line high: separate gaps above solid color blocks
+ * (column backgrounds) are not merged.
  */
 export function joinShadedBlanks(
   image: RgbaImage,
@@ -602,7 +626,7 @@ export function joinShadedBlanks(
   const paper = (c: readonly number[]) => c.every((v) => v >= PAPER);
   const near = (a: readonly number[], b: readonly number[]) =>
     a.every((v, i) => Math.abs(v - b[i]!) <= BOX_TOLERANCE);
-  /** a、b 中间的空隙里有一块一行高的底色：返回它的左右边。 */
+  /** Check if the gap between a and b contains one line-height of shading: returns its left and right bounds. */
   const boxBetween = (a: OcrBox, b: OcrBox) => {
     const x0 = Math.ceil(a.x + a.width);
     const x1 = Math.floor(b.x);
@@ -613,7 +637,7 @@ export function joinShadedBlanks(
     const y0 = Math.round(top + 0.25 * (bottom - top));
     const y1 = Math.round(bottom - 0.25 * (bottom - top));
     if (y1 <= y0) return null;
-    // 底色：空隙正中那一点的颜色（不是白纸）。
+    // Shading color: the color of the exact center point of the gap (not white paper).
     const color = at(Math.round((x0 + x1) / 2), Math.round((y0 + y1) / 2));
     if (paper(color)) return null;
     let best: [number, number] | null = null;
@@ -629,8 +653,9 @@ export function joinShadedBlanks(
       }
     }
     if (!best || best[1] - best[0] < Math.max(BOX_MIN * lineHeight, BOX_SHARE * gap)) return null;
-    // 两段字本身在白纸上：字底下也是这个底色时，是整行的底纹（账单上一行一行的浅绿底，EU 样本 025），
-    // 不是句子里要填的空格。
+    // Text segments themselves on white paper: when characters also rest on this shading, it
+    // represents full-row shading (light green table rows in bill, EU sample 025), not fillable
+    // blanks inside sentences.
     const under = (l: OcrBox, from: number, to: number) => {
       let n = 0;
       let all = 0;
@@ -647,8 +672,9 @@ export function joinShadedBlanks(
       under(b, b.x, b.x + reach) > ON_FILL
     )
       return null;
-    // 一行高：在底色的几处往上、往下量它有多高，取最矮的（上下两行的空格常常挨着，连成两行高；
-    // 整片的色块哪里都高得多）。
+    // Line height: measure height upward and downward at several points in the shading, taking the
+    // minimum (spaces in upper and lower rows often touch, merging into two line heights; solid
+    // color blocks are much taller everywhere).
     const cy = Math.round((y0 + y1) / 2);
     const limit = Math.ceil(BOX_MAX_HEIGHT * lineHeight);
     const tall = (x: number) => {
@@ -673,7 +699,7 @@ export function joinShadedBlanks(
   for (const first of [...lines].sort((a, b) => a.x - b.x)) {
     if (used.has(first)) continue;
     let line = first;
-    // 和刚接上的那一段比（接起来的行比一个字「y」高得多）。
+    // Compare with the newly merged segment (merged lines are much taller than a single 'y').
     let last = first;
     for (;;) {
       const right = last.x + last.width;
@@ -693,7 +719,7 @@ export function joinShadedBlanks(
   return { lines: out, source };
 }
 
-/** 两段字和中间的一块底色接成一行：底色那里一串「_」，后一段以标点开头时不空格。 */
+/** Merge two text segments and the intervening shading into a single line: insert a run of '_' at the shading, and do not add a space if the subsequent segment starts with punctuation. */
 function joinAcross(a: OcrBox, b: OcrBox, box: [number, number]): OcrBox {
   const x = a.x;
   const right = b.x + b.width;

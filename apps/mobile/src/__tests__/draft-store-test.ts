@@ -11,7 +11,7 @@ import {
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { createWorkspaceStore, shownConfig, type WorkspaceStore } from '../workspace/store';
 
-// AI 修改的草稿（D-190）：一句一句地改、退一步、离开再回来、应用成一个版本、删除、重启后还在。
+// AI modification draft (D-190): modify step by step, step back, leave and return, apply as a version, delete, still present after restart.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -50,7 +50,7 @@ describe('AI change drafts (D-190)', () => {
     expect(draftConfig(store).theme.primaryColor).toBe('#2F9E44');
     expect(store.getState().config).toBe(before);
     expect(store.getState().head!.id).toBe(headId);
-    // 外壳显示草稿；离开后显示正式的 App。
+    // Shell shows draft; displays official app after leaving.
     expect(shownConfig(store.getState())!.theme.primaryColor).toBe('#2F9E44');
     store.getState().closeDraft();
     expect(shownConfig(store.getState())).toBe(before);
@@ -69,7 +69,7 @@ describe('AI change drafts (D-190)', () => {
     await store.getState().stepBack();
     expect(store.getState().draft!.steps).toHaveLength(1);
     expect(draftConfig(store).theme.primaryColor).not.toBe('#2F9E44');
-    // 只剩一步时不能再退（要整个丢掉就删除草稿）。
+    // Cannot step back when only one step remains (to discard entirely, delete the draft).
     await store.getState().stepBack();
     expect(store.getState().draft!.steps).toHaveLength(1);
   });
@@ -124,7 +124,7 @@ describe('AI change drafts (D-190)', () => {
     expect(draft.open).toBe(false);
     expect(draft.steps.map((s) => s.input)).toEqual(['首页改成文件工作台', '主题换成绿色']);
     expect(draft.steps.at(-1)!.config.theme.primaryColor).toBe('#2F9E44');
-    // 回到草稿时打开草稿模式；新的一句接着改这份草稿。
+    // Open draft mode when returning to the draft; a new sentence continues to modify this draft.
     second.getState().openDraft();
     expect(second.getState().draft!.open).toBe(true);
     await say(second, '字体大一点');
@@ -141,7 +141,7 @@ describe('AI change drafts (D-190)', () => {
       now: () => new Date(2026, 9, 24, 9, 0),
     });
     await store.getState().boot();
-    // 新用户的首页没有工具卡片（D-182）：先添加图片和 PDF 工具，PDF 卡片排在第二。
+    // New user's home screen has no tool cards (D-182): add image and PDF tools first, with the PDF card ranked second.
     await store.getState().proposeOps(
       [
         { op: 'setPackage', package: 'image', do: 'add' },
@@ -153,7 +153,7 @@ describe('AI change drafts (D-190)', () => {
     await say(store, '字体大一点');
     await say(store, '把 PDF 放到最上面');
     store.getState().closeDraft();
-    // 离开草稿期间移除了 PDF 工具：第二步要挪的卡片没有了，第一步还在。
+    // PDF tool removed while leaving the draft: the card to be moved in step 2 is gone, while step 1 remains.
     await store
       .getState()
       .proposeOps([{ op: 'setPackage', package: 'pdf', do: 'remove' }], '移除 PDF');
@@ -206,7 +206,7 @@ describe('function changes go straight in (D-191)', () => {
   it('a new quick action is applied right away, with its home entry, and can be undone', async () => {
     const { store } = await booted();
     const baseId = store.getState().head!.id;
-    // 带说明（notes）的新快捷操作：内置规则不再有目标句（D-265），用一个固定的计划。
+    // New quick action with notes: built no longer has a target sentence (D-265), using a fixed plan.
     const withNotes: AIProvider = {
       plan: async () => ({
         kind: 'ops',
@@ -250,7 +250,7 @@ describe('function changes go straight in (D-191)', () => {
     expect(store.getState().config!.theme.primaryColor).not.toBe('#2F9E44');
     expect(store.getState().next).toBe('主题换成绿色');
     expect(await repo.getMeta('next')).toBe('主题换成绿色');
-    // 重启后还在；点了之后进草稿，用掉就清掉。
+    // Still present after restart; enters draft upon clicking, and is cleared once used.
     const again = makeStore(repo);
     await again.getState().boot();
     expect(again.getState().next).toBe('主题换成绿色');
@@ -297,7 +297,7 @@ describe('function changes go straight in (D-191)', () => {
 });
 
 describe('the draft chat remembers what was said (D-207)', () => {
-  /** 记下每次交给 AI 的上下文。 */
+  /** Record the context passed to the AI each time. */
   async function recorded(repo = new MemoryWorkspaceRepo()) {
     const mock = createMockAIProvider();
     const contexts: PlanContext[] = [];
@@ -388,7 +388,7 @@ describe('the draft chat remembers what was said (D-207)', () => {
     const { store: again } = await recorded(repo);
     expect(again.getState().draft!.replies).toEqual(store.getState().draft!.replies);
     again.getState().openDraft();
-    // 退一步：排在退掉的那一步后面的回复一起去掉。
+    // Step back: responses following the stepped-back step are removed together.
     await again.getState().stepBack();
     expect(again.getState().draft!.replies.map((r) => r.input)).toEqual(['撤销刚才的修改']);
 
@@ -399,7 +399,7 @@ describe('the draft chat remembers what was said (D-207)', () => {
 });
 
 describe('function changes said in the draft chat take effect right away (D-411)', () => {
-  /** 建一张表，再（第二句）放一个读它的页面；第三句删掉这张表。别的话交给内置规则。 */
+  /** Create a table, then (second sentence) place a page reading it; third sentence deletes this table. Leave other words to built-in rules. */
   const scripted = (): AIProvider => ({
     plan: async (input, ctx) => {
       if (input === '建书单表')
@@ -459,17 +459,17 @@ describe('function changes said in the draft chat take effect right away (D-411)
       kind: 'applied',
     });
     const state = store.getState();
-    // 进了正式版本，是一个能撤销的 AI 版本（底线 7）。
+    // Entered official version, which is an undoable AI version (invariant 7).
     expect(state.head).toMatchObject({ parentId: headId, source: 'ai' });
     expect(quickActionsOf(state.config!).some((w) => w.id === 'visa-photo')).toBe(true);
     expect(state.config!.theme.primaryColor).not.toBe('#2F9E44');
-    // 草稿还开着，一步都没多；草稿的样子里两样都有。
+    // Draft is still open, with no extra steps; both are present in the draft state.
     expect(state.draft).toMatchObject({ open: true });
     expect(state.draft!.steps).toHaveLength(1);
     expect(draftConfig(store).theme.primaryColor).toBe('#2F9E44');
     expect(quickActionsOf(draftConfig(store)).some((w) => w.id === 'visa-photo')).toBe(true);
     expect(shownConfig(state)).toBe(draftConfig(store));
-    // 聊天框说一句，三种语言的这句话都在 messages 里（这里是中文）。
+    // Saying a sentence in the chat box, this sentence in all three languages is in messages (here in Chinese).
     expect(state.draft!.replies).toEqual([
       expect.objectContaining({
         afterSteps: 1,
@@ -481,7 +481,7 @@ describe('function changes said in the draft chat take effect right away (D-411)
       }),
     ]);
 
-    // 应用草稿不会盖掉刚才的功能。
+    // Applying the draft does not overwrite the just-completed feature.
     await store.getState().applyDraft();
     expect(store.getState().config!.theme.primaryColor).toBe('#2F9E44');
     expect(quickActionsOf(store.getState().config!).some((w) => w.id === 'visa-photo')).toBe(true);
@@ -512,7 +512,7 @@ describe('function changes said in the draft chat take effect right away (D-411)
     expect(store.getState().draft).toMatchObject({ open: true });
     expect(draftConfig(store).theme.primaryColor).toBe('#2F9E44');
     expect(quickActionsOf(draftConfig(store)).some((w) => w.id === 'visa-photo')).toBe(false);
-    // 再应用草稿也回不来。
+    // Applying the draft again cannot bring it back.
     await store.getState().applyDraft();
     expect(quickActionsOf(store.getState().config!).some((w) => w.id === 'visa-photo')).toBe(false);
   });

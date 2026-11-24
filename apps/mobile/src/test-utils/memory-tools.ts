@@ -5,11 +5,11 @@ import { sha256 as sha256Bytes } from '@noble/hashes/sha2.js';
 import jobApply from '../../../../tools/job-apply/manifest.json';
 import type { ToolFs } from '../tool-download/store';
 
-// 测试用：内存里的 tools 目录、一个假的托管（地址 → 字节），和发布目录的小帮手（用测试自己的密钥签名）。
+// For testing: in-memory tools directory, fake hosting (URL → bytes), and helper for publish directory (signed with test's own key).
 
 export const TOOLS_URL = 'https://tools.test/morph';
 
-/** 同步算出来的 SHA-256（包成 Promise）：整条下载链路都在微任务里完成，测试里好等。 */
+/** Synchronously calculated SHA-256 (wrapped in a Promise): the entire download chain completes within microtasks, making it easy to await in tests. */
 export const toolSha256 = async (bytes: Uint8Array) =>
   [...sha256Bytes(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
 
@@ -53,13 +53,13 @@ export class MemoryToolFs implements ToolFs {
   }
 }
 
-/** 仓库里的示例数据工具（tools/job-apply）。 */
+/** Example data tools in the repository (tools/job-apply). */
 export const exampleManifest = (): ToolManifest =>
   JSON.parse(JSON.stringify(jobApply)) as ToolManifest;
 
 export const testKey = generateSigningKey();
 
-/** 把这些清单「发布」到假的托管上：清单文件、目录和签名。返回目录。 */
+/** "Publish" these manifests to fake hosting: manifest files, directory, and signature. Returns directory. */
 export async function publish(
   fs: MemoryToolFs,
   manifests: ToolManifest[],

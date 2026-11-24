@@ -1,4 +1,4 @@
-// release 包冒烟脚本（smoke-release-android.mjs）：用一个假的 adb 跑它的判断。真设备上的那一次见发版清单。
+// Release package smoke test script (smoke-release-android.mjs): Run assertions using a mock adb. See the release checklist for real device testing.
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,7 +7,7 @@ import { test } from 'node:test';
 
 import { crashesIn, smoke } from './smoke-release-android.mjs';
 
-/** 假 adb：按场景回答，记下每次调用。 */
+/** Mock adb: Respond according to scenarios and record every invocation. */
 function fakeAdb(scenario) {
   const dir = mkdtempSync(join(tmpdir(), 'smoke-adb-'));
   const calls = join(dir, 'calls.log');

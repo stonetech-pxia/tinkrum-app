@@ -3,15 +3,22 @@ import QuickLook
 import UIKit
 import UniformTypeIdentifiers
 
-// 分享和存到文件夹的 iOS 实现（D-119、D-120）：
-// - 分享：UIActivityViewController 一次带上全部文件（微信、WhatsApp、邮件、隔空投送、存到「文件」…）。
-// - 存到文件夹：UIDocumentPickerViewController 让用户选一个文件夹（可以新建；iCloud 云盘、Google Drive、
-//   Dropbox 等「文件」提供者由它们自己的 App 同步），再用 NSFileCoordinator 把文件复制进去，重名时加序号。
-//   不用导出模式：模拟器实测文件夹里已有同名文件时，导出选择器报 OSStatus -8072、什么也不存。
-// 记住上次选的文件夹（P-019、D-123）：存成书签（UserDefaults），下次直接存进去；文件夹没了就重新让用户选。
-// 每个快捷操作记自己的文件夹（D-196）：「快捷操作 ID → 书签」另存一份；还没有时用最后选过的那个并记给它。
-// - 预览（D-238）：QLPreviewController 显示收件页面上的一个文件（PDF、办公文档等），系统自带缩放和翻页。
-// Morph 只把本机文件交给系统界面和用户选的文件夹，不联网。
+// iOS implementation for sharing and saving to folders (D-119, D-120):
+// - Sharing: UIActivityViewController with all files at once (WeChat, WhatsApp, Mail, AirDrop, Save
+// to Files, etc.).
+// - Save to folder: UIDocumentPickerViewController lets the user select a folder (can create a new
+// one; file providers such as iCloud Drive, Google Drive, Dropbox, etc. are synchronized by their
+// own apps), then uses NSFileCoordinator to copy files in, appending a sequence number on name
+// collisions. Does not use export mode: simulator tests showed that when a file with the same name
+// already exists in the folder, the export picker returns OSStatus -8072 and saves nothing.
+// Remembers the last-selected folder (P-019, D-123): saves as a security-scoped bookmark
+// (UserDefaults) so it can be saved directly next time; if the folder is gone, prompts the user to
+// select it again. Each quick action records its own folder (D-196): saves a separate map of "quick
+// action ID -> bookmark"; if none exists yet, uses the last-selected one and records it for this
+// action.
+// - Preview (D-238): QLPreviewController displays a file on the inbox page (PDF, office documents,
+// etc.) with system-provided zoom and paging. Morph only passes local files to the system UI and
+// user-selected folders, without network access.
 
 final class PresenterMissingException: Exception, @unchecked Sendable {
   override var reason: String { "There is no screen to show the sheet on" }
@@ -46,14 +53,15 @@ public class MorphShareModule: Module {
     }
     .runOnQueue(DispatchQueue.main)
 
-    // 交给别的 AI App（D-611）：一段文字（提示词）和文件一起放进分享面板，收到的 App 把文字放进输入框、文件作附件。
+    // Hand over to another AI app (D-611): a piece of text (prompt) is placed into the share sheet along with files; the receiving app puts the text into its input field and the files as attachments.
     AsyncFunction("shareFilesWithText") { (text: String, uris: [URL], _: [String], promise: Promise) in
       self.presentSheet([text] + uris, promise: promise)
     }
     .runOnQueue(DispatchQueue.main)
 
-    // 打开系统预览后就返回，不等用户关掉；mimeType 只给 Android 用。name 是原来的文件名：分享扩展存的副本
-    // 是 UUID 文件名，标题要显示原来的。
+    // Returns immediately after opening the system preview without waiting for the user to close
+    // it; mimeType is for Android only. name is the original file name: the copy saved by the share
+    // extension has a UUID file name, so the title must display the original one.
     AsyncFunction("previewFile") { (uri: URL, _: String, name: String, promise: Promise) in
       guard let presenter = self.appContext?.utilities?.currentViewController() else {
         promise.reject(PresenterMissingException())
@@ -77,8 +85,11 @@ public class MorphShareModule: Module {
       UserDefaults.standard.set(kept, forKey: folderBookmarksKey)
     }
 
-    // 系统备份里不放 Tinkrum 的数据（D-599）：把这些目录标成不备份（iCloud 备份、电脑上的备份都跳过目录里的
-    // 全部内容）。标在目录上：文件被整个换掉时文件上的标记会丢，目录上的不会。标不上的跳过，不挡启动。
+    // Exclude Tinkrum data from system backup (D-599): marks these directories as excluded from
+    // backup (both iCloud backup and computer backups skip all contents within the directories).
+    // Marked on the directory level: when a file is completely replaced, file-level marks are lost,
+    // but directory-level marks are retained. Skips any that cannot be marked without blocking
+    // startup.
     AsyncFunction("excludeFromBackup") { (uris: [URL]) in
       var values = URLResourceValues()
       values.isExcludedFromBackup = true
@@ -87,7 +98,7 @@ public class MorphShareModule: Module {
       }
     }
 
-    // mimeTypes 只给 Android 用。useRemembered：有记住的文件夹就直接存进去，不弹选择器。key：快捷操作 ID。
+    // mimeTypes is for Android only. useRemembered: if a remembered folder exists, saves directly into it without displaying a picker. key: quick action ID.
     AsyncFunction("exportFiles") { (uris: [URL], names: [String], _: [String], useRemembered: Bool, key: String, promise: Promise) in
       guard !self.busy else {
         promise.reject(SheetBusyException())
@@ -102,7 +113,7 @@ public class MorphShareModule: Module {
         return
       }
       let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.folder], asCopy: false)
-      // 完成后清掉 folderDelegate，打破 self ↔ delegate 的引用环。
+      // Clears folderDelegate upon completion to break the self <-> delegate reference cycle.
       let delegate = FolderDelegate { folder in
         self.folderDelegate = nil
         self.busy = false
@@ -123,7 +134,7 @@ public class MorphShareModule: Module {
     .runOnQueue(DispatchQueue.main)
   }
 
-  /** 复制放到后台，不卡界面。结果：存了几个、文件夹名。 */
+  /** Copies in the background without blocking the UI. Result: count of saved items, folder name. */
   private static func copyInBackground(_ uris: [URL], names: [String], into folder: URL, promise: Promise) {
     DispatchQueue.global(qos: .userInitiated).async {
       do {
@@ -137,7 +148,7 @@ public class MorphShareModule: Module {
     }
   }
 
-  /** 每个快捷操作的书签：快捷操作 ID → 书签。 */
+  /** Bookmarks for each quick action: quick action ID -> bookmark. */
   private static func bookmarks() -> [String: Data] {
     UserDefaults.standard.dictionary(forKey: folderBookmarksKey) as? [String: Data] ?? [:]
   }
@@ -149,8 +160,10 @@ public class MorphShareModule: Module {
   }
 
   /**
-   * 快捷操作 key 的文件夹：它自己的，没有时是最后选过的（adopt 为 true 时记给它，真正要存的时候才记）。
-   * 都没有、书签失效或文件夹已经不在了时返回 nil（并忘掉失效的那个）。
+   * Folder for quick action key: its own folder, or the last-selected one if none exists (when
+   * adopt is true, records it for this action, only recording when actually saving). Returns nil
+   * if none exist, the bookmark is invalid, or the folder no longer exists (and forgets the
+   * invalid one).
    */
   private static func rememberedFolder(for key: String, adopt: Bool) -> URL? {
     if let data = bookmarks()[key] {
@@ -166,7 +179,7 @@ public class MorphShareModule: Module {
     return url
   }
 
-  /** 解析书签；书签失效或文件夹已经不在了时返回 nil。书签过期时用 save 存新的。 */
+  /** Resolves a bookmark; returns nil if the bookmark is invalid or the folder no longer exists. Uses save to store a new bookmark when expired. */
   private static func resolve(_ data: Data, save: (Data) -> Void) -> URL? {
     var stale = false
     guard let url = try? URL(resolvingBookmarkData: data, options: [], relativeTo: nil, bookmarkDataIsStale: &stale),
@@ -174,7 +187,7 @@ public class MorphShareModule: Module {
       return nil
     }
     defer { url.stopAccessingSecurityScopedResource() }
-    // 书签会跟着文件夹走：被删进「最近删除」（.Trash）时也能解析出来，这时当作文件夹已经不在了。
+    // Bookmarks follow folders: can also be resolved when moved to the Recently Deleted folder (.Trash), in which case it is treated as if the folder no longer exists.
     var isDirectory: ObjCBool = false
     guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue,
           !url.pathComponents.contains(".Trash") else {
@@ -186,7 +199,7 @@ public class MorphShareModule: Module {
     return url
   }
 
-  /** 记给这个快捷操作，也记成最后选过的。 */
+  /** Record for this quick action, and also remember as the last picked one. */
   private static func remember(_ folder: URL, for key: String) {
     guard folder.startAccessingSecurityScopedResource() else { return }
     defer { folder.stopAccessingSecurityScopedResource() }
@@ -204,7 +217,7 @@ public class MorphShareModule: Module {
       let dest = freeURL(in: folder, name: i < names.count ? names[i] : source.lastPathComponent)
       var coordinatorError: NSError?
       var copyError: Error?
-      // iCloud 云盘等「文件」提供者要求经过文件协调再写。
+      // File providers such as iCloud Drive require file coordination when writing.
       coordinator.coordinate(writingItemAt: dest, options: .forReplacing, error: &coordinatorError) { url in
         do {
           try FileManager.default.copyItem(at: source, to: url)
@@ -223,7 +236,7 @@ public class MorphShareModule: Module {
     return sources.count
   }
 
-  /** 不覆盖已有的文件：「报告.pdf」被占用时依次试「报告 2.pdf」「报告 3.pdf」（和「文件」App 一样）。 */
+  /** Do not overwrite existing files: when "report.pdf" is occupied, tries "report 2.pdf", "report 3.pdf", etc., sequentially (same as the Files app). */
   private static func freeURL(in dir: URL, name: String) -> URL {
     let base = (name as NSString).deletingPathExtension
     let ext = (name as NSString).pathExtension
@@ -237,7 +250,7 @@ public class MorphShareModule: Module {
     return url
   }
 
-  /** 打开一次分享面板；面板关掉后返回。 */
+  /** Opens the share sheet once; returns after the sheet is dismissed. */
   private func presentSheet(_ items: [Any], promise: Promise) {
     guard !busy else {
       promise.reject(SheetBusyException())
@@ -257,7 +270,7 @@ public class MorphShareModule: Module {
     presenter.present(sheet, animated: true)
   }
 
-  /** iPad 上以弹出框显示，要给一个位置（屏幕中间）。 */
+  /** Displays as a popover on iPad, requiring a designated anchor location (center of the screen). */
   private static func anchor(_ controller: UIViewController, on presenter: UIViewController) {
     guard let popover = controller.popoverPresentationController else { return }
     popover.sourceView = presenter.view
@@ -286,7 +299,7 @@ final class FolderDelegate: NSObject, UIDocumentPickerDelegate, UIAdaptivePresen
     finish(nil)
   }
 
-  // 向下滑动关掉选择器也算取消。
+  // Swiping down to dismiss the picker is also treated as a cancellation.
   func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
     finish(nil)
   }

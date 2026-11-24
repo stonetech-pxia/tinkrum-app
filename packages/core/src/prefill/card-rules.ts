@@ -2,8 +2,9 @@ import type { TextPage } from './rows';
 import type { ValueSuggestion } from './rank';
 import { firstCount } from './card-names';
 
-// 名片候选规则（研究原型，step4）。输入是识别出的行（带框），输出是网站、姓名、职位、公司的候选。
-// 不用后行断言；全部同步；不写数据，不联网。
+// Business card candidate rules (research prototype, step4). Input is recognized lines (with
+// bounding boxes), output is candidates for website, name, title, and company. No lookbehinds;
+// fully synchronous; no writing data, no network requests.
 
 export interface Unit {
   text: string;
@@ -12,15 +13,15 @@ export interface Unit {
   w: number;
   h: number;
   page: number;
-  row: number; // 全局排号
+  row: number; // Global sequence number
   relY: number;
   src: 'cell' | 'stack' | 'part';
-  /** stack/part 用到的原始格（用于排除重复） */
+  /** Original grid cells used by stack/part (for duplicate exclusion) */
   from: number[];
   id: number;
 }
 
-// ---------- 词表 ----------
+// ---------- Lexicon ----------
 const fold = (s: string) => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const squash = (s: string) => fold(s).replace(/[^\p{L}\p{N}]/gu, '');
 
@@ -372,7 +373,7 @@ const JOB_RE = new RegExp(
     .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
     .join('|')})(?![a-z])`,
 );
-// 词表里短的缩写（ux、ui、vp、dg、lead）只当整词；其余的前缀匹配（directeur → directrice 各自在表里）。
+// Short abbreviations in the lexicon (ux, ui, vp, dg, lead) are matched as whole words only; the rest use prefix matching (directeur -> directrice each in the table).
 export const hasJob = (t: string) => {
   const f = fold(t);
   return JOB_RE.test(f) || jobCjk(t);
@@ -472,7 +473,7 @@ const SITE_RE = new RegExp(
 const GENERIC_MAIL =
   /^(gmail|googlemail|yahoo|ymail|hotmail|outlook|live|msn|icloud|me|aol|qq|163|126|sina|sohu|foxmail|proton|protonmail|gmx|web|t-online|orange|free|wanadoo|laposte|sfr|neuf|libero|virgilio|tiscali|hinet|naver|daum|hanmail|kakao|yandex|mail|rambler|bluewin|terra|uol|bol|ig|telefonica|movistar|msa|seed|so-net|ezweb|docomo|softbank|nifty|biglobe|ocn|yahoo\.co|hotmail\.co)$/;
 
-// ---------- 分析 ----------
+// ---------- Analysis ----------
 export interface CardDoc {
   units: Unit[];
   emails: string[];
@@ -489,7 +490,7 @@ export function analyzeCard(pages: readonly TextPage[]): CardDoc {
   for (let pi = 0; pi < pages.length; pi++) {
     const page = pages[pi]!;
     const H = page.height || 1;
-    // 拍出来的名片常是歪的，排的合并会把不相干的字接在一起：直接用识别出的行，按竖直中心排序。
+    // Captured business cards are often skewed, and row merging can join unrelated text: directly use recognized lines, sorted by vertical center.
     const ls = page.lines
       .filter((l) => l.text.trim())
       .map((l) => ({ ...l, cy: l.y + l.height / 2 }))
@@ -513,7 +514,7 @@ export function analyzeCard(pages: readonly TextPage[]): CardDoc {
   }
   const cells = [...units];
   const nRows = rowBase;
-  // 叠起来的两行（姓和名、公司名分两行）：下面一行左对齐或居中对齐、字高相近、间隔小。
+  // Stacked two lines (last name/first name or company name split across two lines): the lower line is left-aligned or centered, font heights are similar, and the gap is small.
   if (cells.length <= 150) {
     for (const a of cells) {
       for (const b of cells) {
@@ -541,7 +542,7 @@ export function analyzeCard(pages: readonly TextPage[]): CardDoc {
       }
     }
   }
-  // 一格里用分隔符拼了几样（姓名, 职位 | 公司）：拆成各段。
+  // Multiple items concatenated with a separator in a single cell (name, title | company): split into separate segments.
   for (const c of cells) {
     const parts = c.text
       .split(/\s*[|｜·•,，;；/／]\s*|\s+[-–—]\s+/)
@@ -567,7 +568,7 @@ export function analyzeCard(pages: readonly TextPage[]): CardDoc {
   return { units, emails, sites, medianH, maxH, nRows };
 }
 
-/** b 紧挨着 a（上或下一行，左对齐或居中对齐）。 */
+/** b is immediately adjacent to a (upper or lower line, left-aligned or centered). */
 export function adjacent(a: Unit, b: Unit): boolean {
   if (a.page !== b.page || a === b) return false;
   const hh = Math.max(a.h, b.h);
@@ -582,7 +583,7 @@ const vs = (value: string, score: number, relY: number): ValueSuggestion => ({
   pick: { label: '', relY: Math.round(relY * 1000) / 1000 },
 });
 
-// ---------- 网站 ----------
+// ---------- Website ----------
 export function websiteCandidates(doc: CardDoc): ValueSuggestion[] {
   const out: { v: string; s: number; relY: number }[] = [];
   const seen = new Set<string>();
@@ -599,7 +600,7 @@ export function websiteCandidates(doc: CardDoc): ValueSuggestion[] {
     let sc = 2;
     if (/^(https?:\/\/|www\.)/i.test(s.value)) sc += 1;
     if (!/\//.test(s.value.replace(/^https?:\/\//i, ''))) sc += 0.3;
-    // 标签：同一格里值前面有 web/site/url/网址 之类的字
+    // Label: words like web/site/url/website preceding the value in the same cell
     if (
       /(web|site|url|www|网站|網站|网址|網址|官网|sitio|página)/i.test(u.text.replace(s.value, ''))
     )
@@ -613,7 +614,7 @@ export function websiteCandidates(doc: CardDoc): ValueSuggestion[] {
   return out.slice(0, 3).map((o) => vs(o.v, o.s, o.relY));
 }
 
-// ---------- 姓名 ----------
+// ---------- Name ----------
 const HONOR = new Set([
   'mr',
   'mrs',
@@ -738,9 +739,9 @@ export function nameOf(
   }
   if (/[\d@:/&_#%+=<>()[\]{}]/.test(t) || /[㐀-鿿가-힯぀-ヿ]/.test(t)) return null;
   let words = t.split(' ').filter(Boolean);
-  // 前面的称呼去掉（Dr. Mr. M.）
+  // Remove preceding honorifics (Dr. Mr. M.)
   while (words.length > 2 && HONOR.has(fold(words[0]!).replace(/\.$/, ''))) words.shift();
-  // 末尾的 Jr. / PhD
+  // Remove trailing Jr. / PhD
   words = words.filter((w, i) => !(i > 0 && /^(jr|sr|ii|iii|phd|mba|cpa|md)\.?,?$/i.test(w)));
   if (words.length < 2 || words.length > 4) return null;
   const core = words.filter((w) => !PARTICLE.has(fold(w)));
@@ -749,7 +750,7 @@ export function nameOf(
     if (!TOK.test(w)) return null;
     if (!PARTICLE.has(fold(w)) && !isUpperStart(w)) return null;
   }
-  // 单字母缩写最多一个
+  // At most one single-letter abbreviation
   if (core.filter((w) => w.replace(/\./g, '').length === 1).length > 1) return null;
   const joined = words.join(' ');
   if (hasJob(joined) || hasCompany(joined) || ADDRESS_WORD.test(fold(joined))) return null;
@@ -761,7 +762,7 @@ export function nameOf(
     firstCount(lastTok),
     ...(f.length > 2 ? f.slice(1, -1).map((x) => firstCount(x)) : [0]),
   );
-  // 邮箱前缀呼应：名/姓的前三个字母以上出现在邮箱的段里，或者「首字母 + 姓」。
+  // Email prefix echo: the first three or more letters of the first/last name appear in the email segment, or "initial + last name".
   let echo = 0;
   for (const w of f) {
     if (w.length >= 3 && (lt.toks.has(w) || lt.locals.some((l) => l.includes(w)))) echo++;
@@ -802,7 +803,7 @@ export function nameCandidates(doc: CardDoc): ValueSuggestion[] {
   return cands.slice(0, 3).map((c) => vs(c.v, c.s, c.relY));
 }
 
-// ---------- 职位 ----------
+// ---------- Title ----------
 const GERMAN_END =
   /(leitung|leiter|leiterin|beratung|berater|beraterin|entwickler|entwicklerin|designer|designerin|grafikdesign|grafikdesignerin|sachbearbeiter|referent|buchhaltung|vertrieb)$/;
 const hasJobDe = (t: string) =>
@@ -824,13 +825,13 @@ export function titleCandidates(doc: CardDoc): ValueSuggestion[] {
     if (t.length < 2 || t.length > 50) continue;
     if (/[@]|https?:|www\./i.test(t) || /\d{4,}/.test(t)) continue;
     if (!hasJob(t) && !hasJobDe(t)) continue;
-    // 公司名里带职位词的（Design Studio、Consulting）：有公司后缀的整行不当职位
+    // Company names containing title words (Design Studio, Consulting): entire lines with company suffixes are not treated as titles.
     if (hasSuffix(t)) continue;
     if (ADDRESS_WORD.test(fold(t)) && !/(manager|director)/.test(fold(t))) continue;
     const words = t.split(/\s+/).length;
     if (!/[\u3400-\u9fff]/.test(t) && words > 7) continue;
     let sc = 1;
-    // 紧挨姓名
+    // Adjacent to name
     const near = names.some((n) => n.id !== u.id && !u.from.includes(n.id) && adjacent(n, u));
     if (near) sc += 2;
     const k = squash(t);
@@ -850,13 +851,13 @@ export function titleCandidates(doc: CardDoc): ValueSuggestion[] {
     .map((c) => vs(c.v, c.s, c.relY));
 }
 
-// ---------- 公司 ----------
+// ---------- Company ----------
 function domainLabels(doc: CardDoc): string[] {
   const out: string[] = [];
   const add = (host: string) => {
     const parts = fold(host).split('.').filter(Boolean);
     if (parts.length < 2) return;
-    // 去掉常见的二级后缀
+    // Remove common secondary suffixes
     let i = parts.length - 2;
     if (['co', 'com', 'org', 'net', 'ac', 'gov', 'edu'].includes(parts[i]!) && parts.length >= 3)
       i--;
@@ -888,7 +889,7 @@ export function companyCandidates(doc: CardDoc): ValueSuggestion[] {
   const sortedH = [...cellUnits].map((u) => u.h).sort((a, b) => b - a);
   for (const u of doc.units) {
     if (u.src === 'part') continue;
-    // 叠起来的两行里有职位行（Sales Manager + Northwind Ltd）：不是一个公司名。
+    // Stacked two lines containing a title line (Sales Manager + Northwind Ltd): not a single company name.
     if (
       u.src === 'stack' &&
       u.from.some((id) => {
@@ -924,7 +925,7 @@ export function companyCandidates(doc: CardDoc): ValueSuggestion[] {
       sc += 2.5;
       why += 'S';
     }
-    // 邮箱/网站域名呼应
+    // Email/website domain echo
     let echoV = 0;
     for (const l of labels) {
       if (Math.min(l.length, sq.length) < 4) continue;
@@ -963,7 +964,7 @@ export function companyCandidates(doc: CardDoc): ValueSuggestion[] {
     .map((c) => vs(c.v, c.s, c.relY));
 }
 
-// ---------- 邮箱：识别把「@」两边拆开、加了空格、拆成上下两行的写法 ----------
+// ---------- Email: recognize formatting where '@' is split across sides, padded with spaces, or split into upper and lower lines ----------
 export function looseEmails(doc: CardDoc): ValueSuggestion[] {
   const out: { v: string; relY: number }[] = [];
   const add = (v: string, relY: number) => {
@@ -998,12 +999,12 @@ export function looseEmails(doc: CardDoc): ValueSuggestion[] {
   return out.slice(0, 3).map((o) => vs(o.v, 1.3, o.relY));
 }
 
-/** 这份文字像不像名片：行不多、有联系方式、没有明细和合计这类单据字样。 */
+/** Whether this text looks like a business card: few lines, has contact info, and lacks document terms like details and totals. */
 export function cardLike(doc: CardDoc, strict = false): boolean {
   const cells = doc.units.filter((u) => u.src === 'cell');
   if (cells.length === 0 || cells.length > 60) return false;
   if (strict) {
-    // 公司栏原来就有（小票/发票的店名、开票方）打分，名片规则要接手就得先有联系方式。
+    // The company column already exists (receipt/invoice store name, issuer) and is scored; business card rules must have contact info first to take over.
     const phone = cells.some((u) => /(^|[^\d])\+?\(?\d[\d\s\-().]{6,}\d/.test(u.text));
     if (doc.emails.length === 0 && doc.sites.length === 0 && !phone) return false;
     if (cells.length > 40) return false;
@@ -1021,7 +1022,7 @@ export function cardLike(doc: CardDoc, strict = false): boolean {
     )
   )
     return false;
-  // 有日期又有金额的是单据
+  // Items with both dates and amounts are documents
   if (money >= 1 && cells.some((u) => /\b\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}\b/.test(u.text)))
     return false;
   return !cells.some((u) =>

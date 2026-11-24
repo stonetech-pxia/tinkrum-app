@@ -9,7 +9,7 @@ import { PDFVIEW_PAGE } from './pages/pdfview';
 import { SCAN_PAGE } from './pages/scan';
 import type { PackStore } from './store';
 
-// 扩展包运行环境：按需挂载隐藏的 WebView（每个扩展包一个页面），页面是我们随 App 发布的固定 HTML。
+// Pack runtime environment: lazily mounts hidden WebViews (one per pack), using fixed HTML shipped alongside the app.
 
 const PAGES: Record<PackPageId, string> = {
   pdfview: PDFVIEW_PAGE,
@@ -24,7 +24,7 @@ export interface Packs {
 
 const PacksContext = createContext<Packs | null>(null);
 
-/** 没有扩展包环境时（部分测试）返回 null：需要扩展包的步骤会提示无法准备。 */
+/** Returns null when the pack environment is missing (some tests): steps requiring packs will report that they cannot be prepared. */
 export function usePacks(): Packs | null {
   return useContext(PacksContext);
 }
@@ -41,8 +41,10 @@ export function PackHostProvider({ value, children }: { value: Packs; children: 
               key={page}
               ref={(w) => value.bridge.attach(page, w)}
               source={{ html: PAGES[page]!, baseUrl: PACK_BASE_URL }}
-              // 白名单设为全部，所有加载都交给下面的判断：只允许我们自己的页面，其他地址一律拒绝。
-              // （不在白名单里的地址 react-native-webview 会交给系统打开，例如 Safari，所以不能靠白名单拦。）
+              // Origin whitelist set to '*', delegating all loading to the following check: only
+              // our own pages are allowed, all other URLs are rejected. (URLs not in the whitelist
+              // are opened by react-native-webview using the system, e.g., Safari, so whitelist
+              // filtering alone is insufficient.)
               originWhitelist={['*']}
               onShouldStartLoadWithRequest={(r) =>
                 r.url.startsWith(PACK_BASE_URL) ||
@@ -50,7 +52,7 @@ export function PackHostProvider({ value, children }: { value: Packs; children: 
                 r.url.startsWith('blob:')
               }
               onMessage={(e) => void value.bridge.onMessage(page, e.nativeEvent.data)}
-              // iOS 内存紧张时会结束网页进程，安卓是渲染进程：都当作页面停了，下次调用重新挂上。
+              // When iOS experiences low memory pressure, it terminates the web process; on Android, it's the render process: both are treated as page stops, remounting on the next call.
               onContentProcessDidTerminate={() => value.bridge.processGone(page)}
               onRenderProcessGone={() => value.bridge.processGone(page)}
               onError={(e) => {

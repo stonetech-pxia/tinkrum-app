@@ -1,4 +1,4 @@
-// 写法说明里的完整示例（D-593）：一份能照原样导入的 App 文件。docs/agent/example-plants.json 由快照测试从这里生成。
+// Complete example in writing instructions (D-593): an App file that can be imported as is. docs/agent/example-plants.json is generated from here by snapshot tests.
 export const AGENT_EXAMPLE_APP = {
   format: 'tinkrum-app',
   version: 1,

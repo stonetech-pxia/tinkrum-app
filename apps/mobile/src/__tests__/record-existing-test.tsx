@@ -21,8 +21,10 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
-// 记一笔放进已有的记录（D-443，out.addRecord 的 into: "existing"）：用户在运行时选一条已有的记录，
-// 文件接在它的附件后面、文字接在它的文字后面，表单里核对并保存才写进去。只追加，不替换、不删除。
+// Log an entry into an existing record (D-443, out.addRecord into: "existing"): user selects an
+// existing record at runtime, files are appended to its attachments, text is appended to its text,
+// and it is written only after review and save in the form. Append only, no replacement or
+// deletion.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -57,11 +59,11 @@ const textWorkflow: Workflow = {
 
 type Pick = LocalSteps['recordPick'];
 type Entry = LocalSteps['recordEntry'];
-/** 用户在选记录界面选哪一条（null：取消）；表单里的回答（null：取消，函数：照输入算）。 */
+/** Which record the user selects in the record selection interface (null: cancel); answers in the form (null: cancel, function: compute from input). */
 type Script = {
   pick?: string | null | ((input: Pick['in']) => string | null);
   entry?: Entry['out'] | null | ((input: Entry['in']) => Entry['out'] | null);
-  /** 选完记录、表单还开着的时候发生的事（例如这条记录被删了）。 */
+  /** Events occurring after selecting a record while the form is still open (e.g., this record gets deleted). */
   during?: (repo: MemoryWorkspaceRepo) => Promise<void>;
 };
 
@@ -169,10 +171,10 @@ describe('with data', () => {
     photos(files, 2);
     const result = await run();
     expect(result.status).toBe('succeeded');
-    // 选记录的界面拿到这张表的记录。
+    // Record selection interface receives records of this table.
     expect(picks).toHaveLength(1);
     expect(picks[0]!.records.map((r) => r.id).sort()).toEqual(['r1', 'r2']);
-    // 表单是这条记录的表单：原来的值在，新文件接在原来的后面。
+    // Form is the form for this record: original values are present, new files are appended after original ones.
     expect(entries).toHaveLength(1);
     expect(entries[0]!.existing?.id).toBe('r1');
     const added = (await repo.listAssets()).filter((a) => a.id !== 'old0').map((a) => a.id);
@@ -180,7 +182,7 @@ describe('with data', () => {
     const scan = entries[0]!.prefill.scan as string[];
     expect(scan[0]).toBe('old0');
     expect(scan.slice(1).sort()).toEqual([...added].sort());
-    // 没有新建记录；这一条更新了，别的字段没动。
+    // No new record created; this entry updated, other fields unchanged.
     const after = await repo.listRecords('docs');
     expect(after).toHaveLength(2);
     const r1 = after.find((r) => r.id === 'r1')!;
@@ -188,7 +190,7 @@ describe('with data', () => {
     expect(r1.values.scan).toHaveLength(3);
     expect((r1.values.scan as string[])[0]).toBe('old0');
     expect(after.find((r) => r.id === 'r2')!.values).toEqual({ title: 'Second' });
-    // 新文件是用户文件，授权给这个快捷操作；文件原样交给下一步。
+    // New files are user files, granted to this quick action; files passed as-is to the next step.
     for (const id of added) expect(await repo.hasGrant('workflow:to-existing', id)).toBe(true);
     if (result.status === 'succeeded') expect(result.saved).toHaveLength(2);
   });
@@ -271,7 +273,7 @@ describe('edge cases', () => {
     expect(entries[0]!.overflow).toBe(true);
     expect((entries[0]!.prefill.scan as string[]).slice(0, almost.length)).toEqual(almost);
     expect(entries[0]!.prefill.scan).toHaveLength(MAX_ATTACHMENTS);
-    // 放不下的那两个没有存成用户文件。
+    // Those two files that could not fit were not stored as user files.
     expect(await repo.listAssets()).toHaveLength(MAX_ATTACHMENTS);
     expect(((await repo.getRecord('r1'))!.values.scan as string[]).length).toBe(MAX_ATTACHMENTS);
   });
@@ -319,7 +321,7 @@ describe('the parameter', () => {
     expect(action.params.safeParse({ collectionId: 'docs', into: 'somewhere' }).success).toBe(
       false,
     );
-    // 旧配置不写 into：还是新建一条。
+    // Old configuration without into: still create a new record.
     expect(action.params.safeParse({ collectionId: 'docs' }).success).toBe(true);
   });
 });
@@ -377,7 +379,7 @@ describe('the screens', () => {
     );
     const rows = screen.getAllByTestId(/^pick-row-/).map((n) => n.props.testID);
     expect(rows).toEqual(['pick-row-b', 'pick-row-c', 'pick-row-a']);
-    // 没选之前不能确定。
+    // Cannot be determined before selection.
     await fireEvent.press(screen.getByTestId('local-done'));
     expect(onDone).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('pick-row-c'));

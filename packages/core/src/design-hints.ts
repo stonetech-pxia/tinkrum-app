@@ -2,16 +2,20 @@ import type { AppFile } from './app-file';
 import { fieldDefinition } from './fields';
 import type { Collection, Component, Page } from './schema';
 
-// 设计建议（D-602）：别的 AI 写的 App 文件能导入以后，再说哪里用起来不顺手。只是建议，不挡导入。
-// 每一条都是创始人 2026-11-20 在对话里看过模拟器里的前后对比图后定的；证据是 AI 写的 69 份文件和 9 个预设
-// （side-session-notes/design-hints-2026-11-20）。条件按道理写，不为了避开预设收窄；预设碰到了就改预设。
-// 设计上的取舍（标题块的副标题、一点就记的按钮和完整表单并存、日历和列表同页、首页放一份摘要）是风格，不在这里。
+// Design suggestions (D-602): Once AI-generated app files can be imported, we will address
+// usability issues. This is a recommendation only and does not block imports. Every rule was
+// established by the founder on 2026-11-20 after reviewing before-and-after comparison screenshots
+// in the simulator in conversation; evidence is the 69 AI-written files and 9 presets
+// (side-session-notes/design-hints-2026-11-20). Conditions are written logically without narrowing
+// to bypass presets; if a preset hits it, update the preset. Design trade-offs (subtitles on header
+// blocks, one-tap record buttons coexisting with full forms, calendars and lists on the same page,
+// summaries on the home screen) are stylistic choices and do not belong here.
 
-/** 页面开头放超过这么多字段的内嵌表单，页面一打开就是一张表。 */
+/** Inline forms at the beginning of a page exceeding this many fields result in the page opening directly to a table. */
 const FORM_FIRST_MAX = 3;
-/** 不管放在哪，内嵌表单超过这么多字段。 */
+/** Regardless of placement, inline forms exceeding this many fields. */
 const FORM_MAX = 6;
-/** 读一张表的这些块列出一条条记录，点一条能打开它。 */
+/** These blocks reading a table list individual records, and tapping one opens it. */
 const RECORD_LOOKS: ReadonlySet<unknown> = new Set([
   'list',
   'cards',
@@ -21,9 +25,9 @@ const RECORD_LOOKS: ReadonlySet<unknown> = new Set([
   'checklist',
   'table',
 ]);
-/** 长得一样的一条条列表：两个挨着、中间没有小标题就分不清（日历、圆块、看板一眼看得出不同）。 */
+/** Monotonous lists of identical items: two adjacent lists without a subheading become indistinguishable (calendars, circular blocks, and kanban boards are visually distinct at a glance). */
 const PLAIN_LISTS: ReadonlySet<unknown> = new Set(['list', 'cards', 'checklist', 'table']);
-/** 不算页面内容的块：标题、时间段、提示。 */
+/** Blocks not counted as page content: headers, time periods, notices. */
 const NOT_CONTENT: ReadonlySet<unknown> = new Set(['header', 'period', 'notice']);
 
 type Tool = { as?: string; do?: string; table?: string; ask?: unknown; values?: unknown };
@@ -33,7 +37,7 @@ const toolsOf = (b: Component) => ((b as { tools?: Tool[] }).tools ?? []) as Too
 const childrenOf = (b: Component) =>
   ((b as { children?: Component[] }).children ?? []) as Component[];
 
-/** 表单问几个字段：ask "all" 是这张表里表单能填的全部（算出来的字段不问）。 */
+/** Number of fields asked by a form: ask "all" means all fillable fields in this table (computed fields are not asked). */
 function formFields(b: Component, tables: ReadonlyMap<string, Collection>): number {
   let most = 0;
   for (const t of toolsOf(b)) {
@@ -52,7 +56,7 @@ function formFields(b: Component, tables: ReadonlyMap<string, Collection>): numb
 
 const sourceTable = (b: Component) => (b as { source?: { table?: string } }).source?.table;
 const showOf = (b: Component) => ((b as { show?: Show }).show ?? {}) as Show;
-/** 算出来的字段：没有「选填」一说。 */
+/** Computed fields: there is no such thing as "optional". */
 const COMPUTED = new Set(['formula', 'rollup', 'lookup', 'previous', 'dateOffset']);
 
 export function designHints(file: AppFile): string[] {
@@ -61,7 +65,7 @@ export function designHints(file: AppFile): string[] {
 
   file.pages.forEach((page: Page, p) => {
     const blocks = page.blocks as Component[];
-    // 1. 内嵌表单太长，或者一打开页面先是一张表：换成一个「添加」按钮，内容放前面。
+    // 1. Inline form is too long, or page opens with a table first: replace with an "Add" button, moving content to the front.
     const first = blocks.findIndex((b) => !NOT_CONTENT.has(b.look));
     const flagged = new Set<Component>();
     if (first >= 0 && blocks[first]!.look === 'form') {
@@ -87,7 +91,7 @@ export function designHints(file: AppFile): string[] {
       });
     walk(blocks, `pages.${p}.blocks`);
 
-    // 5. 两个长得一样的列表挨着，中间没有小标题：分不清哪段是哪个（不管是不是同一张表）。
+    // 5. Two identical lists placed side by side without a subsection heading: impossible to tell which segment belongs to which table (regardless of whether they are the same table).
     let previous = false;
     blocks.forEach((b, i) => {
       if (PLAIN_LISTS.has(b.look)) {
@@ -105,7 +109,7 @@ export function designHints(file: AppFile): string[] {
       if (!table || !RECORD_LOOKS.has(b.look)) continue;
       const show = showOf(b);
       const field = (id: unknown) => table.fields.find((f) => f.id === id);
-      // 4. 行上的按钮新建同一张表的一条、又不带这一行：每一行都挂一个「新建」。
+      // 4. A row action that creates a new entry for the same table without containing that row: every row has a dangling "New" button.
       for (const tool of toolsOf(b))
         if (
           tool.as === 'button' &&
@@ -116,7 +120,7 @@ export function designHints(file: AppFile): string[] {
           hints.push(
             `${path} (block "${b.id}"): every row gets a button that adds a new ${t} entry; put one add button below the list instead (a "button" block whose tool is {"do": "create", "table": "${t}", "ask": "all"}), or use {"as": "addHere", "do": "create", "table": "${t}", "ask": "all", "values": "$here"}${see(1)}`,
           );
-      // 6. 行标题是选填字段：没填的那几行显示的是表名和录入那天，不是这条记录。
+      // 3. Row title is an optional field: rows without a value filled show the table name and the entry date instead of the record itself.
       const title = field(show.title);
       if (
         title &&
@@ -127,7 +131,7 @@ export function designHints(file: AppFile): string[] {
         hints.push(
           `${path} (block "${b.id}"): the row title "${title.id}" is optional, so entries without it show the table's name and the day they were added instead; use a field that is always filled as the title (a required field, or a date with a default) and move "${title.id}" to subtitles${see(3)}`,
         );
-      // 3. 一行里并排显示一个汇总（已存、已花）和另一个数字（目标、预算）：如果是目标或上限，进度条一眼看出差多少。
+      // 2. Displaying a summary value side by side with another number (e.g., target vs. budget) in a single row: if it is a target or cap, a progress bar makes the gap instantly clear.
       if (show.format === undefined && (b.look === 'list' || b.look === 'cards')) {
         const shown = [
           show.title,
@@ -150,7 +154,7 @@ export function designHints(file: AppFile): string[] {
     }
   });
 
-  // 2. 一张表被别的表关联（书 ← 阅读记录），却没有「一条记录的页面」：点开一本书看不到它的记录（内置的编辑页不列关联的记录）。
+  // 1. A table is related to another table (e.g., books <- reading records) but lacks a dedicated record detail page: opening a book does not show its related records (the built-in edit page does not list related records).
   const listed = new Set<string>();
   const allBlocks = (list: Component[]): Component[] =>
     list.flatMap((b) => [b, ...allBlocks(childrenOf(b))]);
@@ -178,7 +182,7 @@ export function designHints(file: AppFile): string[] {
   return hints;
 }
 
-/** 每条建议指向结构模式里照着能写对的那一个（D-603，tinkrum-app-patterns.md）。 */
+/** Each suggestion points to the exact pattern in the structure patterns that can be followed to write it correctly (D-603, tinkrum-app-patterns.md). */
 const see = (...n: number[]) =>
   `; see ${n.length > 1 ? 'patterns' : 'pattern'} ${n.join(' and ')} in tinkrum-app-patterns.md`;
 

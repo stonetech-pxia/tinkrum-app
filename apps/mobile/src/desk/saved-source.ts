@@ -15,25 +15,29 @@ import {
   loadDeskSource,
 } from './store';
 
-// 存成用户文件以后还能放回桌上改（file-room §10 第 6 题，创始人 2026-10-30 同意在 R2 做，D-367）：
-// 存 xlsx / docx 时，把中间格式和它用到的图片放在这个用户文件自己的目录 assets/<id>/ 里，
-// 「设置 → 存储空间」把它们算在这个文件上，删文件时整个目录一起删（removeAssetFile）。
-// 从存储空间「放到桌上」时复制一份回桌上（用户文件不动）。中间格式里有识别出的文字，只在本机，AI 看不到。
+// Can be placed back on the desk for editing after being saved as a user file (file-room §10
+// question 6, founder agreed on 2026-10-30 to do in R2, D-367): when saving xlsx / docx, place the
+// intermediate format and its referenced images into the user file's own directory assets/<id>/,
+// let "Settings -> Storage" count them toward this file, and delete the entire directory when
+// deleting the file (removeAssetFile). When placing "On Desk" from storage, copy a copy back to the
+// desk (user files remain unchanged). The intermediate format contains recognized text stored only
+// locally; the AI cannot see it.
 
 type Files = Pick<
   FilePlatform,
   'desk' | 'readUri' | 'readBytes' | 'writeBytes' | 'saveRunFile' | 'freeDiskBytes' | 'imageSize'
 >;
 
-/** 用户文件所在的目录 ID（assets/<id>/名字）；不是这种路径时 null。 */
+/** Directory ID where the user file is located (assets/<id>/name); null if not matching this path format. */
 const assetDirOf = (asset: Pick<AssetRecord, 'path'>) => {
   const [root, id] = asset.path.split('/');
   return root === 'assets' && id ? id : null;
 };
 
 /**
- * 「完成 → 存到文件」、工具栏的「保存」：桌上这几份存成用户文件；有中间格式的再把中间格式和图片存在旁边。
- * 返回存好的文件 ID（按顺序；放回记录的附件用，D-395）。
+ * "Finish -> Save to file", toolbar "Save": save these desk items as user files; if an
+ * intermediate format exists, save it and its images alongside. Return the saved file IDs (in
+ * order; used for record attachment restoration, D-395).
  */
 export async function saveDeskFiles(
   files: Files,
@@ -55,7 +59,7 @@ export async function saveDeskFiles(
   );
   for (const [i, file] of list.entries()) {
     const assetId = saved[i]?.assetId;
-    // 从外来的 docx / xlsx 读出来的中间格式（D-509）不存：存下来的文件下次打开时再读一遍（只存一份，不变量 14）。
+    // Intermediate formats read from external docx / xlsx (D-509) are not saved: saved files are read again the next time they are opened (only one copy is stored, invariant 14).
     if (!file.source || file.source.imported || !assetId) continue;
     const source = await loadDeskSource(files, desk, file);
     if (!source) continue;
@@ -78,7 +82,7 @@ async function readSaved(files: Pick<FilePlatform, 'readBytes'>, asset: AssetRec
   }
 }
 
-/** 这个用户文件带着中间格式时，中间格式和图片一共多大（存储空间里加在它上面）；没有时 null。 */
+/** Total size of the intermediate format and images combined when this user file carries an intermediate format (added to its storage size); null otherwise. */
 export async function savedSourceBytes(
   files: Pick<FilePlatform, 'readBytes'>,
   asset: AssetRecord,
@@ -88,7 +92,9 @@ export async function savedSourceBytes(
 }
 
 /**
- * 存过的 Word 的中间格式（图片换成能读的地址），预览页按编辑页的版面显示它（D-470）；没有、读不出来时 null。
+ * Intermediate format of previously saved Word documents (images replaced with readable URIs),
+ * displayed on the preview page according to the editor layout (D-470); null if missing or
+ * unreadable.
  */
 export async function savedWordDoc(
   files: Pick<FilePlatform, 'readBytes' | 'fileUri'>,
@@ -104,7 +110,7 @@ export async function savedWordDoc(
   ).doc as DocDoc;
 }
 
-/** 从存储空间放回桌上：复制这个文件、中间格式和图片进一个新桌面（用户文件不动）。不能改时返回 null。 */
+/** Place back on the desk from storage: copy this file, intermediate format, and images into a new workspace (user files remain unchanged). Returns null if uneditable. */
 export async function placeAssetOnDesk(
   files: Files,
   asset: AssetRecord,

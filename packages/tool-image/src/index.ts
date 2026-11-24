@@ -1,5 +1,5 @@
-// 图片工具的纯算法：不依赖平台 API，像素处理由 App 里的
-// expo-image-manipulator 和 Skia 完成，这里在 Node 中可直接测试。
+// Pure algorithm for image tools: no platform API dependency. Pixel processing is handled by
+// expo-image-manipulator and Skia in the app, and can be tested directly in Node here.
 
 export * from './exif';
 export * from './flatten';

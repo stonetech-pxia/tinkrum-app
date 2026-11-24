@@ -7,10 +7,10 @@ import { Card, PageTitle } from '../renderer/ui';
 import type { RevisionRecord } from '../storage/types';
 import { useWorkspace } from '../workspace/context';
 
-/** 一页显示多少个版本；往下翻到第一个版本为止（底线 7：改动记录永远能回到以前任何时候）。 */
+/** Number of versions displayed per page; scroll down until the first version (invariant 7: change history can always return to any earlier point). */
 const PAGE = 50;
 
-/** 改动记录（§3 旅程 D，D-112）：每次修改都是一个不可变版本；回到之前会生成新版本。 */
+/** Change history (§3 journey D, D-112): every modification is an immutable version; reverting to a previous state generates a new version. */
 export function HistoryView({ env, onRestored }: { env: RenderEnv; onRestored?: () => void }) {
   const { palette, locale } = env;
   const headId = useWorkspace((s) => s.head!.id);
@@ -19,11 +19,11 @@ export function HistoryView({ env, onRestored }: { env: RenderEnv; onRestored?: 
   const confirm = useWorkspace((s) => s.confirm);
   const cancel = useWorkspace((s) => s.cancel);
   const [revisions, setRevisions] = useState<RevisionRecord[]>([]);
-  // 最近一页读满了，更早的可能还有。
+  // Latest page is full, earlier ones may still exist.
   const [more, setMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // 有了新版本（改动、回到以前）就从最近一页重新开始。
+  // Starts over from the latest page whenever a new version appears (modification, revert).
   useEffect(() => {
     let alive = true;
     void listRevisions(PAGE).then((r) => {
@@ -49,7 +49,7 @@ export function HistoryView({ env, onRestored }: { env: RenderEnv; onRestored?: 
     }
   }
 
-  /** 回到之前的样子：先问一句（说明哪些会回到当时、文件不受影响），确认后立即生效，可以撤销（D-190）。 */
+  /** Revert to previous state: asks for confirmation first (explaining what reverts to past state, files remain unaffected), takes effect immediately upon confirmation, undoable (D-190). */
   async function restore(id: number) {
     if (env.locked) return env.locked();
     const result = await proposeRestore(id);

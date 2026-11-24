@@ -23,7 +23,7 @@ export const TotalSourceSchema = z.strictObject({
   days: z.strictObject({ date: DaysSchema.shape.date }).optional(),
 });
 
-/** 汇总读法（数字块、图表共用）：一张表筛出来的记录算一个数，或者按组每组一个数。 */
+/** Summary read methods (shared by number blocks and charts): records filtered from a table count as one number, or one number per group when grouped. */
 export const NumberSourceSchema = z.strictObject({
   table: IdSchema,
   calc: z
@@ -39,22 +39,23 @@ export const NumberSourceSchema = z.strictObject({
   aggregate: z.enum(AGGREGATES),
   field: IdSchema.optional(),
   filter: filterSchema().optional(),
-  /** 按日子算的聚合（D-284）用哪个日期、怎么算连续。 */
+  /** Which date to use and how to calculate streaks for date-based aggregation (D-284). */
   days: DaysSchema.optional(),
-  /** 按单选或引用字段每组一行（D-248、D-336）。 */
+  /** One row per group for single-select or relation fields (D-248, D-336). */
   group: GroupingSchema.optional(),
-  /** 目标（D-307）：显示「3 / 5」和进度。 */
+  /** Goal (D-307): displays "3 / 5" and progress. */
   goal: z.number().positive().max(1_000_000_000).optional(),
-  /** 和上一段同期比（D-308）：筛选里唯一的 inPeriod 条件换成上一段。 */
+  /** Compare with the same period last cycle (D-308): replaces the only inPeriod condition in the filter with the previous period. */
   compare: z.literal('previous').optional(),
-  /** 跟着页面上的时间范围（D-440）：同一页要有一个 period 块；筛选里的 inPeriod 不再用，按选的范围算。 */
+  /** Follows the time range on the page (D-440): there must be a period block on the same page; inPeriod in filters is no longer used, calculated based on the selected range. */
   period: z.literal('page').optional(),
   /**
-   * 跟着页面上的一排选项（D-573）：同一页要有一个 choices 块，读的是同一张表；只算这个字段是选中那一项的记录
-   * （「全部」不加条件）。按同一个字段分组的不行。
+   * Follows the page-level option tabs (D-573): the page must have a choices block reading the
+   * same table; calculates only records where this field matches the selected item ("All" adds no
+   * condition). Grouping by the same field is not allowed.
    */
   choice: z.literal('page').optional(),
-  /** 减去另一个合计（D-337）：可以是另一张表，例如收入 − 分配出去的钱。检查在 stat-minus.ts。 */
+  /** Subtract another total (D-337): can be another table, e.g., income minus allocated funds. Checked in stat-minus.ts. */
   minus: z
     .strictObject({
       table: IdSchema,
@@ -71,13 +72,16 @@ const shape = { show: z.strictObject({ label: boundedText(1, 40) }), source: Num
 const SEQUENCE: readonly string[] = SEQUENCE_AGGREGATES;
 
 /**
- * 数字（原 stat）：对一张表（可筛选）计数或求和、平均、最小、最大。
- * group.by（D-248）：按一个单选或引用字段分组，每个选项一行（没选的记录另算一行）。
- * 按顺序的聚合（D-284）：streak（当前连续，下面写最佳连续）、daysSince、avgInterval、distinctDays，
- * 按 days.date（默认第一个日期字段，没有就用创建时间）算日子；days.unit、perUnit、skip 只给 streak。
- * goal（D-307）显示「值 / 目标」和进度；compare（D-308）和上一段同期比（compare.ts）。
- * minus（D-337）：显示「这个合计 − 另一个合计」，只有计数和求和（stat-minus.ts）。
- * latest（D-618）：最新一条的 field 的值，和汇总字段的 latest 同一个「最新」（related.ts 的 latestValue，日期是 days.date）。
+ * Number (formerly stat): counts, sums, averages, finds minimum, or maximum for a table
+ * (filterable). group.by (D-248): groups by a single-select or relation field, with one row per
+ * option (records with no selection count as a separate row). Sequential aggregation (D-284):
+ * streak (current streak, best streak displayed below), daysSince, avgInterval, distinctDays,
+ * calculated by days.date (defaults to the first date field, falls back to creation time);
+ * days.unit, perUnit, skip apply only to streak. goal (D-307) displays "value / goal" and
+ * progress; compare (D-308) compares with the same period last cycle (compare.ts). minus (D-337):
+ * displays "this total minus another total", supports count and sum only (stat-minus.ts). latest
+ * (D-618): value of the field from the latest entry, sharing the same "latest" logic as summary
+ * fields (related.ts latestValue, date is days.date).
  */
 export const numberComponent: LookDefinitionOf<'number', typeof shape> = defineLook({
   look: 'number',
@@ -103,12 +107,12 @@ export const numberComponent: LookDefinitionOf<'number', typeof shape> = defineL
       if (SEQUENCE.includes(aggregate))
         problems.push(`${aggregate} doesn't depend on a period: no source.period`);
     }
-    // latest（D-618）：最新一条的一个数，每笔自己选货币的金额说不清是哪种货币。
+    // latest (D-618): a single value from the latest record; amounts where each entry has its own currency cannot clearly determine which currency is used.
     if (aggregate === 'latest' && hasRecordCurrency(collection!.fields.find((f) => f.id === field)))
       problems.push(
         `latest can't be used with ${field}: ${field} has its own currency on each entry; show it in a list of the newest entries instead`,
       );
-    // D-429：每笔货币不同的金额分开显示，不能拿一个数去比或相减。
+    // D-429: amounts with different currencies per entry are displayed separately and cannot be compared or subtracted using a single number.
     if (
       hasRecordCurrency(collection!.fields.find((f) => f.id === c.source.field)) &&
       (c.source.goal !== undefined || c.source.compare !== undefined || c.source.minus)

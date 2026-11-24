@@ -66,7 +66,7 @@ it('places local text in the selected color, undoes it and walks through photos'
         kind: 'text',
         text: '只留在本机',
         color: '#2563EB',
-        // 字从点的地方开始、底边落在点上（2026-11-09）：点在页面 (100, 100)，字框 100×30。
+        // The character starts from the point, and its bottom edge lands on the point (2026-11-09): the point is at page (100, 100), and the text box size is 100x30.
         point: { x: 100, y: 70 },
       }),
     ],
@@ -161,9 +161,9 @@ it('a placed text gets a style panel: size and rotation sliders, edit the words,
   await fireEvent(screen.getByTestId('annotate-area'), 'layout', {
     nativeEvent: { layout: { width: 200, height: 100 } },
   });
-  // 起手工具来自参数：直接是「文字」，没有先输入文字也能点一下放一个默认文字。
+  // Initial tool comes from parameter: directly "text", allowing placement of default text with a tap without entering text first.
   expect(screen.getByTestId('annotate-tool-text')).toBeSelected();
-  // 样式区一直占着位置（没选中时点不了），放好字时页面不会被挤小、挪位置。
+  // The style area constantly occupies its position (uneditable when unselected); placing text does not shrink or reposition the page.
   expect(screen.getByTestId('annotate-style')).toHaveProp('pointerEvents', 'none');
   const touch = (x: number, y: number) => ({
     nativeEvent: { locationX: x, locationY: y },
@@ -177,11 +177,11 @@ it('a placed text gets a style panel: size and rotation sliders, edit the words,
   await fireEvent(screen.getByTestId('annotate-drawing'), 'responderGrant', touch(100, 50));
   expect(screen.getByTestId('annotate-label-0')).toHaveProp('accessibilityLabel', '文字');
   expect(screen.getByTestId('annotate-style')).toHaveProp('pointerEvents', 'auto');
-  // 只有上面一个输入框：选中时改的是选中的那段字。
+  // Only a single input box at the top: selection modifies the currently selected text segment.
   expect(screen.getByTestId('annotate-text')).toHaveProp('defaultValue', '文字');
   await fireEvent.changeText(screen.getByTestId('annotate-text'), '你好，签证');
   expect(screen.getByTestId('annotate-label-0')).toHaveProp('accessibilityLabel', '你好，签证');
-  // 滑块：按在最右边 = 旋转到最大。
+  // Slider: dragging to the far right = maximum rotation.
   await fireEvent(screen.getByTestId('annotate-rotation'), 'layout', {
     nativeEvent: { layout: { width: 200, height: 28 } },
   });
@@ -240,7 +240,7 @@ async function openDocument(
   return onDone;
 }
 
-// 2026-11-09 用户测试：弹键盘时页面一缩、整屏重排，打的字丢了（「9 Nov 2026」只剩「9 Nov」）。
+// 2026-11-09 user test: when the keyboard pops up, the page shrinks, the whole screen relayouts, and typed text is lost ("9 Nov 2026" becomes "9 Nov").
 it('the text box is not overwritten by the screen while typing', async () => {
   await openDocument(async () => []);
   expect(screen.getByTestId('annotate-text').props.value).toBeUndefined();
@@ -248,7 +248,7 @@ it('the text box is not overwritten by the screen while typing', async () => {
   expect(screen.getByTestId('annotate-text').props.value).toBeUndefined();
 });
 
-// 2026-11-09 用户测试：默认字号按页面大小算，A4 上约 27 磅，合同正文才 11 磅。
+// 2026-11-09 user test: default font size is calculated based on page size, about 27 pt on A4, whereas contract body text is only 11 pt.
 it('on a document page a new text takes the size of the nearest recognized line', async () => {
   const lines = jest.fn(async () => [{ x: 0, y: 90, width: 1000, height: 40 }]);
   const onDone = await openDocument(lines);

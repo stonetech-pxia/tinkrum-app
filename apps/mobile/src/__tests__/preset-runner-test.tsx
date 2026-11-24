@@ -22,8 +22,9 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore, type WorkspaceStore } from '../workspace/store';
 
-// 快捷操作卡片可以直接指向内设快捷操作的预设 ID（D-259，和 D-236 一致）：不用先添加；
-// 用户改过以后配置里有副本，卡片显示并运行副本。
+// Quick action cards can directly reference preset IDs of built-in quick actions (D-259, consistent
+// with D-236): no need to add them first; after user modifications, a copy exists in the config,
+// and the card displays and runs the copy.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 

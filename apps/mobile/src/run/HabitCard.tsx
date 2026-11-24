@@ -24,8 +24,10 @@ import type { WorkspaceRepo } from '../storage/types';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { useWorkflowChange } from './workflow-change';
 
-// 从使用习惯里提议（D-127）：连续几次在「每次运行时问」里选了同样的值，结果页问要不要做成一个
-// 不用再选的快捷操作放到首页。统计只在本机（app_meta），不发给 AI；用户点了才修改，可以撤销。
+// Suggest from usage habits (D-127): when the same value is repeatedly chosen across several runs
+// in "ask at runtime", the results page prompts whether to make it a quick action on the home
+// screen that doesn't require re-selection. Statistics are kept locally only (app_meta), never sent
+// to the AI; changes occur only upon user tap and can be undone.
 
 const metaKey = (workflowId: string) => `habit:${workflowId}`;
 
@@ -48,8 +50,8 @@ interface Suggestion {
 }
 
 /**
- * 一次成功的运行结束后调用一次：记下这次的回答，够次数时显示提议。
- * answers 是这次运行里每一步「每次运行时问」的回答。
+ * Called once after a successful run ends: records this response, showing suggestions when the
+ * threshold is met. answers contains responses to each step's "ask at runtime" in this run.
  */
 export function HabitCard({
   workflow,
@@ -90,7 +92,7 @@ export function HabitCard({
     return () => {
       live = false;
     };
-    // 每次运行的结果只记一次。
+    // Result of each run is recorded only once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

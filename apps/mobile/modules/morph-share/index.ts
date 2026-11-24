@@ -1,22 +1,25 @@
 import { requireOptionalNativeModule } from 'expo';
 
-// 本地 Expo 模块 MorphShare（D-119、D-120、D-123、D-196）：一次分享多个文件、把文件存进用户在「文件」里选的文件夹。
-// iOS 是 ios/MorphShareModule.swift（UIActivityViewController、UIDocumentPickerViewController 选文件夹），
-// Android 是 android/…/MorphShareModule.kt（ACTION_SEND_MULTIPLE、存储访问框架）。只用系统框架，不联网。
-// Expo Go 和测试里是 null，调用方退回逐个分享 / expo-file-system 选文件夹。
+// Local Expo module MorphShare (D-119, D-120, D-123, D-196): share multiple files at once, save
+// files into a folder selected by the user in "Files". iOS is ios/MorphShareModule.swift
+// (UIActivityViewController, UIDocumentPickerViewController for folder selection), Android is
+// android/.../MorphShareModule.kt (ACTION_SEND_MULTIPLE, Storage Access Framework). Uses system
+// frameworks only, no network. Null in Expo Go and tests, callers fall back to individual sharing /
+// expo-file-system folder selection.
 
 export interface SavedToFolder {
   saved: number;
-  /** 文件夹的显示名（给用户看，不发给 AI）。 */
+  /** Display name of the folder (shown to user, not sent to AI). */
   folder: string;
 }
 
 export interface MorphShareModule {
-  /** 打开一次系统分享面板，带上全部文件（本机 file:// 地址）；面板关掉后返回。 */
+  /** Opens the system share sheet once with all files (local file:// URIs); returns after the sheet is dismissed. */
   shareFiles(uris: readonly string[], mimeTypes: readonly string[]): Promise<void>;
   /**
-   * 交给别的 AI App（D-611）：和 shareFiles 一样，再带一段文字（提示词），收到的 App 把它放进输入框。
-   * 比这个功能早的开发版没有它，调用方退回只发文字。
+   * Hand off to other AI apps (D-611): same as shareFiles, with an additional text snippet
+   * (prompt) which the receiving app puts into its input box. Older dev builds predating this
+   * feature lack it, callers fall back to sending text only.
    */
   shareFilesWithText?(
     text: string,
@@ -24,17 +27,20 @@ export interface MorphShareModule {
     mimeTypes: readonly string[],
   ): Promise<void>;
   /**
-   * 这个快捷操作（key）会存进的文件夹的名字（D-196）：它自己记住的，没有时是最后选过的那个（D-123）；
-   * 都没有、或者文件夹已经不在 / 授权被收回时为 null。
+   * Name of the folder (D-196) that this quick action (key) will save to: its own remembered one,
+   * falling back to the last picked one (D-123); null if neither exists, or if the folder no
+   * longer exists / permission was revoked.
    */
   rememberedFolder(key: string): string | null;
   /**
-   * 把文件复制进一个文件夹：useRemembered 为 true 且有记住的文件夹时直接存进去（这个快捷操作自己的，
-   * 没有时用最后选过的并记给它），否则让用户选一个（iCloud 云盘、Google Drive 等「文件」提供者都可以），
-   * 记给这个快捷操作，也记成最后选过的。
-   * names 是文件名（含扩展名）；文件夹里已有同名文件时不覆盖（iOS 加「 2」，Android 由文档提供者改名）。
-   * 返回存了几个和文件夹名；用户取消时返回 null。
-   * 文件夹写不进去时抛出 code 为 ERR_FOLDER_NOT_WRITABLE 的错误。
+   * Copies files into a folder: saves directly if useRemembered is true and a remembered folder
+   * exists (this quick action's own, falling back to the last picked one which is then recorded),
+   * otherwise prompts the user to select one (iCloud Drive, Google Drive, and other "Files"
+   * providers are supported), records it for this quick action and as the last picked one. names
+   * are filenames (including extension); does not overwrite existing files with the same name in
+   * the folder (iOS appends " 2", Android renamed by document provider). Returns count of saved
+   * files and folder name; returns null if cancelled by user. Throws an error with code
+   * ERR_FOLDER_NOT_WRITABLE when the folder is not writable.
    */
   exportFiles(
     uris: readonly string[],
@@ -44,16 +50,19 @@ export interface MorphShareModule {
     key: string,
   ): Promise<SavedToFolder | null>;
   /**
-   * 用系统预览打开一个文件（D-238）：iOS 是 QuickLook（标题用 name，原来的文件名），Android 复制一份到缓存
-   * 后交给能打开它的 App；打开后就返回。
-   * Android 上没有能打开它的 App 时抛出 code 为 ERR_NO_VIEWER 的错误，读不到文件时为 ERR_PREVIEW_FAILED。
+   * Open a file using the system preview (D-238): on iOS uses QuickLook (title uses name,
+   * replacing the original file name); on Android, copies it to the cache and passes it to an app
+   * capable of opening it, then returns immediately. On Android, throws an error with code
+   * ERR_NO_VIEWER if no app can open it, or ERR_PREVIEW_FAILED if the file cannot be read.
    */
   previewFile(uri: string, mimeType: string, name: string): Promise<void>;
-  /** 忘掉不在 keep 里的快捷操作的文件夹（快捷操作已经删掉了）；最后选过的那个不动。 */
+  /** Forget the folders of quick actions that are no longer in keep (the quick actions have been deleted); leaves the last-selected folder untouched. */
   forgetFolders(keep: readonly string[]): void;
   /**
-   * 把这些目录（file:// 地址）标成不进系统备份（D-599；只有 iOS：iCloud 备份和电脑上的备份都跳过目录里的
-   * 全部内容）。标不上的跳过。Android 在 app.json 里关掉 allowBackup，没有这个函数。
+   * Mark these directories (file:// URIs) to be excluded from system backup (D-599; iOS only:
+   * both iCloud backup and computer backups skip all contents within the directories). Skips any
+   * that cannot be marked. On Android, allowBackup is disabled in app.json and this function does
+   * not exist.
    */
   excludeFromBackup?(uris: readonly string[]): Promise<void>;
 }

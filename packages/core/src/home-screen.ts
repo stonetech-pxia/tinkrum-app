@@ -3,34 +3,38 @@ import { workflowKinds, QUICK_ACTION_CATEGORIES } from './quick-actions';
 import { MAX_HOME_SCREEN, quickActionsOf, type IconValue, type WorkspaceConfig } from './schema';
 import { isDark, resolveColors } from './theme';
 
-// 手机桌面（D-271）：nav.phoneHomeScreen 里的快捷操作出现在长按 Morph 图标的菜单里（iOS Home Screen Quick Actions、
-// Android App Shortcuts）。菜单由配置算出来，每次配置变了（AI 修改、撤销、恢复、删除、改名）整份换掉。
-// 点一下打开 Morph 直接开始那个快捷操作，和点运行卡片一样（D-108）。
+// Mobile desktop (D-271): quick actions under nav.phoneHomeScreen appear in the long-press menu of
+// the Morph icon (iOS Home Screen Quick Actions, Android App Shortcuts). The menu is computed from
+// the configuration and completely replaced whenever the configuration changes (AI modification,
+// undo, restore, deletion, renaming). Tapping opens Morph and immediately starts that quick action,
+// identical to tapping a run card (D-108).
 
-// 也可以放 App（D-485）：项是 app:<id>，点了进那个 App。
+// Supports placing Apps as well (D-485): items formatted as app:<id> open that App when tapped.
 
 export interface HomeScreenItem {
-  /** 菜单项的 ID：快捷操作的 ID，或 app:<id>。 */
+  /** Menu item ID: either a quick action ID or app:<id>. */
   id: string;
   kind: 'quickAction' | 'app';
   title: string;
-  /** 快捷操作自己的图标，没有时用它的分类图标；App 用自己的图标，没有时是 apps。 */
+  /** Quick action's own icon, falling back to its category icon if absent; apps use their own icon, falling back to apps if absent. */
   icon: IconValue;
   /**
-   * App 的桌面图标用的颜色（D-606）：底色是这个 App 自己主题的主色，图标用主色上的字色。
-   * 桌面图标不跟着系统的深浅色变，跟随系统的主题按浅色算。快捷操作没有，用 Tinkrum 的图标（D-271）。
+   * Colors used for the app's desktop icon (D-606): background color is the primary color of the
+   * app's own theme, and foreground uses the text color on that primary color. Desktop icons do
+   * not adapt to system dark/light mode, following the system theme treated as light mode. Quick
+   * actions lack this and use the Tinkrum icon (D-271).
    */
   colors?: { background: string; foreground: string };
 }
 
-/** 桌面菜单里的项（快捷操作、App）的 ID，按 nav.phoneHomeScreen 的顺序；不在配置里的不算。 */
+/** IDs of items in the desktop menu (quick actions, apps), in the order of nav.phoneHomeScreen; items not in the config are excluded. */
 function homeScreenIds(config: WorkspaceConfig): string[] {
   const ids = new Set(quickActionsOf(config).map((w) => w.id));
   const apps = new Set((config.nav.apps ?? []).map((a) => `app:${a.id}`));
   return (config.nav.phoneHomeScreen ?? []).filter((id) => ids.has(id) || apps.has(id));
 }
 
-/** 桌面菜单里的项，按 nav.phoneHomeScreen 的顺序；校验器保证不超过 MAX_HOME_SCREEN 个，这里再截一次。 */
+/** Items in the desktop menu, in the order of nav.phoneHomeScreen; the validator ensures it does not exceed MAX_HOME_SCREEN, and we truncate it here again. */
 export function homeScreenItems(config: WorkspaceConfig): HomeScreenItem[] {
   const workflows = quickActionsOf(config);
   return homeScreenIds(config)
@@ -57,19 +61,20 @@ export function homeScreenItems(config: WorkspaceConfig): HomeScreenItem[] {
     });
 }
 
-/** 这次修改新放到桌面的快捷操作（应用后带用户去看怎么用，Android 上点了按钮才固定到桌面）。 */
+/** Quick actions newly placed on the desktop in this modification (after application, guides the user on how to use them; on Android, pinned to the desktop only after tapping the button). */
 export function addedToHomeScreen(before: WorkspaceConfig, after: WorkspaceConfig): string[] {
   const was = new Set(homeScreenIds(before));
   return homeScreenIds(after).filter((id) => !was.has(id));
 }
 
-/** 桌面菜单满了：再放一个之前要先拿掉一个。 */
+/** Desktop menu is full: another item must be removed before placing a new one. */
 export const homeScreenFull = (config: WorkspaceConfig): boolean =>
   homeScreenIds(config).length >= MAX_HOME_SCREEN;
 
 /**
- * 放到桌面 / 从桌面拿掉一个快捷操作的修改（长按菜单里的开关）：v34 的操作写整个列表（nav.phoneHomeScreen），
- * 这里按现在的列表加上或去掉这一个。新放的排在最后。
+ * Modification to place/remove a quick action on the desktop (long-press menu toggle): v34
+ * operations write the entire list (nav.phoneHomeScreen), whereas here we add or remove this
+ * single item based on the current list. Newly placed items are appended at the end.
  */
 export function homeScreenOp(config: WorkspaceConfig, itemId: string, on: boolean): Op {
   const ids = (config.nav.phoneHomeScreen ?? []).filter((id) => id !== itemId);

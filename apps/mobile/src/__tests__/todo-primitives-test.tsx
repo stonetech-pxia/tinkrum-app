@@ -14,8 +14,9 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 日程的「一次」（D-340）、给一条记录用的页面（D-342）、快速添加的预设值（D-343）和本机认日期（D-344）。
-// 例子是待办：项目、任务两张表；这些能力不只给待办用。
+// Schedule "single" event (D-340), single-record page (D-342), quick-add preset values (D-343), and
+// on-device date recognition (D-344). Example uses Todos: projects and tasks tables; these
+// capabilities are not limited to Todos.
 
 const tables: Collection[] = [
   {

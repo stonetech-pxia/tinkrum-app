@@ -14,7 +14,7 @@ import {
 import type { Collection, Field } from './schema';
 import { registry } from './test-helpers';
 
-// 容器把记录里的字段交给工具（D-428、D-442）：字段给什么类型的值、附件里哪些文件能交给第一步。
+// Containers pass record fields to tools (D-428, D-442): determines what value types fields provide and which files in attachments can be handed to the first step.
 
 const action = (id: string) => registry.actions.get(id)!;
 const info = (id: string, name: string, mimeType: string, size = 10): AttachmentInfo => ({
@@ -45,7 +45,7 @@ describe('what kind of value a field hands over', () => {
     expect(fieldHandedText(f('number'), 12.5, 'en')).toBe('12.5');
     expect(fieldHandedText(f('number'), undefined, 'en')).toBe('');
     expect(fieldHandedText(f('date'), '2026-11-05', 'en')).not.toBe('');
-    // 附件字段不是文字。
+    // Attachment fields are not text.
     expect(fieldHandedText(f('file'), ['a'], 'en')).toBe('');
   });
 });

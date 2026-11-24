@@ -1,4 +1,6 @@
-"""诊断思考模式和 JSON 约束的单条请求；不计入正式成绩。"""
+"""Single-request probe for diagnosing thinking patterns and JSON constraints; not counted toward
+formal evaluation metrics.
+"""
 import argparse
 import json
 from pathlib import Path

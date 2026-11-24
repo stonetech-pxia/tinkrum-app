@@ -57,13 +57,18 @@ import {
 import { createRelayRuntime, loadRootEnv } from '../src/config';
 import { createApp } from '../src/server';
 
-// 提示词测试实验台（side-session-notes/agent-test-plan/PLAN.md）：比 eval.ts 多重复运行、并发、完整记录和通用检查。
-// 用法：npx tsx scripts/lab.ts --out runs/x.jsonl [--suite eval|<cases.json>] [--cases A1,C1] [--repeat 5]
+// Prompt testing workbench (`side-session-notes/agent-test-plan/PLAN.md`): extends `eval.ts` with
+// repeated runs, concurrency, comprehensive logging, and general checks. Usage: `npx tsx
+// scripts/lab.ts --out runs/x.jsonl [--suite eval|<cases.json>] [--cases A1,C1] [--repeat 5]`
 //        [--concurrency 16] [--model claude-haiku-5-5] [--effort low] [--drop-rule 17,44] [--rule-first 51] [--resume]
-// 个人记录能力验收：npx tsx scripts/lab.ts --out runs/accept.jsonl --acceptance [--acceptance-ids habit-simple,todo-board]
-// 走和 --app-flow 一样的流程，说开场白，再按没过的 core 项一句句说（最多 4 轮），最后点一次「把这些补上」；统计看 lab-accept-report.ts。
-// cases.json 是数组，每项 {id, input 或 turns, locale, setup, about?, earlier?, expect?, rubric?, tags?, configFile?}；
-// 没有 check，只记录，判定交给 lab-judge.ts。turns 是一段长对话，按 App 的做法一句接一句。
+// Personal record capability acceptance: `npx tsx scripts/lab.ts --out runs/accept.jsonl
+// --acceptance [--acceptance-ids habit-simple,todo-board]` follows the same flow as `--app-flow`,
+// outputting an opening statement, then proceeding sentence by sentence through failed core items
+// (up to 4 rounds), and finally tapping "Fix these" once. Statistics are handled by
+// `lab-accept-report.ts`. `cases.json` is an array where each item is `{id, input or turns, locale,
+// setup, about?, earlier?, expect?, rubric?, tags?, configFile?}`. There is no check, only logging;
+// judgment is delegated to `lab-judge.ts`. `turns` is a long conversation, sentence by sentence
+// following app behavior.
 
 const { values } = parseArgs({
   options: {
@@ -80,11 +85,11 @@ const { values } = parseArgs({
     'strip-examples': { type: 'boolean' },
     'max-repairs': { type: 'string' },
     route: { type: 'boolean' },
-    // 和 App 一样的流程（runAppFlow）：外观进草稿，功能直接生效，每句带工具清单，大工程逐步做。
+    // Same flow as the app (`runAppFlow`): look changes enter a draft, feature changes take effect immediately, each sentence includes a tool inventory, and large tasks are performed incrementally.
     'app-flow': { type: 'boolean' },
     acceptance: { type: 'boolean' },
     'acceptance-ids': { type: 'string' },
-    // 换开场白（场景 id → 一句模糊的话），要求和打分不变。
+    // Change opening statement (scenario ID -> a vague phrase); requirements and scoring remain unchanged.
     'acceptance-openings': { type: 'string' },
   },
 });
@@ -100,9 +105,9 @@ interface LabCase {
   expect?: { kind: string; reason?: string };
   rubric?: string;
   tags?: string[];
-  /** 配置来自文件（规模测试），覆盖 setup。 */
+  /** Configuration comes from a file (scale testing), overriding setup. */
   configFile?: string;
-  /** 现有 setup 之外还要先做的操作（例如单条记录页）。 */
+  /** Additional operations to be performed prior to existing setup (e.g., single record page). */
   setupOps?: unknown[];
 }
 
@@ -111,7 +116,7 @@ interface CallLog {
   stopReason: string | null;
   usage: Completion['usage'];
   ms: number;
-  /** 这次调用是修复：发给模型的问题清单。 */
+  /** This invocation is a repair: list of issues sent to the model. */
   repair?: string;
 }
 
@@ -122,7 +127,7 @@ if (values.effort) env.MORPH_AI_EFFORT = values.effort;
 const out = values.out;
 if (!out) throw new Error('--out 必填');
 
-// 预算（创始人 2026-11-03：只用 Haiku，总额 $10）：累计花费记在 LAB_LEDGER，到上限就停。
+// Budget (founder 2026-11-03: use Haiku only, total budget $10): cumulative cost is recorded in `LAB_LEDGER`, stops when limit is reached.
 const LEDGER = process.env.LAB_LEDGER;
 const BUDGET = 10;
 if (!LEDGER) throw new Error('需要 LAB_LEDGER');
@@ -157,7 +162,7 @@ const relay = createRelayCompleter({
   fetchImpl: ((url: string, init?: RequestInit) => server.request(url, init)) as typeof fetch,
 });
 
-/** 消融实验：去掉或前移规则。规则在 ## Rules 下，每条一行，以「编号. 」开头。 */
+/** Ablation study: remove or move rules forward. Rules are under `## Rules`, one per line, starting with "number. ". */
 const ruleLine = (n: number) => new RegExp(`^${n}\\. .*\\n`, 'm');
 function transformSystem(system: string): string {
   let s = system;
@@ -170,7 +175,7 @@ function transformSystem(system: string): string {
     if (!m) throw new Error('没有这条规则');
     s = s.replace(m[0], '').replace('## Rules\n', `## Rules\n${m[0]}`);
   }
-  // 去掉规则里括号中的例句（用户原话），看规则离开例子还能不能用。
+  // Remove example sentences in parentheses (user utterances) from rules to see if rules still work without examples.
   if (values['strip-examples']) {
     const start = s.indexOf('## Rules');
     const end = s.indexOf('\n## ', start + 1);
@@ -213,7 +218,7 @@ function logged(calls: CallLog[]): Complete {
   };
 }
 
-/** 键排好序再比：校验会调整键的顺序，那不算改动。 */
+/** Sort keys before comparing: validation adjusts key order, which is not considered a change. */
 const json = (v: unknown): string =>
   JSON.stringify(v ?? null, (_k, x: unknown) =>
     x && typeof x === 'object' && !Array.isArray(x)
@@ -222,7 +227,7 @@ const json = (v: unknown): string =>
   );
 const ctxFor = (locale: Locale) => ({ registry, locale, now: new Date() });
 
-/** 前后配置的差别，按用户看得懂的东西列出来：通用的「顺手改了别的」检查用。 */
+/** Differences between previous and subsequent configurations, listed in user-understandable terms: used for general "accidentally changed something else" checks. */
 function scopeOf(before: WorkspaceConfig, after: WorkspaceConfig): string[] {
   const changes: string[] = [];
   const diffById = <T extends { id: string }>(
@@ -273,7 +278,7 @@ function scopeOf(before: WorkspaceConfig, after: WorkspaceConfig): string[] {
   return changes;
 }
 
-/** 给用户看的句子和模型新写的名字：通用的语言、用词检查用。 */
+/** Sentences shown to the user and newly written names by the model: used for general language and terminology checks. */
 function planTexts(plan: Plan): string[] {
   if (plan.kind === 'reject') return [plan.message, ...plan.examples];
   if (plan.kind !== 'ops') return [];
@@ -358,7 +363,7 @@ async function runConversation(c: LabCase, calls: CallLog[]) {
         history.push(config);
         config = prepared.after;
         earlier.push({ input, done: true, reply: prepared.lines.join('; ') });
-        // 用户点「接着改」（D-191）。
+        // User taps "Continue modifying" (D-191).
         if (plan.next) queue.unshift(plan.next);
       } else {
         turns.push({ input, plan, ok: false, issues: prepared.issues });
@@ -372,7 +377,7 @@ async function runConversation(c: LabCase, calls: CallLog[]) {
         earlier.push({ input, done: true, reply: 'restored the previous version' });
       }
     } else if (plan.kind === 'build') {
-      // 这条路不做步骤化（--app-flow 才做）：只记下回了计划。
+      // This path does not use steps (unlike `--app-flow`): only records that a plan was returned.
       turns.push({ input, plan, ok: true });
     } else {
       turns.push({ input, plan, ok: false, issues: [plan.message] });
@@ -383,19 +388,21 @@ async function runConversation(c: LabCase, calls: CallLog[]) {
 }
 
 /**
- * App 现在的流程（ai-change.ts、draft.ts、build.ts）：每句都带工具清单（D-414）；大工程自动点「开始」，逐步执行，
- * 记录每步结果（D-415）；依赖草稿的功能修改，模拟用户点「应用草稿并继续」（D-413）。
+ * Current app flow (`ai-change.ts`, `draft.ts`, `build.ts`): every sentence includes a tool list
+ * (D-414); large tasks automatically click "Start", execute step by step, and record each step's
+ * result (D-415); for feature modifications relying on drafts, simulates user clicking "Apply
+ * draft and continue" (D-413).
  */
 async function runAppFlow(
   c: LabCase,
   calls: CallLog[],
   options: {
-    /** 开场之后、点「把这些补上」之前，接着说话（验收模拟用户）。 */
+    /** After the opening and before clicking "Fix these", continue speaking (acceptance simulated user). */
     afterOpening?: (flow: {
       config: () => WorkspaceConfig;
       send: (input: string) => Promise<void>;
     }) => Promise<void>;
-    /** 最多点几次「把这些补上」。 */
+    /** Maximum number of times to click "Fix these". */
     fixRounds?: number;
   } = {},
 ) {
@@ -410,12 +417,12 @@ async function runAppFlow(
     inChat?: boolean;
     buildStep?: { index: number; total: number; id: string };
     appliedDraftFirst?: boolean;
-    /** 这个计划里的外观套不上（D-419），没进草稿。 */
+    /** Looks in this plan cannot be fitted (D-419) and did not enter the draft. */
     lookNotDone?: string[];
   };
   type Draft = { config: WorkspaceConfig; steps: Step[] };
   let head = initialConfig(c);
-  // 用函数读写：闭包里改过的 let，TypeScript 在循环里会把它收窄成 never。
+  // Read and write via functions: a `let` modified inside a closure will be narrowed to `never` by TypeScript within loops.
   const box: { draft: Draft | null; session: WorkSession; next: string | null } = {
     draft: null,
     session: emptySession(),
@@ -428,7 +435,7 @@ async function runAppFlow(
   const note = (turn: SessionTurn, config: WorkspaceConfig) => {
     box.session = recheckItems(recordTurn(box.session, turn), config, registry, c.locale);
   };
-  // 草稿套到新版本上（draft.ts 的 rebaseDraft）：套不上的那一步和后面的都去掉；善后操作跟着这一步一起算。
+  // Rebase draft onto a new version (`draft.ts`'s `rebaseDraft`): drop the step that failed to fit and all subsequent steps; cleanup operations follow along with this step.
   const rebase = (cleanup: readonly Op[] = []) => {
     if (!box.draft) return;
     let config = head;
@@ -457,7 +464,7 @@ async function runAppFlow(
     box.draft = null;
   };
 
-  /** 一句话。返回卡住的原因（搭建时用来停下），没卡住返回 null。 */
+  /** A single sentence. Returns the reason for getting stuck (used by the builder to stop), or `null` if not stuck. */
   const say = async (
     input: string,
     stepInfo?: { index: number; total: number; id: string },
@@ -487,7 +494,7 @@ async function runAppFlow(
         ...(session ? { session } : {}),
       });
     } catch (e) {
-      // 真实 App 里这一句失败，用户可以接着说。
+      // In the real app, if this sentence fails, the user can continue speaking.
       if (INFRA.test(String(e))) throw e;
       turns.push({ input, plan: null, ok: false, failed: String(e), ...log });
       return String(e);
@@ -500,7 +507,7 @@ async function runAppFlow(
         return 'a plan inside a step';
       }
       turns.push({ input, plan, ok: true, ...log });
-      // 自动点「开始」，一步失败就停（用户可以选重试、跳过，这里当作跳过，接着记录后面的）。
+      // Automatically click "Start"; stop if any step fails (the user can choose retry or skip; here treated as skip, continuing to record subsequent ones).
       box.session = startBuildItems(box.session, plan.summary, plan.steps);
       for (const [i, step] of plan.steps.entries()) {
         const info = { index: i + 1, total: plan.steps.length, id: step.id };
@@ -509,7 +516,7 @@ async function runAppFlow(
           box.session = setItemStatus(box.session, buildItemId(step.id), 'skipped', stuck);
           continue;
         }
-        // 这句话里剩下的外观（next）：还算这一步。
+        // Remaining looks in this sentence (`next`): still counted towards this step.
         if (box.next) {
           const next = box.next;
           box.next = null;
@@ -554,7 +561,7 @@ async function runAppFlow(
           fn = kept;
         }
       }
-      // 要用到草稿里的东西（D-413）：模拟用户点「应用草稿并继续」。
+      // Needs to use items from the draft (D-413): simulates user clicking "Apply draft and continue".
       let appliedDraftFirst = false;
       if (!fn.ok && box.draft) {
         applyDraft();
@@ -571,7 +578,7 @@ async function runAppFlow(
       const scope = scopeOf(head, fn.after);
       head = fn.after;
       rebase(cleanup);
-      // 外观进草稿（ai-change.ts 的 deferredIntoDraft，D-419）：不再问模型；套不上才变成「接着改」的那句话。
+      // Looks enter draft (`ai-change.ts`'s `deferredIntoDraft`, D-419): no longer asks the model; only becomes the "Continue modifying" sentence if they fail to fit.
       const look = first.deferred.length > 0 ? prepareOps(shown(), first.deferred, ctx) : null;
       if (look?.ok)
         box.draft = {
@@ -649,7 +656,7 @@ async function runAppFlow(
     const queue = [...inputs];
     while (queue.length > 0 && turns.length < 40) {
       await say(queue.shift()!);
-      // 用户点「接着改」（D-191）。
+      // User taps "Continue modifying" (D-191).
       if (box.next) {
         queue.unshift(box.next);
         box.next = null;
@@ -658,7 +665,7 @@ async function runAppFlow(
   };
   await drain(c.turns ?? [c.input!]);
   await options.afterOpening?.({ config: shown, send: (input) => drain([input]) });
-  // 结束时还有用不了的，用户点一次「把这些补上」（默认最多两次）。
+  // If there are still unusable items at the end, the user clicks "Fix these" once (maximum twice by default).
   const before = new Set(
     checkTools(initialConfig(c), registry).issues.map((i) => `${i.code}|${i.target}`),
   );
@@ -678,12 +685,13 @@ async function runAppFlow(
   return { turns, finalConfig: head, session: box.session };
 }
 
-/** 验收最多替用户说几句（开场白之外）。 */
+/** Maximum number of turns the acceptance test can speak on behalf of the user (excluding the opening statement). */
 const ACCEPTANCE_ROUNDS = 4;
 
 /**
- * 个人记录能力验收（acceptance/）：走 runAppFlow，每轮打分；没过的 core 项按顺序模拟用户说一句，
- * 最后点一次「把这些补上」。合格只看代码打分。
+ * Personal record capability acceptance (`acceptance/`): runs `runAppFlow`, scores each round;
+ * simulates user speaking one sentence in order for each failed core item, and finally clicks
+ * "Fix these" once. Passing is judged solely by code scoring.
  */
 async function runAcceptance(s: Scenario, calls: CallLog[]) {
   const roundLog = (said: string, score: ScenarioScore) => ({
@@ -719,7 +727,7 @@ async function runAcceptance(s: Scenario, calls: CallLog[]) {
   );
   const final = scoreScenario(s, finalConfig, registry);
   const beforeFix = rounds.at(-1)!;
-  // 点过「把这些补上」时单独算一轮。
+  // Counted as a separate round when "Fix these" has been clicked.
   if (calls.length > beforeFix.calls) rounds.push(roundLog('(fix these)', final));
   const firstQualified = rounds.findIndex((r) => r.qualified);
   return {
@@ -729,7 +737,7 @@ async function runAcceptance(s: Scenario, calls: CallLog[]) {
     category: s.category,
     rounds,
     qualified: final.qualified,
-    /** 第几轮合格：0 = 开场白一句就合格。 */
+    /** Round at which qualification was achieved: 0 = qualified on the opening statement alone. */
     qualifiedAtRound: final.qualified ? firstQualified : null,
     missingCore: final.missingCore,
     missing: final.requirements.filter((r) => !r.pass).map((r) => r.id),
@@ -753,7 +761,7 @@ async function runEval(c: EvalCase, calls: CallLog[]) {
     maxRepairs: Number(values['max-repairs'] ?? 1),
   });
   const { outcome, plans } = await runEvalCase(c, provider, registry, new Date());
-  // 重放一次，取改动范围（runEvalCase 不返回中间配置）。
+  // Replay once to get the change scope (`runEvalCase` does not return intermediate configs).
   const ctx = ctxFor(c.locale);
   let config = buildSetup(c.setup, c.locale, registry);
   for (const e of c.earlier ?? []) {
@@ -938,7 +946,7 @@ async function execute(job: Job) {
   if (totals.finished % 50 === 0) console.log(`  ${totals.finished}/${todo.length}`);
 }
 
-// 先单独跑一个，把系统提示词写进缓存，后面并发的才读得到。
+// Run one test case first to write system prompts into cache so subsequent concurrent ones can read them.
 const first = todo.shift();
 if (first) await execute(first);
 let next = 0;

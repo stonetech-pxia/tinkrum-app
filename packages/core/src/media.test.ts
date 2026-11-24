@@ -15,7 +15,7 @@ import {
 
 const MB = 1024 * 1024;
 
-/** iPhone 拍的 1 分钟 1080p 视频，约 120 MB。 */
+/** A 1-minute 1080p video shot on iPhone is about 120 MB. */
 const phone: VideoSource = {
   durationMs: 60_000,
   size: 120 * MB,
@@ -60,13 +60,13 @@ describe('planVideoSize', () => {
     const plan = planVideoSize(phone, 20 * MB);
     expect(plan.kind).toBe('encode');
     if (plan.kind !== 'encode') return;
-    // 20 MB × 8 × 0.92 ÷ 60 秒 ≈ 2572 kbps，减去 128 kbps 声音。
+    // 20 MB × 8 × 0.92 ÷ 60 seconds ≈ 2572 kbps, minus 128 kbps audio.
     const total = (20 * MB * 8 * SIZE_MARGIN) / 60 / 1000;
     expect(plan.plan.audioKbps).toBe(128);
     expect(plan.plan.videoKbps).toBe(Math.floor(total - 128));
     expect(plan.plan.shortSide).toBe(720);
     expect(plan.plan.maxFps).toBe(30);
-    // 预计大小不超过目标。
+    // Expected size does not exceed target.
     const bytes = ((plan.plan.videoKbps + plan.plan.audioKbps) * 1000 * 60) / 8;
     expect(bytes).toBeLessThan(20 * MB);
   });
@@ -94,7 +94,7 @@ describe('planVideoSize', () => {
     const plan = planVideoSize(long, 10 * MB);
     expect(plan.kind).toBe('tooSmall');
     if (plan.kind !== 'tooSmall') return;
-    // 至少要视频 150 kbps + 声音 32 kbps。
+    // Requires at least 150 kbps video + 32 kbps audio.
     const min = ((MIN_VIDEO_KBPS + 32) * 1000 * 480) / 8 / SIZE_MARGIN / MB;
     expect(plan.minMB).toBeGreaterThanOrEqual(min);
     expect(plan.minMB).toBeLessThan(min + 0.2);

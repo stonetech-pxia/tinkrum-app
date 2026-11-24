@@ -7,7 +7,7 @@ import { initialParams } from './workflow/check';
 import { registry, workspace } from './test-helpers';
 import { findWorkflow } from './workflows/presets';
 
-// 记录页顶部的按钮（D-428）：有哪些由表上的 recordRow 决定，值空的、对不上的不出现。
+// Buttons at the top of the record page (D-428): determined by recordRow on the table; empty or mismatched values do not appear.
 
 const quickActions = () => quickActionsOf(workspace('en'));
 
@@ -209,7 +209,7 @@ describe('any field can be handed to a step that takes its kind (D-442)', () => 
     expect(show(docs, {})).toEqual([]);
     expect(show(docs, { scan: [] })).toEqual([]);
     expect(show(docs, { scan: ['gone'] })).toEqual([]);
-    // 文件信息还没读到：先不显示，读到了再出现。
+    // File info not yet read: do not display initially; appear once read.
     expect(show(docs, { scan: ['p1'] }, new Map())).toEqual([]);
   });
 
@@ -244,7 +244,7 @@ describe('any field can be handed to a step that takes its kind (D-442)', () => 
       name: 'S',
     };
     expect(runsInline(wf as Workflow, out)).toBe(false);
-    // 最后一步交给 App 外面也一样。
+    // Same when handing off the final step to outside the app.
     expect(
       runsInline({ ...wf, steps: [step('pdf.compress'), step('out.share')] } as Workflow, out),
     ).toBe(false);

@@ -10,7 +10,7 @@ import { Image, Text } from 'react-native';
 
 import { DrawnIconView } from './DrawnIcon';
 
-// 图标白名单（core 的 ICON_NAMES）→ 系统图标：iOS 用 SF Symbols，Android 用 Material Symbols。
+// Icon whitelist (core's ICON_NAMES) -> System icons: SF Symbols on iOS, Material Symbols on Android.
 
 type SymbolName = Extract<SymbolViewProps['name'], { ios?: unknown }>;
 
@@ -58,8 +58,10 @@ const SYMBOLS: Record<Exclude<IconName, CustomIconName>, SymbolName> = {
 };
 
 /**
- * 自带图形的图标（D-485，按预设画的，源文件在 assets/preset-icons/*.svg）：单色 PNG 按主题染色，和 Tink 的小锤子一样。
- * 系统图标库里没有对应的，所以长按菜单里没有图标（iosSymbolName 返回 undefined）。
+ * Built-in graphic icons (D-485, drawn from presets, source files in assets/preset-icons/*.svg):
+ * monochrome PNGs tinted by theme, just like Tink's hammer. Since there are no corresponding
+ * icons in the system icon library, they have no icon in the long-press menu (iosSymbolName
+ * returns undefined).
  */
 const CUSTOM_IMAGES: Record<CustomIconName, number> = {
   wallet: require('../../assets/images/preset-icons/wallet.png'),
@@ -73,7 +75,7 @@ const CUSTOM_IMAGES: Record<CustomIconName, number> = {
   paper: require('../../assets/images/preset-icons/paper.png'),
 };
 
-/** 房间工具栏的动作图标（core 的 TOOL_ICON_NAMES，D-364）：不在白名单里，配置和 AI 用不到。 */
+/** Action icons for room toolbar (core's TOOL_ICON_NAMES, D-364): not in whitelist, config and AI cannot use them. */
 const TOOL_SYMBOLS: Record<ToolIconName, SymbolName> = {
   rotate: { ios: 'rotate.right', android: 'rotate_right' },
   crop: { ios: 'crop', android: 'crop' },
@@ -110,7 +112,7 @@ const TOOL_SYMBOLS: Record<ToolIconName, SymbolName> = {
   share: { ios: 'square.and.arrow.up', android: 'share' },
   save: { ios: 'square.and.arrow.down', android: 'download' },
   preview: { ios: 'eye.fill', android: 'visibility' },
-  // textformat、text.cursor 跟着系统语言画字（中文系统是「格式」「字」），换成没有字的符号。
+  // textformat and text.cursor render text based on the system language (showing "format" and "character" on Chinese systems); replace with text-free symbols.
   textbox: { ios: 'text.insert', android: 'text_fields' },
   sticky: { ios: 'text.bubble.fill', android: 'sticky_note_2' },
   brush: { ios: 'scribble', android: 'brush' },
@@ -120,14 +122,15 @@ const TOOL_SYMBOLS: Record<ToolIconName, SymbolName> = {
   mosaic: { ios: 'square.grid.2x2.fill', android: 'blur_on' },
 };
 
-/** 系统菜单里用的 SF Symbol 名字（长按 Morph 图标的菜单，D-271）；emoji 没有。 */
+/** SF Symbol name used in system menus (menu on long-pressing the Morph icon, D-271); emojis have none. */
 export function iosSymbolName(name: IconValue): string | undefined {
   return name in SYMBOLS ? SYMBOLS[name as keyof typeof SYMBOLS].ios : undefined;
 }
 
 /**
- * 把图标画成图片时用（Android 的桌面图标，D-606）：系统图标给 Material Symbols 的名字，自带图形的给那张
- * 单色 PNG，表情两样都没有（按文字画）。
+ * Used when rendering icons as images (Android desktop icon, D-606): system icons take Material
+ * Symbol names, built-in graphics take the monochrome PNG, and emojis take neither (rendered as
+ * text).
  */
 export function iconSource(name: IconValue): { symbol?: string; image?: number } {
   if (name in CUSTOM_IMAGES) return { image: CUSTOM_IMAGES[name as CustomIconName] };
@@ -143,7 +146,7 @@ export function Icon({
   size?: number;
   color: string;
 }) {
-  // Tink 的小锤子（D-436）：系统图标库里没有，用单色 PNG 按主题染色。
+  // Tink's hammer (D-436): not in the system icon library, rendered as a monochrome PNG tinted by theme.
   if (name === 'tink') {
     return (
       <Image
@@ -153,7 +156,7 @@ export function Icon({
       />
     );
   }
-  // 配置里画出来的图标（D-625）：从图标库取路径，用 Skia 画。
+  // Icons generated in config (D-625): fetch path from icon library, render using Skia.
   if (isDrawnIconRef(name)) return <DrawnIconView name={name} size={size} color={color} />;
   if (name in CUSTOM_IMAGES) {
     return (
@@ -170,7 +173,7 @@ export function Icon({
       : name in TOOL_SYMBOLS
         ? TOOL_SYMBOLS[name as ToolIconName]
         : null;
-  // 不是内置图标名的就是 emoji（schema 已校验），按原样显示。
+  // Anything not a built-in icon name is an emoji (validated by schema), displayed as-is.
   if (!symbol) {
     return (
       <Text
@@ -190,14 +193,15 @@ export function Icon({
       name={symbol}
       size={size}
       tintColor={color}
-      // 平台不支持系统图标时（例如 Web），用一个圆点占位，保证布局不变。
+      // When the platform does not support system icons (e.g., Web), use a placeholder dot to ensure layout stability.
       fallback={<Text style={{ width: size, height: size, color, fontSize: size * 0.6 }}>●</Text>}
     />
   );
 }
 
 /**
- * 内核界面自己用的图标（草稿模式的按钮、发送、划屏介绍的示意图等，D-190）。不在 core 的白名单里：AI 和配置用不到它们。
+ * Icons used by core UI itself (draft mode buttons, send, swipe-through tutorial diagrams, etc.,
+ * D-190). Not in core whitelist: AI and config cannot use them.
  */
 const UI_SYMBOLS = {
   chat: { ios: 'bubble.left.fill', android: 'chat' },

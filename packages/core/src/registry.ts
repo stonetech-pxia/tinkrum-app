@@ -2,10 +2,12 @@ import { IO_ACTIONS } from './tools/io';
 import type { IconName, Locale, Localized, Page, QuickAction } from './schema';
 import type { ActionDefinition, Permission } from './workflow/contract';
 
-// 动作与工具的登记表（§6 ActionDefinition / ToolDefinition，§7B Tool Manifest）。
-// 只有登记过的动作才能出现在工作流里；动作的实现由 tool-* 包和 App 运行时提供，这里只描述契约。
-// v34 里这里的「工具」是工具包（配置的 packages，界面上照旧叫「工具」）；工具包的页面写在 containers.pages，
-// 快捷操作写在 tools[]（kind "quickAction"，package 是工具包 ID）。
+// Registry of actions and tools (§6 ActionDefinition / ToolDefinition, §7B Tool Manifest). Only
+// registered actions can appear in workflows; action implementations are provided by tool-*
+// packages and the App runtime, this file describes contracts only. In v34, "tools" here refers to
+// tool packages (config packages, still called "tools" in the UI); tool package pages are defined
+// in containers.pages, and quick actions in tools[] (kind "quickAction", package is tool package
+// ID).
 
 export interface ToolDefinition {
   id: string;
@@ -13,25 +15,25 @@ export interface ToolDefinition {
   name: Localized;
   description: Localized;
   icon: IconName;
-  /** 供自然语言解析匹配的别名（小写）。 */
+  /** Aliases (lowercase) for natural language parsing matching. */
   aliases: readonly string[];
   permissions: readonly Permission[];
   actions: readonly ActionDefinition[];
-  /** 工具包的页面（v34 的块，page.package 是工具包 ID）。 */
+  /** Tool package pages (v34 blocks, page.package is tool package ID). */
   createPage(locale: Locale): Page;
-  /** 安装时写进配置 tools[] 的快捷操作（单功能工作流和工具自带的流程，D-061；package 是工具包 ID）。 */
+  /** Quick actions written into config tools[] upon installation (single-function workflows and tool-native procedures, D-061; package is tool package ID). */
   createWorkflows(locale: Locale): QuickAction[];
-  /** 从服务器下载的工具（D-177）；没有这一项的是随 App 发布的内置工具。 */
+  /** Tools downloaded from server (D-177); built-in tools shipped with the App lack this entry. */
   origin?: 'download';
 }
 
-/** 内核动作：不属于任何工具，所有工作流都可以使用。 */
+/** Kernel actions: not part of any tool, available in all workflows. */
 export const CORE_ACTIONS: readonly ActionDefinition[] = IO_ACTIONS;
 
 export interface Registry {
   tools: ReadonlyMap<string, ToolDefinition>;
   actions: ReadonlyMap<string, ActionDefinition>;
-  /** 动作 → 所属工具；内核动作不在此表中。 */
+  /** Action -> owning tool; kernel actions are absent from this table. */
   actionOwner: ReadonlyMap<string, string>;
 }
 
@@ -57,12 +59,13 @@ export function createRegistry(tools: readonly ToolDefinition[]): Registry {
 
 const revisions = new WeakMap<Registry, number>();
 
-/** 注册表改过几次（加入或替换下载的工具时加 1）；提示词按它缓存。 */
+/** Number of times the registry has been modified (incremented when adding or replacing downloaded tools); used for prompt caching. */
 export const registryRevision = (registry: Registry) => revisions.get(registry) ?? 0;
 
 /**
- * 加入或替换一个下载的工具（D-177）。直接改这个注册表，用到它的地方（运行、校验、AI）都能看到。
- * 下载的工具没有自己的动作（第一步只组合已有的动作），不能顶替内置工具。
+ * Add or replace a downloaded tool (D-177). Modifies this registry directly so that all consumers
+ * (execution, validation, AI) can access it. Downloaded tools have no actions of their own (the
+ * first step only composes existing actions) and cannot override built-in tools.
  */
 export function registerTool(registry: Registry, tool: ToolDefinition): void {
   if (tool.origin !== 'download') throw new Error(`tool ${tool.id} is not a downloaded tool`);

@@ -6,15 +6,17 @@ import type { Locale, Workflow, WorkflowStep } from '../schema';
 import { actionAccepts, type ActionDefinition, type ValueType } from './contract';
 import { handedInput, workflowProblems } from './check';
 
-// 工作流执行器（TOOLS_DESIGN §3）：唯一按顺序执行动作的地方。配置里只有动作 ID 和参数，没有任何代码。
-// 动作的实现（ActionImpl）和平台能力（services）由 App 注入，因此这里可以在 Node 中测试。
+// Workflow executor (TOOLS_DESIGN §3): the sole place where actions are executed sequentially. The
+// config contains only action IDs and parameters, with zero code. Action implementations
+// (`ActionImpl`) and platform capabilities (`services`) are injected by the app, allowing this to
+// be tested in Node.
 
 export type FileValueType = Exclude<ValueType, 'text' | 'records'>;
 
-/** 运行中的一个文件：缓存目录里的临时文件，保存之前不是用户文件（D-063）。 */
+/** A file in-flight: a temporary file in the cache directory, not a user file before saving (D-063). */
 export interface RunItem {
   uri: string;
-  /** 不含扩展名的显示名。 */
+  /** Display name without file extension. */
   name: string;
   ext: string;
   mimeType: string;
@@ -22,44 +24,50 @@ export interface RunItem {
   width?: number;
   height?: number;
   pageCount?: number;
-  /** PDF 渲染成图时保留的纸张尺寸（磅），仅对 for 指向的当前图片有效。 */
+  /** Paper size (points) preserved when rendering PDF to image, valid only for the current image pointed to by `for`. */
   pageSize?: { for: string; width: number; height: number };
-  /** 本机数字 PDF 绘图来源；后续改图令 for 失效，不能再套用原版面。 */
+  /** Native digital PDF drawing source; subsequent image modifications invalidate `for`, preventing reuse of the original layout. */
   pdfSource?: { for: string; uri: string; page: number };
-  /** 视频、音频的时长（毫秒）。 */
+  /** Duration of video or audio (milliseconds). */
   durationMs?: number;
-  /** 照片的拍摄时间（毫秒）。 */
+  /** Photo capture timestamp (milliseconds). */
   takenAt?: number;
-  /** 文件的修改时间（毫秒）：「文件」App 选的文件有，按日期筛选时拍摄时间读不到就用它（D-242）。 */
+  /** File modification time (milliseconds): present on files selected from the "Files" app; used as capture time when filtering by date if capture time is unreadable (D-242). */
   modifiedAt?: number;
-  /** 系统文档相机拍的页面：已经找边拉正，scan.detect 直接放行。 */
+  /** Pages captured by system document camera: already edge-detected and straightened, `scan.detect` passes them through directly. */
   straightened?: boolean;
-  /** 已经存成用户文件时的文件 ID。 */
+  /** File ID when already saved as a user file. */
   assetId?: string;
   /**
-   * 识别文字用的图（D-267）：scan.enhance 记下增强前的那张（增强对系统识别没有帮助，黑白还会抹掉淡字）。
-   * 只在 uri 还等于 for 时有效：之后哪一步生成了新图片，uri 就变了，识别退回用当前的图。
-   * width / height 是增强时转正前的大小，skew 是转正转的角度（度），用来把识别框换算到增强后的图上。
+   * Image used for text recognition (D-267): `scan.enhance` records the image prior to
+   * enhancement (enhancement does not help system recognition, and black-and-white removes faint
+   * text). Valid only while `uri` still equals `for`: if any subsequent step generates a new
+   * image, `uri` changes and recognition falls back to the current image. `width`/`height` are
+   * dimensions before straightening during enhancement; `skew` is the straightening angle
+   * (degrees) used to map recognition bounding boxes onto the enhanced image.
    */
   ocrSource?: { uri: string; for: string; width: number; height: number; skew: number };
   /**
-   * 转 Excel 的 TableDoc（D-272）：结果页的「查看和编辑」改它，再重新生成 xlsx。写法和 ocrSource 一样，
-   * 只在 uri 还等于 for 时有效（后面哪一步生成了新文件，就不能再编辑）。
-   * pagesWithoutTables：识别范围是「仅表格内容」、但没找到带线的表格、按全部内容输出的页（从 1 开始）。
+   * TableDoc for Excel conversion (D-272): modified via "View and edit" on the result page, then
+   * regenerates `xlsx`. Behaves like `ocrSource`, valid only while `uri` still equals `for`
+   * (cannot be edited if a subsequent step generates a new file). `pagesWithoutTables`: pages
+   * where the recognition scope was "table content only", but no lined tables were found, falling
+   * back to outputting full content (1-indexed).
    */
   tableDoc?: { uri: string; for: string; pagesWithoutTables?: number[] };
-  /** 转 Word 的 DocDoc（D-328）：结果页的「查看和编辑」改它，再重新生成 docx。写法和 tableDoc 一样。 */
+  /** DocDoc for Word conversion (D-328): modified via "View and edit" on the result page, then regenerates `docx`. Behaves identically to `tableDoc`. */
   docDoc?: { uri: string; for: string };
 }
 
 export type RunValue =
   | { type: FileValueType; items: RunItem[] }
   /**
-   * 文字只留在本机（OCR、二维码识别）：复制、存成文件，绝不发给 AI。
-   * spoken：这段文字是一段录音转出来的、用户说的话（D-575）；「记一笔」按它直接填表。
+   * Text stays local (OCR, QR code recognition): copied or saved as a file, never sent to the AI.
+   * `spoken`: text transcribed from an audio recording of user speech (D-575); "Log an expense"
+   * fills forms directly using it.
    */
   | { type: 'text'; text: string; name: string; spoken?: boolean }
-  /** 一张数据表里的记录（D-042）：只在本机生成 PDF / 打印，绝不发给 AI。 */
+  /** Records in a data table (D-042): generated into PDFs/printed locally only, never sent to the AI. */
   | { type: 'records'; collectionId: string; records: DataRecord[]; name: string };
 
 export type FileValue = Extract<RunValue, { items: RunItem[] }>;
@@ -98,59 +106,59 @@ export type RunErrorCode =
   | 'textTooLong'
   | 'doesNotFit'
   | 'noRecords'
-  /** 容器交来的附件一个都用不了（文件已经不在了，或第一步不收这种文件，D-442）。 */
+  /** No attachments provided by the container can be used (file no longer exists, or the first step does not accept such files, D-442). */
   | 'noFiles'
-  /** 放进已有记录时，这条记录的附件已经放满了（D-443）。 */
+  /** When adding to an existing record, the record's attachment slots are full (D-443). */
   | 'recordFull'
-  /** 这个快捷操作要记录页或列表交给它的值，这次运行没有（D-428）。 */
+  /** This quick action requires values supplied by a record page or list, which were absent in this run (D-428). */
   | 'needsRecord'
-  /** 这段文字不是能打开的电话、邮箱或网址（D-428）。 */
+  /** This text is not an openable phone number, email address, or URL (D-428). */
   | 'badLink'
-  /** 命名要在本机识别文字，这台设备没有系统自带的文字识别（Expo Go，D-244）。 */
+  /** Naming requires local text recognition, but this device lacks system built-in text recognition (Expo Go, D-244). */
   | 'needsRecognition'
-  /** 按条件筛选之后一个文件都不剩（detail.count：原来几个，D-242）。 */
+  /** No files remain after filtering by conditions (`detail.count`: original count, D-242). */
   | 'noneMatched'
-  /** 视频、音频要用原生模块处理，Expo Go 里没有（D-141）。 */
+  /** Video and audio processing requires native modules, which are unavailable in Expo Go (D-141). */
   | 'needsFullApp'
-  /** 系统打不开这段视频 / 音频（格式不支持、有版权保护）。 */
+  /** The system cannot open this video/audio (unsupported format or copyright protection). */
   | 'mediaUnsupported'
   | 'mergeUnsupported'
   | 'backgroundFailed'
-  /** 手机剩余空间不够（detail.gb：还需要多少 GB）。 */
+  /** Insufficient free storage space on the phone (`detail.gb`: additional GB needed). */
   | 'notEnoughSpace'
-  /** 目标大小太小，压出来看不清（detail.mb：至少要多少 MB）。 */
+  /** Target size is too small, resulting in unreadable output (`detail.mb`: minimum MB required). */
   | 'targetTooSmall'
-  /** 处理视频时切到了别的 App（iOS 不让后台用视频编码器，D-148）。 */
+  /** Switched to another app during video processing (iOS disallows background video encoders, D-148). */
   | 'interrupted'
-  /** 音频压到目标大小会听不清（detail.mb：至少要多少 MB，D-153）。 */
+  /** Compressing audio to the target size would make it unintelligible (`detail.mb`: minimum MB required, D-153). */
   | 'audioTooSmall'
-  /** 视频里没有声音（取声音时，D-155）。 */
+  /** No audio track in the video (when extracting audio, D-155). */
   | 'noAudio'
-  /** 录音里没有听到说话（语音转文字，D-150）。 */
+  /** No speech detected in the recording (speech-to-text, D-150). */
   | 'noSpeech'
-  /** 这种格式这台手机打不开（detail.format：MKV 等，D-185）。 */
+  /** This format is not supported by this phone (detail.format: MKV, etc., D-185). */
   | 'formatUnsupported'
-  /** 视频太长，做不成 GIF（detail.seconds：最长几秒，D-184）。 */
+  /** Video is too long to convert into a GIF (`detail.seconds`: maximum seconds, D-184). */
   | 'tooLong'
-  /** 这台手机不能本机识别这种语言的表格（转 Excel 要每行文字的位置，D-272）。 */
+  /** This phone cannot locally recognize tables in this language (Excel conversion requires character bounding boxes per line, D-272). */
   | 'tableUnsupported'
-  /** 这台手机不能本机识别这种语言的文档（转 Word 要每行文字的位置，D-328）。 */
+  /** This phone cannot locally recognize documents in this language (Word conversion requires character bounding boxes per line, D-328). */
   | 'wordUnsupported'
-  /** 这台手机不能把这种文档转成 PDF（detail.format：XLSX 等；Android 只能转 Word，D-186）。 */
+  /** This phone cannot convert this document type to PDF (`detail.format`: XLSX, etc.; Android supports Word only, D-186). */
   | 'documentUnsupported'
   | 'unexpected';
 
 export class RunError extends Error {
   constructor(
     readonly code: RunErrorCode,
-    /** 只含规格数字和文件显示名，给用户看；不写进执行记录。 */
+    /** Contains specification numbers and file display names only, for user viewing; not written to execution logs. */
     readonly detail: Record<string, string | number> = {},
   ) {
     super(`${code} ${JSON.stringify(detail)}`);
   }
 }
 
-/** 用户取消（选择器、本地操作界面、运行时询问、扩展包下载确认）。 */
+/** User cancelled (picker, local operation UI, runtime prompt, pack download confirmation). */
 export class RunCancelled extends Error {}
 
 export interface StepContext<S> {
@@ -162,12 +170,12 @@ export interface StepContext<S> {
   now(): Date;
   newId(): string;
   services: S;
-  /** 步内进度，例如第 3/10 张；unit 为 percent 时 done 是 0–100（视频处理）。 */
+  /** In-step progress, e.g., 3/10; when `unit` is 'percent', `done` is 0-100 (video processing). */
   progress(done: number, total: number, unit?: 'percent'): void;
   throwIfCancelled(): void;
-  /** 本次运行保存成用户文件的 ID（file.save 填写）。 */
+  /** IDs of files saved as user files during this run (populated by `file.save`). */
   saved: string[];
-  /** 这一步问到的密码（secret 参数）：只在这次运行里用；没有问（没有询问界面、用户没填）时没有这个键。 */
+  /** Passwords requested during this step (`secret` parameters): used only in this current run; key is absent if unrequested (no prompt UI or user left blank). */
   secrets: Readonly<Record<string, string>>;
 }
 
@@ -178,10 +186,13 @@ export type ActionImpl<S> = (
 ) => Promise<RunValue>;
 
 /**
- * 把一个动作的参数 schema 和它的实现连起来（R14）：实现里的 params 类型是从 schema 推出来的。
- * schema 在 core 里导出，定义（ActionDefinition.params）和实现用同一个；在 core 里改了参数的名字或取值，
- * 实现这边编译就报错，不会漏改。schema 只用来推类型，运行时参数已经按它校验过了。
- * 新增 / 修改动作时优先这样写，不要再手写 params as { ... }。
+ * Connects an action's parameter schema with its implementation (R14): implementation parameter
+ * types are inferred from the schema. The schema is exported in core; definition
+ * (`ActionDefinition.params`) and implementation share the same schema. If a parameter name or
+ * value is modified in core, implementation compilation errors immediately, preventing missed
+ * updates. The schema is used solely for type inference; runtime parameters have already been
+ * validated against it. When adding or modifying actions, write them this way preferentially
+ * rather than manually casting `params as { ... }`.
  */
 export function implOf<S, P extends Record<string, unknown>>(
   _schema: z.ZodType<P>,
@@ -191,7 +202,7 @@ export function implOf<S, P extends Record<string, unknown>>(
 }
 
 export type RunEvent =
-  /** items：这一步要处理几个文件（输入是文件时），images：是不是图片，运行页据此写「第 n/N 张」（D-276）。 */
+  /** `items`: number of files this step processes (when input is files); `images`: whether they are images; the run page displays "Image n/N" based on this (D-276). */
   | { kind: 'step'; index: number; items?: number; images?: boolean }
   | { kind: 'progress'; index: number; done: number; total: number; unit?: 'percent' };
 
@@ -208,19 +219,19 @@ export type RunResult =
       status: 'succeeded';
       value: RunValue | null;
       saved: string[];
-      /** 第一步（输入）拿到的文件总大小：结果页显示「原来 X → 现在 Y」。 */
+      /** Total size of files obtained in the first step (input): result page displays "Original X -> Current Y". */
       inputSize: number;
     }
   | { status: 'cancelled' }
   | { status: 'failed'; error: RunError; stepIndex: number | null };
 
-/** 一步要的扩展包；optional：不下载这一步也照样做（D-274）。 */
+/** Pack required by a step; `optional`: step proceeds even without downloading (D-274). */
 export interface PackNeed {
   pack: string;
   optional: boolean;
 }
 
-/** 这一步在这台设备上要的一个扩展包（见 RunOptions.devicePack）。 */
+/** A pack required by this step on this device (see `RunOptions.devicePack`). */
 export interface DevicePack {
   pack: string;
   optional?: boolean;
@@ -235,22 +246,27 @@ export interface RunOptions<S> {
   locale: Locale;
   now: () => Date;
   newId: () => string;
-  /** 运行时询问参数；返回本次使用的参数，null 表示用户取消。不写回配置。 */
+  /** Asks for parameters at runtime; returns parameters used for this run, or `null` if the user cancelled. Not written back to config. */
   askParams?: (request: AskRequest) => Promise<Record<string, unknown> | null>;
   /**
-   * 步骤需要扩展包时调用：已安装或用户确认下载并完成后返回 true；用户拒绝返回 false（D-064）。
-   * optional：不下载这一步也照样做（D-274），界面据此说明，不让人以为会取消。
+   * Called when a step requires a pack: returns `true` if installed or user confirmed download
+   * and completion; returns `false` if user refused (D-064). `optional`: step proceeds even
+   * without downloading (D-274), which the UI communicates so users do not assume cancellation.
    */
   ensurePack?: (packId: string, options?: { optional?: boolean }) => Promise<boolean>;
   /**
-   * 第一次有步骤要扩展包时，把这一步和后面各步要的一次问完（D-299）：界面只列还没装的，一次下载。
-   * 返回用户没下载的可选扩展包；null 表示必需的没下载，取消运行。没有它时每一步用 ensurePack 分开问。
-   * 后面的步骤按配置里的参数和现在的输入估；估漏的（例如运行时选了别的语言）到那一步再用 ensurePack 问。
+   * When a pack is first needed by a step, prompts for all required packs for this step and
+   * subsequent steps at once (D-299): the UI lists only uninstalled ones for a single download.
+   * Returns optional packs not downloaded by the user; `null` indicates required packs were not
+   * downloaded, cancelling the run. When absent, each step queries separately via `ensurePack`.
+   * Subsequent steps estimate based on config parameters and current inputs; any missed
+   * estimations (e.g., language selected at runtime) prompt via `ensurePack` when reached.
    */
   ensurePacks?: (needs: readonly PackNeed[]) => Promise<string[] | null>;
   /**
-   * 这一步在这台设备上不需要扩展包时返回 true，不调用 ensurePack（D-085–D-087）：
-   * 系统自带的识别（iOS 的 Vision、Android 的 ML Kit），或者输入已经是拉正的页面。
+   * Returns `true` without calling `ensurePack` when this step requires no packs on this device
+   * (D-085–D-087): system built-in recognition (iOS Vision, Android ML Kit), or input is already
+   * a straightened page.
    */
   packNotNeeded?: (
     actionId: string,
@@ -258,10 +274,12 @@ export interface RunOptions<S> {
     input: RunValue | null,
   ) => boolean;
   /**
-   * 这一步在这台设备上要的扩展包（D-269，例如文字识别模型）；有它时代替动作自己的扩展包。
-   * optional：用户不下载也照样做（例如可搜索 PDF 没有文字层），不取消运行。
-   * extra：不代替动作自己的扩展包，而是另外问一次（D-274：扫描的展平模型；只能是 optional）。
-   * 一步要几个时给数组（D-328：转 Word 要文字识别模型，另外可选版面分析模型）。
+   * Pack required by this step on this device (D-269, e.g., text recognition model); replaces the
+   * action's own pack when present. `optional`: proceeds even if the user does not download
+   * (e.g., searchable PDF without text layer), without cancelling the run. `extra`: does not
+   * replace the action's own pack, but prompts additionally (D-274: scanning flattening model;
+   * must be `optional`). Accepts an array when multiple are needed per step (D-328: Word
+   * conversion requires text recognition model plus optional layout analysis model).
    */
   devicePack?: (
     actionId: string,
@@ -269,14 +287,16 @@ export interface RunOptions<S> {
     input: RunValue | null,
   ) => DevicePack | readonly DevicePack[] | undefined;
   /**
-   * 容器交给第一步的值（D-428）：记录页的这一条、这个字段的值、列表选出的记录。第一步是输入动作时不用。
-   * 第一步要它、却没有（从快捷操作列表、桌面、提醒走到这里）时不运行任何一步。
+   * Value handed over to the first step by the container (D-428): the current entry on a record
+   * page, this field's value, or selected records from a list. Not used when the first step is an
+   * input action. If the first step requires it but it is absent (reached from quick action list,
+   * home screen, reminders), no steps are executed.
    */
   handed?: RunValue | null;
-  /** 界面把 cancelled 设为 true 即可取消。 */
+  /** Setting `cancelled` to `true` in the UI cancels execution. */
   signal?: { cancelled: boolean };
   onEvent?: (event: RunEvent) => void;
-  /** 执行记录（tool_runs）：只记录元数据，不记录内容和文件名。 */
+  /** Execution log (`tool_runs`): records metadata only, omitting content and file names. */
   record?: {
     start(): Promise<number>;
     finish(
@@ -290,10 +310,10 @@ export interface RunOptions<S> {
   };
 }
 
-/** 检查「停止」的间隔。 */
+/** Interval for checking cancellation. */
 const CANCEL_POLL_MS = 200;
 
-/** core 不依赖 DOM 或 Node 的类型，计时器从全局对象取（App 和测试环境都有）。 */
+/** Core does not depend on DOM or Node types; timers are retrieved from the global object (available in both app and test environments). */
 const timers = globalThis as unknown as {
   setInterval(fn: () => void, ms: number): unknown;
   clearInterval(id: unknown): void;
@@ -315,7 +335,7 @@ export async function runWorkflow<S>(opts: RunOptions<S>): Promise<RunResult> {
     return result;
   };
 
-  // 一步要的扩展包：动作自己的（或设备代替它的），再加另外要的可选的（D-274）。
+  // Packs needed for a step: action's own pack (or device fallback), plus other required optionals (D-274).
   const packNeeds = (
     action: ActionDefinition,
     params: Record<string, unknown>,
@@ -335,17 +355,17 @@ export async function runWorkflow<S>(opts: RunOptions<S>): Promise<RunResult> {
       ...devices.filter((d) => d.extra).map((d) => ({ pack: d.pack, optional: true })),
     ];
   };
-  // 这次运行里已经装好的、用户不下载的可选扩展包：不再问。
+  // Optional packs already installed in this run that the user does not need to download: do not prompt again.
   const ready = new Set<string>();
   const skipped = new Set<string>();
   let askedAll = false;
 
-  // 配置保存前已经校验过；执行前再检查一次（D-020 纵深防御）。
+  // Validated before saving config; check again before execution (D-020 defense in depth).
   if (workflowProblems(workflow, registry).length > 0) {
     return finish({ status: 'failed', error: new RunError('invalidWorkflow'), stepIndex: null });
   }
 
-  // 容器交的值：类型对不上、没有、是空的都不开始（D-428）。文件（D-442）是第一步收的那种文件。
+  // Values handed by the container: do not start if types mismatch, values are missing, or empty (D-428). Files (D-442) are the kind received in the first step.
   const wanted = handedInput(workflow.steps, registry);
   const given = wanted !== null ? (opts.handed ?? null) : null;
   if (wanted !== null) {
@@ -371,7 +391,7 @@ export async function runWorkflow<S>(opts: RunOptions<S>): Promise<RunResult> {
   const throwIfCancelled = () => {
     if (opts.signal?.cancelled) throw new RunCancelled();
   };
-  // 用户点「停止」时不再等待挂起的系统界面（例如没能弹出的文件选择器）：每一步都和取消信号赛跑。
+  // When the user taps "Stop", do not wait for suspended system UI (e.g., file pickers that failed to appear): every step races against the cancellation signal.
   let stopWatching = () => {};
   const whenCancelled = new Promise<never>((_, reject) => {
     if (!opts.signal) return;
@@ -400,7 +420,7 @@ export async function runWorkflow<S>(opts: RunOptions<S>): Promise<RunResult> {
       const impl = opts.impls[step.action];
       if (!impl) throw new RunError('unsupportedAction', { action: step.action });
       let params = action.params.parse(step.params);
-      // 密码每次都问（D-194），和配置里的 ask 一起问；回答分开放，不进参数。
+      // Always prompt for passwords (D-194), asked alongside configuration prompts; answers are stored separately and do not enter parameters.
       const secretKeys = action.fields.filter((f) => f.kind === 'secret').map((f) => f.key);
       const keys = [...(step.ask ?? []), ...secretKeys.filter((k) => !step.ask?.includes(k))];
       const secrets: Record<string, string> = {};
@@ -430,7 +450,7 @@ export async function runWorkflow<S>(opts: RunOptions<S>): Promise<RunResult> {
         )
           throw new RunError('invalidWorkflow');
       }
-      // 先问参数再确认扩展包：文字识别的语言包由本次选的语言决定。
+      // Prompt for parameters first, then confirm packs: OCR language packs are determined by the selected language.
       const needs = packNeeds(action, params, value);
       if (needs.length && opts.ensurePacks && !askedAll) {
         askedAll = true;
@@ -438,7 +458,7 @@ export async function runWorkflow<S>(opts: RunOptions<S>): Promise<RunResult> {
           const a = registry.actions.get(s.action)!;
           return packNeeds(a, a.params.parse(s.params), value);
         });
-        // 同一个扩展包只列一次；有一步必需就是必需的。
+        // List each pack only once; if any step requires it, it is required.
         const all: PackNeed[] = [];
         for (const need of [...needs, ...later]) {
           const seen = all.find((n) => n.pack === need.pack);
@@ -453,7 +473,7 @@ export async function runWorkflow<S>(opts: RunOptions<S>): Promise<RunResult> {
         if (ready.has(pack) || (optional && skipped.has(pack)) || !opts.ensurePack) continue;
         const ok = await orCancel(opts.ensurePack(pack, optional ? { optional: true } : undefined));
         if (ok) ready.add(pack);
-        // 可选的不下载也照样做这一步。
+        // Optional packs still execute this step even if not downloaded.
         else if (optional) skipped.add(pack);
         else throw new RunCancelled();
       }
@@ -493,6 +513,6 @@ export async function runWorkflow<S>(opts: RunOptions<S>): Promise<RunResult> {
   }
 }
 
-/** 一个值里所有文件的总大小。 */
+/** Total size of all files in a value. */
 export const totalSize = (value: RunValue | null) =>
   isFileValue(value) ? value.items.reduce((sum, item) => sum + item.size, 0) : 0;

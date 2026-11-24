@@ -3,8 +3,9 @@ import { drawHomeScreenIcon } from './icon-image';
 import type { HomeScreenEntry, HomeScreenPlatform } from './platform';
 
 /**
- * 交给本地模块的项。Android：App 自己的图标先画成一张图（D-606）；画不出来就不带图，原生用 Tinkrum 的图标。
- * iOS 的菜单只收系统图标（symbol），不画（drawHomeScreenIcon 在 iOS 上什么都不画）。
+ * Items passed to the native module. Android: App's own icon is first drawn as an image (D-606);
+ * if it cannot be drawn, no icon is supplied, and native uses Tinkrum's icon. iOS menus only
+ * accept system icons (symbol) and do not draw (drawHomeScreenIcon does nothing on iOS).
  */
 async function toNative({ art, ...item }: HomeScreenEntry): Promise<ShortcutItem> {
   if (!art) return item;
@@ -12,10 +13,10 @@ async function toNative({ art, ...item }: HomeScreenEntry): Promise<ShortcutItem
   return image ? { ...item, image } : item;
 }
 
-/** 画图要等：一次一次排着换，后一次的菜单不会被前一次的盖掉。 */
+/** Drawing requires waiting: queued sequentially so the menu of a later operation doesn't overwrite an earlier one. */
 let queue: Promise<unknown> = Promise.resolve();
 
-/** 本地模块 MorphShortcuts（D-271）；Expo Go、Web 和测试里没有，返回 null（不同步、不显示按钮）。 */
+/** Local module MorphShortcuts (D-271); absent in Expo Go, Web, and tests, returns null (not synchronized, buttons not displayed). */
 export const nativeHomeScreen: HomeScreenPlatform | null = MorphShortcuts
   ? {
       setItems: (items, disabledMessage) => {

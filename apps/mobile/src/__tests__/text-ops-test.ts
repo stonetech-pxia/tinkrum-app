@@ -5,7 +5,7 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeVision } from '../test-utils/fake-files';
 
-// 文字加工（D-245）：识别出的文字在本机整理、替换、提取、拆行，结果只在结果页显示。
+// Text processing (D-245): recognized text is organized, replaced, extracted, and line-split on-device, with results displayed only on the result page.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 let ids = 0;

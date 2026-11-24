@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { TAX_WORD } from './rules-data';
 
-// 税字样词表（D-403）：整份文字里一个税字样都没有时，没有标签的数不当税额。
-// 新加的语言（中文、日文、韩文、土耳其语、葡语、阿拉伯语、俄语、波兰语……）不能因为词表漏了而被当成「没写税」。
+// Tax keyword glossary (D-403): when there is no tax keyword in the entire text, unlabeled numbers
+// are not treated as tax amounts. Newly added languages (Chinese, Japanese, Korean, Turkish,
+// Portuguese, Arabic, Russian, Polish...) must not be treated as 'tax not specified' due to
+// glossary omissions.
 
 describe('TAX_WORD', () => {
   it.each([
@@ -37,7 +39,7 @@ describe('TAX_WORD', () => {
     'PPN 11%',
     'moms 25%',
     'ภาษีมูลค่าเพิ่ม',
-  ])('认得「%s」', (text) => {
+  ])('Recognizes "%s"', (text) => {
     expect(TAX_WORD.test(text)).toBe(true);
   });
 
@@ -50,7 +52,7 @@ describe('TAX_WORD', () => {
     '合计 43.20',
     '合計',
     'Итого',
-  ])('不认「%s」', (text) => {
+  ])('Does not recognize "%s"', (text) => {
     expect(TAX_WORD.test(text)).toBe(false);
   });
 });

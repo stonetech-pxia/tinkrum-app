@@ -1,4 +1,6 @@
-"""在固定的 50 张干净小票上顺序运行候选模型，两种输出模式。"""
+"""Run candidate models sequentially on a fixed set of 50 clean receipts, supporting two output
+modes.
+"""
 from __future__ import annotations
 
 import json

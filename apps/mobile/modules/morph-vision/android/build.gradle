@@ -1,5 +1,7 @@
-// 本地 Expo 模块的 Android 部分（D-087）：文字识别用 PP-OCRv6（D-269，ONNX Runtime 跑模型，模型是下载的扩展包），
-// ML Kit 只留韩文识别器（模型打包进 App）；文档扫描通过 Google Play 服务。ML Kit 是闭源的 Google 组件，和 AGPL 的关系见 DECISIONS P-015。
+// Android portion of the local Expo module (D-087): OCR uses PP-OCRv6 (D-269, running models via
+// ONNX Runtime with models downloaded as extension packs), ML Kit retains only the Korean
+// recognizer (models packaged into the app); document scanning uses Google Play services. ML Kit is
+// a closed-source Google component; see DECISIONS P-015 regarding AGPL compliance.
 plugins {
   id 'com.android.library'
   id 'expo-module-gradle-plugin'
@@ -13,22 +15,22 @@ android {
   defaultConfig {
     versionCode 1
     versionName '1.0.0'
-    // release 包开了 R8：ML Kit 的内部类不能被合并、改写。
+    // R8 is enabled in the release build: ML Kit internal classes must not be merged or obfuscated.
     consumerProguardFiles 'consumer-rules.pro'
   }
 }
 
 dependencies {
   implementation "com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1"
-  // 证件照自动框脸（D-252）：模型打包进 App。
+  // Automatic face bounding for ID photos (D-252): models packaged into the app.
   implementation "com.google.mlkit:face-detection:16.1.7"
-  // 照片里是什么（没有文字的照片做推荐用）：图像标注的基础模型打包进 App。版本没在 Google Maven 上核对过，同步时确认。
+  // Image content classification (used for recommendations on photos without text): base image labeling model packaged into the app. Version not verified on Google Maven; confirm during synchronization.
   implementation "com.google.mlkit:image-labeling:17.0.9"
-  // 「记一笔」预填的日期和金额（只做规则的补充）：实体识别，每种语言的模型第一次用时下载。版本没在 Google Maven 上核对过。
+  // Pre-filling date and amount for "log an expense" (supplementing rules only): entity extraction, with models for each language downloaded on first use. Version not verified on Google Maven.
   implementation "com.google.mlkit:entity-extraction:16.0.0-beta5"
-  // PP-OCRv6 不认韩文，韩文还用 ML Kit（D-269）。
+  // PP-OCRv6 does not recognize Korean, so Korean continues to use ML Kit (D-269).
   implementation "com.google.mlkit:text-recognition-korean:16.0.1"
-  // ONNX Runtime（MIT）：跑 PP-OCRv6 的两个模型（D-269）。
+  // ONNX Runtime (MIT): runs the two PP-OCRv6 models (D-269).
   implementation "com.microsoft.onnxruntime:onnxruntime-android:1.30.0"
   implementation "com.google.android.gms:play-services-mlkit-document-scanner:16.0.0"
   implementation "com.google.android.gms:play-services-base:18.11.1"

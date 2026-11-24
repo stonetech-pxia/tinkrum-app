@@ -5,7 +5,7 @@ import type { Op } from './ops';
 import type { Collection, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// 页面上的时间范围块和跟着它的图表、数字卡（D-440）：配置检查、删块时的清理。
+// Period blocks on pages and their associated charts and number cards (D-440): config validation, and cleanup when deleting blocks.
 
 const ctx = { registry, locale: 'zh' as const, now: new Date(2026, 10, 4) };
 

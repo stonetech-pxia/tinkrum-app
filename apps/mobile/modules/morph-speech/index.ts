@@ -1,34 +1,38 @@
 import { requireOptionalNativeModule, type EventSubscription } from 'expo';
 
-// 本地 Expo 模块 MorphSpeech（D-150、D-151）：在本机把录音转成文字，不上传。
-// iOS 是 ios/MorphSpeechModule.swift：iOS 26 起用系统的 SpeechAnalyzer（SpeechTranscriber），
-// 更早的系统退回 SFSpeechRecognizer（只用本机识别）。Android 系统不能识别音频文件，
-// android/… 里编进了 whisper.cpp（MIT），模型是第一次用时下载的下载内容（core/packs.ts 的 speech-whisper-*）。
-// Expo Go 和测试里是 null，调用方报「要在正式版 Morph 里用」。识别出的文字只返回给 App，不写日志。
+// Local Expo module MorphSpeech (D-150, D-151): converts audio recordings to text on-device without
+// uploading. iOS uses ios/MorphSpeechModule.swift: starting from iOS 26, uses system SpeechAnalyzer
+// (SpeechTranscriber), falling back to SFSpeechRecognizer on older systems (local recognition
+// only). The Android system cannot recognize audio files, so whisper.cpp (MIT) is compiled into
+// android/...; models are downloaded on first use (speech-whisper-* in core/packs.ts). Returns null
+// in Expo Go and tests, callers report 'must be used in the official Morph release'. Recognized
+// text is returned only to the app and is not logged.
 
 export type SpeechEngine = 'system' | 'whisper';
 
 /**
- * 一种语言在这台设备上能不能识别（只对 engine 为 system 有意义；whisper 的模型由下载内容管理，总是 installed）：
- * installed 可以直接识别；needsDownload 系统要先下载这种语言的识别模型（由苹果提供，prepareLanguage）；
- * unsupported 这台设备不支持。
+ * Whether a language can be recognized on this device (only meaningful when engine is system;
+ * whisper models are managed via downloads and are always installed): installed can be recognized
+ * directly; needsDownload means the system must first download the recognition model for this
+ * language (provided by Apple, via prepareLanguage); unsupported means this device does not
+ * support it.
  */
 export type LanguageStatus = 'installed' | 'needsDownload' | 'unsupported';
 
 export interface TranscribeOptions {
-  /** 用于进度事件和取消。 */
+  /** Used for progress events and cancellation. */
   taskId: string;
-  /** system：BCP 47（zh-CN、en-US）；whisper：whisper 的语言代码（zh、en）。 */
+  /** system: BCP 47 (zh-CN, en-US); whisper: whisper language code (zh, en). */
   language: string;
-  /** whisper 模型文件（file:// 地址或绝对路径），只有 whisper 需要。 */
+  /** whisper model file (file:// URI or absolute path), required only for whisper. */
   model?: string;
-  /** whisper 的语音检测模型（跳过没人说话的部分），只有 whisper 用。 */
+  /** whisper voice activity detection model (to skip parts where no one is speaking), used only by whisper. */
   vad?: string;
-  /** whisper 的提示词：中文用简体的句子，不然常常输出繁体。 */
+  /** whisper prompt: use Simplified Chinese sentences for Chinese, otherwise it often outputs Traditional Chinese. */
   prompt?: string;
-  /** 只给测试用：iOS 26 起也走 SFSpeechRecognizer，用来在新系统上检查旧系统的那条路。 */
+  /** For testing only: also use SFSpeechRecognizer on iOS 26+ to check the old system path on new systems. */
   legacy?: boolean;
-  /** 为字幕请求词/段落时间戳（旧版 iOS 按词分组）。 */
+  /** Requests word/segment timestamps for subtitles (older iOS versions grouped by word). */
   timed?: boolean;
 }
 
@@ -51,24 +55,26 @@ export interface SpeechProgressEvent {
 
 export interface MorphSpeechModule {
   readonly engine: SpeechEngine;
-  /** 能识别的语言（system：BCP 47，下划线换成连字符；whisper：语言代码）。 */
+  /** Recognizable languages (system: BCP 47, underscores replaced with hyphens; whisper: language code). */
   supportedLanguages(): Promise<string[]>;
   languageStatus(language: string): Promise<LanguageStatus>;
   /**
-   * 系统下载这种语言的识别模型（iOS 26 起，由苹果提供、所有 App 共用）；已经有了就直接返回。
-   * 只能在用户确认后调用。进度用 taskId 发 onProgress。
+   * System downloads the recognition model for this language (starting from iOS 26, provided by
+   * Apple, shared across all apps); returns immediately if already present. Can only be called
+   * after user confirmation. Sends onProgress updates via taskId.
    */
   prepareLanguage(language: string, taskId: string): Promise<void>;
   /**
-   * 识别一个音频文件（m4a、wav、mp3、aac、caf…；Android 上系统能解码的都行）。
-   * 错误码：ERR_SPEECH_UNSUPPORTED_LANGUAGE、ERR_SPEECH_NEEDS_DOWNLOAD、ERR_SPEECH_NOT_AUTHORIZED、
-   * ERR_SPEECH_UNREADABLE_AUDIO（打不开 / 没有声音轨）、ERR_SPEECH_MODEL（模型文件坏了）、ERR_SPEECH_CANCELLED、
-   * ERR_SPEECH_UNAVAILABLE（这台设备上系统识别用不了，例如 iOS 模拟器）。
+   * Transcribe an audio file (m4a, wav, mp3, aac, caf...; any format decodable by the system on
+   * Android). Error codes: ERR_SPEECH_UNSUPPORTED_LANGUAGE, ERR_SPEECH_NEEDS_DOWNLOAD,
+   * ERR_SPEECH_NOT_AUTHORIZED, ERR_SPEECH_UNREADABLE_AUDIO (cannot open / no audio track),
+   * ERR_SPEECH_MODEL (corrupted model file), ERR_SPEECH_CANCELLED, ERR_SPEECH_UNAVAILABLE (system
+   * speech recognition unavailable on this device, e.g., iOS simulator).
    */
   transcribe(uri: string, options: TranscribeOptions): Promise<NativeTranscript>;
-  /** 取消一次识别：transcribe 以 ERR_SPEECH_CANCELLED 结束。 */
+  /** Cancel a transcription: transcribe finishes with ERR_SPEECH_CANCELLED. */
   cancel(taskId: string): void;
-  /** 边读边算文件的 SHA-256（下载的模型有几百 MB，不能整份读进 JS）。 */
+  /** Computes file SHA-256 while reading (downloaded models are hundreds of MBs and cannot be read entirely into JS). */
   sha256File(uri: string): Promise<string>;
   addListener(event: 'onProgress', listener: (e: SpeechProgressEvent) => void): EventSubscription;
 }

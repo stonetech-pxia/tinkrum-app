@@ -21,7 +21,7 @@ import {
 
 const page = { width: 1700, height: 2400 };
 
-/** 不弯的 UVDoc 网格：每个输出点对着补边后的图上同样的位置。 */
+/** Unwarped UVDoc grid: each output point corresponds to the same position on the padded image. */
 function flatWarp(size = page): UvdocWarp {
   const grid = new Float32Array(2 * 45 * 31);
   for (let y = 0; y < 45; y++) {
@@ -33,7 +33,7 @@ function flatWarp(size = page): UvdocWarp {
   return { grid, page: size };
 }
 
-/** 一条文字行：y = f(x)，x 从 x0 到 x1，每 4 像素一个点。 */
+/** A text line: y = f(x), x from x0 to x1, one point every 4 pixels. */
 function line(f: (x: number) => number, x0 = 150, x1 = 1550, thickness = 30): PageLine {
   const xs: number[] = [];
   const ys: number[] = [];
@@ -73,12 +73,12 @@ describe('flatten: model input and grid', () => {
       { x: 1699, y: 2399 },
     ]) {
       const s = uvdocSource(warp, p.x, p.y);
-      // 补边后的网格：页面点在补边图上的相对位置不同于页面上的，所以只检查补边边界和中心。
+      // Padded grid: relative positions of page points on the padded image differ from those on the page, so only padded boundaries and center are checked.
       expect(s.x).toBeGreaterThanOrEqual(0);
       expect(s.y).toBeLessThanOrEqual(2399);
     }
     expect(uvdocSource(warp, 849.5, 1199.5).x).toBeCloseTo(849.5, 0);
-    // 输出的边对着补边图的边，落在纸外，夹到纸边上。
+    // Output edges correspond to padded image edges, falling outside the paper and clamped to the paper edge.
     expect(uvdocSource(warp, 0, 0)).toEqual({ x: 0, y: 0 });
     expect(uvdocSource(warp, 1699, 2399)).toEqual({ x: 1699, y: 2399 });
   });
@@ -89,7 +89,7 @@ describe('flatten: text lines', () => {
     const w = 400;
     const h = 600;
     const prob = new Uint8Array(w * h);
-    // 一条斜一点的行（10 像素高）、一个竖条（不是行）、一块概率不够的。
+    // A slightly slanted line (10 pixels high), a vertical bar (not a line), and a block with insufficient probability.
     for (let x = 40; x < 360; x++) {
       const y0 = 100 + Math.round(x / 40);
       for (let y = y0; y < y0 + 10; y++) prob[y * w + x] = 230;
@@ -99,7 +99,7 @@ describe('flatten: text lines', () => {
     const found = textLinesFromProb(prob, w, h, { width: 1600, height: 2400 });
     expect(found).toHaveLength(1);
     const [l] = found;
-    // 换算到页面：放大 4 倍。
+    // Scaled to page: multiplied by 4.
     expect(l!.thickness).toBeCloseTo(40, 0);
     expect(l!.xs[0]).toBe(160);
     expect(l!.ys[0]).toBeCloseTo((100 + 1 + 4.5) * 4, 0);
@@ -113,7 +113,7 @@ describe('flatten: text lines', () => {
     const gray = new Uint8Array(w * h).fill(235);
     for (let x = 100; x < 900; x++) gray[700 * w + x] = gray[701 * w + x] = 30;
     for (let y = 200; y < 1200; y++) gray[y * w + 500] = gray[y * w + 501] = 30;
-    // 一行字（短横段）不是表格线。
+    // A line of text (short horizontal segment) is not a table line.
     for (let x = 100; x < 160; x++) gray[300 * w + x] = 30;
     const target = { width: 1000, height: 1400 };
     const h1 = ruleLines(gray, w, h, target, false);
@@ -141,7 +141,7 @@ describe('flatten: refining by the text lines', () => {
       lines(10, (x, row) => 300 + row * 150 + Math.tan((deg * Math.PI) / 180) * x);
     const r = planRefinement(page, tilt(0.3));
     expect(r.angle).toBeCloseTo(0.3, 2);
-    // 输出页上一条水平线，取的是原来那条斜线。
+    // A horizontal line on the output page, taking the original slanted line.
     const yAt = (x: number) => 300 + 4 * 150 + Math.tan((0.3 * Math.PI) / 180) * x;
     const target = rotatePoint(page, 0.3, { x: 850, y: yAt(850) }).y;
     for (const x of [200, 850, 1500]) {
@@ -164,7 +164,7 @@ describe('flatten: refining by the text lines', () => {
     expect(r.lines).toBe(10);
     for (const row of [2, 5, 8]) {
       const xs = [300, 600, 900, 1200];
-      // 目标高度是这条行的平均高度：沿着输出页上的水平线取样，应该落在弯的行上。
+      // Target height is the average height of this line: sampled along the horizontal line on the output page, should land on the warped line.
       let mean = 0;
       for (let x = 150; x <= 1550; x += 4) mean += wave(x, row);
       mean /= Math.floor(1400 / 4) + 1;
@@ -183,7 +183,7 @@ describe('flatten: refining by the text lines', () => {
   });
 
   it('interpolates between lines and keeps the shift constant beyond the first and last', () => {
-    // 上半页的行往下弯 6 像素，下半页的行不弯：中间按高度线性过渡。
+    // Upper half lines bend downwards by 6 pixels, lower half lines do not bend: linear transition by height in the middle.
     const r = planRefinement(
       page,
       lines(
@@ -194,7 +194,7 @@ describe('flatten: refining by the text lines', () => {
     const mid = (y: number) => flattenSource(page, null, r, 850, y).y - y;
     expect(mid(500)).toBeGreaterThan(2);
     expect(Math.abs(mid(2100))).toBeLessThan(0.5);
-    // 第一行以上取第一行的位移。
+    // Use displacement of the first line for anything above the first line.
     expect(mid(100)).toBeCloseTo(mid(320), 0);
   });
 
@@ -225,7 +225,7 @@ describe('flatten: one mesh for one resampling', () => {
     for (let i = 0; i < n; i += 97) {
       const x = mesh.positions[i * 2]!;
       const y = mesh.positions[i * 2 + 1]!;
-      // 画布边缘（0 和 1700）对着第一个、最后一个像素的外沿：纹理坐标夹在像素中心以内。
+      // Canvas edges (0 and 1700) correspond to outer edges of first and last pixels: texture coordinates are clamped within pixel centers.
       expect(mesh.texcoords[i * 2]).toBeCloseTo(Math.min(Math.max(x, 0.5), 1699.5), 3);
       expect(mesh.texcoords[i * 2 + 1]).toBeCloseTo(Math.min(Math.max(y, 0.5), 2399.5), 3);
     }

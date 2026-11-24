@@ -1,8 +1,10 @@
 import ExpoModulesCore
 import WidgetKit
 
-// 桌面小组件（D-321–D-323）的 App 这一边：画面写进 App Group，让 WidgetKit 重画；取走小组件点了的操作。
-// iOS 不能替用户把小组件放到桌面，canPin 永远是 false（用户在桌面上「编辑 → 添加小组件」）。
+// App-side of the home screen widget (D-321–D-323): writes rendering output into the App Group to
+// trigger a WidgetKit redraw; retrieves tapped widget actions. iOS cannot automatically place
+// widgets on the home screen for the user, so canPin is always false (users use "Edit -> Add
+// Widget" on the home screen).
 
 private let appGroup = "group.dev.stonetech.tinkrum"
 
@@ -24,14 +26,15 @@ public class MorphWidgetsModule: Module {
       WidgetCenter.shared.reloadAllTimelines()
     }
 
-    // 读出点了还没处理的操作，不删（R07）：App 一条一条执行、记下做完了，再用 removeQueue 确认删掉。
-    // id 是文件名（不带 .json）。读不出来的留着，下次再读。
+    // Read unhandled tapped actions without deleting them (R07): App executes them one by one,
+    // records completion, and then confirms deletion using removeQueue. id is the filename (without
+    // .json). Unreadable ones are kept for the next read.
     AsyncFunction("readQueue") { () -> [[String: String]] in
       guard let queue = self.dir?.appendingPathComponent("queue", isDirectory: true),
         let names = try? FileManager.default.contentsOfDirectory(atPath: queue.path)
       else { return [] }
       var out: [[String: String]] = []
-      // 只取写完的（.json）；写到一半的 .tmp 留到下次。
+      // Process only completed files (.json); partially written .tmp files are left for next time.
       for name in names.sorted() where name.hasSuffix(".json") {
         let url = queue.appendingPathComponent(name)
         if let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) {
@@ -41,7 +44,7 @@ public class MorphWidgetsModule: Module {
       return out
     }
 
-    // 删掉处理好了的点按。只认队列目录里的文件名：带路径的 id 不删。
+    // Delete processed taps. Only recognizes filenames within the queue directory: paths containing IDs are not deleted.
     AsyncFunction("removeQueue") { (ids: [String]) in
       guard let queue = self.dir?.appendingPathComponent("queue", isDirectory: true) else { return }
       for id in ids where !id.isEmpty && !id.contains("/") && !id.contains("..") {

@@ -10,10 +10,12 @@ import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { LOOK_PROMPTS, openLookGuide, useGuide } from './store';
 
 /**
- * 引导第 1、2 步：右上角 Tink 说的话（D-447）。浮在页面上面，不占页面的位置；
- * 气泡下面的页面轻微虚化（Tink 那一行不虚化，Tink 自己带光圈）。
- * 第 1 步：点气泡打开那句话；右下角「跳过」直接加上两个文件入口（不进预览，D-239）。
- * 第 2 步：「搭好了」，右下角「我知道了」关掉气泡，引导结束（第 3 步样板 App 取消了，D-447）。
+ * Guidance steps 1 and 2: speech from Tink in the top right (D-447). Floats above the page
+ * without occupying layout space; the page beneath the bubble is slightly blurred (Tink's line is
+ * not blurred, and Tink has a halo). Step 1: tap the bubble to open that sentence; bottom-right
+ * "Skip" directly adds two file entries (bypassing preview, D-239). Step 2: "All set",
+ * bottom-right "Got it" closes the bubble, ending the guidance (step 3 sample app was cancelled,
+ * D-447).
  */
 export function GuideBubble({
   palette,
@@ -21,9 +23,9 @@ export function GuideBubble({
   blurTarget,
 }: {
   palette: Palette;
-  /** 气泡尖角的位置：Tink 那一行的下边。 */
+  /** Position of the bubble's pointer: bottom edge of Tink's line. */
   top: number;
-  /** Android 要把被虚化的内容包进 BlurTargetView 才会真模糊。 */
+  /** Android requires wrapping blurred content in a BlurTargetView for real blurring to take effect. */
   blurTarget: RefObject<ComponentRef<typeof View> | null>;
 }) {
   const { locale } = useWorkspaceContext();
@@ -36,7 +38,7 @@ export function GuideBubble({
   if (stage !== 'look' && stage !== 'goal') return null;
   const look = stage === 'look';
 
-  /** 跳过引导（D-231）：直接加上两个文件入口（不进预览），顶部不出「已改好 · 撤销」（D-239）。 */
+  /** Skip guidance (D-231): directly add two file entries (bypassing preview), without showing "Modified · Undo" at the top (D-239). */
   async function skip() {
     const ops = homeFileEntryOps(config, locale);
     if (ops.length > 0) {
@@ -71,7 +73,7 @@ export function GuideBubble({
               paddingHorizontal: palette.inset,
               backgroundColor: palette.primary,
               opacity: pressed ? 0.85 : 1,
-              // 高光：主色的光晕，和右上角 Tink 的光圈一起把人的目光带过去。
+              // Highlight: primary color glow, which together with Tink's top-right halo draws the user's eye.
               boxShadow: `0px 0px 18px ${palette.primary}99`,
             },
           ]}>
@@ -96,8 +98,10 @@ export function GuideBubble({
 }
 
 const styles = StyleSheet.create({
-  // 气泡贴在右上角 Tink 下面，三角尖角对着 Tink：Tink 的中心离屏幕右边 pad + 12（入口那一行贴着页面边距），
-  // 气泡右边离屏幕 pad - 3，尖角中心离气泡右边 15；靠 Tink 的那个角收小，尖角落在直边上。
+  // Bubble attached to the top right below Tink, with the triangular tip pointing at Tink: Tink's
+  // center is screen right pad + 12 (the entry row aligns with the page margin), the bubble's right
+  // side is screen pad - 3, and the tip's center is 15 from the bubble's right side; the corner
+  // facing Tink is made smaller, and the tip lands on the straight edge.
   wrap: { alignItems: 'flex-end', paddingTop: 12 },
   tail: {
     position: 'absolute',

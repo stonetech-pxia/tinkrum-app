@@ -16,7 +16,7 @@ import { FakeFiles, FakeVision } from '../test-utils/fake-files';
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
-/** 安装图片工具后的单功能工作流。 */
+/** Single-function workflow after installing image tools. */
 function toolWorkflow(id: string): Workflow {
   const result = applyOps(
     createDefaultWorkspace('zh'),
@@ -121,9 +121,9 @@ describe('image tool workflows', () => {
     const items = imagesOf(await run());
     expect(items.map((i) => `${i.name}.${i.ext}`)).toEqual(['IMG_1.jpg', 'small.jpg']);
     for (const item of items) expect(item.size).toBeLessThanOrEqual(240 * 1024);
-    // 小图不需要缩小：原尺寸、最高质量就已满足。
+    // Small images do not need scaling down: original size and highest quality already suffice.
     expect(items[1]).toMatchObject({ width: 300, height: 200 });
-    // 大图先降质量，不够才缩小尺寸，宽高比不变。
+    // Large images reduce quality first, then scale down dimensions if insufficient, preserving aspect ratio.
     expect(items[0]!.width! / items[0]!.height!).toBeCloseTo(4 / 3, 2);
     expect(items[0]!.size).toBeGreaterThan(200 * 1024);
   });
@@ -211,20 +211,20 @@ describe('image tool workflows', () => {
     const stripped = files.disk.get(items[0]!.uri)!;
     expect(readExif(stripped).hasLocation).toBe(false);
     expect(stripped.length).toBeLessThan(withGps.length);
-    // 只重新编码了 HEIC 那一张。
+    // Only re-encoded the HEIC image.
     expect(files.encodes).toHaveLength(1);
     expect(items[1]).toMatchObject({ ext: 'jpg' });
   });
 });
 
-/** 一个最小的 JPEG：SOI + 含 GPS 指针的 EXIF APP1 + 一个假的扫描段 + EOI。 */
+/** A minimal JPEG: SOI + EXIF APP1 with GPS pointer + fake scan segment + EOI. */
 function jpegWithExif(): Uint8Array {
   const tiff = [
     0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08,
-    // IFD0：1 个条目，GPS IFD 指针（0x8825）
+    // IFD0: 1 entry, GPS IFD pointer (0x8825)
     0x00, 0x01, 0x88, 0x25, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x1a, 0x00, 0x00,
     0x00, 0x00,
-    // GPS IFD：1 个条目，GPSLatitude（0x0002）
+    // GPS IFD: 1 entry, GPSLatitude (0x0002)
     0x00, 0x01, 0x00, 0x02, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00,
   ];
@@ -297,7 +297,7 @@ describe('background removal', () => {
     const pick = jest.spyOn(files, 'pickPhotos');
     expect(await run()).toMatchObject({ status: 'failed', error: { code: 'unsupportedAction' } });
     expect(vision.calls).toEqual([]);
-    // 开始前就说做不了：不让用户先选照片。
+    // Declares it cannot be done before starting: does not let the user pick photos first.
     expect(pick).not.toHaveBeenCalled();
     pick.mockRestore();
     vision.backgroundRemovalSupported = true;

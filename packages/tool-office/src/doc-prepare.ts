@@ -13,7 +13,7 @@ import { type Box } from './types';
 import { figureOwns, figureWorkingImage, planWordFigures } from './word-figures';
 import { leaderDots } from './word-fill-ins';
 
-/** 隔离整图并准备像素、纸张和识别行。 */
+/** Isolate full images and prepare pixels, paper, and recognition lines. */
 export function preparePage(
   state: Pick<
     PageBuildContext,
@@ -25,8 +25,10 @@ export function preparePage(
   const join = options.joinLines ?? defaultJoin;
   const { image } = input;
   const paper = input.paper ?? photoPaper(image);
-  // 按 Word 的纸宽估字：窄幅 PDF 按它的物理宽度；横向的纸（横向 A4 的 PDF、横拍的照片）按 842 磅宽，
-  // 不按竖向 A4 的 595 磅，不然字整体只有原来的 0.71 倍。比 A3 大的纸已经由 fitPaper 缩过，不会因此放大字。
+  // Estimate font width based on Word paper width: narrow PDFs use their physical width; landscape
+  // pages (landscape A4 PDFs, landscape photos) use 842 points width instead of portrait A4's 595
+  // points, otherwise text scales down to 0.71x its original size. Pages larger than A3 have
+  // already been scaled by fitPaper and will not be enlarged by this.
   const fontWidthPx = (image.width * A4_WIDTH_PT) / (paper?.width ?? A4_WIDTH_PT);
   const lines = input.lines.filter((l) => l.text.trim());
   const joinParagraph = lines.length < DENSE_LINES ? (options.joinParagraph ?? join) : join;
@@ -61,7 +63,7 @@ export function preparePage(
     : figures.length
       ? buildPage(input, options, false, repairTables, repairBarcodes)
       : undefined;
-  // 旧路径已经完整保图且没有输出图内文字/表格时，不重排原本正确的页。
+  // Do not re-layout originally correct pages when the legacy path already preserves the image completely and outputs no in-image text/tables.
   if (
     previous &&
     !native &&
@@ -72,21 +74,24 @@ export function preparePage(
     )
   )
     return donePage(previous);
-  // 原生整图：图里的字只有画进了剪图才归图。和剪图外的原生字（nativeText）重叠的识别行留作正文，
-  // 不然一段只有一部分在图里的 PDF 文字（轴标签和图旁的说明连在一起）在图里、正文里都没有。
+  // Native full image: text inside the image belongs to the image only if rendered inside the
+  // clipping. Recognition lines overlapping native text outside the clipping (nativeText) are
+  // retained as body text, preventing PDF text that is partially inside an image (such as axis
+  // labels connected to descriptions beside graphs) from being lost in both the image and body
+  // text.
   const owns = (box: Box) =>
     native
       ? figures.some((f) => lineShareIn(box, f.box) > 0.8) &&
         !input.nativeText?.some((t) => lineShareIn(box, t) >= 0.5)
       : figureOwns(box, figures);
   const available = figures.length ? lines.filter((l) => !owns(l)) : lines;
-  // 表单的点线（填写处）先从找线、组表用的图里抹掉，后面接进标签那一行（EU 样本 021）。
+  // Erase dotted lines (fill-in areas) from the line-finding and table-grouping image first, then attach them back to the corresponding label line (EU sample 021).
   const { dots, erased: working } = leaderDots(
     figureWorkingImage(image, figures, lineHeight),
     lines,
     lineHeight,
   );
-  // 抹掉图形不能顺带改变图外网格的坐标系；倾斜仍按原图估计。
+  // Erasing graphics must not alter the coordinate system of grids outside images; skew is still estimated from the original image.
   const tableSkew = input.skew ?? (figures.length ? findLines(image).skew : undefined);
   const layout = figures.length
     ? sourceRegions.flatMap((r) => {

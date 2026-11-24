@@ -15,15 +15,17 @@ import {
 import { SPEAK_LANGUAGES, SPEAK_LANGUAGE_NAMES, SPEAK_RATE_MAX, SPEAK_RATE_MIN } from '../speak';
 import type { ActionDefinition } from '../workflow/contract';
 
-// 音频工具（D-152–D-156）：语音转文字、压小 / 转格式、剪一段、几段合成一段、从视频里取声音。
-// 编码在 App 的原生模块 morph-media 里（iOS AVFoundation、Android Media3），语音转文字在 morph-speech 里
-// （iOS 系统识别，Android whisper.cpp，D-150、D-151），文字转语音在 morph-tts 里（系统声音，D-270）。
-// 全部在本机处理；识别出的文字、要朗读的文字都不发给 AI（D-036）。
+// Audio tool (D-152–D-156): speech-to-text, compression/format conversion, audio trimming, merging
+// multiple clips, extracting audio from video. Encoding is handled by the native module
+// `morph-media` on the app side (iOS AVFoundation, Android Media3), speech-to-text by
+// `morph-speech` (iOS system recognition, Android whisper.cpp, D-150, D-151), and text-to-speech by
+// `morph-tts` (system voices, D-270). All processing is performed on device; recognized text and
+// text to be spoken are never sent to the AI (D-036).
 
 export const AUDIO_TOOL_ID = 'audio';
 export const AUDIO_PAGE_ID = 'tool-audio';
 
-/** 压小音频、转格式的参数。导出给 App 里的实现用（implOf），定义和实现是同一个 schema。 */
+/** Parameters for audio compression and format conversion. Exported for use by the implementation in the app (implOf); definition and implementation share the same schema. */
 export const AUDIO_COMPRESS_PARAMS = z.strictObject({
   by: z.enum(['size', 'quality']),
   maxMB: z.number().min(0.1).max(2000),
@@ -145,7 +147,7 @@ export const AUDIO_ACTIONS: readonly ActionDefinition[] = [
       },
       {
         key: 'model',
-        // Android 用哪个识别模型（下载内容：更准 190 MB、更快 60 MB）；iPhone 用系统识别，不看这一项。
+        // Which Android recognition model to use (download content: 190 MB for higher accuracy, 60 MB for faster speed); iPhone uses system recognition and ignores this setting.
         label: { en: 'Recognition', zh: '识别', fr: 'Reconnaissance' },
         kind: 'choice',
         options: [
@@ -154,11 +156,11 @@ export const AUDIO_ACTIONS: readonly ActionDefinition[] = [
         ],
       },
     ],
-    // Android 的识别模型是下载内容；iOS 用系统识别，不需要（App 的 packNotNeeded）。
+    // The Android recognition model is downloadable content; iOS uses system recognition and does not need it (packNotNeeded in the app).
     pack: SPEECH_MODEL_PACKS.standard,
     packFor: (params) => SPEECH_MODEL_PACKS[params.model as SpeechModel],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -251,7 +253,7 @@ export const AUDIO_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -279,9 +281,9 @@ export const AUDIO_ACTIONS: readonly ActionDefinition[] = [
       { id: 'mp3', label: { en: 'MP3', zh: 'MP3', fr: 'MP3' }, values: { format: 'mp3' } },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
-      // MP3 输出（D-183）；跟在视频后面时换成「提取视频里的声音」（fitToPrevious）。
+      // MP3 output (D-183); when following a video, changes to "Extract audio from video" (fitToPrevious).
       {
         match:
           /^(?:转|转成|转换成|改成|存成)\s*(m4a|wav|mp3)(?:\s*格式)?$|^(?:convert (?:it |them )?to|save (?:it |them )?as) (m4a|wav|mp3)$/i,
@@ -319,7 +321,7 @@ export const AUDIO_ACTIONS: readonly ActionDefinition[] = [
     params: z.strictObject({}),
     fields: [],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -349,7 +351,7 @@ export const AUDIO_ACTIONS: readonly ActionDefinition[] = [
       { id: 'mp3', label: { en: 'MP3', zh: 'MP3', fr: 'MP3' }, values: { format: 'mp3' } },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -398,7 +400,7 @@ export const AUDIO_ACTIONS: readonly ActionDefinition[] = [
       { ...formatField, options: formatField.options.filter((o) => o.value !== 'mp3') },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265、D-270）。
+    // Step descriptions recognized by built-in rules (D-265, D-270).
     phrases: [
       {
         match:
@@ -409,7 +411,7 @@ export const AUDIO_ACTIONS: readonly ActionDefinition[] = [
   },
 ];
 
-/** 默认识别语言跟随界面语言。 */
+/** Default recognition language follows the interface language. */
 export const speechLangFor = (locale: Locale) =>
   locale === 'zh' ? 'zh' : locale === 'fr' ? 'fr' : 'en';
 
@@ -419,7 +421,7 @@ const pickAudio = (min: number, max: number) => ({
   params: { source: 'files', min, max },
 });
 
-/** 单功能工作流（D-061）：工具页上每个一个运行卡片。 */
+/** Single-feature workflow (D-061): one run card for each on the tools page. */
 export function audioWorkflows(locale: Locale): Workflow[] {
   const wf = (id: string, name: [string, string], steps: Workflow['steps']): Workflow => ({
     id,

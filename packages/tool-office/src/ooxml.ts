@@ -2,11 +2,13 @@ import { strFromU8, unzipSync, type UnzipFileInfo } from 'fflate';
 
 import { children, parseXml, type XmlElement } from './xml';
 
-// 打开外来的 docx / xlsx（D-509）的包：认出加了密码的（Office 把加密的文件装在 OLE 复合文件里，不是 zip）、
-// 老格式（.doc / .xls 改了扩展名）和坏文件；只解压用得到的部分，解压前按目录里写的大小拦住太大的文件和
-// 压缩炸弹（同 tool-archive）。全部在本机，不联网（不变量 1）。
+// Opens external docx/xlsx packages (D-509): recognizes password-protected files (Office stores
+// encrypted files in OLE compound files rather than zip), legacy formats (.doc/.xls with changed
+// extensions), and corrupted files; only unzips needed parts, checking file sizes and compression
+// bombs against directory declarations before unzipping (same as tool-archive). Fully local, no
+// network requests (Invariant 1).
 
-/** 读不了的原因：加了密码、不是 docx / xlsx、文件坏了、太大（编辑页和预览放不下）。 */
+/** Causes for unreadable files: password-protected, not docx/xlsx, corrupted, too large (exceeding editor and preview capacity). */
 export type OfficeImportError = 'encrypted' | 'notOffice' | 'damaged' | 'tooLarge';
 
 export class OfficeImportFailure extends Error {
@@ -15,7 +17,7 @@ export class OfficeImportFailure extends Error {
   }
 }
 
-/** 包的上限：一个 XML 部分、解压出来一共、图片一共（字节），压缩比（超过 1 MB 的部分才看）。 */
+/** Package limits: max bytes for an XML part, total unzipped size, total images (bytes), and compression ratio (checked only for parts > 1 MB). */
 export const OFFICE_LIMITS = {
   maxPartBytes: 40 * 1024 * 1024,
   maxTotalBytes: 80 * 1024 * 1024,
@@ -26,10 +28,10 @@ const RATIO_CHECK_MIN_BYTES = 1024 * 1024;
 
 const CFB_MAGIC = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
 
-/** OLE 复合文件（加密的 Office 文件、老的 .doc / .xls）。 */
+/** OLE compound file (encrypted Office files, legacy .doc/.xls). */
 const isCfb = (bytes: Uint8Array) => CFB_MAGIC.every((b, i) => bytes[i] === b);
 
-/** 复合文件的目录里有没有「EncryptedPackage」这个流（名字是 UTF-16LE）：有就是加了密码的 Office 文件。 */
+/** Check if the compound file directory contains the "EncryptedPackage" stream (named in UTF-16LE): if present, it is a password-protected Office file. */
 function hasEncryptedPackage(bytes: Uint8Array): boolean {
   const name = 'EncryptedPackage';
   const first = name.charCodeAt(0);
@@ -44,7 +46,7 @@ function hasEncryptedPackage(bytes: Uint8Array): boolean {
   return false;
 }
 
-/** 部分的文字：UTF-8（带不带 BOM 都行），UTF-16 要有 BOM。 */
+/** Part text: UTF-8 (with or without BOM), UTF-16 must have a BOM. */
 export function decodeOfficeXml(bytes: Uint8Array): string {
   if (bytes[0] === 0xff && bytes[1] === 0xfe) return utf16(bytes, true);
   if (bytes[0] === 0xfe && bytes[1] === 0xff) return utf16(bytes, false);
@@ -64,12 +66,12 @@ function utf16(bytes: Uint8Array, little: boolean): string {
 export interface Relationship {
   id: string;
   type: string;
-  /** 包里的路径（不以 / 开头）；外部链接时是原来写的地址。 */
+  /** Path within the package (does not start with /); original address for external links. */
   target: string;
   external: boolean;
 }
 
-/** 相对 from 这个部分的目录解析出包里的路径。 */
+/** Resolve the package path relative to the directory of the 'from' part. */
 export function resolvePart(from: string, target: string): string {
   const parts = target.startsWith('/') ? [] : from.split('/').slice(0, -1);
   for (const seg of target.replace(/^\/+/, '').split('/')) {
@@ -82,19 +84,20 @@ export function resolvePart(from: string, target: string): string {
 export interface OoxmlPackage {
   names: string[];
   bytes(path: string): Uint8Array | undefined;
-  /** 解析好的 XML；没有这个部分时 undefined，坏了时抛 damaged。 */
+  /** Parsed XML; undefined if the part is missing, throws 'damaged' if corrupted. */
   xml(path: string): XmlElement | undefined;
-  /** 一个部分的关系（_rels/名字.rels）。 */
+  /** Relationships for a part (_rels/name.rels). */
   rels(path: string): Map<string, Relationship>;
-  /** 包的主文档（_rels/.rels 里的 officeDocument）。 */
+  /** Main document of the package (officeDocument in _rels/.rels). */
   main(): string | undefined;
 }
 
 const caseless = (names: readonly string[]) => new Map(names.map((n) => [n.toLowerCase(), n]));
 
 /**
- * 打开包：wanted 决定解压哪些部分（其余只看目录）。是加了密码的 Office 文件、老格式、坏文件、太大时抛
- * OfficeImportFailure。
+ * Open package: 'wanted' determines which parts to extract (others only have their directory
+ * inspected). Throws OfficeImportFailure if password-protected, legacy format, corrupted, or too
+ * large.
  */
 export function openPackage(
   data: Uint8Array,
@@ -118,7 +121,7 @@ export function openPackage(
     }
     if (isMedia(file.name)) {
       media += file.originalSize;
-      // 图片太多时后面的不解压（这几张图片空着），文档照样能读。
+      // If there are too many images, stop extracting subsequent ones (leaving those image slots empty), allowing the document to still be read.
       if (media > OFFICE_LIMITS.maxMediaBytes) return false;
     } else if (file.originalSize > OFFICE_LIMITS.maxPartBytes) {
       throw new OfficeImportFailure('tooLarge');
@@ -134,7 +137,7 @@ export function openPackage(
     if (e instanceof OfficeImportFailure) throw e;
     throw new OfficeImportFailure('damaged');
   }
-  // 包里的名字不分大小写（有的工具写 Word/Document.xml）。
+  // Case-insensitive package file names (some tools write Word/Document.xml).
   const byLower = caseless(Object.keys(files));
   const find = (path: string) => byLower.get(path.replace(/^\/+/, '').toLowerCase());
   const parsed = new Map<string, XmlElement | undefined>();
@@ -186,5 +189,5 @@ export function openPackage(
   return pkg;
 }
 
-/** 关系的类型名（地址的最后一段：image、styles、worksheet）。 */
+/** Relationship type name (last segment of the URL: image, styles, worksheet). */
 export const relKind = (rel: Relationship) => rel.type.split('/').at(-1) ?? '';

@@ -1,14 +1,14 @@
-// 原生手势用官方 Jest 替身，Worklets 不创建真实 UI runtime。
+// Native gestures use official Jest mock; Worklets do not create a real UI runtime.
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
 require('react-native-gesture-handler/jestSetup');
 /* global jest */
-// Jest 里没有原生模块：WebView（扩展包页面）用一个空组件代替。扩展包的逻辑在测试里通过假的 PackRuntime 测。
+// No native modules in Jest: WebView (pack pages) is replaced by an empty component. Pack logic is tested via a mock PackRuntime in tests.
 jest.mock('react-native-webview', () => {
   const { View } = require('react-native');
   return { WebView: View, default: View };
 });
 
-// Skia（签名板、拼图、二维码）也是原生模块：界面用空组件代替，离屏绘制在测试里不可用（由注入的平台能力替身完成）。
+// Skia (signature pad, collage, QR code) is also a native module: UI is replaced with an empty component, and offscreen rendering is unavailable in tests (handled by injected platform capability mocks).
 jest.mock('@shopify/react-native-skia', () => {
   const { View } = require('react-native');
   const unavailable = () => {
@@ -31,14 +31,14 @@ jest.mock('@shopify/react-native-skia', () => {
   };
 });
 
-// 图表（Victory Native XL，D-438）用 Skia 画，Jest 里没有：画图的部分用空组件，点按层是普通 React Native 组件，照常测。
+// Charts (Victory Native XL, D-438) rendered via Skia are absent in Jest: rendering parts use an empty component, while touch layers are standard React Native components and tested normally.
 jest.mock('victory-native', () => ({
   CartesianChart: () => null,
   Bar: () => null,
   Line: () => null,
 }));
 
-// 视频播放（expo-video）也是原生模块：画面用空组件代替，播放器只记录状态（剪一段、结果页播放）。
+// Video playback (expo-video) is also a native module: visuals are replaced by an empty component while the player records state only (trimming, result page playback).
 jest.mock('expo-video', () => {
   const React = require('react');
   const { View } = require('react-native');
@@ -78,14 +78,15 @@ jest.mock('expo-video', () => {
         const player = makePlayer(source);
         setup?.(player);
         return player;
-        // 和真的一样只随地址重建；setup 只在创建时调用一次。
+        // Rebuilt on address change just like the real one; setup is called only once upon creation.
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [source]),
   };
 });
 
-// expo-audio（录音，D-154）：假的录音机。record() 之后每次读状态时长加 1 秒；stop() 写出一个小文件地址。
-// global.__audioPermission 可以设成 false 测「没有麦克风权限」。
+// expo-audio (audio recording, D-154): mock recorder. Duration increments by 1 second on each state
+// read after record(); stop() writes out a small file path. global.__audioPermission can be set to
+// false to test "no microphone permission".
 jest.mock('expo-audio', () => {
   const React = require('react');
   const makeRecorder = () => {

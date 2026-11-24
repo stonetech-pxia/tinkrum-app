@@ -64,7 +64,7 @@ describe('each entry has its own currency (D-429)', () => {
       record('a', { amount: 100, currency: 'usd' }),
       record('b', { amount: 50, currency: 'eur' }),
       record('c', { amount: 1, currency: 'usd' }),
-      record('d', { currency: 'jpy' }), // 没有金额：不算一种货币
+      record('d', { currency: 'jpy' }), // No amount: not counted as a currency.
     ];
     const text = perCurrencyText(records, claims, 'sum', 'amount', 'en')!;
     expect(text).toContain('€50.00');
@@ -111,7 +111,7 @@ describe('each entry has its own currency (D-429)', () => {
     const same = { amount: 100, currency: 'usd', date: '2026-11-01' };
     expect(findSimilarRecords(claims, same, saved)).toHaveLength(1);
     expect(findSimilarRecords(claims, { ...same, currency: 'eur' }, saved)).toHaveLength(0);
-    // 没选就是默认货币。
+    // Unselected defaults to the default currency.
     expect(findSimilarRecords(claims, { amount: 100, date: '2026-11-01' }, saved)).toHaveLength(1);
   });
 
@@ -129,7 +129,7 @@ describe('each entry has its own currency (D-429)', () => {
     it('a currency the field does not offer, or none, gives nothing', () => {
       expect(currencyInText(choice, ['Total £5'])).toBeNull();
       expect(currencyInText(choice, ['Total 12.50'])).toBeNull();
-      // CA$ 不算美元。
+      // CA$ is not counted as US dollars.
       expect(currencyInText(choice, ['Total CA$5'])).toBeNull();
     });
     it('RM before an amount is ringgit when the field offers it (D-549)', () => {

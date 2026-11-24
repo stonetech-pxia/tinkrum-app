@@ -9,7 +9,7 @@ import { Button, Card } from '../renderer/ui';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import type { BuildRun, BuildRunStep } from '../workspace/store';
 
-/** App 进后台就停在手上这一步之后（D-415）：回来由用户点继续，不自动接着做（底线 16）。 */
+/** Stops at the current step when the app enters the background (D-415): upon return, the user clicks continue rather than automatically resuming (invariant 16). */
 export function useStopBuildInBackground() {
   const { store } = useWorkspaceContext();
   useEffect(() => {
@@ -22,8 +22,10 @@ export function useStopBuildInBackground() {
 }
 
 /**
- * 大工程的搭建计划（D-415）：先看计划，可以删掉某步，点「开始」；然后是进度；一步失败时选重试、跳过或停止；
- * 全部结束后是整体检查的结果。系统层的界面，不在配置里，AI 改不了（底线 8）。
+ * Setup plan for large builds (D-415): review the plan first, steps can be deleted, click
+ * "Start"; then progress is shown; retry, skip, or stop options on step failure; overall check
+ * results displayed upon completion. System-layer interface, not in config, cannot be modified by
+ * AI (invariant 8).
  */
 export function BuildPanel({
   build,
@@ -33,9 +35,9 @@ export function BuildPanel({
 }: {
   build: BuildRun;
   palette: Palette;
-  /** 打开草稿看外观，离开这个页面。 */
+  /** Open draft to view look, leaving this page. */
   onSeeLook: () => void;
-  /** 「把这些补上」（D-418）。 */
+  /** "Fill these in" (D-418). */
   onFix: () => void;
 }) {
   const { locale } = useWorkspaceContext();
@@ -268,11 +270,11 @@ function FinishedPart({
   const { registry } = useWorkspaceContext();
   const endBuild = useWorkspace((s) => s.endBuild);
   const hasDraft = useWorkspace((s) => !!s.draft);
-  // 整体检查看用户确认草稿后会看到的样子。
+  // Overall check view of what the user will see after confirming the draft.
   const planned = useWorkspace((s) => s.draft?.steps.at(-1)?.config ?? s.config!);
   const session = useWorkspace((s) => s.session);
   const busy = useWorkspace((s) => s.busy);
-  // 只算这个会话新增的（D-418）：开始前就有的问题不怪这次搭建。
+  // Count only issues added in this session (D-418): pre-existing issues before starting are not blamed on this build.
   const blockers = sessionProblems(session, planned, registry);
   const body = [palette.font('body', 14), { color: palette.muted }];
   return (

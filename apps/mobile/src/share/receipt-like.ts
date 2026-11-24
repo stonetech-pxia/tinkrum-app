@@ -9,9 +9,12 @@ import type { PickedFile } from '../runtime/platform';
 import { useWorkspaceContext } from '../workspace/context';
 
 /**
- * 收到的文件像不像收据（有合计金额的小票、账单、发票，D-476、D-477）：在本机读前 3 个文件里的文字，
- * 用规则看（`rulePreset`），读完就丢，不存、不发给 AI。文字识别用不了、读不出来、不像：都是 false，
- * 面板照旧，不报错。没有带收据规则的表时不读（没有可推荐的）。只读不改，原件不动（底线 4）。
+ * Whether received files look like receipts (receipts, bills, invoices with totals, D-476,
+ * D-477): read text from the first 3 files locally, evaluate using rules (`rulePreset`), discard
+ * after reading without storing or sending to the AI. If OCR is unavailable, unreadable, or
+ * dissimilar: all false, panel remains unchanged without throwing errors. Not read when there is
+ * no table with receipt rules (no recommendations available). Read-only, originals untouched
+ * (Invariant 4).
  */
 export function useReceiptLike(picked: readonly PickedFile[], enabled: boolean): boolean {
   const { files, locale } = useWorkspaceContext();
@@ -33,7 +36,7 @@ export function useReceiptLike(picked: readonly PickedFile[], enabled: boolean):
   useEffect(() => {
     const items = picked.flatMap((p) => {
       const kind = readableKind({ mimeType: p.mimeType ?? '', name: p.name });
-      // 只读照片：PDF 要再读一遍文字层或画页，表单里还要读一次，先不做。
+      // Read images only: PDFs require re-reading text layers or rendering pages, and forms require another read; defer for now.
       return kind === 'image' ? [{ kind, uri: p.uri }] : [];
     });
     if (!enabled || items.length === 0) return;
@@ -44,7 +47,7 @@ export function useReceiptLike(picked: readonly PickedFile[], enabled: boolean):
       })
       .catch(() => undefined);
     return () => abort.abort();
-    // key 代表这批文件；picked 本身每次渲染都是新数组。
+    // Key represents this batch of files; picked itself is a new array on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, deps, enabled]);
   return like;

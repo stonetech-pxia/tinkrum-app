@@ -1,8 +1,9 @@
 import type { Theme } from './schema';
 import type { Backdrop, CardColorRole, ThemeCard, ThemeColors } from './schema-base';
 
-// 默认风格「Clay」（来自 Docudis 的设计 token：沙色背景、奶油卡片、陶土橙主色、鼠尾草绿次色），
-// 以及根据主题计算最终配色的纯函数。App 渲染和校验器（对比度检查）共用这里的结果。
+// Default "Clay" style (from Docudis design tokens: sand background, cream cards, terracotta orange
+// primary, sage green secondary), along with pure functions calculating final color schemes based
+// on the theme. Shared by app rendering and the validator (contrast checking).
 
 export const CLAY = {
   primary: '#C8623A',
@@ -18,7 +19,7 @@ export const CLAY = {
     danger: '#B03A2E',
     shadow: '#785A3C',
   },
-  // Docudis 只有浅色；深色是按同一色相推出的暖棕色版本。
+  // Docudis only defines light mode; dark mode is a warm-brown derivative derived using the same hue.
   dark: {
     background: '#1C1815',
     surface: '#28221E',
@@ -46,10 +47,12 @@ export const DEFAULT_THEME: Theme = {
 };
 
 /**
- * 新用户第一次打开时的风格（D-487）：在 Clay 的基础上再做细——卡片是黏土感（内高光 + 柔和阴影），页面背景有一层
- * 淡淡的暖色渐变，图标浅底彩色，圆角再大一点。主色、字体、配色都不变。
- * DEFAULT_THEME 仍是「基准」：测试、评测、旧配置和「重置主题」都回到它；只有起始配置和 Clay 预设用这个
- * （Clay 预设的页面背景是纯色，D-552）。
+ * Style for first-time users upon initial launch (D-487): refines Clay - cards feature a
+ * clay-like feel (inner highlights + soft shadows), page backgrounds have a subtle warm gradient,
+ * icons use light colored backgrounds, and corner radii are slightly increased. Primary colors,
+ * typography, and color schemes remain unchanged. DEFAULT_THEME remains the baseline: tests,
+ * evaluations, old configs, and "reset theme" revert to it; only starter config and Clay presets
+ * use this (Clay preset page backgrounds are solid colors, D-552).
  */
 export const STARTER_THEME: Theme = {
   ...DEFAULT_THEME,
@@ -68,9 +71,9 @@ export interface ResolvedColors {
   caption: string;
   border: string;
   primary: string;
-  /** 主色上的文字颜色，等于 onAccent(primary)。 */
+  /** Text color on primary background, equivalent to onAccent(primary). */
   onPrimary: string;
-  /** 用作文字（链接、选中的导航项）时的主色；在背景上不够清楚时会自动调深或调浅。 */
+  /** Primary color used for text (links, selected navigation items); automatically darkened or lightened if contrast against the background is insufficient. */
   primaryText: string;
   primaryTint: string;
   secondary: string;
@@ -81,7 +84,7 @@ export interface ResolvedColors {
   onTertiaryTint: string;
   danger: string;
   shadow: string;
-  /** 弹层遮罩：底部菜单 / 居中问话框。 */
+  /** Overlay scrim for bottom sheets and centered dialogs. */
   scrim: string;
   scrimStrong: string;
 }
@@ -94,7 +97,7 @@ const rgb = (hex: string): [number, number, number] => {
 const toHex = ([r, g, b]: number[]) =>
   `#${[r, g, b].map((v) => Math.round(v!).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
 
-/** 按比例 t（0 = a，1 = b）混合两种颜色。 */
+/** Mixes two colors by ratio t (0 = a, 1 = b). */
 export function mix(a: string, b: string, t: number): string {
   const ca = rgb(a);
   const cb = rgb(b);
@@ -109,22 +112,23 @@ function luminance(hex: string): number {
   return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
 }
 
-/** WCAG 对比度（1–21）。 */
+/** WCAG contrast ratio (1–21). */
 export function contrast(a: string, b: string): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi! + 0.05) / (lo! + 0.05);
 }
 
 /**
- * 任意实色底上的文字（主按钮、提示条、选中的 Pill、步骤圆点共用这一条）：
- * 白字对比度够 3:1（粗体和控件文字的要求）就用白字，否则用深色。
- * 中等亮度的主色（如 Clay 的陶土色）因此保留白字（创始人 2026-11-22 选定）。
+ * Text color on any solid background (shared by primary buttons, banner prompts, selected pills,
+ * and step dots): uses white if the contrast is at least 3:1 (the requirement for bold and UI
+ * text), otherwise uses dark text. Medium-brightness primary colors (such as Clay's terracotta)
+ * therefore retain white text (selected by the founder on 2026-11-22).
  */
 export function onAccent(accent: string): string {
   return contrast('#FFFFFF', accent) >= 3 ? '#FFFFFF' : '#1A1714';
 }
 
-/** 让 color 在 background 上达到 min 对比度：逐步向 toward 混合。 */
+/** Ensures color achieves min contrast against background by progressively mixing toward toward. */
 function readable(color: string, background: string, toward: string, min: number): string {
   for (let t = 0; t <= 1; t += 0.1) {
     const c = t === 0 ? color : mix(color, toward, t);
@@ -137,7 +141,7 @@ export function isDark(theme: Theme, systemDark: boolean): boolean {
   return theme.mode === 'dark' || (theme.mode === 'system' && systemDark);
 }
 
-/** 按这一组底色和文字色算出全部颜色。readOn：主色当文字用时压在什么颜色上。 */
+/** Calculates all colors from this group of base and text colors. readOn: what background color the primary color is pressed against when used as text. */
 function buildColors(
   theme: Theme,
   dark: boolean,
@@ -146,11 +150,11 @@ function buildColors(
     background: string;
     surface: string;
     text: string;
-    /** 灰字、说明、分隔线按 text 和 surface 算（否则用默认风格的）。 */
+    /** Gray text, descriptions, and dividers are calculated based on text and surface (otherwise uses default style values). */
     derive: boolean;
     readOn: string;
     shadowInk: string;
-    /** 卡片有自己的文字色时（D-409）：危险色压在这个底色上要清楚；默认风格的红只按浅底或深底配的。 */
+    /** When a card has its own custom text color (D-409): danger colors must be clear against this background; default style reds are tailored only for light or dark backgrounds. */
     dangerOn?: string;
   },
 ): ResolvedColors {
@@ -182,28 +186,30 @@ function buildColors(
     tertiaryTint: mix(tertiary, surface, tintAmount),
     onTertiaryTint: readable(tertiary, mix(tertiary, surface, tintAmount), text, 4.5),
     danger: on.dangerOn ? readable(base.danger, on.dangerOn, text, 3) : base.danger,
-    // 浅色模式下 Clay 的暖棕阴影只适合 Clay 配色；换了配色时阴影用正文色，色相跟着主题走。
+    // In light mode, Clay's warm brown shadow is suitable only for the Clay color scheme; when the scheme changes, shadows use the body text color, following the theme's hue.
     shadow: custom && !dark ? shadowInk : base.shadow,
   };
 }
 
-/** 这个模式下生效的颜色覆盖。深色模式：darkColors 优先，没设置的颜色沿用 colors（旧主题只有 colors，行为不变）。 */
+/** Color overrides active in this mode. Dark mode: darkColors take priority, unconfigured colors fall back to colors (legacy themes only have colors, behavior unchanged). */
 const overridesOf = (theme: Theme, dark: boolean): ThemeColors =>
   dark ? { ...theme.colors, ...theme.darkColors } : theme.colors;
 
-/** 卡片有自己的文字色（D-409）时返回它；没写或和正文色一样时只有一种文字色。 */
+/** Returns the card's custom text color if present (D-409); if omitted or identical to the body text color, only a single text color is used. */
 function cardInk(o: ThemeColors, text: string): string | undefined {
   return o.surfaceText && o.surfaceText !== text ? o.surfaceText : undefined;
 }
 
-/** 阴影要压在页面上：两种文字色里取深的那个，深色页面配浅色卡片时不会变成一圈亮边。 */
+/** Shadows must sit atop the page: takes the darker of the two text colors, preventing light cards on dark pages from turning into a glowing border. */
 const shadowInkOf = (text: string, ink: string | undefined) =>
   ink && luminance(ink) < luminance(text) ? ink : text;
 
 /**
- * 放在页面背景上的颜色。设了 surfaceText 且正文色在卡片上看不清时（D-409），这里的 surface 是
- * 由页面背景调出来的一层，给还用这份配色的导航栏、弹窗和系统页面的卡片用，正文色压在上面一定清楚；
- * 真正的卡片色和卡片上的文字色见 resolveSurfaceColors。
+ * Colors placed on the page background. When surfaceText is set and the body text color is
+ * unclear on cards (D-409), the surface here is a layer derived from the page background, used
+ * for navigation bars, modals, and system page cards that still use this palette, ensuring body
+ * text is always legible against it; actual card colors and card text colors are defined in
+ * resolveSurfaceColors.
  */
 export function resolveColors(theme: Theme, dark: boolean): ResolvedColors {
   const base = dark ? CLAY.dark : CLAY.light;
@@ -231,9 +237,11 @@ export function resolveColors(theme: Theme, dark: boolean): ResolvedColors {
 }
 
 /**
- * 放在卡片上的颜色（D-409）：文字、灰字、分隔线都从 surfaceText 和卡片色算。这里的 background
- * 是卡片里凹下去的一层（tone muted 的卡片、输入框外的底），surfaceText 压在上面也清楚。
- * 没设 surfaceText（或和正文色一样）时返回 undefined：卡片和页面只用 resolveColors 这一份，和以前一样。
+ * Colors placed on cards (D-409): text, muted text, and dividers are all calculated from
+ * surfaceText and card colors. The background here is the recessed layer within cards (toned
+ * muted cards, background outside input fields), ensuring surfaceText is also legible on it.
+ * Returns undefined when surfaceText is not set (or equals body text color): cards and pages use
+ * resolveColors exclusively, maintaining legacy behavior.
  */
 export function resolveSurfaceColors(theme: Theme, dark: boolean): ResolvedColors | undefined {
   const base = dark ? CLAY.dark : CLAY.light;
@@ -253,15 +261,17 @@ export function resolveSurfaceColors(theme: Theme, dark: boolean): ResolvedColor
   });
 }
 
-/** 毛玻璃卡片里卡片色的比例，其余透出页面背景（对比度检查按这个比例估算卡片的实际颜色）。 */
+/** Proportion of the card color in frosted glass cards, with the rest letting the page background bleed through (contrast checks estimate actual card color using this ratio). */
 export const GLASS_OPACITY = 0.4;
 
-/** 极光背景里每团颜色中心的不透明度。 */
+/** Opacity of the center of each color blob in aurora backgrounds. */
 export const AURORA_ALPHA = { light: 0.45, dark: 0.5 } as const;
 
 /**
- * 页面背景上出现的颜色（不透明值）。渲染器按它们画渐变，校验器检查文字压在上面是否清楚。
- * gradient：主色淡色 → 背景色 → 辅助色淡色；aurora：主色、辅助色、第三色三团光的中心色。
+ * Colors appearing on the page background (opacity values). The renderer draws gradients using
+ * them, and the validator checks text legibility against them. gradient: primary light ->
+ * background -> secondary light; aurora: center colors of the three light blobs (primary,
+ * secondary, tertiary).
  */
 export function backdropStops(theme: Theme, c: ResolvedColors): string[] {
   switch (theme.backdrop) {
@@ -280,7 +290,7 @@ export function backdropStops(theme: Theme, c: ResolvedColors): string[] {
   }
 }
 
-/** 金属卡片的四个色标（上亮、中段由亮转暗、下面反光），从卡片底色算出。 */
+/** The four color stops for metallic cards (top highlight, middle transition from light to dark, bottom reflection), calculated from the card background color. */
 export function chromeStops(base: string, dark: boolean): [string, string, string, string] {
   return [
     mix(base, '#FFFFFF', dark ? 0.2 : 0.65),
@@ -290,15 +300,16 @@ export function chromeStops(base: string, dark: boolean): [string, string, strin
   ];
 }
 
-/** #RRGGBB 加不透明度 → CSS 的 rgba(...)。 */
+/** Converts #RRGGBB plus opacity to CSS rgba(...) format. */
 export function rgba(hex: string, alpha: number): string {
   const [r, g, b] = rgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 /**
- * 自定义卡片里的颜色角色 → 这个模式下的颜色（D-624）。colors 是卡片这份配色，page 是页面那份：
- * text 取页面上的文字色（和新粗野的边框、硬阴影一样），border / shadow 取卡片配色的分隔线色和阴影色。
+ * Maps custom card color roles to colors for this mode (D-624). colors is the card's palette,
+ * page is the page's palette: text uses page text color (like new brutalist borders and hard
+ * shadows), border and shadow use the card palette's divider and shadow colors.
  */
 export function cardRoleColors(
   colors: ResolvedColors,
@@ -316,11 +327,11 @@ export function cardRoleColors(
   };
 }
 
-/** 自定义卡片的边框和阴影（D-624）：渲染器把它盖在 cardStyle 的底色上。 */
+/** Custom card borders and shadows (D-624): overlaid by the renderer on top of cardStyle's background color. */
 export interface CardParts {
   borderWidth?: number;
   borderColor?: string;
-  /** CSS box-shadow，几层用逗号连起来。 */
+  /** CSS box-shadow, multiple layers joined by commas. */
   boxShadow?: string;
 }
 
@@ -346,7 +357,7 @@ export function customCardParts(
 
 export const MIN_TEXT_CONTRAST = 4.5;
 
-/** 正文可能直接压在上面的颜色和压在上面的那种文字：页面背景用 text，卡片（含毛玻璃和金属）用 surfaceText。 */
+/** Colors that body text may sit directly on and their corresponding text color: uses text for page backgrounds, and surfaceText for cards (including frosted glass and metallic). */
 function textSurfaces(theme: Theme, c: ResolvedColors, card: ResolvedColors | undefined) {
   const surface = card?.surface ?? c.surface;
   const onCard = card ? { name: 'surfaceText', color: card.text } : { name: 'text', color: c.text };
@@ -377,9 +388,10 @@ function textSurfaces(theme: Theme, c: ResolvedColors, card: ResolvedColors | un
 }
 
 /**
- * 可读性检查：页面上的文字在背景上、卡片上的文字在卡片（含渐变背景、毛玻璃和金属卡片的实际颜色）上的
- * 对比度必须达到 WCAG AA。写了 surfaceText 时卡片看它，text 只看页面（D-409）。
- * 返回不满足的组合；主题可能显示为浅色或深色时两种都检查。
+ * Readability check: text on backgrounds and text on cards (including actual colors for gradient,
+ * frosted glass, and metallic cards) must achieve WCAG AA contrast. When surfaceText is
+ * specified, cards use it, while text applies only to pages (D-409). Returns failing
+ * combinations; checks both if a theme can be rendered as light or dark.
  */
 export function contrastProblems(theme: Theme): string[] {
   const modes = theme.mode === 'system' ? [false, true] : [theme.mode === 'dark'];
@@ -399,8 +411,9 @@ export function contrastProblems(theme: Theme): string[] {
 }
 
 /**
- * 图片背景（D-258）：遮罩是卡片（或页面）原来的底色，盖在图片上的不透明度至少是这个值，
- * 文字不够清楚时再加深（overlayOpacity）。
+ * Image backgrounds (D-258): the overlay uses the original card (or page) background color, with
+ * an opacity over the image of at least this value, increased further (overlayOpacity) if text is
+ * insufficiently legible.
  */
 export const OVERLAY_OPACITY: Record<Backdrop['overlay'], number> = {
   light: 0.5,
@@ -409,8 +422,10 @@ export const OVERLAY_OPACITY: Record<Backdrop['overlay'], number> = {
 };
 
 /**
- * 不透明度为 opacity 的遮罩盖在任意一张图片上，文字最差的对比度：图片每个通道都在黑和白之间，
- * 盖上遮罩后的颜色就在「遮罩盖在全黑上」和「盖在全白上」之间，最差的情况在两头；文字的亮度落在中间时为 1。
+ * Minimum contrast of text when an overlay of opacity opacity is placed over any image: every
+ * image channel lies between black and white, so the color with the overlay applied lies between
+ * 'overlay on pure black' and 'overlay on pure white', with the worst case at the extremes;
+ * evaluates to 1 when text luminance falls in the middle.
  */
 export function overlayContrast(text: string, overlay: string, opacity: number): number {
   const darkest = mix('#000000', overlay, opacity);
@@ -421,9 +436,11 @@ export function overlayContrast(text: string, overlay: string, opacity: number):
 }
 
 /**
- * 遮罩实际用的不透明度：从选的深浅开始逐步加深，直到 text 不管图片是什么样都过 MIN_TEXT_CONTRAST
- * （在纯底色上本来就不到的，不比纯底色上更差）。图片上的文字一律用正文色（App 的 onPicture），
- * 所以只要算正文色这一种；灰字在图片上要遮罩盖到将近不透明才清楚。
+ * Actual overlay opacity used: starts from the chosen shade and gradually increases until text
+ * passes MIN_TEXT_CONTRAST regardless of the image (cases failing even on pure solid backgrounds
+ * are not made worse than on solid backgrounds). Text on images always uses the body text color
+ * (app's onPicture), so only body text is calculated; muted text requires near-opaque overlays to
+ * be legible.
  */
 export function overlayOpacity(level: Backdrop['overlay'], overlay: string, text: string): number {
   const need = Math.min(MIN_TEXT_CONTRAST, contrast(text, overlay) - 0.01);

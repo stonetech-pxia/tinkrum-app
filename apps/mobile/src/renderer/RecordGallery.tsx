@@ -7,8 +7,9 @@ import { AttachmentThumb, firstImage } from './Attachments';
 import type { RenderEnv } from './components';
 import { ColorDot, type RecordMarks } from './record-marks';
 
-// 图片墙（D-540）：每条记录附件里的第一张图片（和列表的缩略图同一个规则），标题在下面；
-// 没有图片的画一块占位，写着标题。点一张打开这一条。看什么都不写（底线 15）。
+// Image wall (D-540): the first image in each entry's attachments (following the same rule as list
+// thumbnails), with the title below; displays a placeholder block with the title if there are no
+// images. Tapping an image opens that entry. Displays nothing when viewing (invariant 15).
 
 const COLUMNS = 2;
 

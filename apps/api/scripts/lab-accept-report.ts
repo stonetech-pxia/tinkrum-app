@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 
-// 个人记录能力验收的统计（lab.ts --acceptance 写的 jsonl）。不调用模型。
-// 用法：npx tsx scripts/lab-accept-report.ts runs/accept.jsonl [更多文件]
+// Statistics for personal record capability acceptance (written by `lab.ts --acceptance` into
+// JSONL). Does not invoke models. Usage: `npx tsx scripts/lab-accept-report.ts runs/accept.jsonl
+// [more files]`
 
 interface Row {
   id: string;

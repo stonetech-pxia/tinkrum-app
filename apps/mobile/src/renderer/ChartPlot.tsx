@@ -4,10 +4,13 @@ import { useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Bar, CartesianChart, Line } from 'victory-native';
 
-// 柱状图和折线图的画法（D-438）：Victory Native XL（Skia）画柱子、折线、网格和 Y 轴刻度；
-// 点按、读屏标签和读数还是 Chart.tsx 里那一排透明的可点区域（children），所以 x 轴按「每个点一格」排：
-// 点 i 在第 i 格的正中（x 范围 -0.5 到 n-0.5），可点区域的每一格正好盖在它上面。
-// X 轴的文字不在这里画（Skia 字体没有中文字形，分类名可能是中文），由 Chart.tsx 用普通文字标第一段和最后一段。
+// Bar and line chart rendering (D-438): Victory Native XL (Skia) renders bars, lines, grids, and
+// Y-axis ticks; tapping, screen reader labels, and values still use the transparent clickable area
+// row (children) from Chart.tsx, so the X-axis is arranged with "one grid cell per point": point i
+// is centered in cell i (x range -0.5 to n-0.5), with each clickable area cell directly overlying
+// it. X-axis text is not rendered here (Skia fonts lack Chinese glyphs, and category names may be
+// Chinese), and is instead labeled for the first and last segments by Chart.tsx using standard
+// text.
 
 const KARLA = require('@expo-google-fonts/karla/400Regular/Karla_400Regular.ttf');
 
@@ -26,14 +29,14 @@ export function ChartPlot({
 }: {
   kind: 'bar' | 'line';
   values: readonly (number | null)[];
-  /** 上一期（D-439）：和 values 一一对应；折线画成虚线，柱状图画成淡色的宽柱子垫在后面。 */
+  /** Previous period (D-439): corresponds one-to-one with values; lines are rendered dashed, and bar charts have light wide bars padded underneath. */
   previous?: readonly (number | null)[] | undefined;
   selected: number;
   color: string;
   mutedColor: string;
   gridColor: string;
   labelColor: string;
-  /** 盖在图上的一排可点区域（每个点一格）。 */
+  /** A row of clickable areas overlaid on the chart (one cell per point). */
   children: ReactNode;
 }) {
   const font = useFont(KARLA, 11);
@@ -119,7 +122,7 @@ export function ChartPlot({
                     connectMissingData={false}
                     curveType="linear"
                   />
-                  {/* 两边的周期都没有值时折线没有线段：孤立的一个读数要画出一个点，否则看不见（D-631）。 */}
+                  {/* When neither period has values, line charts have no segments: an isolated reading must draw a single point so it remains visible (D-631). */}
                   {points.v.map((p, i) =>
                     p.y != null && i !== selected ? (
                       <Circle key={i} cx={p.x} cy={p.y as number} r={3} color={color} />

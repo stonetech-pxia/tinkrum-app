@@ -22,9 +22,9 @@ import { FIELDS, fieldDefinition, type Collection, type Field } from './schema';
 import { registry } from './test-helpers';
 import { V33_NOW, sampleRecords } from './test-records';
 
-// 排序每条记录的键只算一次（排序前算好），顺序和以前每次比较都现算的一模一样。
+// Sorting keys for each record are computed only once (precomputed before sorting), and the order is identical to calculating on the fly during every comparison.
 
-/** 一张表放上每种字段的 example（引用字段指向它自己，公式用 weight）。 */
+/** A table populated with an example for each field type (reference field points to itself, formula uses weight). */
 const raw: Collection = {
   id: 'expenses',
   name: 'Expenses',
@@ -32,7 +32,7 @@ const raw: Collection = {
 };
 const table = expandCollection([raw], raw);
 
-/** 以前的 sortRecords（比较时现算键），照抄，用来对照。 */
+/** Previous sortRecords (calculating keys on the fly during comparison), copied verbatim for comparison purposes. */
 function sortBefore(
   records: readonly DataRecord[],
   collection: Collection,
@@ -70,7 +70,7 @@ function sortBefore(
   });
 }
 
-/** 30 条样本记录，再加几条和别的记录同时创建、值也一样的（平局）。 */
+/** 30 sample records, plus a few created at the same time as other records with identical values (ties). */
 function records(): DataRecord[] {
   const list = sampleRecords([raw]).get('expenses')!;
   const ties = list
@@ -83,7 +83,7 @@ const sortable = table.fields.filter((f) => fieldDefinition(f.type).sort !== fal
 
 describe('sorting computes each key once', () => {
   it('sorts by every sortable field type', () => {
-    // 单选、日程、日期、公式、空值、平局都在里面。
+    // Single select, event, date, formula, empty values, and ties are all included.
     expect(sortable.map((f) => f.type)).toEqual(
       expect.arrayContaining(['choice', 'schedule', 'formula', 'date', 'datetime', 'number']),
     );
@@ -124,7 +124,7 @@ describe('sorting computes each key once', () => {
     });
     const formula = table.fields.find((f) => f.type === 'formula')!;
     sortRecords(list, table, { field: formula.id, direction: 'asc' }, V33_NOW);
-    // 一条记录的公式读几次它的值是固定的；以前每次比较都再读，200 条要比十几次。
+    // A record's formula value is fixed when read multiple times; previously every comparison re-read it, taking a dozen comparisons for 200 records.
     expect(Math.max(...counts.values())).toBeLessThanOrEqual(3);
   });
 });
@@ -172,7 +172,7 @@ describe('sorting by up to three fields (D-560)', () => {
         { field: 'due', direction: 'asc' },
       ]),
     ).toEqual(['c', 'b', 'e', 'f', 'a', 'd']);
-    // 三个都一样时按创建时间从新到旧（和一个字段时一样）。
+    // When all three are identical, sorts by creation time from newest to oldest (same as a single field).
     expect(
       ids([
         { field: 'priority', direction: 'desc' },

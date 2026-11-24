@@ -8,7 +8,7 @@ import { Button, Card } from '@/renderer/ui';
 import { useWorkspaceContext } from '@/workspace/context';
 import { AI_RETURN_TTL, aiReturnIsActive, useAiReturn } from './return';
 
-/** 不自动碰剪贴板：只有「粘贴」的这一次点击才读。 */
+/** Does not automatically touch the clipboard: reads only on the single click of "Paste". */
 export function AiReturnCard({
   palette,
   style,

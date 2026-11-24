@@ -17,8 +17,9 @@ import type { Collection, WorkspaceConfig } from './schema';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 一键记录工具能写的值（D-565）：从今天或这一条的日期起加减几天、几个月；抄这一条的一个字段；
-// increment 加这一条的一个数字字段。配置里只有引用，没有内容（底线 14），AI 看不到值（底线 2）。
+// Values writeable by one-tap record tools (D-565): add/subtract days or months from today or the
+// record's date; copy a field from this record; increment a numeric field from this record. Config
+// contains references only, no content (invariant 14), AI cannot see values (invariant 2).
 process.env.TZ = 'Europe/Paris';
 
 const now = new Date(2026, 0, 31, 18, 5); // 2026-01-31
@@ -166,7 +167,7 @@ describe('values relative to today or to this entry (D-565)', () => {
           [rowButton({ do: 'increment', table: 'cards', field: 'score', by: 'interval' })],
           'l4',
         ),
-        // 一个按钮不作用在某一条上：只能从今天算。
+        // A button not operating on a specific record: can only calculate from today.
         button({
           do: 'create',
           table: 'orders',
@@ -174,7 +175,7 @@ describe('values relative to today or to this entry (D-565)', () => {
         }),
       ]),
     ).toBe('');
-    // 一条记录的页面上，按钮可以抄这一条（"$record"）。
+    // On a single record page, buttons can copy from this record ("$record").
     expect(
       problems(
         [
@@ -205,11 +206,11 @@ describe('values relative to today or to this entry (D-565)', () => {
   });
 
   it('a copy needs this entry, and a field whose kind fits', () => {
-    // 首页的按钮没有「这一条」。
+    // Home screen buttons do not have "this record".
     expect(
       problems([button({ do: 'create', table: 'orders', values: { price: { copy: 'price' } } })]),
     ).toMatch(/\{copy\} reads a field of this entry/);
-    // setAll 改的是很多条，也没有「这一条」；从今天算的日期可以。
+    // setAll modifies multiple records and also lacks "this record"; dates calculated from today are allowed.
     expect(
       problems([
         button({
@@ -240,11 +241,11 @@ describe('values relative to today or to this entry (D-565)', () => {
       /can't copy products\.name \(text\) into orders\.qty \(number\)/,
     );
     expect(order({ price: { copy: 'nope' } })).toMatch(/nope is not a field of products/);
-    // 算出来的字段可以抄出来（下单时的价格就定住了），不能抄进去；文件不抄（底线 3）。
+    // Computed fields can be copied out (price at order time is fixed), but cannot be copied into; files are not copied (invariant 3).
     expect(order({ gross: { copy: 'price' } })).toMatch(/orders\.gross is a formula field/);
     expect(order({ photo: { copy: 'photo' } })).toMatch(/orders\.photo is a file field/);
     expect(order({ price: { copy: 'gross' } })).toBe('');
-    // 不同表的引用不能抄。
+    // References from different tables cannot be copied.
     expect(
       problems([
         list('orders', [
@@ -317,7 +318,7 @@ describe('running them', () => {
     expect(set({ from: 'today', add: 1, unit: 'months' })).toEqual({ due: '2026-02-28' });
     expect(set({ from: 'due', add: -1, unit: 'months' })).toEqual({ due: '2025-12-31' });
     expect(set({ from: 'today', add: 'interval', unit: 'days' })).toEqual({ due: '2026-02-03' });
-    // 起点或加数没有值：这一项不写。
+    // Start or addend missing a value: this item is omitted.
     expect(set({ from: 'seen', add: 1, unit: 'days' })).toEqual({});
   });
 
@@ -337,7 +338,7 @@ describe('running them', () => {
       { now, rowId: 'p1', entry: { record: computed!, view: expandCollection(tables, products) } },
     );
     expect(input).toEqual({ product: 'p1', price: 15, qty: 2, what: 'Coffee beans' });
-    // 没有「这一条」（不该发生，检查会拦）：这一项不写。
+    // No "this record" (should not happen, caught by check): this item is omitted.
     expect(createInput(orders, { price: { copy: 'price' } }, { now })).toEqual({});
   });
 

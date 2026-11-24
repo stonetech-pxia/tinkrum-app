@@ -1,14 +1,18 @@
 import { clamp } from '@morph/core/math';
-// 扫描件增强的纯算法（D-266）：在缩小的分析图上估计纸张背景、黑白两端、彩色还是灰度、文字倾斜角，
-// 黑白模式再算局部阈值要用的均值和标准差。全分辨率的逐像素运算交给 App 里的 Skia 着色器，
-// 这里只处理小图，在 Node 里可以直接测试。去噪点是唯一在全分辨率上跑的部分（只看黑点）。
+// Pure algorithm for scanned document enhancement (D-266): estimates paper background, black/white
+// endpoints, color vs. grayscale, and text skew angle on a downscaled analysis image. For
+// black-and-white mode, it also computes the mean and standard deviation required for local
+// thresholding. Full-resolution pixel-by-pixel operations are delegated to the Skia shader in the
+// app; only the small image is processed here so it can be tested directly in Node. Despeckling is
+// the only part run at full resolution (checking black dots only).
 //
-// 思路参考 ScanTailor 的光照归一化（背景 → 除法）和投影法纠偏、FairScan 的纸色拉白和 Sauvola，
-// 都是按论文和公开算法自己写的，没有拷贝它们的代码（两者都是 GPL）。
+// Approach referenced from ScanTailor's illumination normalization (background -> division) and
+// projection-based deskewing, FairScan's paper color whitening, and Sauvola. All implemented from
+// papers and public algorithms without copying their code (both are GPL).
 
 import type { Size } from './geometry';
 
-/** RGBA 像素（每像素 4 字节，和 Skia 的 RGBA_8888 一致）。 */
+/** RGBA pixels (4 bytes per pixel, matching Skia's RGBA_8888). */
 export interface RgbaImage {
   width: number;
   height: number;
@@ -17,71 +21,77 @@ export interface RgbaImage {
 
 export type ScanLook = 'auto' | 'gray' | 'bw';
 
-/** 输出成什么：彩色、灰度、黑白。 */
+/** Output type: color, grayscale, or black-and-white. */
 export type ScanOutput = 'color' | 'gray' | 'bw';
 
 export interface ScanPlan {
   output: ScanOutput;
-  /** 纸张背景（每格一个颜色，RGBA）。在全图上按格子中心双线性插值，像素除以它。 */
+  /** Paper background (one color per cell, RGBA). Bilinearly interpolated across the full image using cell centers; pixels are divided by this. */
   background: RgbaImage;
-  /** 除过背景之后的黑点和白点（0–1 附近）：lo 映射成黑，hi 映射成白。 */
+  /** Black and white points after background division (around 0-1): `lo` maps to black, `hi` maps to white. */
   lo: number;
   hi: number;
-  /** 文字行的倾斜角（度，图片坐标 y 向下，正数是向右下斜）；拉正要转 -skew。没把握时是 0。 */
+  /** Text line skew angle (in degrees, image coordinates y downward, positive means slanting down-right); straightening requires rotating by `-skew`. Defaults to 0 when uncertain. */
   skew: number;
-  /** 黑白模式的局部统计（R = 均值 × 255，G = 标准差 × 2 × 255），其他模式是 null。 */
+  /** Local statistics for black-and-white mode (`R = mean × 255`, `G = standard deviation × 2 × 255`), null for other modes. */
   stats: RgbaImage | null;
 }
 
 /**
- * 背景格子的长边格数。分析图长边 800 时每格约 8 像素：比笔画宽，又能贴着阴影的硬边（书页、手的影子）；
- * 48 格时硬边两侧会留下约 50 像素宽的灰带（D-275 的实验）。字太密、整格都是字的格子由下面的去离群补上。
+ * Number of cells along the long side for the background grid. At 800 for the long side of the
+ * analysis image, each cell is about 8 pixels: wider than a stroke, yet able to hug shadow hard
+ * edges (page and hand shadows). At 48 cells, 50-pixel-wide gray bands would remain on both sides
+ * of hard edges (D-275 experiments). Cells that are too dense or entirely filled with text are
+ * patched by the outlier removal below.
  */
 const GRID_LONG = 96;
-/** 彩色和灰度把中间调压暗一点（γ），淡字更清楚。着色器里用同一个值。 */
+/** Darken midtones slightly (γ) for color and grayscale to make faint text clearer. The shader uses the same value. */
 export const SCAN_MIDTONE_GAMMA = 1.3;
 /**
- * 接近白点的软膝（D-275）：拉伸后 1 − knee 以下照旧，往上用二次曲线在 1 + knee 处平滑地接到 1。
- * 纸（约 1.06）仍然是纯白，但只比纸暗一点的淡字（反光里的红字、细小的字）不会被一刀切成白；
- * 实验里这样增强后的错字比增强前少（拍屏幕那页 2 → 0），一刀切时反而多（2 → 8）。
+ * Soft knee near the white point (D-275): below `1 - knee` remains unchanged after stretching,
+ * while values above smoothly transition to 1 using a quadratic curve ending at `1 + knee`. The
+ * paper (approx. 1.06) remains pure white, but faint text only slightly darker than the paper
+ * (red text in reflections, tiny characters) is not thresholded away into white. Experiments show
+ * enhanced mistyped characters decrease (screen capture page 2 -> 0), whereas hard cutoff
+ * increases them (2 -> 8).
  */
 export const SCAN_KNEE = 0.12;
 
-/** 按黑白两端拉伸之后（t：0 是黑点、1 是白点）的软膝曲线，结果在 0–1。着色器里是同一个公式。 */
+/** Soft knee curve after stretching by black and white endpoints (`t`: 0 is black point, 1 is white point), result in 0-1. The shader uses the same formula. */
 export function scanTone(t: number, knee = SCAN_KNEE): number {
   const a = 1 - knee;
   const u = Math.min(t, 1 + knee);
   const v = u < a ? u : u - ((u - a) * (u - a)) / (4 * knee);
   return clamp(v, 0, 1);
 }
-/** 每格里取亮度排前 10% 的像素当纸张（字是暗的，而且一般只占一小部分）。 */
+/** Take the top 10% brightest pixels in each cell as paper (text is dark and generally occupies only a small fraction). */
 const PAPER_SHARE = 0.1;
-/** 比周围的纸暗一半以上的格子当作图片或大块深色，用周围的纸色补上；没那么暗的当作阴影，照常拉白。 */
+/** Cells darker than surrounding paper by more than half are treated as images or large dark blocks and filled using surrounding paper colors; less dark ones are treated as shadows and whitened as usual. */
 const OUTLIER_RATIO = 0.5;
-/** 背景的下限（相对整页纸色），防止除法把深色区域放大成白。 */
+/** Background floor limit (relative to full-page paper color) to prevent division from amplifying dark regions into white. */
 const BACKGROUND_FLOOR = 0.3;
 
-/** 判断彩色：颜色够浓（max − min）的块占比超过这个就是彩色（FairScan 是 0.03%，这里按 4×4 的块算，放宽一点）。 */
+/** Color determination: if the proportion of blocks with sufficiently rich color (`max - min`) exceeds this, it is classified as color (FairScan uses 0.03%, here calculated on 4×4 blocks and slightly relaxed). */
 const COLOR_CHROMA = 0.15;
 const COLOR_SHARE = 0.001;
 
-/** 纠偏：只在 ±7° 里找，先 1° 粗搜，再在最好的角度两边 1° 内按 0.1° 细搜；小于 0.15° 不转。 */
+/** Deskewing: searches only within ±7°, using a 1° coarse search first, followed by a 0.1° fine search within 1° of the best angle. Skews less than 0.15° are not rotated. */
 const SKEW_RANGE = 7;
 const SKEW_COARSE = 1;
 const SKEW_FINE = 0.1;
 const SKEW_MIN = 0.15;
-/** 数暗点的格子宽（像素）：7° 时一格两头只差 1 像素。 */
+/** Cell width in pixels for counting dark points: at 7°, each cell differs by only 1 pixel at both ends. */
 const SKEW_CELL = 8;
-/** 最好角度的分数至少是所有角度平均分的这么多倍才算有把握（只有图片、没有成行的字时不转）。 */
+/** Confidence threshold: the score of the best angle must be at least this many times the average score of all angles to be considered confident (does not rotate when there are images without aligned text lines). */
 const SKEW_CONFIDENCE = 1.6;
 
-/** Sauvola：k 越大越容易判成白；窗口按统计图长边的比例。 */
+/** Sauvola: larger `k` makes it easier to classify as white; window size is proportional to the long side of the statistics image. */
 export const SAUVOLA_K = 0.3;
 const SAUVOLA_WINDOW_SHARE = 1 / 24;
 
 const luma = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b;
 
-/** 第 i 个格子覆盖的像素范围 [start, end)：格子均匀分布，和着色器按格子中心采样一致。 */
+/** Pixel range `[start, end)` covered by the `i`-th cell: cells are evenly distributed, matching shader sampling at cell centers. */
 function cellRange(i: number, cells: number, size: number): [number, number] {
   return [Math.floor((i * size) / cells), Math.floor(((i + 1) * size) / cells)];
 }
@@ -94,7 +104,7 @@ export function gridSize(size: Size, long = GRID_LONG): Size {
   };
 }
 
-/** 在格子图上按 0–1 的位置双线性取值（边缘外取边缘值），和 Skia 的线性采样 + Clamp 一样。 */
+/** Bilinear sampling on the grid image using 0-1 coordinates (clamped to edge values outside), identical to Skia's linear sampling + clamp. */
 export function sampleGrid(grid: RgbaImage, u: number, v: number, out: Float32Array): void {
   const gx = clamp(u * grid.width - 0.5, 0, grid.width - 1);
   const gy = clamp(v * grid.height - 0.5, 0, grid.height - 1);
@@ -115,7 +125,7 @@ export function sampleGrid(grid: RgbaImage, u: number, v: number, out: Float32Ar
   }
 }
 
-/** 小格子上的加权方框模糊（权重为 0 的格子不参与，相当于用周围补上）。 */
+/** Weighted box blur on small cells (cells with weight 0 are excluded, effectively filled using surroundings). */
 function maskedBlur(
   values: Float32Array,
   weights: Float32Array,
@@ -142,8 +152,9 @@ function maskedBlur(
 }
 
 /**
- * 小格子上的加权中位数（只看权重不为 0 的格子；值是 0–255 的亮度，取整后用滑动直方图，
- * 每移一格只加减一列，在没有 JIT 的 Hermes 上也很快）。
+ * Weighted median on small cells (considering only cells with non-zero weight; values are 0-255
+ * luminance, rounded and processed using a sliding histogram adding/removing only one column per
+ * step, remaining fast even on Hermes without JIT).
  */
 function maskedMedian(
   values: Float32Array,
@@ -160,8 +171,10 @@ function maskedMedian(
     const yb = Math.min(height - 1, y + radius);
     hist.fill(0);
     let count = 0;
-    // 滑动中值（Huang）：记着当前的候选值 m 和比它小的个数 below，窗口每移一格只做少量调整，
-    // 不用每格从 0 数到中值（格子多了以后这一步最费时）。结果和从头数一样。
+    // Sliding median (Huang): remembers the current candidate value `m` and the count of values
+    // smaller than it (`below`), making minor adjustments each time the window shifts instead of
+    // counting from 0 to the median at every cell (crucial for performance when cell count is
+    // high). Results are identical to counting from scratch.
     let m = 0;
     let below = 0;
     const column = (xx: number, d: number) => {
@@ -186,7 +199,7 @@ function maskedMedian(
         continue;
       }
       const need = (count >> 1) + 1;
-      // 中值是累计个数第一次到 need 的那个值（最大到 255）。
+      // The median is the value where the cumulative count first reaches `need` (up to 255).
       while (m > 0 && below >= need) {
         m--;
         below -= hist[m]!;
@@ -202,8 +215,10 @@ function maskedMedian(
 }
 
 /**
- * 估计纸张背景：每格取最亮的 10% 像素的平均颜色，再去掉比周围暗很多的格子（字太密、图片、深色块），
- * 最后平滑。每个通道分开估，所以除完之后纸张也变成中性的白（顺带校正了白平衡）。
+ * Estimates paper background: for each cell, takes the average color of the brightest 10% of
+ * pixels, filters out cells much darker than their surroundings (dense text, images, dark
+ * blocks), and finally smooths. Channels are estimated separately, so after division, the paper
+ * becomes neutral white (incidentally correcting white balance).
  */
 export function estimateBackground(image: RgbaImage): RgbaImage {
   const { width, height, data } = image;
@@ -214,7 +229,7 @@ export function estimateBackground(image: RgbaImage): RgbaImage {
   const cell = [new Float32Array(n), new Float32Array(n), new Float32Array(n)] as const;
   const lum = new Float32Array(n);
   const hist = new Uint32Array(256);
-  // 每个像素的亮度只算一次（整数，Rec.601 权重 × 256）。
+  // Luminance of each pixel computed once (integer, Rec.601 weights × 256).
   const y8 = new Uint8Array(width * height);
   for (let p = 0; p < width * height; p++) {
     y8[p] = (77 * data[p * 4]! + 150 * data[p * 4 + 1]! + 29 * data[p * 4 + 2]! + 128) >> 8;
@@ -231,7 +246,7 @@ export function estimateBackground(image: RgbaImage): RgbaImage {
       }
       const g = gy * gw + gx;
       if (count === 0) continue;
-      // 亮度排前 10% 的门槛。
+      // Threshold for the top 10% brightest pixels.
       let need = Math.max(1, Math.round(count * PAPER_SHARE));
       let cut = 255;
       for (; cut > 0; cut--) {
@@ -260,11 +275,13 @@ export function estimateBackground(image: RgbaImage): RgbaImage {
     }
   }
 
-  // 去掉比周围纸色暗很多的格子（字太密、图片、黑块）：和大范围的中位数比（用中位数，
-  // 旁边有反光时参照值不会被拉高，反光周围的纸不会被误删，D-266），迭代到不再变化。
+  // Removes cells much darker than surrounding paper (dense text, images, dark blocks) by comparing
+  // against a wide-range median (using median so reference values are not pulled up when
+  // reflections are nearby, preventing paper around reflections from being falsely deleted, D-266),
+  // iterating until stable.
   const weights = new Float32Array(n).fill(1);
   const wide = Math.max(2, Math.round(Math.max(gw, gh) / 4));
-  // 大块图片从边缘往里一圈圈被去掉，所以多迭代几次（格子很少，很快）。
+  // Large images are stripped ring by ring from the edges inward, requiring a few extra iterations (cells are few, so it runs very quickly).
   for (let pass = 0; pass < 12; pass++) {
     const ref = maskedMedian(lum, weights, gw, gh, wide);
     let changed = false;
@@ -277,16 +294,16 @@ export function estimateBackground(image: RgbaImage): RgbaImage {
   }
   if (!weights.some((w) => w > 0)) weights.fill(1);
 
-  // 整页纸色：有效格子亮度的中位数，用来定下限。
+  // Full-page paper color: the median luminance of valid cells, used to set the lower bound.
   const valid = Array.from(lum).filter((_, g) => weights[g]! > 0);
   valid.sort((a, b) => a - b);
   const paper = valid[Math.floor(valid.length / 2)] ?? 255;
 
   const out = new Uint8Array(n * 4);
   const smooth = cell.map((ch) => {
-    // 先用有效格子补上无效的，再整体轻微平滑。
+    // Fills invalid cells using valid ones via `maskedBlur`, followed by slight overall smoothing.
     const filled = maskedBlur(ch, weights, gw, gh, 1);
-    // 周围一圈都无效（大块图片中间）时才需要更大范围的补法。
+    // A wider patching range is needed only when the entire surrounding ring is invalid (the center of a large image).
     let wider: Float32Array | null = null;
     for (let g = 0; g < n; g++) {
       if (weights[g]! > 0) filled[g] = ch[g]!;
@@ -306,14 +323,14 @@ export function estimateBackground(image: RgbaImage): RgbaImage {
   return { width: gw, height: gh, data: out };
 }
 
-/** 除以背景后的颜色（0–1 附近，纸张约为 1）。背景按格子中心双线性插值，和 sampleGrid 一样，只是按行预先算好。 */
+/** Color after dividing by background (around 0-1, paper is approx. 1). Background is bilinearly interpolated using cell centers, just like `sampleGrid`, but pre-calculated row by row. */
 export function normalizeByBackground(image: RgbaImage, background: RgbaImage): Float32Array {
   const { width, height, data } = image;
   const gw = background.width;
   const gh = background.height;
   const bd = background.data;
   const out = new Float32Array(width * height * 3);
-  // 每一列在格子里的位置。
+  // Column position of each pixel within the cells.
   const cx0 = new Int32Array(width);
   const cx1 = new Int32Array(width);
   const cfx = new Float32Array(width);
@@ -323,7 +340,7 @@ export function normalizeByBackground(image: RgbaImage, background: RgbaImage): 
     cx1[x] = Math.min(cx0[x]! + 1, gw - 1);
     cfx[x] = gx - cx0[x]!;
   }
-  // 当前行在竖直方向插值后的格子颜色。
+  // Interpolated cell color of the current row in the vertical direction.
   const row = new Float32Array(gw * 3);
   for (let y = 0; y < height; y++) {
     const gy = clamp(((y + 0.5) / height) * gh - 0.5, 0, gh - 1);
@@ -354,8 +371,10 @@ const LEVEL_BINS = 512;
 const LEVEL_MAX = 2;
 
 /**
- * 黑白两端：白点取纸张（亮度直方图在 0.6 以上的峰）稍低一点，纸上的噪点直接变白；
- * 黑点取最暗的 0.5%，但不超过白点的一半，空白页不会被拉成一片噪点。
+ * Black and white endpoints: white point takes a slightly lower value than the paper peak
+ * (luminance histogram peak above 0.6) so paper noise directly becomes white; black point takes
+ * the darkest 0.5%, capped at half the white point to prevent blank pages from being stretched
+ * into patches of noise.
  */
 export function levelsOf(normalized: Float32Array): { lo: number; hi: number } {
   const hist = new Uint32Array(LEVEL_BINS);
@@ -379,7 +398,7 @@ export function levelsOf(normalized: Float32Array): { lo: number; hi: number } {
   return { lo, hi };
 }
 
-/** 按黑白两端拉伸后的亮度（0–1）。 */
+/** Luminance (0-1) after stretching by black and white endpoints. */
 export function leveledLuma(normalized: Float32Array, lo: number, hi: number): Float32Array {
   const pixels = normalized.length / 3;
   const out = new Float32Array(pixels);
@@ -392,8 +411,11 @@ export function leveledLuma(normalized: Float32Array, lo: number, hi: number): F
 }
 
 /**
- * 黑白模式用的「墨水深浅」：拉伸后三个通道里最暗的那个（0–1）。红字、蓝字的某个通道很暗，
- * 按亮度算会被当成浅色、二值化后消失；按最暗的通道算就和黑字一样。白纸三个通道都亮，不受影响。
+ * Ink darkness for black-and-white mode: the darkest of the three channels (0-1) after
+ * stretching. Red or blue text has one very dark channel, which would be treated as light and
+ * disappear during binarization if calculated by luminance; calculating by the darkest channel
+ * treats it just like black text. White paper has bright channels across all three and remains
+ * unaffected.
  */
 export function leveledInk(normalized: Float32Array, lo: number, hi: number): Float32Array {
   const pixels = normalized.length / 3;
@@ -407,8 +429,10 @@ export function leveledInk(normalized: Float32Array, lo: number, hi: number): Fl
 }
 
 /**
- * 彩色还是灰度：除过背景（纸已经是中性白）后，按 4×4 的块取平均（压掉噪点和摩尔纹），
- * 不太暗也不太亮、颜色够浓的块占比超过 0.1% 就保留彩色。
+ * Color vs. grayscale: after background division (where paper is already neutral white), averages
+ * are taken over 4×4 blocks (suppressing noise and moiré patterns). If blocks that are neither
+ * too dark nor too bright and have sufficient color saturation account for more than 0.1%, color
+ * is retained.
  */
 export function looksColored(
   normalized: Float32Array,
@@ -448,17 +472,20 @@ export function looksColored(
 }
 
 /**
- * 投影法找文字倾斜（ScanTailor 的思路）：把暗点按候选角度剪切后逐行计数，
- * 文字行对齐时相邻行的计数差最大。返回 0 表示没把握或不需要转。
+ * Finds text skew using projection methods (ScanTailor approach): shears dark points by candidate
+ * angles and counts them row by row; the difference in counts between adjacent rows is maximized
+ * when text lines are aligned. Returns 0 if uncertain or no rotation is needed.
  */
 export function findSkew(lumaImage: Float32Array, width: number, height: number): number {
   let dark = 0;
   for (let p = 0; p < lumaImage.length; p++) if (lumaImage[p]! < 0.5) dark++;
-  // 字太少（或者几乎全是黑的）都不转。
+  // Skips rotation if text is too sparse (or almost entirely black).
   if (dark < 200 || dark > lumaImage.length * 0.5) return 0;
-  // 暗点不取样，按每行里横着 SKEW_CELL 像素一格数：每格的暗点数放在格子中间投影。
-  // 不能按扫描顺序每隔几个取一个点：大块实心色块（页眉的深色横条）里取到的点排成斜的格子，
-  // 投影在格子的方向上最整齐，会把倾斜估成好几度；随机取样又给每行添了噪声，盖过了字行。
+  // Dark points are not sampled individually; instead, they are counted in buckets of `SKEW_CELL`
+  // pixels horizontally per row: dark point counts per cell are projected at cell centers. Avoids
+  // sampling every few points in scan order, which could form slanted grid patterns from solid dark
+  // blocks (like dark header bars) and falsely estimate skew by several degrees. Random sampling,
+  // on the other hand, adds noise to each row that overrides text lines.
   const cols = Math.ceil(width / SKEW_CELL);
   const counts = new Float64Array(height * cols);
   for (let y = 0; y < height; y++)
@@ -515,7 +542,7 @@ export function findSkew(lumaImage: Float32Array, width: number, height: number)
   return Math.abs(best) < SKEW_MIN ? 0 : best;
 }
 
-/** 旋转 deg 度后能放下整张图的画布大小（四个角不会被裁掉）。 */
+/** Canvas size large enough to hold the entire image after rotating by `deg` degrees (without cutting off corners). */
 export function rotatedSize(size: Size, deg: number): Size {
   const a = Math.abs((deg * Math.PI) / 180);
   const c = Math.cos(a);
@@ -527,8 +554,10 @@ export function rotatedSize(size: Size, deg: number): Size {
 }
 
 /**
- * 黑白模式的局部统计：墨水深浅（leveledInk）先 2×2 缩小，再用积分图算窗口内的均值和标准差（Sauvola 用）。
- * 窗口很大（约长边的 1/24），统计图在全图上插值，误差可以忽略。
+ * Local statistics for black-and-white mode: `leveledInk` is first downscaled 2×2, then integral
+ * images are used to compute window mean and standard deviation (for Sauvola). With a large
+ * window (approx. 1/24 of the long side), statistics are interpolated across the full image with
+ * negligible error.
  */
 export function localStats(lumaImage: Float32Array, width: number, height: number): RgbaImage {
   const sw = Math.max(1, Math.floor(width / 2));
@@ -584,12 +613,12 @@ export function localStats(lumaImage: Float32Array, width: number, height: numbe
   return { width: sw, height: sh, data: out };
 }
 
-/** Sauvola 阈值（墨水深浅都是 0–1，R = 0.5）：低于它的是黑。着色器里是同一个公式。 */
+/** Sauvola threshold (ink darkness values are 0-1, R = 0.5): values below this are black. The shader uses the same formula. */
 export function sauvolaThreshold(mean: number, sd: number, k = SAUVOLA_K): number {
   return mean * (1 + k * (sd / 0.5 - 1));
 }
 
-/** 从缩小的分析图算出整页的增强参数。 */
+/** Computes full-page enhancement parameters from the downscaled analysis image. */
 export function planScanEnhance(image: RgbaImage, look: ScanLook): ScanPlan {
   const background = estimateBackground(image);
   const normalized = normalizeByBackground(image, background);
@@ -610,8 +639,10 @@ export function planScanEnhance(image: RgbaImage, look: ScanLook): ScanPlan {
 }
 
 /**
- * 黑白页去噪点（全分辨率，RGBA，R < 128 算黑）：8 连通的小黑块（宽和高都不超过 maxSide），
- * 如果 reach 像素内没有别的大块（字），就涂白；挨着字的小点（i 的点、句号）保留。返回去掉了几个。
+ * Despeckling for black-and-white pages (full resolution, RGBA, `R < 128` considered black):
+ * small 8-connected black blobs (width and height both not exceeding `maxSide`) are painted white
+ * if no other large blobs (text) exist within `reach` pixels; small dots close to text (dot on
+ * 'i', periods) are preserved. Returns the count of removed items.
  */
 export function despeckle(
   image: RgbaImage,
@@ -619,7 +650,7 @@ export function despeckle(
 ): number {
   const { width, height, data } = image;
   const labels = new Int32Array(width * height);
-  // 并查集（0 号不用）。
+  // Disjoint-set data structure (index 0 unused).
   let parent = new Int32Array(1024);
   let next = 1;
   const find = (a: number) => {
@@ -715,8 +746,10 @@ export function despeckle(
 }
 
 /**
- * 在增强前的图上识别出的框，换算到增强后的图上（D-267）：增强时先缩放到 base，
- * 再以中心转 -skew 度、放进 canvas 中间（和 Skia 里画的顺序一样）。转的角度很小，框只移动中心、宽高照旧。
+ * Boxes recognized on the pre-enhancement image mapped to the enhanced image (D-267): enhancement
+ * first downscales to `base`, centers and rotates by `-skew` degrees into the canvas (matching
+ * Skia's drawing order). Since the rotation angle is very small, boxes only shift their center
+ * while keeping width and height unchanged.
  */
 export function boxesToEnhanced<T extends { x: number; y: number; width: number; height: number }>(
   boxes: readonly T[],

@@ -3,20 +3,20 @@ import { leafBlocks } from './doc';
 import { lineShareIn } from './layout';
 import type { OcrBox, RgbaImage } from './types';
 
-// 测试用的合成页面：白底上画黑色的矩形（线、字的笔画），整页可以转一个角度（模拟拍歪了）。
+// Synthetic test page: black rectangles (lines, character strokes) drawn on a white background, the entire page can be rotated by an angle (simulating a crooked scan).
 
 export interface Rect {
   x: number;
   y: number;
   width: number;
   height: number;
-  /** 灰度（0 黑 – 255 白），不给是 20（黑）。 */
+  /** Grayscale (0 black - 255 white), defaults to 20 (black) if not provided. */
   shade?: number;
-  /** 彩色（RGB，0–255）：给了就不看 shade。 */
+  /** Color (RGB, 0-255): if provided, shade is ignored. */
   color?: readonly [number, number, number];
 }
 
-/** 画一页：rects 是转之前的坐标，deg 是绕页面中心顺时针转的角度（y 朝下）。 */
+/** Draw a page: rects are coordinates before rotation, deg is the clockwise rotation angle around the page center (y pointing down). */
 export function renderPage(
   width: number,
   height: number,
@@ -31,7 +31,7 @@ export function renderPage(
   const cy = height / 2;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      // 转回去，看落在哪个矩形里。
+      // Rotate back to see which rectangle it falls into.
       const u = cx + (x + 0.5 - cx) * cos + (y + 0.5 - cy) * sin;
       const v = cy - (x + 0.5 - cx) * sin + (y + 0.5 - cy) * cos;
       for (const r of rects) {
@@ -47,7 +47,7 @@ export function renderPage(
   return { width, height, data };
 }
 
-/** 一点转 deg 度以后的位置。 */
+/** The position of a point after rotation by deg degrees. */
 export function rotatePoint(x: number, y: number, width: number, height: number, deg: number) {
   const a = (deg * Math.PI) / 180;
   const cx = width / 2;
@@ -58,17 +58,17 @@ export function rotatePoint(x: number, y: number, width: number, height: number,
   };
 }
 
-/** 网格线：横线在 ys、竖线在 xs，线宽 2；skip 里的边不画（合并单元格）。 */
+/** Grid lines: horizontal lines at ys, vertical lines at xs, line width 2; edges in skip are not drawn (merged cells). */
 export function gridRects(
   xs: readonly number[],
   ys: readonly number[],
   options: {
     thickness?: number;
-    /** 不画的竖线段：[第几条竖线, 第几行]。 */
+    /** Vertical line segments not to draw: [vertical line index, row index]. */
     skipV?: readonly [number, number][];
-    /** 不画的横线段：[第几条横线, 第几列]。 */
+    /** Horizontal line segments not to draw: [horizontal line index, column index]. */
     skipH?: readonly [number, number][];
-    /** 每条线上的断口（像素宽）。 */
+    /** Break width on each line (pixel width). */
     breakEvery?: number;
   } = {},
 ): Rect[] {
@@ -76,7 +76,7 @@ export function gridRects(
   const out: Rect[] = [];
   const pushBroken = (r: Rect, horizontal: boolean) => {
     if (!options.breakEvery) return void out.push(r);
-    // 每隔 breakEvery 像素断开 6 像素（复印件的断线）。
+    // Break by 6 pixels every breakEvery pixels (broken lines in photocopies).
     const length = horizontal ? r.width : r.height;
     for (let s = 0; s < length; s += options.breakEvery) {
       const piece = Math.min(options.breakEvery - 6, length - s);
@@ -103,14 +103,14 @@ export function gridRects(
   return out;
 }
 
-/** 像字的笔画：一排竖条（每 7 像素一条，宽 2，高 h），不会被当成线。 */
+/** Character-like strokes: a row of vertical bars (every 7 pixels, width 2, height h), not to be mistaken for lines. */
 export function glyphs(x: number, y: number, width: number, h = 16): Rect[] {
   const out: Rect[] = [];
   for (let s = 0; s + 2 <= width; s += 7) out.push({ x: x + s, y, width: 2, height: h });
   return out;
 }
 
-/** 假的识别结果：转之前的框，换成转过以后的位置（大小不变）；chars 给每个字均匀的位置。 */
+/** Fake recognition result: pre-rotation boxes replaced with post-rotation positions (size unchanged); chars gives even positions for each character. */
 export function fakeLine(
   text: string,
   box: Rect,
@@ -138,8 +138,10 @@ export function fakeLine(
 }
 
 /**
- * 字的守恒：识别出来的每个词在 Word 的可编辑文字里正好出现一次（丢字、重复都算错）。
- * 一半以上落在图片块里的行可以只留在图里（出现 0 次或 1 次都行）。按词计数，不受分段、分格影响。
+ * Text conservation: each recognized word appears exactly once in Word's editable text (missing
+ * words and duplicates are considered errors). Lines with more than half falling inside image
+ * blocks can stay solely in the image (appearing 0 or 1 time is fine). Counted by words,
+ * unaffected by segmentation or grid splitting.
  */
 export function textConservation(
   page: Pick<DocPage, 'blocks'>,
@@ -147,7 +149,7 @@ export function textConservation(
 ): { missing: string[]; extra: string[] } {
   const leaves = leafBlocks(page);
   const images = leaves.filter((b) => b.kind === 'image').map((b) => b.box);
-  // 列表的编号写进 Word 的自动编号，不在项目文字里：编号样的词两边都不数。
+  // List numbers are written into Word's automatic numbering, not in the item text: words resembling numbers are counted on neither side.
   const marker = /^(?:[(（]?[\p{N}\p{L}]{1,3}[.)）、:]|[•·\-–*])$/u;
   const words = (s: string) => s.split(/\s+/).filter((w) => w && !marker.test(w));
   const count = (list: readonly string[]) => {

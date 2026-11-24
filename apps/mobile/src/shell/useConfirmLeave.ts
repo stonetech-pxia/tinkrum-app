@@ -6,8 +6,10 @@ import { Alert } from 'react-native';
 import { t, type StringKey } from '../i18n';
 
 /**
- * 有没保存的改动时，返回（按钮、手势）前先问「放弃修改？」（2026-11-06 测试：新记录表单、桌上的修改，
- * 返回就悄悄没了）。返回的 leave() 用在保存、删除以后：不问，直接返回。
+ * When there are unsaved changes, prompt "Discard changes?" before returning via button or
+ * gesture (2026-11-06 test: new record form, edits on desk were quietly lost upon returning). The
+ * leave() function for returning is used after saving or deleting: returns directly without
+ * prompting.
  */
 export function useConfirmLeave(unsaved: boolean, message: StringKey, locale: Locale) {
   const router = useRouter();

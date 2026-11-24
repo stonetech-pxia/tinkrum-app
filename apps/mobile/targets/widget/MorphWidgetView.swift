@@ -2,8 +2,9 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-// 小组件的画法：统计（值、目标进度环）、按钮（点一下执行）、记录列表（列表几行，或 tiles 的几个圆）。
-// 颜色用 App 风格的主色（深色模式用深色那份），底色用系统的。
+// Widget rendering logic: Statistics (values, target progress rings), buttons (execute on tap),
+// record lists (number of rows, or tiles circles). Uses app theme primary color (dark mode
+// variant), with system background color.
 
 extension Color {
   init(hex: String) {
@@ -89,7 +90,7 @@ struct MorphWidgetView: View {
   private func stat(_ view: ItemView) -> some View {
     heading(view.title)
     if let rows = view.rows {
-      // 按单选分组的统计：每个选项一行。
+      // Statistics grouped by single selection: One row per option.
       ForEach(rows.prefix(rowLimit), id: \.id) { row in
         HStack {
           Text(row.title).font(.subheadline).lineLimit(1)

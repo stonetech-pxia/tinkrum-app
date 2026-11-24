@@ -1,14 +1,18 @@
 import Compression
 import Foundation
 
-// zip 的读写（D-600），不依赖 Expo，可以单独编译测试（tests/）。
-// - 写：边读边写，不把文件读进内存；单个文件和整个压缩包超过 4 GB 时用 Zip64。已经压缩过的文件（照片、视频、PDF 等）
-//   只存不压，数据库和文本才压。每个文件写完后回头补本地头里的校验和与大小，所以不用数据描述符。
-// - 读：先读中央目录并逐条检查（名字、符号链接、加密、压缩方式、大小），全部通过才解压；解压时边解边数字节，
-//   超过声明的大小就停（防压缩炸弹），最后核对校验和。名字不安全、有符号链接的包整个拒绝。
-// 取消：每读一块问一次 shouldCancel；取消、出错时由调用方删掉没写完的文件。
+// ZIP read/write (D-600), independent of Expo, can be compiled and tested separately (tests/).
+// - Write: read-as-you-write, without reading files into memory; use Zip64 when a single file or
+// the entire archive exceeds 4 GB. Already compressed files (photos, videos, PDFs, etc.) are stored
+// without recompression; only databases and text are compressed. Backpatch the local header's
+// checksum and size after writing each file, so data descriptors are not needed.
+// - Read: read the central directory first and check each entry (name, symbolic links, encryption,
+// compression method, size) one by one, unpacking only if all pass; count bytes as you decompress,
+// stopping if it exceeds the declared size (zip bomb protection), and finally verify the checksum.
+// Completely reject archives with unsafe names or symbolic links. Cancellation: prompt shouldCancel
+// on every read chunk; upon cancellation or error, unfinished files are deleted by the caller.
 
-// 系统的 libz 里的 crc32（podspec 链接了 -lz）。
+// crc32 from system libz (linked via -lz in podspec).
 @_silgen_name("crc32")
 private func zlibCrc32(_ crc: UInt, _ buf: UnsafePointer<UInt8>?, _ len: UInt32) -> UInt
 
@@ -26,10 +30,10 @@ let zipChunk = 1 << 20
 let zipMaxEntries = 2_000_000
 let zipMaxCentralBytes: UInt64 = 1 << 29
 let zipMaxNameBytes = 4096
-/** 比这小的单个文件不用 Zip64（留出余量，压缩后略大也不会超过 4 GB）。 */
+/** Single files smaller than this do not need Zip64 (leaves margin so that slightly larger compressed output still stays under 4 GB). */
 let zipBigFile: UInt64 = 0xF000_0000
 
-/** 已经是压缩格式的文件：只存不压。 */
+/** Files that are already in a compressed format: store only, do not compress. */
 let zipStoredExtensions: Set<String> = [
   "jpg", "jpeg", "png", "heic", "heif", "webp", "gif", "avif", "jp2",
   "mp4", "mov", "m4v", "m4a", "mp3", "aac", "opus", "ogg", "flac", "webm", "mkv",
@@ -41,7 +45,7 @@ func zipShouldStore(_ name: String) -> Bool {
   return zipStoredExtensions.contains(ext)
 }
 
-// MARK: - 小工具
+// MARK: - Utilities
 
 private func put16(_ d: inout Data, _ v: UInt16) {
   d.append(UInt8(v & 0xFF))
@@ -94,7 +98,7 @@ private func dosDateTime(_ date: Date) -> (time: UInt16, date: UInt16) {
   return (time, day)
 }
 
-// MARK: - 压缩流（Compression 框架的 ZLIB 是不带头的 deflate）
+// MARK: - Compression stream (ZLIB in Compression framework is headless deflate)
 
 final class Flate {
   private var stream: compression_stream
@@ -116,7 +120,7 @@ final class Flate {
     dst.deallocate()
   }
 
-  /// 喂一块数据；产出交给 sink。final 为 true 表示这是最后一块。返回 true 表示压缩流已经结束。
+  /// Feed a chunk of data; output delivered to sink. final true indicates the last chunk. Returns true when the compression stream has ended.
   func process(_ input: Data, final: Bool, sink: (UnsafeBufferPointer<UInt8>) throws -> Void) throws -> Bool {
     var ended = false
     try input.withUnsafeBytes { (raw: UnsafeRawBufferPointer) throws -> Void in
@@ -135,7 +139,7 @@ final class Flate {
           return
         }
         if status != COMPRESSION_STATUS_OK { throw ZipFail.damaged("deflate") }
-        // 输入吃完、输出没满：这一块处理完了；最后一块要一直处理到 END（没有进展就停，免得空转）。
+        // Input exhausted, output not full: this chunk is fully processed; the last chunk must be processed until END (stop if making no progress to avoid spinning).
         if stream.src_size == 0 && stream.dst_size > 0 && (!final || produced == 0) { return }
       }
     }
@@ -143,7 +147,7 @@ final class Flate {
   }
 }
 
-// MARK: - 写
+// MARK: - Write
 
 struct ZipCentral {
   var name: String
@@ -162,7 +166,7 @@ final class ZipWriter {
   private let forceZip64: Bool
   private(set) var offset: UInt64 = 0
   private var central: [ZipCentral] = []
-  /// 已写进压缩包的原始字节数（给进度用）。
+  /// Original raw bytes written into the archive (for progress reporting).
   private(set) var inputBytes: UInt64 = 0
 
   init(url: URL, forceZip64: Bool = false) throws {
@@ -190,7 +194,7 @@ final class ZipWriter {
     return .io(error.localizedDescription)
   }
 
-  /// 写一个文件进去。read 每次给出下一块（空表示结束）。
+  /// Write a file into the archive. read provides the next chunk each time (empty indicates end).
   func add(
     name: String, size declared: UInt64, modified: Date, store: Bool,
     read: () throws -> Data, shouldCancel: () -> Bool, progress: (UInt64) -> Void
@@ -246,7 +250,7 @@ final class ZipWriter {
     }
     if let flate { _ = try flate.process(Data(), final: true, sink: sink) }
 
-    // 补本地头里的校验和和大小。
+    // Backpatch the checksum and size in the local header.
     if size >= 0xFFFF_FFFF && !local64 { throw ZipFail.io("file grew while writing") }
     let end = offset
     var patch = Data()
@@ -289,7 +293,7 @@ final class ZipWriter {
       }, shouldCancel: shouldCancel, progress: { _ in })
   }
 
-  /// 写中央目录和结尾，关掉文件。
+  /// Write the central directory and end record, then close the file.
   func finish() throws {
     let cdStart = offset
     for e in central {
@@ -373,7 +377,7 @@ final class ZipWriter {
   }
 }
 
-// MARK: - 读
+// MARK: - Read
 
 struct ZipEntry {
   let name: String
@@ -384,14 +388,14 @@ struct ZipEntry {
   let offset: UInt64
 }
 
-/** 名字能不能用：只允许相对路径、没有 .. 和 .、没有空段、没有反斜杠、没有盘符。 */
+/** Whether a name is valid: allows only relative paths, no .. or ., no empty segments, no backslashes, no drive letters. */
 func zipSafeName(_ raw: String) -> Bool {
   if raw.isEmpty || raw.utf8.count > zipMaxNameBytes { return false }
   if raw.contains("\0") || raw.contains("\\") || raw.hasPrefix("/") { return false }
   let scalars = Array(raw.unicodeScalars)
   if scalars.count >= 2, scalars[1] == ":", scalars[0].properties.isAlphabetic { return false }
   var parts = raw.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-  if parts.last == "" { parts.removeLast() }  // 目录条目的结尾斜杠
+  if parts.last == "" { parts.removeLast() }  // Trailing slash for directory entries
   if parts.isEmpty { return false }
   return !parts.contains { $0.isEmpty || $0 == "." || $0 == ".." }
 }
@@ -427,7 +431,7 @@ final class ZipReader {
     }
   }
 
-  /// 读中央目录并检查每一条。有一条不合格整个压缩包就拒绝。
+  /// Read the central directory and validate every entry. Reject the entire archive if any entry fails validation.
   func load() throws {
     if length < 22 { throw ZipFail.notZip }
     let tailLength = Int(min(length, 65_557))
@@ -481,7 +485,7 @@ final class ZipReader {
       let end = pos + 46 + nameLength + extraLength + commentLength
       guard end <= cd.count else { throw ZipFail.damaged("central entry") }
       let nameData = cd.subdata(in: (cd.startIndex + pos + 46)..<(cd.startIndex + pos + 46 + nameLength))
-      // 带 Zip64 附加字段的：只有写成 0xFFFFFFFF 的那几项在里面，顺序固定。
+      // Entries with Zip64 extra fields: only the fields written as 0xFFFFFFFF are contained within, in a fixed order.
       var extra = pos + 46 + nameLength
       let extraEnd = extra + extraLength
       while extra + 4 <= extraEnd {
@@ -505,7 +509,7 @@ final class ZipReader {
       pos = end
       if flags & 0x1 != 0 || flags & 0x40 != 0 { throw ZipFail.unsupported("encrypted") }
       if method != 0 && method != 8 { throw ZipFail.unsupported("method \(method)") }
-      // 符号链接和别的特殊文件：整个压缩包拒绝。
+      // Symbolic links and other special files: reject the entire archive.
       if madeBy >> 8 == 3 {
         let type = (external >> 16) & 0xF000
         if type != 0 && type != 0x8000 && type != 0x4000 { throw ZipFail.unsafe("special file") }
@@ -528,7 +532,7 @@ final class ZipReader {
     entries = list
   }
 
-  /// 把一条解到 dest（父目录按需创建）。边解边数字节，超过声明的大小就停；最后核对校验和。
+  /// Extract an entry to dest (parent directories created as needed). Count bytes during extraction, stopping if it exceeds the declared size; finally verify the checksum.
   func extract(
     _ entry: ZipEntry, to dest: URL, shouldCancel: () -> Bool, progress: (UInt64) -> Void
   ) throws {

@@ -12,15 +12,16 @@ import type { TableBlock, TableDoc } from './types';
 import { writeRowsXlsx, writeXlsx } from './xlsx';
 import { importXlsx, MAX_IMPORT_CELLS, readXlsxRows } from './xlsx-import';
 
-// 读外来的 xlsx（D-509）：用 jszip 按 Excel 的写法拼的工作簿测（共享字符串、行内字符串、合并格子、公式、
-// 数字格式、列宽、几张工作表），再看写回去的 xlsx。
+// Reading external xlsx (D-509): tested using a workbook assembled via JSZip following Excel's
+// structure (shared strings, inline strings, merged cells, formulas, number formats, column widths,
+// multiple worksheets), then verifying the written-back xlsx.
 
 const NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
 const RNS = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
 const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const PKG = 'xmlns="http://schemas.openxmlformats.org/package/2006/relationships"';
 
-/** 2026-10-01 在 Excel 里的序列号（1900 年制）。 */
+/** Serial number for 2026-10-01 in Excel (1900 date system). */
 const OCT_1 = (Date.UTC(2026, 9, 1) - Date.UTC(1899, 11, 30)) / 86400000;
 
 interface SheetSpec {
@@ -92,7 +93,7 @@ const STRINGS = [
   si('Date'),
   si('Item'),
   si('Amount'),
-  // 富文本的几截连起来；注音（rPh）不要。
+  // Join rich text segments; ignore phonetic guides (rPh).
   '<si><r><t>Total </t></r><r><rPr><b/></rPr><t>£</t></r><rPh sb="0" eb="1"><t>ignored</t></rPh></si>',
   si('Notes'),
 ];
@@ -107,9 +108,9 @@ const EXPENSES: SheetSpec = {
     `<row r="3"><c r="A3" s="1"><v>${OCT_1}</v></c><c r="B3" t="inlineStr"><is><t>Café</t></is></c><c r="C3" s="2"><v>12.5</v></c>` +
     '<c r="D3" t="b"><v>1</v></c><c r="E3" t="e"><v>#DIV/0!</v></c><c r="F3" s="3"><v>0.155</v></c></row>' +
     `<row r="4"><c r="A4" s="1"><v>${OCT_1 + 1}</v></c><c r="B4" t="inlineStr"><is><t>Train</t></is></c><c r="C4" s="2"><v>1234</v></c></row>` +
-    // 公式：留下最后算出的结果；没算过的留下公式的字。
+    // Formulas: keep the last evaluated result; for unevaluated ones, keep the formula string.
     '<row r="5"><c r="B5" t="s"><v>4</v></c><c r="C5" s="2"><f>SUM(C3:C4)</f><v>1246.5</v></c><c r="D5"><f>C5*2</f></c></row>' +
-    // 只有样式、没有值的格子不算内容。
+    // Cells with only styles and no values are not counted as content.
     '<row r="40"><c r="Z40" s="2"/></row>' +
     '</sheetData><mergeCells count="1"><mergeCell ref="A1:C1"/></mergeCells>',
 };
@@ -128,7 +129,7 @@ describe('importXlsx', () => {
     const { doc, formulas } = importXlsx(await workbook([EXPENSES, NOTES], STRINGS));
     expect(doc.pages.map((p) => p.name)).toEqual(['October', 'Notes']);
     const t = table(doc);
-    // A1 到 F5：最后一格有内容的是第 5 行、第 F 列（只有样式的 Z40 不算）。
+    // A1 to F5: the last cell containing content is at row 5, column F (Z40 with only style is not counted).
     expect([t.rows, t.cols, t.col]).toEqual([5, 6, 0]);
     expect(cellAt(t, 0, 0)).toMatchObject({
       text: 'Expenses October 2026',
@@ -136,7 +137,7 @@ describe('importXlsx', () => {
       rowSpan: 1,
       align: 'center',
     });
-    // 合并区域盖住的位置没有格子。
+    // No cells exist at locations covered by merged ranges.
     expect(cellAt(t, 0, 1)).toBeUndefined();
     expect(cellAt(t, 0, 3)).toMatchObject({ text: '' });
     expect(cellAt(t, 2, 1)).toMatchObject({ text: 'Café', write: { kind: 'text' } });
@@ -146,7 +147,7 @@ describe('importXlsx', () => {
     expect(formulas).toBe(2);
     expect(cellAt(t, 4, 3)).toMatchObject({ text: '=C5*2', write: { kind: 'text' } });
     expect(table(doc, 1).cells.map((c) => c.text)).toEqual(['Notes', '3']);
-    // 不画边框（原来的边框读不出来，也不给每一格加上）。
+    // Do not draw borders (original borders cannot be read, nor are they added to every cell).
     expect(t.borderless).toBe(true);
   });
 
@@ -182,11 +183,11 @@ describe('importXlsx', () => {
     expect(sheet).toContain('<mergeCell ref="A1:C1"/>');
     expect(sheet).toMatch(new RegExp(`<c r="A3" s="\\d+"><v>${OCT_1}</v></c>`));
     expect(sheet).toMatch(/<c r="C5" s="\d+"><v>1246.5<\/v><\/c>/);
-    // 日期写回自带的 14 号格式（Excel 按地区显示短日期）。
+    // Write dates back using the built-in format ID 14 (Excel displays short dates according to locale).
     expect(styles).toContain('numFmtId="14"');
     expect(styles).toContain('formatCode="#,##0.00\\ &quot;€&quot;"');
     expect(styles).not.toContain('borderId="1"');
-    // 再读一遍：格子的字和值一样。
+    // Read again: cell text and values match.
     const again = importXlsx(writeXlsx(doc)).doc;
     expect(table(again).cells.map((c) => c.text)).toEqual(table(doc).cells.map((c) => c.text));
     expect(again.pages.map((p) => p.name)).toEqual(['October', 'Notes']);
@@ -204,7 +205,7 @@ describe('importXlsx', () => {
 
   it('the 1904 date system', async () => {
     const t = table(importXlsx(await workbook([EXPENSES], STRINGS, { date1904: true })).doc);
-    // 同一个序列号在 1904 年制里晚 4 年零 1 天。
+    // The same serial number in the 1904 date system is 4 years and 1 day later.
     expect(cellAt(t, 2, 0)!.text).toBe('10-02-30');
   });
 
@@ -219,11 +220,11 @@ describe('importXlsx', () => {
       { length: 201 },
       (_, r) => `<row r="${r + 1}"><c r="CV${r + 1}"><v>1</v></c></row>`,
     ).join('');
-    // 201 行 × 100 列 = 20100 格（从 A1 到 CV201 的方块）。
+    // 201 rows * 100 cols = 20,100 cells (the block from A1 to CV201).
     expect(201 * 100).toBeGreaterThan(MAX_IMPORT_CELLS);
     const big = await workbook([{ name: 'Big', xml: `<sheetData>${rows}</sheetData>` }], []);
     expect(importOffice(big, 'xlsx')).toEqual({ ok: false, error: 'tooLarge' });
-    // Office 加密的文件装在同一种复合文件里（这份是 Pages 存的 Word）。
+    // Office encrypted files are packaged in the same compound file format (this one is a Word document saved by Pages).
     const locked = new Uint8Array(
       readFileSync(join(__dirname, 'fixtures/office/password-pages.docx')),
     );
@@ -297,7 +298,7 @@ describe('rows of a sheet for importing entries (D-574)', () => {
       { text: '1,234.50', number: 1234.5 },
       { text: '2026-10-01', number: OCT_1, date: true },
     ]);
-    // 空的格子不写进文件：这一行前两格是空的。
+    // Empty cells are not written to the file: the first two cells in this row are empty.
     expect(sheet!.rows[2]![0]).toEqual({ text: '' });
     expect(sheet!.rows[2]![2]).toMatchObject({ number: OCT_1 + 0.5, date: true });
   });

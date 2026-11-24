@@ -18,18 +18,20 @@ import { Image } from 'react-native';
 import { iconSource } from '../renderer/Icon';
 import type { HomeScreenArt } from './platform';
 
-// Android 桌面图标上的图（D-606；别的平台是 icon-image.ts，不画）：App 自己的图标画在它自己主色的底上。只画我们自己的固定内容：
-// 内置图标的字形、自带图形的 PNG 或一个表情，都在本机画，不联网。
+// Graphic on Android desktop icon (D-606; other platforms use icon-image.ts, which doesn't draw):
+// App's own icon drawn on its primary color background. Only draws our own fixed content: glyphs of
+// built-in icons, PNG of bundled graphics, or an emoji, all drawn locally without networking.
 //
-// 图是 Android 的自适应图标（108dp 见方，桌面只显示中间约 72dp，再按自己的形状裁）：底色铺满整张，
-// 图标放在所有桌面都不会裁到的中间一块里。
+// Graphic is an Android adaptive icon (108dp square, desktop only shows the middle ~72dp and crops
+// to its own shape): background color fills entirely, icon is placed in the middle area guaranteed
+// not to be cropped on any desktop.
 
-/** 108dp × 4：最密的屏幕也够，系统按需要缩小。 */
+/** 108dp × 4: enough for densest screens, system scales down as needed. */
 const SIZE = 432;
-/** 图标本身的边长。 */
+/** Side length of the icon itself. */
 const BOX = Math.round(SIZE * 0.36);
 
-/** 打包进 App 的文件（字体、图片）读成数据。 */
+/** Reads files bundled into the app (fonts, images) into data. */
 function read(asset: number) {
   const source = Image.resolveAssetSource(asset);
   if (!source) throw new Error('asset missing');
@@ -39,7 +41,7 @@ function read(asset: number) {
 const SYMBOLS = 'symbols';
 let symbolFonts: Promise<SkTypefaceFontProvider> | null = null;
 
-/** Material Symbols 的字体（App 里的系统图标用的同一个文件），读一次留着。 */
+/** Material Symbols font (same file used by system icons in the app), read once and kept. */
 function loadSymbolFonts(): Promise<SkTypefaceFontProvider> {
   symbolFonts ??= read(symbolFont.font)
     .then((data) => {
@@ -57,8 +59,9 @@ function loadSymbolFonts(): Promise<SkTypefaceFontProvider> {
 }
 
 /**
- * 一行字排成 BOX 高：行高等于字号、上下留白对半分，字形（或表情）就在这一行的正中。
- * 给了 fonts 时用图标字体：字体按名字把一串字母换成那个图标（rlig 连字）。
+ * Lays out a line of text to BOX height: line height equals font size, top and bottom margins
+ * split evenly, glyph (or emoji) is centered in the line. When fonts are provided, uses icon
+ * fonts: font maps a string of letters to that icon by name (rlig ligature).
  */
 function line(text: string, color: string, fonts?: SkTypefaceFontProvider) {
   const builder = fonts ? Skia.ParagraphBuilder.Make({}, fonts) : Skia.ParagraphBuilder.Make({});
@@ -78,8 +81,10 @@ function line(text: string, color: string, fonts?: SkTypefaceFontProvider) {
 }
 
 /**
- * 配置里画出来的图标（D-625）：24×24 的路径缩放到图标那一块（和别的图标同样大小、同一种颜色），
- * 填满的合成一条按 even-odd 画，只画线的 2 宽、圆头圆角。有一条读不了就抛错（调用方不带图）。
+ * Icon drawn from config (D-625): 24x24 path scaled to the icon area (same size and color as
+ * other icons), filled paths combined into one drawn with even-odd rule, line-only drawn with
+ * width 2 and round caps/joins. Throws an error if any path cannot be read (caller supplies no
+ * icon).
  */
 function drawPaths(canvas: SkCanvas, icon: DrawnIcon, color: string) {
   const paths = icon.paths.map((d) => Skia.Path.MakeFromSVGString(d));
@@ -105,10 +110,10 @@ function drawPaths(canvas: SkCanvas, icon: DrawnIcon, color: string) {
   canvas.restore();
 }
 
-/** 画出来的 PNG（base64）。画不出来时抛错，调用方不带图，原生用 Tinkrum 的图标。 */
+/** Drawn PNG (base64). Throws an error if unable to draw, caller supplies no icon, native uses Tinkrum's icon. */
 export async function drawHomeScreenIcon(art: HomeScreenArt): Promise<string> {
   const source = iconSource(art.icon);
-  // 先把要读的东西读完再开画布。
+  // Read everything that needs to be read before opening the canvas.
   const fonts = source.symbol ? await loadSymbolFonts() : undefined;
   const picture = source.image ? Skia.Image.MakeImageFromEncoded(await read(source.image)) : null;
   if (source.image && !picture) throw new Error('icon image unreadable');
@@ -118,10 +123,10 @@ export async function drawHomeScreenIcon(art: HomeScreenArt): Promise<string> {
   const canvas = surface.getCanvas();
   canvas.drawColor(Skia.Color(art.background));
   if (isDrawnIconRef(art.icon)) {
-    // 图标库里没有（不该发生，校验会拦）时只有底色，不把 my:<id> 当字画出来。
+    // When not found in the icon library (should not happen, validation catches it), only the background color is used, without drawing my:<id> as text.
     if (art.drawn) drawPaths(canvas, art.drawn, art.foreground);
   } else if (picture) {
-    // 单色 PNG：只用它的形状，染成图标色。
+    // Monochrome PNG: uses only its shape, tinted to the icon color.
     const paint = Skia.Paint();
     paint.setColorFilter(Skia.ColorFilter.MakeBlend(Skia.Color(art.foreground), BlendMode.SrcIn));
     const at = (SIZE - BOX) / 2;

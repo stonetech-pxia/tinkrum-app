@@ -37,13 +37,14 @@ import {
   type WorkflowStep,
 } from './schema';
 
-// 把修改操作翻译成用户能看懂的说明（§4：将新增、删除或调整哪些页面/操作）。
-// 描述基于修改前的配置，这样被删除或改名的对象仍能用原来的名字称呼。
+// Translate modification operations into human-readable descriptions (§4: which pages/actions will
+// be added, deleted, or adjusted). Descriptions are based on the pre-modification configuration so
+// deleted or renamed objects can still be referred to by their original names.
 
 export interface DescribeContext {
   registry: Registry;
   locale: Locale;
-  /** 用于展示命名模板示例。 */
+  /** Used to display naming template examples. */
   now: Date;
 }
 
@@ -64,8 +65,10 @@ export function componentLabel(
 }
 
 /**
- * 提醒什么时候响（修改说明、「设置 → 提醒」用）。带 unless 时接着说什么时候不响（D-564）：只说表名，
- * 有筛选或 link 时说「符合条件的记录」，不说筛选的值。
+ * When a reminder triggers (used in modification descriptions, and "Settings -> Reminders"). When
+ * `unless` is present, further specify when it does not trigger (D-564): only mention the table
+ * name, and if there are filters or links, say "records meeting the criteria" without stating
+ * filter values.
  */
 export function reminderWhen(r: Reminder, config: WorkspaceConfig, locale: Locale): string {
   const when = reminderWhenOnly(r, config, locale);
@@ -98,7 +101,7 @@ function reminderWhenOnly(r: Reminder, config: WorkspaceConfig, locale: Locale):
     });
   }
   if ('minutes' in when) {
-    // 日期时间前几分钟（D-562）。
+    // Minutes before date and time (D-562).
     const table = config.data.tables.find((c) => c.id === when.before.table);
     const field = table?.fields.find((f) => f.id === when.before.field);
     return t(locale, 'reminderWhenMinutesBefore', {
@@ -126,7 +129,7 @@ function reminderWhenOnly(r: Reminder, config: WorkspaceConfig, locale: Locale):
 
 const truncate = (s: string, max = 40) => (s.length > max ? `${s.slice(0, max)}…` : s);
 
-/** 字段类型在修改说明里的名字（字段定义的 label）。 */
+/** Names of field types in modification descriptions (field definition labels). */
 const FIELD_TYPE_NAMES: Record<string, [string, string]> = Object.fromEntries(
   FIELDS.map((d) => [d.type, d.label]),
 );
@@ -136,7 +139,7 @@ type ThemeTokenKey = Exclude<
   'primaryColor' | 'mode' | 'colors' | 'darkColors' | 'card'
 >;
 
-/** 主题 token 的名字和取值说明。 */
+/** Names and value descriptions of theme tokens. */
 function describeToken(key: ThemeTokenKey, value: unknown, locale: Locale): string {
   const values: Record<string, Record<string, [string, string]>> = {
     font: {
@@ -195,7 +198,7 @@ function describeToken(key: ThemeTokenKey, value: unknown, locale: Locale): stri
   return t(locale, 'describe__41054', { v0: pick(names[key]), v1: shown });
 }
 
-/** 同一次修改中新建的对象也按名字描述；帮助函数共用原配置和输出列表。 */
+/** Objects created in the same modification are also described by name; helper functions share the original configuration and output list. */
 function createDescribeNames(
   ops: readonly Op[],
   before: WorkspaceConfig,
@@ -203,7 +206,7 @@ function createDescribeNames(
   lines: string[],
 ) {
   const zh = ctx.locale === 'zh';
-  // 同一次修改里新建的数据表、页面也要能用名字称呼（例如新建页面后把它放进导航栏）。
+  // Data tables and pages newly created in the same modification must also be referrable by name (e.g., adding a newly created page to the navigation bar).
   const addedTables = ops.flatMap((op) =>
     op.op === 'addData' && typeof op.table !== 'string' ? [op.table] : [],
   );
@@ -212,7 +215,7 @@ function createDescribeNames(
     op.op === 'addContainer' && typeof op.page === 'object' ? [op.page as Page] : [],
   );
 
-  // 同一次修改里新建的快捷操作、提醒也要能找到名字（新建后接着加步骤）。
+  // Quick actions and reminders newly created in the same modification must also be locatable by name (adding steps immediately after creation).
   const addedTools = ops.flatMap((op) =>
     op.op === 'addTool' && typeof op.tool !== 'string' ? [op.tool] : [],
   );
@@ -227,7 +230,7 @@ function createDescribeNames(
   const page = (id: string) => known.containers.pages.find((p) => p.id === id);
   const pageName = (id: string) => page(id)?.title ?? id;
   const appName = (id: string) => before.nav.apps?.find((a) => a.id === id)?.name ?? id;
-  // 同一次修改里新加的块（例如先加分组再把卡片移进去）也要能用名字称呼。
+  // Blocks newly added in the same modification (e.g., adding a group first and then moving cards into it) must also be referrable by name.
   const added = ops.flatMap((op) =>
     op.op === 'addContainer' && op.block ? [op.block as Component] : [],
   );
@@ -305,7 +308,7 @@ function createDescribeNames(
       : String(type);
 
   const list = (items: string[]) => items.join(t(ctx.locale, 'separatorList'));
-  /** 改了快捷操作的一步：参数（合并）、每次问什么（整个换）。 */
+  /** Modified a step in a quick action: parameters (merged), what to ask each time (replaced entirely). */
   const describeStep = (
     wfId: string,
     stepId: string,
@@ -342,7 +345,7 @@ function createDescribeNames(
     }
   };
 
-  /** 字段的名字（记录块和工具里的字段 ID 都换成它）；系统字段也有名字。 */
+  /** Field name (replaces field IDs in record blocks and tools with this name); system fields also have names. */
   const fieldLabel = (tableId: string | undefined, id: string) =>
     id === 'createdAt'
       ? t(ctx.locale, 'describeFieldCreatedAt')
@@ -384,11 +387,11 @@ function createDescribeNames(
 
 type DescribeNames = ReturnType<typeof createDescribeNames>;
 
-/** 块属性、读什么和工具用法的说明；属性的遍历顺序保持不变。 */
+/** Descriptions of block properties, data sources, and tool usage; property traversal order remains unchanged. */
 function createBlockDescriptions(names: DescribeNames) {
   const { fieldLabel, ctx, list, collName, wf, toolName, page, pageName, known, findComp } = names;
 
-  /** 记录块每一条的显示（show 的键大多是字段 ID）。不是这几个键时返回 null。 */
+  /** Display of each item in a record block (most keys in `show` are field IDs). Returns null if not one of these keys. */
   const recordShowChange = (k: string, v: unknown, table: string | undefined): string | null => {
     const field = (id: unknown) => fieldLabel(table, String(id));
     switch (k) {
@@ -423,7 +426,7 @@ function createBlockDescriptions(names: DescribeNames) {
     }
   };
 
-  /** 块读什么（source）的一个键。 */
+  /** A key of what the block reads (`source`). */
   const sourceChange = (
     k: string,
     v: unknown,
@@ -438,7 +441,7 @@ function createBlockDescriptions(names: DescribeNames) {
         return t(ctx.locale, off ? 'describeSourceFilterOff' : 'describeSourceFilter');
       case 'sort': {
         if (off) return t(ctx.locale, 'describeSourceSortOff');
-        // 几个字段依次排（D-560）。
+        // Multiple fields listed sequentially (D-560).
         if (Array.isArray(v) && v.length > 1)
           return t(ctx.locale, 'describeSourceSortMany', {
             fields: (v as { field: string }[]).map((k) => fieldLabel(table, k.field)).join(' / '),
@@ -496,7 +499,7 @@ function createBlockDescriptions(names: DescribeNames) {
     }
   };
 
-  /** 一个工具用法的称呼，改动说明里用。 */
+  /** Name of a tool usage, used in change descriptions. */
   const useName = (u: ToolUse): string => {
     if (u.label) return t(ctx.locale, 'describeUseButton', { label: u.label });
     if ('opens' in u) return t(ctx.locale, 'describeUseOpen');
@@ -520,7 +523,7 @@ function createBlockDescriptions(names: DescribeNames) {
     }
   };
 
-  /** 表单改了什么：问哪几个字段、按钮的字、认日期、自动填入。 */
+  /** What the form changed: which fields are asked for, button text, date recognition, auto-fill. */
   const formToolChange = (before: ToolUse | undefined, after: ToolUse): string[] => {
     const was = (before && 'do' in before && before.do === 'create' ? before : {}) as Partial<
       Extract<ToolUse, { do: 'create' }>
@@ -550,7 +553,7 @@ function createBlockDescriptions(names: DescribeNames) {
     return parts;
   };
 
-  /** 块上的工具改了什么：表单说问什么，其他说加了、去掉了哪个。 */
+  /** What changed regarding tools on a block: forms specify what is asked, others specify which tool was added or removed. */
   const toolsChange = (current: Component | undefined, after: readonly ToolUse[]): string[] => {
     const known = current && isKnownComponent(current) ? current : undefined;
     const before = ((known as { tools?: ToolUse[] } | undefined)?.tools ?? []) as ToolUse[];
@@ -573,7 +576,7 @@ function createBlockDescriptions(names: DescribeNames) {
     return parts;
   };
 
-  /** 打开的目标用名字称呼（页面标题、快捷操作的名字），不露 ID。 */
+  /** Refer to open targets by name (page title, quick action name) without exposing IDs. */
   const opensLabel = (target: string): string => {
     if (target.startsWith('tool:')) {
       const id = target.slice('tool:'.length);
@@ -584,7 +587,7 @@ function createBlockDescriptions(names: DescribeNames) {
     return navTargetLabel(target as NavTarget, known, ctx.locale);
   };
 
-  /** 块的 show / source / tools / opens 的修改（原 setComponentProps：一个属性一段）。 */
+  /** Modifications to a block's show / source / tools / opens (formerly setComponentProps: one property per section). */
   const blockChanges = (pageId: string, blockId: string, changes: BlockChanges): string[] => {
     const current = findComp(pageId, blockId);
     const parts: string[] = [];
@@ -651,14 +654,14 @@ function createBlockDescriptions(names: DescribeNames) {
     return parts;
   };
 
-  /** 一个属性改成什么（名字、取值都写成人话，D-230；富文本显示成纯文字，太长时截断）。 */
+  /** How a property was changed (names and values written in human language, D-230; rich text displayed as plain text, truncated if too long). */
   const propChange = (k: string, v: unknown) => {
     const name = localize(PROP_NAMES[k], ctx.locale);
     if (k === 'mode')
       return t(ctx.locale, v === 'sheet' ? 'describeFormSheet' : 'describeFormInline');
     if (k === 'accent') return t(ctx.locale, v ? 'describeAccentOn' : 'describeAccentOff');
     if (k === 'icon' && v !== null) return t(ctx.locale, 'describeIconChanged');
-    // 不认识的键也不露键名。
+    // Unrecognized keys do not expose key names either.
     if (!name) return t(ctx.locale, 'describeSettingsChanged');
     if (v === null) return t(ctx.locale, 'describe_removed_d5c25', { v0: name });
     const named = typeof v === 'string' ? localize(PROP_VALUES[k]?.[v], ctx.locale) : null;
@@ -679,7 +682,7 @@ type OpDescriptions = {
   [K in Op['op']]: (op: Extract<Op, { op: K }>, state: DescriptionState) => void;
 };
 
-// 按操作类型分发，新增操作时类型检查会要求补齐说明。
+// Dispatched by operation type; type checking requires completing descriptions when new operations are added.
 const OP_DESCRIPTIONS: OpDescriptions = {
   addData: (op, state) => {
     const { lines, ctx, list, typeName, collName } = state;
@@ -747,7 +750,7 @@ const OP_DESCRIPTIONS: OpDescriptions = {
         );
       if (changes.recordRow !== undefined)
         lines.push(t(ctx.locale, 'describeRecordRow', { name: collName(table) }));
-      // D-570：记录表单的分段和条件显示。
+      // D-570: Record form sections and conditional display.
       if (changes.form !== undefined)
         lines.push(t(ctx.locale, 'describeEntryForm', { name: collName(table) }));
       if (changes.prefillRules !== undefined)
@@ -787,9 +790,9 @@ const OP_DESCRIPTIONS: OpDescriptions = {
                 : 'describeFieldFormatNone',
         ),
       );
-    // D-570：填写提示、范围。
+    // D-570: Input hints, ranges.
     if (changes.hint !== undefined) parts.push(t(ctx.locale, 'describeFieldHint'));
-    // D-607：单选改成可以选多个。
+    // D-607: Change single-select to allow multiple selections.
     if (changes.multiple === true) parts.push(t(ctx.locale, 'describeFieldMultiple'));
     if (changes.min !== undefined || changes.max !== undefined)
       parts.push(t(ctx.locale, 'describeFieldRange'));
@@ -893,7 +896,7 @@ const OP_DESCRIPTIONS: OpDescriptions = {
             : t(ctx.locale, 'describe_Floating_buttons_d071d', { v0: navList(nav.floating) }),
         );
       if (nav.phoneHomeScreen) {
-        // 整个列表：多出来的放上手机桌面，少了的拿掉（D-271）。
+        // Entire list: extras are placed on the phone home screen, missing ones are removed (D-271).
         const was = before.nav.phoneHomeScreen ?? [];
         const nameOf = (id: string) =>
           id.startsWith('app:') ? appName(id.slice('app:'.length)) : (wf(id)?.name ?? id);
@@ -956,7 +959,7 @@ const OP_DESCRIPTIONS: OpDescriptions = {
           ? t(ctx.locale, 'describeShowIfOff', { component: label })
           : t(
               ctx.locale,
-              // D-579：带筛选的说「符合条件的记录」。
+              // D-579: Include filters and say "records meeting the criteria".
               changes.showIf.filter?.length
                 ? changes.showIf.has === 'some'
                   ? 'describeShowIfSomeMatching'
@@ -1092,7 +1095,7 @@ const OP_DESCRIPTIONS: OpDescriptions = {
     const newName = typeof changes.name === 'string' ? changes.name : undefined;
     const steps = changes.steps as { action: string }[] | undefined;
     if (steps) {
-      // 整体换步骤（原 updateWorkflow：快捷操作编辑页保存、恢复预设）。
+      // Entirely replacing steps (formerly updateWorkflow: saving quick action edit page, restoring preset).
       if (newName !== undefined && newName !== name)
         lines.push(t(ctx.locale, 'describe_Rename_to_decb3', { v0: name, v1: newName }));
       lines.push(
@@ -1143,7 +1146,7 @@ const OP_DESCRIPTIONS: OpDescriptions = {
   },
   setTheme: (op, state) => {
     const { lines, ctx, appName, modeLabel, colorNames } = state;
-    // 画出来的图标（D-625）：一个图标一行；图标库整个工作区一份，在 app 里改也一样说。
+    // Rendered icons (D-625): one icon per line; icon library has one copy per workspace, changes made within the app are described identically.
     const iconLines = Object.entries(op.icons ?? {}).map(([id, icon]) =>
       t(ctx.locale, icon ? 'describeDrawnIconSet' : 'describeDrawnIconRemoved', { id }),
     );
@@ -1177,7 +1180,7 @@ const OP_DESCRIPTIONS: OpDescriptions = {
     for (const [key, value, prefix] of colorChanges) {
       if (value === undefined) continue;
       const label = colorNames[key as keyof typeof colorNames];
-      // 法语不能拼成「Mode sombre arrière-plan」：整句按语言写在 describe_dark_color 里。
+      // French cannot be phrased as "Mode sombre arrière-plan": write the full sentence per language in `describe_dark_color`.
       const name = prefix
         ? t(ctx.locale, 'describe_dark_color', {
             v0: ctx.locale === 'en' ? label.toLowerCase() : label,
@@ -1201,7 +1204,7 @@ const OP_DESCRIPTIONS: OpDescriptions = {
     ] as const) {
       if (op[key] !== undefined) lines.push(describeToken(key, op[key], ctx.locale));
     }
-    // 自定义卡片（D-624）。
+    // Custom cards (D-624).
     if (op.card) lines.push(t(ctx.locale, 'describeThemeCardSet'));
     else if (op.card === null) lines.push(t(ctx.locale, 'describeThemeCardRemoved'));
     lines.push(...iconLines);
@@ -1211,7 +1214,7 @@ const OP_DESCRIPTIONS: OpDescriptions = {
     const { lines, known, ctx, toolName } = state;
 
     if (op.do === 'add')
-      // 工具箱里已经有这个工具时不再往首页放入口（D-181）。
+      // Do not add entries to the home screen if the tool already exists in the toolbox (D-181).
       lines.push(
         shownInToolGrid(known, op.package, [...ctx.registry.tools.keys()])
           ? t(ctx.locale, 'describe_Add_the_tool_adds_its_page_7a595', {
@@ -1227,7 +1230,7 @@ const OP_DESCRIPTIONS: OpDescriptions = {
           v0: toolName(op.package),
         }),
       );
-    // update：说明在 notes 里（列出新增的功能）。
+    // update: description is in notes (listing added features).
     return;
   },
 };
@@ -1349,7 +1352,7 @@ export function describeChange(
   return lines;
 }
 
-/** 恢复历史版本时的说明（§7E）：哪些会回到当时的样子、工具入口如何变化、文件不受影响。 */
+/** Description when restoring a historical version (§7E): what returns to its previous state, how tool entry points change, files remain unaffected. */
 export function describeRestore(
   before: WorkspaceConfig,
   after: WorkspaceConfig,
@@ -1364,7 +1367,7 @@ export function describeRestore(
   ];
 }
 
-/** 换成一个保存的预设时的说明（D-410）：和恢复历史版本一样，多一句现在选好的文件不会跟过来。 */
+/** Description when applying a saved preset (D-410): same as restoring a historical version, with an extra note that currently selected files will not be carried over. */
 export function describePresetApply(
   before: WorkspaceConfig,
   after: WorkspaceConfig,
@@ -1381,7 +1384,7 @@ export function describePresetApply(
   ];
 }
 
-/** 换成另一份配置时，工具和表的变化，最后一句说文件和记录不受影响。 */
+/** When switching to another configuration, describes changes to tools and tables, and concludes by stating that files and records remain unaffected. */
 function snapshotLines(
   before: WorkspaceConfig,
   after: WorkspaceConfig,
@@ -1427,7 +1430,7 @@ function snapshotLines(
   return lines;
 }
 
-/** 块的 show / source 里的键在修改说明里的名字（原组件 props 的名字；look → shape，target → opens）。 */
+/** Names of keys in block `show` / `source` within modification descriptions (formerly component props names; look -> shape, target -> opens). */
 const PROP_NAMES: Record<string, Localized> = {
   title: { zh: '标题', en: 'title', fr: 'titre' },
   subtitle: { zh: '副标题', en: 'subtitle', fr: 'sous-titre' },
@@ -1448,7 +1451,7 @@ const PROP_NAMES: Record<string, Localized> = {
   tools: { zh: '按钮和操作', en: 'buttons and actions', fr: 'boutons et actions' },
 };
 
-/** 取值也写成人话（D-230）。 */
+/** Values are also written in human language (D-230). */
 const PROP_VALUES: Record<string, Record<string, Localized>> = {
   shape: {
     row: { zh: '一行（右边有箭头）', en: 'a row with an arrow', fr: 'une ligne avec flèche' },
@@ -1488,7 +1491,7 @@ const PROP_VALUES: Record<string, Record<string, Localized>> = {
   },
 };
 
-/** 块的样式修改（对齐、颜色、大小、图片背景）怎么说。 */
+/** How block style modifications (alignment, color, size, image background) are described. */
 function styleChanges(
   style: NonNullable<BlockChanges['style']>,
   before: Backdrop | undefined,
@@ -1531,7 +1534,7 @@ function styleChanges(
     .join(zh ? '，' : ', ');
 }
 
-/** 图片背景的一次修改（D-258）怎么说。 */
+/** How a single modification to the image background (D-258) is described. */
 function backdropChange(
   patch: BackdropPatch | null,
   before: Backdrop | undefined,

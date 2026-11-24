@@ -7,12 +7,12 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, makePdf } from '../test-utils/fake-files';
 import { openPick, renderToolsApp, starterAfterGuide } from '../test-utils/render-app';
 
-// D-455：打开、分享的文件都存进文档库，存下缩略图和文字（PDF 文字层、图片识别）；全部文件能按里面的字搜。
+// D-455: Opened and shared files are saved into the document library, storing thumbnails and text (PDF text layer, image recognition); all files are searchable by text inside them.
 
 async function start() {
   const repo = new MemoryWorkspaceRepo();
   const files = new FakeFiles();
-  // 只要文字相关的两个函数：PDF 文字层和图片识别。
+  // Only the two functions related to text: PDF text layer and image recognition.
   files.vision = {
     pdfText: async () => '房屋租赁合同 甲方 王小明 月租金 4500 元',
     recognizeText: async () => '午餐 合计 128 元',
@@ -67,15 +67,15 @@ describe('opened files go into the library with their text (D-455)', () => {
     const { files, repo } = await start();
     files.nextMedia = [files.offerImage('收据.jpg', 400, 300)];
     await openPick('media');
-    // 一份文件进预览页（D-457），存记录在底栏上。
+    // A file enters the preview page (D-457), with record storage on the bottom bar.
     await screen.findByTestId('preview-bar');
     expect(await repo.listAssets()).toHaveLength(1);
     await fireEvent.press(await screen.findByTestId('preview-record'));
     await fireEvent.press(await screen.findByTestId('share-record-new'));
     await screen.findByTestId('new-table-save');
-    // 没有再复制一份。
+    // No duplicate copy made.
     expect(await repo.listAssets()).toHaveLength(1);
-    // 不保存就离开：文档库里那一份还在。
+    // Leave without saving: the copy in the document library remains.
     await act(() => router.back());
     await waitFor(() => expect(screen.queryByTestId('new-table-save')).toBeNull());
     expect((await repo.listAssets()).map((a) => a.name)).toEqual(['收据.jpg']);

@@ -7,7 +7,7 @@ import type {
 } from '../../modules/morph-speech';
 import { createSpeech, SpeechError, type SpeechPacks } from '../runtime/speech';
 
-// 语音转文字的 App 一侧（D-150、D-151）：用假的原生模块检查语言代码、模型地址、进度、取消和错误码。
+// Speech-to-text app side (D-150, D-151): use fake native module to check language codes, model paths, progress, cancellation, and error codes.
 
 class FakeSpeech implements MorphSpeechModule {
   calls: { uri: string; options: TranscribeOptions }[] = [];
@@ -19,7 +19,7 @@ class FakeSpeech implements MorphSpeechModule {
     durationMs: 1000,
   };
   error: { code: string; message: string } | null = null;
-  /** transcribe 等到 release 才返回（测取消）。 */
+  /** transcribe waits until release to return (for testing cancellation). */
   hold = false;
   private release: (() => void) | null = null;
   private listeners: ((e: SpeechProgressEvent) => void)[] = [];
@@ -85,7 +85,7 @@ describe('speech to text', () => {
     });
     expect(native.calls[0]!.options).toEqual({ taskId: expect.any(String), language: 'zh-CN' });
     expect(out).toEqual({ text: '明天开会，别迟到。', durationMs: 1000 });
-    // 只收自己这次的进度；结束后不再监听。
+    // Receive progress only for this run; stop listening after completion.
     expect(progress).toEqual([0.4]);
     expect(native.listening).toBe(0);
   });

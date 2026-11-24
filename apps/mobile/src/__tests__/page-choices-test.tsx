@@ -7,8 +7,11 @@ import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 页面上的一排选项（D-573，创始人 2026-11-16 决定 ② 第二步）：点「待发货」，下面跟着的列表、合计和图表都只剩待发货的；
-// 不跟着的照旧；在列表下面添加时新的一条预设成选中的那一项；列表上方的工具交出的是现在显示的记录。什么都不写（底线 15）。
+// Options row on the page (D-573, founder decision ② second step, 2026-11-16): tap "Pending
+// shipment", and the list, totals, and charts that follow it are filtered to only show "Pending
+// shipment"; unrelated ones remain as they are; when adding below a list, a new entry is preset to
+// the selected option; the tools above the list output the currently displayed records. Doing
+// nothing writes nothing (invariant 15).
 
 const orders = {
   id: 'orders',
@@ -149,7 +152,7 @@ describe('a row of choices that the blocks of the page follow (D-573)', () => {
     expect(await screen.findByTestId('choices-all')).toHaveTextContent('Tout');
     expect(screen.getByTestId('choices-all').props.accessibilityState.selected).toBe(true);
     expect(screen.getByTestId('choices-to-ship')).toHaveTextContent('To ship');
-    // 字段里有选项写了颜色：每一项前面一个点。
+    // An option in the field has a color specified: a dot in front of each item.
     expect(screen.getByTestId('choices-dot-shipped')).toBeTruthy();
   });
 
@@ -178,7 +181,7 @@ describe('a row of choices that the blocks of the page follow (D-573)', () => {
     await settle();
     expect(screen.getByTestId('stat-value-orders-Total')).toHaveTextContent('150');
     expect(screen.getByTestId('list-tool-count')).toHaveTextContent('All 2 entries in this list');
-    // 跟着的列表只有待发货的两条；不跟着的卡片四条都在。
+    // The following list has only the two "Pending shipment" items; all four cards that do not follow it are present.
     expect(screen.getAllByText('Desk')).toHaveLength(2);
     expect(screen.getAllByText('Lamp')).toHaveLength(1);
     expect(screen.getAllByText('Mug')).toHaveLength(1);
@@ -191,7 +194,7 @@ describe('a row of choices that the blocks of the page follow (D-573)', () => {
     await fireEvent.press(screen.getByTestId('choices-all'));
     await settle();
     expect(screen.getByTestId('stat-value-orders-Total')).toHaveTextContent('175');
-    // 选来选去什么都不写。
+    // Selecting and unselecting writes nothing.
     const stored = await repo.listRecords('orders');
     expect(stored.map((r) => r.updatedAt)).toEqual([100, 101, 102, 103]);
   });

@@ -13,7 +13,7 @@ const NONE: FileFilter = {
   whenEmpty: 'stop',
 };
 const MB = 1024 * 1024;
-// 2026-10-22 上午，设备本地时间。
+// 2026-10-22 morning, device local time.
 const now = new Date(2026, 9, 22, 10, 0);
 const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
 

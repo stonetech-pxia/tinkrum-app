@@ -8,7 +8,7 @@ import type { Locale } from '@morph/core';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { acceptNextAlert, renderToolsApp } from '../test-utils/render-app';
 
-// AI 修改页上的搭建计划和工具清单（D-414、D-415）。用内置规则，不发请求。
+// Build plan and tool inventory on AI modification page (D-414, D-415). Uses built-in rules without sending requests.
 
 async function openChange(locale: Locale = 'zh', repo = new MemoryWorkspaceRepo()) {
   const app = await renderToolsApp(repo, undefined, { locale });
@@ -21,14 +21,14 @@ async function say(text: string) {
   await fireEvent.press(screen.getByTestId('change-submit'));
 }
 
-describe('搭建计划', () => {
-  it('新用户：说大工程看到计划，删一步，开始，走完，看结果和存预设的提示', async () => {
+describe('Build plan', () => {
+  it('New user: discuss large project, view plan, delete a step, start, complete, view results and preset saving prompt', async () => {
     const { store } = await openChange();
     await say('搭建一个记账 App');
     expect(await screen.findByTestId('build-panel')).toBeTruthy();
     expect(screen.getByText('一个能用的记账 App')).toBeTruthy();
     expect(screen.getByText('证件照快捷操作')).toBeTruthy();
-    // 计划开着时没有输入框的发送、没有清单。
+    // No input field sending or inventory when plan is open.
     expect(screen.queryByTestId('change-session')).toBeNull();
 
     await fireEvent.press(screen.getByTestId('build-step-remove-scan'));
@@ -39,14 +39,14 @@ describe('搭建计划', () => {
     expect(await screen.findByTestId('build-check')).toBeTruthy();
     expect(screen.getByTestId('build-preset-hint')).toBeTruthy();
     expect(store.getState().config!.data.tables.length).toBeGreaterThan(0);
-    // 外观在草稿里：点了才看。
+    // Appearance in draft: view only upon tapping.
     expect(store.getState().draft!.open).toBe(false);
     await fireEvent.press(screen.getByTestId('build-see-look'));
     await waitFor(() => expect(store.getState().draft!.open).toBe(true));
     expect(store.getState().build).toBeNull();
   });
 
-  it('一步失败（内置规则触发）：卡在哪、重试、走完', async () => {
+  it('Step failure (built-in rules triggered): where it stalls, retry, complete', async () => {
     const { store } = await openChange();
     await say('搭建一个记账 App，有一步会失败');
     await fireEvent.press(await screen.findByTestId('build-start'));
@@ -58,7 +58,7 @@ describe('搭建计划', () => {
     expect(store.getState().build!.steps.map((s) => s.status)).toEqual(['done', 'done', 'done']);
   });
 
-  it('停下：显示还差几步，继续能接着做', async () => {
+  it('Stop: display remaining steps count, continue to resume', async () => {
     const repo = new MemoryWorkspaceRepo();
     const { store } = await openChange('zh', repo);
     await say('搭建一个记账 App，有一步会失败');
@@ -75,7 +75,7 @@ describe('搭建计划', () => {
     ['zh', '前面已经做好了'],
     ['en', 'Already done in an earlier step'],
     ['fr', 'Déjà fait à une étape précédente'],
-  ] as const)('前面已做好的一步有自己的说明（%s），别的步骤没有', async (locale, text) => {
+  ] as const)('A preceding completed step has its own description (%s), while other steps do not', async (locale, text) => {
     const { store } = await openChange(locale);
     await act(async () =>
       store.setState({
@@ -95,14 +95,14 @@ describe('搭建计划', () => {
     expect(screen.getByTestId('build-check')).toBeTruthy();
   });
 
-  it('小改（改颜色）不出现计划', async () => {
+  it('Small modifications (color change) do not trigger plan', async () => {
     const { store } = await openChange();
     await say('主题换成绿色');
     await waitFor(() => expect(store.getState().draft).not.toBeNull());
     expect(screen.queryByTestId('build-panel')).toBeNull();
   });
 
-  it('法语界面：新界面都是法语', async () => {
+  it('French interface: new interfaces are entirely in French', async () => {
     await openChange('fr');
     await say('Build a budget app');
     expect(await screen.findByText('Plan de création')).toBeTruthy();
@@ -113,11 +113,11 @@ describe('搭建计划', () => {
   });
 });
 
-describe('工具清单', () => {
-  it('还差的项点一下填进输入框；能清空；新用户没有清单', async () => {
+describe('Tool inventory', () => {
+  it('Tap remaining items to fill input field; can clear; new users have no inventory', async () => {
     const { store } = await openChange();
     expect(screen.queryByTestId('change-session')).toBeNull();
-    // 开始后结束：没做的留在清单里。
+    // Start then end: uncompleted items remain in inventory.
     await say('搭建一个记账 App，有一步会失败');
     await fireEvent.press(await screen.findByTestId('build-start'));
     await fireEvent.press(await screen.findByTestId('build-stop'));
@@ -136,8 +136,8 @@ describe('工具清单', () => {
   });
 });
 
-describe('把这些补上（D-418）', () => {
-  it('没有问题：不显示', async () => {
+describe('Fix these (D-418)', () => {
+  it('No issues: do not display', async () => {
     await openChange();
     expect(screen.queryByTestId('change-fix')).toBeNull();
     await say('搭建一个记账 App');
@@ -148,7 +148,7 @@ describe('把这些补上（D-418）', () => {
     expect(screen.queryByTestId('change-fix')).toBeNull();
   });
 
-  it('搭建结果有问题：看到按钮，点了问题消失，按钮也没了', async () => {
+  it('Issues with build results: see button, tapping makes issues and button disappear', async () => {
     const { store } = await openChange();
     await say('搭建一个记账 App，缺页面');
     await fireEvent.press(await screen.findByTestId('build-start'));
@@ -159,13 +159,13 @@ describe('把这些补上（D-418）', () => {
     await fireEvent.press(screen.getByTestId('build-fix'));
     await waitFor(() => expect(screen.queryByTestId('build-fix')).toBeNull());
     expect(screen.queryByTestId('build-check-problem')).toBeNull();
-    // 补的是页面（外观）：进草稿，看外观的按钮还在。
+    // Supplemented item is a page (appearance): enters draft, view appearance button remains.
     expect(store.getState().draft).not.toBeNull();
     expect(screen.getByTestId('build-see-look')).toBeTruthy();
     expect(store.getState().build!.phase).toBe('finished');
   });
 
-  it('AI 修改页平时也显示：有 N 个地方用不了和按钮；点了进草稿，回来按钮没了', async () => {
+  it('AI modification page displays normally: N unusable items and button; tapping enters draft, button disappears upon return', async () => {
     const { store } = await openChange();
     await store.getState().change('新建一个记账页面');
     await store.getState().change('新建一个快捷操作：拍照，记到账目');
@@ -180,7 +180,7 @@ describe('把这些补上（D-418）', () => {
     expect(screen.queryByTestId('change-fix')).toBeNull();
   });
 
-  it('起点已有的问题不显示', async () => {
+  it('Pre-existing issues at starting point are not displayed', async () => {
     const repo = new MemoryWorkspaceRepo();
     const first = await openChange('zh', repo);
     await first.store.getState().change('新建一个记账页面');
@@ -192,7 +192,7 @@ describe('把这些补上（D-418）', () => {
     expect(screen.queryByTestId('change-fix')).toBeNull();
   });
 
-  it('法语：按钮和个数都是法语，单数写法', async () => {
+  it('French: buttons and counts are in French, singular form', async () => {
     const { store } = await openChange('fr');
     await store.getState().change('Create an expense page');
     await store.getState().change('Create a quick action: take photos, add a record to Expenses');

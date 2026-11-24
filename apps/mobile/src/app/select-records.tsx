@@ -13,9 +13,11 @@ import { Toast } from '@/shell/Toast';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '@/workspace/context';
 
 /**
- * 「设置 → 数据 → 选几条删除」（D-547）：系统层的页面，AI 改不了，不在配置的页面里，所以不和长按编辑（D-235）抢手势。
- * 删之前先问一句（底线 11）；删了和一条条删一样进回收站（30 天），提示条能撤销，「设置 → 数据」里也能恢复。
- * 只看不写（底线 15）：选中只在这一页的内存里。
+ * "Settings -> Data -> Pick entries to delete" (D-547): system layer page, cannot be modified by
+ * AI, not in configured pages, so it does not conflict with long-press editing gestures (D-235).
+ * Ask before deleting (invariant 11); deleted entries go to trash (30 days) just like single
+ * deletions, banner allows undo, and can also be restored in "Settings -> Data". Read-only, no
+ * writing (invariant 15): selection exists only in this page's memory.
  */
 export default function SelectRecordsRoute() {
   const { table } = useLocalSearchParams<{ table: string }>();
@@ -30,7 +32,7 @@ export default function SelectRecordsRoute() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   if (!collection) return null;
   const list = [...(records ?? [])].sort((a, b) => b.updatedAt - a.updatedAt);
-  // 已经不在的（别处删了）不算。
+  // Already missing entries (deleted elsewhere) are not counted.
   const chosen = list.filter((r) => selected.has(r.id)).map((r) => r.id);
   const all = list.length > 0 && chosen.length === list.length;
 

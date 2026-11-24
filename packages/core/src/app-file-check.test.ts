@@ -7,7 +7,7 @@ import { appFileJsonText, checkAppFileText } from './app-file-check';
 import { CURRENT_SCHEMA_VERSION } from './schema';
 import { registry } from './test-helpers';
 
-// 检查 App 文件（D-593）：别的 AI 写的文件，导入前说清楚哪里不对，说法要能照着改。
+// Check app files (D-593): clearly explain what is wrong with files written by other AIs before importing, with explanations actionable for fixing.
 
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 19) };
 const DIR = join(__dirname, 'fixtures', 'portal-apps');
@@ -57,7 +57,7 @@ describe('checkAppFileText', () => {
     expect(problems(rest)).toEqual([expect.stringMatching(/^schemaVersion: /)]);
   });
 
-  // D-607：39 → 40 只加了单选的 multiple；39 的文件（网站上的预设）照样逐项说清楚。
+  // D-607: 39 → 40 only added multiple to single-select; version 39 files (website presets) are still explained item by item.
   it('checks a file of the previous version in detail when migrating it changes nothing else', () => {
     const d = habits();
     expect(d.schemaVersion).toBe(CURRENT_SCHEMA_VERSION - 1);
@@ -118,7 +118,7 @@ describe('checkAppFileText', () => {
   });
 });
 
-// 报错带改法（D-597）：别的 AI 只拿着这份文件，照着报错就要能改对，不用回去翻指南。
+// describe('checkAppFileText says how to fix it', () => {
 describe('checkAppFileText says how to fix it', () => {
   it('turns a wrong id into the right one', () => {
     const d = habits();

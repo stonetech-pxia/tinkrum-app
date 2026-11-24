@@ -2,8 +2,9 @@ import { readAppFile, type AppFile } from '@morph/core';
 
 import type { WorkspaceRepo } from '../storage/types';
 
-// 导入的 App 的原文件（D-485）：只存在本机的 app_meta 里，不进配置、不发给 AI，用来「恢复初始样子」。
-// 不是从文件导入的 App（Tink 或自己搭的）没有原文件，也就没有「恢复初始样子」。
+// Original files of imported app (D-485): stored only in local app_meta, not in config, not sent to
+// AI, used for "restore initial state". Apps not imported from files (built by Tink or user) have
+// no original files, hence no "restore initial state".
 
 type Meta = Pick<WorkspaceRepo, 'getMeta' | 'setMeta'>;
 const key = (appId: string) => `app.origin.${appId}`;

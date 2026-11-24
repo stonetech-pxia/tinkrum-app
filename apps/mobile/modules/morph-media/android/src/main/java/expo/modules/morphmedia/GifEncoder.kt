@@ -2,9 +2,10 @@ package expo.modules.morphmedia
 
 import java.io.OutputStream
 
-// 动图 GIF 的编码器（D-184）：Android 系统没有 GIF 编码器，自己写一个，不引入第三方库。
-// 每一帧自己的 256 色调色板（中位切分），4×4 有序抖动减少色带，LZW 压缩，循环播放。
-// 只用 ARGB 像素数组，不碰 Android 的类，可以在电脑上的 JVM 里测试（GifEncoderTest）。
+// Animated GIF encoder (D-184): Android system lacks a GIF encoder, so we write our own without
+// introducing third-party libraries. Each frame has its own 256-color palette (median cut), 4x4
+// ordered dithering to reduce banding, LZW compression, and loop playback. Uses only ARGB pixel
+// arrays without touching Android classes, allowing testing on the desktop JVM (GifEncoderTest).
 
 class GifEncoder(
   private val out: OutputStream,
@@ -14,16 +15,16 @@ class GifEncoder(
   private var started = false
   private val lzw = Lzw()
 
-  /** 加一帧：pixels 是 width × height 个 ARGB（透明度忽略），delayMs 是这一帧停留的时间。 */
+  /** Add a frame: pixels is width × height ARGB values (alpha ignored), delayMs is the display duration for this frame. */
   fun addFrame(pixels: IntArray, delayMs: Int) {
     require(pixels.size == width * height) { "frame size" }
     if (!started) writeHeader()
     val palette = Palette.of(pixels)
     val indices = palette.map(pixels, width)
-    // 图形控制扩展：停留时间（百分之一秒），不透明。
+    // Graphics Control Extension: delay time (hundredths of a second), opaque.
     val delay = ((delayMs + 5) / 10).coerceIn(2, 65535)
     out.write(byteArrayOf(0x21, 0xF9.toByte(), 4, 0x04, (delay and 0xFF).toByte(), (delay shr 8).toByte(), 0, 0))
-    // 图像描述：整张画布，带 256 色的局部调色板。
+    // Image Descriptor: full canvas, with a local 256-color palette.
     out.write(0x2C)
     writeShort(0)
     writeShort(0)
@@ -44,8 +45,8 @@ class GifEncoder(
     out.write("GIF89a".toByteArray(Charsets.US_ASCII))
     writeShort(width)
     writeShort(height)
-    out.write(byteArrayOf(0x70, 0, 0)) // 没有全局调色板
-    // NETSCAPE2.0：无限循环。
+    out.write(byteArrayOf(0x70, 0, 0)) // No global palette
+    // NETSCAPE2.0: infinite loop.
     out.write(byteArrayOf(0x21, 0xFF.toByte(), 0x0B))
     out.write("NETSCAPE2.0".toByteArray(Charsets.US_ASCII))
     out.write(byteArrayOf(3, 1, 0, 0, 0))
@@ -57,14 +58,14 @@ class GifEncoder(
   }
 }
 
-/** 一帧的调色板：中位切分，按每个通道 5 位（32768 种颜色）的直方图来分。 */
+/** Single-frame palette: median cut, divided using a histogram with 5 bits per channel (32,768 colors). */
 internal class Palette private constructor(
-  /** 256 × 3 字节（不足 256 色时后面补 0）。 */
+  /** 256 × 3 bytes (padded with 0s if fewer than 256 colors). */
   val rgb: ByteArray,
-  /** 5 位 RGB → 调色板序号。 */
+  /** 5-bit RGB -> palette index. */
   private val lookup: ByteArray,
 ) {
-  /** 每个像素 → 调色板序号，加 4×4 有序抖动（按 5 位网格的一格大小）。 */
+  /** Pixel -> palette index, with 4x4 ordered dithering added (scaled to a 5-bit grid step size). */
   fun map(pixels: IntArray, width: Int): ByteArray {
     val indices = ByteArray(pixels.size)
     for (i in pixels.indices) {
@@ -79,7 +80,7 @@ internal class Palette private constructor(
   }
 
   companion object {
-    /** 4×4 Bayer 矩阵，换算成 -4..+3（5 位网格的一格是 8）。 */
+    /** 4x4 Bayer matrix, converted to -4..+3 (one step on a 5-bit grid is 8). */
     private val BAYER = intArrayOf(0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5).map { it / 2 - 4 }.toIntArray()
 
     fun of(pixels: IntArray): Palette {
@@ -88,7 +89,7 @@ internal class Palette private constructor(
       val colors = counts.indices.filter { counts[it] > 0 }.toIntArray()
       val boxes = ArrayList<IntArray>()
       boxes.add(colors)
-      // 每次把「颜色最多的那一维跨度 × 像素数」最大的盒子沿那一维从中位数切开，直到 256 个。
+      // Each step splits the box with the largest dimension ("span of dimension with most colors × pixel count") along that dimension at the median, until 256 boxes are reached.
       while (boxes.size < 256) {
         var best = -1
         var bestScore = 0L
@@ -125,7 +126,7 @@ internal class Palette private constructor(
       val rgb = ByteArray(256 * 3)
       val lookup = ByteArray(32768)
       for ((i, box) in boxes.withIndex()) {
-        // 盒子的颜色 = 按像素数加权的平均（换回 8 位）。
+        // Box color = average weighted by pixel count (converted back to 8 bits).
         var r = 0L
         var g = 0L
         var b = 0L
@@ -142,7 +143,7 @@ internal class Palette private constructor(
         rgb[i * 3 + 2] = ((b * 8 + n * 4) / n).coerceAtMost(255).toByte()
         for (c in box) lookup[c] = i.toByte()
       }
-      // 抖动会落到这一帧没出现过的颜色上：这些颜色找最近的调色板颜色。
+      // Dithering may land on colors not present in this frame: these colors find the nearest palette color.
       val used = boxes.size
       for (c in 0 until 32768) {
         if (counts[c] > 0) continue
@@ -190,8 +191,9 @@ internal class Palette private constructor(
 }
 
 /**
- * GIF 的 LZW：8 位最小码长，码表满 4096 时发清除码重来；输出分成不超过 255 字节的数据块。
- * 码表（4 MB）每个编码器一份，每帧、每次清除只清用过的格子。
+ * GIF LZW: 8-bit minimum code length, sends a clear code to restart when the code table reaches
+ * 4096; output is split into data blocks of at most 255 bytes. One code table (4 MB) per encoder,
+ * clearing only used slots per frame and per clear operation.
  */
 internal class Lzw {
   private companion object {
@@ -200,7 +202,7 @@ internal class Lzw {
     const val MAX_CODES = 4096
   }
 
-  /** (前缀码 << 8 | 下一个字节) → 码；0 表示没有。 */
+  /** (prefix code << 8 | next byte) -> code; 0 indicates none. */
   private val table = IntArray(MAX_CODES shl 8)
   private val used = IntArray(MAX_CODES)
   private var usedCount = 0
@@ -235,7 +237,7 @@ internal class Lzw {
       if (next < MAX_CODES) {
         table[key] = next
         used[usedCount++] = key
-        // 解码器在读到下一个码之前加上这一项：码表的下一项到 2^codeSize 时加长一位。
+        // Decoder adds this entry before reading the next code: increases code length by 1 when the next code table entry reaches 2^codeSize.
         if (next == (1 shl codeSize) && codeSize < 12) codeSize++
         next++
       } else {
@@ -251,7 +253,7 @@ internal class Lzw {
     bits.finish()
   }
 
-  /** 低位在前地拼码，满 255 字节写一个数据块。 */
+  /** Packs codes from lower bits, writes a data block when 255 bytes are full. */
   private class BlockWriter(private val out: OutputStream) {
     private val block = ByteArray(255)
     private var size = 0

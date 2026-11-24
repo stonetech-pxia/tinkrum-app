@@ -4,17 +4,18 @@ import { create } from 'zustand';
 import { isMediaFile } from '../runtime/actions/helpers';
 import type { FilePlatform, PickedFile } from '../runtime/platform';
 
-// 分享到 Morph（TOOLS_DESIGN §11）：别的 App 分享进来、还没处理的文件。只在内存里，不进配置、不进数据库，
-// 也不发给 AI；用户关闭收件或运行页面后清掉（D-116）。
+// Shared to Morph (TOOLS_DESIGN §11): files shared from other apps that have not yet been
+// processed. Kept in memory only; does not enter the config, database, or AI; cleared after the
+// user closes the inbox or execution page (D-116).
 
 export interface IncomingShare {
-  /** 每次分享一个新 ID：收件页面据此知道是不是又分享了一批。 */
+  /** A new ID for each share: allows the inbox page to determine whether a new batch has been shared. */
   id: number;
   files: PickedFile[];
   source: 'share' | 'picker' | 'result';
-  /** 结果的独立临时副本及来源配置，只留本机。 */
+  /** Independent temporary copy of the result and source config, kept locally only. */
   result?: { runId: string; workflow: Workflow };
-  /** Android：原生模块顺手复制到 App 缓存目录的副本（file://），用完一起删。 */
+  /** Android: copies (file://) conveniently created in the app cache directory by native modules, deleted together after use. */
   copies: string[];
 }
 
@@ -55,10 +56,11 @@ const num = (v: unknown) => {
 };
 
 /**
- * expo-share-intent 原生模块给的数据 → 选择器同样格式的文件列表。
- * iOS 是一段 JSON（分享扩展复制到 App Group 共享目录的 file:// 地址）；Android 是对象，
- * 用 content:// 地址（发送方授予了读权限；filePath 常常是 App 没有权限读的外部存储路径）。
- * 文字和网址不收（Morph 只处理文件），返回空列表。
+ * Data from expo-share-intent native module -> file list formatted for the picker. iOS is a JSON
+ * string (file:// path copied by the share extension to the App Group shared directory); Android
+ * is an object using content:// addresses (read permission granted by sender; filePath is often
+ * an external storage path the app lacks permission to read). Text and URLs are ignored (Morph
+ * processes files only), returning an empty list.
  */
 export function normalizeShare(raw: unknown): PickedFile[] {
   let value = raw;
@@ -91,8 +93,9 @@ export function normalizeShare(raw: unknown): PickedFile[] {
 }
 
 /**
- * expo-share-intent 的 Android 模块读不到原始路径时，会把文件复制到 App 缓存目录的最上层（用原文件名）。
- * 我们用 content:// 地址，不用这些副本，但要记下来删掉（D-116）。
+ * When the Android module of expo-share-intent cannot read the original path, it copies the file
+ * to the root of the app cache directory (using the original filename). We use content://
+ * addresses instead of these copies, but they must be tracked for deletion (D-116).
  */
 export function nativeCopies(raw: unknown): string[] {
   const files = (raw as { files?: unknown } | null)?.files;
@@ -105,8 +108,9 @@ export function nativeCopies(raw: unknown): string[] {
 }
 
 /**
- * 用完一批分享的文件（D-116）：从内存里清掉，删掉共享目录里的副本。
- * 这期间又分享了一批时，只清这一批，新的一批保留。
+ * After using a batch of shared files (D-116): clear them from memory and delete the copies in
+ * the shared directory. If another batch is shared during this process, clear only this batch and
+ * retain the new one.
  */
 export async function releaseShare(
   files: Pick<FilePlatform, 'removeShared' | 'removeRun' | 'removePickedCopies'>,
@@ -121,7 +125,7 @@ export async function releaseShare(
     await files.removeRun(batch.result.runId).catch(() => undefined);
     return;
   }
-  // App 里选的：只删选择器放在缓存里的副本，相册和「文件」里的原件不动。
+  // Selected within the app: delete only the copies placed in the cache by the picker; originals in the photo library and "Files" remain untouched.
   if (batch.source === 'picker') {
     await files.removePickedCopies(batch.files.map((f) => f.uri)).catch(() => undefined);
     return;
@@ -131,8 +135,10 @@ export async function releaseShare(
 }
 
 /**
- * 先把整批放进新的运行目录再交接：上一页关闭会删掉原运行目录，不能把它的 URI 直接传下去。
- * 上一次运行自己产出的视频、音频直接移过来（可能有几个 GB，D-142），其他的复制。
+ * Move into a new execution directory before handover: closing the previous page deletes its
+ * original execution directory, so its URI cannot be directly passed down. Video and audio
+ * directly produced by the previous run are moved directly (which may be several GBs, D-142),
+ * while others are copied.
  */
 export async function copyResults(
   files: Pick<FilePlatform, 'copyToRun' | 'adoptIntoRun' | 'removeRun'>,

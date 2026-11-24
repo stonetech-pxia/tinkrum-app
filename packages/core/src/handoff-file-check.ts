@@ -6,7 +6,7 @@ import { preparePreset } from './saved-presets';
 import { quickActionsOf, remindersOf, type Locale, type WorkspaceConfig } from './schema';
 import { checkTools } from './tool-check';
 
-/** 单 App 的导入检查保持不变；整份设置走预设的迁移与校验，不把它当成一个子 App 安装。 */
+/** Import checks for single apps remain unchanged; full setups go through preset migration and validation, without installing them as sub-apps. */
 export function checkHandoffFileText(
   text: string,
   ctx: { registry: Registry; locale: Locale; now: Date },
@@ -50,7 +50,7 @@ export function checkHandoffFileText(
   };
 }
 
-/** 网站上复用现有 App 草图预览，整份设置按各自的 App/主页分开预览；不引入第二个 renderer。 */
+/** Reuses existing app draft previews on the website, previewing full setups separately by app/home screen; avoids introducing a second renderer. */
 export function setupPreviewFiles(config: WorkspaceConfig) {
   return [
     {

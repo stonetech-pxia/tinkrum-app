@@ -1,13 +1,13 @@
 import { pad } from './field-values';
-// 文件命名模板（§7C）：只允许白名单占位符，不支持任何表达式。
+// File naming template (§7C): only whitelisted placeholders are allowed, no expressions are supported.
 //   {date}         = {date:YYYY-MM-DD}
-//   {date:FORMAT}  FORMAT 只能由 YYYY MM DD HH mm ss 和 - _ . 组成，使用设备本地时间
-//   {index}        同一次执行中的序号（从 1 开始）
-//   {seq}          两位序号：01、02…（超过 99 时照常增长）
-//   {sourceName}   这个文件原来的名字（不含扩展名）
-//   {taken} / {taken:FORMAT}  照片的拍摄日期；读不到时用当天
-//   {ocr:RULE} / {qr:RULE}    这次运行在本机从这个文件识别出的文字 / 二维码内容里按规则取的一段（D-244）；
-//                             RULE 只能是 text-rules.ts 的 TEXT_RULES，AI 只选规则，看不到文字
+// {date:FORMAT} FORMAT can only consist of YYYY MM DD HH mm ss and - _ ., using device local time.
+// {index} Sequential number in the same execution (starting from 1). {seq} Two-digit sequence
+// number: 01, 02... (continues incrementing past 99). {sourceName} Original name of this file
+// (without extension). {taken} / {taken:FORMAT} Photo capture date; falls back to current date if
+// unreadable. {ocr:RULE} / {qr:RULE} A segment extracted according to rules from the text / QR code
+// content recognized on-device from this file during the current run (D-244); RULE must be a
+// TEXT_RULES entry from text-rules.ts, AI only picks the rule and cannot see the text.
 
 import { TEXT_RULES, extractFirst, type TextRule } from './text-rules';
 import type { Locale } from './schema';
@@ -39,15 +39,15 @@ export interface NameContext {
   now: Date;
   index?: number;
   sourceName?: string;
-  /** 照片的拍摄时间（EXIF）。 */
+  /** Photo capture timestamp (EXIF). */
   takenAt?: Date;
-  /** 这个文件在本机识别出的文字和二维码内容（模板里有 {ocr:…} / {qr:…} 时才有，D-244）。 */
+  /** Recognized text and QR code content for this file on-device (present only when templates contain {ocr:...} / {qr:...}, D-244). */
   recognized?: { ocr?: string; qr?: string };
-  /** 认日期时分不清日 / 月时用（英文月在前）。 */
+  /** Used when disambiguating day/month order for dates (English month first). */
   locale?: Locale;
 }
 
-/** 模板要不要在本机识别文字 / 二维码（D-244）。 */
+/** Whether the template requires on-device text / QR code recognition (D-244). */
 export function templateReads(template: string): { ocr: boolean; qr: boolean } {
   return { ocr: /\{ocr:[^{}]*\}/.test(template), qr: /\{qr:[^{}]*\}/.test(template) };
 }
@@ -72,8 +72,9 @@ function formatDate(format: string, d: Date): string {
 }
 
 /**
- * 去掉文件系统不允许的字符：连着的几个换成一个连接符；开头的点和连接符去掉
- * （点开头在「文件」App 里是隐藏文件，「../」换完只剩一串点和连接符）。
+ * Strip characters disallowed by the file system: sequences of consecutive bad characters are
+ * replaced with a single hyphen; leading dots and hyphens are removed (leading dots create hidden
+ * files in the Files app, and "../" leaves only dots and hyphens after replacement).
  */
 export function sanitizeFileName(name: string): string {
   const cleaned = name
@@ -84,7 +85,7 @@ export function sanitizeFileName(name: string): string {
   return cleaned.slice(0, MAX_NAME_LENGTH) || 'untitled';
 }
 
-/** 渲染模板，返回不含扩展名的文件名。调用前应先通过 checkNameTemplate。 */
+/** Render template, returning the file name without extension. Should be validated via checkNameTemplate before calling. */
 export function renderNameTemplate(template: string, ctx: NameContext): string {
   let missing = false;
   let rendered = template.replace(PLACEHOLDER, (_, body: string) => {
@@ -101,14 +102,14 @@ export function renderNameTemplate(template: string, ctx: NameContext): string {
     const [kind, format = 'YYYY-MM-DD'] = body.split(':');
     return formatDate(format, kind === 'taken' ? (ctx.takenAt ?? ctx.now) : ctx.now);
   });
-  // 识别不到要的内容：去掉留下的连接符；什么都不剩时用原来的名字（D-244）。
+  // Required content could not be recognized: remove any leftover hyphens; fall back to the original name if nothing remains (D-244).
   if (missing)
     rendered = rendered.replace(/^[\s\-_.]+|[\s\-_.]+$/g, '').replace(/([-_.])[\s\-_.]+/g, '$1');
   if (missing && !rendered) rendered = ctx.sourceName ?? '';
   return sanitizeFileName(rendered);
 }
 
-/** 重名时追加序号，绝不覆盖已有文件：report.pdf → report-2.pdf → report-3.pdf */
+/** Append sequence number on name collision, never overwrite existing files: report.pdf -> report-2.pdf -> report-3.pdf */
 export function uniqueFileName(base: string, ext: string, existing: Iterable<string>): string {
   const taken = new Set([...existing].map((n) => n.toLowerCase()));
   let candidate = `${base}.${ext}`;

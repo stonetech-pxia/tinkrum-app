@@ -15,9 +15,9 @@ import {
 import type { Collection } from './schema';
 import { fromV33, v33Fixture } from './test-helpers';
 
-const now = new Date(2026, 9, 22, 9, 0); // 2026-10-22，周四
+const now = new Date(2026, 9, 22, 9, 0); // 2026-10-22, Thursday
 
-/** 记账模版的表（v33 代码存下来的模版配置，迁移到 v34）。 */
+/** Accounting template table (template configuration stored in v33 code, migrated to v34). */
 const expenses = (): Collection => fromV33(v33Fixture('template-budget')).data.tables[0]!;
 
 let seq = 0;

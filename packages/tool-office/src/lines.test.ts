@@ -8,7 +8,7 @@ const H = 1400;
 const grey = (rects: readonly Rect[], shade: number) => rects.map((r) => ({ ...r, shade }));
 
 describe('light rules (Word)', () => {
-  // 电子版模板的浅灰线（EU 样本 001、006）：最暗的通道约 0.8，白纸上的 Sauvola 阈值只有 0.7。
+  // Light gray lines of digital templates (EU samples 001, 006): the darkest channel is about 0.8, while the Sauvola threshold on white paper is only 0.7.
   const lightGrid = grey(gridRects([100, 400, 900], [300, 360, 420, 480]), 205);
 
   it('finds a light grey grid only when asked for light rules', () => {
@@ -28,7 +28,7 @@ describe('light rules (Word)', () => {
     ];
     const text = [...glyphs(120, 230, 600), ...glyphs(120, 262, 600), ...glyphs(120, 712, 600)];
     const found = findLines(renderPage(W, H, [...shading, ...text]), { skew: 0, light: true });
-    // 只有 6 像素高、两边是白纸的那一条算线。
+    // Only the 6-pixel high segment flanked by white paper is considered a line.
     expect(found.horizontal.map((h) => Math.round(h.pos))).toEqual([603]);
     expect(found.vertical).toHaveLength(0);
   });
@@ -42,8 +42,9 @@ describe('light rules (Word)', () => {
 
 describe('highlights touching a rule', () => {
   it('keeps a row rule with a highlighted word right under or over it (EU sample 067)', () => {
-    // 银行对账单：金额、收款人用绿色荧光笔标出来，色块紧贴着行线（上面或下面）；
-    // 一排里上下两块挨着时，从这一排的顶线一直连到底线。
+    // Bank statements: amounts and payees are highlighted with green fluorescent highlighter, with
+    // color blocks abutting the line (above or below); when two blocks touch vertically within a
+    // row, connect them from the top line to the bottom line of the row.
     const ys = [300, 360, 420, 480, 540];
     const rules = gridRects([100, 300, 760, 900], ys, { thickness: 2 });
     const marks: Rect[] = [
@@ -60,7 +61,7 @@ describe('highlights touching a rule', () => {
 
 describe('number badges on box corners', () => {
   it('does not cut a rule out of a box whose corner badge sits on its end (EU sample 068)', () => {
-    // 事故报告的编号方块（青色实心，24 像素见方）贴在框的左上角：和顶边连成一块，照旧不当成单独的线。
+    // Accident report number box (cyan solid, 24 pixels square) attached to the top-left corner of the box: merges with the top edge and is not treated as a standalone line, as usual.
     const top: Rect = { x: 100, y: 300, width: 400, height: 2 };
     const badge: Rect = { x: 100, y: 300, width: 26, height: 26, color: [0, 170, 230] };
     const found = findLines(renderPage(W, H, [top, badge]), { skew: 0 });
@@ -70,7 +71,7 @@ describe('number badges on box corners', () => {
 
 describe('colour-filled cells', () => {
   it('finds the rules around a yellow cell spanning all rows (EU sample 057)', () => {
-    // 电费单的价目表：左边一格黄底（#FFCB35，最暗的通道很暗）跨三排，深灰的线围着它。
+    // Electricity bill price list: a yellow background cell on the left (#FFCB35, very dark darkest channel) spans three rows, surrounded by dark gray lines.
     const rules = gridRects([100, 330, 650, 900], [300, 360, 420, 480], {
       thickness: 3,
       skipH: [
@@ -88,7 +89,7 @@ describe('colour-filled cells', () => {
 
 describe('pale coloured rules', () => {
   it('still finds rules in a pale blue that is bright but not a saturated fill (EU sample 040)', () => {
-    // 老发票纸上印的浅蓝格线：亮度 0.76，颜色不浓，按最暗的通道算仍是线；只有又亮又浓的黄底才按亮度算。
+    // Light blue grid lines printed on old invoice paper: brightness 0.76, low saturation, still counted as lines based on the darkest channel; only bright and saturated yellow backgrounds are evaluated by brightness.
     const rules = gridRects([100, 400, 900], [300, 360, 420, 480]).map((r) => ({
       ...r,
       color: [170, 200, 235] as const,
@@ -101,8 +102,9 @@ describe('pale coloured rules', () => {
 
 describe('boxes stacked a few pixels apart', () => {
   it('does not join an invoice item table with the tables a few pixels under it (EU sample 054)', () => {
-    // 商品表下面隔一条窄窄的白缝：左边一张税额表、右边一个合计框，各有自己的框，
-    // 左右的边和商品表的列线在同一条竖线上。
+    // A narrow white gap beneath the product table: a tax table on the left and a total box on the
+    // right, each with its own box, whose left and right edges share vertical coordinates with the
+    // product table's column lines.
     const items = gridRects([60, 560, 700, 820, 940], [300, 340, 380, 420]);
     const tax = gridRects([60, 260, 400], [428, 458, 488]);
     const totals = gridRects([700, 820, 940], [428, 458, 488, 518]);
@@ -119,20 +121,20 @@ describe('boxes stacked a few pixels apart', () => {
 
 describe('findTables: rules above a grid', () => {
   it('does not chain section underlines far above a grid into it', () => {
-    // 会议纪要：各节标题下面一条横线，彼此隔着整段文字；最后一节下面是一张网格。
+    // Meeting minutes: a horizontal line under each section title, separated from each other by full paragraphs of text; a grid appears beneath the final section.
     const underlines: Rect[] = [100, 340, 580].map((y) => ({ x: 100, y, width: 802, height: 2 }));
     const image = renderPage(W, H, [
       ...underlines,
       ...gridRects([100, 500, 900], [600, 640, 680, 720]),
     ]);
-    // 三条分隔线自己是一串（只有横线、分不出列，组表时会丢掉），网格从 600 起，不连上去。
+    // The three separator lines form a sequence on their own (consisting only of horizontal lines without column distinctions, which would be lost during table grouping); the grid starts from 600 and does not connect upward.
     const grid = findTables(findLines(image, { skew: 0 })).find((t) => t.vs.length > 0)!;
     expect(Math.abs(grid.box.y - 600)).toBeLessThan(4);
     expect(grid.hs).toHaveLength(4);
   });
 
   it('still chains header rules spaced like the grid rows', () => {
-    // 表头上面几条横线和网格的行一样高（IRS Schedule D 的表头），是同一张表。
+    // Several horizontal lines above the header match the height of the grid rows (IRS Schedule D header), belonging to the same table.
     const rules: Rect[] = [480, 520, 560].map((y) => ({ x: 100, y, width: 802, height: 2 }));
     const image = renderPage(W, H, [...rules, ...gridRects([100, 500, 900], [600, 640, 680, 720])]);
     const tables = findTables(findLines(image, { skew: 0 }));
@@ -141,7 +143,7 @@ describe('findTables: rules above a grid', () => {
   });
 
   it('does not chain fill-in rules across a grid between them', () => {
-    // 发票右边一列填写横线：上面三条、隔着整张商品栏、下面三条（EU 样本 001），是上下两串，不是一张高高的表。
+    // A column of fill lines on the right side of the invoice: three on top, separated by the entire product section, and three on the bottom (EU sample 001), forming two separate vertical groups rather than a single tall table.
     const fills: Rect[] = [100, 160, 220, 600, 660, 720].map((y) => ({
       x: 700,
       y,
@@ -160,7 +162,7 @@ describe('findTables: rules above a grid', () => {
 });
 
 describe('findTables: stacked tables in one frame (Word)', () => {
-  // 登记表（EU 样本 004）：一个外框里上下两张表，列线不一样，编号列线上下连着。
+  // Registration form (EU sample 004): two tables stacked vertically within a single outer box with differing column lines, where the numbering column lines are connected vertically.
   const rects = [
     ...gridRects([100, 160, 500, 900], [100, 140, 180, 220]),
     ...gridRects([100, 160, 300, 650, 900], [220, 260, 300, 340]),
@@ -187,8 +189,9 @@ describe('findTables: stacked tables in one frame (Word)', () => {
   });
 
   it('splits two tables side by side under a shared header band (EU sample 090)', () => {
-    // 化验申请单：上面整页宽的表头和「Dati paziente」一排，下面左右两张表隔着一道 30 像素的白缝，
-    // 两张表的横线各自止于白缝两边，行也对不齐。
+    // Lab test request form: a full-page width header and the "Dati paziente" row at the top,
+    // followed below by two side-by-side tables separated by a 30-pixel white gap, whose horizontal
+    // lines terminate at the gap edges and whose rows do not align.
     const sideBySide = [
       ...gridRects([50, 950], [60, 120, 150]),
       ...gridRects([50, 100, 300, 420, 480], [150, 180, 210, 240, 270, 300, 330]),
@@ -212,7 +215,7 @@ describe('findTables: stacked tables in one frame (Word)', () => {
   });
 
   it('does not split a table whose rows have a gap only in one column', () => {
-    // 表身的横线在中间一列断开（那一列是合并的一大格），左右两边的竖线照旧连着：一张表。
+    // Table body horizontal lines are interrupted in the middle column (which is a merged large cell), while the left and right vertical lines remain connected: a single table.
     const gapped = [
       ...gridRects([50, 950], [60, 150]),
       ...gridRects([50, 480], [150, 180, 210, 240, 270]),
@@ -227,14 +230,14 @@ describe('findTables: stacked tables in one frame (Word)', () => {
 
 describe('findTables: rules-only chains', () => {
   it('does not chain the bottom rules of stacked form frames into one table (EU sample 014)', () => {
-    // 三节表单框：标题把顶线断开，框不成网格；三条整页宽的底线彼此隔着一整节（都不到页高的 40%）。
+    // Three section form boxes: the title interrupts the top line, preventing the box from forming a grid; three full-page-width bottom lines are separated by a full section each (each less than 40% of the page height).
     const bottoms: Rect[] = [300, 800, 1300].map((y) => ({ x: 60, y, width: 882, height: 2 }));
     const tables = findTables(findLines(renderPage(W, H, bottoms), { skew: 0 }));
     expect(tables).toHaveLength(0);
   });
 
   it('still takes a three-line table with a short header and a tall body', () => {
-    // 三线表：顶线、表头线隔着一行，表身很高。
+    // Three-line table: the top line and header line are separated by one row, and the table body is very tall.
     const rules: Rect[] = [300, 340, 900].map((y) => ({ x: 60, y, width: 882, height: 2 }));
     const tables = findTables(findLines(renderPage(W, H, rules), { skew: 0 }));
     expect(tables).toHaveLength(1);
@@ -242,7 +245,7 @@ describe('findTables: rules-only chains', () => {
   });
 
   it('does not chain evenly spaced answer lines across a large gap (EU sample 041)', () => {
-    // 两组填写横线，每组 5 条、间距 60，中间隔着 240（标题和留白）；再往下一大段以后还有一条。
+    // Two groups of fill lines, 5 lines per group with a 60 spacing, separated by 240 in the middle (for titles and whitespace); another line follows a large gap further down.
     const ys = [200, 260, 320, 380, 440, 680, 740, 800, 860, 920, 1300];
     const rules: Rect[] = ys.map((y) => ({ x: 60, y, width: 882, height: 2 }));
     const tables = findTables(findLines(renderPage(W, H, rules), { skew: 0 }));
@@ -251,7 +254,7 @@ describe('findTables: rules-only chains', () => {
   });
 
   it('still chains evenly spaced header rules across a tall table body (EU sample 048)', () => {
-    // 表头一排四块字、下面一排小标题，再往下是很高的表身和合计。
+    // Header row with four text blocks, followed by a row of subheadings, and further down by a tall table body and totals.
     const ys = [200, 240, 280, 560, 600];
     const rules: Rect[] = ys.map((y) => ({ x: 60, y, width: 882, height: 2 }));
     const text = [
@@ -266,7 +269,7 @@ describe('findTables: rules-only chains', () => {
   });
 
   it('ends a three-line table at its bottom rule when a header pair follows a gap (EU sample 050)', () => {
-    // 酒店账单：三线表（顶线、表头线、底线），底下隔着合计几行，再是税额栏的两条线（表头线、底线）。
+    // Hotel bill: a three-line table (top line, header line, bottom line), followed below by a few total rows, and then two lines for the tax column (header line and bottom line).
     const ys = [200, 236, 560, 760, 790];
     const rules: Rect[] = ys.map((y) => ({ x: 60, y, width: 882, height: 2 }));
     const tables = findTables(findLines(renderPage(W, H, rules), { skew: 0 }));
@@ -275,7 +278,7 @@ describe('findTables: rules-only chains', () => {
   });
 
   it('does not chain underscore blanks inside sentences into a table (EU sample 095)', () => {
-    // 合同模板：「(DNI/NIE ______),」的填空横线压在字的底线上，几处的末端碰巧上下对齐。
+    // Contract template: fill-in lines like `(DNI/NIE ______),` lie on top of the text baseline, with the ends of several lines coincidentally aligned vertically.
     const ys = [300, 390, 900];
     const rules: Rect[] = ys.map((y) => ({ x: 700, y, width: 180, height: 2 }));
     const text = ys.flatMap((y) => [
@@ -288,7 +291,7 @@ describe('findTables: rules-only chains', () => {
   });
 
   it('still chains a ruled table with uneven rows', () => {
-    // 每排一条横线、排高不一样（有的格子折成好几行）：照旧是一张表。
+    // One horizontal line per row, with varying row heights (some cells wrap into multiple lines): still treated as a single table.
     const ys = [200, 240, 280, 420, 460, 640, 680];
     const rules: Rect[] = ys.map((y) => ({ x: 60, y, width: 882, height: 2 }));
     const tables = findTables(findLines(renderPage(W, H, rules), { skew: 0 }));
@@ -297,7 +300,7 @@ describe('findTables: rules-only chains', () => {
   });
 
   it('starts a rules-only table at the dark header bar on top of it, with its column rule (EU sample 024)', () => {
-    // 时刻表：深色表头横条（白字）直接压在第一行上，中间没有横线；下面只有横线，钟点一列右边一条竖线，没有外框。
+    // Timetable: a dark header bar (white text) placed directly above the first row with no horizontal line between them; below are only horizontal lines, with a vertical line to the right of the time column, and no outer border.
     const letters = glyphs(160, 310, 200).map((r) => ({ ...r, shade: 255 }));
     const bar: Rect = { x: 100, y: 300, width: 400, height: 36, shade: 60 };
     const rules: Rect[] = [368, 400, 432, 464, 496].map((y) => ({
@@ -318,7 +321,7 @@ describe('findTables: rules-only chains', () => {
 
 describe('filled boxes are not tables', () => {
   it('does not read a solid shaded blank in a sentence as a one-cell table (EU sample 082)', () => {
-    // 合同里要填的地方：一块 72×25 的实心青色底，四条边都是「线」，围成了一张 1×1 的表。
+    // Fillable areas in contracts: a 72x25 solid cyan background block where all four edges are "lines", forming a 1x1 table.
     const box = {
       x: 400,
       y: 300,
@@ -336,8 +339,11 @@ describe('filled boxes are not tables', () => {
 
 describe('skew next to a solid colour band', () => {
   it('measures the tilt of a scan whose top is a wide dark band, so its ruled table is found', () => {
-    // 扫描件（转了 0.6°）的页眉是整页宽的深蓝色块：暗点里大半是色块。按扫描顺序每隔几个取一个点，
-    // 色块里取到的点排成斜的格子，投影在约 7° 处最整齐，估出的倾斜错成 −7°，下面带线的表全散了。
+    // The header of a scanned document (rotated 0.6°) is a dark blue block spanning the full page
+    // width: dark points consist mostly of color blocks. Sampling every few pixels in scanning
+    // order, the points sampled within the color block form a slanted grid whose projection is
+    // cleanest at about 7°, leading to an estimated tilt error of -7°, which disrupts the lined
+    // table below.
     const band: Rect = { x: 0, y: 0, width: 1413, height: 420, color: [34, 96, 154] };
     const xs = [170, 240, 440, 1290];
     const ys = Array.from({ length: 10 }, (_, i) => 560 + i * 56);
@@ -354,7 +360,7 @@ describe('skew next to a solid colour band', () => {
 
 describe('page edges are not table rules', () => {
   it('keeps a ruled table apart from the fold of a photographed two-page leaflet (EU sample 100)', () => {
-    // 两页并排拍的说明书：中缝是一条从页顶通到页底的黑线，右页表格的横线左端离它只有 4 像素。
+    // Two-page spread instruction manual: the gutter is a black line running from the top to the bottom of the page, and the left ends of the right page's table horizontal lines are only 4 pixels away from it.
     const fold: Rect = { x: 478, y: 5, width: 3, height: 1390 };
     const grid = gridRects([485, 600, 760, 900], [1000, 1050, 1100, 1150, 1200]);
     const tables = findTables(findLines(renderPage(W, H, [fold, ...grid]), { skew: 0 }));

@@ -9,8 +9,9 @@ import { modelEngine, ruleEngine } from './engine';
 import { planDocument } from './code-rules';
 import type { ModelRequest, OpenModel } from './model';
 
-// 收据模版的「分类」（D-405）：词表有把握就直接给候选，拿不准才问本机模型；回答只进候选。
-// 下面的单据文字都是自己编的短样例，不是真实票据。
+// Receipt template "category" (D-405): if the lexicon is confident, provide candidates directly;
+// otherwise prompt the local model; answers only enter candidates. The receipt texts below are
+// self-compiled short examples, not real receipts.
 
 const pageOf = (rows: string[]) => ({
   width: 600,
@@ -29,7 +30,7 @@ const OPTIONS = [
 const CATEGORY: Field = { id: 'category', name: 'Category', type: 'choice', options: OPTIONS };
 const AMOUNT: Field = { id: 'total', name: 'Amount', type: 'money', currency: 'USD' };
 
-// 词表认不出的一张店（没有店名词、没有票面词）。
+// A store unrecognized by the lexicon (no store name, no receipt terms).
 const PLAIN = ['Zeta Corner', 'Item A 3.00', 'Item B 4.00', 'Total 7.00'];
 
 function fakeModel(answer: string | ((req: ModelRequest) => string)) {
@@ -58,7 +59,7 @@ const run = (rows: string[], fields: Field[] = [CATEGORY]) => ({
   now,
 });
 
-describe('词表', () => {
+describe('Lexicon', () => {
   it.each([
     [['Sunrise Pharmacy', 'Aspirin 4.00'], 'pharmacy'],
     [['Blue Door Bistro', 'Table 7', 'Pasta 12.00', 'Service charge 1.20'], 'dining'],
@@ -72,7 +73,7 @@ describe('词表', () => {
     expect(categoryByLexicon(rows)).toBe(expected);
   });
 
-  it('认不出的店不猜；店名区外只出现一次店类词（1 分）也不够', () => {
+  it('Do not guess unrecognized stores; a single occurrence of a category word outside the store name area (1 point) is also insufficient', () => {
     expect(categoryByLexicon(PLAIN)).toBeNull();
     expect(
       categoryByLexicon([...PLAIN, 'Thank you', 'See you', 'Visit us', 'Online', 'cafe']),
@@ -80,12 +81,12 @@ describe('词表', () => {
     expect(categoryByLexicon([])).toBeNull();
   });
 
-  it('两类一样强时不选', () => {
+  it('Do not select when categories are equally strong', () => {
     expect(categoryByLexicon(['Pharmacy Cafe Corner', 'Item 1.00'])).toBeNull();
   });
 });
 
-describe('收据模版的分类字段', () => {
+describe('Receipt template category field', () => {
   it.each([
     [
       'en',
@@ -106,7 +107,7 @@ describe('收据模版的分类字段', () => {
       ],
     ],
   ] as [Locale, string, string[]][])(
-    '三种语言都有，ID 一样，字段认成分类概念 (%s)',
+    'Present in all three languages with the same ID, fields recognized as category concept (%s)',
     (locale, name, labels) => {
       const table = templateCollectionOp('purchase', createDefaultWorkspace(locale), locale).table;
       const f = table.fields.find((x) => x.id === 'category')!;
@@ -118,8 +119,8 @@ describe('收据模版的分类字段', () => {
   );
 });
 
-describe('分类字段的候选', () => {
-  it('词表有把握：候选是选项 ID，不问模型，也没有位置（不记点选）', async () => {
+describe('Category field candidates', () => {
+  it('Lexicon confident: candidate is the option ID, model is not asked, and there is no position (tap count not recorded)', async () => {
     const rows = ['Sunrise Pharmacy', 'Aspirin 4.00', 'Total 4.00'];
     const plan = planDocument(run(rows));
     expect(plan.fields[0]!.ask).toBe(false);
@@ -127,17 +128,17 @@ describe('分类字段的候选', () => {
     const out = await modelEngine(m.open)(run(rows));
     expect(out.category).toEqual([{ value: 'pharmacy', score: 0 }]);
     expect(m.state.opened).toBe(0);
-    // 模型没装也一样（只用规则）。
+    // Works even without the model installed (rules only).
     expect((await ruleEngine(run(rows))).category).toEqual([{ value: 'pharmacy', score: 0 }]);
   });
 
-  it('票面上写了选项名：候选还是它（规则打分），不问模型', async () => {
+  it('Option name printed on the receipt: candidate remains the same (rule scoring), model is not asked', async () => {
     const plan = planDocument(run([...PLAIN, 'Category: Transport']));
     expect(plan.fields[0]!.ask).toBe(false);
     expect(plan.fields[0]!.code[0]?.value).toBe('transport');
   });
 
-  it('词表没把握：问模型，回答在候选里，语法只有这张表当前的选项', async () => {
+  it('Lexicon uncertain: ask the model, answers are in candidates, and grammar is restricted to the current table\'s options only', async () => {
     const m = fakeModel('grocery');
     const out = await modelEngine(m.open)(run(PLAIN));
     expect(out.category?.map((s) => s.value)).toEqual(['grocery']);
@@ -149,7 +150,7 @@ describe('分类字段的候选', () => {
     expect(m.state.released).toBe(1);
   });
 
-  it('用户改了选项名：ID 没变还是认得，提示词和语法不跟着改名', async () => {
+  it('User modified option name: ID remains unchanged and is still recognized, prompts and grammar do not rename along with it', async () => {
     const renamed: Field = {
       ...CATEGORY,
       options: OPTIONS.map((o) => ({ ...o, label: `我的${o.label}` })),
@@ -160,7 +161,7 @@ describe('分类字段的候选', () => {
     expect(m.asked[0]!.prompt).not.toContain('我的');
   });
 
-  it('用户加的选项：名字进语法，回答它时给它的 ID；用户删掉的选项不在语法里', async () => {
+  it('User-added option: name enters grammar, answers return its ID; deleted options are excluded from grammar', async () => {
     const custom: Field = {
       ...CATEGORY,
       options: [
@@ -176,7 +177,7 @@ describe('分类字段的候选', () => {
     expect(m.asked[0]!.grammar).not.toContain('grocery');
   });
 
-  it('选项名里有引号、换行、模板标记：清掉再进语法，不能改写提示词', async () => {
+  it('Option names containing quotes, newlines, or template markers: sanitized before entering grammar, cannot alter prompt', async () => {
     const odd: Field = {
       ...CATEGORY,
       options: [
@@ -191,14 +192,14 @@ describe('分类字段的候选', () => {
     expect(req.prompt.split('<|im_end|>')).toHaveLength(3);
   });
 
-  it('模型的回答不是选项：丢掉，没有候选', async () => {
+  it('Model answer is not an option: discarded, no candidates', async () => {
     for (const bad of ['restaurant', 'Dining out', '', 'null', 'grocery | pharmacy']) {
       const out = await modelEngine(fakeModel(bad).open)(run(PLAIN));
       expect(out.category).toBeUndefined();
     }
   });
 
-  it('模型没装、加载失败：不报错，没有分类候选，别的字段照常', async () => {
+  it('Model not installed or loading failed: no error, no category candidates, other fields function normally', async () => {
     const rows = [...PLAIN];
     const none = await modelEngine(async () => null)(run(rows, [CATEGORY, AMOUNT]));
     expect(none.category).toBeUndefined();
@@ -210,7 +211,7 @@ describe('分类字段的候选', () => {
     expect((await ruleEngine(run(rows))).category).toBeUndefined();
   });
 
-  it('不是分类的单选字段不问模型（行为不变）', async () => {
+  it('Non-category single-choice fields are not sent to the model (behavior unchanged)', async () => {
     const status: Field = {
       id: 'status',
       name: 'Status',
@@ -227,14 +228,14 @@ describe('分类字段的候选', () => {
     expect(planDocument(run(PLAIN, [status])).fields[0]!.ask).toBe(false);
   });
 
-  it('只有一个选项（分不清）不问；分类是文字字段时照旧', async () => {
+  it('Single option (ambiguous) is not asked; category as text field remains unchanged', async () => {
     const one: Field = { ...CATEGORY, options: [{ id: 'other', label: 'Other' }] };
     expect(planDocument(run(PLAIN, [one])).fields[0]!.ask).toBe(false);
     const text: Field = { id: 'category', name: 'Category', type: 'text' };
     expect(planDocument(run(PLAIN, [text])).fields[0]!.ask).toBe(true);
   });
 
-  it('同一张票：分类只多问一次，别的字段的问法不变', async () => {
+  it('Same receipt: category is asked at most once, prompt behavior for other fields remains unchanged', async () => {
     const m = fakeModel((req) => (req.grammar.includes('"dining"') ? 'dining' : 'null'));
     const rows = ['Zeta Corner', 'Item A 3.00', 'Subtotal 7.00', 'Paid 7.00'];
     const withCat = await modelEngine(m.open)(run(rows, [AMOUNT, CATEGORY]));

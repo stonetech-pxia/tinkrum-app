@@ -4,7 +4,7 @@ import type { Palette } from './theme';
 
 export type Tone = NonNullable<ComponentStyle['tone']>;
 
-/** 文字组件的 tone 是文字颜色。 */
+/** The tone of a text component represents the text color. */
 export function textColor(palette: Palette, tone: Tone | undefined, fallback: string): string {
   switch (tone) {
     case 'primary':

@@ -135,7 +135,7 @@ describe('sharedSizeProblem (P-006)', () => {
 
   it('applies the same limits as the pickers', () => {
     expect(sharedSizeProblem([pdf('a', 10 * MB)])).toBeNull();
-    // PDF 单独算（D-601）：单个 100 MB、合计 200 MB。
+    // PDFs calculated separately (D-601): individual 100 MB, total 200 MB.
     expect(sharedSizeProblem([pdf('a', 60 * MB), pdf('b', 100 * MB)])).toBeNull();
     expect(sharedSizeProblem([pdf('big', 101 * MB)])).toEqual({
       code: 'tooLarge',
@@ -146,7 +146,7 @@ describe('sharedSizeProblem (P-006)', () => {
       code: 'tooLargeTotal',
       detail: { mb: 200 },
     });
-    // 其他文件不变：单个 50 MB、合计 100 MB；混合时各算各的。
+    // Other files unchanged: individual 50 MB, total 100 MB; mixed files calculated independently.
     const png = (name: string, size: number) => ({
       name: `${name}.png`,
       mimeType: 'image/png',
@@ -183,7 +183,7 @@ describe('sharedSizeProblem (P-006)', () => {
       code: 'tooLargeTotal',
       detail: { mb: 100 },
     });
-    // 视频和音频单独算：单个 4 GB，最多 10 个，不计入 100 MB 的合计（D-142）。
+    // Videos and audio calculated separately: individual 4 GB, up to 10 files, excluded from the 100 MB total (D-142).
     expect(sharedSizeProblem([mov('1', 900 * MB), mov('2', 900 * MB), pdf('a', 10 * MB)])).toBe(
       null,
     );
@@ -195,7 +195,7 @@ describe('sharedSizeProblem (P-006)', () => {
       code: 'tooMany',
       detail: { max: 10 },
     });
-    // 不知道大小的文件先放行，复制进来之后再按实际大小检查。
+    // Files with unknown size are initially permitted and checked against actual size after copying.
     expect(sharedSizeProblem([{ name: 'x.pdf', mimeType: 'application/pdf', size: null }])).toBe(
       null,
     );

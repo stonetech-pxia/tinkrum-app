@@ -10,7 +10,7 @@ const schema = z.strictObject({
   default: z.literal('today').optional(),
 });
 
-/** 日期 YYYY-MM-DD（设备本地日期）；default today = 新记录填今天（一天从几点开始见 D-286）。 */
+/** Date YYYY-MM-DD (device local date); default today = new records are set to today (see D-286 for start of day). */
 export const dateField: FieldDefinitionOf<'date', typeof schema> = defineField({
   type: 'date',
   schema,

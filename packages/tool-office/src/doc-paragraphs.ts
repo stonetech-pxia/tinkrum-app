@@ -25,7 +25,7 @@ import { type TextTablesState } from './doc-text-tables';
 import { type PageTypographyState } from './doc-typography';
 import { type TableCell } from './types';
 
-/** 按组生成段落、标题、列表和标签值对。 */
+/** Generate paragraphs, headings, lists, and label-value pairs by group. */
 export function buildParagraphBlocks(
   state: Pick<
     PageTypographyState,
@@ -61,7 +61,7 @@ export function buildParagraphBlocks(
     const blocks: DocLeaf[] = [];
     units.push({ box: group.box, blocks });
     if (group.pairs) {
-      // 一行一对：标签、制表符、值（D-332）。
+      // One pair per line: label, tab, value (D-332).
       const text = group.pairs
         .map(([label, value]) => `${join(label).trim()}\t${join(value).trim()}`)
         .join('\n');
@@ -91,8 +91,10 @@ export function buildParagraphBlocks(
         const cell = cells.size === 1 ? [...cells][0] : undefined;
         const released = cells.size > 0;
         const previous = chunks.at(-1);
-        // 误判网格的不同格子仍是独立信息行，不能因去掉边框就把两条议程接成一段；
-        // 网格外的正文和网格里的第一行也不接（一边是原来的段落，一边是去掉边框后放出来的行）。
+        // Different cells of misidentified grids remain independent information lines; do not merge
+        // two agenda items into a single paragraph simply because borders were removed. Do not
+        // merge body text outside grids with the first line inside grids either (one side is the
+        // original paragraph, the other is lines released after border removal).
         if (
           previous &&
           released === previousReleased &&
@@ -105,7 +107,7 @@ export function buildParagraphBlocks(
       }
       return chunks;
     });
-    // 一块的第一段和前面的块之间原来就空着。
+    // The first paragraph of a block was originally spaced from the preceding block.
     if (paragraphs[0]) paragraphs[0].spaced = true;
     let list: DocList | null = null;
     const groupLeft = Math.min(...group.lines.map((l) => l.x));
@@ -122,15 +124,19 @@ export function buildParagraphBlocks(
       const text = (repaired ? joinParagraph : join)(paraLines).trim();
       if (!text) continue;
       const { h, short, size, style } = styleOf(paraLines, text, group.title);
-      // 去掉编号以后没有字的（「(3).」）不当列表项。
-      // 从误判网格释放的文字保留原有题号/标号，不再凭这几行另造自动编号。
+      // Items without text after removing numbering ('(3).') are not treated as list items. Text
+      // released from misidentified grids retains its original title/numbering; do not generate new
+      // automatic numbering for these lines.
       const released = paraLines.some((l) =>
         rejected.some((t) => placedIn.get(t)?.includes(orig(l))),
       );
       if (para.list && !released && /[\p{L}\p{N}]/u.test(stripMarker(text))) {
         const marker = listMarker(para.rows[0]!.text);
-        // 同一种编号接着上一个列表；换了写法另起一个。编号不是接着上一项的（议程 1–6 后面的「1. Délibérations」）
-        // 也另起：列表只记第一项的编号，接进去就把后面的编号改成了 7、8（EU 样本 037）。
+        // Same numbering sequence continuing the previous list; a different formatting style starts
+        // a new one. Numbering that does not continue the previous item ('1.
+        // D\u00e9lib\u00e9rations' following agendas 1\u20136) also starts a new list: lists record
+        // only the first item's number, and merging would misnumber subsequent items as 7 and 8 (EU
+        // sample 037).
         if (
           list &&
           list.ordered === marker.ordered &&
@@ -156,13 +162,13 @@ export function buildParagraphBlocks(
         continue;
       }
       list = null;
-      // 标题：模型说是标题（字不比正文小），或者字明显比正文大、不超过两行；对话和整句不算（D-330）。
+      // Heading: recognized by the model as a heading (text no smaller than body), or text significantly larger than body text and up to two lines; dialogue and full sentences are excluded (D-330).
       const big =
         !short &&
         size >= HEADING_RATIO * bodySize &&
         para.rows.length <= 2 &&
         looksLikeHeading(text);
-      // 模型说是标题的区域里和正文一样大、不加粗的行（信头的地址、电话）是正文（D-463）。
+      // Lines in regions identified by the model as headings that match body text size and lack bold styling (such as letterhead addresses or phone numbers) are treated as body text (D-463).
       const titled = group.title > 0 && (size > bodySize || style.bold === true);
       const headingLike = (titled || big) && !notHeading(text);
       const heading: 0 | 1 | 2 = headingLike
@@ -176,7 +182,7 @@ export function buildParagraphBlocks(
         para.rows.length <= 2 &&
         Math.min(box.x, image.width - box.x - box.width) > PAGE_CENTER_MARGIN * image.width &&
         Math.abs(box.x - (image.width - box.x - box.width)) < PAGE_CENTER * image.width;
-      // 几行左边对齐、右边参差的是左对齐的段落，哪怕整段左右空得差不多（EU 样本 036：满版的图把页边压没了）。
+      // Paragraphs with left-aligned and ragged right lines are left-aligned paragraphs, even if the overall left/right margins are roughly balanced (EU sample 036: full-page graphics compressing margins).
       const lefts = para.rows.map((r) => r.box.x);
       const rights = para.rows.map((r) => r.box.x + r.box.width);
       const raggedRight =
@@ -191,8 +197,11 @@ export function buildParagraphBlocks(
           : boxAlign;
       const centered = align === 'center';
       const right = align === 'right';
-      // 首行缩进：第一行的左边和其他行比，最多 4 个行高（D-330）。只有一行的段落不写首行缩进（D-463）：
-      // docx 里每段的左缩进按它在原图里的左边写（书页里单独一行的对话也一样缩进），再加首行缩进就缩了两遍。
+      // First-line indentation: left position of the first line compared to other lines, up to 4
+      // line heights (D-330). Single-line paragraphs have no first-line indentation (D-463): DOCX
+      // sets each paragraph's left indent based on its original layout position (dialogues on
+      // single lines in books are indented similarly), adding first-line indentation would apply it
+      // twice.
       const first = para.rows[0]!.box.x;
       const base = Math.min(...para.rows.slice(1).map((r) => r.box.x));
       const indent = Math.round(first - base);
@@ -208,7 +217,7 @@ export function buildParagraphBlocks(
         text,
         ...(heading ? { heading } : {}),
         ...style,
-        // 标题写明自己的字号（D-463）：不然按标题样式放大 1.3、1.6 倍，比原件大。
+        // Headings specify their own font size (D-463): otherwise scaling up by 1.3x or 1.6x according to heading styles makes them larger than the original.
         ...(heading ? { size } : {}),
         ...(centered ? { align: 'center' as const } : right ? { align: 'right' as const } : {}),
         ...(para.spaced ? { spaced: true } : {}),

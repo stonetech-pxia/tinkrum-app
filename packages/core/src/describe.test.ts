@@ -5,7 +5,7 @@ import type { BlockChanges, Op } from './ops-schema';
 import type { Locale, WorkspaceConfig } from './schema';
 import { apply, registry, workspace } from './test-helpers';
 
-// 草稿说明说用户的话：字段用字段名、不露内部键名和 ID（走查 REPORT3 第 4 条）。
+// Draft description states what the user says: fields use field names, without exposing internal keys and IDs (walkthrough REPORT3 item 4).
 
 const setup: Op[] = [
   {
@@ -70,15 +70,15 @@ const lines = (block: string, changes: BlockChanges, locale: Locale = 'zh') =>
     { registry, locale, now: new Date(2026, 10, 4) },
   );
 
-describe('记录列表的显示（字段用字段名）', () => {
-  it('右侧显示', () => {
+describe('Display of record list (fields use field names)', () => {
+  it('Right-side display', () => {
     expect(lines('list1', { show: { trailing: 'priority' } })).toEqual([
       '修改「任务」的记录列表：右侧显示「优先级」',
     ]);
     expect(lines('list1', { show: { trailing: null } })[0]).toContain('右侧不再显示');
   });
 
-  it('标题、小字、格式、空白提示', () => {
+  it('Title, subtitle, format, empty state prompt', () => {
     expect(lines('list1', { show: { title: 'project' } })[0]).toContain('每条的标题显示「项目」');
     expect(lines('list1', { show: { subtitles: ['project', 'due'] } })[0]).toContain('项目、到期');
     expect(
@@ -89,13 +89,13 @@ describe('记录列表的显示（字段用字段名）', () => {
     );
   });
 
-  it('系统字段也说人话', () => {
+  it('System fields also speak human language', () => {
     expect(lines('list1', { show: { trailing: 'createdAt' } })[0]).toContain(
       '右侧显示「添加时间」',
     );
   });
 
-  it('改读什么：排序、条数、筛选、分组', () => {
+  it('What to read: sorting, limit, filters, grouping', () => {
     const line = lines('list1', {
       source: {
         sort: { field: 'due', direction: 'desc' },
@@ -109,8 +109,8 @@ describe('记录列表的显示（字段用字段名）', () => {
   });
 });
 
-describe('工具的改法', () => {
-  it('表单改问什么：说问哪几个字段，不说「一键按钮」', () => {
+describe('How tools are modified', () => {
+  it('What forms ask: specify which fields to ask for, without saying "one-tap button"', () => {
     const [line] = lines('form1', {
       tools: [
         {
@@ -125,7 +125,7 @@ describe('工具的改法', () => {
     expect(line).toBe('修改「任务」的添加表单：问「标题、项目、优先级、备注」');
   });
 
-  it('列表加勾选和按钮', () => {
+  it('Adding checkboxes and buttons to the list', () => {
     const [line] = lines('list1', {
       tools: [
         { as: 'check', do: 'toggle', table: 'tasks', field: 'priority' },
@@ -145,7 +145,7 @@ describe('工具的改法', () => {
   });
 });
 
-describe('守护：常见修改的说明里没有内部键名和 ID', () => {
+describe('Guard: Descriptions of common modifications contain no internal key names or IDs', () => {
   const common: [string, BlockChanges][] = [
     ['list1', { show: { title: 'project' } }],
     ['list1', { show: { subtitles: ['project', 'due'] } }],
@@ -187,7 +187,7 @@ describe('守护：常见修改的说明里没有内部键名和 ID', () => {
     ['stat1', { source: { aggregate: 'sum', field: 'cost' } }],
     ['stat1', { source: { goal: 10, compare: 'previous' } }],
   ];
-  // 英文、法文里 goal、group 这样的词是正常的话，只查不会自然出现的键名和 ID。
+  // Words like goal and group are normal in English and French; only check for key names and IDs that would not occur naturally.
   const KEYS =
     /\b(trailing|subtitles|emptyText|aggregate|priority|project|tasks|list1|form1|stat1|smartDate)\b/;
 
@@ -196,7 +196,7 @@ describe('守护：常见修改的说明里没有内部键名和 ID', () => {
       for (const locale of ['zh', 'en', 'fr'] as const) {
         const [line] = lines(block, changes, locale);
         expect(line, locale).toBeTruthy();
-        // 中文说明里不该有任何英文单词。
+        // Chinese descriptions should not contain any English words.
         expect(line, locale).not.toMatch(KEYS);
         if (locale === 'zh') expect(line).not.toMatch(/[A-Za-z]{3,}/);
         expect(line, locale).not.toMatch(/[{}[\]]/);

@@ -21,7 +21,7 @@ function expectClose(actual: number[] | undefined, expected: number[]): void {
   expected.forEach((v, i) => expect(actual?.[i]).toBeCloseTo(v));
 }
 
-/** 文字框中心（在 PDF 用户空间中）。 */
+/** Text box center (in PDF user space). */
 function textCenter(m: number[], text: string, size: number): [number, number] {
   const [a = 0, b = 0, c = 0, d = 0, e = 0, f = 0] = m;
   const w = font.widthOfTextAtSize(text, size) / 2;
@@ -75,7 +75,7 @@ describe('addPageNumbers', () => {
     const out = await addPageNumbers(await makePdf([{ size: [600, 800], rotate: 90 }]), NUMBERS);
     const [draw] = textDraws(await pageContent(out, 0));
     const w = font.widthOfTextAtSize('1', 12);
-    // 视图宽 800、高 600；视图底边 = PDF 右边 x = 600。
+    // Viewport width 800, height 600; viewport bottom = PDF right side x = 600.
     expectClose(draw?.m, [0, 1, -1, 0, 600 - 20, (800 - w) / 2]);
   });
 
@@ -192,7 +192,7 @@ describe('stampImage', () => {
     });
     expect(imageDraws(await pageContent(out, 0))).toEqual([]);
     const [draw] = imageDraws(await pageContent(out, 1));
-    // 视图宽 800：图片宽 400、高 266.67；旋转 90° 后从 PDF (266.67, 0) 向上画。
+    // Viewport width 800: image width 400, height 266.67; draws upward from PDF (266.67, 0) after 90° rotation.
     expectClose(
       [draw?.x ?? NaN, draw?.y ?? NaN, draw?.w ?? NaN, draw?.h ?? NaN],
       [800 / 3, 0, 400, 800 / 3],

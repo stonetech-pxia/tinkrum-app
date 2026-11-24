@@ -20,7 +20,7 @@ import {
 } from './edit';
 import type { TableBlock, TableDoc } from './types';
 
-// 3 × 3：A1:B1 合并，A2:A3 合并。
+// 3x3: A1:B1 merged, A2:A3 merged.
 //   | head (A1:B1) | c |
 //   | tall (A2:A3) | e | f |
 //   |              | h | i |
@@ -58,14 +58,14 @@ const DOC: TableDoc = {
 };
 const AT = { page: 0, block: 1 };
 const tableOf = (doc: TableDoc) => doc.pages[0]!.blocks[1] as TableBlock;
-/** 每个位置正好属于一个格子。 */
+/** Each position belongs to exactly one cell. */
 function expectTiled(t: TableBlock) {
   const owner = cellOwners(t);
   expect([...owner].every((i) => i >= 0)).toBe(true);
   const area = t.cells.reduce((n, c) => n + c.rowSpan * c.colSpan, 0);
   expect(area).toBe(t.rows * t.cols);
 }
-/** 表格画成文字，方便断言：每一行列出每个位置的文字（合并格子的每个位置都写它的文字）。 */
+/** Render table as text for easy assertion: list text at each position for every row (write text for every position in a merged cell). */
 function picture(t: TableBlock): string[][] {
   const owner = cellOwners(t);
   return Array.from({ length: t.rows }, (_, r) =>
@@ -129,7 +129,7 @@ describe('TableDoc editing (D-272)', () => {
   });
 
   it('inserts and deletes a column across every table on the page', () => {
-    // 第二张表只占共用的第 2、3 列（C、D）；页上一共 4 列。
+    // The second table occupies only the shared 2nd and 3rd columns (C, D); there are 4 columns in total on the page.
     const narrow: TableBlock = {
       kind: 'table',
       rows: 1,
@@ -146,14 +146,14 @@ describe('TableDoc editing (D-272)', () => {
       pages: [{ ...DOC.pages[0]!, colWidths: [100, 200, 300, 400], blocks: [TABLE, narrow] }],
     };
     const blocksOf = (d: TableDoc) => d.pages[0]!.blocks as TableBlock[];
-    // 在 B 前面插入：第一张表多一列，第二张表整张右移。
+    // Insert before B: the first table gains a column, and the second table shifts entirely to the right.
     const inserted = insertColumn(doc, 0, 1);
     const [a, b] = blocksOf(inserted);
     expect(picture(a!)[1]).toEqual(['tall', '', 'e', 'f']);
     expect([b!.col, b!.cols]).toEqual([3, 2]);
     expect(picture(b!)).toEqual([['x', 'y']]);
     expect(inserted.pages[0]!.colWidths).toEqual([100, 100, 200, 300, 400]);
-    // 删掉 C：两张表都经过它，各少一列。
+    // Delete C: both tables pass through it, each losing a column.
     const deleted = deleteColumn(doc, 0, 2);
     const [c, d] = blocksOf(deleted);
     expect(picture(c!)).toEqual([
@@ -164,7 +164,7 @@ describe('TableDoc editing (D-272)', () => {
     expect([d!.col, d!.cols]).toEqual([2, 1]);
     expect(picture(d!)).toEqual([['y']]);
     expect(deleted.pages[0]!.colWidths).toEqual([100, 200, 400]);
-    // 第二张表只剩一列时，不能删它所在的列（表格不能整张删）。
+    // When only one column remains in the second table, its containing column cannot be deleted (the entire table cannot be deleted).
     expect(canDeleteColumn(deleted.pages[0]!, 2)).toBe(false);
     expect(deleteColumn(deleted, 0, 2)).toBe(deleted);
     expect(canDeleteColumn(deleted.pages[0]!, 0)).toBe(true);
@@ -217,7 +217,7 @@ describe('undo and redo', () => {
     expect(undo(h)).toBe(h);
     h = redo(h);
     expect(tableOf(h.present).cells[1]!.text).toBe('C');
-    // 新的修改清掉重做。
+    // New modifications clear out redo history.
     h = pushHistory(h, setCellText(h.present, AT, 1, 'X'));
     expect(h.future).toHaveLength(0);
     expect(redo(h)).toBe(h);
@@ -239,7 +239,7 @@ describe('undo and redo', () => {
   it('reads back a saved document and rejects broken files', () => {
     expect(parseTableDoc(JSON.stringify(DOC))).toEqual(DOC);
     expect(parseTableDoc('{')).toBeNull();
-    // 旧版本（每张表各自的列）不再读。
+    // Legacy versions (where each table had its own columns) are no longer read.
     expect(parseTableDoc('{"version":1,"scope":"all","pages":[]}')).toBeNull();
   });
 });

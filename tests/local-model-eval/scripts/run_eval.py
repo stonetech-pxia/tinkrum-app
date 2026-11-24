@@ -1,4 +1,6 @@
-"""用本机 llama-server 逐条评测；每条原始回复立即写入 JSONL，可断点续跑。"""
+"""Evaluate sequentially using the local `llama-server`; each raw response is immediately written
+to JSONL to support resumption from breakpoints.
+"""
 from __future__ import annotations
 
 import argparse

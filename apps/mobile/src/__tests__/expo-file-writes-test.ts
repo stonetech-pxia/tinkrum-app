@@ -1,7 +1,10 @@
-// expo-file-system 的 File.write 在 Android 上是异步的（返回 Promise，另有 writeSync）。
-// 不等它写完就往下走，下一步可能读到写了一半的文件：手机上「多份材料合一」第 3 步报「文件可能已损坏」。
-// 这里把 write 换成慢一点才写完的版本，检查每个写文件的地方都等它写完。
-// copy 也一样（返回 Promise，另有 copySync）：分享前复制的那一份没复制完就交给 Gmail，Gmail 报「无法添加附件」（ENOENT）。
+// expo-file-system's File.write is asynchronous on Android (returns a Promise, with writeSync as an
+// alternative). Proceeding without awaiting completion may cause the next step to read a
+// half-written file: step 3 of "merge multiple materials" reports "file may be corrupted" on phone.
+// Here, write is replaced with a version that finishes slowly, verifying that every file-writing
+// location awaits completion. copy is similar (returns a Promise, with copySync as an alternative):
+// the copy prepared for sharing is handed to Gmail before finishing copy, causing Gmail to report
+// "unable to add attachment" (ENOENT).
 
 import { Platform } from 'react-native';
 
@@ -41,7 +44,7 @@ jest.mock('expo-file-system', () => {
       mockDisk.delete(this.uri);
     }
     write(content: Uint8Array | string) {
-      // 和 Android 一样：调用时还没写，等一会儿才写进去。
+      // Same as Android: not yet written upon call, writes after a short delay.
       return new Promise<void>((resolve) =>
         setTimeout(() => {
           mockDisk.set(this.uri, content);
@@ -50,7 +53,7 @@ jest.mock('expo-file-system', () => {
       );
     }
     copy(destination: { uri: string }) {
-      // 和 Android 一样：调用时还没复制，等一会儿才复制过去。
+      // Same as Android: not yet copied upon call, copies after a short delay.
       return new Promise<void>((resolve) =>
         setTimeout(() => {
           mockDisk.set(destination.uri, mockDisk.get(this.uri)!);
@@ -68,7 +71,7 @@ jest.mock('expo-file-system', () => {
   return { File, Directory, Paths: { cache: { uri: 'cache' }, document: { uri: 'doc' } } };
 });
 
-// 原生分享：交出去的时候，那个文件要已经在了。
+// Native sharing: the file must already exist when handed over.
 const mockSharedExisted: boolean[] = [];
 jest.mock('../../modules/morph-share', () => ({
   __esModule: true,
@@ -79,8 +82,9 @@ jest.mock('../../modules/morph-share', () => ({
   },
 }));
 
-// 文字识别（D-269）：张量写进临时文件交给原生模块。原生只看文件有多大，没写完就报
-// 「input has 0 bytes」（手机上「识别照片里的文字」第 2 步）。
+// OCR (D-269): tensors are written to temporary files and passed to the native module. The native
+// side checks the file size; if incomplete, it reports "input has 0 bytes" (step 2 of "recognize
+// text in photo" on mobile).
 const mockDetectInputs: number[] = [];
 jest.mock('../../modules/morph-vision', () => ({
   __esModule: true,
@@ -103,7 +107,7 @@ jest.mock('../packs/store', () => ({
   },
 }));
 jest.mock('../runtime/skia', () => ({
-  // 正好是模型要的大小，不用缩放：逐像素放大要 4 秒，全量跑时会超过 5 秒上限。
+  // Exactly the size the model needs, no scaling required: resizing pixel-by-pixel takes 4 seconds, which exceeds the 5-second limit when running full-scale.
   ocrPixels: async () => ({ width: 736, height: 736, data: new Uint8Array(736 * 736 * 4) }),
 }));
 
@@ -141,7 +145,7 @@ it('finishes copying a file into the share folder before the system share sheet 
   const original = Platform.OS;
   Platform.OS = 'android';
   try {
-    // 文档库里的文件不在 FileProvider 开放的目录里：先复制一份再交出去。
+    // Files in the document library are not in the FileProvider-exposed directory: copy them first before handing them out.
     mockDisk.set('doc/v2-0.docx', new Uint8Array([80, 75]));
     await expoFilePlatform.shareUris([
       {

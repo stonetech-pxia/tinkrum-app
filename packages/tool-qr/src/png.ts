@@ -2,7 +2,7 @@ import { zlibSync } from 'fflate';
 
 import type { RgbaImage } from './index';
 
-// 最小的 PNG 编码器（RGBA，8 位，不做行滤波）：生成的二维码直接存成 PNG，不需要 Skia，也能在 Node 里测试。
+// Minimal PNG encoder (RGBA, 8-bit, no row filtering): generated QR codes are saved directly as PNG without Skia, enabling tests in Node.
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
   let c = n;
@@ -32,11 +32,11 @@ export function encodePng({ width, height, data }: RgbaImage): Uint8Array {
   const hv = new DataView(header.buffer);
   hv.setUint32(0, width);
   hv.setUint32(4, height);
-  header.set([8, 6, 0, 0, 0], 8); // 8 位 RGBA
+  header.set([8, 6, 0, 0, 0], 8); // 8-bit RGBA
   const stride = width * 4;
   const raw = new Uint8Array((stride + 1) * height);
   for (let y = 0; y < height; y++) {
-    raw[y * (stride + 1)] = 0; // 不滤波
+    raw[y * (stride + 1)] = 0; // No filtering
     raw.set(data.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1);
   }
   const parts = [

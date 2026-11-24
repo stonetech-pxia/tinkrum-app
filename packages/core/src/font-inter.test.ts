@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { FONT_CHOICES, ThemeSchema } from './schema-base';
 import { createDefaultWorkspace } from './defaults';
 
-// 主题字体多一种 inter（D-591）：写 "inter" 能通过，不认识的名字照旧被拒。
+// Additional theme font inter (D-591): writing "inter" passes, unrecognized names are rejected as usual.
 
 const theme = createDefaultWorkspace('zh').theme;
 

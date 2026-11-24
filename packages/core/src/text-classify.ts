@@ -1,51 +1,57 @@
-// 文件的「形式 / 主题」原型（只在本机，还没接进收件页面）：识别出的文字先由代码判断能不能读，
-// 空白和乱码直接判「无法判断」，不交给模型；能读的再拿本地 Embedding 的相似度排候选，
-// 分数不够高、或者第一和第二名太接近时也给「无法判断」。只给可点的推荐用，绝不自动运行（D-190）。
-// 文字、向量和结果都不离开手机，不发给 AI。阈值由调用方给：要在校准集上定，见
-// side-session-notes/model-eval/CLASSIFY_124_REPORT.md（测量报告，不在仓库里）。
-// 不用 \p{…}（Hermes 的老版本不支持 Unicode 属性），字符范围直接写出来。
+// File "form/topic" prototype (local-only, not yet integrated into the inbox): The recognized text
+// is first checked by code for readability. Blank and garbled text are directly classified as
+// "unknown" and never sent to the model. Readable text is ranked against candidates using local
+// embedding similarity; if the score is not high enough, or if the top two results are too close,
+// it also returns "unknown". Used exclusively for clickable recommendations, never runs
+// automatically (D-190). Text, vectors, and results never leave the device and are never sent to
+// the AI. Thresholds are provided by the caller and must be determined on a calibration set, see
+// side-session-notes/model-eval/CLASSIFY_124_REPORT.md (measurement report, not in repo). Avoid
+// \\p{...} (older Hermes versions do not support Unicode properties), write out character ranges
+// explicitly.
 
 export type TextReadability = 'blank' | 'garbled' | 'readable';
 
-/** 至少要有这么多个能读的字（汉字、单词里的字母、数字）才交给模型。 */
+/** Requires at least this many readable characters (Chinese characters, letters in words, numbers) before sending to the model. */
 export const MIN_READABLE_CHARS = 6;
-/** 能读的字至少要占非空白字符的这么多。 */
+/** Readable characters must account for at least this fraction of non-whitespace characters. */
 export const MIN_READABLE_SHARE = 0.5;
 
-// 中日韩文字（汉字、假名、谚文）：每个字都算能读。
+// CJK characters (Hanzi, Kana, Hangul): every character is considered readable.
 const CJK = /[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]/;
-// 拉丁（含法文重音）、希腊、西里尔字母。
+// Latin (including French accents), Greek, and Cyrillic letters.
 const LETTERS = 'A-Za-zÀ-ÖØ-öø-ɏͰ-ϿЀ-ӿ';
 const LETTER = new RegExp(`[${LETTERS}]`);
 const ANY_TEXT = new RegExp(`[${LETTERS}0-9]|${CJK.source}`);
 const WORD = new RegExp(`^[${LETTERS}]+(?:['’\\-][${LETTERS}]+)*$`);
-// 数字、金额、日期、时间、百分比（12,50 €、$4.20、2026-03-12、14:05、-20%）。
+// Numbers, amounts, dates, times, percentages (12,50 €, $4.20, 2026-03-12, 14:05, -20%).
 const NUMBER = /^[-+]?[$€£¥]?\d[\d.,:/\-]*[%€$£¥]?$/;
-// 单号、编码（INV-2026-0042、F2026-118、A12B34）：至少两个数字，至少四个字符。
+// Receipt numbers, codes (INV-2026-0042, F2026-118, A12B34): at least two digits, at least four characters.
 const CODE = /^(?=(?:[^\d]*\d){2})[A-Za-z0-9#/\-]{4,}$/;
-// 表格的填写横线和勾选框（申请人姓名：________ □男 □女）是版面，不算字也不算乱码。
+// Form blank lines and checkboxes (Applicant name: ________ □ Male □ Female) are layout elements, neither characters nor garbled text.
 const FORM_BLANKS = /[_\u2610\u25a1]+/g;
-// 前后的标点不算进单词。
+// Leading and trailing punctuation are not counted as part of the word.
 const EDGE = /^[\s.,;:!?¡¿()[\]{}"'«»“”‘’<>*·•…—–]+|[\s.,;:!?¡¿()[\]{}"'«»“”‘’<>*·•…—–]+$/g;
 
-/** 一个用空白隔开的片段里能读的字数。 */
+/** Number of readable characters within a whitespace-separated segment. */
 function readableChars(token: string): number {
   if (CJK.test(token)) {
-    // 中文的一段常常连着数字和单位（实付32.00元），汉字、字母、数字都算。
+    // A Chinese text segment is often followed by numbers and units (e.g., 32.00 RMB paid); Chinese characters, letters, and numbers are all counted.
     return [...token].filter((ch) => CJK.test(ch) || LETTER.test(ch) || /\d/.test(ch)).length;
   }
   const core = token.replace(EDGE, '');
   if (core.length === 0) return 0;
-  // 单个字母（à、a、l）不算：乱码里最常见的就是零散的单个字母。
+  // Single letters (à, a, l) are excluded: scattered single letters are the most common artifact in garbled text.
   if (WORD.test(core) && core.length >= 2) return core.length;
   if (NUMBER.test(core) || CODE.test(core)) return core.length;
   return 0;
 }
 
 /**
- * 识别结果能不能拿去判断：没有任何字母、数字或汉字是 blank；能读的字太少、或者占比太低
- * （「lI1 |:; 0O0 ■■」这类）是 garbled；其余是 readable。只看字符，不看意思：读得通但说的是别的事
- * （一首诗、一页说明书）由后面的分数判断。
+ * Determines whether the recognition result can be used for classification: returns 'blank' if
+ * there are no letters, numbers, or Chinese characters; 'garbled' if there are too few readable
+ * characters or their proportion is too low (such as "lI1 |:; 0O0 ■■"); otherwise 'readable'.
+ * Evaluates characters only, not semantics: text that is grammatically correct but discusses
+ * something else (a poem, a manual) is handled by subsequent score checks.
  */
 export function textReadability(text: string): TextReadability {
   if (!ANY_TEXT.test(text)) return 'blank';
@@ -58,7 +64,7 @@ export function textReadability(text: string): TextReadability {
   return good >= MIN_READABLE_CHARS && good >= MIN_READABLE_SHARE * total ? 'readable' : 'garbled';
 }
 
-/** 一个候选（内设的形式、主题，或者用户自己的类别）和它说明文字的向量。 */
+/** A candidate label (embedded form, topic, or user-defined category) along with the vector of its description text. */
 export interface LabelVector {
   id: string;
   vector: ArrayLike<number>;
@@ -69,7 +75,7 @@ export interface LabelScore {
   score: number;
 }
 
-/** 余弦相似度；有一个是零向量时为 0。 */
+/** Cosine similarity; returns 0 if either vector is a zero vector. */
 export function cosine(a: ArrayLike<number>, b: ArrayLike<number>): number {
   if (a.length !== b.length) throw new Error('vector lengths differ');
   let dot = 0;
@@ -83,7 +89,7 @@ export function cosine(a: ArrayLike<number>, b: ArrayLike<number>): number {
   return na === 0 || nb === 0 ? 0 : dot / Math.sqrt(na * nb);
 }
 
-/** 按相似度从高到低排候选；同分时保持原来的顺序。 */
+/** Ranks candidates by similarity from highest to lowest; preserves original order on ties. */
 export function rankLabels(query: ArrayLike<number>, labels: readonly LabelVector[]): LabelScore[] {
   return labels
     .map((l, i) => ({ id: l.id, score: cosine(query, l.vector), i }))
@@ -92,8 +98,10 @@ export function rankLabels(query: ArrayLike<number>, labels: readonly LabelVecto
 }
 
 /**
- * 给出类别的条件（每个维度分开定）：最高分不低于 minScore，并且比第二名至少高 minMargin。
- * 相似度不是正确的概率，这两个数只能在校准集上定，换模型、换量化、换候选说明都要重新定。
+ * Conditions for assigning a category (defined independently per dimension): the top score must
+ * not be lower than minScore, and must exceed the second place by at least minMargin. Similarity
+ * is not a probability, so these thresholds must be determined on a calibration set and
+ * re-evaluated when changing models, quantization, or candidate descriptions.
  */
 export interface GuessThresholds {
   minScore: number;
@@ -106,7 +114,7 @@ export type LabelGuess =
   | { status: 'label'; id: string; score: number; margin: number }
   | { status: 'unknown'; reason: UnknownReason };
 
-/** 从排好的分数里挑一个，或者给「无法判断」。只有一个候选时，差距算无限大。 */
+/** Selects one from the ranked scores, or returns "unknown". If there is only a single candidate, the margin is treated as infinite. */
 export function pickLabel(scores: readonly LabelScore[], thresholds: GuessThresholds): LabelGuess {
   const valid = scores.filter((s) => Number.isFinite(s.score)).sort((x, y) => y.score - x.score);
   const [first, second] = valid;
@@ -125,8 +133,9 @@ export interface FacetGuesses {
 }
 
 /**
- * 判断一段识别出的文字的形式和主题。空白、乱码不调用模型，两个维度都给「无法判断」。
- * embed 是本机的 Embedding（查询要带和校准时同样的任务说明，所以按维度分开编码）。
+ * Determines the form and topic of recognized text. Blank and garbled text do not invoke the
+ * model and both dimensions return "unknown". Embedding uses local models (queries must include
+ * the same task description as calibration, so they are encoded separately per dimension).
  */
 export async function guessFacets(
   text: string,

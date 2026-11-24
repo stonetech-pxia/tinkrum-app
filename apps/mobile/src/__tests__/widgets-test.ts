@@ -15,8 +15,9 @@ import { buildWidgetSnapshot, REPEATS } from '../widgets/snapshot';
 import type { PlacedWidget, WidgetSnapshot, WidgetView } from '../widgets/types';
 import { drainMessage, runQueuedWidgetOps } from '../widgets/useWidgets';
 
-// 桌面小组件（D-321–D-325）：画面按页面上同一份配置算；点了以后的画面预先算好；跨天换上明天那份；
-// 小组件点的操作由 App 按点的时间执行。
+// Desktop widgets (D-321–D-325): visuals calculated from the same configuration as the page;
+// post-tap visuals pre-calculated; switch to tomorrow's version across days; widget tap operations
+// executed by the app according to tap timestamp.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -39,7 +40,7 @@ const habits: Collection = {
 
 const add = (block: object) => ({ op: 'addContainer', page: 'home', block });
 
-// 按钮和图块上的工具：配置里的写法和小组件指纹（actionHash）用同一份。
+// Tools on buttons and blocks: configuration syntax matches the widget fingerprint (actionHash).
 const DRINK = { do: 'create', table: 'water', values: { day: 'today' } } as const;
 const PLUS_ONE = {
   as: 'tap',
@@ -125,7 +126,7 @@ it('a new user with nothing placed: no items, no actions, two days of (empty) vi
   expect(snap.states[0]!.until).toBe(snap.states[1]!.from);
   expect(snap.states[1]!.from).toBe(new Date(2026, 9, 31).getTime());
   expect(snap.colors.light.primary).toMatch(/^#[0-9A-Fa-f]{6}$/);
-  // 风格固定浅色时，深色桌面上的小组件也要用深色那份（淡色不能还是浅色那份）。
+  // When style is fixed to light, widgets on a dark desktop must also use the dark version (light color must not remain light).
   expect(snap.colors.dark.tint).not.toBe(snap.colors.light.tint);
 });
 
@@ -144,7 +145,7 @@ it('a stat with a goal shows value / goal and a ring; a button tap is predicted 
   expect(button).toMatchObject({ kind: 'button', title: '+1 杯水', op: 'b:drink' });
   expect(button.note).toBeUndefined();
   expect(snap.ops['b:drink']).toEqual({ component: 'drink', hash: expect.any(String) });
-  // 连点 1…4 次以后：统计跟着涨，按钮下面写「已记下」。
+  // After tapping 1…4 times: statistics increment accordingly, "Logged" is displayed below the button.
   const after = snap.states[0]!.after['b:drink']!;
   expect(after).toHaveLength(REPEATS);
   expect((after[0]!['water-today'] as Of<'stat'>).ratio).toBe(0.25);
@@ -217,7 +218,7 @@ it('French: the widget text follows the app language', async () => {
 describe('running the taps the widget queued', () => {
   const tap = (op: string, component: string, hash: string, at: number, record?: string) =>
     JSON.stringify({ op, component, hash, at, ...(record ? { record } : {}) });
-  // 队列里每次点按有自己的 id（R07）；确认删除在 widget-queue-test.ts 里测。
+  // Each tap in the queue has its own id (R07); deletion confirmation is tested in widget-queue-test.ts.
   const run = (raw: string[], repo: MemoryWorkspaceRepo, config: WorkspaceConfig, now: Date) =>
     runQueuedWidgetOps(
       raw.map((text, i) => ({ id: `tap${i}`, text })),

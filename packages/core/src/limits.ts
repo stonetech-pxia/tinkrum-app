@@ -1,12 +1,13 @@
-// 文件大小上限（DECISIONS P-006）。pdf-lib 会把整份文件读入内存，手机上必须限制。
+// File size limit (DECISIONS P-006). pdf-lib reads entire files into memory, which must be limited on mobile devices.
 export const FILE_LIMITS = {
   maxFileBytes: 50 * 1024 * 1024,
   maxTotalBytes: 100 * 1024 * 1024,
 } as const;
 
 /**
- * PDF 单独的上限（D-601，创始人 2026-11-20 定）：单个 100 MB、一次运行里所有 PDF 合计 200 MB。
- * 其他要整份读进内存的文件仍按上面的 FILE_LIMITS；混合时 PDF 和非 PDF 各算各的，互不占额度。
+ * PDF-specific limits (D-601, decided by founder 2026-11-20): 100 MB per single file, 200 MB
+ * total across all PDFs in a single run. Other files requiring full in-memory loading still
+ * follow FILE_LIMITS above; PDFs and non-PDFs are calculated separately without sharing quotas.
  */
 export const PDF_LIMITS = {
   maxFileBytes: 100 * 1024 * 1024,
@@ -17,8 +18,10 @@ export const isPdfFile = (f: { name: string; mimeType?: string | null }) =>
   f.mimeType === 'application/pdf' || /\.pdf$/i.test(f.name);
 
 /**
- * 不是视频、音频的文件（要整份读进内存的）：先逐个查单个上限（PDF 用 PDF_LIMITS，其他用 FILE_LIMITS），
- * 再分别查 PDF 合计和非 PDF 合计。返回的 mb 是实际用到的那个上限。收件页面和快捷操作共用这一份（P-006、D-601）。
+ * Non-video/audio files (requiring full in-memory read): check individual limits first (PDFs use
+ * PDF_LIMITS, others use FILE_LIMITS), then check PDF totals and non-PDF totals separately. The
+ * returned mb is the actual applicable limit. Shared between the inbox page and quick actions
+ * (P-006, D-601).
  */
 export function inMemorySizeProblem(
   files: readonly { name: string; size: number | null; mimeType?: string | null }[],
@@ -41,8 +44,9 @@ export function inMemorySizeProblem(
 }
 
 /**
- * 视频和音频的上限（D-142）：由原生模块边读边写，不进 JS 内存，所以不受上面 50 MB 的限制。
- * 单个不超过 4 GB，一次最多 10 个；开始前另外检查手机剩余空间。
+ * Video and audio limits (D-142): read and written in streams by native modules without entering
+ * JS memory, thus exempt from the 50 MB limit above. Maximum 4 GB per file, up to 10 files at
+ * once; check remaining device storage separately before starting.
  */
 export const MEDIA_LIMITS = {
   maxFileBytes: 4 * 1024 * 1024 * 1024,
@@ -50,8 +54,11 @@ export const MEDIA_LIMITS = {
 } as const;
 
 /**
- * 报表带附件（D-425）：照片缩到长边 maxSide 再放进 PDF；最多放 maxCount 个附件、合计 maxBytes，多的不放并印在报表上。
- * 每 batchImages 张（或 batchBytes）排一次版，系统排版的那份 HTML 不会太大；pdf-lib 合并时整份在内存里，所以有合计上限。
+ * Reports with attachments (D-425): downscale photos so their long edge is at most maxSide before
+ * embedding in PDF; maximum maxCount attachments totalling maxBytes, excess attachments are
+ * omitted and noted in the report. Layout in batches of batchImages (or batchBytes) to prevent
+ * system HTML rendering from becoming too large; pdf-lib merges the entire file in memory, hence
+ * the total size limit.
  */
 export const REPORT_ATTACHMENT_LIMITS = {
   maxCount: 60,

@@ -5,12 +5,14 @@ import { extOf } from '../runtime/actions/helpers';
 import type { FilePlatform } from '../runtime/platform';
 import { mapSourcePaths, sourcePaths, type DeskSourceDoc } from './store';
 
-// 用户文件旁边的中间格式（D-367、D-400）：assets/<id>/morph-source.json 和它用到的图片
-// morph-source-<n>.<扩展名>（JSON 里写同一目录里的文件名）。房间里存的、结果页的「保存」、
-// 快捷操作的保存步骤都写这一份，从存储空间「放到桌上」时读它（saved-source.ts）。
-// 单独一个文件：保存步骤（runtime/actions/io.ts）也要用，saved-source.ts 又用着 io.ts 的 saveItems。
+// Intermediate format files alongside user files (D-367, D-400): assets/<id>/morph-source.json and
+// its referenced images morph-source-<n>.<ext> (with filenames in the same directory specified in
+// the JSON). The storage in rooms, "Save" on result pages, and save steps in quick actions all
+// write this file, which is read when placing items "On Desk" from storage (saved-source.ts). As a
+// standalone file: used by save steps (runtime/actions/io.ts), while saved-source.ts also relies on
+// io.ts's saveItems.
 
-/** 中间格式的文件名（和用户文件放在同一个目录里）。 */
+/** Intermediate format filename (located in the same directory as user files). */
 export const SOURCE_NAME = 'morph-source.json';
 
 export interface SavedSource {
@@ -18,20 +20,20 @@ export interface SavedSource {
   kind: DeskSourceDoc['kind'];
   doc: unknown;
   pagesWithoutTables?: number[];
-  /** 中间格式和图片一共多大（存储空间里加在这个文件上）。 */
+  /** Total size of the intermediate format and images combined (added to this file in storage). */
   bytes: number;
 }
 
 type Files = Pick<FilePlatform, 'readUri' | 'writeBytes'>;
 
-/** 把中间格式（图片是现在能读的地址）和它用到的图片存进用户文件 assetId 的目录。 */
+/** Save the intermediate format (where images have currently readable URIs) and its referenced images into the user file's assetId directory. */
 export async function writeSavedSource(
   files: Files,
   assetId: string,
   source: DeskSourceDoc,
   pagesWithoutTables?: readonly number[],
 ): Promise<void> {
-  // 图片换成同一个目录里的文件名，各复制一份。
+  // Replace images with filenames in the same directory, making a copy of each.
   const names = new Map<string, string>();
   let bytes = 0;
   for (const [k, path] of [...sourcePaths(source)].entries()) {
@@ -41,7 +43,7 @@ export async function writeSavedSource(
     try {
       data = await files.readUri(path);
     } catch {
-      // 读不到的图片不存（这张图空着），中间格式照样存：不然整份文件放回桌上就不能改了（D-470）。
+      // Unreadable images are not saved (leaving those images empty), but the intermediate format is saved anyway; otherwise, putting the file back on the desk would prevent further editing (D-470).
       continue;
     }
     const written = await files.writeBytes(assetId, name, data);
@@ -55,16 +57,18 @@ export async function writeSavedSource(
     kind: source.kind,
     doc,
     ...(pagesWithoutTables?.length ? { pagesWithoutTables: [...pagesWithoutTables] } : {}),
-    // 图片加上中间格式本身（JSON 外面的几个字段不算）。
+    // Images plus the intermediate format itself (excluding fields outside the JSON).
     bytes: bytes + new TextEncoder().encode(docJson).length,
   };
   await files.writeBytes(assetId, SOURCE_NAME, new TextEncoder().encode(JSON.stringify(body)));
 }
 
 /**
- * 结果页的「保存」、快捷操作的保存步骤（D-400）：转 Excel、转 Word 的结果带着中间格式时，跟着存一份。
- * 中间格式不再对应这个文件（后面的步骤改过它）、读不出来时只存文件，和放到桌上一样。
- * 运行目录里的中间格式和图片只复制（运行页关掉时才删）。
+ * "Save" on result pages, save steps in quick actions (D-400): when Excel or Word conversion
+ * results carry an intermediate format, save a copy along with it. If the intermediate format no
+ * longer corresponds to this file (modified by subsequent steps) or cannot be read, save only the
+ * file, just like placing it on the desk. Intermediate formats and images in the runtime
+ * directory are only copied (deleted when the runtime page is closed).
  */
 export async function saveRunItemSource(
   files: Files,

@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { makePalette } from '../renderer/theme';
 import { CornersScreen } from '../run/local/CornersScreen';
 
-// 四角调整界面：逐张确认；找不到纸张时用内缩的默认框，也可以一键选整张照片。
+// Corner adjustment interface: confirms page by page; uses the inset default box when paper cannot be found, or allows selecting the entire photo with one tap.
 
 const item = (name: string) => ({
   uri: `file:///run/${name}.jpg`,

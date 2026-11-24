@@ -17,14 +17,17 @@ import { countPages, mergePdfs } from '@morph/tool-pdf';
 
 import { freshName, mimeOf, writeItem, type RunServices } from './helpers';
 
-// 报表带附件（D-425）：print.records 打开 attachments 时，每条记录的照片和 PDF 按记录顺序接在报表后面。
-// 照片解码时就缩小，每几张排一次版（一份 HTML 不会太大）；PDF 的页面用 tool-pdf 合并，前面一页写明是哪条记录的。
-// 少一个附件不会让整份报表失败：跳过，并印在报表上。原件只读，不移动、不删除（底线 4）。
-// 中间文件属于这次运行，用完就删，成功和失败都一样。
+// Report with attachments (D-425): when print.records opens attachments, photos and PDFs for each
+// record are appended to the report in record order. Photos are downscaled upon decoding,
+// layout-grouped to keep HTML size manageable; PDF pages are merged using tool-pdf, with the
+// preceding page indicating the corresponding record. Missing an attachment does not fail the
+// entire report: it is skipped and noted in the report. Originals are read-only, never moved or
+// deleted (invariant 4). Intermediate files belong to this run and are deleted upon completion, on
+// both success and failure.
 
 type Ctx = Parameters<ActionImpl<RunServices>>[2];
 
-/** 按顺序接在报表后面的一份 PDF：temp 是这次运行自己的，用户的 PDF 附件不是。 */
+/** A PDF appended to the report in order: temp belongs to this run, whereas the user's PDF attachments do not. */
 interface Segment {
   uri: string;
   name: string;
@@ -35,7 +38,7 @@ export interface CollectedAttachments {
   segments: Segment[];
   overLimit: string[];
   unreadable: string[];
-  /** 全部附件的图注（合并失败时报表上要写都没放进来）。 */
+  /** Captions for all attachments (noted in the report if merging fails). */
   titles: string[];
   locale: Ctx['locale'];
   cleanup(): Promise<void>;
@@ -82,7 +85,7 @@ export async function collectAttachments(
 
   let batch: ReportAttachmentPage[] = [];
   let batchBytes = 0;
-  /** 把攒着的这几页排成一份 PDF；排不出来时这几个附件算读不了，不影响别的。 */
+  /** Layout accumulated pages into a PDF; if layout fails, these attachments are deemed unreadable without affecting others. */
   const flush = async (): Promise<boolean> => {
     if (batch.length === 0) return true;
     const pages = batch;
@@ -126,7 +129,7 @@ export async function collectAttachments(
   };
 
   const addPdf = async (a: ReportAttachment, uri: string, size: number): Promise<number> => {
-    // 带密码或坏掉的 PDF 在这里就读不了，算在跳过的里面。
+    // Password-protected or corrupted PDFs cannot be read here and are counted among skipped items.
     const pdfPages = await countPages(await files.readUri(uri));
     batch.push({ attachment: a, pdfPages });
     if (!(await flush())) return 0;
@@ -171,14 +174,14 @@ export async function collectAttachments(
     ctx.throwIfCancelled();
     await flush();
   } catch (e) {
-    // 取消也是失败的一种：不等运行结束，先删掉这一步的中间文件。
+    // Cancellation is also a form of failure: delete intermediate files for this step immediately without waiting for execution to finish.
     await collected.cleanup();
     throw e;
   }
   return collected;
 }
 
-/** 印报表，再把附件接在后面。合并失败时只留报表，并写明附件都没放进来。 */
+/** Print report, then append attachments. If merging fails, keep only the report and note that attachments could not be included. */
 export async function mergeReport(
   ctx: Ctx,
   collected: CollectedAttachments,

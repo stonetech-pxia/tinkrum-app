@@ -1,4 +1,6 @@
-"""用既有 Qwen3.5 0.8B GGUF 测动态标签与开放命名；结果不入库。"""
+"""Test dynamic tags and open naming using existing Qwen3.5 0.8B GGUF; results are not stored in
+the database.
+"""
 from __future__ import annotations
 
 import argparse

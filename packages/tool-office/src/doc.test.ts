@@ -40,7 +40,7 @@ const W = 1000;
 const H = 1400;
 const page = { width: W, height: H };
 
-/** 一页：每行字画成竖条（像字的笔画），粗细可选；返回图和识别结果。 */
+/** Single page: render each line of text as vertical bars (like character strokes) with optional stroke thickness; returns image and recognition results. */
 function textPage(
   rows: { text: string; x: number; y: number; width: number; h?: number; stroke?: number }[],
   extra: Rect[] = [],
@@ -49,7 +49,7 @@ function textPage(
   const lines: OcrBox[] = [];
   for (const r of rows) {
     const h = r.h ?? 20;
-    // 字的笔画在框里上下各留 20%。
+    // Character strokes leave 20% blank space at the top and bottom of the box.
     const stroke = r.stroke ?? 2;
     for (let s = 0; s + stroke <= r.width; s += 7 + stroke)
       rects.push({ x: r.x + s, y: r.y + h * 0.2, width: stroke, height: h * 0.6 });
@@ -76,8 +76,9 @@ describe('paragraphsOf', () => {
   });
 
   it('keeps receipt item lines apart when each has its own amount far to the right (EU sample 003)', () => {
-    // 小票：「1 0,4 Schorle」「1 T-RINDERSTEAK」两行，右边隔得很远各有单价和金额；上面一行「Bed. 2 Rg.」
-    // 让右边看着没有空。不是一段折行。
+    // Receipt: two lines "1 0,4 Schorle" and "1 T-RINDERSTEAK", with unit prices and amounts far
+    // away on the right; the line above ("Bed. 2 Rg.") makes the right side look non-empty. Not a
+    // wrapped paragraph.
     const items = [
       line('10,4 Schorle', 52, 709, 214, 39),
       line('1 T-RINDERSTEAK', 51, 749, 246, 38),
@@ -90,17 +91,17 @@ describe('paragraphsOf', () => {
       line('19.90', 620, 752, 86, 40),
     ];
     expect(paragraphsOf(items, peers)).toHaveLength(2);
-    // 右边是正文（不是金额）时照旧按折行判断。
+    // When the right side is prose (not an amount), evaluate line wrapping as usual.
     const prose = peers.map((p) => ({ ...p, text: 'and so on' }));
     expect(paragraphsOf(items, prose)).toHaveLength(1);
   });
 
   it('keeps two short lines apart when a blank line height separates them (EU sample 041, 049)', () => {
-    // 答案一列里上下两个「○ ja ○ nein」，中间空着将近一个行高：两行，不是一段折行。
+    // Two stacked "○ ja ○ nein" in an answer column separated by nearly one line height: two separate lines, not a wrapped paragraph.
     const a = line('Oja Onein', 1140, 930, 165, 28);
     const b = line('O ja O nein', 1140, 984, 165, 28);
     expect(paragraphsOf([a, b])).toHaveLength(2);
-    // 平常行距的两行短行（窄栏里的折行）照样接成一段。
+    // Two short lines with normal line spacing (wrapped lines in a narrow column) are still joined into a single paragraph.
     expect(paragraphsOf([a, { ...b, y: 962 }])).toHaveLength(1);
   });
 
@@ -108,10 +109,10 @@ describe('paragraphsOf', () => {
     const lines = [
       line('First paragraph runs to the right edge and', 100, 100, 800),
       line('wraps here.', 100, 125, 200),
-      // 有缩进：新的一段（中文书的段首空两格）。
+      // Indented: new paragraph (two-space indentation at paragraph start in Chinese books).
       line('Second paragraph starts with an indent and runs', 140, 150, 760),
       line('to the next line.', 100, 175, 300),
-      // 空了一行多：新的一段，记下 spaced。
+      // More than one line gap: new paragraph, record as spaced.
       line('Third after a gap.', 100, 240, 400),
       line('1. A list item that is long enough to reach the', 100, 265, 800),
       line('right edge, continued with a hanging indent', 130, 290, 500),
@@ -138,8 +139,9 @@ describe('paragraphsOf', () => {
   });
 
   it('keeps centred letterhead lines apart when the next first word would have fit, and joins a wrapped centred title', () => {
-    // 同一条中线、左边只差 9 和 15 像素（不到半个行高）。下面的正文写满 129–1239：
-    // 「Telefon」接在上一行后面、照样居中也排得下，却换了行，是一行一行排的。
+    // Sharing the same center line, left coordinates differ by only 9 and 15 pixels (less than half
+    // a line height). The full-width body text below spans 129–1239: "Telefon" appended to the
+    // previous line would fit even while centered, yet it wrapped, indicating line-by-line layout.
     const lines = [
       line('Praxis für Allgemeinmedizin · Dr. med. Lena Hartmann', 279, 158, 849, 37),
       line('Lindenstraße 14, 79098 Freiburg im Breisgau', 347, 207, 713, 41),
@@ -154,7 +156,7 @@ describe('paragraphsOf', () => {
       40,
     );
     expect(paragraphsOf(lines, [body])).toHaveLength(4);
-    // 居中的标题折成两行、两行差不多长：第二行的第一个词在这一栏的宽里放不下，是同一段。
+    // Centered title wrapped across two lines of similar length: the first word of the second line does not fit within the column width, so it is the same paragraph.
     const title = [
       line('Annual report on the regional water quality of', 200, 100, 600, 40),
       line('measurements taken in the alpine lakes', 215, 145, 570, 40),
@@ -175,9 +177,9 @@ describe('paragraphsOf', () => {
       line('Subletting is not permitted.', 170, 540, 318, 37),
       line('Inventory checked: Ok', 170, 603, 263, 31),
     ];
-    // 同一栏里上面的正文写到 1251：「Inventory」接在 488 后面放得下，是两段。
+    // Upper body text in the same column reaches 1251: "Inventory" fits after 488, so these are two paragraphs.
     expect(paragraphsOf(lines, [pets])).toHaveLength(2);
-    // 别的栏里的行（左边不齐）不算这一栏的宽。
+    // Lines in other columns (with unaligned left edges) do not count toward this column's width.
     expect(paragraphsOf(lines, [{ ...pets, x: 700, width: 500 }])).toHaveLength(1);
   });
 });
@@ -291,7 +293,7 @@ describe('OCR region paragraph fragments', () => {
 
 describe('paragraphsOf: centered lines (D-463)', () => {
   it('keeps centered letter-head lines one per paragraph, but still joins wrapped prose', () => {
-    // 处方的页眉：每行居中、宽度差不多，最宽的一行定了右边；以前「CDS 20 PANTIN」和下一行的地址被当成折行接在一起。
+    // Prescription header: each line centered with similar width, widest line defines the right boundary; previously "CDS 20 PANTIN" and the address on the next line were joined together as wrapped text.
     const head = [
       line('CENTRE DE SANTE', 473, 124, 304, 31),
       line('CDS 20 PANTIN', 502, 175, 243, 32),
@@ -303,7 +305,7 @@ describe('paragraphsOf: centered lines (D-463)', () => {
     expect(paragraphsOf(head).map((p) => p.rows.map((r) => r.text))).toEqual(
       head.map((l) => [l.text]),
     );
-    // 左边对齐、写到右边的正文照样接成一段。
+    // Left-aligned prose extending to the right is correctly joined into a single paragraph.
     const prose = [
       line('A long line of body text that runs to the right', 100, 100, 800),
       line('edge and wraps here.', 100, 125, 300),
@@ -312,7 +314,7 @@ describe('paragraphsOf: centered lines (D-463)', () => {
   });
 
   it('does not put a small tagline into the row of the big wordmark whose box reaches over it (EU sample 091)', () => {
-    // 标志字 136 像素高的框往下压到口号（24 像素高）上面，两行左右叠着。
+    // Marker text with a 136-pixel-high box presses down onto the slogan (24 pixels high), overlapping vertically.
     const head = [
       line('flexPEDIA', 456, 72, 505, 136),
       line('FLEX OPLOSSINGEN WAAR JE BLIJ VAN WORDT', 478, 191, 471, 24),
@@ -355,7 +357,7 @@ describe('strokeRatio and textColor', () => {
   });
 
   it('does not count a strike-through or an underline as a stroke', () => {
-    // 同样的字，上面多一条横穿整行的线（删除线）。
+    // Identame text, with an additional horizontal line piercing across the entire line (strikethrough).
     const plain = textPage([{ text: 'a', x: 100, y: 100, width: 400 }]);
     const struck = textPage(
       [{ text: 'a', x: 100, y: 100, width: 400 }],
@@ -371,7 +373,7 @@ describe('strokeRatio and textColor', () => {
     const image = renderPage(W, 200, glyphs(100, 50, 300, 20));
     const box = { x: 100, y: 50, width: 300, height: 20 };
     expect(textColor(image, box)).toBeUndefined();
-    // 字的像素换成蓝色。
+    // Change character pixels to blue.
     const blue = { ...image, data: image.data.slice() };
     for (let i = 0; i < blue.data.length; i += 4) {
       if (blue.data[i]! < 128) blue.data.set([23, 32, 148], i);
@@ -386,11 +388,11 @@ describe('hasUnderline (D-463)', () => {
     const text = glyphs(100, 104, 400, 12);
     const page = (extra: Rect[]) => renderPage(W, 300, [...text, ...extra]);
     expect(hasUnderline(page([]), box)).toBe(false);
-    // 下划线：在字的下面，和字一样长。
+    // Underline: positioned below text, matching text length.
     expect(hasUnderline(page([{ x: 100, y: 118, width: 400, height: 2 }]), box)).toBe(true);
-    // 分隔线、表格线：比字长出去很多。
+    // Divider lines, table lines: significantly longer than text.
     expect(hasUnderline(page([{ x: 20, y: 118, width: 900, height: 2 }]), box)).toBe(false);
-    // 删除线：在字的中间。
+    // Strikethrough: positioned across the middle of text.
     expect(hasUnderline(page([{ x: 100, y: 109, width: 400, height: 2 }]), box)).toBe(false);
   });
 });
@@ -416,7 +418,7 @@ describe('foldEmptyColumns', () => {
       [0, 0, 3, 'A'],
       [1, 0, 3, 'B'],
     ]);
-    // 中间一列有字：只把它右边的空列并进它，它自己不并。
+    // Middle column contains text: fold only empty columns to its right into it, do not fold the middle column itself.
     const kept = foldEmptyColumns({
       ...table,
       cells: table.cells.map((c) => (c.row === 1 && c.col === 1 ? { ...c, text: 'x' } : c)),
@@ -435,7 +437,7 @@ describe('buildDocPage', () => {
     list.map(([kind, label, box]) => ({ kind, label, score: 0.9, box }));
 
   it('does not center a line that nearly fills the text width (EU sample 021)', () => {
-    // 页眉的字比正文宽一点：接近整行宽的一行左右各空出两个多行高，不是居中的。
+    // Header text is slightly wider than body text: a line close to full page width with over two line heights of blank space on both sides is not centered.
     const { image, lines } = textPage([
       { text: 'Gazette of the Region', x: 60, y: 100, width: 220, h: 22 },
       { text: 'No. 2292', x: 840, y: 100, width: 100, h: 22 },
@@ -534,7 +536,7 @@ describe('buildDocPage', () => {
       '12',
     ]);
     expect(table.kind === 'table' && table.colWidths).toEqual([300, 300]);
-    // 页码不写进文件。
+    // Page numbers are not written to file.
     expect(JSON.stringify(doc.blocks)).not.toContain('"3"');
     expect(doc.bodySize).toBeGreaterThanOrEqual(9);
     expect(doc.bodySize).toBeLessThanOrEqual(12);
@@ -570,7 +572,7 @@ describe('buildDocPage', () => {
       .join('\n');
     expect(text).toContain('Art. 1');
     expect(text).toContain('n.a.');
-    // 真的页码照旧不写（D-334）。
+    // Actual page numbers remain unwritten as before (D-334).
     expect(text).not.toContain('Pagina 2');
   });
 
@@ -623,7 +625,7 @@ describe('buildDocPage', () => {
   });
 
   it('does not take bracketed field codes for numbered items (EU sample 089)', () => {
-    // 欧盟统一的行驶证：每一格的编号「(12)」「(13)」只是字段代码，不是列表的编号。
+    // EU uniform registration certificate: cell numbers "(12)", "(13)" are field codes, not list numbers.
     const { image, lines } = textPage([
       { text: '(12) (13)', x: 100, y: 100, width: 120 },
       { text: 'Masse', x: 100, y: 200, width: 100 },
@@ -726,7 +728,7 @@ describe('buildDocPage', () => {
       { text, x: 190, y: 120 + i * 70, width: 14 * text.length },
     ]);
     const { image, lines } = textPage(rows);
-    // 版面模型把编号划进了一个大区域，第一项的条文另有一个小区域。
+    // Layout model categorized numbering into a major region, while item clauses have a separate minor region.
     const doc = buildDocPage({
       image,
       lines,
@@ -737,7 +739,7 @@ describe('buildDocPage', () => {
         ['text', 'text', { x: 105, y: 115, width: 500, height: 32 }],
       ]),
     });
-    // 编号写成列表的编号也行：按列表的起始编号算出显示的编号。
+    // Numbering formatted as list numbers is also acceptable: compute displayed numbers based on starting list number.
     const texts = leafBlocks(doc).flatMap((b) =>
       b.kind === 'paragraph'
         ? [b.text]
@@ -751,7 +753,7 @@ describe('buildDocPage', () => {
   });
 
   it('does not centre a ragged-right paragraph whose lines share one left edge (EU sample 036)', () => {
-    // 字的左右两边空得差不多（满版的图把整页文字的左右边撑到了纸边），但几行左边对齐、右边参差：左对齐。
+    // Similar spacing on both left and right of text (full-page image pushed left and right text bounds to paper edges), but lines are left-aligned with ragged right edges: left-aligned.
     const { image, lines } = textPage([
       { text: 'A margin note sits at the far left.', x: 5, y: 60, width: 300 },
       {
@@ -836,7 +838,7 @@ describe('buildDocPage', () => {
       lines,
       source: 's',
       skew: 0,
-      // 版面模型说对话是标题（实验里的书页就是这样）。
+      // The layout model treats the dialogue as a title (book pages in experiments are structured this way).
       regions: regions([['title', 'paragraph_title', { x: 130, y: 140, width: 320, height: 50 }]]),
     });
     const paras = doc.blocks as DocParagraph[];
@@ -857,18 +859,18 @@ describe('buildDocPage', () => {
         width: 740,
       },
       { text: 'right edge and wraps back to the left margin.', x: 100, y: 125, width: 600 },
-      // 一行的段落：和这一块其他行的左边比。
+      // Single-line paragraph: compared to the left edge of other lines in this block.
       { text: 'A short indented line.', x: 160, y: 150, width: 300 },
       { text: 'Next paragraph without an indent runs on to the right', x: 100, y: 175, width: 800 },
       { text: 'edge as well.', x: 100, y: 200, width: 200 },
-      // 单独一块的一行（书页里单独一个区域的对话）：和整页的左边距比；页边上零星的字不算左边距。
+      // Single line in its own block (dialogue in a standalone region on a book page): compared to the left margin of the entire page; stray characters in the margin do not count as the left margin.
       { text: '“A line of dialogue on its own.”', x: 160, y: 300, width: 400 },
       { text: 'A line on its own at the margin.', x: 100, y: 400, width: 400 },
       { text: '00', x: 20, y: 600, width: 30 },
     ]);
     const doc = buildDocPage({ image, lines, source: 's', skew: 0 });
     const paras = doc.blocks as DocParagraph[];
-    // 只有一行的段落不写首行缩进（D-463）：docx 按它的左边写左缩进，见 docx.test 的「places each paragraph」。
+    // Paragraphs with only a single line have no first-line indent (D-463): docx writes left indentation based on its left side, see "places each paragraph" in docx.test.
     expect(paras.map((p) => [p.text.slice(0, 10), p.indent, Math.round(p.box.x)])).toEqual([
       ['Indented f', 60, 100],
       ['A short in', undefined, 160],
@@ -883,12 +885,12 @@ describe('buildDocPage', () => {
     const { image, lines } = textPage(
       [
         { text: 'Report', x: 100, y: 40, width: 200, h: 30 },
-        // 左右两张表，上下范围重叠。
+        // Two tables side by side with overlapping vertical ranges.
         { text: 'A', x: 120, y: 110, width: 40 },
         { text: '1', x: 320, y: 110, width: 20 },
         { text: 'B', x: 620, y: 110, width: 40 },
         { text: '2', x: 820, y: 110, width: 20 },
-        // 左右两栏文字。
+        // Two text columns side by side.
         { text: 'Left column first line of text that runs', x: 100, y: 300, width: 380 },
         { text: 'on to a second line.', x: 100, y: 325, width: 200 },
         { text: 'Right column first line of text that runs', x: 600, y: 300, width: 380 },
@@ -901,7 +903,7 @@ describe('buildDocPage', () => {
     expect(doc.blocks.map((b) => b.kind)).toEqual(['paragraph', 'row', 'row', 'paragraph']);
     const tables = doc.blocks[1] as DocRow;
     expect(tables.cells.map((c) => c.blocks.map((b) => b.kind))).toEqual([['table'], ['table']]);
-    // 列宽按原图位置：第一格到第二格的左边，最后一格到它的右边。
+    // Column width based on original image position: from the left of the first cell to the second, and the last cell to its right edge.
     expect(tables.cells.map((c) => Math.round(c.width))).toEqual([500, 300]);
     const columns = doc.blocks[2] as DocRow;
     expect(
@@ -919,14 +921,14 @@ describe('buildDocPage', () => {
 
   it('drops short stray marks at the page edge or far from the text, keeps short real text (D-334)', () => {
     const { image, lines } = textPage([
-      // 页角的污点认成「00」：贴着页边，框比正文行高很多。
+      // Corner smudges recognized as "00": adjacent to the page edge, with bounding boxes much taller than body lines.
       { text: '00', x: 4, y: 0, width: 40, h: 90 },
       { text: 'GENERAL CONDITIONS', x: 300, y: 150, width: 400, h: 30 },
       { text: 'Never put a hot pan directly on the worktop, use a', x: 100, y: 250, width: 800 },
       { text: 'trivet.', x: 100, y: 275, width: 100 },
-      // 签名认成「Q」：离别的字很远，没把握。
+      // Signature recognized as "Q": far away from other text, low confidence.
       { text: 'Q', x: 600, y: 500, width: 40, h: 50 },
-      // 离得远、但认得准、和正文一样高的编号（「②」）照样留下。
+      // Numbering (such as "②") that is far away, accurately recognized, and as tall as body text is kept.
       { text: '(2)', x: 100, y: 700, width: 30 },
       { text: 'Ok', x: 100, y: 900, width: 30 },
     ]);
@@ -943,7 +945,7 @@ describe('buildDocPage', () => {
   });
 
   it('keeps a short tall code printed white on a coloured band (EU sample 056)', () => {
-    // 表单抬头的绿条上白色的大字「A1」：短、高、离别的字远，但不是污点。
+    // Large white text "A1" on the green form header bar: short, tall, and far from other text, but not a smudge.
     const code = { x: 120, y: 120, width: 80, height: 70 };
     const white: Rect[] = [];
     for (let s = 0; s + 6 <= code.width; s += 14)
@@ -968,7 +970,7 @@ describe('buildDocPage', () => {
   });
 
   it('sizes a form in proportion to the page, down to about 6 pt; prose stays at 9 pt or more (D-335)', () => {
-    // 原图 1000 像素宽按 A4 595 磅换算：行高 13 像素的字约 7 磅。
+    // Original image width of 1000 pixels scaled to A4 595 points: 13-pixel-tall text is approximately 7 points.
     const form = textPage(
       Array.from({ length: 8 }, (_, i) => [
         { text: `LABEL ${i}`, x: 80, y: 100 + i * 30, width: 90, h: 13 },
@@ -981,7 +983,7 @@ describe('buildDocPage', () => {
       { text: 'DATE', x: 80, y: 130, width: 40, h: 9 },
     ]);
     expect(buildDocPage({ ...tiny, source: 's', skew: 0 }).bodySize).toBe(6);
-    // 条款页：一样小的字，但都是折行的长段落：正文不小于 9 磅。
+    // Terms page: text is equally small, but consists of long wrapped paragraphs; body text is at least 9 points.
     const prose = textPage(
       Array.from({ length: 4 }, (_, p) =>
         [0, 1, 2].map((r) => ({
@@ -1028,7 +1030,7 @@ describe('buildDocPage', () => {
       ],
       gridRects([100, 400, 900], [100, 200]),
     );
-    // App 的接法（D-268）会把够长的几行接成一段；表格的格子里按原图换行。
+    // The app's joining logic (D-268) joins sufficiently long lines into a single paragraph; table cells wrap according to the original image.
     const join = (ls: readonly OcrBox[]) =>
       [...ls]
         .sort((a, b) => a.y - b.y)
@@ -1042,7 +1044,7 @@ describe('buildDocPage', () => {
   });
 
   it('sizes text on a landscape page by the landscape paper width, not the portrait A4 width (EU sample 017)', () => {
-    // 横向 A4（842 × 595 磅）渲染成 1400 × 990 像素：20 像素高的行约 842 × 0.9 × 20 / 1400 ≈ 11 磅。
+    // Landscape A4 (842 × 595 points) rendered at 1400 × 990 pixels: 20-pixel-tall lines are approximately 842 × 0.9 × 20 / 1400 ≈ 11 points.
     const LW = 1400;
     const LH = 990;
     const rects: Rect[] = [];
@@ -1065,9 +1067,9 @@ describe('buildDocPage', () => {
       paper: { width: 841.9, height: 595.3 },
       skew: 0,
     });
-    // 旧的按 595 磅估：约 7.7 磅（只有原来的 0.71 倍），再被正文下限抬到 9 磅。
+    // Old estimation based on 595 points: about 7.7 points (only 0.71x of original), raised to 9 points by the body text minimum limit.
     expect(pdf.bodySize).toBeGreaterThanOrEqual(10.5);
-    // 横拍的照片没有纸张信息，Word 的纸也按横向 A4：字一样大。
+    // Photos taken in landscape orientation lack paper information, and Word treats the page as landscape A4: text size remains the same.
     expect(buildDocPage({ image, lines, source: 's', skew: 0 }).bodySize).toBe(pdf.bodySize);
   });
 
@@ -1129,11 +1131,11 @@ describe('buildDocPage', () => {
         skew: 0,
       });
     };
-    // 不是 A4 比例的一页纸（如 Letter）：纸的高宽比和照片一样，横竖用同一个比例，不把竖向压扁。
+    // Pages not matching the A4 aspect ratio (such as Letter): paper aspect ratio matches the photo, using the same scale for both dimensions without squishing the vertical axis.
     const letter = page(1000, 1290);
     expect(letter.paper!.width).toBeCloseTo(595.3, 1);
     expect(letter.paper!.height / letter.paper!.width).toBeCloseTo(1290 / 1000, 3);
-    // 接近 A4 比例的照片仍是 A4；竖长的小票不设纸，按旧版连续排、自然分页（不压扁成一页 A4）。
+    // Photos close to A4 aspect ratio are still treated as A4; tall and narrow receipts have no assigned paper size and use continuous layout like older versions, naturally paginating without being squished into a single A4 page.
     expect(page(1000, 1400).paper).toEqual({ width: 595.3, height: 841.9 });
     expect(page(600, 1500).paper).toBeUndefined();
     expect(page(600, 2400).paper).toBeUndefined();
@@ -1154,16 +1156,16 @@ describe('buildDocPage', () => {
     const a4 = build({ width: 595.3, height: 841.9 });
     expect(scan.paper!.width).toBeCloseTo(595.3, 1);
     expect(scan.paper!.height / scan.paper!.width).toBeCloseTo(3508.5 / 2481, 3);
-    // 字号、页边和 A4 原件一样，不因为纸大就把字缩成一小团。
+    // Font size, margins, and A4 original match; text is not shrunk into a tiny cluster just because the paper is large.
     expect(scan.bodySize).toBe(a4.bodySize);
     expect(scan.margins!.left).toBeCloseTo(a4.margins!.left, 0);
-    // 横向的大纸按 A4 长边；A3 和 Letter、Legal 这类真实纸张照旧。
+    // Large landscape paper follows the long edge of A4; real paper sizes like A3, Letter, and Legal remain unchanged.
     expect(build({ width: 3508.5, height: 2481 }).paper!.width).toBeCloseTo(841.9, 1);
     expect(build({ width: 841.9, height: 1190.6 }).paper).toEqual({ width: 841.9, height: 1190.6 });
     expect(build({ width: 612, height: 1008 }).paper).toEqual({ width: 612, height: 1008 });
   });
   it('sizes lines by the width of their letters when the page is set in one font (D-463)', () => {
-    // 识别框一样高（p、g 往下伸的字母让小字的框也一样高），字宽看得出大小：正文 17 像素，小字 13，大字 22。
+    // Recognition boxes are equally tall (descending letters like p and g make small text boxes share the same height), but font width reflects size: body text is 17 pixels, small text 13, large text 22.
     const px = (text: string, size: number) => Math.round(textEm(text) * size);
     const body = [
       'Docteur Martin LEROY',
@@ -1189,7 +1191,7 @@ describe('buildDocPage', () => {
   });
 
   it('keeps the letter-width size of an all-capitals heading on known paper, only removing the body-minimum inflation', () => {
-    // 全大写的行没有上下伸的字母，识别框比同字号的正文矮：框高只说 1.2 倍，字宽说 1.41 倍（D-463 按字宽）。
+    // All-caps lines lack ascending/descending letters, making their recognition boxes shorter than body text of the same size: box height is specified as 1.2x, width as 1.41x (D-463 based on font width).
     const px = (text: string, size: number) => Math.round(textEm(text) * size);
     const body = [
       'Docteur Claire FONTAINE',
@@ -1211,14 +1213,14 @@ describe('buildDocPage', () => {
     };
     const a4 = sizes({ width: 595.3, height: 841.9 });
     expect(a4.title / a4.body).toBeCloseTo(24 / 17, 1);
-    // 窄纸（D-533）：正文按物理宽度约 5.4 磅，被抬到最小字号 6 磅；标题按原图约 7.6 磅，不跟着这次抬高再放大。
+    // Narrow paper (D-533): body text width is physically ~5.4 points, raised to the minimum font size of 6 points; titles are ~7.6 points from the original image and do not scale up further with this increase.
     const narrow = sizes({ width: 300, height: 420 });
     expect(narrow.body).toBe(6);
     expect(narrow.title).toBeLessThanOrEqual(8);
   });
 
   it('does not make same-size, regular lines in a title region headings; headings keep their size (D-463)', () => {
-    // 版面模型把整个页眉（机构名 + 地址、电话）框成一个标题区域。
+    // The layout model boxes the entire header (organization name + address, phone) into a single title region.
     const { image, lines } = textPage([
       { text: 'CENTRE DE SANTE', x: 380, y: 60, width: 240, h: 26, stroke: 5 },
       { text: '20 rue du pré saint Gervais', x: 400, y: 100, width: 200 },
@@ -1242,7 +1244,7 @@ describe('buildDocPage', () => {
     });
     const [title, street, phone] = doc.blocks as DocParagraph[];
     expect(title).toMatchObject({ text: 'CENTRE DE SANTE', heading: 1, bold: true });
-    // 标题写明自己的字号，不按标题样式放大。
+    // Titles explicitly declare their own font size rather than scaling up based on title styles.
     expect(title!.size).toBeDefined();
     expect(street).toMatchObject({ text: '20 rue du pré saint Gervais', align: 'center' });
     expect(street!.heading).toBeUndefined();
@@ -1250,7 +1252,7 @@ describe('buildDocPage', () => {
   });
 
   it('centres a single line centred on the page although the text around it is lopsided (D-463)', () => {
-    // 左边一大块医生信息、右边的字很短：整页文字的左右边不对称，按它们判断居中会漏掉页眉。
+    // Large doctor information block on the left with very short text on the right: left and right margins of the entire page text are asymmetric, so calculating centering based on them would miss the header.
     const { image, lines } = textPage([
       { text: 'ORDONNANCE DE LUNETTES', x: 300, y: 100, width: 400 },
       { text: 'Ancien Assistant à la fondation Ophtalmologique', x: 40, y: 200, width: 500 },
@@ -1259,16 +1261,16 @@ describe('buildDocPage', () => {
     const doc = buildDocPage({ image, lines, source: 's', skew: 0 });
     const [title, wide, doctor] = doc.blocks as DocParagraph[];
     expect(title!.align).toBe('center');
-    // 左边那块里居中的行不当整页居中：位置留给 docx 的左缩进。
+    // Centered lines within the left block are not treated as centered for the whole page: position is reserved for docx left indentation.
     expect(wide!.align).toBeUndefined();
     expect(doctor!.align).toBeUndefined();
   });
 
   it('pairs form labels with their values row by row (D-332)', () => {
     const { image, lines } = textPage([
-      // 右边一块的上面还有一行（和值连成了一块），不参加配对。
+      // An extra line above the right-hand block (merged with the value into a single block) is excluded from pairing.
       { text: 'IN EUROS', x: 830, y: 120, width: 120 },
-      // 左边：地址；右边：一列标签、一列值（隔得远，分成了两块）。
+      // Left: address; right: a column of labels and a column of values (spaced far apart, split into two blocks).
       { text: 'ACME SARL', x: 80, y: 150, width: 160 },
       { text: '12 RUE DE PARIS', x: 80, y: 175, width: 220 },
       { text: '75003 PARIS', x: 80, y: 200, width: 160 },
@@ -1280,7 +1282,7 @@ describe('buildDocPage', () => {
       { text: '31 MARCH 2019', x: 830, y: 175, width: 140 },
       { text: '2 MAY 2017', x: 830, y: 200, width: 120 },
       { text: '1 85 03 75 115 042', x: 830, y: 225, width: 160 },
-      // 冒号结尾的标签，一行也配。
+      // Labels ending with a colon are matched even if they are a single line.
       { text: 'Date :', x: 100, y: 600, width: 80 },
       { text: '12 mars 2019', x: 500, y: 600, width: 150 },
     ]);
@@ -1298,7 +1300,7 @@ describe('buildDocPage', () => {
         'SOCIAL SECURITY NO\t1 85 03 75 115 042',
       ].join('\n'),
     );
-    // 值的位置：相对标签左边的距离（原图像素）。
+    // Value position: distance relative to the left of the label (in original image pixels).
     expect(form.tab).toBe(270);
     expect(doc.blocks[2]).toMatchObject({ text: 'Date :\t12 mars 2019', tab: 400 });
   });
@@ -1328,7 +1330,7 @@ describe('ragged-right wrapping (D-473)', () => {
   });
 
   it('keeps stacked short lines apart when the next word would fit in the room to their right (EU sample 023, 025)', () => {
-    // 地址：最宽的一行看着写满了这一块，可是右边一直空到整页的右边（或者右边隔得很远的另一块）。
+    // Address: the widest line appears to fill the block, but the right side remains empty all the way to the page edge (or another distant block on the right).
     const address = [
       line('Atelier Garance', 600, 100, 150),
       line('Camille Rousseau', 600, 125, 165),
@@ -1342,7 +1344,7 @@ describe('ragged-right wrapping (D-473)', () => {
         [line('Kunden-Nr.: 1004711', 700, 110, 200)],
       ),
     ).toHaveLength(4);
-    // 窄栏的正文：右边隔一条窄缝就是另一栏，下一个词放不下，照样是折行。
+    // Narrow column body text: separated from another column by a narrow gap on the right; when the next word does not fit, it wraps accordingly.
     const column = [
       line('Die Abschläge haben', 100, 100, 200),
       line('wir an Ihren Verbrauch', 100, 125, 190),
@@ -1354,7 +1356,7 @@ describe('ragged-right wrapping (D-473)', () => {
   });
 
   it('joins a line that stopped short because the next word would not fit', () => {
-    // 左对齐的正文右边参差不齐：第二行没写到头（离右边 30），因为下一行的第一个词放不下。
+    // Right side of left-aligned body text is ragged: second line does not reach the end (30 units from the right) because the first word of the next line does not fit.
     const lines = [
       line(
         'Whereas recognition of the inherent dignity and of the equal rights of all',
@@ -1364,7 +1366,7 @@ describe('ragged-right wrapping (D-473)', () => {
       ),
       line('the human family is the foundation of freedom, justice', 100, 125, 770),
       line('and peace in the world,', 100, 150, 280),
-      // 上一行离右边很远、下一个词放得下：段落到这里结束。
+      // Previous line is far from the right edge and the next word fits: the paragraph ends here.
       line('Whereas disregard and contempt', 100, 175, 300),
     ];
     const paras = paragraphsOf(lines);
@@ -1456,23 +1458,23 @@ describe('rule grids and diagrams (D-473)', () => {
   it('rejects a big grid that is mostly empty cells (form underlines), keeps real tables', () => {
     expect(isRuleGrid(grid(10, 60))).toBe(true);
     expect(isRuleGrid(grid(40, 60))).toBe(false);
-    // 小的稀疏表（签字栏）不判。
+    // Small, sparse tables (signature blocks) are ignored.
     expect(isRuleGrid(grid(2, 12))).toBe(false);
   });
 
   it('rejects a layout grid: many positions but few (heavily merged) cells', () => {
-    // 17 行 × 14 列只有 20 个格子：表单的版面，不是数据表（W-9 的上半页）。
+    // 17 rows × 14 columns with only 20 cells: form layout, not a data table (upper half of W-9).
     const layout = { ...grid(20, 20), rows: 17, cols: 14 };
     expect(isRuleGrid(layout)).toBe(true);
-    // 8 × 6 每个位置都有格子：数据表。
+    // 8 × 6 where every position has a cell: data table.
     expect(isRuleGrid({ ...grid(48, 48), rows: 8, cols: 6 })).toBe(false);
   });
 
   it('keeps a well-structured merged form table (order form) but rejects paragraph-in-cell grids', () => {
-    // 订货单：441 个位置、175 个格子（0.40），每格不到一行字：真表格，保留。
+    // Order form: 441 positions, 175 cells (0.40), each cell containing less than one line of text: true table, retained.
     const order = { ...grid(175, 175), rows: 21, cols: 21 };
     expect(isRuleGrid(order, 127)).toBe(false);
-    // W-4：120 个位置、42 个格子（0.35），每格 1.8 行字：格子里是整段话，不当表格。
+    // W-4: 120 positions, 42 cells (0.35), each cell containing 1.8 lines of text: cells contain full paragraphs, not treated as a table.
     const w4 = { ...grid(42, 42), rows: 15, cols: 8 };
     expect(isRuleGrid(w4, 74)).toBe(true);
     expect(isRuleGrid(w4, 30)).toBe(false);
@@ -1480,7 +1482,7 @@ describe('rule grids and diagrams (D-473)', () => {
 
   it('keeps a labelled diagram as an image but not a block of prose lines', () => {
     const rects: Rect[] = [
-      // 色块和线：字以外的图形。
+      // Color blocks and lines: graphics other than text.
       { x: 110, y: 110, width: 80, height: 80 },
       { x: 210, y: 110, width: 80, height: 80 },
       { x: 110, y: 210, width: 180, height: 60 },
@@ -1491,7 +1493,7 @@ describe('rule grids and diagrams (D-473)', () => {
     expect(isDiagram(image, box, labels)).toBe(true);
     const prose = [line('This is a long sentence of ordinary prose text here', 100, 130, 190, 14)];
     expect(isDiagram(image, box, prose)).toBe(false);
-    // 没有图形、只有标签（表单里认错的图片）不当示意图。
+    // No graphics, only labels (misrecognized images in forms) are not treated as diagrams.
     expect(isDiagram(renderPage(W, H, []), box, labels)).toBe(false);
   });
 });
@@ -1530,7 +1532,7 @@ describe('label column (D-473)', () => {
 
 describe('small layout fixes (D-473)', () => {
   it('does not pair rows of very different height (logo and big title next to small print)', () => {
-    // W-9 页眉的真实位置（缩到 1000 宽）：左边「Form」「W-9」大标志、小字，右边三行小字。
+    // True position of W-9 header (scaled to 1000 width): large "Form" / "W-9" logo and small text on the left, three lines of small text on the right.
     const k = 0.8;
     const rows = [
       { text: 'Form', x: 71, y: 94, width: 42, h: 22 },
@@ -1544,12 +1546,12 @@ describe('small layout fixes (D-473)', () => {
     const { image, lines } = textPage(rows);
     const doc = buildDocPage({ image, lines, source: 's', skew: 0 });
     const texts = leafBlocks(doc).flatMap((b) => (b.kind === 'paragraph' ? [b.text] : []));
-    // 大标志不被配成「标签\t值」按小字的中位行高写。
+    // Large logo is not paired as "label\tvalue" using the median line height of small text.
     expect(texts.some((t) => t.includes('W-9') && t.includes('\t'))).toBe(false);
   });
 
   it('sizes long lines of a slightly skewed scan by their text, not their taller box (EU sample 050)', () => {
-    // 斜 0.57°：左右两块同一排的字右边低 7 像素；很长的页脚行的框比字高出 宽 × 斜率。
+    // 0.57° tilt: right side of text on the same row in left and right blocks is lower by 7 pixels; very long footer line bounding box is taller than the text by width × slope.
     const slope = 0.01;
     const rows = [0, 1, 2, 3, 4, 5].flatMap((i) => [
       { text: `Anreise ${i}`, x: 100, y: 200 + i * 40, width: 150 },
@@ -1598,7 +1600,7 @@ describe('small layout fixes (D-473)', () => {
     expect(out).toHaveLength(1);
     const merged = out[0] as DocRow;
     expect(merged.cells.map((c) => c.blocks.length)).toEqual([2, 2]);
-    // 列位置不一样的两行不合并。
+    // Two lines with differing column positions are not merged.
     const other = row(300, 'L2', 'R2');
     other.cells[1]!.blocks = [para('R2', 700, 300) as never];
     expect(mergeColumnRows([row(100, 'L1', 'R1'), other], 20)).toHaveLength(2);
@@ -1613,7 +1615,7 @@ describe('answer column beside clauses (EU sample 041)', () => {
   });
 
   it('gives each short answer its own row with the clauses up to the one it stands beside', () => {
-    // 一个区域里四段条款（一段没有答案），右边一列「○ ja ○ nein」各对着一段条款的最后一行。
+    // Four clauses in a region (one without an answer), with a column of "○ ja ○ nein" on the right corresponding to the last line of each clause.
     const clauses = [
       para('Sie darf in allen Angelegenheiten entscheiden und befugt sein.', 150, 100, 850, 90),
       para('Solange es erforderlich ist, darf sie', 150, 230, 400, 25),
@@ -1798,7 +1800,7 @@ describe('persistent prose columns', () => {
 
 describe('ruled tables and barcodes (D-501)', () => {
   it('does not cut the empty part of a ruled table with many columns out as a barcode', () => {
-    // 工资单下半截没字的地方只有一排平行的列线，按条形码剪成图片后是一条带黑竖线的空白图。
+    // The lower half of the payslip has only a row of parallel column lines where there is no text; after being clipped into an image like a barcode, it is a blank image with a vertical black line.
     const xs = Array.from({ length: 13 }, (_, i) => 100 + i * 65);
     const lines: OcrBox[] = [];
     const rects: Rect[] = [...gridRects(xs, [100, 140, 600])];
@@ -1816,7 +1818,7 @@ describe('ruled tables and barcodes (D-501)', () => {
 
 describe('text left out of a table (D-501)', () => {
   it('a footer whose tall box covers the table’s bottom line comes out once, as text after the table', () => {
-    // 照片里弯的一行页脚：识别框很高，罩住了表格的底线，横跨所有列线。它不进表，也不能丢。
+    // A curved line of footer text in the photo: recognition box is very tall, covering the table bottom line and spanning all column lines. It is neither included in the table nor discarded.
     const xs = [100, 300, 500, 700, 900];
     const rects: Rect[] = [...gridRects(xs, [200, 240, 300])];
     const lines: OcrBox[] = [];
@@ -1824,7 +1826,7 @@ describe('text left out of a table (D-501)', () => {
       lines.push(fakeLine(`v${c}`, { x: xs[c]! + 40, y: 255, width: 80, height: 20 }, page));
       rects.push(...glyphs(xs[c]! + 44, 258, 72, 14));
     }
-    // 中心刚过底线（离表格的框不到 0.3 个行高）：按框算会当成表里的字，表里又没放，就丢了。
+    // Center just past the bottom line (less than 0.3 line heights from the table box): box-based calculation would treat it as table text, but since it is not in the table, it gets lost.
     lines.push(fakeLine('Keep this payslip', { x: 100, y: 284, width: 800, height: 34 }, page));
     rects.push({ x: 300, y: 300, width: 2, height: 30 }, ...glyphs(110, 304, 780, 12));
     const doc = buildDocPage({ image: renderPage(W, H, rects), lines, source: 'p.jpg', skew: 0 });
@@ -1843,7 +1845,7 @@ describe('text left out of a table (D-501)', () => {
 
 describe('ruled tables whose column lines cut through words (D-502)', () => {
   it('are not used as tables; their text stays whole', () => {
-    // 竖线从每行字的中间穿过（字的笔画、折痕认成了列线）：按这张表排，每行字被切成两半。
+    // Vertical lines passing through the middle of text lines (strokes or creases misrecognized as column lines): structured by this table, each text line is cut in half.
     const rects: Rect[] = [...gridRects([100, 400, 700], [100, 140, 180, 220])];
     const lines: OcrBox[] = [];
     for (let r = 0; r < 3; r++) {
@@ -1860,7 +1862,7 @@ describe('ruled tables whose column lines cut through words (D-502)', () => {
 });
 
 describe('ruled field boxes in a rejected form grid (EU sample 062)', () => {
-  // 整页的网格：12 列共用的列线，每排的框分在不同的地方。
+  // Full-page grid: shared column lines across 12 columns, with boxes of each row located in different places.
   const colWidths = Array.from({ length: 12 }, () => 100);
   const cell = (row: number, col: number, colSpan: number, text: string, y: number, h = 60) => ({
     row,
@@ -1871,7 +1873,7 @@ describe('ruled field boxes in a rejected form grid (EU sample 062)', () => {
     box: { x: col * 100, y, width: colSpan * 100, height: h },
   });
   const cells = [
-    // 节的标题条：字在中间，下面没有写的地方。
+    // Section title bar: text in the middle, with no writable area below.
     cell(0, 0, 12, 'C. Dane podatnika', 0, 40),
     cell(1, 0, 5, '10. Nazwisko', 40),
     cell(1, 5, 3, '11. Pierwsze imię', 40),
@@ -1879,7 +1881,7 @@ describe('ruled field boxes in a rejected form grid (EU sample 062)', () => {
     cell(2, 0, 4, '13. Kraj', 100),
     cell(2, 4, 5, '14. Województwo', 100),
     cell(2, 9, 3, '', 100),
-    // 选项的一节：好几行字。
+    // Option section: multiple lines of text.
     cell(3, 0, 12, '7. Składasz\n1. zeznanie\n2. korektę zeznania', 160, 90),
     cell(4, 0, 6, '20. Miejscowość', 250),
     cell(4, 6, 6, '21. Kod pocztowy', 250),
@@ -1910,7 +1912,7 @@ describe('ruled field boxes in a rejected form grid (EU sample 062)', () => {
     const found = fieldBoxTables(table, colWidths, placed, 20);
     expect(found).toHaveLength(2);
     const [first, second] = found;
-    // 10–14 两排一张表，只留这两排用到的列线：0、4、5、8、9、12。
+    // Rows 10–14 form a single table, keeping only the column lines used by these rows: 0, 4, 5, 8, 9, 12.
     expect(first!.table.rows).toBe(2);
     expect(first!.colWidths).toEqual([400, 100, 300, 100, 300]);
     expect(first!.table.cells.map((c) => [c.row, c.col, c.colSpan, c.text])).toEqual([
@@ -1921,13 +1923,13 @@ describe('ruled field boxes in a rejected form grid (EU sample 062)', () => {
       [1, 1, 3, '14. Województwo'],
       [1, 4, 1, ''],
     ]);
-    // 选项的一节下面的 20、21 是另一张。
+    // Items 20 and 21 below the option section form another table.
     expect(second!.table.cells.map((c) => c.text)).toEqual(['20. Miejscowość', '21. Kod pocztowy']);
     expect(second!.colWidths).toEqual([600, 600]);
   });
 
   it('leaves out the empty frame space beside the boxes (EU sample 004)', () => {
-    // 两个框只占外框的左半边：右边的空地也被线分成了格子，整列空着。
+    // Two boxes occupy only the left half of the outer box: the empty space on the right is also divided into grid cells by lines, leaving the entire column empty.
     const side = (row: number, y: number, a: string, b: string) => [
       cell(row, 0, 3, a, y),
       cell(row, 3, 3, b, y),
@@ -1960,7 +1962,7 @@ describe('ruled field boxes in a rejected form grid (EU sample 062)', () => {
   });
 
   it('does not take a single field box on its own', () => {
-    // 20 那一排只有自己（上面是选项的一节），只有一个框：不拿。
+    // Row 20 is by itself (preceded by the option section) and has only a single box: ignored.
     const single = {
       ...table,
       cells: cells

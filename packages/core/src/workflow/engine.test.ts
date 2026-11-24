@@ -16,7 +16,7 @@ const pdfItem = (name: string, size = 10) => ({
   size,
 });
 
-/** 假的动作实现：记录调用顺序和收到的参数。 */
+/** Fake action implementation: records call order and received parameters. */
 function fakeImpls(log: string[]): Record<string, ActionImpl<unknown>> {
   return {
     'in.files': async (_input, params) => {
@@ -77,7 +77,7 @@ describe('runWorkflow', () => {
       'save',
     ]);
     expect(events).toEqual(['step 0', 'step 1', '1/2', '2/2', 'step 2', 'step 3']);
-    // 执行记录只有元数据。
+    // Execution logs contain metadata only.
     expect(records).toEqual([{ id: 7, status: 'succeeded', outputAssetId: 'asset1' }]);
   });
 
@@ -154,7 +154,7 @@ describe('runWorkflow', () => {
   });
 
   it('re-checks the workflow before running anything', async () => {
-    // 输入步骤放到后面：输入只能是第一步。
+    // Input step placed at the end: input must be the first step only.
     const broken = { ...merge(), steps: [...merge().steps.slice(1), merge().steps[0]!] };
     const { promise, log } = run(broken);
     expect(await promise).toMatchObject({ status: 'failed', error: { code: 'invalidWorkflow' } });
@@ -257,7 +257,7 @@ describe('runWorkflow', () => {
     expect(await ok.promise).toMatchObject({ status: 'succeeded' });
     expect(asked).toEqual(['ppocr']);
 
-    // 必需的扩展包，用户不下载：取消。
+    // Required pack, user declines download: cancel.
     const declined = run(wf, {
       impls,
       ensurePack: async () => false,
@@ -265,7 +265,7 @@ describe('runWorkflow', () => {
     });
     expect(await declined.promise).toMatchObject({ status: 'cancelled' });
 
-    // 可选的：不下载也照样做。
+    // Optional pack: proceeds without downloading.
     const optional = run(wf, {
       impls,
       ensurePack: async () => false,
@@ -291,7 +291,7 @@ describe('runWorkflow', () => {
     const asked: string[] = [];
     const declined = run(wf, {
       impls,
-      // 扫描包要下载、展平模型用户不下载：照样扫描。
+      // Ensure pack: `async (id) => (asked.push(id), id === 'scan')`.
       ensurePack: async (id) => (asked.push(id), id === 'scan'),
       devicePack: (id) =>
         id === 'scan.detect' ? { pack: 'dewarp', optional: true, extra: true } : undefined,
@@ -299,7 +299,7 @@ describe('runWorkflow', () => {
     expect(await declined.promise).toMatchObject({ status: 'succeeded' });
     expect(asked).toEqual(['scan', 'dewarp']);
 
-    // 问可选的扩展包时告诉界面「不下载也照样做」，界面才能说清楚。
+    // When asking for optional packs, inform the UI that it "proceeds without downloading" so the UI can explain clearly.
     const options: unknown[] = [];
     await run(wf, {
       impls,
@@ -312,7 +312,7 @@ describe('runWorkflow', () => {
       ['dewarp', { optional: true }],
     ]);
 
-    // 动作自己的扩展包仍然是必需的。
+    // The action's own pack remains required.
     const noScan = run(wf, {
       impls,
       ensurePack: async (id) => id === 'dewarp',
@@ -341,7 +341,7 @@ describe('runWorkflow', () => {
         ? [{ pack: 'ppocr' }, { pack: 'layout', optional: true, extra: true }]
         : undefined;
     const options: unknown[] = [];
-    // 版面分析模型不下载：照样转。
+    // Layout analysis model not downloaded: convert anyway.
     const ok = run(wf, {
       impls,
       ensurePack: async (id, o) => (options.push([id, o]), id === 'ppocr'),
@@ -353,14 +353,14 @@ describe('runWorkflow', () => {
       ['layout', { optional: true }],
     ]);
     expect(converted).toBe(1);
-    // 文字识别模型是必需的。
+    // OCR model is required.
     const declined = run(wf, { impls, ensurePack: async (id) => id === 'layout', devicePack });
     expect(await declined.promise).toMatchObject({ status: 'cancelled' });
     expect(converted).toBe(1);
   });
 
   describe('one download prompt for the whole run (D-299)', () => {
-    // 2026-10-29 真机：新用户「拍表格转 Excel」要连着确认三次（找边 → 展平 → 认字）。
+    // 2026-10-29 real device: new user "Scan table to Excel" needs three consecutive confirmations (detect edges -> flatten -> recognize text).
     const wf: Workflow = {
       id: 'excel',
       kind: 'quickAction',
@@ -400,7 +400,7 @@ describe('runWorkflow', () => {
         ensurePack: async (id) => (single.push(id), true),
       });
       expect(await promise).toMatchObject({ status: 'succeeded' });
-      // 认字模型也在找边之前装好：展平后的逐行精修（D-274）第一次就能用。
+      // OCR model is also installed before edge detection: line-by-line fine-tuning after flattening (D-274) is available on the first try.
       expect(batches).toEqual([
         [
           { pack: 'scan', optional: false },
@@ -486,7 +486,7 @@ describe('runWorkflow', () => {
       params: { network: 'Home', security: 'WPA', hidden: false },
       secrets: { password: 'secret123' },
     });
-    // 配置里存不进密码：参数结构里没有这个键。
+    // Password cannot be stored in config: this key does not exist in the parameter structure.
     expect(
       registry.actions.get('in.wifi')!.params.safeParse({
         network: 'Home',

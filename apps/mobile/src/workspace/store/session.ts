@@ -18,8 +18,9 @@ import {
 import type { Kernel } from './kernel';
 import type { WorkspaceState } from './types';
 
-// 工具清单（D-414）：本机一个会话，存在 app_meta，随 App 重启保留。不在配置里，AI 改不了（底线 8）；
-// 只有用户说的话、计划里的一句话和配置结构，没有记录（底线 1、2、14）。规则都在 core 的 ai/session.ts。
+// Tool list (D-414): A session on the device, stored in app_meta, retained across app restarts. Not
+// in config, AI cannot change it (Invariant 8); only user words, a sentence in the plan, and config
+// structure, no records (Invariants 1, 2, 14). Rules are all in core's ai/session.ts.
 
 const SESSION_META_KEY = 'session';
 
@@ -32,14 +33,14 @@ export function createSession(k: Kernel) {
     await repo.setMeta(SESSION_META_KEY, JSON.stringify(next));
   }
 
-  /** 记下一句，再看看之前没做好的现在好了没有。config：改完之后用户看到的样子。 */
+  /** Record a sentence, then check whether previously unfinished items are now fixed. config: What the user sees after modification. */
   async function record(
     turn: Omit<SessionTurn, 'reason'> & { reason?: string; verdict?: ToolVerdict },
     config: WorkspaceConfig,
   ) {
     const first = turn.verdict?.blockers[0];
     const reason = turn.reason ?? (first ? issueReason(first, config, locale) : undefined);
-    // 「把这些补上」不成一项（D-418）：还差什么按钮自己算，这句话填回输入框也不带问题清单。
+    // "Fill these in" does not count as an item (D-418): calculate missing buttons yourself, and filling this sentence back into the input box does not include the issue checklist.
     const { kind, ...rest } = turn;
     const said = turn.input === t(locale, 'fixProblems') ? rest : turn;
     await update((s) =>
@@ -52,13 +53,13 @@ export function createSession(k: Kernel) {
     );
   }
 
-  /** 旧版 App 没有会话：有草稿时把草稿聊天框里说过的话接过来（earlier），其余是空的（底线 12）。 */
+  /** Older app versions have no session: when a draft exists, connect words spoken in the draft chat box (earlier), rest are empty (Invariant 12). */
   async function load(earlier: WorkSession['said']) {
     const stored = await repo.getMeta(SESSION_META_KEY);
     set({ session: stored ? parseSession(stored) : { ...emptySession(), said: earlier } });
   }
 
-  /** 第一句之前记下起点（D-418）：这时已有的问题不算这个会话的。 */
+  /** Record starting point before the first sentence (D-418): existing issues at this time do not count towards this session. */
   async function markStart(config: WorkspaceConfig) {
     const old = get().session;
     if (markSessionStart(old, config, registry) !== old)

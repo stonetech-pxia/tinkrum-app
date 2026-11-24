@@ -29,8 +29,10 @@ import { recordToVCard } from './vcard';
 import { validateWorkspace } from './validate';
 import { CONTAINER_PRESETS, presetById, presetWorkflow } from './workflows/presets';
 
-// 样板 App（samples/*.json，D-260）：每个样板在三种语言下，对新用户、已有同名表和页面、导航栏已满、
-// 接近上限的配置套用，结果都要通过校验；引用都指向换过的 ID；预设展开后和用户自己添加时一样。
+// Sample apps (samples/*.json, D-260): Each sample under all three languages must pass validation
+// for new users, existing tables/pages with duplicate names, full navigation bars, and near-limit
+// configurations; all references must point to remapped IDs; presets when expanded must match
+// user-added entries.
 
 const LOCALES: Locale[] = ['en', 'zh', 'fr'];
 
@@ -40,19 +42,19 @@ function ops(sample: SampleApp, config: WorkspaceConfig, locale: Locale): Op[] {
   return result.ops;
 }
 
-/** 新用户：引导前的首页是空的，导航栏只有首页、AI、设置。 */
+/** New user: Home screen before onboarding is empty, navigation bar contains only Home, AI, and Settings. */
 const fresh = (locale: Locale) => createStarterWorkspace(locale, registry);
 
-/** 已经有和样板同名的表、页面、快捷操作、提醒：先套用一次同一个样板（再加上它会用到的预设 ID）。 */
+/** Already contains tables, pages, quick actions, or reminders with the same name as the sample: apply the same sample once first (plus any preset IDs it uses). */
 function crowded(sample: SampleApp, locale: Locale): WorkspaceConfig {
   const base = fresh(locale);
   return apply(base, ops(sample, base, locale), locale);
 }
 
-/** 导航栏已满（默认工作空间：首页、工具、AI、历史、设置）。 */
+/** Navigation bar is full (default workspace: Home, Tools, AI, History, Settings). */
 const navFull = (locale: Locale) => workspace(locale);
 
-/** 加上几张表和几个页面，让表和页面都只剩 room 个空位。 */
+/** Add a few tables and pages so that both tables and pages have only room spare slots remaining. */
 function nearLimit(locale: Locale, room: { tables: number; pages: number }): WorkspaceConfig {
   let config = fresh(locale);
   const extra: Op[] = [];
@@ -98,8 +100,8 @@ const added = (before: WorkspaceConfig, after: WorkspaceConfig) => ({
 });
 
 /**
- * 一段配置 JSON 里所有的引用：表（table、when.before / each 里的 table、步骤参数的 collectionId）、
- * 快捷操作（{tool: id}，$pick.* 除外）、page:x、tool:x。
+ * All references in a configuration JSON: tables (table, table in when.before / each, step
+ * parameter collectionId), quick actions ({tool: id}, excluding $pick.*), page:x, tool:x.
  */
 function refsIn(
   value: unknown,
@@ -111,7 +113,7 @@ function refsIn(
       if ((k === 'table' || k === 'collectionId') && typeof v === 'string') {
         if (!v.startsWith('$')) out.tables.push(v);
       } else if (k === 'tool' && typeof v === 'string') {
-        // 容器用的内设快捷操作（D-428）不用添加，直接引用。
+        // Built-in quick actions used by containers (D-428) are not added, they are referenced directly.
         if (!v.startsWith('$') && !CONTAINER_PRESETS.some((p) => p.id === v)) out.workflows.push(v);
       } else if (typeof v === 'string' && v.startsWith('page:')) out.pages.push(v.slice(5));
       else if (typeof v === 'string' && v.startsWith('tool:')) out.workflows.push(v.slice(5));
@@ -142,18 +144,18 @@ describe.each(SAMPLE_APPS)('sample %s', (sample) => {
       if (!result.ok) return;
       const after = apply(before, result.ops, locale);
       expectValid(after);
-      // App 走的路：一次修改最多 30 个操作，解析、套用、校验都要过（prepareOps）。
+      // App execution path: at most 30 operations per modification, parsing, application, and validation must all succeed (prepareOps).
       const prepared = prepareOps(before, result.ops, { registry, locale, now: new Date() });
       expect(prepared.ok ? [] : prepared.issues).toEqual([]);
 
-      // 用户看到的文字都换成了这种语言，没有留下 { en, zh, fr } 或占位符（$files、$row 这类是配置里的词，不是占位符）。
+      // All text seen by the user is translated to this language, leaving no { en, zh, fr } or placeholders ($files, $row, etc., are configuration keywords, not placeholders).
       expect(JSON.stringify(after)).not.toMatch(/"en":|\$(table|page|tool)\./);
-      // 不改风格主题（D-260）。
+      // Do not modify the style theme (D-260).
       expect(after.theme).toEqual(before.theme);
 
       const fresh = added(before, after);
       expect(fresh.pages.has(result.mainPageId)).toBe(true);
-      // 新加的内容引用的表、页面、快捷操作，都是这次新加的（换过的 ID），不会指到原来同名的那个上。
+      // Tables, pages, and quick actions referenced by newly added content are all newly created for this addition (remapped IDs), and do not point to existing ones with the same name.
       const content = [
         ...after.data.tables.filter((c) => fresh.tables.has(c.id)),
         ...after.containers.pages.filter((p) => fresh.pages.has(p.id)),
@@ -165,11 +167,11 @@ describe.each(SAMPLE_APPS)('sample %s', (sample) => {
       for (const id of refs.tables) expect(fresh.tables).toContain(id);
       for (const id of refs.pages) expect(fresh.pages).toContain(id);
       for (const id of refs.workflows) expect(fresh.workflows).toContain(id);
-      // 每个新加的快捷操作都在样板的页面上有入口。
+      // Every newly added quick action has an entry point on the sample's pages.
       const runners = new Set(refs.workflows);
       for (const id of fresh.workflows) expect(runners).toContain(id);
 
-      // 主页面有入口：导航栏有空位就在导航栏，满了就在首页加一个快捷入口。
+      // Main page has an entry point: in the navigation bar if there is space, otherwise added as a quick entry on the home screen.
       const target = `page:${result.mainPageId}`;
       const home = after.containers.pages.find((p) => p.id === HOME_PAGE_ID)!;
       const onHome = allComponents(home).some(
@@ -182,7 +184,7 @@ describe.each(SAMPLE_APPS)('sample %s', (sample) => {
         expect(after.nav.bar).toEqual(before.nav.bar);
         expect(onHome).toBe(true);
       }
-      // 首页的组件引用也都是新的。
+      // Home screen component references are also new.
       const homeRefs = refsIn(
         allComponents(home).filter(
           (c) =>
@@ -219,7 +221,7 @@ describe.each(SAMPLE_APPS)('sample %s', (sample) => {
       expect(second.reminders.length).toBe(first.reminders.length);
       for (const id of second.tables) expect(first.tables.has(id)).toBe(false);
       for (const id of second.pages) expect(first.pages.has(id)).toBe(false);
-      // 两次都放进了导航栏（新用户的导航栏有两个空位）。
+      // Both times they were placed in the navigation bar (new user navigation bar has two empty slots).
       expect(twice.nav.bar).toHaveLength(5);
     });
 
@@ -243,7 +245,7 @@ describe('sample files', () => {
         expect(info.name.length).toBeGreaterThan(0);
         expect(info.summary.length).toBeGreaterThan(0);
       }
-      // 三种语言出来的配置结构一样，只有文字不同（预设展开的步骤本来就按语言不同，例如翻译成哪种语言）。
+      // Configuration structure is identical across all three languages, differing only in text (preset-expanded steps naturally vary by language, e.g., translation target).
       const shape = (locale: Locale) =>
         JSON.stringify(
           ops(sample, fresh(locale), locale).filter(
@@ -253,13 +255,13 @@ describe('sample files', () => {
               op.tool.kind !== 'quickAction' ||
               !op.tool.preset,
           ),
-          // 默认货币随语言（D-429）、语音转文字听哪种语言随语言（D-576），算文字。
+          // Default currency follows language (D-429), speech-to-text language follows language (D-576), considered as text.
           (k, v: unknown) =>
             typeof v === 'string' && (k === 'default' || k === 'lang' || !/^[a-z0-9:-]+$/.test(v))
               ? 'TEXT'
               : v,
         );
-      // 英文用 Letter 纸，中文和法语用 A4。
+      // English uses Letter paper, Chinese and French use A4.
       expect(shape('fr')).toBe(shape('zh'));
     }
   });
@@ -275,7 +277,7 @@ describe('sample files', () => {
     }
     expect(mains.size).toBe(SAMPLE_APPS.length);
     expectValid(config);
-    // 导航栏满了以后，后面的样板的主页面放在首页的快捷入口里。
+    // After the navigation bar is full, subsequent sample main pages are placed in home screen quick entries.
     expect(config.nav.bar).toHaveLength(5);
   });
 
@@ -313,7 +315,7 @@ describe('sample files', () => {
 });
 
 describe('sample expense-helper', () => {
-  // 扫收据的样板：不带参数就只有通用规则，也不会问有没有记过（D-421、D-426）。
+  // Receipt scanner sample: without parameters it only applies general rules, and does not ask whether an expense was logged (D-421, D-426).
   it('its table reads attachments as receipts', () => {
     const base = fresh('en');
     const config = apply(base, ops('expense-helper', base, 'en'), 'en');
@@ -323,9 +325,10 @@ describe('sample expense-helper', () => {
 });
 
 describe('samples equal the v33 samples, migrated', () => {
-  // fixtures/v33/sample-<id>-zh.json：v33 代码给新用户（starter）套用样板的结果。
-  // 名片样板（D-423）、收据样板（D-437）是 v34 以后加的，没有 v33 的样子。
-  // 报销助手（D-425、D-427）多了打印带附件、导出 Excel，下面单独查。
+  // fixtures/v33/sample-<id>-zh.json: Results of applying samples to new users (starter) under v33
+  // code. Business card sample (D-423) and receipt sample (D-437) were added after v34 and do not
+  // have v33 counterparts. Expense claim assistant (D-425, D-427) has extra print with attachments
+  // and Excel export, checked separately below.
   it.each(
     SAMPLE_APPS.filter(
       (s) =>
@@ -334,7 +337,7 @@ describe('samples equal the v33 samples, migrated', () => {
   )('%s in zh', (sample) => {
     const before = fresh('zh');
     expect(apply(before, ops(sample, before, 'zh'), 'zh')).toEqual(
-      // 旧样板的文案写的是旧名字 Morph（D-435）；只比结构和其余内容，固定样本不改。
+      // Old sample copy uses the old name Morph (D-435); compared only for structure and remaining content, fixed samples are unchanged.
       JSON.parse(
         JSON.stringify(
           withStarterTheme(withScanKeep(fromV33(v33Fixture(`sample-${sample}-zh`)))),
@@ -367,7 +370,7 @@ describe('samples equal the v33 samples, migrated', () => {
     const config = structuredClone(apply(before, ops('expense-helper', before, 'zh'), 'zh'));
     const claims = config.data.tables.find((t) => t.prefillRules === 'receipt')!;
     delete claims.prefillRules;
-    // D-429：每笔单独选货币，所以多一个货币字段，饼图改成数笔数（不同货币不能加在一起）。
+    // D-429: Each entry selects its currency individually, so an extra currency field is added, and pie charts are changed to count entries (different currencies cannot be summed together).
     claims.fields = claims.fields.filter((f) => f.id !== 'currency');
     const amount = claims.fields.find((f) => f.id === 'amount')!;
     expect(amount).toMatchObject({ type: 'money', currency: 'CNY', currencyField: 'currency' });
@@ -466,7 +469,7 @@ describe('the business card sample (D-423)', () => {
         );
         expect(text).not.toContain('private');
       }
-      // 联系人多一个标签，别的一样。
+      // Contacts have an extra tags field, everything else is identical.
       expect(tables[0]!.fields.map((f) => f.id).filter((id) => id !== 'tags')).toEqual(
         tables[1]!.fields.map((f) => f.id),
       );
@@ -511,7 +514,7 @@ describe('the business card sample (D-423)', () => {
     ];
     expect(steps('scan-card')).toEqual(scan('contacts'));
     expect(steps('scan-my-card')).toEqual(scan('my-card'));
-    // 导出从联系人列表上点，列表把现在选出的记录交给第一步（D-428）。
+    // Export is triggered from the contacts list, passing currently selected records from the list to the first step (D-428).
     expect(steps('export-contacts')).toEqual([
       ['records.toVCard', undefined],
       ['out.share', undefined],
@@ -531,9 +534,9 @@ describe('the business card sample (D-423)', () => {
   });
 });
 
-describe('draftReceiptSample（新建表单页选了购物凭证，D-479）', () => {
+describe('draftReceiptSample (shopping voucher selected in new form page, D-479)', () => {
   it.each(LOCALES)(
-    '没改字段和表名：整套「收据」样板，建出来的表就是记录要放的表（%s）',
+    'Fields and table names unmodified: complete "Receipt" preset, the built table is the target table for records (%s)',
     (locale) => {
       const config = workspace(locale);
       const table = draftTable('purchase', config, locale);
@@ -544,7 +547,7 @@ describe('draftReceiptSample（新建表单页选了购物凭证，D-479）', ()
       expect(got!.table.id).toBe('receipts');
       expect(got!.table.name).toBe(sampleInfo('receipts', locale).name);
       expect(added.data.tables[0]!.prefillRules).toBe('receipt');
-      // 整套：列表页、开销页、扫描、语音记一笔（D-576）和导出三个快捷操作。
+      // Full suite: list page, expense page, scan, log an expense via voice (D-576), and export quick actions.
       expect(added.containers.pages.map((p) => p.id)).toEqual(
         expect.arrayContaining(['receipts', 'spending']),
       );
@@ -556,7 +559,7 @@ describe('draftReceiptSample（新建表单页选了购物凭证，D-479）', ()
     },
   );
 
-  it('金额的货币跟草稿（按文件上的符号定的，D-548）', () => {
+  it('Currency of amount matches the draft (determined by symbol on the file, D-548)', () => {
     const config = workspace('en');
     const table = withCurrency(draftTable('purchase', config, 'en'), 'MYR');
     const got = draftReceiptSample(table, 'purchase', config, 'en')!;
@@ -567,7 +570,7 @@ describe('draftReceiptSample（新建表单页选了购物凭证，D-479）', ()
     expect(money(got.table)).toEqual(['MYR']);
   });
 
-  it('已经有一张叫 receipts 的表：新表 ID 换掉，返回的表和建出来的一致', () => {
+  it('A table named receipts already exists: new table ID is remapped, returned table matches the created one', () => {
     const config = workspace('zh');
     const first = draftReceiptSample(
       draftTable('purchase', config, 'zh'),
@@ -582,7 +585,7 @@ describe('draftReceiptSample（新建表单页选了购物凭证，D-479）', ()
     expect(second.table.id).not.toBe('receipts');
   });
 
-  it('用户改过字段或表名、选的不是购物凭证、样板放不下：不用样板', () => {
+  it('User modified fields or table name, selected a non-voucher preset, or sample does not fit: do not use sample', () => {
     const config = workspace('zh');
     const table = draftTable('purchase', config, 'zh');
     expect(draftReceiptSample({ ...table, name: '我的小票' }, 'purchase', config, 'zh')).toBeNull();

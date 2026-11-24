@@ -16,10 +16,11 @@ import { GlassFill } from './GlassFill';
 import { Icon, UiIcon, type UiIconName } from './Icon';
 import { iconColors, onSurface, type Palette } from './theme';
 
-// Clay 风格的基础界面元素（对应 Docudis 的 clay_widgets）。配置渲染器和系统页面共用，
-// 所以主题里的颜色、字体、圆角和间距会作用到整个 App。
+// Clay-style basic UI elements (corresponding to Docudis clay_widgets). Shared by the config
+// renderer and system pages, so colors, fonts, border radii, and spacing in the theme apply across
+// the entire app.
 
-/** 卡片：主题圆角、柔和阴影（或描边），按下时轻微缩小。 */
+/** Card: theme border radius, soft shadow (or stroke), slight scale down when pressed. */
 export function Card({
   palette,
   children,
@@ -34,11 +35,11 @@ export function Card({
 }: {
   palette: Palette;
   children: ReactNode;
-  /** 图片背景（D-258）：有图片时铺在内容下面，代替底色（和毛玻璃）。 */
+  /** Image background (D-258): When present, rendered beneath the content, replacing the background color (and frosted glass). */
   backdrop?: Backdrop | undefined;
   accessibilityLabel?: string;
   onPress?: () => void;
-  /** 页面编辑：长按打开组件的操作面板（D-052）。 */
+  /** Page editing: Long press to open the component's action panel (D-052). */
   onLongPress?: () => void;
   disabled?: boolean;
   background?: string;
@@ -79,7 +80,7 @@ export function Card({
   );
 }
 
-/** 彩色图标块：三个圆角加一个较尖的左下角。 */
+/** Colored icon block: three rounded corners and one sharper bottom-left corner. */
 export function IconTile({
   palette,
   icon,
@@ -114,8 +115,8 @@ export function IconTile({
 }
 
 /**
- * 主按钮（52pt 高）、描边按钮和文字按钮；icon 显示在文字前面。
- * variant 为 icon 时只显示一个圆形图标，文字留给读屏（D-230）。
+ * Primary button (52pt high), outlined button, and text button; icon appears before the text.
+ * When variant is icon, displays only a circular icon, leaving text for screen readers (D-230).
  */
 export function Button({
   palette,
@@ -206,7 +207,7 @@ export function Button({
   );
 }
 
-/** 小号胶囊按钮；选中、单选、危险、图标共用同一套状态和无障碍语义。 */
+/** Small pill button; selected, radio, danger, and icon states share the same set of states and accessibility semantics. */
 export function Pill({
   palette,
   label,
@@ -225,7 +226,7 @@ export function Pill({
   testID?: string;
   selected?: boolean;
   disabled?: boolean;
-  /** 内核界面自己的图标（UiIcon），不是配置里的图标：那一套不认识的名字会被当成 emoji 原样画出来。 */
+  /** Kernel interface's own icons (UiIcon), not icons from the config: unrecognized names in that set are rendered as raw emojis. */
   icon?: UiIconName;
   radio?: boolean;
 }) {
@@ -270,7 +271,7 @@ export function Pill({
   );
 }
 
-/** 选记录的搜索输入；容器只决定外边距和底色。 */
+/** Search input for picking records; container determines only margins and background color. */
 export function SearchInput({
   palette,
   value,
@@ -310,7 +311,7 @@ export function SearchInput({
   );
 }
 
-/** 页面大标题（Sora 28）。 */
+/** Page large title (Sora 28). */
 export function PageTitle({ palette, children }: { palette: Palette; children: ReactNode }) {
   return (
     <Text
@@ -323,7 +324,7 @@ export function PageTitle({ palette, children }: { palette: Palette; children: R
   );
 }
 
-/** 大写的小节标题。 */
+/** Uppercase section title. */
 export function SectionLabel({ palette, children }: { palette: Palette; children: string }) {
   return (
     <Text
@@ -336,7 +337,7 @@ export function SectionLabel({ palette, children }: { palette: Palette; children
   );
 }
 
-/** 设置页等列表里的一行：图标块、标题、说明、右侧箭头。 */
+/** A row in lists like settings: icon block, title, description, right arrow. */
 export function ListRow({
   palette: pagePalette,
   icon,

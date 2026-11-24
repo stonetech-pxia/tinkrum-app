@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Palette } from '../../renderer/theme';
 
-// 本地操作界面的外框：标题、取消、完成。全屏显示在运行页面之上。
+// Outer frame of local operation interfaces: title, cancel, done. Displayed full-screen above the run page.
 
 export function LocalFrame({
   palette,
@@ -24,14 +24,14 @@ export function LocalFrame({
   onCancel: () => void;
   onDone: () => void;
   doneDisabled?: boolean;
-  /** 有输入框的界面（记一笔，D-187）：键盘弹出时「完成」跟着上移，不被挡住。 */
+  /** Interfaces with input fields (log an entry, D-187): when the keyboard pops up, "Done" moves up along with it so it is not blocked. */
   avoidKeyboard?: boolean;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   return (
     <KeyboardAvoidingView
-      // Android 是 edge-to-edge，窗口不会因为键盘变小：两边都留出键盘的高度。
+      // Android is edge-to-edge, so the window does not shrink due to the keyboard: both sides reserve the keyboard height.
       enabled={avoidKeyboard === true}
       behavior="padding"
       style={[styles.root, { backgroundColor: palette.background, paddingTop: insets.top }]}>
@@ -46,11 +46,11 @@ export function LocalFrame({
           style={[palette.font('title', 17), styles.title, { color: palette.text }]}>
           {title}
         </Text>
-        {/* 与「取消」对称占位，让标题居中。 */}
+        {/* Symmetric placeholder balancing the "Cancel" button to center the title. */}
         <View style={styles.side} />
       </View>
       <View style={styles.body}>{children}</View>
-      {/* 「完成」放在底部：单手好按，也不会被系统或开发菜单的按钮挡住。 */}
+      {/* Place "Done" at the bottom: easy to press with one hand, and unobstructed by system or developer menu buttons. */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <Pressable
           testID="local-done"

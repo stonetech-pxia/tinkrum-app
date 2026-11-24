@@ -5,20 +5,24 @@ import { Hono, type Context, type Next } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 
-// 模型转发（D-193）：App 发来系统提示词和对话，服务器加上 key、用自己选的模型转发给 Claude，原样返回。
-// 服务器不认识 schema、工具和提示词，App 怎么升级都不用改服务器；模型输出由 App 校验（§8）。
-// 因为提示词由 App 给，防滥用靠：只收规划要用的请求形状、按金额限额、不像计划的回复计分封设备，
-// 以及上架前的设备证明（P-024）。
-// 需求回收（D-189）：AI 做不到时，用户点「把这个需求告诉我们」才把那一句话发到 /v1/needs，存进 needs。
-// 测试期保存请求（D-240）：给了 requests 时，每次转发成功就把提示词、对话和回复存一条，用来找 AI 理解错的句子。
+// Model relay (D-193): App sends system prompt and conversation, server attaches key and relays to
+// Claude using its own chosen model, returning the response as-is. The server is agnostic to
+// schemas, tools, and prompts, allowing the app to upgrade without server changes; model output is
+// validated by the app (§8). Since prompts are provided by the app, abuse prevention relies on:
+// accepting only request shapes required for planning, rate limiting by amount, penalizing/banning
+// devices for non-plan-like responses, and pre-release device attestation (P-024). Feature requests
+// (D-189): when AI fails, user tapping "Tell us about this feature" sends that single sentence to
+// /v1/needs, storing it in needs. Test-period request saving (D-240): when requests is provided,
+// every successful relay saves the prompt, conversation, and response to debug sentences
+// misunderstood by the AI.
 
-/** 转发一次：只有系统提示词和对话，其余参数（模型、输出上限、思考力度）由服务器决定。 */
+/** Single relay: contains only system prompt and conversation; all other parameters (model, max output tokens, thinking effort) are determined by the server. */
 export type Relay = (request: {
   system: string;
   messages: PlannerMessage[];
 }) => Promise<Completion>;
 
-/** 美元 / 百万 token。缓存写入按输入价格的 1.25 倍算。 */
+/** USD / million tokens. Cache writes are billed at 1.25x the input price. */
 export interface Price {
   input: number;
   output: number;
@@ -26,35 +30,35 @@ export interface Price {
 }
 
 export interface ServerOptions {
-  /** 没配置 ANTHROPIC_API_KEY 时为 null，/v1/complete 返回 503。 */
+  /** Null when ANTHROPIC_API_KEY is not configured, causing /v1/complete to return 503. */
   relay: Relay | null;
   model: string | null;
   price: Price;
-  /** 每台设备每分钟最多请求数（防止误操作或循环快速耗尽额度）。 */
+  /** Maximum requests per device per minute (prevents accidental or rapid-loop quota exhaustion). */
   perMinuteLimit: number;
-  /** 每台设备每天最多花多少美元。 */
+  /** Maximum USD spend per device per day. */
   deviceDailyUsd: number;
-  /** 所有设备合计每天最多花多少美元。令牌和设备 id 都能伪造，这才是费用的真正上限（D-132）。 */
+  /** Maximum total USD spend across all devices per day. Since tokens and device IDs can be forged, this is the true spending cap (D-132). */
   globalDailyUsd: number;
-  /** 一台设备一天里有这么多次回复不像修改计划，当天就不再给它转发。 */
+  /** Number of times a device gives a non-plan-like response in a day before relays are stopped for that day. */
   offPlanLimit: number;
-  /** 设置后，请求必须带 x-morph-client 头。登录鉴权上线前的临时防护（D-132）。 */
+  /** When set, requests must include the x-morph-client header. Temporary protection before login authentication goes live (D-132). */
   clientToken?: string;
-  /** 一次转发模型最多输出多少 token（和 relay 的 max_tokens 一致）；在途请求按它预留费用，默认 16000。 */
+  /** Maximum output tokens per relay response (matches relay max_tokens); reserved for in-flight requests, defaulting to 16000. */
   maxOutputTokens?: number;
   now?: () => number;
   log?: (entry: Record<string, unknown>) => void;
-  /** 需求回收（D-189）：保存用户主动发来的需求；不给时 /v1/needs 返回 503。 */
+  /** Feature requests (D-189): stores user-submitted feature requests; when absent, /v1/needs returns 503. */
   needs?: NeedStore;
-  /** 每台设备每天最多发几条需求。 */
+  /** Maximum feature requests per device per day. */
   needsPerDeviceLimit?: number;
-  /** 所有设备合计每天最多收几条需求。 */
+  /** Maximum total feature requests accepted across all devices per day. */
   needsDailyLimit?: number;
-  /** 测试期保存请求（D-240）：不给时不保存。 */
+  /** Test-period request saving (D-240): when absent, requests are not saved. */
   requests?: RequestStore;
 }
 
-/** 一次转发成功的请求：设备 id 只存哈希（和日志一样），不存原始 id 和 IP。 */
+/** A successful relayed request: device ID stores only a hash (like logs), without raw ID or IP. */
 export interface RequestEntry {
   at: string;
   device: string;
@@ -78,7 +82,7 @@ export interface NeedEntry {
   text: string;
   locale: 'en' | 'zh' | 'fr';
   reason: string;
-  /** 用的是哪种 AI：mock（内置规则）、server、byok。内置规则听不懂的句子很多是规则本身的限制。 */
+  /** AI type used: mock (built-in rules), server, byok. Many sentences misunderstood by built-in rules are due to rule limitations. */
   ai?: string | undefined;
   platform?: string | undefined;
   appVersion?: string | undefined;
@@ -100,9 +104,11 @@ const NeedRequestSchema = z.strictObject({
     .optional(),
 });
 
-// 只收规划要用的形状：第一次请求，或「请求、模型回复、修正」三条。用户消息只能是文字（不收图片、文件），
-// 模型回复只能是它自己返回的文字和思考块。客户端不能指定模型、工具或任何其他参数。
-// 大配置（D7）：配置连同指令放在用户消息里。上限按字符算，下面的 bodyLimit 按字节算。
+// Accepts only shapes required for planning: initial request, or a sequence of three ("request,
+// model response, correction"). User messages must be text only (no images or files), and model
+// responses must be its own returned text and thinking blocks. Clients cannot specify models,
+// tools, or any other parameters. Large configs (D7): config is included in user messages along
+// with instructions. Limits are character-based, whereas bodyLimit below is byte-based.
 const MAX_USER_MESSAGE = 128_000;
 const UserMessage = z.strictObject({
   role: z.literal('user'),
@@ -133,7 +139,7 @@ const CompleteRequestSchema = z.strictObject({
   ]),
 });
 
-/** 回复像不像一个修改计划：带字符串 kind 的 JSON 对象。和 Plan 的版本无关，只用来给滥用计分。 */
+/** Checks whether a response resembles a modification plan: a JSON object with a string kind field. Independent of Plan versions, used solely for abuse scoring. */
 export function looksLikePlan(text: string): boolean {
   const trimmed = text
     .trim()
@@ -158,7 +164,7 @@ export const costOf = (usage: Completion['usage'], price: Price) =>
     usage.outputTokens * price.output) /
   1_000_000;
 
-// App 首次使用时生成的随机 id，只用于按设备限额。
+// Random ID generated on first app use, used solely for per-device rate limiting.
 const DEVICE_ID = /^[A-Za-z0-9-]{8,64}$/;
 const PLATFORM = /^(ios|android)$/;
 const APP_VERSION = /^[0-9A-Za-z.+-]{1,32}$/;
@@ -167,9 +173,9 @@ const digest = (value: string) => createHash('sha256').update(value).digest();
 
 interface DeviceUsage {
   recent: number[];
-  /** 当天已经花的（模型返回后按实际用量结算）。 */
+  /** Amount spent today (settled by actual usage after model response). */
   usd: number;
-  /** 在途请求预留的、还没结算的。 */
+  /** Reserved and unsettled amount for in-flight requests. */
   reserved: number;
   offPlan: number;
 }
@@ -185,10 +191,12 @@ export function createApp(options: ServerOptions) {
   const now = options.now ?? Date.now;
   const log = options.log ?? ((entry) => console.log(JSON.stringify(entry)));
   const tokenDigest = options.clientToken ? digest(options.clientToken) : null;
-  // 每台设备最近一分钟的请求时间、当天花的钱（含在途请求预留的）和不像计划的回复数；只记录转发过的请求，所以大小有上限。
-  // 一天一份：跨天时换新的，前一天还在途的请求按它开始时的那天结算，不记到新的一天。
+  // Each device's recent request timestamps, daily spend (including reserved amounts for in-flight
+  // requests), and non-plan-like response counts; records only relayed requests, so size is
+  // bounded. One entry per day: rolls over at date change, while prior-day in-flight requests
+  // settle against their start day and are not charged to the new day.
   let today = newDay(new Date(now()).toDateString());
-  /** 过了零点就换新的一天。 */
+  /** Switches to a new day past midnight. */
   const dayNow = (t: number) => {
     const name = new Date(t).toDateString();
     if (name !== today.name) today = newDay(name);
@@ -196,10 +204,12 @@ export function createApp(options: ServerOptions) {
   };
   const maxOutputTokens = options.maxOutputTokens ?? 16_000;
   /**
-   * 准入：检查限额，通过就登记（分钟计数、预留费用）。检查和登记之间不能有 await——
-   * 并发的请求才不会都在「还没花钱」时通过（R03）。reserve 为 null 时只检查、不登记。
-   * 费用上限按「已花 + 在途预留」判断：在途的请求最多花多少先预留，做完按实际结算；
-   * 只要还没到上限就放行，所以最多超出一次请求的费用。
+   * Admission control: checks limits and registers if passed (minute count, reserved cost). Must
+   * be no await between check and registration to ensure concurrent requests do not pass while
+   * "no money spent" holds (R03). When reserve is null, checks only without registering. Spend
+   * cap evaluated against "spent + in-flight reserved": maximum potential cost of in-flight
+   * requests is reserved upfront and settled post-execution; requests are admitted as long as the
+   * cap is not reached, allowing at most one request's cost to exceed the limit.
    */
   function admit(
     key: string,
@@ -239,7 +249,7 @@ export function createApp(options: ServerOptions) {
     await next();
   };
 
-  // 需求的计数：只按设备 id 限次数，不写进存储。
+  // Request counts: rate-limited strictly by device ID without persistent storage.
   let needDay = new Date(now()).toDateString();
   let needCount = 0;
   let needDevices = new Map<string, number>();
@@ -287,8 +297,9 @@ export function createApp(options: ServerOptions) {
   app.post(
     '/v1/complete',
     requireClient,
-    // 全是中文时（UTF-8 每字 3 字节）：提示词 192k + 两条用户消息 128k + 模型回复 64k = 512k 字 ≈ 1.5 MiB，
-    // 再留些给 JSON 转义和思考块。
+    // When entirely in Chinese (3 bytes per character in UTF-8): prompt 192k + two user messages
+    // 128k + model response 64k = 512k characters ≈ 1.5 MiB, leaving margin for JSON escaping and
+    // thinking blocks.
     bodyLimit({
       maxSize: 2 * 1024 * 1024,
       onError: (c) => c.json({ error: 'payload_too_large' }, 413),
@@ -300,15 +311,16 @@ export function createApp(options: ServerOptions) {
         return c.json({ error: 'bad_request' }, 400);
       const t = now();
       const key = deviceHeader ?? 'unknown';
-      // 先便宜地查一遍（被拒绝的请求不用再解析请求体），解析之后再准入一次：
-      // 解析要 await，这期间别的请求可能已经把额度用完了。
+      // Perform an inexpensive preliminary check first (rejected requests bypass request body
+      // parsing), followed by a second admission check after parsing: parsing requires await,
+      // during which other requests might exhaust the quota.
       const early = admit(key, t, null);
       if (!early.ok) return c.json({ error: early.error }, early.status);
 
       const body = CompleteRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!body.success) return c.json({ error: 'bad_request' }, 400);
 
-      // 预留：输入按 UTF-8 字节数的一半估 token（偏多），输出按上限；缓存写入贵 25%，也算进去。
+      // Reservation: inputs estimated at half of UTF-8 byte count for tokens (conservative), outputs at max; cache writes cost 25% more and are included.
       const inputBytes =
         Buffer.byteLength(body.data.system) +
         body.data.messages.reduce((n, m) => n + Buffer.byteLength(JSON.stringify(m.content)), 0);
@@ -324,7 +336,7 @@ export function createApp(options: ServerOptions) {
       const admitted = admit(key, now(), reserve);
       if (!admitted.ok) return c.json({ error: admitted.error }, admitted.status);
       const { day, device } = admitted;
-      // 结算：预留的还回去，实际花的记上。记在准入时那一天（跨天了也不记到新的一天）；只结算一次。
+      // Settlement: reserved amount is refunded and actual spend is recorded. Logged to the day of admission (cross-day transitions do not spill over to the new day); settled exactly once.
       let open = true;
       const close = (usd: number) => {
         if (!open) return;
@@ -343,7 +355,7 @@ export function createApp(options: ServerOptions) {
         const deviceHash = digest(key).toString('hex').slice(0, 8);
         const round = body.data.messages.length === 1 ? 1 : 2;
         if (options.requests) {
-          // 平台和版本格式不对就不存，不拒绝请求；保存失败只记日志，照常返回回复。
+          // Invalid platform and version formats are not saved but do not reject requests; save failures are logged while responses return normally.
           const platform = c.req.header('x-morph-platform');
           const appVersion = c.req.header('x-morph-version');
           await options.requests
@@ -362,7 +374,7 @@ export function createApp(options: ServerOptions) {
             })
             .catch((e: unknown) => log({ event: 'request_store_error', error: String(e) }));
         }
-        // 日志只记录元数据，不记录提示词、用户输入或回复；设备 id 只记哈希前 8 位。
+        // Logs record metadata only, excluding prompts, user inputs, or responses; device IDs store only the first 8 characters of their hash.
         log({
           event: 'complete',
           device: deviceHash,

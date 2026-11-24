@@ -13,7 +13,7 @@ import {
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { createWorkspaceStore, type WorkspaceStore } from '../workspace/store';
 
-// 大工程步骤化（D-415）和工具清单（D-414）。用假的 planner，不发真实请求。
+// Large engineering step-by-step (D-415) and tool inventory (D-414). Uses fake planner without sending real requests.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -87,13 +87,13 @@ const SCRIPT: Record<string, Plan> = {
   '搭建读书 App': { kind: 'build', summary: '一个读书 App', steps: [...STEPS] },
 };
 
-/** planFails：这些句子第一次抛错。 */
+/** planFails: these sentences throw an error on the first attempt. */
 function setup(
   options: {
     repo?: MemoryWorkspaceRepo;
     fails?: string[];
     script?: Record<string, Plan>;
-    /** 「把这些补上」发出去的请求回什么。 */
+    /** What the request sent for "fix these" returns. */
     fixPlan?: Plan;
   } = {},
 ) {
@@ -133,8 +133,8 @@ const statuses = (store: WorkspaceStore) => store.getState().build?.steps.map((s
 const planned = (store: WorkspaceStore) =>
   store.getState().draft?.steps.at(-1)?.config ?? store.getState().config!;
 
-describe('大工程先出计划', () => {
-  it('前一步把后一步也做了：这一步打勾但记下「前面已经做好了」，不算失败，全程结果照常', async () => {
+describe('Large projects generate a plan first', () => {
+  it('Previous step also completed the subsequent step: this step is checked off but records "previously completed", not a failure, overall result proceeds normally', async () => {
     const { store } = await booted({
       script: {
         放书单列表: {
@@ -154,7 +154,7 @@ describe('大工程先出计划', () => {
     expect(steps.filter((s) => s.already)).toHaveLength(1);
   });
 
-  it('新用户说大工程：看到计划，什么都没改，点「开始」才调模型（底线 16）', async () => {
+  it('New user discusses large project: sees plan, nothing modified, tapping "Start" invokes the model (invariant 16)', async () => {
     const { store, calls } = await booted();
     const headId = store.getState().head!.id;
     expect(await store.getState().change('搭建读书 App')).toEqual({ kind: 'build' });
@@ -164,7 +164,7 @@ describe('大工程先出计划', () => {
     expect(store.getState().session.items).toEqual([]);
   });
 
-  it('删掉一步再开始：那一步不做', async () => {
+  it('Delete a step before starting: that step is not executed', async () => {
     const { store, calls } = await booted();
     await store.getState().change('搭建读书 App');
     await store.getState().removeBuildStep('remind');
@@ -179,7 +179,7 @@ describe('大工程先出计划', () => {
     expect(remindersOf(store.getState().config!)).toEqual([]);
   });
 
-  it('步骤被删光：计划没了，不能开始', async () => {
+  it('Steps deleted entirely: plan is gone, cannot start', async () => {
     const { store, calls } = await booted();
     await store.getState().change('搭建读书 App');
     for (const s of STEPS) await store.getState().removeBuildStep(s.id);
@@ -188,13 +188,13 @@ describe('大工程先出计划', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('小改不出计划', async () => {
+  it('Small modifications do not generate a plan', async () => {
     const { store } = await booted();
     expect(await store.getState().change('主题换成绿色')).toMatchObject({ kind: 'drafted' });
     expect(store.getState().build).toBeNull();
   });
 
-  it('在草稿聊天框里说大工程也一样出计划', async () => {
+  it('Discussing large projects in the draft chat box also generates a plan', async () => {
     const { store } = await booted();
     await store.getState().change('主题换成绿色');
     expect(await store.getState().draftChange('搭建读书 App')).toEqual({ kind: 'build' });
@@ -202,8 +202,8 @@ describe('大工程先出计划', () => {
   });
 });
 
-describe('一步一步做', () => {
-  it('功能直接生效，外观进草稿（底线 7）；每步一次调用，带清单和步骤位置', async () => {
+describe('Step-by-step execution', () => {
+  it('Features take effect immediately, appearance enters draft (invariant 7); one call per step, with inventory and step position', async () => {
     const { store, calls } = await booted();
     await store.getState().change('搭建读书 App');
     await store.getState().startBuild();
@@ -211,10 +211,10 @@ describe('一步一步做', () => {
     expect(statuses(store)).toEqual(['done', 'done', 'done', 'done']);
 
     const { config, draft } = store.getState();
-    // 功能进了正式版本。
+    // Feature entered the official version.
     expect(config!.data.tables.some((t) => t.id === 'books')).toBe(true);
     expect(remindersOf(config!).map((r) => r.id)).toEqual(['read']);
-    // 外观还在草稿里，没有打开，等用户看。
+    // Appearance is still in draft, not opened yet, waiting for user review.
     expect(config!.theme.primaryColor).not.toBe('#2F9E44');
     expect(draft).toMatchObject({ open: false });
     expect(draft!.steps.map((s) => s.input)).toEqual(['放书单列表', '主题换成绿色']);
@@ -228,19 +228,19 @@ describe('一步一步做', () => {
       { index: 4, total: 4, remaining: 0 },
     ]);
     expect(steps[0]!.ctx.session!.goal).toBe('一个读书 App');
-    // 第二步看得到上一步做好的表。
+    // Second step can see the table created in the previous step.
     expect(steps[1]!.ctx.config.data.tables.some((t) => t.id === 'books')).toBe(true);
-    // 正在做的不用再列一遍，后面的都在。
+    // Ongoing items are not listed again, subsequent ones are present.
     expect(steps[1]!.ctx.session!.open.map((i) => i.text)).toEqual([
       '每天提醒看书',
       '主题换成绿色',
     ]);
-    // 不弹一串「已改好 · 撤销」。
+    // Do not pop up a series of "Modified · Undo".
     await store.getState().markRendered(store.getState().head!.id);
     expect(store.getState().banner).toBeNull();
   });
 
-  it('全部结束后整体检查：工具都能用，清单全做好；应用草稿走现有确认', async () => {
+  it('Overall check after completion: all tools usable, inventory fully completed; app draft goes through standard confirmation', async () => {
     const { store } = await booted();
     await store.getState().change('搭建读书 App');
     await store.getState().startBuild();
@@ -255,7 +255,7 @@ describe('一步一步做', () => {
     expect(store.getState().build).toBeNull();
   });
 
-  it('8 步也能走完', async () => {
+  it('Can also complete 8 steps', async () => {
     const steps = Array.from({ length: 8 }, (_, i) => ({
       id: `s${i}`,
       kind: 'record' as const,
@@ -271,7 +271,7 @@ describe('一步一步做', () => {
     expect(store.getState().config!.data.tables).toHaveLength(8);
   });
 
-  it('一步里功能做完还剩外观（next）：同一步接着做，不用用户再点', async () => {
+  it('Feature completion in a step leaves appearance remaining (next): continue in the same step without requiring user to tap again', async () => {
     const script: Record<string, Plan> = {
       建书单表: { ...table('books'), next: '放书单列表' } as Plan,
     };
@@ -285,11 +285,11 @@ describe('一步一步做', () => {
   });
 });
 
-describe('一步的计划里功能和外观都有（D-419）', () => {
+describe('Both feature and appearance are present in the step plan (D-419)', () => {
   const opsOf = (plan: Plan) => (plan.kind === 'ops' ? plan.ops : []);
   const both: Plan = { kind: 'ops', ops: [...opsOf(table('books')), ...opsOf(page('books'))] };
 
-  it('外观进草稿不打开，不多问模型，做完了「看看外观」', async () => {
+  it('Appearance enters draft without opening, without querying the model extra, completes "view appearance"', async () => {
     const { store, calls } = await booted({ script: { 建书单表: both } });
     await store.getState().change('搭建读书 App');
     await store.getState().removeBuildStep('page');
@@ -305,7 +305,7 @@ describe('一步的计划里功能和外观都有（D-419）', () => {
     expect(draft).toMatchObject({ open: false });
     expect(draft!.steps).toHaveLength(1);
     expect(banner).toBeNull();
-    // 结束时的整体检查看的是含草稿的样子：表有入口，这一步做好了。
+    // Overall check at the end sees the draft-included state: table has an entry point, this step is successfully completed.
     expect(openItems(store.getState().session)).toEqual([]);
     expect(store.getState().session.items.find((i) => i.id === 'b-data')!.status).toBe('done');
 
@@ -318,8 +318,8 @@ describe('一步的计划里功能和外观都有（D-419）', () => {
   });
 });
 
-describe('一步失败', () => {
-  it('模型失败就停下，已做的留着；重试接着做', async () => {
+describe('Step failure', () => {
+  it('Stop when model fails, keep completed work; retry to continue', async () => {
     const { store } = await booted({ fails: ['放书单列表'] });
     await store.getState().change('搭建读书 App');
     await store.getState().startBuild();
@@ -336,7 +336,7 @@ describe('一步失败', () => {
     expect(openItems(store.getState().session)).toEqual([]);
   });
 
-  it('不合法就停下；跳过接着做后面的', async () => {
+  it('Stop when invalid; skip and continue with subsequent ones', async () => {
     const script: Record<string, Plan> = {
       每天提醒看书: {
         kind: 'ops',
@@ -356,7 +356,7 @@ describe('一步失败', () => {
     );
   });
 
-  it('仍有 blocker 就停下，说明原因（最后一步没有后面的步骤放过它）', async () => {
+  it('Stop if blockers remain, explain reasons (the last step is exempted as there are no subsequent steps)', async () => {
     const script: Record<string, Plan> = {
       只有按钮: {
         kind: 'ops',
@@ -378,7 +378,7 @@ describe('一步失败', () => {
     expect(store.getState().build!.steps[1]!.reason).toContain('books');
   });
 
-  it('要用到草稿里的页面：卡住，点「应用草稿并继续」才确认草稿（底线 7）', async () => {
+  it('Requires using pages in the draft: stalls, tapping "Apply draft and continue" confirms the draft (invariant 7)', async () => {
     const script: Record<string, Plan> = {
       放书单列表: {
         kind: 'ops',
@@ -427,7 +427,7 @@ describe('一步失败', () => {
     expect(remindersOf(store.getState().config!).map((r) => r.id)).toEqual(['read']);
   });
 
-  it('模型在一步里又回计划或撤销：算这一步失败，不会连着开新计划', async () => {
+  it('Model returns to plan or undo within a step: counts as step failure, does not initiate a new plan consecutively', async () => {
     const script: Record<string, Plan> = {
       放书单列表: { kind: 'build', summary: '又一份', steps: [...STEPS] },
       每天提醒看书: { kind: 'restorePrevious' },
@@ -443,8 +443,8 @@ describe('一步失败', () => {
   });
 });
 
-describe('停止和继续', () => {
-  it('中途停止：模型回来了也不应用，做好的留着；继续从这一步接着做', async () => {
+describe('Stop and continue', () => {
+  it('Stop midway: do not apply even if model returns, keep completed work; resume from this step', async () => {
     const { store, hooks } = await booted();
     await store.getState().change('搭建读书 App');
     hooks.before = async (input) => {
@@ -461,12 +461,12 @@ describe('停止和继续', () => {
     expect(statuses(store)).toEqual(['done', 'done', 'done', 'done']);
   });
 
-  it('重启后不自动继续（底线 16）：一次模型都不调，停在没做完的步骤，用户点了才接着做', async () => {
+  it('No automatic continuation after restart (invariant 16): zero model calls, halts at unfinished step, resumes only when user taps', async () => {
     const repo = new MemoryWorkspaceRepo();
     const first = await booted({ repo });
     await first.store.getState().change('搭建读书 App');
     first.hooks.before = async (input) => {
-      // 第二步做到一半进程没了：不让这一轮结束。
+      // Process terminated halfway through step 2: prevent this round from ending.
       if (input === '放书单列表') await new Promise(() => {});
     };
     void first.store.getState().startBuild();
@@ -484,7 +484,7 @@ describe('停止和继续', () => {
     expect(again.calls.map((c) => c.input)).toEqual(['放书单列表', '每天提醒看书', '主题换成绿色']);
   });
 
-  it('停下后结束：做好的留着，没做的留在清单里', async () => {
+  it('Finish after stopping: keep completed work, leave uncompleted in the inventory', async () => {
     const { store } = await booted({ fails: ['放书单列表'] });
     await store.getState().change('搭建读书 App');
     await store.getState().startBuild();
@@ -500,7 +500,7 @@ describe('停止和继续', () => {
     ]);
   });
 
-  it('计划看到一半重启：计划还在，没有开始', async () => {
+  it('Restart while viewing plan: plan remains, not started', async () => {
     const repo = new MemoryWorkspaceRepo();
     const first = await booted({ repo });
     await first.store.getState().change('搭建读书 App');
@@ -510,8 +510,8 @@ describe('停止和继续', () => {
   });
 });
 
-describe('工具清单（D-414）', () => {
-  it('不在草稿聊天框里也带上之前说过的话和还差的项', async () => {
+describe('Tool inventory (D-414)', () => {
+  it('Include previously discussed utterances and remaining items even outside the draft chat box', async () => {
     const script: Record<string, Plan> = {
       建书单表: { ...table('books'), next: '放书单列表' } as Plan,
     };
@@ -523,7 +523,7 @@ describe('工具清单（D-414）', () => {
     expect(session.open).toEqual([{ kind: 'look', text: '放书单列表', status: 'todo' }]);
   });
 
-  it('随 App 重启保留；清空后不再发', async () => {
+  it('Retained across app restarts; no longer sent after clearing', async () => {
     const repo = new MemoryWorkspaceRepo();
     const first = await booted({ repo });
     await first.store.getState().change('建书单表');
@@ -539,7 +539,7 @@ describe('工具清单（D-414）', () => {
     expect(third.store.getState().session.said.map((s) => s.input)).toEqual(['每天提醒看书']);
   });
 
-  it('新用户、旧版 App 没有清单：空的，照常用；旧草稿里说过的话接过来', async () => {
+  it('New users, old app versions without inventory: empty, used as usual; carry over utterances from old drafts', async () => {
     const fresh = await booted();
     expect(fresh.store.getState().session).toEqual({ items: [], said: [] });
 
@@ -552,7 +552,7 @@ describe('工具清单（D-414）', () => {
     expect(again.store.getState().session.items).toEqual([]);
   });
 
-  it('存坏了也当空的', async () => {
+  it('Corrupted storage treated as empty', async () => {
     const repo = new MemoryWorkspaceRepo();
     await repo.setMeta('session', '{broken');
     await repo.setMeta('build', '{broken');
@@ -562,7 +562,7 @@ describe('工具清单（D-414）', () => {
     expect(store.getState().build).toBeNull();
   });
 
-  it('模型说做了也没用：还有 blocker 就是 failed，补上后代码判定做好', async () => {
+  it('Model claiming completion is ineffective: remaining blockers mean failed, code determines completion after fix', async () => {
     const script: Record<string, Plan> = {
       只有按钮: {
         kind: 'ops',
@@ -579,13 +579,13 @@ describe('工具清单（D-414）', () => {
     const item = store.getState().session.items[1]!;
     expect(item).toMatchObject({ text: '只有按钮', status: 'failed' });
     expect(item.reason).toContain('books');
-    // 列表进了草稿：也算改完之后看到的样子。
+    // List entered draft: also counts as the state seen after modification.
     await store.getState().draftChange('加列表');
     expect(openItems(store.getState().session)).toEqual([]);
     expect(store.getState().session.items[1]!.reason).toBeUndefined();
   });
 
-  it('撤销之后：那句话告诉模型没做，清单不算做了', async () => {
+  it('After undo: inform model that the utterance was not executed, inventory item counts as incomplete', async () => {
     const { store, calls } = await booted();
     await store.getState().change('每天提醒看书');
     await store.getState().markRendered(store.getState().head!.id);
@@ -598,7 +598,7 @@ describe('工具清单（D-414）', () => {
     expect(store.getState().session.items[0]!.status).toBe('skipped');
   });
 
-  it('草稿退一步、删草稿：那句不算说过', async () => {
+  it('Draft step back, discard draft: that utterance no longer counts as said', async () => {
     const { store } = await booted();
     await store.getState().change('主题换成绿色');
     await store.getState().deleteDraft();
@@ -607,8 +607,8 @@ describe('工具清单（D-414）', () => {
   });
 });
 
-describe('把这些补上（D-418）', () => {
-  /** 有添加按钮、没有地方看的表：books 用不了。 */
+describe('Fix these (D-418)', () => {
+  /** Table with add button but nowhere to view: books cannot be used. */
   const addOnly = (id: string): Plan => ({
     kind: 'ops',
     ops: [(page(id) as Extract<Plan, { kind: 'ops' }>).ops[0]!],
@@ -622,7 +622,7 @@ describe('把这些补上（D-418）', () => {
     const s = store.getState();
     return sessionProblems(s.session, planned(store), registry);
   };
-  it('没有问题：不发请求', async () => {
+  it('No issues: do not send request', async () => {
     const { store, calls } = await booted();
     await store.getState().change('主题换成绿色');
     const count = calls.length;
@@ -630,7 +630,7 @@ describe('把这些补上（D-418）', () => {
     expect(calls).toHaveLength(count);
   });
 
-  it('点一次发一次请求：模型看到英文的问题，用户记录里是自己的语言，不多一项清单', async () => {
+  it('Send request per tap: model sees English issue, user records are in their own language, inventory count does not increase', async () => {
     const t = await booted({
       fixPlan: listOnly('books'),
       script: { 建书单表: table('books'), 放添加按钮: addOnly('books') },
@@ -648,13 +648,13 @@ describe('把这些补上（D-418）', () => {
     expect(store.getState().session.said.at(-1)!.input).toBe('把这些补上');
     expect(store.getState().session.items).toHaveLength(items);
     expect(store.getState().draft!.steps.at(-1)!.input).toBe('把这些补上');
-    // 外观进草稿（底线 7）：正式版本还没变，草稿里问题没了。
+    // Appearance entered draft (invariant 7): official version unchanged, issue resolved in draft.
     expect(problems(store)).toEqual([]);
     expect(await store.getState().fixProblems()).toBeNull();
     expect(calls).toHaveLength(count + 1);
   });
 
-  it('功能修改直接生效，能撤销（底线 7）', async () => {
+  it('Feature modifications take effect immediately, undoable (invariant 7)', async () => {
     const { store } = await booted({
       fixPlan: table('films'),
       script: { 建书单表: table('books'), 放添加按钮: addOnly('books') },
@@ -667,7 +667,7 @@ describe('把这些补上（D-418）', () => {
     expect(store.getState().config!.data.tables.map((x) => x.id)).toContain('films');
   });
 
-  it('问题还在：可以再点；不自动循环', async () => {
+  it('Issues remain: can tap again; no automatic looping', async () => {
     const t = await booted({
       fixPlan: green,
       script: { 建书单表: table('books'), 放添加按钮: addOnly('books') },
@@ -683,7 +683,7 @@ describe('把这些补上（D-418）', () => {
     expect(calls).toHaveLength(count + 2);
   });
 
-  it('模型拒绝：什么都没改，还能再点，不多一项清单', async () => {
+  it('Model rejection: nothing changed, can tap again, inventory count does not increase', async () => {
     const { store } = await booted({
       fixPlan: { kind: 'reject', reason: 'unknown', message: '不会', examples: [] },
       script: { 建书单表: table('books'), 放添加按钮: addOnly('books') },
@@ -696,7 +696,7 @@ describe('把这些补上（D-418）', () => {
     expect(problems(store)).not.toEqual([]);
   });
 
-  it('会话开始前就有的问题不算；别的会话也不算', async () => {
+  it('Issues existing before session start are ignored; other sessions are also ignored', async () => {
     const repo = new MemoryWorkspaceRepo();
     const first = await booted({
       repo,
@@ -715,7 +715,7 @@ describe('把这些补上（D-418）', () => {
     expect(calls).toHaveLength(count);
   });
 
-  it('草稿里的问题也算：草稿拿掉列表，正式版本还好好的', async () => {
+  it('Issues in draft also count: remove list from draft, official version remains intact', async () => {
     const remove: Plan = {
       kind: 'ops',
       ops: [{ op: 'removeContainer', page: 'home', block: 'books-list' }],
@@ -739,7 +739,7 @@ describe('把这些补上（D-418）', () => {
     expect(problems(store).map((i) => i.target)).toEqual(['table:books']);
   });
 
-  it('重启后起点还在', async () => {
+  it('Starting point remains after restart', async () => {
     const repo = new MemoryWorkspaceRepo();
     const a = await booted({
       repo,

@@ -49,7 +49,7 @@ const TOOL_LABEL = {
   mosaic: 'annotateMosaic',
 } as const;
 
-/** 文字框的大小（原图点），预览、点选、导出用同一个排版。 */
+/** Text box size (original image points); preview, tapping, and export use the same layout. */
 const measure: Measure = (text, fontSize) => {
   const { width, height } = textLayout(text, fontSize);
   return { width, height };
@@ -115,7 +115,7 @@ export function AnnotateScreen({
       selected: null,
     }),
   );
-  // 这一页认出的行（原图点）：新写的字照最近的一行定字号。只在本机认、只在用文字工具时认，不存不发。
+  // Lines recognized on this page (original image points): newly written text determines font size based on the nearest line. Recognized locally only, exclusively while using the text tool, and neither stored nor sent.
   const textTool = state.tool === 'text' || state.tool === 'note';
   const pageLines = state.lines?.[state.index];
   useEffect(() => {
@@ -163,8 +163,9 @@ export function AnnotateScreen({
       cancelLabel={t(locale, 'cancel')}
       doneLabel={t(locale, last ? 'localDone' : 'localNext')}
       onCancel={onCancel}
-      // 弹键盘时不把页面挤小：唯一的输入框在最上面，键盘盖住的是页面下半截（2026-11-09 用户测试：
-      // 页面一缩、整屏重排，正在打的字丢了）。
+      // Keep the page from shrinking when the keyboard pops up: the sole input field is at the top,
+      // and the keyboard covers the lower half of the page (2026-11-09 user testing: when the page
+      // shrank and the entire screen re-rendered, the text currently being typed was lost).
       onDone={() => (last ? onDone(state.marks) : dispatch({ type: 'next' }))}>
       <ScrollView
         horizontal
@@ -219,8 +220,10 @@ export function AnnotateScreen({
         </View>
       )}
       {textTool ? (
-        // 只有这一个输入框：没选中时写要放的字，选中时改选中的那段。不用 value 控制（屏幕重画时不会把正在打的字
-        // 改回旧的），换了选中的那段就换一个输入框（key）显示它的字。
+        // Only this single input field: when unselected, it specifies text to be added; when
+        // selected, it edits the selected segment. Controlled without value prop (prevents screen
+        // re-renders from reverting currently typed text to old values); changing the selected
+        // segment switches the input field (key) displaying its text.
         <TextInput
           key={selected ? `mark-${state.index}-${state.selected}` : `draft-${state.index}`}
           testID="annotate-text"
@@ -328,7 +331,7 @@ export function AnnotateScreen({
         ) : null}
       </View>
       {textTool ? (
-        // 样式区一直占着位置（没选中时点不了）：放好一段字时页面不会被挤小、挪位置。
+        // The style area permanently occupies space (unclickable when unselected): placing a text segment does not cause the page to shrink or shift positions.
         <View
           testID="annotate-style"
           pointerEvents={selected ? 'auto' : 'none'}

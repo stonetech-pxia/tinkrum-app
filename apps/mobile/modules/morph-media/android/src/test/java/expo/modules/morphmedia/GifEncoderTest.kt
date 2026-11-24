@@ -7,8 +7,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// GIF 编码器（D-184）：编出来的文件用一个独立写的小解码器读回来（Android 单元测试里没有 javax.imageio），
-// 帧数、尺寸、颜色都要对得上。电脑上用系统 GIF 解码器（ImageIO、macOS sips）也检查过同样的输出。
+// GIF encoder (D-184): The generated file is read back using a independently written mini-decoder
+// (javax.imageio is not available in Android unit tests); frame count, dimensions, and colors must
+// match. The same output has also been verified on computers using system GIF decoders (ImageIO,
+// macOS sips).
 class GifEncoderTest {
   private val w = 241
   private val h = 137
@@ -21,7 +23,7 @@ class GifEncoderTest {
     return out.toByteArray()
   }
 
-  /** 只认这个编码器写出的结构：没有全局调色板，每帧一个图形控制扩展 + 256 色局部调色板。 */
+  /** Recognizes only the structure written by this encoder: no global palette, each frame has a graphic control extension + 256-color local palette. */
   private fun decode(gif: ByteArray): List<IntArray> {
     var p = 0
     fun u8() = gif[p++].toInt() and 0xFF
@@ -128,7 +130,7 @@ class GifEncoderTest {
     return c
   }
 
-  /** 解码后每帧每个通道的平均误差。 */
+  /** Average error per channel for each frame after decoding. */
   private fun meanErrors(frames: List<IntArray>): List<Double> {
     val decoded = decode(encode(frames))
     assertEquals(frames.size, decoded.size)
@@ -152,7 +154,7 @@ class GifEncoderTest {
         (0xFF shl 24) or (((x * 255 / w + f * 30) and 255) shl 16) or ((y * 255 / h) shl 8) or (((x + y) * 3) and 255)
       }
     }
-    // 随机噪点：码表很快写满，要发清除码重来。
+    // Random noise: codebook fills up quickly, requires sending a clear code to restart.
     val random = Random(1)
     val noise = IntArray(w * h) { 0xFF000000.toInt() or random.nextInt(0xFFFFFF) }
     val solid = IntArray(w * h) { 0xFF336699.toInt() }

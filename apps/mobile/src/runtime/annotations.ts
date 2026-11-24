@@ -1,4 +1,4 @@
-// 标注仅保存在本次运行中；AI 看不到这些文字、坐标或笔画。
+// Annotations are kept only for the current run; the AI cannot see these texts, coordinates, or strokes.
 export interface AnnotationPoint {
   x: number;
   y: number;
@@ -10,20 +10,20 @@ export type ImageAnnotation =
       text: string;
       fontSize: number;
       color: string;
-      /** 顺时针转的角度，绕文字框中心。 */
+      /** Clockwise rotation angle around the text box center. */
       rotation?: number;
-      /** 注释：文字后面的底色（黄色便签）。 */
+      /** Comment: background color behind text (yellow sticky note). */
       fill?: string;
     }
   | {
-      // erase：涂白；mosaic：打码（只用起止两点围成的框）。
+      // erase: whiting out; mosaic: pixelating (using only the bounding box defined by start and end points).
       kind: 'arrow' | 'box' | 'pen' | 'highlight' | 'erase' | 'mosaic';
       points: AnnotationPoint[];
       width: number;
       color: string;
     };
 
-/** 起止两点围成的框（erase、mosaic）。 */
+/** Bounding box defined by start and end points (erase, mosaic). */
 export function markRect(mark: { points: AnnotationPoint[] }) {
   const a = mark.points[0]!;
   const b = mark.points[mark.points.length - 1]!;
@@ -35,7 +35,7 @@ export function markRect(mark: { points: AnnotationPoint[] }) {
   };
 }
 
-/** 预览和导出共用同一组原图坐标路径。 */
+/** Preview and export share the same set of original image coordinate paths. */
 export function annotationPaths(
   mark: Exclude<ImageAnnotation, { kind: 'text' }>,
 ): AnnotationPoint[][] {
@@ -60,7 +60,7 @@ export function annotationPaths(
 export const annotationSvg = (points: AnnotationPoint[]) =>
   points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ');
 
-/** 标注按页面放大缩小 k 倍（预览图上画的，换到更大的图上用）。 */
+/** Scale annotations by factor k according to page zoom (drawn on the preview image, used when switching to a larger image). */
 export function scaleMarks(marks: readonly ImageAnnotation[], k: number): ImageAnnotation[] {
   const pt = (p: AnnotationPoint) => ({ x: p.x * k, y: p.y * k });
   return marks.map((m) =>

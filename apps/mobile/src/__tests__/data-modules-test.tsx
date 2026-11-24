@@ -17,7 +17,7 @@ import { statText } from '../renderer/data';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 数据组件的新能力：按选项分组统计（D-248）。记录只在本机读取，组件只引用表和字段。
+// New capability for data components: group statistics by options (D-248). Records are read locally only, and components only reference tables and fields.
 
 const expenses: Collection = {
   id: 'expenses',
@@ -38,7 +38,7 @@ const expenses: Collection = {
   ],
 };
 
-/** 首页放上这些组件，表是 expenses。 */
+/** Place these components on the home screen using the expenses table. */
 const seedWith =
   (...components: NewComponent[]) =>
   (locale: Locale, registry: Registry) => {
@@ -95,7 +95,7 @@ describe('stat grouped by a choice field', () => {
     });
     expect((await screen.findByTestId('stat-group-expenses-food')).props.children).toBe('¥42.50');
     expect(screen.getByTestId('stat-group-expenses-transport').props.children).toBe('¥4.00');
-    // 没有记录的选项也列出来（合计 0）。
+    // Options with no records are also listed (totaling 0).
     expect(screen.getByTestId('stat-group-expenses-fun').props.children).toBe('¥0.00');
     expect(screen.getByTestId('stat-group-expenses-none').props.children).toBe('¥99.00');
     expect(screen.getByText('未选')).toBeTruthy();
@@ -116,7 +116,7 @@ describe('stat grouped by a choice field', () => {
 });
 
 describe('chart (D-249)', () => {
-  // 图表按真实的今天算最近几段：记录的日期也按今天往前推。
+  // Charts calculate recent periods relative to the real current date: record dates are also evaluated relative to today.
   const daysAgo = (n: number) => {
     const d = new Date();
     return localDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - n));
@@ -170,7 +170,7 @@ describe('chart (D-249)', () => {
     });
     expect(await screen.findByText('¥30.00（75%）')).toBeTruthy();
     expect(screen.getByText('¥10.00（25%）')).toBeTruthy();
-    // 没有记录的分类不画。
+    // Categories with no records are not rendered.
     expect(screen.queryByTestId('chart-slice-fun')).toBeNull();
   });
 
@@ -269,7 +269,7 @@ describe('link to another table (D-250)', () => {
     await repo.deleteRecord('c1', 3);
     store.getState().bumpRecords();
     expect(await screen.findByText('已删除的记录')).toBeTruthy();
-    // 订单里的引用还在，恢复客户后又能看到名字。
+    // References within orders are preserved, and customer names reappear after the customer table is restored.
     expect((await repo.listRecords('orders'))[0]!.values.client).toBe('c1');
     await repo.restoreRecord('c1');
     store.getState().bumpRecords();
@@ -309,7 +309,7 @@ describe('link to another table (D-250)', () => {
   });
 });
 
-// 关联字段里「新加一条」（D-546）：打开那张表的新记录页，存好以后回来就选上它；取消什么都不变。
+// "Add new" in linked fields (D-546): opens the new record page for that table, and upon saving, returns with it selected; cancelling changes nothing.
 describe('a new linked record from the picker', () => {
   const clients: Collection = {
     id: 'clients',
@@ -373,7 +373,7 @@ describe('a new linked record from the picker', () => {
     await addClientThroughPicker('赵六');
     const [client] = await repo.listRecords('clients');
     expect(client!.values).toEqual({ name: '赵六' });
-    // 回到订单表单：选上了新客户，订单还没有存（存订单是另一次点击）。
+    // Return to the order form: the new customer is selected, but the order is not yet saved (saving the order requires a separate click).
     expect(await screen.findByTestId('form-add-order-client')).toHaveTextContent(/赵六/);
     expect(await repo.listRecords('orders')).toEqual([]);
     await fireEvent.changeText(screen.getByTestId('form-add-order-item'), '茶叶');

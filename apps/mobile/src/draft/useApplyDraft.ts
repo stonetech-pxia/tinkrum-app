@@ -6,33 +6,35 @@ import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import type { Applied } from '../workspace/store';
 
 /**
- * 应用之后带用户去该去的地方（草稿应用后，或者功能类修改直接应用后，D-191）：
- * 新做了一个快捷操作 →「做好了」页面（D-125）；
- * 从收件页面开始的 → 回到收件页面，用分享的文件运行新的快捷操作（D-129）；
- * 从一个快捷操作开始的（「让 AI 改这个」）→ 它的「做好了」页面，现在就能再用一次（D-126）；
- * 把一个已有的快捷操作放到了手机桌面 → 它的「做好了」页面，说明怎么用、Android 上可以添加到桌面（D-271）；
- * 新建了一张数据表 → 数据表的「做好了」页面，现在就能记一笔；
- * 套用的样板 App（D-260）→ 它的主页面，提示可以用 AI 接着改。
+ * Takes the user to the appropriate place after application (after a draft application or a
+ * feature modification is applied directly, D-191): newly created quick action -> "done" page
+ * (D-125); started from the inbox page -> return to the inbox page and run the new quick action
+ * with the shared file (D-129); started from a quick action ("Let AI modify this") -> its "done"
+ * page so it can be used again right away (D-126); placed an existing quick action on the phone's
+ * home screen -> its "done" page explaining how to use it and that it can be added to the home
+ * screen on Android (D-271); newly created data table -> the data table's "done" page, ready to
+ * log an entry immediately; applied sample app (D-260) -> its main page with a prompt that AI can
+ * be used to continue modifying it.
  */
 export function useAfterApply(): (applied: Applied) => void {
   const router = useRouter();
   const { store } = useWorkspaceContext();
   const showInShell = useWorkspace((s) => s.showInShell);
   return ({ origin, addedWorkflowIds, addedCollectionIds, homeScreenWorkflowIds, notes }) => {
-    // 样板一次加了好几个快捷操作和表，不去「做好了」页面。退一步退掉了样板时页面不在，留在原处。
+    // A sample adds several quick actions and tables at once, so it skips the "done" page. Stepping back to cancel the sample leaves the page missing, so stay in place.
     if (origin.sample) {
       const { id, pageId } = origin.sample;
       const config = store.getState().config;
       if (!config?.containers.pages.some((p) => p.id === pageId)) return;
       useSampleHint.getState().show(id, pageId);
       const target = pageTarget(pageId);
-      // 先回到外壳（草稿可能是在推入的页面上应用的），再打开主页面，不会叠两层同一页。
+      // Return to the shell first (the draft might have been applied on a pushed page), then open the main page to avoid stacking two layers of the same page.
       if (router.canDismiss()) router.dismissAll();
       if (!showInShell(config, target))
         router.push({ pathname: '/page/[pageId]', params: { pageId } });
       return;
     }
-    // AI 的说明（D-110）：草稿里显示在回复里，直接应用的功能显示在「做好了」页面上。
+    // AI explanation (D-110): shown in the reply within the draft, or displayed on the "done" page for directly applied features.
     const extra = notes?.length ? { notes: JSON.stringify(notes) } : {};
     const made = addedWorkflowIds.length === 1 ? addedWorkflowIds[0] : undefined;
     if (origin.about?.kind === 'shared') {
@@ -63,7 +65,7 @@ export function useAfterApply(): (applied: Applied) => void {
   };
 }
 
-/** 「做好了」页面的 notes 参数（JSON 字符串数组）；看不懂就当没有。 */
+/** The notes parameter for the "done" page (array of JSON strings); treat as empty if unparseable. */
 export function readyNotes(param: string | undefined): string[] {
   try {
     const value: unknown = param ? JSON.parse(param) : [];
@@ -73,7 +75,7 @@ export function readyNotes(param: string | undefined): string[] {
   }
 }
 
-/** 「应用」草稿（D-190）：合成一个版本保存（顶部照常出现「已改好 · 撤销」），然后同上。 */
+/** "Apply" draft (D-190): synthesize a version and save it (the "Modified · Undo" banner appears at the top as usual), then same as above. */
 export function useApplyDraft(): () => Promise<void> {
   const applyDraft = useWorkspace((s) => s.applyDraft);
   const after = useAfterApply();

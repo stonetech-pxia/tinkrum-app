@@ -13,8 +13,10 @@ import { isBackgroundAction, startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeBackground, FakeFiles, FakeMedia } from '../test-utils/fake-files';
 
-// 长任务切到后台也继续（D-160–D-162）：含视频、音频步骤的运行前后保活，进度写进通知，
-// 不在前台时发完成通知；短任务不碰。原生模块 morph-background 换成 FakeBackground。
+// Long-running tasks continue when switched to background (D-160–D-162): keeps alive before and
+// after runs containing video and audio steps, writes progress to notifications, and sends
+// completion notification when not in the foreground; short tasks are unaffected. Replaces native
+// module morph-background with FakeBackground.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const MB = 1024 * 1024;
@@ -43,7 +45,7 @@ function setup(workflow: Workflow, opts: { signal?: { cancelled: boolean } } = {
     choose: async () => null,
     open: async () => null as never,
   };
-  // 每次读时间往后走 2 秒：进度通知不被「一秒最多一次」挡掉。
+  // Advance time by 2 seconds on every time read: prevent progress notifications from being blocked by the "at most once per second" limit.
   let clock = new Date(2026, 9, 24).getTime();
   const run = async () =>
     (
@@ -90,7 +92,7 @@ describe('background runs', () => {
       text: `第 ${compress + 1}/${workflow.steps.length} 步：压缩视频 · 50%`,
       fraction: 0.5,
     });
-    // 在前台结束：不发完成通知。
+    // Ended in foreground: do not send completion notification.
     expect(background.calls.at(-1)).toEqual({ kind: 'end', done: null });
   });
 
@@ -113,7 +115,7 @@ describe('background runs', () => {
       done: { title: `「${workflow.name}」没有完成`, body: '点这里看看是怎么回事。' },
     });
 
-    // 用户自己停的：不用通知。
+    // Stopped by the user: no notification needed.
     const stopped = setup(workflow, { signal: { cancelled: true } });
     stopped.background.foreground = false;
     expect((await stopped.run()).status).toBe('cancelled');

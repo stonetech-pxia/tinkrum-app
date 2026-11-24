@@ -3,9 +3,12 @@ import type { Registry } from './registry';
 import type { Collection } from './schema';
 import { didYouMean } from './suggest';
 
-// 导入校验（validateWorkspace、prepareOps）说的问题是给 Tink 看的：用块 id、表 id 说话，Tink 手里有整份配置。
-// 别的 AI 手里只有这份文件（D-597）：把问题换成文件里的位置（pages.1.blocks.3），再补上改法——
-// 这张表有哪些字段、文件里有哪些表和页、是不是想写 X。只改说法，不改判断：认不出来的问题原样说。
+// Issues reported by import validation (validateWorkspace, prepareOps) are meant for Tink: they
+// speak in block IDs and table IDs, and Tink holds the entire configuration. Other AIs hold only
+// this file (D-597): translate issues into positions within the file (pages.1.blocks.3) and append
+// fix instructions—what fields this table has, what tables and pages are in the file, and whether X
+// was intended. Translates descriptions only, does not change judgment logic: unrecognized issues
+// are reported as-is.
 
 interface BlockAt {
   path: string;
@@ -14,7 +17,7 @@ interface BlockAt {
   table: string | undefined;
 }
 
-/** 校验里的引用名 → 文件里的写法（components 的 refs.role）。 */
+/** Reference name in validation → notation in file (components' refs.role). */
 const ROLE_PATH: Record<string, string> = {
   subtitleField: 'show.subtitles',
   trailingField: 'show.trailing',
@@ -56,7 +59,7 @@ export function explainProblems(
   const tableOf = (id: string): Collection | undefined => file.tables.find((t) => t.id === id);
   const fieldIds = (table: Collection) => table.fields.map((f) => f.id);
 
-  /** 问题后面补的改法：说出文件里有什么，能猜就猜一个。 */
+  /** Fix instructions appended after issues: state what exists in the file, guessing if possible. */
   function fix(body: string, blockTable?: string): string {
     let m = /(\S+) is not a field of (\S+)/.exec(body);
     if (m) {
@@ -87,11 +90,11 @@ export function explainProblems(
     return body;
   }
 
-  /** 校验里的引用名换成文件里的写法：「subtitleField x」→「show.subtitles x」。 */
+  /** Change reference names in validation to the file format style: "subtitleField x" -> "show.subtitles x". */
   const plain = (body: string) =>
     body.replace(/^(\w+) /, (all, role: string) => (ROLE_PATH[role] ? `${ROLE_PATH[role]} ` : all));
 
-  /** 同一个块 id 在几页上都有时，挑内容里提到问题里的词最多的。 */
+  /** When the same block ID appears across multiple pages, pick the one whose content matches the query terms the most. */
   function where(id: string, body: string): BlockAt[] {
     const all = blocks.get(id) ?? [];
     if (all.length < 2) return all;

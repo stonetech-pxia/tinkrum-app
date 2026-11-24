@@ -17,8 +17,10 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeVision, makePng, makePdf } from '../test-utils/fake-files';
 import type { PackRuntime } from '../packs/bridge';
 
-// 扫描件转 Word（D-328）的执行：像素只解码一次（认字、找线、版面分析共用）；版面分析模型没装或出错时
-// 只按位置分段；图片区域按比例从原图剪下来嵌进 docx；结果是一个 docx，旁边存一份 DocDoc。
+// Execution of Word export from scans (D-328): Pixels are decoded only once (shared by OCR, line
+// finding, and layout analysis); if the layout analysis model is missing or fails, segmentation is
+// done solely by position; image regions are cropped proportionally from the original image and
+// embedded into the docx; the result is a docx with a corresponding DocDoc saved alongside it.
 
 jest.mock('expo-localization', () => ({ getLocales: jest.fn(() => []) }));
 
@@ -95,7 +97,7 @@ async function documentXml(files: FakeFiles, item: RunItem) {
   return { xml: strFromU8(zip['word/document.xml']!), names: Object.keys(zip) };
 }
 
-/** 一页：表格线 + 识别结果（坐标和找线的图一样）。 */
+/** One page: table lines + recognition results (coordinates match the line-finding image). */
 function onePage(vision: FakeVision) {
   vision.tableImages = [renderPage(W, H, gridRects(XS, YS))];
   vision.layers = [{ width: W, height: H, lines }];
@@ -267,7 +269,7 @@ describe('ocr.toWord (D-328)', () => {
     const { files, vision, run } = setup([pick, word()]);
     vision.enableLayout();
     vision.layoutRegions = [regions];
-    // 原图是找线那张的 2 倍大：图片按比例剪。
+    // The original image is twice the size of the line-finding one: images are cropped proportionally.
     files.nextPhotos = [files.offerImage('年度报告.jpg', 2 * W, 2 * H)];
     onePage(vision);
     const item = resultItem(await run());
@@ -276,7 +278,7 @@ describe('ocr.toWord (D-328)', () => {
       ext: 'docx',
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     });
-    // 像素只解码一次，认字和版面分析都用它。
+    // Pixels are decoded only once, used by both OCR and layout analysis.
     expect(vision.calls.filter((c) => c.method === 'tablePixels')).toHaveLength(1);
     expect(vision.calls.filter((c) => c.method === 'detectLayout')).toHaveLength(1);
     const { xml, names } = await documentXml(files, item);
@@ -286,13 +288,15 @@ describe('ocr.toWord (D-328)', () => {
     expect(xml.match(/<w:tr>/g)).toHaveLength(2);
     expect(xml).toContain('午餐');
     expect(names).toContain('word/media/image1.jpg');
-    // 图片区域在原图上的位置是 (600,800,800×600)；剪的时候四周多留一点边（D-473，不切到图边的字），
-    // 所以框要把区域整个包住，又不能大出一行字的高度。
+    // The position of the image region on the original image is (600, 800, 800x600); when cropping,
+    // leave a little extra margin around it (D-473, to avoid clipping text at the edge of the
+    // image), so the bounding box must fully enclose the region without exceeding the height of a
+    // line of text.
     const encoded = files.encodes.at(-1)!;
     expect(encoded.format).toBe('jpeg');
     const crop = (encoded.ops as { crop: { x: number; y: number; width: number; height: number } })
       .crop;
-    const slack = 2 * 24; // 原图是 2 倍，一行字高 24
+    const slack = 2 * 24; // The original image is 2x scale, line height is 24
     expect(crop.x).toBeLessThanOrEqual(600);
     expect(crop.y).toBeLessThanOrEqual(800);
     expect(crop.x + crop.width).toBeGreaterThanOrEqual(1400);
@@ -301,7 +305,7 @@ describe('ocr.toWord (D-328)', () => {
     expect(800 - crop.y).toBeLessThanOrEqual(slack);
     expect(crop.x + crop.width - 1400).toBeLessThanOrEqual(slack);
     expect(crop.y + crop.height - 1400).toBeLessThanOrEqual(slack);
-    // DocDoc 存在运行目录里，只对这个 docx 有效；图片块记着剪好的文件。
+    // DocDoc is stored in the runtime directory and is valid only for this docx; image blocks remember the cropped file.
     expect(item.docDoc?.for).toBe(item.uri);
     const doc = parseDocDoc(decodeUtf8(await files.readUri(item.docDoc!.uri)))!;
     expect(doc.pages[0]!.blocks.map((b) => b.kind)).toEqual([
@@ -330,7 +334,7 @@ describe('ocr.toWord (D-328)', () => {
     }
   });
 
-  it('puts several pictures into one document named 文档-日期 (D-298), a page each', async () => {
+  it('puts several pictures into one document named doc-date (D-298), a page each', async () => {
     const { files, vision, run } = setup([pick, word()]);
     files.nextPhotos = [files.offerImage('a.jpg', W, H), files.offerImage('b.jpg', W, H)];
     vision.tableImages = [renderPage(W, H, []), renderPage(W, H, [])];
@@ -371,11 +375,11 @@ describe('ocr.toWord (D-328)', () => {
       { pack: 'ppocr' },
       { pack: 'layout', optional: true, extra: true },
     ]);
-    // 系统自己能认的语言（韩文）：只问版面分析模型。
+    // Languages the system can recognize natively (Korean): query only the layout analysis model.
     expect(devicePack(files, 'ocr.toWord', { lang: 'kor' })).toEqual([
       { pack: 'layout', optional: true, extra: true },
     ]);
-    // 没配置扩展包下载地址（没有 layoutModel）：不问版面分析模型。
+    // No layout model download URL configured (no layoutModel): do not query the layout analysis model.
     vision.layoutModel = undefined;
     expect(devicePack(files, 'ocr.toWord', { lang: 'chi_sim' })).toEqual([{ pack: 'ppocr' }]);
   });

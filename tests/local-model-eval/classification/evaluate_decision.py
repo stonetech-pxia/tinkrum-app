@@ -1,4 +1,6 @@
-"""Jev 式开放候选决策模型的同题测试；原始输出写入忽略的 results/。"""
+"""Jev-style open candidate decision model comparative testing; raw outputs are written to the
+ignored `results/` directory.
+"""
 from __future__ import annotations
 
 import argparse
@@ -52,7 +54,7 @@ def run_laya(model_path: str, noise: bool, english_criteria: bool,
                 continue
             state = damaged_text(case) if noise else case["text"]
             if not state.strip():
-                # 两条非空但不可读的样本仍送模型；完全空白直接记拒判。
+                # Non-empty but unreadable samples are still sent to the model; completely blank ones are directly marked as rejected.
                 row = {"id": case["id"], "lang": case["lang"], "truth_kind": case["kind"],
                        "truth_topic": case["topic"], "predicted_kind": "unknown", "predicted_topic": "unknown",
                        "guarded_empty": True, "elapsed_s": 0.0}

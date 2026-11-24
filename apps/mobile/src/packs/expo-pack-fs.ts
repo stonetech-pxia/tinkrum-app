@@ -4,9 +4,11 @@ import { Directory, File, Paths } from 'expo-file-system';
 import MorphSpeech from '../../modules/morph-speech';
 import { PackStore, type PackFs, type Sha256 } from './store';
 
-// PackFs 的 Expo 实现：documentDirectory/packs/。下载用 expo-file-system，哈希用 expo-crypto（都在 Expo Go 里）。
-// 大文件（语音模型）的哈希由原生模块 MorphSpeech 边读边算（没有它时退回整份读进来算）。
-// 随 App 打包的扩展包（D-510）在 App 里的 packs/ 下：iOS 是 .app 里的文件夹，Android 是 APK 的 assets（asset:///packs/）。
+// Expo implementation of PackFs: documentDirectory/packs/. Downloads use expo-file-system, hashes
+// use expo-crypto (both available in Expo Go). Large file hashes (speech models) are computed
+// chunk-by-chunk by the native MorphSpeech module (falling back to reading the entire file into
+// memory if unavailable). Packs bundled with the App (D-510) reside under packs/ in the App: iOS is
+// a folder inside .app, Android is APK assets (asset:///packs/).
 
 const root = () => new Directory(Paths.document, 'packs');
 const bundle = () => new Directory(Paths.bundle, 'packs');
@@ -82,7 +84,7 @@ export const expoPackFs: PackFs = {
   },
 
   async bundledDirs(path) {
-    // 读不到 App 里的目录时当作没带：照旧提示下载，不让「装好了没有」整个出错。
+    // When the App directory cannot be read, treat it as absent: prompt for download as usual, preventing "installed or not" errors from breaking everything.
     try {
       const dir = path ? new Directory(bundle(), ...path.split('/')) : bundle();
       if (!dir.exists) return [];
@@ -110,10 +112,12 @@ export const expoSha256: Sha256 = async (bytes) => {
 };
 
 /**
- * App 里唯一的 PackStore：根布局（下载）、文字识别、展平、版面和语音转文字共用。随 App 打包的扩展包在第一次用到时
- * 从 App 里复制（D-510），两个 PackStore 同时复制同一个会互相删掉对方复制了一半的文件，所以只能有一个。
- * 只在用户确认后下载，存在 documentDirectory/packs（D-064）；还没定托管地址的扩展包（展平、版面，D-274）
- * 从 EXPO_PUBLIC_MORPH_PACKS_URL 下载，没配置时不提示下载。
+ * The single PackStore in the App: shared by root layout (downloads), OCR, flattening, layout
+ * analysis, and speech-to-text. Bundled packs are copied upon first use (D-510); if two
+ * PackStores copy the same pack simultaneously they corrupt each other's half-copied files, so
+ * there can only be one. Downloaded only after user confirmation, stored in
+ * documentDirectory/packs (D-064); packs without a hosting URL yet (flattening, layout, D-274)
+ * are downloaded from EXPO_PUBLIC_MORPH_PACKS_URL, prompting is skipped if unconfigured.
  */
 export const expoPackStore = new PackStore(
   expoPackFs,
@@ -123,7 +127,7 @@ export const expoPackStore = new PackStore(
   process.env.EXPO_PUBLIC_MORPH_PACKS_URL,
 );
 
-/** 通道读文件：扩展包里的文件和本次运行的临时文件。 */
+/** Channel file reader: files inside packs and temporary files of the current run. */
 export function expoBridgeFiles(store: {
   isInstalled(id: string): Promise<boolean>;
   path(id: string, file: string): string;

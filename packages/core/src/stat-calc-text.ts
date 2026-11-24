@@ -20,7 +20,7 @@ const FUNCTIONS = {
   abs: 'calcFnAbs',
 } as const;
 
-/** 公式的草稿说明只读结构，用表名、字段名和聚合称呼替换内部引用，不读任何记录。 */
+/** Formula draft descriptions read structure only, replacing internal references with table names, field names, and aggregate labels without reading any records. */
 export function totalFormulaText(
   source: NumberSource,
   config: WorkspaceConfig,

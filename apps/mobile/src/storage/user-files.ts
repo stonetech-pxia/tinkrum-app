@@ -6,8 +6,10 @@ import type { FilePlatform } from '../runtime/platform';
 import { indexAssetText } from './asset-text';
 import type { AssetRecord, WorkspaceRepo } from './types';
 
-// 删除用户文件（「设置 → 存储空间」，D-264）：先删磁盘上的文件，再删数据库里的记录。
-// 磁盘删了、记录没删掉时，这个文件还列在存储空间里，再删一次就行；反过来会留下看不见、删不掉的文件。
+// Delete user files (Settings -> Storage, D-264): delete physical files on disk first, then
+// database records. If the disk file is deleted but the database record fails to delete, the file
+// remains listed in storage and can be deleted again; the reverse order leaves orphaned, invisible,
+// undeletable files.
 
 export async function deleteUserFiles(
   ids: readonly string[],
@@ -23,8 +25,8 @@ export async function deleteUserFiles(
 }
 
 /**
- * 重命名一个用户文件（全部文件页面，D-472）：只改用户看到的名字，后缀不变（「合同」→「合同.pdf」）；
- * 名字空了或没变时不改，返回 false。
+ * Rename a user file (all files view, D-472): modifies the user-visible name only, preserving the
+ * extension ("contract" -> "contract.pdf"); returns false if the name is empty or unchanged.
  */
 export async function renameUserFile(
   asset: AssetRecord,
@@ -32,7 +34,7 @@ export async function renameUserFile(
   repo: WorkspaceRepo,
 ): Promise<boolean> {
   const ext = /\.([^./]+)$/.exec(asset.name)?.[1] ?? '';
-  // 空的不改（sanitizeFileName 会把空名字变成 untitled）。
+  // Do not modify empty strings (sanitizeFileName turns empty names into untitled).
   if (!base.trim().replace(/^\.+/, '')) return false;
   const clean = sanitizeFileName(base.trim().replace(/^\.+/, ''));
   const name = ext ? `${clean}.${ext}` : clean;
@@ -42,9 +44,11 @@ export async function renameUserFile(
 }
 
 /**
- * 把几个 PDF 按顺序合成一个新的用户文件（全部文件页面，D-472）：原来的文件都不动。新文件和快捷操作存的一样
- * 画缩略图（saveRunFile）、在后面读文字（D-455）。读不了、加了密的 PDF 报 RunError（和「合并 PDF」一样的说明）；
- * 太大的（单个 100 MB、合计 200 MB，D-601）也报 RunError，在读文件之前。
+ * Combine several PDFs into a new user file in order (all file pages, D-472): original files are
+ * left untouched. The new file is rendered with thumbnails (saveRunFile) and read for text
+ * (D-455) just like quick action outputs. Unreadable or password-protected PDFs throw RunError
+ * (same description as "Merge PDFs"); oversized ones (single 100 MB, total 200 MB, D-601) also
+ * throw RunError before reading the files.
  */
 export async function mergeUserPdfs(
   assets: readonly AssetRecord[],
@@ -53,8 +57,10 @@ export async function mergeUserPdfs(
   files: FilePlatform,
   ctx: { now(): Date; newId(): string },
 ): Promise<AssetRecord> {
-  // pdf-lib 把整份文件读进内存：和快捷操作一样先按单个 100 MB、合计 200 MB 检查（P-006、D-601），读文件之前就拒绝。
-  // 大小用存进文档库时记下的（runner 的 copyHandedFiles 也是这样查的）。
+  // pdf-lib reads the entire file into memory: just like quick actions, it checks for single 100 MB
+  // / total 200 MB limits upfront (P-006, D-601) and rejects before reading the file. Sizes use the
+  // values recorded when stored in the document library (runner's copyHandedFiles checks them the
+  // same way).
   checkSizes(assets.map((a) => ({ name: a.name, size: a.size, mimeType: a.mimeType })));
   const inputs: { name: string; bytes: Uint8Array }[] = [];
   for (const a of assets) inputs.push({ name: a.name, bytes: await files.readBytes(a.path) });
@@ -78,7 +84,7 @@ export async function mergeUserPdfs(
     try {
       await repo.addAsset(asset);
     } catch (e) {
-      // 合成的文件已经存进文档库目录、数据库里登记不上：删掉它，别留下看不见的副本（R10）；原来的文件不动。
+      // The combined file was already stored in the document library directory but could not be registered in the database: delete it so no invisible copy is left behind (R10); original files remain untouched.
       await files.removeAssetFile(stored.path).catch(() => undefined);
       throw e;
     }

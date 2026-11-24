@@ -16,7 +16,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 日期、时间的选择器（D-543）：JS 写的月历格子和几点几分，不用原生组件；「今天」「现在」照旧。
+// Date and time pickers (D-543): JS-implemented calendar grid and time selectors without native components; "Today" and "Now" work as usual.
 
 const events: Collection = {
   id: 'events',
@@ -66,7 +66,7 @@ it('picks a date from a month grid, in the user language, and moves between mont
   await fireEvent.press(await screen.findByTestId('form-log-day-pick'));
   const month = today().slice(0, 7);
   expect(screen.getByText(monthTitle(month, 'fr'))).toBeTruthy();
-  // 周一开头（设置 → 日期的默认）。
+  // Monday start (default in Settings -> Date).
   expect(screen.getByTestId('form-log-day-weekdays')).toHaveTextContent('LMMJVSD');
   await fireEvent.press(screen.getByTestId('form-log-day-next'));
   const next = shiftMonth(month, 1);

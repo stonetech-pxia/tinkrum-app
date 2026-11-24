@@ -28,7 +28,7 @@ interface OverlayProps {
   animationType?: ModalProps['animationType'];
 }
 
-/** 弹层的窗口、遮罩和键盘避让只有这一处；内容和遮罩互为兄弟，点内容不会误关。 */
+/** Single implementation for overlay window, backdrop, and keyboard avoidance; content and backdrop are siblings, tapping content does not cause accidental closure. */
 function Overlay({
   palette,
   locale,
@@ -59,7 +59,7 @@ function Overlay({
           onPress={onClose}
           style={StyleSheet.absoluteFill}
         />
-        {/* Android 的 Modal 不跟着键盘缩小，三星键盘也需要 padding（草稿聊天、运行问话框）。 */}
+        {/* Android's Modal does not shrink with keyboard, Samsung keyboard also requires padding (draft chat, execution prompt dialog). */}
         <KeyboardAvoidingView
           behavior="padding"
           pointerEvents="box-none"
@@ -97,17 +97,17 @@ function Overlay({
   );
 }
 
-/** 底部菜单和表单；调用处只管内容，不再各写安全区、遮罩和键盘避让。 */
+/** Bottom menus and forms; callers only manage content without repeatedly writing safe areas, backdrops, and keyboard avoidance. */
 export function BottomSheet(props: OverlayProps & { onClose: () => void; bottomPadding?: number }) {
   return <Overlay {...props} sheet />;
 }
 
-/** 居中的问话或进度；没有 onClose 的进度框不能点遮罩或按返回取消。 */
+/** Centered prompt or progress; progress dialogs without onClose cannot be dismissed by tapping backdrop or pressing back. */
 export function Dialog(props: OverlayProps) {
   return <Overlay {...props} sheet={false} />;
 }
 
-/** 全屏照片、播放器和本地编辑器不使用弹层的边距或键盘避让。 */
+/** FullScreen photos, players, and local editors do not use overlay margins or keyboard avoidance. */
 export function FullScreenModal({
   children,
   onClose,

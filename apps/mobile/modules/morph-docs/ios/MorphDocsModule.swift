@@ -3,9 +3,12 @@ import PDFKit
 import UIKit
 import WebKit
 
-// 办公文档转 PDF 的 iOS 实现（D-186）：WKWebView 打开文档（系统自己把 Word、Excel、PowerPoint、RTF 排成网页），
-// 等排版稳定后用 UIPrintPageRenderer 按纸张分页，画进 PDF。全部在本机，网页视图不联网（只读这一个文件）。
-// PDF 密码（D-194）：PDFKit 判断要不要密码、解锁后另存一份没有密码的、加上打开密码。密码只在这一次调用里用。
+// iOS implementation for converting office documents to PDF (D-186): WKWebView opens the document
+// (the system automatically formats Word, Excel, PowerPoint, RTF into web pages), and after layout
+// stabilizes, UIPrintPageRenderer paginates by paper size and renders into PDF. Entirely local; the
+// web view does not connect to the network (reads only this single file). PDF passwords (D-194):
+// PDFKit determines whether a password is required, unlocks and saves an unencrypted copy, and adds
+// an open password. Passwords are used only in this call.
 
 final class DocUnreadableException: GenericException<String>, @unchecked Sendable {
   override var code: String { "ERR_DOC_UNREADABLE" }
@@ -21,18 +24,19 @@ public class MorphDocsModule: Module {
   public func definition() -> ModuleDefinition {
     Name("MorphDocs")
 
-    // none：没有加密；restricted：不用密码就能打开，但限制了打印、复制等（P-027 不解除）；locked：要密码才能打开。
+    // none: unencrypted; restricted: can be opened without a password, but printing, copying, etc., are restricted (not lifted in P-027); locked: requires a password to open.
     AsyncFunction("pdfLockState") { (uri: URL) -> String in
       guard let doc = PDFDocument(url: uri) else { throw DocUnreadableException(uri.lastPathComponent) }
       return doc.isLocked ? "locked" : doc.isEncrypted ? "restricted" : "none"
     }
 
-    // 密码不对时返回 nil。
+    // Returns nil when the password is incorrect.
     AsyncFunction("unlockPdf") { (uri: URL, password: String, output: URL) -> [String: Any]? in
       guard let doc = PDFDocument(url: uri) else { throw DocUnreadableException(uri.lastPathComponent) }
       guard doc.unlock(withPassword: password) else { return nil }
-      // 解锁后直接写出的文件仍然带密码（macOS 上实测）：把每页（连同页上的批注、表单）复制进一份新文档。
-      // 书签目录和文档信息不带过去。
+      // Files written directly after unlocking still retain the password (observed on macOS): copy
+      // each page (along with annotations and forms on the page) into a new document. Bookmarks,
+      // table of contents, and document info are not carried over.
       let copy = PDFDocument()
       for i in 0..<doc.pageCount {
         if let page = doc.page(at: i)?.copy() as? PDFPage { copy.insert(page, at: copy.pageCount) }
@@ -86,7 +90,7 @@ private final class DocRenderer: NSObject, WKNavigationDelegate {
     config.websiteDataStore = .nonPersistent()
     let view = WKWebView(frame: CGRect(x: 0, y: 0, width: width - margin * 2, height: height), configuration: config)
     view.navigationDelegate = self
-    // 不放进窗口时有的文档不排版：放在屏幕外、透明。
+    // Some documents fail to lay out when not placed in a window: place off-screen with zero opacity.
     view.alpha = 0
     let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
     window?.insertSubview(view, at: 0)
@@ -102,8 +106,9 @@ private final class DocRenderer: NSObject, WKNavigationDelegate {
       view.loadFileURL(uri, allowingReadAccessTo: uri)
     }
     try await waitForLayout(view)
-    // Word 文档被排进一个「一页纸」的外框（固定宽度、页边距、至少一页高）：去掉外框的尺寸和边距，
-    // 分页和边距交给下面的打印排版，否则短文档也会多出一张空白页。
+    // Word documents are laid out within a "single page" frame (fixed width, margins, at least one
+    // page high): remove the frame's dimensions and margins so pagination and margins are handled
+    // by the print formatter below, otherwise short documents will produce an extra blank page.
     _ = try? await view.evaluateJavaScript(
       """
       (() => {
@@ -112,9 +117,12 @@ private final class DocRenderer: NSObject, WKNavigationDelegate {
         Object.assign(page.style, { minHeight: '0', height: 'auto', width: 'auto', maxWidth: 'none', padding: '0', margin: '0' });
       })()
       """)
-    // Excel（D-513）：系统把表格排成网页时列与列之间没有留白，右对齐的数字会贴着右边一列的文字
-    // （"433.2Open"），转成 PDF 后再识别（转 Word）就连成一个词。每个单元格左右各留一点空隙；
-    // 加了空隙后表格比页面宽时整体缩小到页宽，不切掉最后一列。
+    // Excel (D-513): when the system formats spreadsheets into web pages, there is no spacing
+    // between columns, causing right-aligned numbers to touch the text of the column to the right
+    // ("433.2Open"), which merges into a single word when recognized (converted to Word) after
+    // exporting to PDF. Leave a small gap to the left and right of each cell; after adding gaps, if
+    // the table is wider than the page, scale it down to fit the page width without clipping the
+    // last column.
     if ["xls", "xlsx"].contains(uri.pathExtension.lowercased()) {
       _ = try? await view.evaluateJavaScript(
         """
@@ -149,8 +157,10 @@ private final class DocRenderer: NSObject, WKNavigationDelegate {
   }
 
   /**
-   * 文档排成网页后高度还会变一会儿：等到连续两次一样（最多 5 秒）。读不到高度时（文档预览不一定执行脚本）
-   * 等满 1 秒就继续，有没有内容由分页的结果判断。
+   * After a document is formatted as a web page, its height continues to change for a moment:
+   * wait until it remains identical twice in a row (up to 5 seconds). When height cannot be read
+   * (document previews do not necessarily execute scripts), continue after a full 1 second; the
+   * presence of content is determined by the pagination results.
    */
   private func waitForLayout(_ view: WKWebView) async throws {
     var last = -1.0
@@ -183,7 +193,7 @@ private final class DocRenderer: NSObject, WKNavigationDelegate {
     loaded = nil
   }
 
-  /** 只允许打开这个文件本身，文档里的链接、外部图片一律不加载。 */
+  /** Only allow opening the file itself; links and external images within the document are strictly blocked from loading. */
   func webView(
     _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
     decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void

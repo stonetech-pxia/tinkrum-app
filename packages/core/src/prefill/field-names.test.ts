@@ -10,7 +10,7 @@ const page = (lines: [string, number, number][], height = 16): TextPage => ({
 });
 
 describe('extractFieldNames', () => {
-  it('冒号：左边是字段名，整段不切开', () => {
+  it('Colon: left side is the field name; do not split the entire segment', () => {
     expect(
       extractFieldNames([
         page([
@@ -20,7 +20,7 @@ describe('extractFieldNames', () => {
       ]),
     ).toEqual(['Date of birth', 'N° de facture']);
   });
-  it('字段名里有认不出的字符也不切开（OCR 错字、符号）', () => {
+  it('Do not split even if there are unrecognized characters in the field name (OCR typos, symbols)', () => {
     expect(
       extractFieldNames([
         page([
@@ -31,13 +31,13 @@ describe('extractFieldNames', () => {
       ]),
     ).toEqual(['NumÃ©ro de contrat', 'Assur€', 'Prix H.T. (€)']);
   });
-  it('同一行两组冒号都找到', () => {
+  it('Find both sets of colons on the same line', () => {
     expect(extractFieldNames([page([['Inv No :KSB800  Date:11/03/18', 40, 100]])])).toEqual([
       'Inv No',
       'Date',
     ]);
   });
-  it('值在右边，文字值也不当字段名', () => {
+  it('Value is on the right; do not treat text values as field names', () => {
     const lines: [string, number, number][] = [
       ['Postal district', 40, 100],
       ['Northbridge', 380, 100],
@@ -52,7 +52,7 @@ describe('extractFieldNames', () => {
       'Annual fee',
     ]);
   });
-  it('换行的字段名合成一个：值在第二行或第一行', () => {
+  it('Merge wrapped field names into one: value is on the second line or the first line', () => {
     const second: [string, number, number][] = [
       ['Member', 40, 100],
       ['reference', 40, 119],
@@ -74,7 +74,7 @@ describe('extractFieldNames', () => {
       'Policy',
     ]);
   });
-  it('值在下面，文字值不当字段名', () => {
+  it('Value is below; do not treat text values as field names', () => {
     const lines: [string, number, number][] = [
       ['Insurer', 40, 100],
       ['Bluecrest', 40, 120],
@@ -85,7 +85,7 @@ describe('extractFieldNames', () => {
     ];
     expect(extractFieldNames([page(lines)])).toEqual(['Insurer', 'Policy number', 'Vehicle make']);
   });
-  it('表格：第一排是字段名，换行的表头按列合并', () => {
+  it('Table: first row contains field names, wrap-around headers are merged by column', () => {
     const table: [string, number, number][] = [
       ['Item', 40, 100],
       ['Qty', 240, 100],
@@ -99,7 +99,7 @@ describe('extractFieldNames', () => {
     ];
     expect(extractFieldNames([page(table)])).toEqual(['Item', 'Qty', 'Unit price']);
   });
-  it('中文和没有专门处理的语言一样（不靠词典）', () => {
+  it('Chinese is treated the same as languages without special handling (no dictionary used)', () => {
     expect(
       extractFieldNames([
         page([
@@ -109,7 +109,7 @@ describe('extractFieldNames', () => {
       ]),
     ).toEqual(['保单号码', 'Prémio anual']);
   });
-  it('标题、整句和值不算；只有一行字时不猜', () => {
+  it('Titles, full sentences, and values are not counted; do not guess when there is only a single line of text', () => {
     expect(
       extractFieldNames([
         page([
@@ -123,11 +123,11 @@ describe('extractFieldNames', () => {
 });
 
 describe('fieldNameFromText', () => {
-  it('取冒号左边，去掉填空线', () => {
+  it('Take the left side of the colon and remove fill-in lines', () => {
     expect(fieldNameFromText('Policy number: PL-1')).toBe('Policy number');
     expect(fieldNameFromText('Name ______')).toBe('Name');
   });
-  it('值判断', () => {
+  it('Value validation', () => {
     expect(looksLikeValue('MB-4831')).toBe(true);
     expect(looksLikeValue('Address line 2')).toBe(false);
   });

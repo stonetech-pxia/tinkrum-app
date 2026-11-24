@@ -1,13 +1,17 @@
-// 公式字段（D-188）：数据表里由别的数字字段算出来的值，例如「{price} * {qty}」。
-// 只有数字、字段引用 {字段 ID}、+ - * /、括号和负号：解析成一棵小树再计算，不执行任何代码，
-// 没有变量和循环。值不存进记录，显示和统计时现算。
-// D-246：加一个受限的条件 if(比较, 是的时候, 不是的时候)。比较只能写在 if 的第一项里，只有 > < >= <= =；
-// if 算一层括号，嵌套层数和长度的上限不变。
-// D-247：日期。日期字段 {due} 和 today 是「日期」，只能放进 days(从, 到)（相差几天，到 − 从）或 if 的比较里，
-// 不能加减乘除；公式的结果一定是数字。类型在校验时按字段类型检查（formulaType）。
-// D-280：函数 min、max、round、abs；时间 {time} 和日期时间 {datetime} 只能放进 hours(从, 到) / minutes(从, 到)
-// 或 if 的比较里（时间跨午夜时自动加 24 小时），日期时间也能放进 days()；时长当作分钟数。
-// D-281：公式可以引用别的公式字段（检查时挡住循环引用），最长 500 字。
+// Formula fields (D-188): values calculated from other number fields in a data table, e.g.,
+// `{price} * {qty}`. Only numbers, field references `{field ID}`, + - * /, parentheses, and minus
+// sign: parsed into a small expression tree and evaluated without executing any code, variables, or
+// loops. Values are not stored in records, computed on the fly for display and statistics. D-246:
+// Add a restricted condition if(comparison, true_case, false_case). Comparison can only be written
+// in the first argument of if, with only > < >= <= =; if counts as one nesting level, upper limit
+// of nesting depth and length unchanged. D-247: Dates. Date field `{due}` and today are "dates",
+// can only be placed in days(from, to) (difference in days, to − from) or if comparisons, cannot
+// use arithmetic operators; formula result must always be a number. Types checked during validation
+// based on field type (formulaType). D-280: Functions min, max, round, abs; time `{time}` and
+// datetime `{datetime}` can only be placed in hours(from, to) / minutes(from, to) or if comparisons
+// (time automatically adds 24 hours across midnight), datetimes can also be placed in days();
+// durations treated as minutes. D-281: Formulas can reference other formula fields (circular
+// references blocked during checking), max 500 characters.
 
 export const MAX_FORMULA_LENGTH = 500;
 
@@ -41,7 +45,7 @@ type Token =
   | { t: 'fn'; fn: FormulaFunction }
   | { t: '+' | '-' | '*' | '/' | '(' | ')' | ',' };
 
-/** D-280 的函数：参数个数 [最少, 最多]。 */
+/** D-280 functions: parameter count [min, max]. */
 const FUNCTIONS = {
   min: [2, 10],
   max: [2, 10],
@@ -53,7 +57,7 @@ const FUNCTIONS = {
 export type FormulaFunction = keyof typeof FUNCTIONS;
 const isFunction = (word: string): word is FormulaFunction => Object.hasOwn(FUNCTIONS, word);
 
-/** 公式里认识的词：if（D-246）、today 和 days（D-247），以及 FUNCTIONS（D-280）。 */
+/** Recognized words in formulas: if (D-246), today and days (D-247), and FUNCTIONS (D-280). */
 const WORDS = new Set(['if', 'today', 'days']);
 
 function tokenize(text: string): Token[] | string {
@@ -112,7 +116,7 @@ function tokenize(text: string): Token[] | string {
   return tokens;
 }
 
-/** 解析公式；引用的字段按出现顺序去重列出。 */
+/** Parse formula; referenced fields listed with deduplication in order of appearance. */
 export function parseFormula(text: string): ParsedFormula {
   if (text.length > MAX_FORMULA_LENGTH) return { ok: false, error: 'too long' };
   const tokenized = tokenize(text);
@@ -122,7 +126,7 @@ export function parseFormula(text: string): ParsedFormula {
   let depth = 0;
   const peek = () => tokens[pos];
 
-  // 加减 → 乘除 → 负号 → 数字 / 字段 / 括号。
+  // Addition/subtraction → multiplication/division → minus sign → number / field / parentheses.
   function expr(): FormulaNode | string {
     let left = term();
     while (typeof left !== 'string' && (peek()?.t === '+' || peek()?.t === '-')) {
@@ -170,7 +174,7 @@ export function parseFormula(text: string): ParsedFormula {
     if (token.t === 'fn') return fnCall(token.fn);
     return `unexpected "${tokenText(token)}"`;
   }
-  // min / max / round / abs / hours / minutes：参数用逗号隔开，个数按 FUNCTIONS。
+  // min / max / round / abs / hours / minutes: comma-separated arguments, count validated against FUNCTIONS.
   function fnCall(fn: FormulaFunction): FormulaNode | string {
     if (tokens[pos++]?.t !== '(') return `${fn} needs ( after it`;
     if (++depth > 20) return 'too deeply nested';
@@ -191,7 +195,7 @@ export function parseFormula(text: string): ParsedFormula {
         : `${fn} needs ${least} to ${most} parts`;
     return { kind: 'fn', fn, args };
   }
-  // days(从, 到)：两个日期相差几天。
+  // days(from, to): difference in days between two dates.
   function daysCall(): FormulaNode | string {
     if (tokens[pos++]?.t !== '(') return 'days needs ( after it';
     if (++depth > 20) return 'too deeply nested';
@@ -204,7 +208,7 @@ export function parseFormula(text: string): ParsedFormula {
     depth--;
     return { kind: 'days', from, to };
   }
-  // if(比较, 是的时候, 不是的时候)：比较是「式子 运算符 式子」，只能出现在这里。
+  // if(comparison, true_case, false_case): comparison is "expression operator expression", can only appear here.
   function ifCall(): FormulaNode | string {
     if (tokens[pos++]?.t !== '(') return 'if needs ( after it';
     if (++depth > 20) return 'too deeply nested';
@@ -254,19 +258,20 @@ export function parseFormula(text: string): ParsedFormula {
 const tokenText = (token: Token) =>
   token.t === 'cmp' ? token.cmp : token.t === 'fn' ? token.fn : token.t;
 
-/** 字段在公式里的类型：数字（数字、金额、评分、时长、别的公式）、日期、时间（HH:mm）、日期时间。 */
+/** Field types in formulas: number (number, amount, rating, duration, other formulas), date, time (HH:mm), datetime. */
 export type FormulaType = 'number' | 'date' | 'time' | 'datetime';
 
-/** days()、hours()、minutes() 的参数是什么类型：只有字段和 today 会是日期类（别的式子都算出数字）。 */
+/** Parameter types for days(), hours(), minutes(): only fields and today qualify as date/time types (all other expressions evaluate to numbers). */
 function argType(n: FormulaNode, typeOf: (field: string) => FormulaType | null): FormulaType {
   if (n.kind === 'today') return 'date';
   return n.kind === 'ref' ? (typeOf(n.field) ?? 'number') : 'number';
 }
 
 /**
- * 公式的类型（D-247）：日期只能进 days() 和比较，加减乘除、负号和 if 的两个结果都要是数字。
- * 时间和日期时间（D-280）只能进 hours()、minutes() 和比较，日期时间也能进 days()。
- * typeOf 给出字段的类型（不能用的字段返回 null）；返回值类型，或者一句说明哪里不对。
+ * Formula type (D-247): dates can only go into days() and comparisons; arithmetic, unary minus,
+ * and both results of if must be numbers. Times and datetimes (D-280) can only go into hours(),
+ * minutes(), and comparisons; datetimes can also go into days(). typeOf provides field types
+ * (unsupported fields return null); returns result type or an error description string.
  */
 export function formulaType(
   node: FormulaNode,
@@ -324,19 +329,19 @@ export function formulaType(
   }
 }
 
-/** 本地日期 YYYY-MM-DD → 天数（按 UTC 算，不受夏令时影响）；不是日期时为 undefined。 */
+/** Local date YYYY-MM-DD → day number (calculated in UTC, unaffected by daylight saving time); undefined when not a date. */
 export function dayNumber(date: string): number | undefined {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86_400_000 : undefined;
 }
 
-/** 时间 HH:mm → 当天的分钟数；不是时间时为 undefined。 */
+/** Time HH:mm → minutes of the day; undefined when not a time. */
 export function minuteOfDay(time: string): number | undefined {
   const m = /^(\d{2}):(\d{2})$/.exec(time);
   return m ? Number(m[1]) * 60 + Number(m[2]) : undefined;
 }
 
-/** 本地日期时间 YYYY-MM-DDTHH:mm → 分钟数（按 UTC 算，不受夏令时影响）；不是日期时间时为 undefined。 */
+/** Local datetime YYYY-MM-DDTHH:mm → minute number (calculated in UTC, unaffected by daylight saving time); undefined when not a datetime. */
 export function minuteNumber(datetime: string): number | undefined {
   const day = dayNumber(datetime.slice(0, 10));
   const minute = datetime[10] === 'T' ? minuteOfDay(datetime.slice(11)) : undefined;
@@ -344,10 +349,12 @@ export function minuteNumber(datetime: string): number | undefined {
 }
 
 /**
- * 计算；有字段没填、除以 0 或结果不是有限数时返回 undefined（不显示，也不计入统计）。
- * 日期字段由 valueOf 给出天数（dayNumber），时间给出当天的分钟数（minuteOfDay），日期时间给出分钟数
- * （minuteNumber），时长就是分钟数；today 是今天的天数，没给时用到 today 的公式没有值。
- * typeOf 给出字段的类型（days() 要把日期时间换成天数，hours() 要知道是不是跨午夜的时间）。
+ * Evaluate; returns undefined if any field is unfilled, division by zero occurs, or result is not
+ * a finite number (not displayed, excluded from stats). Date fields provide day number via
+ * valueOf (dayNumber), time provides minutes of the day (minuteOfDay), datetime provides minute
+ * number (minuteNumber), duration is minutes; today is today's day number, formulas referencing
+ * today have no value if today is missing. typeOf provides field types (days() converts datetime
+ * to days, hours() needs to know if time crosses midnight).
  */
 export function evaluateFormula(
   node: FormulaNode,
@@ -362,7 +369,7 @@ export function evaluateFormula(
     case 'today':
       return today;
     case 'days': {
-      // 日期时间按它那一天算。
+      // Calculate datetime based on its calendar date.
       const day = (n: FormulaNode) => {
         const v = at(n);
         return v !== undefined && argType(n, typeOf) === 'datetime' ? Math.floor(v / 1440) : v;
@@ -383,14 +390,14 @@ export function evaluateFormula(
         case 'abs':
           return Math.abs(a!);
         case 'round': {
-          // 位数取整数、限制在 0–4（和字段的 decimals 一样），四舍五入（负数也往远离 0 的方向）。
+          // Decimal places clamped to integer, limited to 0–4 (same as field decimals), rounded (negative numbers also round away from 0).
           const f = 10 ** Math.min(4, Math.max(0, Math.round(b ?? 0)));
           return (Math.sign(a!) * Math.round(Math.abs(a!) * f + 1e-9)) / f;
         }
         case 'hours':
         case 'minutes': {
           let diff = b! - a!;
-          // 时间只有几点几分：结束比开始早就是跨过了午夜。
+          // Time has only hours and minutes: end earlier than start means it crossed midnight.
           if (diff < 0 && argType(node.args[0]!, typeOf) === 'time') diff += 1440;
           return node.fn === 'hours' ? diff / 60 : diff;
         }
@@ -419,7 +426,7 @@ export function evaluateFormula(
       return Number.isFinite(r) ? r : undefined;
     }
     case 'if': {
-      // 比较的两边有一个没有值，整个公式就没有值（不猜是哪一边）。
+      // If either side of a comparison lacks a value, the entire formula has no value (does not guess which side).
       const a = at(node.left);
       const b = at(node.right);
       if (a === undefined || b === undefined) return undefined;
@@ -428,7 +435,7 @@ export function evaluateFormula(
   }
 }
 
-/** 相等允许极小的误差（0.1 + 0.2 = 0.3）。 */
+/** Equality allows for tiny precision error (0.1 + 0.2 = 0.3). */
 function compare(a: number, cmp: Comparison, b: number): boolean {
   const same = Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
   switch (cmp) {

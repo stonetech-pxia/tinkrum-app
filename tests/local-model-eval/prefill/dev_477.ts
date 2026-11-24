@@ -1,5 +1,6 @@
-// 在已有的 477 例（data/，开发时看过）上比较改进前后：旧的 text-rules extractFirst 对新的候选 + 按标签挑。
-// 用法（仓库根目录）：npx tsx tests/local-model-eval/prefill/dev_477.ts [--misses amount|date]
+// Compare before and after improvements across existing 477 cases (data/, reviewed during
+// development): Old text-rules extractFirst versus new candidates + tag-based filtering. Usage
+// (repository root): npx tsx tests/local-model-eval/prefill/dev_477.ts [--misses amount|date]
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

@@ -3,13 +3,15 @@ import type { Collection } from '@morph/core';
 import { revisionTables } from '../workspace/revision-tables';
 import type { RevisionRecord, WorkspaceRepo } from './types';
 
-// 历史版本只追加、不删除（底线 7）：要看全部历史的地方（找回已移出界面的表、看旧版本里用过哪些文件）
-// 一页一页从新读到旧，读完为止，不能只取最近若干个。
+// Historical versions are append-only and never deleted (Invariant 7): wherever full history needs
+// to be viewed (finding tables moved out of the interface, checking which files were used in old
+// versions), read page by page from newest to oldest until done, rather than taking only the most
+// recent ones.
 
-/** 一页读多少个版本（每个版本带整份配置，一次不读太多）。 */
+/** Number of versions to read per page (each version includes the full configuration, avoiding reading too much at once). */
 export const REVISION_PAGE = 100;
 
-/** 从新到旧一页一页读完全部历史版本。onPage 返回 true 表示够了，提前停。 */
+/** Read all historical versions page by page from newest to oldest. Returning true from onPage stops early. */
 export async function eachRevisionPage(
   repo: WorkspaceRepo,
   onPage: (page: RevisionRecord[]) => boolean | void,
@@ -25,8 +27,9 @@ export async function eachRevisionPage(
 }
 
 /**
- * 在历史版本里找回这些表的结构（已移出界面的表，记录还在）：同一张表取最新的那个版本里的样子，
- * 都找到了就停。
+ * Find the table schemas for these tables in historical versions (for tables moved out of the
+ * interface whose records still exist): take the latest version of each table, and stop once all
+ * are found.
  */
 export async function findRevisionTables(
   repo: WorkspaceRepo,

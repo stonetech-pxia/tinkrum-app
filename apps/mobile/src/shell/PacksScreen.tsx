@@ -11,9 +11,11 @@ import { Card, PageTitle, Pill } from '../renderer/ui';
 import { formatBytes } from '../run/ResultView';
 
 /**
- * 「设置 → 扩展包」（D-064，TOOLS_DESIGN §6）：已下载的扩展包和占用空间，可以删除。
- * 删除文字识别包时各语言包一起删除。不进版本，删除后需要时会再次请用户确认下载。
- * 随 App 打包的（D-510）不列：不是下载的，删了用到时又从 App 里复制回来。
+ * "Settings -> Packs" (D-064, TOOLS_DESIGN §6): Downloaded packs and storage space occupied can
+ * be deleted. When deleting a speech recognition pack, all language packs are deleted together.
+ * Not stored in version history; after deletion, the user will be asked to confirm download again
+ * when needed. Bundled packs with the App (D-510) are not listed: they are not downloaded, and if
+ * deleted, are copied back from the App when used.
  */
 export function PacksScreen({
   store,
@@ -26,9 +28,9 @@ export function PacksScreen({
   store: PackStore;
   palette: Palette;
   locale: Locale;
-  /** Android 的翻译语言模型也在这里列出、删除（D-175）；iOS 的由系统设置管理。 */
+  /** Android's translation language models are also listed and deleted here (D-175); iOS's are managed by system settings. */
   translator?: TranslatePlatform | null;
-  /** 从服务器下载的工具（D-177）。已经添加的要先在「工具」里移除才能删。 */
+  /** Tools downloaded from the server (D-177). Already added tools must first be removed in "Tools" before they can be deleted. */
   tools?: readonly { id: string; name: string; version: string; bytes: number; added: boolean }[];
   onRemoveTool?: (id: string) => Promise<void>;
 }) {

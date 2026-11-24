@@ -1,10 +1,10 @@
-// 扫描 node_modules 中所有已安装包的 license 字段，发现与 AGPL-3.0 不兼容或未知的许可证时退出码为 1。
-// 用法：npm run check:licenses
+// Scan the license field of all installed packages in node_modules, exiting with code 1 if any
+// license incompatible with AGPL-3.0 or unknown is found. Usage: npm run check:licenses
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
-// 与 AGPL-3.0 兼容的许可证（SPDX 表达式原样匹配）。新增条目前请确认兼容性，并在 docs/DECISIONS.md 记录。
+// Licenses compatible with AGPL-3.0 (matched verbatim by SPDX expression). Before adding new entries, verify compatibility and record it in docs/DECISIONS.md.
 const ALLOWED = new Set([
   'MIT',
   'MIT-0',
@@ -21,19 +21,19 @@ const ALLOWED = new Set([
   'MPL-2.0',
   'AGPL-3.0-only',
   'MIT AND Apache-2.0',
-  '(MIT AND Zlib)', // pako（pdf-lib 的依赖）：Zlib 为宽松许可证，与 GPL 兼容
-  'MIT AND OFL-1.1', // @expo-google-fonts/sora、karla：代码 MIT，字体文件 OFL-1.1（字体可随任何软件分发）
+  '(MIT AND Zlib)', // pako (dependency of pdf-lib): Zlib is a permissive license, compatible with GPL.
+  'MIT AND OFL-1.1', // @expo-google-fonts/sora, karla: Code is MIT, font files are OFL-1.1 (fonts can be distributed with any software).
   '(MIT OR Apache-2.0)',
   '(MIT OR CC0-1.0)',
   '(BSD-2-Clause OR MIT OR Apache-2.0)',
-  '(BSD-3-Clause OR GPL-2.0)', // node-forge：按 BSD-3-Clause 使用
-  '(MIT OR GPL-3.0-or-later)', // jszip（mammoth 的依赖，D-186）：按 MIT 使用
-  'BSD', // duck（mammoth 的依赖，D-186）：package.json 只写了 BSD，LICENSE 文件是 BSD-2-Clause 原文
+  '(BSD-3-Clause OR GPL-2.0)', // node-forge: Used under BSD-3-Clause.
+  '(MIT OR GPL-3.0-or-later)', // jszip (dependency of mammoth, D-186): Used under MIT.
+  'BSD', // duck (dependency of mammoth, D-186): package.json specifies BSD, LICENSE file is original BSD-2-Clause.
 ]);
 
-// 只对这一个包放行的写法：Public Domain 不是一个明确的许可，不全局放行。
+// Exception rule for this package only: Public Domain is not a clear license, so it is not allowed globally.
 const ALLOWED_FOR = new Map([
-  ['jsonify', 'Public Domain'], // patch-package 的依赖（D-399）：安装时打补丁用，不进 App
+  ['jsonify', 'Public Domain'], // patch-package dependency (D-399): Used for patching during installation, not included in the app.
 ]);
 
 function licenseOf(pkg) {
@@ -70,7 +70,7 @@ function walk(dir) {
 
 walk('node_modules');
 
-// 本地 C 库不在 npm 清单里：同样检查 SPDX，并核对手工审阅过的上游源码和许可原文。
+// Local C libraries are not in the npm manifest: also check SPDX, and cross-check manually reviewed upstream source code and license text.
 const dspRoot = 'apps/mobile/modules/morph-media/dsp';
 const nativeLibraries = JSON.parse(
   fs.readFileSync(path.join(dspRoot, 'dependencies.json'), 'utf8'),
@@ -86,10 +86,12 @@ for (const lib of nativeLibraries) {
 }
 
 if (problems.length > 0) {
-  console.error('以下依赖的许可证未在允许列表中，需要人工确认与 AGPL-3.0 的兼容性：');
+  console.error(
+    'The following dependency licenses are not in the allowlist and need manual AGPL-3.0 compatibility review:',
+  );
   for (const p of problems) console.error(`  ${p}`);
   process.exit(1);
 }
 console.log(
-  `已检查 ${seen.size} 个依赖，许可证均在允许列表中；另检查 ${nativeLibraries.length} 个本地 C 依赖及源码/许可校验和。`,
+  `Checked ${seen.size} dependencies (all licenses allowed) and ${nativeLibraries.length} local C dependencies with source/license checksums.`,
 );

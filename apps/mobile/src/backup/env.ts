@@ -10,13 +10,13 @@ import { DB_MIGRATIONS, migrateDatabase } from '../storage/sqlite';
 import { backupRuntime } from './runtime';
 import type { ArchiveNative, BackupEnv, StagedDb } from './service';
 
-// 整体导出和恢复在真机上的环境（D-600）：原生 zip（MorphArchive）、expo-file-system、expo-sqlite。
+// Environment for overall export and restore on real devices (D-600): native zip (MorphArchive), expo-file-system, expo-sqlite.
 
-/** file:// 地址 → 本机路径（SQLite 要路径，不要 file://，也不要百分号编码）。 */
+/** file:// URI -> local path (SQLite requires path, not file://, and no percent encoding). */
 const toPath = (uri: string) =>
   decodeURIComponent(uri.replace(/^file:\/\//, '')).replace(/\/$/, '');
 
-/** 原生模块在 Expo Go 和测试里没有：这时「备份」这一块不显示。 */
+/** Native modules not present in Expo Go and tests: hide "Backup" section. */
 export const backupAvailable = () => MorphArchive !== null && MorphArchive !== undefined;
 
 function nativeArchive(): ArchiveNative {
@@ -45,7 +45,7 @@ async function openStaged(dirUri: string): Promise<StagedDb> {
         const row = await db.getFirstAsync<{ integrity_check: string }>('PRAGMA integrity_check');
         return row?.integrity_check === 'ok';
       } catch {
-        // 不是数据库文件。
+        // Not a database file.
         return false;
       }
     },
@@ -61,7 +61,7 @@ async function openStaged(dirUri: string): Promise<StagedDb> {
         );
         return row ? { id: row.id, schemaVersion: row.schema_version } : null;
       } catch {
-        // 没有这些表：不是 Tinkrum 的数据库。
+        // No such tables: not a Tinkrum database.
         return null;
       }
     },
@@ -73,7 +73,7 @@ export function createBackupEnv(): BackupEnv {
   return {
     native: nativeArchive(),
     fs: {
-      // 结尾带 / 的是目录，其余是文件。
+      // Paths ending with / are directories, others are files.
       exists: (uri) => (uri.endsWith('/') ? new Directory(uri).exists : new File(uri).exists),
       makeDir: (uri) => new Directory(uri).create({ idempotent: true, intermediates: true }),
       size: (uri) => new File(uri).size,

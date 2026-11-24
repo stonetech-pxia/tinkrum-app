@@ -2,14 +2,16 @@ import type { HandoffScope } from '@morph/core';
 import { create } from 'zustand';
 
 /**
- * 「等 AI 结果」的标记（系统引导，不进配置或用户数据库）。查看、过期不写任何东西；
- * 只有用户点分享、导入成功或关掉卡片时才写一个小文件（和启动计数一样放在数据库外面，是 App 自己的记账，
- * D-621），Android 在用户去别的 App 时把 Tinkrum 进程杀掉，回来这张卡还在。
+ * The "waiting for AI result" flag (system guide, excluded from config or user database). Reading
+ * and expiration write nothing; a small file is written only when the user taps share,
+ * successfully imports, or dismisses the card (stored outside the database like the startup
+ * counter, serving as the app's internal bookkeeping, D-621). On Android, if the Tinkrum process
+ * is killed while visiting other apps, this card remains upon return.
  */
 export const AI_RETURN_TTL = 24 * 60 * 60 * 1000;
 export type AiReturn = { id: number; scope: HandoffScope['kind']; at: number };
 
-/** 标记文件；读写都是同步的，读写失败一律当没有标记，绝不影响使用。 */
+/** Flag file; reads and writes are both synchronous, and read/write failures are treated as no flag, never disrupting usage. */
 export interface ReturnStore {
   read(): string | null;
   write(text: string): void;
@@ -23,7 +25,7 @@ function save(value: AiReturn | null) {
   try {
     backing?.write(JSON.stringify(value));
   } catch {
-    // 写不进去：这次不记，卡片仍在内存里显示。
+    // If writing fails: skipped for now, and the card remains visible in memory.
   }
 }
 
@@ -42,7 +44,7 @@ function load(store: ReturnStore): AiReturn | null {
     )
       return { id: v.id, scope: v.scope as HandoffScope['kind'], at: v.at };
   } catch {
-    // 坏文件当没有。
+    // Corrupted files are treated as none.
   }
   return null;
 }
@@ -51,7 +53,7 @@ export const useAiReturn = create<{
   pending: AiReturn | null;
   start(scope: HandoffScope['kind'], now?: number): AiReturn;
   dismiss(id?: number): void;
-  /** 返回一个标记的还原：分享没成功时把上一个换回来。 */
+  /** Returns the restoration of a flag: rolls back the previous one if sharing fails. */
   restore(previous: AiReturn | null): void;
 }>((set, get) => ({
   pending: null,
@@ -62,7 +64,7 @@ export const useAiReturn = create<{
     return pending;
   },
   dismiss(id) {
-    // 先前分享的导入结束时，不关闭后来另一轮分享的卡片。
+    // When a previously shared import finishes, it does not close the card of another subsequent sharing round.
     if (id !== undefined && get().pending?.id === id) {
       set({ pending: null });
       save(null);
@@ -74,7 +76,7 @@ export const useAiReturn = create<{
   },
 }));
 
-/** 启动时接上标记文件：读出上次留下的（只读，不写）。已经有新的标记就不覆盖。 */
+/** Attaches the flag file at startup: reads whatever was left last time (read-only, no write). Does not overwrite if a new flag already exists. */
 export function attachReturnStore(store: ReturnStore, now = Date.now()) {
   backing = store;
   const loaded = load(store);

@@ -31,12 +31,16 @@ import { t, type StringKey } from '../i18n';
 import type { Palette } from '../renderer/theme';
 import { blockBase, jpegDataUrl, paperWidth, wordPageHtml } from './word-page';
 
-// 桌上的 Word 整页直接改（D-465）：网页里的纸（word-page.ts）就是编辑器，光标随便放、选中跨段的字；
-// 键盘上面一排按钮：字变大、变小、加粗、斜体、下划线、对齐、收起键盘（和 CamScanner 一样）。光标在表格里时
-// 多一排插删行列。页面每改一下交回每一块的样子，停手一会儿（或点操作、完成、离开时）合回文档、记一步撤销。
-// 页面按打开时的文档生成；顶部撤销、重做换了文档时重新生成（光标回到开头）。
+// Directly edit whole Word documents on the desk (D-465): the page in the web view (word-page.ts)
+// acts as the editor, allowing free cursor placement and cross-paragraph selection; a row of
+// buttons above the keyboard: font size up, font size down, bold, italic, underline, alignment,
+// collapse keyboard (same as CamScanner). When the cursor is inside a table, an extra row for
+// inserting/deleting rows and columns appears. Each page edit returns the appearance of each block,
+// and after pausing briefly (or triggering an action, finishing, or leaving), it merges back into
+// the document and records an undo step. Pages are generated based on the document at the time of
+// opening; top undo/redo re-generates when the document changes (cursor returns to the beginning).
 
-/** 停手这么久，改的字合成一步撤销。 */
+/** Pause duration after which typed text is merged into a single undo step. */
 const IDLE_MS = 800;
 
 type Align = 'left' | 'center' | 'right';
@@ -48,9 +52,9 @@ interface PageState {
   underline?: boolean;
   align?: Align;
   cell?: { ref: string; i: number } | null;
-  /** 光标所在的段落、列表（D-467）。 */
+  /** Paragraph or list where the cursor is located (D-467). */
   ref?: string | null;
-  /** 选区碰到的段落、列表（D-468）。 */
+  /** Paragraphs and lists touched by the selection (D-468). */
   refs?: string[];
 }
 
@@ -81,24 +85,27 @@ export function WordEditor({
   doc: DocDoc;
   palette: Palette;
   locale: Locale;
-  /** 编辑页的宽（点）。 */
+  /** Width of the editing page (points). */
   width: number;
-  /** 读图片块的文件（写进页面）。 */
+  /** Read an image block file (to write into the page). */
   readImage: (uri: string) => Promise<Uint8Array>;
   /**
-   * 从这一页的原图上剪下 box（原图像素）那一块，返回剪好的图（D-467，「用原图」）；剪不出来时 null。
-   * 没有时不显示「用原图」。
+   * Crop the box area (original pixels) from the original image of this page, return the cropped
+   * image (D-467, "Use original image"); returns null if it cannot be cropped. Not shown when
+   * absent.
    */
   cropOriginal?: (page: DocPage, box: Box) => Promise<string | null>;
   onApply: (next: DocDoc) => void;
-  /** 光标在页面上（房间收起工具栏，换成这一排格式按钮）。 */
+  /** Cursor is on the page (room collapses toolbar, switches to this row of format buttons). */
   onSelecting: (on: boolean) => void;
-  /** 有改了还没合回文档的字：交出合回去的函数；没有了是 null。 */
+  /** Has text modified but not yet merged back into the document: supplies the merge function; null otherwise. */
   onTyping?: (flush: (() => void) | null) => void;
 }) {
-  // 页面是按 shown 生成的：页面交回来的 ref 指的是它的块。自己合回去的文档不重新生成页面。
-  // 文档每换一次看一次：是刚从页面合回去的那一份就用掉这个记号，别的（撤销、重做、插删行列）重新生成页面。
-  // 撤销可能正好退回到以前从页面合回去的那一份，所以记号用一次就清掉。
+  // Pages are generated based on `shown`: refs returned by the page refer to blocks in it.
+  // Documents merged by itself do not re-generate the page. Each time the document changes, check:
+  // if it is the exact copy just merged back from the page, consume this marker; otherwise (undo,
+  // redo, insert/delete row/column), re-generate the page. Undo might precisely return to a
+  // previous copy merged from the page, so the marker is cleared after one use.
   const [shown, setShown] = useState(doc);
   const [seen, setSeen] = useState(doc);
   const [fromPage, setFromPage] = useState<DocDoc | null>(null);
@@ -107,20 +114,21 @@ export function WordEditor({
     setFromPage(null);
     if (doc !== fromPage) setShown(doc);
   }
-  // 页面交回来的样子（按哪一份文档生成的页面）。页面重新生成以后，旧页面上没合回去的字对不上新的文档，不要了。
+  // Appearance returned by the page (generated from which document version). After the page is re-generated, unmerged text on the old page does not match the new document and is discarded.
   const pending = useRef<{ base: DocDoc; pages: EditedPage[] } | null>(null);
   const [hasPending, setHasPending] = useState(false);
   if (doc !== seen && doc !== fromPage && hasPending) setHasPending(false);
   const [state, setState] = useState<PageState>({ focus: false });
-  // WebView 的类型是函数组件（不带 ref），实际的 ref 有 injectJavaScript。
+  // WebView type is a function component (without ref), the actual ref has injectJavaScript.
   const web = useRef<{ injectJavaScript?: (js: string) => void } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 图片块的字节读好再生成页面。每次重新生成都看一遍：「用原图」（D-467）会多出新剪的图。
-  // 读不到的记成 null（画成灰块），不再读。
+  // Generate pages only after image block bytes are read. Each re-generation checks: "Use original
+  // image" (D-467) may introduce newly cropped images. Unreadable ones are marked as null (drawn as
+  // gray blocks) and not read again.
   const [images, setImages] = useState<Record<string, string | null>>({});
   const srcs = useMemo(() => imageSrcs(shown), [shown]);
-  // 读文件的函数每次渲染都是新的：用最新的那个，不因为它重新读。
+  // The file reading function is new on every render: use the latest one without re-reading due to it.
   const read = useRef(readImage);
   useEffect(() => {
     read.current = readImage;
@@ -169,13 +177,13 @@ export function WordEditor({
     );
   }, [ready, shown, width, images, hasCrop, locale, palette]);
 
-  // 最新的文档和回调（合回去时用；页面的消息、计时器拿到的是旧的闭包）。
+  // Latest document and callbacks (used when merging back; page messages and timers receive old closures).
   const latest = useRef({ doc, shown, onApply });
   useEffect(() => {
     latest.current = { doc, shown, onApply };
   });
 
-  /** 改了的字合回文档，记一步撤销；返回合好的文档。 */
+  /** Merge modified text back into the document, record an undo step; return the merged document. */
   function commit(): DocDoc {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
@@ -188,7 +196,7 @@ export function WordEditor({
     const next = mergeEdited(base, edited.pages, (block, p) =>
       blockBase(block, base.pages[p]!, pw),
     );
-    // 合好的和现在的一样（改回去了）：不记一步。
+    // Merged result is identical to the current one (reverted): do not record a step.
     if (sameValue(next, current)) return current;
     setFromPage(next);
     apply(next);
@@ -225,11 +233,11 @@ export function WordEditor({
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => commitRef.current(), IDLE_MS);
     } else if (msg.type === 'swap') {
-      // 原图小窗上的「换成原件」（D-469）。
+      // "Replace with original" on the original image floating window (D-469).
       void swapInOriginal();
     } else if (msg.type === 'state') {
       setState(msg as unknown as PageState);
-      // 离开页面（收起键盘）：改的字马上合回去。
+      // Leaving the page (collapsing keyboard): modified text is merged back immediately.
       if (!msg.focus) commitRef.current();
     }
   }
@@ -238,13 +246,13 @@ export function WordEditor({
     web.current?.injectJavaScript?.(`window.__wordCommand(${JSON.stringify(name)});true;`);
   }
 
-  // ---- 光标在表格里：插删行列（改完重新生成页面） ----
+  // ---- Cursor inside a table: insert/delete rows and columns (re-generate page after editing) ----
   const table = tableUnderCursor(shown, state.cell ?? null);
   const actions = table ? tableActionsOf(table) : [];
 
   function runTable(id: TableActionId) {
     if (!table) return;
-    // 先把改的字合回去；合回去以后块的下标可能变了（前面的段落删了、分了），按表本身找到它再改。
+    // First merge modified text back; after merging, block indices may have changed (preceding paragraphs deleted or split), locate the table by its identity before editing.
     const merged = commit();
     const at = findTable(merged, table.block.table);
     if (!at) return;
@@ -255,8 +263,8 @@ export function WordEditor({
     if (next !== merged) latest.current.onApply(next);
   }
 
-  // ---- 「用原图」（D-467）：签名、印章被认成了字，换回原图里剪下来的那一块 ----
-  // 选中了几行时一起换（D-468）；都要在同一页上。
+  // ---- "Use original image" (D-467): signatures and stamps recognized as text, swap back to the cropped block from the original image ----
+  // Swap together when multiple rows are selected (D-468); all must be on the same page.
   const targets = cropOriginal
     ? swapTargets(shown, state.refs ?? (state.ref ? [state.ref] : []))
     : null;
@@ -264,8 +272,10 @@ export function WordEditor({
   async function swapInOriginal() {
     if (!cropOriginal || !targets) return;
     command('blur');
-    // 先把改的字合回去（剪图要等一会儿：在合好的这一份上换，latest 这时不一定已经更新）。
-    // 合回去以后块的下标可能变了，按原来的框找；碰到的图片（之前换的、剪好的印章）一起换成一张。
+    // First merge modified text back (cropping takes time: swap on the merged copy, at which point
+    // `latest` may not yet be updated). After merging, block indices may change, locate by original
+    // bounding box; images encountered (previously swapped or cropped stamps) are replaced with a
+    // single image.
     const current = commit();
     const area = originalArea(current, targets.page, targets.boxes);
     if (!area) return;
@@ -307,7 +317,7 @@ export function WordEditor({
         style={styles.flex}
         source={{ html, baseUrl: 'about:blank' }}
         originWhitelist={['*']}
-        // 只显示我们生成的页面，不打开任何链接。
+        // Display only pages generated by us, do not open any links.
         onShouldStartLoadWithRequest={(r) => r.url === 'about:blank' || r.url.startsWith('data:')}
         onMessage={onMessage}
         javaScriptEnabled
@@ -450,7 +460,7 @@ interface TableUnderCursor {
   cell: TableCell;
 }
 
-/** 光标所在的表格和格子（按页面生成时的文档）。 */
+/** Table and cell where the cursor is located (based on the document at page generation time). */
 function tableUnderCursor(
   doc: DocDoc,
   cursor: { ref: string; i: number } | null,
@@ -480,7 +490,7 @@ function tableActionsOf({
   ];
 }
 
-/** 只有这一张表的一页（转 Excel 的编辑函数用）。 */
+/** A single page containing only this table (used by Excel-to-Word conversion editing functions). */
 function oneTablePage(block: DocTable) {
   const page = { source: '', width: 1, height: 1, bodySize: 11, blocks: [block] };
   return tableDocOf({ version: 1, pages: [page] }, { page: 0, block: 0 }, '')!.pages[0]!;
@@ -506,13 +516,13 @@ function tableEdit(id: TableActionId, cell: TableCell, t: TableDoc): TableDoc {
   }
 }
 
-/** 文档里所有图片块的 src（去重）。 */
+/** src of all image blocks in the document (deduplicated). */
 function imageSrcs(doc: DocDoc): string[] {
   return [
     ...new Set(
       doc.pages.flatMap((p) => [
         ...leafBlocks(p).flatMap((b) => (b.kind === 'image' && b.src ? [b.src] : [])),
-        // 每页的原图：光标上方的小窗用（D-468）。
+        // Original image for each page: used by the small floating window above the cursor (D-468).
         ...(p.source ? [p.source] : []),
       ]),
     ),
@@ -525,7 +535,7 @@ function leafAt(doc: DocDoc, at: DocRef) {
   return block?.kind === 'row' ? block.cells[at.cell]?.blocks[at.item ?? -1] : undefined;
 }
 
-/** 合回去以后这张表在哪里（按表本身找：前面的段落删了、分了，下标会变）。 */
+/** Where this table is located after merging back (locate by table itself: preceding paragraphs deleted or split, indices will change). */
 function findTable(doc: DocDoc, table: object): DocRef | null {
   for (const [p, page] of doc.pages.entries()) {
     for (const [b, block] of page.blocks.entries()) {
@@ -543,7 +553,7 @@ function findTable(doc: DocDoc, table: object): DocRef | null {
   return null;
 }
 
-/** 「用原图」要换的块：这些 ref 里的段落、列表（只算和第一块同一页的）；一块都没有时 null。 */
+/** Blocks to swap for "Use original image": paragraphs and lists within these refs (only those on the same page as the first block); null if none. */
 function swapTargets(doc: DocDoc, refs: readonly string[]): { page: number; boxes: Box[] } | null {
   const leaves = refs
     .map((r) => refOf(r))
@@ -558,7 +568,7 @@ function swapTargets(doc: DocDoc, refs: readonly string[]): { page: number; boxe
   };
 }
 
-/** 同一张表：格子的字可能改过（合回去时换成了新对象），按位置和大小认。 */
+/** Same table: cell text may have been modified (replaced with new objects upon merge), recognize by position and size. */
 function sameTable(a: { box: object; rows: number }, b: object) {
   const t = b as { box: object; rows: number };
   return JSON.stringify(a.box) === JSON.stringify(t.box) && a.rows === t.rows;

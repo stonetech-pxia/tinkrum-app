@@ -11,8 +11,10 @@ import type { Palette } from '../renderer/theme';
 import { Pill } from '../renderer/ui';
 import { formatTime } from './local/TrimScreen';
 
-// 结果页上的一个视频或音频（D-140）：图标、文件名、时长 · 宽高 · 大小，「播放」打开全屏播放器
-// （系统自带的播放控件，音频也能播放、看时长）。视频和音频共用，音频工具以后可以换成波形。
+// A video or audio item on the results page (D-140): icon, file name, duration · dimensions · size;
+// "Play" opens fullscreen player (system built-in playback controls, supporting audio playback and
+// duration viewing). Shared between video and audio, audio tools may later be replaced with
+// waveforms.
 
 function Player({
   item,
@@ -54,7 +56,7 @@ export function MediaRow({
   item: RunItem;
   palette: Palette;
   locale: Locale;
-  /** 其余说明（宽高、大小），用「 · 」接在时长后面。 */
+  /** Remaining details (dimensions, size), appended after duration using " · ". */
   detail: string;
 }) {
   const [open, setOpen] = useState(false);

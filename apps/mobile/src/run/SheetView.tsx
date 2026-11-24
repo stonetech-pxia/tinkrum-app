@@ -13,16 +13,18 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 
 import type { Palette } from '../renderer/theme';
 
-// 表格视图（D-272，file-room DESIGN §11.4）：照着 xlsx 的样子画一页 TableDoc（列字母、行号、合并格子）。
-// 从转 Excel 的编辑页拆出来：编辑页和文件房间的大预览共用。只管画和选中，改内容的是用它的那一方；
-// 没有传回调时只能看（房间里 R1 只读）。
+// Sheet view (D-272, file-room DESIGN §11.4): renders a TableDoc page resembling xlsx (column
+// letters, row numbers, merged cells). Split out from the Excel conversion edit page: shared
+// between the edit page and file-room main preview. Handles rendering and selection only, content
+// modification is handled by its consumer; view-only when no callback is passed (R1 read-only in
+// the room).
 
-/** Excel 的一个字符宽大约这么多点；列宽和行高都限制在手指点得到、又不会太宽的范围。 */
+/** Approximate point width of an Excel character; column widths and row heights are constrained to ranges that are easy to tap without being too wide. */
 const CHAR_PX = 8;
-/** 和 xlsx 一样：没有判断出对齐时是「常规」，数字靠右、文字靠左。 */
+/** Same as xlsx: defaults to "General" when alignment cannot be determined, numbers align right, text aligns left. */
 const textAlignOf = (cell: SheetCell) =>
   cell.align ?? (cell.cell !== undefined && cellNumber(cell.text) ? 'right' : 'left');
-/** 格子里的字号（点）：11 磅的字画 13，别的按比例，不小于 9、不大于 28。 */
+/** Font size in cells (points): 11pt font renders as 13, others proportionally, not less than 9, not greater than 28. */
 const screenFont = (cell: SheetCell) =>
   Math.round(
     Math.min(28, Math.max(9, (13 * (cell.size ?? DEFAULT_FONT_SIZE)) / DEFAULT_FONT_SIZE)),
@@ -30,7 +32,7 @@ const screenFont = (cell: SheetCell) =>
 const MIN_COL = 56;
 const MAX_COL = 280;
 const LINE_PX = 20;
-/** 格子左右上下的空白。 */
+/** Left, right, top, and bottom cell padding. */
 const CELL_PAD = 4;
 const MIN_ROW = 32;
 const ROW_HEAD = 40;
@@ -47,7 +49,7 @@ export function SheetView({
 }: {
   layout: SheetLayout;
   palette: Palette;
-  /** 选中的格子（画粗边框）。 */
+  /** Selected cell (draws a thick border). */
   selected?: SheetCell | null;
   onPressCell?: (cell: SheetCell) => void;
   onLongPressRow?: (row: number) => void;
@@ -65,15 +67,19 @@ export function SheetView({
     for (const w of colPx) out.push(out.at(-1)! + w);
     return out;
   }, [colPx]);
-  // 表外的文字整行合并，但不比屏幕宽（表格列多时整行比屏幕宽很多，居中的字会跑到屏幕两边外面）；
-  // 这一行的行高按这个宽度折出来的行数算（按 Excel 列宽估的行数和这里对不上）。
+  // Full-row merging for text outside the table, but not wider than the screen (when a table has
+  // many columns, full-row text can be much wider than the screen, causing centered text to
+  // overflow outside both sides of the screen); row height for this row is calculated based on the
+  // line count wrapped to this width (row counts estimated by Excel column widths do not match
+  // this).
   const textWidth = Math.max(MIN_COL, Math.min(colAt.at(-1) ?? 0, screenWidth - ROW_HEAD));
   const rowPx = useMemo(() => {
-    // 行高按行里最高的格子（磅，按字号）：11 磅的一行是 LINE_PX 个点。
+    // Row height based on the tallest cell in the row (points, based on font size): an 11pt row is LINE_PX points.
     const out = layout.rows.map((r) => Math.max(MIN_ROW, (r.points / LINE_POINTS) * LINE_PX + 10));
     for (const cell of layout.cells) {
-      // 整行合并的文字按屏幕宽折行重算（按 Excel 列宽估的行数和这里对不上）；有列范围的文字、
-      // 并排一带里的文字（合并了几行）、图片不改行高。
+      // Full-row merged text is re-calculated and wrapped based on screen width (row counts
+      // estimated by Excel column widths do not match this); row heights are not changed for text
+      // with column ranges, text in side-by-side strips (spanning multiple rows), or images.
       if (cell.cell !== undefined || cell.image || cell.colSpan < colPx.length || cell.rowSpan > 1)
         continue;
       const size = cell.size ?? DEFAULT_FONT_SIZE;
@@ -94,7 +100,7 @@ export function SheetView({
   return (
     <ScrollView horizontal style={styles.flex} testID={testID}>
       <ScrollView stickyHeaderIndices={[0]} contentContainerStyle={{ width: sheetWidth }}>
-        {/* 列字母（上下滚动时停在顶上）。按位置摆：iOS 上停靠的那一行不按 flexDirection 排。 */}
+        {/* Column letters (stay pinned to the top during vertical scrolling). Positioned explicitly: the docked row on iOS is not arranged using flexDirection. */}
         <View style={[styles.colHeads, { width: sheetWidth, backgroundColor: palette.background }]}>
           {colPx.map((w, c) => (
             <Pressable
@@ -109,7 +115,7 @@ export function SheetView({
                   top: 0,
                   width: w,
                   borderColor: palette.border,
-                  // D-488：选中的格子所在的列和行，表头换成浅主色。
+                  // D-488: headers of the row and column containing the selected cell change to light primary color.
                   ...(selected?.col === c ? { backgroundColor: palette.primaryTint } : {}),
                 },
               ]}>
@@ -154,7 +160,7 @@ export function SheetView({
             const left = ROW_HEAD + colAt[cell.col]!;
             const top = rowAt[cell.row]!;
             const table = cell.cell !== undefined;
-            // 横跨整页的文字不比屏幕宽；有列范围的文字、图片按它占的列。
+            // Text spanning the full page is not wider than the screen; text with column ranges and images span their respective columns.
             const width =
               table || cell.image || cell.colSpan < colPx.length
                 ? colAt[Math.min(cell.col + cell.colSpan, colPx.length)]! - colAt[cell.col]!
@@ -181,7 +187,7 @@ export function SheetView({
                   },
                 ]}>
                 {cell.image ? (
-                  // 从原图剪下来的图片（D-520）；还没有剪出来时只留一个框。
+                  // Images cropped from original images (D-520); leave only a bounding box while not yet cropped.
                   cell.image.src ? (
                     <Image
                       testID={`table-image-${cell.row}-${cell.col}`}

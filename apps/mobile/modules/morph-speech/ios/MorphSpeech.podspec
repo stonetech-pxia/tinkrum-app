@@ -1,5 +1,5 @@
-# 本地 Expo 模块（D-150）：用 iOS 自带的 Speech 框架在本机把录音转成文字。
-# 只依赖 Apple 系统框架，没有第三方代码。
+# Local Expo module (D-150): converts audio recordings to text on-device using Apple's built-in
+# Speech framework. Relies solely on Apple system frameworks with no third-party code.
 
 Pod::Spec.new do |s|
   s.name           = 'MorphSpeech'

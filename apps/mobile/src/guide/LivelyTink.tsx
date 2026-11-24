@@ -4,8 +4,10 @@ import { Animated, Easing, View } from 'react-native';
 import { Icon } from '../renderer/Icon';
 
 /**
- * 会动的 Tink 小锤子（D-447）：引导时右上角的 Tink 像在找人说话——向左看、向右看、回正，
- * 再原地蹦两下，停一会儿，循环；可以带一圈呼吸的光（高光）。只是动画，不写数据。
+ * Animated Tink hammer (D-447): during guidance, Tink in the top right looks like it's trying to
+ * talk to someone—looks left, looks right, returns to center, then hops in place twice, pauses
+ * briefly, and loops; can have a breathing halo of light (highlight) around it. Animation only,
+ * does not write data.
  */
 export function LivelyTink({
   size,
@@ -14,12 +16,12 @@ export function LivelyTink({
 }: {
   size: number;
   color: string;
-  /** 高光：身后一圈会呼吸的光（引导时用主色）。 */
+  /** Highlight: a breathing ring of light behind it (uses primary color during guidance). */
   halo?: string;
 }) {
-  const [turn] = useState(() => new Animated.Value(0)); // -1 向左看，1 向右看
-  const [hop] = useState(() => new Animated.Value(0)); // 0 落地，1 跳起
-  const [glow] = useState(() => new Animated.Value(0)); // 光圈呼吸
+  const [turn] = useState(() => new Animated.Value(0)); // -1 looks left, 1 looks right
+  const [hop] = useState(() => new Animated.Value(0)); // 0 landed, 1 jumped up
+  const [glow] = useState(() => new Animated.Value(0)); // Aura breathing
 
   useEffect(() => {
     const ease = Easing.inOut(Easing.quad);

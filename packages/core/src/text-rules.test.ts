@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { checkNameTemplate, renderNameTemplate, templateReads } from './naming';
 import { extractAll, extractFirst } from './text-rules';
 
-// 识别结果的样子照着真实收据、发票、名片写：有换行、全角冒号、千位分隔、中英混排。
+// Matches real-world receipts, invoices, and business cards: includes line breaks, full-width colons, thousand separators, and mixed Chinese-English text.
 const RECEIPT_ZH = `星巴克咖啡（国贸店）
 发票号码：04418765
 开票日期：2026年10月21日
@@ -58,7 +58,7 @@ describe('extractFirst', () => {
   it('returns null when there is nothing to take', () => {
     expect(extractFirst('hello', 'invoiceNo', 'en')).toBeNull();
     expect(extractFirst('', 'firstLine', 'en')).toBeNull();
-    // 只是一个日期，不是电话。
+    // Just a date, not a phone number.
     expect(extractFirst('2026-10-22', 'phone', 'zh')).toBeNull();
   });
 });

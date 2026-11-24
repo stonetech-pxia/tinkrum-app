@@ -3,18 +3,19 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { BUILTIN_TOOLS, createRegistry } from '@morph/core';
 import { EVAL_CASES, buildSetup } from '@morph/core/src/eval';
 
-// 从评测的 --dump 文件（apps/api/scripts/eval.ts）取出每个通过的用例每一轮说的话和计划里的操作，
-// 只留路由测试要看的（操作名、块的外观、工具的种类），写成 src/__fixtures__/eval-turns.json。
-// 用法：npx tsx scripts/eval-needs.ts <dump.json>...
+// Extracts each passing case's round-by-round utterances and plan operations from evaluation --dump
+// files (apps/api/scripts/eval.ts), keeping only what route tests need (operation name, block
+// looks, tool kinds), and writes to src/__fixtures__/eval-turns.json. Usage: npx tsx
+// scripts/eval-needs.ts <dump.json>...
 
 export interface SlimOp {
   op: string;
-  /** addContainer / updateContainer 里的块（含分组里的）用到的外观，和块上有没有工具。 */
+  /** Looks used by blocks in addContainer / updateContainer (including those in groups), and whether blocks have tools. */
   looks?: string[];
   tools?: boolean;
-  /** updateContainer nav 改了哪些键。 */
+  /** Which keys are changed in updateContainer nav. */
   nav?: string[];
-  /** 工具：reminder / quickAction / preset；有 step 的是改步骤。 */
+  /** Tools: reminder / quickAction / preset; those with steps are step modifications. */
   kind?: string;
   step?: boolean;
 }

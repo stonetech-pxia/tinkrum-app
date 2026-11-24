@@ -22,9 +22,12 @@ import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONObject
 
-// Morph 的桌面小组件（D-321）：RemoteViews 画 App 算好的画面。点按钮或圆块发 ACTION_OP 给自己，
-// 记进队列、马上用「点了以后」那份重画，App 开着时通知它马上执行（D-323）；不打开 App。
-// 放到桌面时系统回调 ACTION_BIND，记下这个小组件显示哪个组件。跨天用 AlarmManager 的非精确闹钟换上明天那份（D-322）。
+// Morph desktop widget (D-321): RemoteViews renders the screen layout calculated by the app. Taps
+// on buttons or circular blocks send ACTION_OP to itself, record it in the queue, immediately
+// redraw using the post-tap state, and notify the app to execute immediately if the app is running
+// (D-323); does not open the app. When placed on the desktop, the system callbacks ACTION_BIND to
+// record which component this widget displays. For day-to-day transitions, uses AlarmManager's
+// inexact alarm to switch to tomorrow's layout (D-322).
 
 const val ACTION_OP = "expo.modules.morphwidgets.OP"
 const val ACTION_BIND = "expo.modules.morphwidgets.BIND"
@@ -86,7 +89,7 @@ object WidgetRender {
     for (id in manager.getAppWidgetIds(provider(ctx))) update(ctx, manager, id)
   }
 
-  /** 到下一份画面开始的时间（明天零点）重画；非精确闹钟，不需要权限，晚几分钟没关系。 */
+  /** Redraw at the start time of the next layout (midnight tomorrow); inexact alarm, no permissions required, a few minutes delay is acceptable. */
   fun scheduleNext(ctx: Context) {
     val states = WidgetStore.snapshot(ctx)?.optJSONArray("states") ?: return
     val now = System.currentTimeMillis().toDouble()
@@ -115,7 +118,7 @@ object WidgetRender {
       fallback
     }
 
-  /** 主色：Android 12 起交给桌面按深浅色选；更早的按现在的模式。 */
+  /** Primary color: From Android 12 onwards, let the desktop choose based on light/dark mode; earlier versions follow the current mode. */
   private fun setPrimary(views: RemoteViews, id: Int, method: String, snap: JSONObject, ctx: Context, key: String = "primary") {
     val light = color(snap, false, key, Color.parseColor("#C2603A"))
     val dark = color(snap, true, key, light)
@@ -137,7 +140,7 @@ object WidgetRender {
     return PendingIntent.getBroadcast(ctx, "$widgetId:$op".hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
   }
 
-  /** 进度环（统计的目标）或圆块（tiles）：画成一张小图。 */
+  /** Progress ring (statistical target) or circular blocks (tiles): rendered as a small image. */
   private fun circleBitmap(ctx: Context, sizeDp: Float, ratio: Double?, full: Boolean, primary: Int, tint: Int, onPrimary: Int, ringOnly: Boolean): Bitmap {
     val size = dp(ctx, sizeDp).toInt()
     val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -181,7 +184,7 @@ object WidgetRender {
     val resolved = if (snap != null && item != null) resolveView(snap, item, System.currentTimeMillis().toDouble(), WidgetStore.queued(ctx)) else null
     val view = resolved?.view
     if (snap == null || view == null) {
-      // 还没放过组件：说明怎么放；点一下打开 App。
+      // Component not yet placed: show placement instructions; tap to open the app.
       views.setOnClickPendingIntent(R.id.widget_root, linkIntent(ctx, "morph://"))
       manager.updateAppWidget(widgetId, views)
       return
@@ -273,7 +276,7 @@ object WidgetRender {
             }
             line!!.addView(R.id.tile_row, tile)
           }
-          // 最后一行不满时补空位，圆块不被拉宽。
+          // Fill empty spaces when the last row is incomplete, preventing circular blocks from being stretched wide.
           val rest = (columns - limit % columns) % columns
           repeat(rest) { line!!.addView(R.id.tile_row, RemoteViews(ctx.packageName, R.layout.morph_widget_tile)) }
           line?.let { views.addView(R.id.widget_tiles, it) }

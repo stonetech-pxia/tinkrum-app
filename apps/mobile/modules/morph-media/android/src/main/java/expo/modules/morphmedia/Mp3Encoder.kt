@@ -3,8 +3,9 @@ package expo.modules.morphmedia
 import java.io.File
 import java.io.FileOutputStream
 
-// MP3 输出（D-183）：Media3 和系统都没有 MP3 编码器，用编进 App 的 LAME（libmorphmp3.so，见 src/main/cpp）。
-// AudioPcm.decode 解出来的 16 位 PCM 一块一块交进来，边编码边写文件，不把整段放进内存。
+// MP3 output (D-183): Neither Media3 nor the system has an MP3 encoder, so LAME compiled into the
+// app (libmorphmp3.so, see src/main/cpp) is used. 16-bit PCM decoded by AudioPcm.decode is passed
+// in chunk by chunk, writing to file as it encodes without loading the entire segment into memory.
 
 class Mp3Writer(private val file: File, private val kbps: Int) {
   private val out = FileOutputStream(file)
@@ -12,7 +13,7 @@ class Mp3Writer(private val file: File, private val kbps: Int) {
   private var channels = 0
   private var buffer = ByteArray(0)
 
-  /** 第一块决定声道和采样率（LAME 需要时自己重采样成 MP3 支持的采样率）。 */
+  /** The first chunk determines channels and sample rate (LAME resamples to an MP3-supported sample rate if needed). */
   fun write(samples: ShortArray, channels: Int, rate: Int) {
     if (handle == 0L) {
       handle = Mp3Encoder.nativeInit(rate, channels, kbps)
@@ -23,7 +24,7 @@ class Mp3Writer(private val file: File, private val kbps: Int) {
       this.channels = channels
     }
     val frames = samples.size / this.channels
-    // LAME 要求的最坏情况：1.25 × 样本数 + 7200 字节。
+    // Worst-case requirement by LAME: 1.25 * sample count + 7200 bytes.
     val needed = frames * 5 / 4 + 7200
     if (buffer.size < needed) buffer = ByteArray(needed)
     val written = Mp3Encoder.nativeEncode(handle, samples, frames, buffer)
@@ -44,7 +45,7 @@ class Mp3Writer(private val file: File, private val kbps: Int) {
     out.close()
   }
 
-  /** 取消或出错时：放掉编码器，关上文件（文件由调用方删除）。 */
+  /** When cancelled or on error: release the encoder and close the file (the file is deleted by the caller). */
   fun abort() {
     if (handle != 0L) Mp3Encoder.nativeClose(handle)
     handle = 0L

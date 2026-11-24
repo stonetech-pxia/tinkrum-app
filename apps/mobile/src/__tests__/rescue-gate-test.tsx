@@ -5,7 +5,7 @@ import { MemoryAttemptStore } from '../test-utils/memory-attempts';
 import { RescueGate } from '../rescue/RescueGate';
 import { markHealthy, readAttempts, recordFatal } from '../rescue/attempts';
 
-// 体检 6.6：App 连续两次没能正常打开（闪退、启动抛错），第三次打开直接进兜底页，不再加载主流程。
+// Health check 6.6: If the app fails to open normally twice in a row (crash, startup error), the third launch goes straight to the rescue page without loading the main flow.
 
 const actions = {
   exportBackup: jest.fn(async () => undefined),
@@ -24,11 +24,11 @@ function Fine() {
   return <Text>home</Text>;
 }
 
-/** 一次启动 = 一个新的 JS 进程（新的 session）。 */
+/** A single launch = a new JS process (a new session). */
 async function start(store: MemoryAttemptStore, App: () => React.JSX.Element | never) {
   return render(<RescueGate App={App} store={store} session={{}} locale="zh" actions={actions} />);
 }
-/** 一启动就抛错：进程没了（测试里就是渲染失败，没有走到「正常」）。 */
+/** Throwing an error on startup: process terminates (in tests, rendering fails before reaching "normal"). */
 async function crash(store: MemoryAttemptStore) {
   await start(store, Crashing).catch(() => undefined);
 }
@@ -57,7 +57,7 @@ it('opens the rescue page on the third start after two starts that crashed', asy
   rendered = 0;
   await start(store, Crashing);
   expect(screen.getByTestId('rescue')).toBeTruthy();
-  // 兜底页没有去加载主流程。
+  // The rescue page did not load the main flow.
   expect(rendered).toBe(0);
 });
 
@@ -111,7 +111,7 @@ it('a crash while rendering the app shows the rescue page at once and keeps the 
     failures: 1,
     lastError: expect.stringMatching(/boom at start/),
   });
-  // 这次没走到正常：下次打开还算着。
+  // This attempt did not reach normal: the next launch still counts it.
   await fireEvent.press(screen.getByTestId('rescue-continue'));
   expect(screen.getByTestId('rescue')).toBeTruthy();
 });

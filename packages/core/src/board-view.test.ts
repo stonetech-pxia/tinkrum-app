@@ -16,7 +16,7 @@ import { rowUpdateInput } from './record-ops';
 import type { Collection, NewComponent } from './schema';
 import { registry } from './test-helpers';
 
-// 阶段 C3（方案 P7）：记录列表的大圆块 tiles 和看板 board。
+// Stage C3 (plan P7): large circle block tiles and board view.
 
 const tasks: Collection = {
   id: 'tasks',
@@ -55,7 +55,7 @@ describe('board columns (D-313)', () => {
     const a = rec({ status: 'done' });
     const b = rec({ status: 'todo' });
     const c = rec({});
-    // 选项删掉了的旧值也算「未分」。
+    // Old values where options were deleted also count as "Unassigned".
     const d = rec({ status: 'gone' });
     const columns = boardColumns(field, [a, b, c, d], 30);
     expect(columns.map((col) => col.option)).toEqual(['todo', 'doing', 'done', null]);
@@ -131,14 +131,14 @@ describe('moving a card (D-314)', () => {
     const input = rowUpdateInput(action, tasks, stored, ctx);
     expect(input).toEqual({ status: 'doing' });
     const prepared = prepareRecordValues(tasks, input!, stored, ctx.now, ctx.cal);
-    // 只改分栏字段，别的值原样保留。
+    // Only update grouping field, keep other values intact.
     expect(prepared).toEqual({ ok: true, values: { ...stored, status: 'doing' } });
   });
 
   it('moving to "not set" clears the field', () => {
     const stored = { title: 'x', status: 'done' };
     const input = rowUpdateInput(boardMoveAction(drag, null, 'Not set'), tasks, stored, ctx);
-    // 清空和表单一样写成空值。
+    // Clearing is written as an empty value, same as forms.
     expect(input).toEqual({ status: '' });
     const prepared = prepareRecordValues(tasks, input!, stored, ctx.now, ctx.cal);
     expect(prepared.ok && prepared.values.status).toBeUndefined();
@@ -204,7 +204,7 @@ describe('tiles and board checks (D-311, D-313)', () => {
   });
 });
 
-// D-351：看板按引用字段分栏（每个项目自己的版块）。
+// D-351: Kanban board grouped by link field (each project has its own section).
 describe('a board by a link field', () => {
   const sections: Collection = {
     id: 'sections',
@@ -260,7 +260,7 @@ describe('a board by a link field', () => {
       ['s2', 'Doing', ['b']],
       [null, null, ['c']],
     ]);
-    // 拖到另一栏：引用字段设成那一栏的那条。
+    // Drag to another column: set link field to that specific entry.
     const drag: BoardDragTool = {
       as: 'drag',
       do: 'set',

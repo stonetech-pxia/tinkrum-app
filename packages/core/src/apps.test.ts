@@ -11,10 +11,10 @@ import { createStarterWorkspace } from './starter';
 import { registry } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// D-485：多个 app。主页是顶层的 bar + theme，其他 app 在 nav.apps；页面、表、快捷操作用 app 字段说属于谁。
+// D-485: Multiple apps. The home screen is the top-level bar + theme, and other apps are under nav.apps; pages, tables, and quick actions use the app field to declare ownership.
 const base = () => createStarterWorkspace('en', registry);
 
-/** 一个有健身 app 的配置：自己的页面、表、底栏（app 页面 + Tink）和主题。 */
+/** A config with a fitness app: its own pages, tables, bottom bar (app pages + Tink), and theme. */
 function withFitness(config: WorkspaceConfig = base()): WorkspaceConfig {
   const next = structuredClone(config);
   next.nav.apps = [
@@ -43,7 +43,7 @@ describe('apps（D-485）', () => {
     expect(base().nav.apps).toBeUndefined();
   });
 
-  it('migrating a v38 config only raises the version (底线 12)', () => {
+  it('migrating a v38 config only raises the version (invariant 12)', () => {
     const old = { ...structuredClone(base()), schemaVersion: 38 };
     const result = migrateWorkspace(old);
     expect(result.ok).toBe(true);
@@ -76,7 +76,7 @@ describe('apps（D-485）', () => {
     expect(codes(config)).toContain('unknown-app');
   });
 
-  it('rejects an owner that does not exist (底线 18)', () => {
+  it('rejects an owner that does not exist (invariant 18)', () => {
     const config = withFitness();
     config.containers.pages.find((p) => p.id === 'fit-home')!.app = 'ghost';
     expect(codes(config)).toContain('unknown-app');
@@ -115,7 +115,7 @@ describe('apps（D-485）', () => {
   });
 });
 
-// ---- 操作（沿用 addContainer / updateContainer / removeContainer / setTheme，加 app 键）----
+// ---- Operations (inheriting addContainer / updateContainer / removeContainer / setTheme, with the app key added) ----
 
 const run = (config: WorkspaceConfig, ops: Op[]) => {
   const result = applyOps(config, ops, { registry, locale: 'en' });
@@ -123,7 +123,7 @@ const run = (config: WorkspaceConfig, ops: Op[]) => {
   return result;
 };
 
-/** 用操作搭一个健身 app：页面、一张表、一个快捷操作，主页上有入口。 */
+/** Build a fitness app using operations: pages, a table, a quick action, with an entry point on the home screen. */
 function buildFitness(): WorkspaceConfig {
   const table = {
     id: 'workouts',
@@ -149,13 +149,13 @@ function buildFitness(): WorkspaceConfig {
   ]).config;
 }
 
-describe('apps 的操作（D-485）', () => {
+describe('App operations (D-485)', () => {
   it('builds an app from ops and the result is valid', () => {
     const config = buildFitness();
     expect(codes(config)).toEqual([]);
     const app = config.nav.apps![0]!;
     expect(app.bar).toEqual(['page:fit-home', 'ai']);
-    // 新 app 的风格是主页风格的一份拷贝，不是同一个对象。
+    // The new app's style is a copy of the home screen's style, not the same object.
     expect(app.theme).toEqual(config.theme);
   });
 
@@ -176,15 +176,15 @@ describe('apps 的操作（D-485）', () => {
     expect(codes(next)).toEqual([]);
   });
 
-  it('removing an app removes its pages, links and quick actions, and keeps its tables (底线 5, 18)', () => {
+  it('removing an app removes its pages, links and quick actions, and keeps its tables (invariants 5, 18)', () => {
     const result = run(buildFitness(), [{ op: 'removeContainer', app: 'fit' }]);
     const next = result.config;
     expect(next.nav.apps).toBeUndefined();
     expect(next.containers.pages.some((p) => p.id === 'fit-home')).toBe(false);
-    // 表还在，归到主页；记录按表 ID 存，不受影响。
+    // The table still exists and belongs to the home screen; records are stored by table ID and are unaffected.
     const table = next.data.tables.find((t) => t.id === 'workouts')!;
     expect(table.app).toBeUndefined();
-    // 打开这个 app 的按钮跟着移除，没有悬空引用。
+    // The button to open this app is removed along with it, leaving no dangling references.
     const home = next.containers.pages.find((p) => p.id === 'home')!;
     expect(JSON.stringify(home.blocks)).not.toContain('app:fit');
     expect(codes(next)).toEqual([]);
@@ -219,7 +219,7 @@ describe('apps 的操作（D-485）', () => {
   });
 });
 
-describe('当前 app 视图（D-485）', () => {
+describe('Current app view (D-485)', () => {
   it('the home view is the top-level bar and theme; an app view is its own', () => {
     const config = withFitness();
     const home = appViewOf(config, null);
@@ -252,7 +252,7 @@ describe('当前 app 视图（D-485）', () => {
   });
 });
 
-describe('打开 app 的入口卡片（D-485）', () => {
+describe('App entry point card (D-485)', () => {
   it('needs no title or icon: they come from the app', () => {
     const config = withFitness();
     config.containers.pages
@@ -263,7 +263,7 @@ describe('打开 app 的入口卡片（D-485）', () => {
   });
 });
 
-describe('桌面菜单里的 App（D-485）', () => {
+describe('Apps in the desktop menu (D-485)', () => {
   it('puts an app on the phone home screen menu next to quick actions', () => {
     const config = buildFitness();
     const next = run(config, [homeScreenOp(config, 'app:fit', true)]).config;
@@ -274,13 +274,13 @@ describe('桌面菜单里的 App（D-485）', () => {
     expect(codes(next)).toEqual([]);
   });
 
-  // 桌面图标画 App 自己的图标（D-606）：底色是这个 App 自己主题的主色，图标用主色上的字色。
+  // An app icon on the desktop renders its own icon (D-606): the background color is the primary color of the app's own theme, and the icon uses the text color on that primary color.
   it('an app on the menu carries its own icon and the colors of its own theme', () => {
     const config = buildFitness();
     const next = run(config, [
       { op: 'updateContainer', app: { id: 'fit', icon: '🏋️' } },
       { op: 'setTheme', app: 'fit', primaryColor: '#2255AA' },
-      // 主页的主色是另一个：App 的桌面图标不跟主页走。
+      // The home screen's primary color is different: the app's desktop icon does not follow the home screen.
       { op: 'setTheme', primaryColor: '#F5D90A' },
       homeScreenOp(config, 'app:fit', true),
     ]).config;
@@ -293,7 +293,7 @@ describe('桌面菜单里的 App（D-485）', () => {
         colors: { background: '#2255AA', foreground: '#FFFFFF' },
       },
     ]);
-    // 浅的主色上图标用深色，看得清。
+    // On a light primary color, use a dark icon so it is clearly visible.
     const light = run(next, [{ op: 'setTheme', app: 'fit', primaryColor: '#F5D90A' }]).config;
     expect(homeScreenItems(light)[0]!.colors).toEqual({
       background: '#F5D90A',
@@ -319,7 +319,7 @@ describe('桌面菜单里的 App（D-485）', () => {
     expect(codes(five)).toContain('homeScreen');
   });
 
-  it('removing the app takes it off the menu (底线 18)', () => {
+  it('removing the app takes it off the menu (invariant 18)', () => {
     const config = buildFitness();
     const on = run(config, [homeScreenOp(config, 'app:fit', true)]).config;
     const gone = run(on, [{ op: 'removeContainer', app: 'fit' }]).config;

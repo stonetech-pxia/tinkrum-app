@@ -15,8 +15,11 @@ function measure(view: HostInstance | null | undefined): Promise<ItemBox | null>
 }
 
 /**
- * 组件里面自己的长按功能正在进行时（看板拖卡片 D-314、长按大圆块打开记录 D-311），外层的长按选中组件
- * 不生效，功能优先：两个长按手势在 iOS 上互相阻止不住（RNGH 的 block 没有拦下外层），这里在 JS 侧挡一下。
+ * When the component's own internal long-press functionality is active (board dragging cards
+ * D-314, long-pressing large circular block to open records D-311), the outer long-press
+ * selection does not take effect, prioritizing internal functionality: two long-press gestures
+ * cannot block each other on iOS (RNGH's block does not intercept the outer one), so it is
+ * blocked here on the JS side.
  */
 let innerGesture = false;
 export function setInnerGesture(active: boolean) {
@@ -38,7 +41,7 @@ interface Session {
   released: boolean;
 }
 
-/** 测量的是没有 transform 的外框；UI 线程上的跟手位移不会污染落点坐标。 */
+/** Measures the outer box without transform; following-finger displacement on the UI thread does not pollute drop target coordinates. */
 export function useSingleDrag(
   page: Page,
   onSelect: (id: string) => void,
@@ -100,8 +103,10 @@ export function useSingleDrag(
     if (!current) return;
     const m = metrics.current;
     const speed = current.moved && m.height > 0 ? edgeSpeed(current.y, m.top, m.top + m.height) : 0;
-    // 只在手指拖到边上时滚。页面自己变得滚不动（进入编辑时顶栏、底栏收起，D-613）不是拖动，
-    // 不能在这里夹回去并算作移动：那样按住不动也会把组件放到别处。
+    // Scroll only when the finger is dragged to the edge. If the page itself becomes non-scrollable
+    // (top and bottom bars collapse upon entering edit mode, D-613), it is not a drag and must not
+    // be clamped back here and counted as a movement: otherwise, holding down without moving would
+    // also place the component elsewhere.
     const next =
       speed === 0 ? m.y : Math.max(0, Math.min(Math.max(0, m.content - m.height), m.y + speed));
     if (next !== m.y) {
@@ -110,7 +115,7 @@ export function useSingleDrag(
       current.moved = true;
       follow();
     }
-    // 即使暂时滚不动，也继续检查；内容尺寸可能刚刚变化。
+    // Continue checking even if temporarily non-scrollable; content dimensions may have just changed.
     frame.current = requestAnimationFrame(autoScroll);
   }
   function begin(id: string, x: number, y: number) {
@@ -135,7 +140,7 @@ export function useSingleDrag(
     scrollShift.value = 0;
     measureSession(current);
   }
-  /** 量可视区和各组件在窗口里的位置；量完才找落点、开始自动滚动。 */
+  /** Measure the visible area and the window positions of each component; find drop targets and start auto-scrolling only after measurement finishes. */
   function measureSession(current: Session) {
     const boxes = new Map<string, ItemBox>();
     current.ready = Promise.all([
@@ -171,8 +176,9 @@ export function useSingleDrag(
     if (!current || current.id !== id) return;
     current.released = true;
     stopFrame();
-    // 松手早于 measureInWindow 回调时，等同一份测量结束后再决定落点。
-    // 取消则立即清理；晚到的测量用 session 身份检查丢弃。
+    // If release happens earlier than the `measureInWindow` callback, wait for the measurement
+    // session to finish before determining the drop target. Cancel immediately cleans up; late
+    // arrivals are discarded using session identity checks.
     if (commit) {
       await current.ready;
       if (session.current !== current) return;
@@ -187,8 +193,10 @@ export function useSingleDrag(
     if (op) latest.current.onMove(op);
   }
   /**
-   * 按住期间页面布局变了（进入编辑时顶栏、底栏收起，页面变高，D-613）：原生滚动位置会被夹到新的最大值，
-   * 组件也换了位置。跟上滚动位置，再量一次，落点按现在的位置算。
+   * Page layout changed while holding down (top and bottom bars collapse upon entering edit mode,
+   * page height increases, D-613): native scroll position gets clamped to the new maximum, and
+   * components also change positions. Keep up with the scroll position, re-measure, and calculate
+   * drop targets based on current positions.
    */
   function layoutChanged() {
     const current = session.current;
@@ -224,10 +232,10 @@ export function useSingleDrag(
     target,
     scrollShift,
     scrollGesture,
-    /** 组件相对滚动内容的位置（工具栏画在滚动内容里）；量不了时立刻给 null。 */
+    /** Component position relative to scroll content (toolbar is rendered inside scroll content); immediately returns null if measurement is impossible. */
     measureInContent: (id: string, done: (box: ItemBox | null) => void) => {
       const view = views.current.get(id)?.view;
-      // 测试替身没有内层视图时退回滚动视图本身。
+      // Fall back to the scroll view itself if the test double has no inner view reference.
       const inner = scrollRef.current?.getInnerViewRef() ?? scrollRef.current;
       if (!view || !inner) return done(null);
       view.measureLayout(

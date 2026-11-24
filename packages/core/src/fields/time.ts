@@ -8,7 +8,7 @@ const schema = z.strictObject({ ...fieldBase, type: z.literal('time') });
 const readTime = (_f: unknown, raw: unknown) =>
   typeof raw === 'string' && isValidTime(raw) ? raw : undefined;
 
-/** D-279：几点几分 HH:mm（没有日期）。公式里 hours / minutes 跨午夜时自动加 24 小时（D-280）。 */
+/** D-279: Hours and minutes in HH:mm format (without date). In formulas, hours/minutes automatically add 24 hours when crossing midnight (D-280). */
 export const timeField: FieldDefinitionOf<'time', typeof schema> = defineField({
   type: 'time',
   schema,
@@ -18,7 +18,7 @@ export const timeField: FieldDefinitionOf<'time', typeof schema> = defineField({
     const time = typeof input === 'string' ? normalizeTime(input) : undefined;
     return time ? { value: time } : { issue: 'invalid' };
   },
-  // 三种语言都写 08:30（法语也是 24 小时制、冒号）。
+  // Always displayed as 08:30 across all three languages (French also uses 24-hour format and colon).
   format: (_f, v) => String(v),
   formula: 'time',
   filter: { is: (_f, v) => readTime(_f, v) !== undefined, compare: 'time' },

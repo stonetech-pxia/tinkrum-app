@@ -1,4 +1,6 @@
-"""独立 OCR 文本的动态候选类别评测；模型文件和结果均不入库。"""
+"""Evaluation of dynamic candidate categories for independent OCR text; neither model files nor
+results are stored in the database.
+"""
 from __future__ import annotations
 
 import argparse
@@ -54,7 +56,9 @@ HYPOTHESIS = {
 
 
 def damaged_text(case: dict) -> str:
-    """固定、可复现的文字丢失扰动；不代表平台 OCR 的真实错误分布。"""
+    """Fixed, reproducible text loss perturbation; does not represent the true error distribution
+    of platform OCR.
+    """
     rng = random.Random(sum((i + 1) * ord(ch) for i, ch in enumerate(case["id"])))
     text = case["text"]
     if not text:

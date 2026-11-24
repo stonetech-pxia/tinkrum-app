@@ -8,12 +8,13 @@ import { t } from '../../i18n';
 import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 
-// 填表（TOOLS_DESIGN §4 fillForm）：按字段类型生成输入（文字 / 勾选 / 下拉 / 单选 / 列表）。
-// 只返回用户改过的字段；填的内容只在本次运行里使用，不进配置，也不发给 AI。
+// Fill form (TOOLS_DESIGN §4 fillForm): generates inputs based on field type (text / checkbox /
+// dropdown / radio / list). Returns only fields modified by the user; filled content is used solely
+// for the current run, never enters configuration, and is never sent to the AI.
 
 type Value = string | boolean;
 
-/** pdf-lib 的标准字体只能写拉丁字母（D-073）；多行文字逐行检查。 */
+/** Standard fonts in pdf-lib support only Latin alphabets (D-073); multiline text is checked line by line. */
 const encodable = (text: string) => text.split(/\r\n|\r|\n/).every(canEncodeStandardText);
 
 export function FillFormScreen({

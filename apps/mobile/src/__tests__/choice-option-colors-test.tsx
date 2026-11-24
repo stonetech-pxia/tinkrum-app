@@ -16,7 +16,7 @@ import { StyleSheet } from 'react-native';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// D-568：写了颜色的选项在按值上色的点、月历的日子、饼图里都用它的颜色；没写的照旧按顺序取色。只看，不写（底线 15）。
+// D-568: Option colors are used in value-colored dots, calendar days, and pie charts; uncolored options fall back to sequential color assignment as before. Read-only, writes nothing (invariant 15).
 
 const money: Collection = {
   id: 'money',
@@ -134,8 +134,9 @@ it('a pie by this choice draws named colours; the rest keep their order colours'
   expect(swatch('misc')).toBe(CHART_COLORS.light[0]);
 });
 
-// D-571（模拟器检查 QA_BATCH3 P1）：支出红、收入绿时，排在它们后面、没写颜色的「转账」不拿青绿（第 3 个分类色），
-// 拿不和红、绿同一色系的颜色。
+// D-571 (simulator check QA_BATCH3 P1): When expenses are red and income is green, the uncolored
+// "Transfer" category coming after them does not take cyan-green (the 3rd categorical color), but
+// instead picks a color outside the red and green hue families.
 it('an option without a colour after named ones avoids their hue families', async () => {
   const repo = new MemoryWorkspaceRepo();
   const ledger: Collection = {

@@ -17,7 +17,7 @@ const hash = (value) => createHash('sha256').update(value).digest('hex');
 const full = () => [{ id: 'full', args: ['run', 'check:full'] }];
 const task = (name) => ({ id: name, args: ['run', name] });
 
-// 按包选检查；不用 import 图猜测某个测试是否会读文件、扫目录或动态加载。
+// Select checks by package; do not use import graphs to guess whether a test reads files, scans directories, or loads dynamically.
 export function selectChecks(paths, workspaces) {
   const owners = new Set();
   let dsp = false,
@@ -41,7 +41,7 @@ export function selectChecks(paths, workspaces) {
     args: ['exec', '--', 'prettier', '--check', '--ignore-unknown', '--', ...paths],
   };
   if (!owners.size) return paths.length ? [format] : [];
-  // 传递地包含所有反向依赖，包括开发和 peer 依赖。
+  // Transitively include all reverse dependencies, including dev and peer dependencies.
   for (let size = -1; size !== owners.size;) {
     size = owners.size;
     for (const w of workspaces)
@@ -56,7 +56,7 @@ export function selectChecks(paths, workspaces) {
           args: ['run', script, '--workspace', w.name],
         });
   }
-  // core 的网络等底线测试也扫描 app/planner 源文件，不在 npm 的反向依赖图里。
+  // Core network and other invariant tests also scan app/planner source files, which are not in the npm reverse dependency graph.
   selected.push({
     id: 'core:invariants',
     args: ['exec', '--workspace', '@morph/core', '--', 'vitest', 'run', 'src/invariants.test.ts'],
@@ -68,7 +68,7 @@ export function selectChecks(paths, workspaces) {
 
 function checkEnvironment() {
   const env = { ...process.env };
-  // npm 生命周期和 Git 钩子带来的调用元数据不影响检查；也不能让嵌套 Git 测试指向外层仓库。
+  // Invocation metadata introduced by npm lifecycle and Git hooks does not affect checks; nested Git tests must not point to the outer repository either.
   for (const key of Object.keys(env))
     if (
       /^npm_/i.test(key) ||
@@ -90,7 +90,7 @@ function checkEnvironment() {
     )
       delete env[key];
   env.VITEST_MAX_WORKERS ??= '1';
-  // npm run 会注入 .bin、NODE 和 COLOR；直接 Git 钩子和 npm run check 必须在同一环境运行。
+  // npm run injects .bin, NODE, and COLOR; direct Git hooks and npm run check must run in the exact same environment.
   env.PATH = (env.PATH ?? '')
     .split(delimiter)
     .filter((path) => !/\/node_modules\/\.bin$|\/npm\/.*\/node-gyp-bin$/.test(path))
@@ -172,7 +172,7 @@ export function runChecks(mode, input = '') {
         mustRunFull = true;
         continue;
       }
-      // 新分支、缺失的远端对象、强推无法可靠界定范围，退回全量，不猜测本地 main。
+      // New branches, missing remote objects, and force pushes cannot be reliably scoped, so fall back to a full check without guessing local main.
       try {
         git('merge-base', '--is-ancestor', remote, head);
         const diff = git('diff', '--name-only', '-z', '--no-renames', remote, head);
@@ -210,7 +210,7 @@ export function runChecks(mode, input = '') {
     mode === '--full' || mustRunFull ? full() : selectChecks(paths, workspaces)
   ).flatMap((check) => {
     if (!check.id.startsWith('format:')) return [check];
-    // 删除的文件参与范围判断，但已经不存在，不能再交给 prettier。
+    // Deleted files participate in scope determination, but since they no longer exist, they cannot be passed to prettier.
     const files = paths.filter((path) => existsSync(join(repo, path)));
     return files.length ? [{ ...check, args: [...check.args.slice(0, 6), ...files] }] : [];
   });
@@ -219,7 +219,7 @@ export function runChecks(mode, input = '') {
   const cacheDir = git('rev-parse', '--git-path', 'morph-checks');
   const cacheFile = resolve(repo, cacheDir, `${hash(head + before)}.json`);
   const passed = readReceipt(cacheFile);
-  // 主动重新全量验收时撤回旧凭据；失败后不能继续拿上次成功绕过推送检查。
+  // Withdraw old credentials when actively re-running a full acceptance check; a failure must not allow bypassing push checks using a previous success.
   if (mode === '--full' && wasClean) rmSync(cacheFile, { force: true });
   const needed =
     mode === '--full'

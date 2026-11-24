@@ -18,14 +18,17 @@ import java.util.concurrent.atomic.AtomicBoolean
 class VisionCancelledException : CodedException("ERR_VISION_CANCELLED", "Cancelled", null)
 
 /**
- * 照片里是什么（没有文字的照片做推荐用，还没接进推荐）：ML Kit 图像标注的基础模型，打包进 App
- * （不需要 Google Play 服务、不下载）。标签是 ML Kit 自己的英文词，和 iOS 的 Vision 不是一套。
- * 先摆正并缩到长边 1024 再标注（模型只看很小的图，原图解码会内存不足）；不写中间文件，
- * 位图和标注器成功、失败、取消都释放。cancel(taskId) 让这次以 ERR_VISION_CANCELLED 结束。
+ * Image content classification (used for recommendations on photos without text, not yet
+ * integrated into recommendations): ML Kit base image labeling model, bundled in the app (does
+ * not require Google Play services or downloads). Labels are ML Kit's own English terms, distinct
+ * from iOS Vision. Corrects orientation and downscales to a long side of 1024 before labeling
+ * (the model inspects very small images, and decoding original images causes out-of-memory
+ * errors); no intermediate files are written, and bitmaps and labelers are released upon success,
+ * failure, or cancellation. cancel(taskId) terminates the operation with ERR_VISION_CANCELLED.
  */
 object ImageClassifier {
   private const val MAX_SIDE = 1024
-  /** 多久看一次「取消」。 */
+  /** Interval for checking cancellation status. */
   private const val POLL_MS = 100L
 
   private val running = ConcurrentHashMap<String, AtomicBoolean>()
@@ -39,7 +42,7 @@ object ImageClassifier {
   ): Map<String, Any> {
     val flag = AtomicBoolean(false)
     running[taskId] = flag
-    // 门槛交给 ML Kit 过滤（它默认 0.5），个数和排序在这里做。
+    // Threshold filtering is delegated to ML Kit (default 0.5); count limits and sorting are handled here.
     val labeler = ImageLabeling.getClient(
       ImageLabelerOptions.Builder().setConfidenceThreshold(minConfidence.toFloat()).build()
     )
@@ -69,13 +72,13 @@ object ImageClassifier {
     } finally {
       running.remove(taskId)
       val done = { labeler.close(); bitmap?.recycle() }
-      // 取消时 ML Kit 可能还在读这张位图：等它结束再回收，不然会读到已回收的位图。
+      // ML Kit may still be reading the bitmap upon cancellation: wait for it to finish before recycling, otherwise it may read a recycled bitmap.
       val unfinished = task?.takeIf { !it.isComplete }
       if (unfinished != null) unfinished.addOnCompleteListener { done() } else done()
     }
   }
 
-  /** 还没开始或已经结束的取消不起作用（JS 那边自己先结束 Promise）。 */
+  /** Cancellations for tasks that have not started or already finished have no effect (JS terminates its own Promise beforehand). */
   fun cancel(taskId: String) {
     running[taskId]?.set(true)
   }

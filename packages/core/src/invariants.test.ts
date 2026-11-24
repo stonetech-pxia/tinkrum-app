@@ -67,10 +67,14 @@ import {
 import { REDACTED_FILE, REDACTED_TEXT, redactForAI } from './workflow/redact';
 import { presetById } from './workflows/presets';
 
-// Tinkrum 的 19 条底线（AGENTS.md「底线」，创始人 2026-10-31 在对话里暂定，同一天改了 3、7、11、16，加了 19）。每条一个 describe，测行为，
-// 不测实现细节。要在 App 里才测得到的（发给 AI 的请求、记录、文件、渲染）在
-// apps/mobile/src/__tests__/invariants-test.tsx 和 invariants-files-test.ts；已经有专门测试的，这里写明在哪里。
-// 测出真的违反时不改代码：用 it.fails 标出来，注释写「违反底线 N，待创始人决定：…」。
+// Tinkrum's 19 invariants (AGENTS.md "Invariants", provisionally set by the founder in conversation
+// on 2026-10-31, items 3, 7, 11, 16 modified and 19 added on the same day). One describe block per
+// invariant, testing behavior rather than implementation details. Tests requiring the app
+// environment (requests sent to AI, records, files, rendering) are located in
+// apps/mobile/src/__tests__/invariants-test.tsx and invariants-files-test.ts; where dedicated tests
+// already exist, their location is noted here. When an actual violation is detected, do not fix the
+// code: mark it with it.fails and a comment "violates invariant N, awaiting the founder's decision:
+// ...".
 
 const REPO = join(__dirname, '..', '..', '..');
 const SENTINEL = 'SENTINEL-私密-7f3a';
@@ -80,7 +84,7 @@ const V33_NAMES = readdirSync(join(__dirname, 'fixtures', 'v33'))
   .map((f) => f.slice(0, -'.json'.length));
 const V34_NAMES = ['habits', 'calendar', 'tasks', 'todo'];
 
-/** 存下来的是 v34，和读配置时一样升到现在的版本。 */
+/** Stored state is v34, upgraded to the current version just like when loading configuration. */
 const v34Fixture = (name: string): WorkspaceConfig => {
   const r = migrateWorkspace(
     JSON.parse(readFileSync(join(__dirname, 'fixtures', 'v34', `${name}.json`), 'utf8')),
@@ -89,20 +93,20 @@ const v34Fixture = (name: string): WorkspaceConfig => {
   return r.config as WorkspaceConfig;
 };
 
-/** 测试用的全部配置：v33 代码存下来的（默认、新用户、模版、样板、评测 setup）迁移后的，加上 v34 的范围模版。 */
+/** All test configurations: migrated versions from v34 code storage (default, new user, template, sample app, evaluation setup), plus the v34 scope template. */
 const CONFIGS: [string, WorkspaceConfig][] = [
   ...V33_NAMES.map((n): [string, WorkspaceConfig] => [n, fromV33(v33Fixture(n))]),
   ...V34_NAMES.map((n): [string, WorkspaceConfig] => [`v34-${n}`, v34Fixture(n)]),
 ];
 
-/** 14 个修改操作的名字（按 ops-schema.ts 里的顺序）。 */
+/** Names of the 14 modification operations (in the order defined in ops-schema.ts). */
 const OP_NAMES = [
   ...readFileSync(join(__dirname, 'ops-schema.ts'), 'utf8').matchAll(/op: z\.literal\('(\w+)'\)/g),
 ].map((m) => m[1]!);
 
 const ctx = { registry, locale: 'zh' as const, now: new Date(2026, 9, 31, 9, 0) };
 
-/** 仓库里的源文件（不含测试、生成的、node_modules）。 */
+/** Source files in the repository (excluding tests, generated files, and node_modules). */
 function sourceFiles(dir: string, exts = ['.ts', '.tsx']): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
@@ -116,11 +120,11 @@ function sourceFiles(dir: string, exts = ['.ts', '.tsx']): string[] {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 数据和隐私
+// Data and Privacy
 // ---------------------------------------------------------------------------------------------
 
-describe('底线 1：用户的数据永远不离开手机', () => {
-  // 真正的请求（自带 key、Tinkrum 服务器、收件页面）在 mobile 的 invariants-test.tsx 里用哨兵字符串测。
+describe('Invariant 1: The user\'s data never leaves the phone', () => {
+  // Actual requests (with keys, Tinkrum server, inbox page) are tested using sentinel strings in mobile's invariants-test.tsx.
 
   it('the app has no telemetry, crash-report or analytics library', () => {
     const pkg = JSON.parse(readFileSync(join(REPO, 'apps', 'mobile', 'package.json'), 'utf8')) as {
@@ -132,8 +136,9 @@ describe('底线 1：用户的数据永远不离开手机', () => {
   });
 
   it('every network call in the app code is one of the allowed kinds (AI, downloads, the need button)', () => {
-    // 新加一个联网的地方，这个测试就会失败：先确认它不带数据内容（底线 1）、不是离线功能必需的（底线 13），
-    // 再加进下面的清单，并在 DECISIONS 里写明。
+    // Adding a new network connection point will cause this test to fail: first verify that it
+    // carries no data content (invariant 1) and is not essential for offline functionality
+    // (invariant 13), then add it to the list below and document it in DECISIONS.
     const ALLOWED: Record<string, string> = {
       'packages/planner/src/http.ts': 'AI 修改：自带 key 调 Claude',
       'packages/planner/src/openai.ts': 'AI 修改：自带 key 调 OpenAI 兼容接口',
@@ -152,7 +157,7 @@ describe('底线 1：用户的数据永远不离开手机', () => {
       ...sourceFiles(join(REPO, 'packages', 'planner', 'src')),
     ]
       .filter((f) => !f.includes(`${join('src', 'test-utils')}`))
-      // 扩展包页面里叫 fetch 的方法是向 App 要本机的字节（BinaryDataFactory），不联网。
+      // The method named fetch in pack pages is used to request local bytes (BinaryDataFactory) from the app, without network access.
       .filter((f) => !f.endsWith(join('packs', 'pages', 'pdfview.ts')))
       .filter((f) => NETWORK.test(readFileSync(f, 'utf8')))
       .map((f) => relative(REPO, f).split('\\').join('/'));
@@ -160,9 +165,10 @@ describe('底线 1：用户的数据永远不离开手机', () => {
   });
 });
 
-describe('底线 2：AI 永远看不到数据内容', () => {
-  // 发出去的请求（含收件页面、草稿聊天、两种 AI）在 mobile 的 invariants-test.tsx 里用哨兵字符串测；
-  // 这里测 core 里决定「发什么」的两处。
+describe('Invariant 2: The AI never sees the content of the data', () => {
+  // Requests sent out (including inbox page, draft chat, both AI types) are tested using sentinel
+  // strings in mobile's invariants-test.tsx; here we test the two places in core that determine
+  // "what to send".
 
   it('the inbox context sent to AI is only kinds and counts: names, sizes and contents do not fit', () => {
     expect(
@@ -223,7 +229,7 @@ describe('底线 2：AI 永远看不到数据内容', () => {
   });
 });
 
-describe('底线 1 / 2 / 14：保存的预设不在配置里（D-410）', () => {
+describe('Invariants 1 / 2 / 14: Saved presets are not in the config (D-410)', () => {
   it('a config carrying saved presets is rejected, so they can never go to the AI with it', () => {
     const config = createDefaultWorkspace('zh');
     expect(
@@ -233,7 +239,7 @@ describe('底线 1 / 2 / 14：保存的预设不在配置里（D-410）', () => 
   });
 });
 
-describe('底线 2：本机模型从文件读的只给候选，只有用户为这一笔说的话才直接填（D-396、D-575）', () => {
+describe('Invariant 2: On-device model reads file text only for suggestions, and only the user\'s spoken sentence for this entry is filled directly (D-396, D-575)', () => {
   const fields = [
     { id: 'title', name: '事项', type: 'text' as const },
     { id: 'due', name: '截止日期', type: 'date' as const },
@@ -249,7 +255,7 @@ describe('底线 2：本机模型从文件读的只给候选，只有用户为�
       .flat()
       .some((s) => s.sure === true);
 
-  it('同一句话：从文件读出来的没有一个直接填，说出来的才有', async () => {
+  it('Same sentence: none read from files are filled directly, only spoken ones are', async () => {
     const text = '明天交房租 2026-11-18 金额 3000元';
     const base = {
       fields,
@@ -262,7 +268,7 @@ describe('底线 2：本机模型从文件读的只给候选，只有用户为�
   });
 });
 
-describe('底线 2：扫到的二维码不发给 AI（D-423）', () => {
+describe('Invariant 2: Scanned QR codes are not sent to the AI (D-423)', () => {
   it('the code is only for the candidates: not in the document text, and never in config', () => {
     const fields = [{ id: 'name', name: 'Name', type: 'text' as const }];
     const plan = planDocument({
@@ -272,7 +278,7 @@ describe('底线 2：扫到的二维码不发给 AI（D-423）', () => {
       locale: 'en',
       codes: [`BEGIN:VCARD\nFN:${SENTINEL}\nEND:VCARD`],
     });
-    // 要问模型时给的是 rows；AI 的计划里只有配置（配置里放不下候选）。
+    // Rows provided when querying the model; the AI plan contains only configuration (candidates do not fit in the config).
     expect(plan.rows).toEqual([]);
     expect(plan.fields[0]!.fromCode.map((s) => s.value)).toEqual([SENTINEL]);
     expect(plan.fields[0]!.ask).toBe(false);
@@ -282,7 +288,7 @@ describe('底线 2：扫到的二维码不发给 AI（D-423）', () => {
   });
 });
 
-describe('底线 3：AI 永远不碰文件', () => {
+describe('Invariant 3: AI never touches files', () => {
   it('the 14 changes AI can make are all changes to the configuration; none reads, writes, moves or deletes a file', () => {
     expect(OP_NAMES).toEqual([
       'addData',
@@ -323,7 +329,7 @@ describe('底线 3：AI 永远不碰文件', () => {
   });
 
   it('a file slot that AI adds starts empty: the user picks the file (prompt rule; the store-level check is in mobile)', () => {
-    // 结构允许 {file: null}（空的文件位）；指向一个文件的 ID 只能由用户选（mobile 的 invariants-test.tsx 测 AI 那一路）。
+    // The structure allows {file: null} (empty file slots); pointing to a file ID can only be chosen by the user (mobile's invariants-test.tsx tests the AI path).
     const config = createDefaultWorkspace('zh');
     const ok = prepareOps(
       config,
@@ -339,11 +345,11 @@ describe('底线 3：AI 永远不碰文件', () => {
     expect(ok.ok ? [] : ok.issues).toEqual([]);
   });
 
-  // 创始人 2026-10-31（对话）：AI 的修改一律不能写文件引用；文件 ID 不再发给 AI。
+  // Founder 2026-10-31 (conversation): AI modifications are strictly prohibited from writing file references; file IDs are no longer sent to the AI.
   describe('only the user picks a file: AI changes never write a reference to one', () => {
     const A = 'useraaaa01';
     const B = 'userbbbb02';
-    /** 首页上一个指向 A 的文件位、一张指向 B 的图片（带图片背景），首页的背景也是 B。 */
+    /** A file slot pointing to A on the home screen, an image pointing to B (with an image background), and the home screen background is also B. */
     function withFiles(): WorkspaceConfig {
       const r = applyOps(
         createDefaultWorkspace('zh'),
@@ -420,7 +426,7 @@ describe('底线 3：AI 永远不碰文件', () => {
     ])('%s is refused', (_name, ops) => {
       const r = prepareOps(withFiles(), ops, ai);
       expect(r.ok).toBe(false);
-      // 用户自己在长按编辑里选文件，走的是同一个 prepareOps（不带 fromAI），照常能存。
+      // When the user selects files themselves in long-press edit, it goes through the same prepareOps (without fromAI) and can be saved normally.
       expect(prepareOps(withFiles(), ops, ctx).ok).toBe(true);
     });
 
@@ -477,7 +483,7 @@ describe('底线 3：AI 永远不碰文件', () => {
   });
 });
 
-describe('底线 3：新设置里没有文件引用（D-424）', () => {
+describe('Invariant 3: No file references in new settings (D-424)', () => {
   const page = (block: object) => ({
     op: 'addContainer' as const,
     page: { id: 'p', title: 'P', blocks: [block] },
@@ -523,7 +529,7 @@ describe('底线 3：新设置里没有文件引用（D-424）', () => {
   });
 });
 
-describe('底线 2 / 3：报表带附件，AI 只能开关这个参数（D-425）', () => {
+describe('Invariants 2 / 3: Reports with attachments, AI can only toggle this parameter (D-425)', () => {
   const steps = (attachments: unknown) => [
     { id: 'a', action: 'in.records', params: { collectionId: 'notes', period: 'all' } },
     {
@@ -550,8 +556,8 @@ describe('底线 2 / 3：报表带附件，AI 只能开关这个参数（D-425�
   });
 });
 
-describe('底线 4：原件永远不移动、不删除', () => {
-  // 文件平台（expo-platform.ts）的删除和移动只碰运行目录、选择器副本：mobile 的 invariants-files-test.ts。
+describe('Invariant 4: Originals are never moved or deleted', () => {
+  // File platform (expo-platform.ts) deletions and moves only touch the runtime directory and picker copies: tested in mobile's invariants-files-test.ts.
   it('the configuration can only point at a file by an opaque id; it has no place for a path or a content:// uri', () => {
     const config = createDefaultWorkspace('zh');
     for (const file of ['content://media/external/images/1', 'file:///DCIM/a.jpg', '/var/a.pdf']) {
@@ -571,8 +577,8 @@ describe('底线 4：原件永远不移动、不删除', () => {
   });
 });
 
-describe('底线 5：改 App 永远不删数据', () => {
-  // 记录在数据库里、不在配置里：removeData、恢复旧版本之后记录都还在，见 mobile 的 invariants-test.tsx。
+describe('Invariant 5: Changing the app never deletes data', () => {
+  // Records reside in the database, not in the configuration: records remain intact after removeData and restoring old versions, see mobile's invariants-test.tsx.
 
   it('records have no place in the configuration: a table or a config carrying entries is rejected', () => {
     const config = createDefaultWorkspace('zh');
@@ -590,20 +596,20 @@ describe('底线 5：改 App 永远不删数据', () => {
   });
 
   it('no change AI can make deletes entries: removing a table or a field only changes the configuration', () => {
-    // 能删记录的只有用户在「设置 → 数据」里亲手点的永久删除和记录页的删除（mobile）。
+    // Records can only be deleted via permanent deletion manually triggered by the user in "Settings -> Data" and deletion on the record page (mobile).
     expect(OP_NAMES.filter((n) => /record|purge|clear|delete/i.test(n))).toEqual([]);
     const config = v34Fixture('tasks');
     const result = applyOps(config, [{ op: 'removeData', table: 'tasks' }], ctx);
-    // 移除表的结果只有配置（和给草稿的说明），没有要执行的删除。
+    // The result of removing a table contains only the configuration (and notes for the draft), with no executions of deletion.
     if (result.ok) expect(Object.keys(result).sort()).toEqual(['config', 'notes', 'ok']);
   });
 });
 
 // ---------------------------------------------------------------------------------------------
-// AI 的权限
+// AI Permissions
 // ---------------------------------------------------------------------------------------------
 
-describe('底线 6：AI 只改 App，不替用户办事（D-113）', () => {
+describe('Invariant 6: The AI only changes the app, not actions for the user (D-113)', () => {
   it('an AI reply is changes, "go back one version" or a refusal: there is no reply that runs a tool or answers', () => {
     for (const reply of [
       { kind: 'run', tool: 'pdf-merge' },
@@ -626,7 +632,7 @@ describe('底线 6：AI 只改 App，不替用户办事（D-113）', () => {
     }
   });
 
-  // D-422：AI 能写字段的 format（配置），没有打电话、写信、开网页的操作；点是用户在记录页上点的。
+  // D-422: AI can set a text field's format (configuration), but has no operations to make calls, send emails, or open links; taps are performed by the user on the record page.
   it("AI can set a text field's format, and no op dials, emails or opens a link", () => {
     const base = applyOps(
       createDefaultWorkspace('zh'),
@@ -651,8 +657,8 @@ describe('底线 6：AI 只改 App，不替用户办事（D-113）', () => {
   });
 });
 
-describe('底线 7：每次修改先进草稿，确认才生效，能撤销', () => {
-  // 草稿、确认、撤销、改动记录在 App 里（mobile 的 invariants-test.tsx、workspace-store-test.ts）。
+describe('Invariant 7: Changes go into a draft first, take effect only when confirmed, and can be undone', () => {
+  // Drafts, confirmation, undo, and change history are within the app (mobile's invariants-test.tsx, workspace-store-test.ts).
   it('an old version from the change history always opens again (every frozen config is a valid snapshot)', () => {
     for (const [name, config] of CONFIGS) {
       const r = prepareSnapshot(config, registry);
@@ -661,7 +667,7 @@ describe('底线 7：每次修改先进草稿，确认才生效，能撤销', ()
   });
 });
 
-describe('底线 8：AI 改不了系统层', () => {
+describe('Invariant 8: The AI cannot change the system layer', () => {
   it('Settings (with the AI page and the change history behind it) always stays reachable', () => {
     const config = createDefaultWorkspace('zh');
     for (const nav of [
@@ -670,7 +676,7 @@ describe('底线 8：AI 改不了系统层', () => {
       { floating: [] },
     ]) {
       const r = prepareOps(config, [{ op: 'updateContainer', nav }], ctx);
-      // 要么拒绝，要么「设置」被放回浮动入口。
+      // Either reject the change, or ensure "Settings" is placed back into the floating entry point.
       if (r.ok) expect([...r.after.nav.bar, ...r.after.nav.floating]).toContain('settings');
     }
     const without = { ...config, nav: { bar: ['page:home' as const], floating: [] } };
@@ -705,11 +711,11 @@ describe('底线 8：AI 改不了系统层', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// 工具
+// Tools
 // ---------------------------------------------------------------------------------------------
 
-describe('底线 9：工具不能触发工具；没有分支、循环', () => {
-  // 工具不触发工具：relation-rules.test.ts「rule 13」（提醒没有步骤、done 不能引用工具、步骤不能是快捷操作）。
+describe('Invariant 9: A tool cannot trigger a tool; no branches or loops', () => {
+  // A step is a single catalog action with parameters: no conditions, jumps, loops, or chaining (relation-rules.test.ts "rule 13": reminders have no steps, done cannot reference tools, steps cannot be quick actions).
   it('a step is one catalog action with parameters: no condition, jump, loop or call', () => {
     for (const extra of [
       { if: { field: 'a', op: 'eq', value: 1 } },
@@ -729,7 +735,7 @@ describe('底线 9：工具不能触发工具；没有分支、循环', () => {
     for (const bad of [
       { do: 'run', table: 't', tool: 'x' },
       { do: 'create', table: 't', then: { do: 'set', table: 't', field: 'a', value: 1 } },
-      // 打卡格的删掉（D-610）也只是一种，不能接着做别的。
+      // Deleting a punch-card cell (D-610) is also a single action and cannot be chained with anything else.
       { do: 'remove', table: 't', then: { do: 'create', table: 't' } },
       { do: 'remove', table: 't', tool: 'x' },
     ])
@@ -737,9 +743,11 @@ describe('底线 9：工具不能触发工具；没有分支、循环', () => {
   });
 });
 
-describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
-  // D-428（取代 D-422 的「不是步骤」，创始人 2026-11-04 在对话里定）：打电话、发短信、发邮件、打开网站是四个步骤，
-  // 只收容器交的文字；块上的工具、提醒都运行不了它们，配置里也写不了地址。
+describe('Invariant 10: Data leaves the app only by the user\'s own tap, every time', () => {
+  // D-428 (superseding D-422's "not a step", decided by the founder in conversation on 2026-11-04):
+  // making phone calls, sending SMS, sending emails, and opening websites are four steps that only
+  // accept text provided by the container; block tools and reminders cannot run them, nor can
+  // addresses be written in the configuration.
   it('only the four value steps open a link, and no block tool or reminder can run them', () => {
     const opening = [...registry.actions.values()].filter((a) => a.opensLink);
     expect(opening.map((a) => [a.id, a.opensLink, a.input, a.fields])).toEqual([
@@ -764,7 +772,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
         }).success,
       ).toBe(false);
     }
-    // 动作的参数里也没有要打开的地址（有也打不开：下一个测试说明只有两个地方能调系统打开）。
+    // Action parameters also contain no addresses to open (even if present, they would not open: the next test demonstrates that only two places can invoke system opening).
     const params = [...registry.actions.values()].flatMap((a) =>
       a.fields
         .filter((f) => /^(tel|mailto|phone|email|url)$/i.test(f.key))
@@ -773,9 +781,12 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     expect(params).toEqual([]);
   });
 
-  // 预设页（系统层，D-593）也能打开一个网页：固定的网址（网站上「用你自己的 AI 做 App」），用户点了才开，
-  // 不带任何数据。创始人 2026-11-19 在对话里选了「允许，加进白名单」（D-596）。
-  // 启动兜底页（D-621）的「去官网看看有没有新版本」同样是固定网址、用户点了才开、不带数据。
+  // Only the record page, rich text, the presets page, and the rescue page link to external sites.
+  // The presets page (system layer, D-593) can also open a webpage: a fixed URL ("Build apps with
+  // your AI" on the website), opened only upon user tap, carrying no data. The founder chose
+  // "Allow, add to whitelist" in conversation on 2026-11-19 (D-596). Similarly, the "Check website
+  // for new versions" on the startup fallback page (D-621) uses a fixed URL, opens only upon user
+  // tap, and carries no data.
   it('only the record page, rich text, the presets page and the rescue page link to the site can open something outside the app', () => {
     const openers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
       .filter((path) => /\bLinking\.openURL\b/.test(readFileSync(path, 'utf8')))
@@ -788,11 +799,14 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     ]);
   });
 
-  // D-627：预设页、AI 页共用主动分享入口；原生接口不在时才走系统文字分享。
-  // D-611：交给别的 AI App 改一个 App 时，没有原生分享（Expo Go）的退路也只发文字（提示词和 App 文件）。
-  // 文件、记录的分享走快捷操作的 out.share 和本地模块，不用 react-native 的 Share。
-  // D-621：启动兜底页把错误信息（版本号和错误文字，用户先在页面上看得到）交给系统分享面板，用户点了、自己挑发给谁；
-  // 创始人 2026-11-22 选了这种做法，不做自动上报。
+  // D-627: Preset and AI pages share the manual share trigger; system text sharing is used only
+  // when native interfaces are absent. D-611: When handing over an app modification to another AI
+  // app, the Expo Go fallback without native sharing sends text only (prompt and app files).
+  // Sharing files and records uses quick action out.share and local modules, avoiding
+  // react-native's Share. D-621: The startup rescue page passes error details (version number and
+  // error text, visible to the user on the page first) to the system share sheet, letting the user
+  // tap and choose a recipient; founder chose this approach on 2026-11-22, rejecting automatic
+  // reporting.
   it('only the hand-off fallback and the rescue page hand text to the system share sheet', () => {
     const sharers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
       .filter((path) => /\bShare\.share\b/.test(readFileSync(path, 'utf8')))
@@ -803,7 +817,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     ]);
   });
 
-  // D-627：只有这一个共用函数调用分享平台，用户点击 AI 页或预设页的按钮才调用它。
+  // D-627: Only this shared function invokes the sharing platform, triggered exclusively by user clicks on the AI page or preset page buttons.
   it('only the explicit handoff helper hands structure to another AI app', () => {
     const callers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
       .filter((path) => /\.shareWithAi\(|\.shareFilesWithText\b/.test(readFileSync(path, 'utf8')))
@@ -822,7 +836,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     ]);
   });
 
-  // D-423：导出成 vCard 只是快捷操作的一步，只做一个文件；要离开 App 还要接 out.share（快捷操作是用户点了才运行）。
+  // D-423: Exporting to vCard is just a step in a quick action, producing a single file; leaving the app also requires out.share (quick actions run only upon user tap).
   it('records.toVCard is only a step: no block tool or reminder can run it', () => {
     const action = registry.actions.get('records.toVCard')!;
     expect(action.input).toEqual(['records']);
@@ -858,7 +872,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     expect(typesAlong(wf.steps, registry)).toEqual(['records', 'files', 'files']);
   });
 
-  // D-427：导出成 Excel 和 vCard 一样只是一步，要离开 App 还要接 out.share。
+  // D-427: Exporting to Excel, like vCard, is just a step, and leaving the app also requires out.share.
   it('records.toExcel is only a step: no block tool or reminder can run it', () => {
     const action = registry.actions.get('records.toExcel')!;
     expect(action.input).toEqual(['records']);
@@ -894,7 +908,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     expect(typesAlong(wf.steps, registry)).toEqual(['records', 'files', 'files']);
   });
 
-  // D-428：记录页的按钮只在 onPress 里运行，「分享 vCard」也走快捷操作，没有另一条路（mobile 测试点了才跑）。
+  // D-428: Buttons on the record page run their tools only inside onPress, and "Share vCard" also goes through quick actions with no other path (tested by mobile upon tap).
   it('the entry page runs its tools only in the tap handler, with no way around the steps', () => {
     const text = readFileSync(
       join(REPO, 'apps', 'mobile', 'src', 'renderer', 'RecordActionRow.tsx'),
@@ -905,7 +919,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     expect(text).toMatch(/onPress=\{\(\) => void run\(/);
   });
 
-  // 容器上的工具不能从别的地方运行：提醒、手机桌面、普通按钮都没有值可交（D-428）。
+  // Tools on containers cannot be run from anywhere else: reminders, home screen widgets, and regular buttons have no values to pass (D-428).
   describe('a quick action taking a handed value cannot be reached from a schedule or a shortcut', () => {
     const base = () => {
       const r = prepareOps(
@@ -996,7 +1010,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     });
   });
 
-  // relation-rules.test.ts「rule 14」：时间触发的工具只打开、不运行；分享、导出只能是快捷操作的步骤。
+  // relation-rules.test.ts "rule 14": Time-triggered tools only open, not run; sharing and exporting can only be quick action steps.
   it('a tool on a block cannot share, export or save to Files', () => {
     for (const action of ['out.share', 'out.saveToFolder', 'out.saveToPhotos', 'out.print'])
       expect(ToolUseSchema.safeParse({ as: 'button', label: 'x', action }).success).toBe(false);
@@ -1017,10 +1031,13 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
   });
 });
 
-describe('底线 11：写数据的操作都能挽回；一个简单操作改不回来的才弹撤销（删除、点一下改几处、批量新建、导入的一批）；批量修改一定先问', () => {
-  // 删除弹撤销、点一下改几处弹撤销（D-566）、其余写入（表单、打勾、一键新建、+1、点圆块）不弹：mobile 的 invariants-test.tsx；
-  // setAll 先问、改完不弹撤销：mobile 的 record-actions-test.tsx；点一下改几处：record-tap-also-test.tsx；
-  // 拖看板：tiles-board-test.tsx；桌面小组件：widgets-journeys-test.tsx。
+describe('Invariant 11: Every action that writes data can be taken back; an undo banner is shown only where one simple action cannot take it back (deletion, a tap that makes several changes at once, entries created in bulk, an imported batch); a bulk change must always ask first', () => {
+  // Deletions pop an undo banner, and actions modifying multiple places pop an undo banner (D-566),
+  // while other writes (forms, checkboxes, one-tap creation, incrementing, tapping circular blocks)
+  // do not: mobile's invariants-test.tsx; setAll asks first and does not pop an undo banner after
+  // completion: mobile's record-actions-test.tsx; modifying multiple places:
+  // record-tap-also-test.tsx; dragging Kanban boards: tiles-board-test.tsx; home screen widgets:
+  // widgets-journeys-test.tsx.
   it('asking before a bulk change does not promise an undo', () => {
     for (const text of [
       en.recordActionConfirm,
@@ -1028,13 +1045,13 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       zh.recordActionConfirm,
       fr.recordActionConfirm,
       frSingular.recordActionConfirm,
-      // 批量新建（D-567）也先问，问的时候也不提撤销。
+      // Bulk creation (D-567) also asks first, and does not mention undo when asking.
       en.recordCreateAllConfirm,
       enSingular.recordCreateAllConfirm,
       zh.recordCreateAllConfirm,
       fr.recordCreateAllConfirm,
       frSingular.recordCreateAllConfirm,
-      // 勾选新建（D-616）问的那一句是勾选页的按钮。
+      // The phrase asked during check-and-create (D-616) is the picker button text.
       en.recordPickAddButton,
       enSingular.recordPickAddButton,
       zh.recordPickAddButton,
@@ -1061,7 +1078,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     for (const base of [
       { do: 'setAll', table: 't', field: 'a', value: true },
       { do: 'createAll', table: 't', from: 's', values: {} },
-      // 勾选新建（D-616）：勾选页的按钮「添加 N 条到 B」就是先问的那一句（创始人 2026-11-21），配置里同样没有跳过它的设置。
+      // Check-and-create (D-616): The picker button text "Add N items to B" is the initial prompt (founder, 2026-11-21), and there is similarly no config setting to skip it.
       { do: 'createAll', table: 't', from: 's', pick: true, values: {} },
     ]) {
       expect(RecordToolSchema.safeParse(base).success).toBe(true);
@@ -1089,14 +1106,17 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       [{ do: 'create', table: 'x', values: {}, ask: 'all' }],
     ])
       expect(ToolUseSchema.safeParse({ ...tap, also }).success, JSON.stringify(also)).toBe(false);
-    // 提醒通知上的「完成」没有地方弹撤销：只能改一处。
+    // The "Done" button on reminder notifications has nowhere to pop an undo banner: it modifies at most a single place.
     const { as: _as, label: _label, also, ...done } = tap;
     expect(RecordToolSchema.safeParse(done).success).toBe(true);
     expect(RecordToolSchema.safeParse({ ...done, also }).success).toBe(false);
   });
 
-  // 清单的勾带 also（D-617）：勾上时顺带设这一条的一两个字段，取消时清空它们，所以取消就是拿回勾上做的全部，不弹撤销；
-  // 只有勾上盖掉了原来有的值时弹撤销（取消放不回那个值）。点开、撤销在 mobile 的 invariants-test.tsx、check-latest-empty-test.tsx。
+  // Checklist check with also (D-617): Checking sets one or two fields on this entry, and
+  // unchecking clears them, so unchecking reverses everything done by checking and does not pop an
+  // undo banner; an undo banner pops only when checking overwrites a previously existing value
+  // (since unchecking cannot restore that value). Opening and undo are tested in mobile's
+  // invariants-test.tsx and check-latest-empty-test.tsx.
   it('a check that also records something makes at most 3 changes, all set on this entry, and unticking clears them', () => {
     const tick = {
       as: 'check',
@@ -1112,7 +1132,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       [{ do: 'setAll', field: 'b', value: true }],
     ])
       expect(ToolUseSchema.safeParse({ ...tick, also }).success, JSON.stringify(also)).toBe(false);
-    // 没有跳过什么的设置（不问、不弹撤销、不清空）。
+    // No settings to skip anything (no prompting, no undo banner, no clearing).
     for (const skip of [{ undo: false }, { quiet: true }, { keep: true }, { clear: false }])
       expect(ToolUseSchema.safeParse({ ...tick, ...skip }).success).toBe(false);
     const config = createDefaultWorkspace('en');
@@ -1148,7 +1168,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       return r.ok ? '' : r.issues.map((i) => i.message).join('\n');
     };
     expect(on(tick)).toBe('');
-    // 新建一条（另一张表）、勾上就清空：取消拿不回来，拒绝。
+    // Creating an entry (in another table) and checking clears it: unchecking cannot restore it, so reject.
     expect(
       on({ ...tick, also: [{ do: 'create', table: 'logs', values: { task: '$row' } }] }),
     ).not.toBe('');
@@ -1168,12 +1188,13 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     expect(checkOverwrites(use, before, after)).toBe(false);
     const back = prepareRecordValues(table, checkInput(use, table, after, { now })!, after, now);
     expect(back.ok && back.values).toEqual(before);
-    // 勾上盖掉了原来的日期：这一次取消放不回它，App 弹撤销。
+    // Checking overwrote the original date: this time unchecking cannot restore it, so the app pops an undo banner.
     expect(checkOverwrites(use, { ...before, completed: '2026-01-05' }, after)).toBe(true);
   });
 
-  // 从表格文件导入（D-574，创始人 2026-11-16 决定 ⑦）：系统层，先给汇总、用户点「导入」才写，导完弹撤销
-  // （mobile 的 import-records-test.tsx、invariants-test.tsx）。
+  // Importing from a table file (D-574, founder decision ⑦ on 2026-11-16): System layer, first
+  // provides a summary, writes only after the user taps "Import", and pops an undo banner after
+  // completion (mobile's import-records-test.tsx, invariants-test.tsx).
   it('asking before an import does not promise an undo, and the import has fixed caps it never passes in part', () => {
     for (const text of [
       en.importSummary,
@@ -1196,9 +1217,12 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       expect(RecordToolSchema.safeParse({ do: kind, table: 't' }).success).toBe(false);
   });
 
-  // 打卡格（D-610）：点只有一条的格子把它移到「最近删除」，提示条上有撤销（mobile 的 grid-test.tsx、invariants-test.tsx）；
-  // 在格子里新建不弹撤销（再点一下就删掉）。这里管住结构：一次只删格子里的一条，没有筛选、条数，也没有跳过撤销的设置；
-  // 只能是打卡格上的点一下（每一条的按钮、按钮块、提醒的完成都不行，grid-look.test.ts）。
+  // Check-in grid (D-610): Tapping a single-item grid cell moves it to "Recently Deleted" with an
+  // undo button on the toast (mobile's grid-test.tsx, invariants-test.tsx); creating inside a cell
+  // does not pop an undo banner (tapping again deletes it). This controls structure: deletes at
+  // most one item per grid cell at a time, without filters, counts, or settings to skip undo;
+  // restricted to taps on the check-in grid (individual item buttons, button blocks, and reminder
+  // completion are excluded; grid-look.test.ts).
   it('removing from a grid is one entry, with no setting that skips the undo, and only on a grid', () => {
     expect(RecordToolSchema.safeParse({ do: 'remove', table: 't' }).success).toBe(true);
     for (const extra of [
@@ -1251,7 +1275,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
   it('setAll is capped at 200 entries', () => {
     const set = (n: number) =>
       RecordToolSchema.safeParse({ do: 'setAll', table: 't', field: 'a', value: true, max: n });
-    // 上限是常量，配置里写不进别的数。批量新建一样（D-567）。
+    // The upper limit is a constant, and no other number can be written in the config. Bulk creation is the same (D-567).
     expect(MAX_SET_ALL).toBe(200);
     expect(set(1000).success).toBe(false);
     expect(MAX_CREATE_ALL).toBe(200);
@@ -1263,10 +1287,10 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
 });
 
 // ---------------------------------------------------------------------------------------------
-// 兼容
+// Compatibility
 // ---------------------------------------------------------------------------------------------
 
-describe('底线 12：旧的永远能打开', () => {
+describe('Invariant 12: Old data always opens', () => {
   it('a print.records step saved before D-425 is still valid, with no attachments', () => {
     const params = { template: 'table', title: 'T', fields: [], pageSize: 'a4' };
     expect(registry.actions.get('print.records')!.params.safeParse(params).success).toBe(true);
@@ -1277,8 +1301,9 @@ describe('底线 12：旧的永远能打开', () => {
     expect(JSON.stringify(opened.tools)).not.toContain('"attachments"');
   });
 
-  // 迁移不丢东西：migrate-v34.test.ts（每份冻结配置的 ID 都在、M1–M8）、v34-equivalence.test.ts（迁移前后算出的
-  // 数据一样）、migrate.test.ts（每一步）。这里把每一份冻结的旧配置从头升到现在。
+  // Migrations lose nothing: migrate-v34.test.ts (all frozen config IDs present, M1-M8),
+  // v34-equivalence.test.ts (data calculated before and after migration is identical),
+  // migrate.test.ts (every step). This upgrades each frozen old config from scratch to the present.
   it.each(V33_NAMES)('frozen v33 config %s opens as a valid current config', (name) => {
     const r = prepareSnapshot(v33Fixture(name), registry);
     expect(r.ok ? [] : r.issues).toEqual([]);
@@ -1298,11 +1323,11 @@ describe('底线 12：旧的永远能打开', () => {
       const r = migrateWorkspace(structuredClone(config));
       expect(r.ok && r.config).toEqual(config);
     }
-    // D-607：单选多了 multiple，升到 40（只提升版本号）。
+    // D-607: Single-select gains multiple, upgrading to version 40 (version bump only).
     expect(CURRENT_SCHEMA_VERSION).toBe(40);
   });
 
-  // D-424：showIf、browse、single 都是新的可选值，没有它们的旧配置一个字不变；schemaVersion 不变。
+  // D-424: showIf, browse, and single are new optional values; old configs without them remain unchanged down to the letter, and schemaVersion is unchanged.
   it('old configs have no showIf or browse and load exactly as they were', () => {
     for (const [, config] of CONFIGS) {
       const text = JSON.stringify(config);
@@ -1312,7 +1337,7 @@ describe('底线 12：旧的永远能打开', () => {
     }
   });
 
-  // D-422：format 是可选的，旧配置没有它，读出来一个字不变，文字的值也一样读。
+  // D-422: format is optional; old configs lack it, read back completely unchanged down to the letter, and text values read identically.
   it('an old config with no format loads unchanged and its text values read the same', () => {
     const table = {
       id: 'c',
@@ -1337,9 +1362,10 @@ describe('底线 12：旧的永远能打开', () => {
   });
 });
 
-describe('底线 13：不联网也能用', () => {
-  // 联网的地方只有 AI、下载、需求按钮：上面「底线 1」的清单测试。离线时原生模块（ML Kit、翻译、语音）的
-  // 行为只能在真机上测，见 INVARIANTS_AUDIT.md。
+describe('Invariant 13: Works without a network', () => {
+  // The core and planner packages call the network exclusively to reach the AI: the checklist tests
+  // for "Invariant 1" above. Offline behaviors for native modules (ML Kit, translation, speech) can
+  // only be tested on real devices, see INVARIANTS_AUDIT.md.
   it('the core and planner packages call the network only to reach the AI', () => {
     const files = [
       ...sourceFiles(join(REPO, 'packages', 'core', 'src')),
@@ -1354,10 +1380,10 @@ describe('底线 13：不联网也能用', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// 容器、工具、数据之间
+// Between containers, tools, and data
 // ---------------------------------------------------------------------------------------------
 
-describe('底线 14：数据只有一份，只在数据里', () => {
+describe('Invariant 14: There is only one copy of the data, and it lives only in the data', () => {
   it('a computed field has no stored value', () => {
     const table = (field: object) => ({
       id: 't',
@@ -1368,7 +1394,7 @@ describe('底线 14：数据只有一份，只在数据里', () => {
     expect(CollectionSchema.safeParse(table(formula)).success).toBe(true);
     expect(CollectionSchema.safeParse(table({ ...formula, value: 4 })).success).toBe(false);
     expect(CollectionSchema.safeParse(table({ ...formula, values: [4] })).success).toBe(false);
-    // 空着的数算 0（D-619）是一个固定的词，没有地方放值；算出来的照样不存。
+    // Empty numbers evaluating to zero (D-619) is a fixed term with nowhere to store values; calculated values are similarly not stored.
     expect(CollectionSchema.safeParse(table({ ...formula, empty: 'zero' })).success).toBe(true);
     for (const empty of [0, 4, 'four', { value: 4 }])
       expect(CollectionSchema.safeParse(table({ ...formula, empty })).success).toBe(false);
@@ -1385,7 +1411,7 @@ describe('底线 14：数据只有一份，只在数据里', () => {
   });
 });
 
-describe('底线 14：配置里没有名片内容（D-423）', () => {
+describe('Invariant 14: No business card content in the config (D-423)', () => {
   const single = (show: object) => ({ id: 'x', look: 'single', source: { table: 't' }, show });
 
   it('a single block holds only a table and field ids; a QR code or values do not fit', () => {
@@ -1436,11 +1462,12 @@ describe('底线 14：配置里没有名片内容（D-423）', () => {
   });
 });
 
-describe('底线 15：看永远不会改', () => {
-  // 渲染每个模版、样板页面时数据库零写入：mobile 的 invariants-test.tsx。
+describe('Invariant 15: Looking never changes anything', () => {
+  // Reading data is a pure function of configuration and entries: zero database writes when rendering templates and sample pages (mobile's invariants-test.tsx).
   it('reading data is a pure function of the configuration and the entries', () => {
-    // source.ts 的读法不收写入的回调；这里检查它导出的读函数都不接受 repo（静态检查）。打卡格（D-610）的行、列、
-    // 每格的数和翻页也一样（grid-view.ts）。
+    // source.ts reading does not accept write callbacks; this checks that its exported read
+    // functions do not accept a repo (static check). The rows, columns, cell counts, and pagination
+    // of check-in grids (D-610) work the same way (grid-view.ts).
     for (const file of ['source.ts', 'grid-view.ts']) {
       const text = readFileSync(join(__dirname, file), 'utf8');
       expect(text).not.toMatch(/insertRecord|updateRecord|deleteRecord|setMeta|commitRevision/);
@@ -1492,16 +1519,17 @@ describe('底线 15：看永远不会改', () => {
   });
 });
 
-describe('底线 16：每次写入都来自用户的一次操作', () => {
-  // 提醒到点只弹通知、没有后台写入：relation-rules.test.ts「rule 13」（提醒没有步骤）；
-  // 启动、渲染、排提醒时零写入：mobile 的 invariants-test.tsx。
+describe('Invariant 16: Every write comes from one user action', () => {
+  // The code scheduling reminders only triggers notifications without background writes:
+  // relation-rules.test.ts "rule 13" (reminders have no steps); zero writes during startup,
+  // rendering, and reminder scheduling (mobile's invariants-test.tsx).
   it('the code that schedules reminders cannot write entries', () => {
     const text = readFileSync(join(__dirname, 'reminders.ts'), 'utf8');
     expect(text).not.toMatch(/insertRecord|updateRecord|deleteRecord/);
   });
 });
 
-describe('底线 17：打卡格只改它显示的那张表（D-610）', () => {
+describe('Invariant 17: Check-in grid only modifies the table it displays (D-610)', () => {
   it('a grid tap adds to or removes from the table the grid reads, never another one', () => {
     const config = createDefaultWorkspace('en');
     config.data.tables.push(
@@ -1538,7 +1566,7 @@ describe('底线 17：打卡格只改它显示的那张表（D-610）', () => {
   });
 });
 
-describe('底线 9 / 17 / 18：勾选新建只在列表下面、只写列表那张表（D-616）', () => {
+describe('Invariants 9 / 17 / 18: Checkbox creation is only below the list and writes only to the list\'s table (D-616)', () => {
   const config = createDefaultWorkspace('en');
   config.data.tables.push(
     { id: 'recipes', name: 'Recipes', fields: [{ id: 'name', name: 'Name', type: 'text' }] },
@@ -1612,9 +1640,11 @@ describe('底线 9 / 17 / 18：勾选新建只在列表下面、只写列表那�
   });
 });
 
-describe('底线 17：用户看到的就是被改的（关系规则 12）', () => {
-  // record-ops.test.ts「relation rule 12」：块上的工具只写块读的那张表，或经 $row / $record 关联到达的那条；
-  // relation-rules.test.ts：提醒的 done 只写这一条。mobile 的 record-actions-test.tsx 测执行时写的是哪张表。
+describe('Invariant 17: What the user sees is what gets changed (Relation Rule 12)', () => {
+  // record-ops.test.ts "relation rule 12": Tools on blocks write only to the table read by the
+  // block, or to the single record reached via $row / $record relations; relation-rules.test.ts:
+  // reminder done writes only to this entry. mobile's record-actions-test.tsx tests which table is
+  // written during execution.
   it('every one-tap tool in every frozen config writes a table the block reads, or a table linked back to it', () => {
     for (const [name, config] of CONFIGS) {
       const r = validateWorkspace(config, registry);
@@ -1626,16 +1656,16 @@ describe('底线 17：用户看到的就是被改的（关系规则 12）', () =
   });
 });
 
-// ---- 底线 18 用的：不靠 validate 的、独立的引用检查 ----
+// ---- Used by Invariant 18: Independent reference checks not relying on validation ----
 
 type Json = Record<string, unknown>;
 
-/** 配置里指向不存在的表、字段、工具、页面、工具包的引用。 */
+/** References in the config pointing to non-existent tables, fields, tools, pages, or packs. */
 function danglingRefs(config: WorkspaceConfig): string[] {
   const tables = new Map(config.data.tables.map((t) => [t.id, new Set(t.fields.map((f) => f.id))]));
   const pages = new Set(config.containers.pages.map((p) => p.id));
   const tools = new Set(config.tools.map((t) => t.id));
-  // 内置的快捷操作（D-236，不用添加就能运行）和两个选择器也是能引用的工具。
+  // Built-in quick actions (D-236, runnable without adding) and the two pickers are also referenceable tools.
   const toolOk = (id: string) =>
     tools.has(id) || presetById(id) !== undefined || (PICK_TOOLS as readonly string[]).includes(id);
   const packages = new Set(config.packages.map((p) => p.id));
@@ -1697,7 +1727,7 @@ function danglingRefs(config: WorkspaceConfig): string[] {
             out.push(`${at}.calc: ${f}`);
       }
     }
-    // 表上的 recordRow（D-428）：字段是这张表的。
+    // recordRow on tables (D-428): Fields belong to this table.
     if (Array.isArray(o.recordRow) && Array.isArray(o.fields)) {
       const own = new Set((o.fields as Json[]).map((f) => f.id));
       for (const item of o.recordRow as Json[])
@@ -1705,7 +1735,7 @@ function danglingRefs(config: WorkspaceConfig): string[] {
           out.push(`${at}.recordRow: ${String(item.field)}`);
     }
     if (typeof o.of === 'string' && !tables.has(o.of)) out.push(`${at}.of: ${o.of}`);
-    // 块上引用一个快捷操作：{tool: "<id>"}（不是 kind 为 reminder 的那种定义）。
+    // A block referencing a quick action: {tool: "<id>"} (not a reminder-kind definition).
     if (typeof o.tool === 'string' && !('kind' in o) && !toolOk(o.tool))
       out.push(`${at}.tool: ${o.tool}`);
     for (const [k, x] of Object.entries(o)) walk(x, `${at}.${k}`);
@@ -1716,7 +1746,7 @@ function danglingRefs(config: WorkspaceConfig): string[] {
   walk(config.data, 'data');
   for (const id of config.nav.phoneHomeScreen ?? [])
     if (!tools.has(id)) out.push(`nav.phoneHomeScreen: ${id}`);
-  // 文件桌面的工具栏：快捷操作的 ID（提醒不算）、目录里的动作。
+  // File desk toolbar: Quick action IDs (excluding reminders) and catalog actions.
   for (const [kind, groups] of Object.entries(config.containers.desk?.tools ?? {}))
     for (const item of (groups ?? []).flatMap((g) => g.items)) {
       if (typeof item === 'string') {
@@ -1725,7 +1755,7 @@ function danglingRefs(config: WorkspaceConfig): string[] {
       } else if (!registry.actions.has(item.action))
         out.push(`containers.desk.tools.${kind}: ${item.action}`);
     }
-  // 快捷操作的步骤：参数里的表（collectionId），和记录生成 PDF 列出的字段（属于前面读取记录的那张表）。
+  // Quick action steps: tables in parameters (collectionId), and fields listed for PDF generation from records (belonging to the table read previously).
   for (const wf of config.tools) {
     if (wf.kind !== 'quickAction') continue;
     let read: string | null = null;
@@ -1743,7 +1773,7 @@ function danglingRefs(config: WorkspaceConfig): string[] {
   return out;
 }
 
-/** 一份配置里每样能删的东西的删除操作。 */
+/** Deletion operations for each deletable item type in a config. */
 function removals(config: WorkspaceConfig): Op[] {
   const ops: Op[] = [];
   for (const t of config.data.tables) {
@@ -1763,7 +1793,7 @@ function removals(config: WorkspaceConfig): Op[] {
   return ops;
 }
 
-/** 确定的伪随机数。 */
+/** Deterministic pseudo-random numbers. */
 function rng(seed: number) {
   let h = seed >>> 0 || 1;
   return () => {
@@ -1774,7 +1804,7 @@ function rng(seed: number) {
   };
 }
 
-describe('底线 18：删掉新设置引用的表和字段（D-424）', () => {
+describe('Invariant 18: Delete tables and fields referenced by new settings (D-424)', () => {
   const sample = () => {
     const base = createStarterWorkspace('en', registry);
     const result = sampleOps('business-cards', base, 'en');
@@ -1824,7 +1854,7 @@ describe('底线 18：删掉新设置引用的表和字段（D-424）', () => {
   });
 });
 
-describe('底线 18：配置永远自洽', () => {
+describe('Invariant 18: The config is always self-consistent', () => {
   it('new summary references are cleaned up or their deletion is refused', () => {
     const initial = createDefaultWorkspace('en');
     const table = (id: string): Collection => ({
@@ -1908,11 +1938,11 @@ describe('底线 18：配置永远自洽', () => {
         if (result.ok) {
           expect(danglingRefs(result.after)).toEqual([]);
         } else {
-          // 拒绝时要说清是哪个块在用它，不能因为别的原因被拒而蒙混过关。
+          // Rejections must clearly state which block is using it, preventing arbitrary rejections from masking the true cause.
           expect(result.issues.join('\n')).toMatch(/calc|split|span|sum|block|used|uses/i);
         }
       }
-    // 确定的结果：删表整个清理（连同用它的块），删被引用的字段一律拒绝，没被任何块引用的 b.end 清理。
+    // Deterministic outcomes: table deletion cleans up entirely (along with blocks using it), deleting referenced fields is strictly rejected, and b.end not referenced by any block is cleaned up.
     expect(outcomes).toEqual({
       a: 'cleaned',
       b: 'cleaned',
@@ -1930,7 +1960,7 @@ describe('底线 18：配置永远自洽', () => {
   it('every frozen config starts without a dangling reference (the checker itself)', () => {
     for (const [name, config] of CONFIGS)
       expect({ name, refs: danglingRefs(config) }).toEqual({ name, refs: [] });
-    // 检查器本身认得出坏引用（包括快捷操作步骤里的表和字段）。
+    // The checker itself correctly identifies broken references (including tables and fields within quick action steps).
     const broken = structuredClone(v34Fixture('tasks'));
     broken.nav.bar = ['page:nope', 'settings'];
     expect(danglingRefs(broken)).toEqual(['nav.bar[0]: page:nope']);
@@ -1946,7 +1976,7 @@ describe('底线 18：配置永远自洽', () => {
       for (const op of removals(config).filter((o) => o.op === 'removeData')) {
         const r = prepareOps(config, [op], ctx);
         if (r.ok) continue;
-        // 别的原因（被别的表引用、表单问的字段）照常拒绝；不能因为快捷操作的步骤拒绝。
+        // Reject other reasons (referenced by other tables, fields requested by forms) as usual; do not reject due to quick action steps.
         expect({ op, issues: r.issues.filter((i) => /^[\w-]+\/[\w-]+: /.test(i)) }).toEqual({
           op,
           issues: [],
@@ -1991,7 +2021,7 @@ describe('底线 18：配置永远自洽', () => {
       expect(danglingRefs(config)).toEqual([]);
   });
 
-  // 下面这些引用校验器原来不查（审计 F3，创始人 2026-11-03 在对话里说先修复）。只在修改时拒绝：旧配置要还能打开（底线 12）。
+  // The reference validators below were previously unchecked (Audit F3, founder instructed to fix first in conversation on 2026-11-03). Reject only upon modification: old configs must still open (Invariant 12).
   describe('a change cannot add a reference to something that does not exist', () => {
     const base = (): WorkspaceConfig => {
       const r = applyOps(
@@ -2139,7 +2169,7 @@ describe('底线 18：配置永远自洽', () => {
         expect(prepareOps(base(), desk(kind, [...items]), ctx).ok).toBe(true);
       const own = prepareOps(base(), [quickAction({}), ...desk('image', ['q'])], ctx);
       expect(own.ok).toBe(true);
-      // 默认工具栏上的动作都能写进配置。
+      // Actions on the default toolbar can all be written into the config.
       for (const kind of ['image', 'pdf', 'sheet', 'doc', 'video', 'audio'] as const) {
         const items = defaultDeskTools(kind, registry, [], 'en').flatMap((g) => g.items);
         const r = prepareOps(base(), desk(kind, items.slice(0, 20)), ctx);
@@ -2162,7 +2192,7 @@ describe('底线 18：配置永远自洽', () => {
       expect(prepareOps(base(), [quickAction({ preset: 'visa-photo' })], ctx).ok).toBe(true);
     });
 
-    it('a config saved with such references still opens and can still be changed (底线 12)', () => {
+    it('a config saved with such references still opens and can still be changed (Invariant 12)', () => {
       const old = structuredClone(base());
       const home = old.containers.pages.find((p) => p.id === 'home')!;
       home.blocks.push(number({ aggregate: 'count', field: 'gone' }) as never);
@@ -2189,7 +2219,7 @@ describe('底线 18：配置永远自洽', () => {
       expect(prepareSnapshot(old, registry).ok).toBe(true);
       const edit = [{ op: 'updateContainer', page: 'home', changes: { title: 'Home 2' } }];
       expect(prepareOps(old, edit, ctx).ok).toBe(true);
-      // 工具栏上旧的提醒 ID：提醒还能删。
+      // Old reminder IDs on the toolbar: reminders can still be deleted.
       const withReminder = structuredClone(old);
       withReminder.containers.desk = { tools: { pdf: [{ items: ['old-r2'] }] } };
       withReminder.tools.push({
@@ -2201,7 +2231,7 @@ describe('底线 18：配置永远自洽', () => {
         opens: 'page:home',
       });
       expect(prepareOps(withReminder, [{ op: 'removeTool', tool: 'old-r2' }], ctx).ok).toBe(true);
-      // 新写的坏引用照样拒绝。
+      // Newly written broken references continue to be rejected.
       expect(
         prepareOps(old, [...edit, ...add(number({ aggregate: 'count', field: 'no' }))], ctx).ok,
       ).toBe(false);
@@ -2210,13 +2240,15 @@ describe('底线 18：配置永远自洽', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// 用户要的事
+// What the user wants
 // ---------------------------------------------------------------------------------------------
 
-describe('底线 19：用户要的事都能做到', () => {
-  // 创始人 2026-10-31（对话）：快捷操作处理文件，最后交给页面（新记录表单、记录页）由用户确认保存；类型对得上的
-  // 动作都能串；AI 不能因为「不合理」拒绝做得到的组合（提示词那一半在 planner 的 prompt-baseline.test.ts）。
-  // 还是直链，每步只拿上一步的输出（底线 9 不变）。
+describe('Invariant 19: What the user wants can be done', () => {
+  // Founder 2026-10-31 (conversation): Quick actions process files and finally hand them over to a
+  // page (new record form, record page) for the user to confirm saving; any actions with matching
+  // types can be chained; the AI cannot refuse achievable combinations as "unreasonable" (the
+  // prompt half is in planner's prompt-baseline.test.ts). Still a straight chain, with each step
+  // taking only the output of the previous one (Invariant 9 unchanged).
   const paramsOf = (a: ActionDefinition) => {
     const p = { ...(defaultParams(a) ?? initialParams(a)) };
     if ('collectionId' in p) p.collectionId = 'notes';
@@ -2249,8 +2281,9 @@ describe('底线 19：用户要的事都能做到', () => {
     const problems: string[] = [];
     let pairs = 0;
     for (const a of actions) {
-      // a 前面接一个能喂它的输入动作（a 本身是输入动作时它就是第一步）。
-      // 输入动作的输出可能看参数（in.files 的 accept）：每个选项都试。
+      // a is preceded by an input action capable of feeding it (if a itself is an input action, it
+      // is the first step). An input action's output may depend on parameters (in.files accept):
+      // test every option.
       const feed = isSourceAction(a)
         ? []
         : sources
@@ -2285,9 +2318,9 @@ describe('底线 19：用户要的事都能做到', () => {
   });
 });
 
-// ---- 容器把数据交给工具（D-428，创始人 2026-11-04 在对话里定）----
+// ---- Containers passing data to tools (D-428, determined by founder in conversation on 2026-11-04) ----
 
-/** 样板「名片」：两张表都有记录页的按钮，列表、单条记录块上都有工具。 */
+/** "Business Card" sample app: Both tables have record page buttons, with tools on lists and single-record blocks. */
 const cardsSample = () => {
   const base = createStarterWorkspace('en', registry);
   const result = sampleOps('business-cards', base, 'en');
@@ -2307,7 +2340,7 @@ const handedSteps = (id: string, ...actions: string[]): Workflow => ({
   })),
 });
 
-describe('底线 2 / 6：AI 能配置容器上的工具，运行不了，也看不到值（D-428）', () => {
+describe('Invariants 2 / 6: AI can configure tools on containers, but cannot run them or see values (D-428)', () => {
   it('recordRow is only structure, and the ops take it', () => {
     const r = prepareOps(
       cardsSample(),
@@ -2345,7 +2378,7 @@ describe('底线 2 / 6：AI 能配置容器上的工具，运行不了，也看�
   });
 });
 
-describe('底线 9：容器上的工具也是直链，不能触发别的工具（D-428）', () => {
+describe('Invariant 9: Tools on containers are also direct chains and cannot trigger other tools (D-428)', () => {
   it('an item in the row names one tool and nothing else', () => {
     const table = { id: 't', name: 'T', fields: [{ id: 'f', name: 'F', type: 'text' }] };
     for (const extra of [{ then: 'other' }, { steps: [] }, { when: [] }, { run: true }])
@@ -2365,10 +2398,12 @@ describe('底线 9：容器上的工具也是直链，不能触发别的工具�
   });
 });
 
-describe('底线 12：旧配置不变（D-428）', () => {
+describe('Invariant 12: Old config remains unchanged (D-428)', () => {
   it('stays on the same version: every addition is optional', () => {
-    // D-607 升到 40 是另一件事（多选），容器上的工具没有再改版本。D-617–D-619（勾带 also、数字块 latest、
-    // 公式 empty "zero"）也不升：都是可选的写法，存的数据不变，旧 App 遇到会拒绝而不是读错。
+    // D-607 upgrading to 40 is a separate matter (multiple select); container tools did not undergo
+    // further version changes. D-617-D-619 (checklist also, latest number blocks, empty formula
+    // "zero") also do not trigger version upgrades: all are optional syntaxes with unchanged stored
+    // data, which older apps will reject rather than misread.
     expect(CURRENT_SCHEMA_VERSION).toBe(40);
   });
 
@@ -2416,7 +2451,7 @@ describe('底线 12：旧配置不变（D-428）', () => {
   });
 });
 
-describe('底线 14：配置里只有 ID，没有值（D-428）', () => {
+describe('Invariant 14: Config contains only IDs, no values (D-428)', () => {
   it('an item has no place for a value, and neither does a list tool', () => {
     const table = { id: 't', name: 'T', fields: [{ id: 'f', name: 'F', type: 'text' }] };
     for (const value of [{ value: '13800000000' }, { text: 'x' }, { url: 'tel:1' }])
@@ -2428,7 +2463,7 @@ describe('底线 14：配置里只有 ID，没有值（D-428）', () => {
   });
 });
 
-describe('底线 17：列表交的就是它选出的（D-428）', () => {
+describe('Invariant 17: Lists pass what they select (D-428)', () => {
   it('a tool on a list must take records, and a tool on each entry cannot be a quick action', () => {
     const list = (use: object) => ({
       op: 'addContainer',
@@ -2444,7 +2479,7 @@ describe('底线 17：列表交的就是它选出的（D-428）', () => {
     });
     const ok = (use: object) => prepareOps(cardsSample(), [list(use)] as Op[], ctx).ok;
     expect(ok({ as: 'list', tool: 'record-vcard' })).toBe(true);
-    // 自己选输入的快捷操作不看列表选了什么，放在列表上会让人以为只作用到看到的这些。
+    // Quick actions that select their own input do not look at what is selected in the list; placing them on a list makes it look like they act only on the visible items.
     expect(ok({ as: 'list', tool: 'scan-card' })).toBe(false);
     expect(ok({ as: 'list', tool: 'record-call' })).toBe(false);
     expect(ok({ as: 'button', label: 'x', tool: 'record-vcard' })).toBe(false);
@@ -2452,7 +2487,7 @@ describe('底线 17：列表交的就是它选出的（D-428）', () => {
   });
 });
 
-describe('底线 4 / 17 / 18：容器把附件交给工具（D-442）', () => {
+describe('Invariants 4 / 17 / 18: Containers pass attachments to tools (D-442)', () => {
   const shrink = () => handedSteps('shrink', 'pdf.compress');
   const tableOf = (config: WorkspaceConfig, id: string) =>
     config.data.tables.find((t) => t.id === id)!;
@@ -2475,11 +2510,11 @@ describe('底线 4 / 17 / 18：容器把附件交给工具（D-442）', () => {
     const row = (recordRow: unknown) =>
       withShrink([{ op: 'updateData', table: 'contacts', changes: { recordRow } }]).ok;
     expect(row([{ tool: 'shrink', field: 'attachments' }])).toBe(true);
-    // 没写字段、写的不是附件字段、字段不存在：交不出文件。
+    // No field specified, not an attachment field, or field does not exist: cannot output files.
     expect(row([{ tool: 'shrink' }])).toBe(false);
     expect(row([{ tool: 'shrink', field: 'name' }])).toBe(false);
     expect(row([{ tool: 'shrink', field: 'nope' }])).toBe(false);
-    // 反过来：收文字的工具不能接附件字段。
+    // Conversely: a tool that receives text cannot be connected to an attachment field.
     expect(row([{ tool: 'record-copy', field: 'attachments' }])).toBe(false);
   });
 
@@ -2528,7 +2563,7 @@ describe('底线 4 / 17 / 18：容器把附件交给工具（D-442）', () => {
       table: { id: 'plain', name: 'Plain', fields: [{ id: 'n', name: 'N', type: 'text' }] },
     };
     expect(withShrink([plain, list({ as: 'list', tool: 'shrink' }, 'plain', 'n')]).ok).toBe(false);
-    // 同样的列表读有附件字段的表：可以（说明上面是因为没有附件字段才不行）。
+    // The same list reading a table with an attachment field: allowed (showing that the above failed because there was no attachment field).
     expect(withShrink([list({ as: 'list', tool: 'shrink' }, 'contacts', 'name')]).ok).toBe(true);
     const single = (table: string, field = 'name') => ({
       op: 'addContainer',
@@ -2578,14 +2613,14 @@ describe('底线 4 / 17 / 18：容器把附件交给工具（D-442）', () => {
     }
   });
 
-  it('the AI is told it can hand attachments, and that it never sees them (底线 2、3)', () => {
+  it('the AI is told it can hand attachments, and that it never sees them (Invariants 2, 3)', () => {
     const rule = registry.actions.get('out.call')!.aiRules!.find((r) => r.n === 54)!.text;
     expect(rule).toMatch(/attachment/i);
     expect(rule).toMatch(/never see/i);
   });
 });
 
-describe('底线 3 / 5 / 14 / 18：记一笔放进已有记录（D-443）', () => {
+describe('Invariants 3 / 5 / 14 / 18: Log an entry into an existing record (D-443)', () => {
   const addRecord = registry.actions.get('out.addRecord')!;
   const own = (params: Record<string, unknown>): Workflow => ({
     id: 'to-existing',
@@ -2598,7 +2633,7 @@ describe('底线 3 / 5 / 14 / 18：记一笔放进已有记录（D-443）', () =
   });
 
   it('the AI only says which table and that it is an existing entry: the entry and the files are chosen by the user when it runs', () => {
-    // 能写的只有表、每个文件一条、into；写不了哪一条记录、哪个文件（也看不到）。
+    // The only writable parts are tables, one file per entry, and into; cannot write to a specific record or file (and cannot see them either).
     for (const extra of [{ recordId: 'r1' }, { assetId: 'a1' }, { fileId: 'a1' }, { values: {} }])
       expect(
         addRecord.params.safeParse({ collectionId: 'contacts', into: 'existing', ...extra })
@@ -2618,7 +2653,7 @@ describe('底线 3 / 5 / 14 / 18：记一笔放进已有记录（D-443）', () =
     expect(added.ok ? [] : added.issues).toEqual([]);
     if (!added.ok) return;
     expect(danglingRefs(added.after)).toEqual([]);
-    // 删掉它写的表：这一步（所以整个快捷操作）一起清理，不留指向不存在的表的引用。
+    // Remove the table it writes: cleaned up together with this step (and thus the whole quick action), leaving no references to non-existent tables.
     const gone = prepareOps(added.after, [{ op: 'removeData', table: 'contacts' }], ctx);
     expect(gone.ok ? [] : gone.issues).toEqual([]);
     if (gone.ok) expect(danglingRefs(gone.after)).toEqual([]);
@@ -2640,7 +2675,7 @@ describe('底线 3 / 5 / 14 / 18：记一笔放进已有记录（D-443）', () =
   });
 });
 
-describe('底线 18：容器上的工具的引用（D-428）', () => {
+describe('Invariant 18: References to tools on containers (D-428)', () => {
   const tableOf = (config: WorkspaceConfig, id: string) =>
     config.data.tables.find((t) => t.id === id)!;
 
@@ -2711,7 +2746,7 @@ describe('底线 18：容器上的工具的引用（D-428）', () => {
     if (!gone.ok) return;
     expect(danglingRefs(gone.after)).toEqual([]);
     const page = gone.after.containers.pages.find((p) => p.id === 'contacts')!;
-    // 导出在样板里是分开的浮动按钮的一项：这一项去掉，别的留着（创始人 2026-11-04 定）。
+    // Export is one of the floating button items in the preset: this item is removed, others remain (decided by the founder 2026-11-04).
     const dial = allComponents(page).find((c) => c.look === 'dial') as {
       tools: { tool?: string; do?: string }[];
     };
@@ -2784,7 +2819,7 @@ describe('底线 18：容器上的工具的引用（D-428）', () => {
   });
 });
 
-describe('底线 19：容器上的工具类型对得上就能串（D-428）', () => {
+describe('Invariant 19: Tools on containers can be chained if their types match (D-428)', () => {
   it('every action taking text or records can start a chain, and what fits can follow', () => {
     for (const action of registry.actions.values()) {
       if (isSourceAction(action) || !handedTypeOf(action)) continue;
@@ -2813,7 +2848,7 @@ describe('底线 19：容器上的工具类型对得上就能串（D-428）', ()
   });
 });
 
-// D-429：每一笔单独选货币。货币是记录里一个单选字段的值，配置里只有字段 ID。
+// D-429: Each entry picks its own currency. Currency is the value of a single-choice field in the record; the config contains only the field ID.
 describe('each entry picks its own currency (D-429)', () => {
   const ctx = { registry, locale: 'en' as const };
   const table = () => ({
@@ -2874,7 +2909,7 @@ describe('each entry picks its own currency (D-429)', () => {
   });
 });
 
-describe('底线 2 / 14：标签只在记录里，配置和发给 AI 的都没有标签名（创始人 2026-11-04 定）', () => {
+describe('Invariants 2 / 14: Tags exist only in records; neither config nor payloads sent to AI contain tag names (decided by the founder 2026-11-04)', () => {
   const list = (browse: object) => ({
     id: 'x',
     look: 'list',
@@ -2949,9 +2984,9 @@ describe('底线 2 / 14：标签只在记录里，配置和发给 AI 的都没�
   });
 });
 
-describe('底线 12：打卡格是新外观，旧配置和改动历史里的旧版本照样打开（D-610）', () => {
+describe('Invariant 12: Check-in grid has a new look, while old configs and old versions in change history still open normally (D-610)', () => {
   it('a new look and keys used only by it: no version bump, old configs load unchanged', () => {
-    // 打卡格自己没升版本；40 是多选（D-607）升的。
+    // Check-in grid did not increment its own version; 40 was bumped for multi-choice (D-607).
     expect(CURRENT_SCHEMA_VERSION).toBe(40);
     for (const [, config] of CONFIGS) {
       const text = JSON.stringify(config);
@@ -2988,9 +3023,9 @@ describe('底线 12：打卡格是新外观，旧配置和改动历史里的旧�
   });
 });
 
-describe('底线 12：旧的配置不用固定区、标签和浮动按钮照样打开（创始人 2026-11-04 定）', () => {
+describe('Invariant 12: Old configs open successfully without fixed areas, tags, or floating buttons (decided by the founder 2026-11-04)', () => {
   it('schemaVersion stays 40 and a config without the new keys is valid and unchanged', () => {
-    // 39 → 40 是 D-607（多选），只提升版本号。
+    // 39 -> 40 is D-607 (multi-choice), which only bumps the version number.
     expect(CURRENT_SCHEMA_VERSION).toBe(40);
     const old = fromV33(v33Fixture('sample-expense-helper-zh') as never);
     const text = JSON.stringify(old);
@@ -2999,7 +3034,7 @@ describe('底线 12：旧的配置不用固定区、标签和浮动按钮照样�
   });
 });
 
-describe('底线 18：固定区、标签筛选、浮动按钮的引用（创始人 2026-11-04 定）', () => {
+describe('Invariant 18: References to fixed areas, tag filters, and floating buttons (decided by the founder 2026-11-04)', () => {
   const dialOf = (config: WorkspaceConfig) =>
     allComponents(config.containers.pages.find((p) => p.id === 'contacts')!).find(
       (c) => c.look === 'dial',
@@ -3141,17 +3176,17 @@ describe('底线 18：固定区、标签筛选、浮动按钮的引用（创始�
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.issues.join()).toMatch(pattern);
     };
-    // 交记录的工具不能当普通项（没有值可交），也不能在没有列表的页面上。
+    // A tool that takes records cannot be used as a regular item (has no value to pass), nor on a page without a list.
     refused(dial([{ tool: 'export-contacts' }]), /takes a record, a value or attachments/);
     refused(dial([{ as: 'list', tool: 'export-contacts' }]), /exactly one top-level list/);
-    // 要容器交记录的才能放 as: "list"；自己选文件的不行。
+    // Only tools requiring container records can use as: "list"; self-selecting files is not allowed.
     refused(dial([{ as: 'list', tool: 'scan-card' }]), /must start with a step that takes records/);
     refused(dial([{ tool: 'no-such' }]), /missing quick action/);
     refused(dial([{ opens: 'no-such', label: 'x' }]), /is not a page/);
     refused(dial([{ do: 'create', table: 'contacts', ask: 'all' }]), /needs a label/);
     refused({ id: 'd', look: 'dial', tools: [{ tool: 'scan-card' }] }, /set pin "bottom"/);
     expect(add(dial([{ tool: 'scan-card' }])).ok).toBe(true);
-    // 一个页面一个。
+    // One per page.
     const two = prepareOps(
       cardsSample(),
       [
@@ -3189,7 +3224,7 @@ describe('底线 18：固定区、标签筛选、浮动按钮的引用（创始�
   });
 });
 
-describe('底线 2 / 5 / 12 / 15：单选可以选多个（D-607）', () => {
+describe('Invariants 2 / 5 / 12 / 15: Single choice can select multiple values (D-607)', () => {
   const days = {
     id: 'days',
     name: 'Days',

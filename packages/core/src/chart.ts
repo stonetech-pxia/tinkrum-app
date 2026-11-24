@@ -22,7 +22,7 @@ import { latestValue } from './related';
 import { t } from './messages';
 import { dateFieldOf, distinctDays } from './sequence';
 
-/** 不写 group.last 时显示最近几段：7 天、8 周、6 个月。 */
+/** Default number of recent periods displayed when group.last is omitted: 7 days, 8 weeks, 6 months. */
 export const DEFAULT_PERIODS: Record<GroupUnit, number> = {
   day: 7,
   week: 8,
@@ -31,8 +31,10 @@ export const DEFAULT_PERIODS: Record<GroupUnit, number> = {
 export const MAX_PERIODS = 31;
 
 /**
- * 饼图的分类色（按固定顺序用，不循环）：dataviz 参考调色板的 8 个色相，相邻两色在色盲模拟下也分得开；
- * 浅色、深色界面各一套。超过 7 类时第 8 块是「其他」，用中性灰。
+ * Category colors for pie charts (used in a fixed sequence without looping): 8 hues from the
+ * dataviz reference palette, ensuring adjacent colors remain distinguishable under
+ * color-blindness simulation; separate sets for light and dark themes. When categories exceed 7,
+ * the 8th slice is labeled "Other" and rendered in neutral gray.
  */
 export const CHART_COLORS = {
   light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6'],
@@ -42,11 +44,15 @@ export const CHART_COLORS = {
 export const MAX_PIE_SLICES = 8;
 
 /**
- * 一个单选选项画成什么颜色（D-568）：写了 color 的用那个有名字的颜色，没写的按 index 取分类色，
- * index 不在分类色里（第 8 个起、没选、「其他」是 -1）时是中性灰。按值上色、月历、饼图都用它。
- * options 是这个字段的全部选项（D-571）：其中有写了颜色的时，没写颜色的按它在没写颜色的选项里的顺序，
- * 取不和那些颜色同一色系的分类色（CHART_COLOR_FAMILIES），在哪里画都是同一个颜色；取完了是中性灰。
- * 一个都没写颜色（或者不传 options）时和以前完全一样。
+ * Determines the display color for a single-select option (D-568): options with an explicit color
+ * use that named color; unassigned options take category colors by index. When an index falls
+ * outside the category colors (starting from the 8th, unselected, or "Other" as -1), neutral gray
+ * is used. Used by value-based coloring, calendars, and pie charts. options represents all
+ * available options for this field (D-571): when some options specify colors, unassigned options
+ * take category colors from the palette (CHART_COLOR_FAMILIES) in order, avoiding the color
+ * families already used, ensuring consistent coloring across views; remaining options fall back
+ * to neutral gray. If no options specify colors (or options is omitted), behavior matches
+ * previous versions entirely.
  */
 export function optionColor(
   option: { id?: string; color?: OptionColor | undefined } | undefined,
@@ -64,7 +70,7 @@ export function optionColor(
   return (k >= 0 ? free[k] : undefined) ?? grey;
 }
 
-/** 饼图和拆分图共用字段中的选项顺序；筛掉前面的选项不能让颜色换位。 */
+/** Pie charts and split charts share option ordering within fields; skipping earlier options does not shift color assignments. */
 export function chartOptionColor(
   key: string | null,
   options: readonly { id: string; color?: OptionColor | undefined }[],
@@ -76,19 +82,21 @@ export function chartOptionColor(
 }
 
 export interface ChartPoint {
-  /** 时间段的开始日期（YYYY-MM-DD）或选项 ID；「其他」和「未选」是 null。 */
+  /** Start date of the time period (YYYY-MM-DD) or option ID; "Other" and "Unassigned" are null. */
   key: string | null;
   label: string;
   value: number;
-  /** 这一段有没有可统计的数（平均值没有数时 value 是 0，但显示「—」）。 */
+  /** Indicates whether the period contains statistically valid data (for averages with no data, value is 0, but displayed as "—"). */
   empty: boolean;
-  /** 同一时间段按单选拆分的部分；所有时间段保持相同的顺序。 */
+  /** Parts split by single-select within the same time period; maintains identical ordering across all time periods. */
   parts?: ChartPoint[];
 }
 
 /**
- * 图表怎么算（图表块的 source 去掉表和筛选）：group 有 unit 时按时间分（by 是日期字段，不写用 dateFieldOf 的默认），
- * 没有 unit 时按单选或引用字段 by 分（D-336）；distinctDays 在按字段分时按 days.date 数日子。
+ * Defines how a chart calculates its data (derived from chart block source excluding table and
+ * filters): when group has unit, groups by time (using by as the date field, defaulting to
+ * dateFieldOf); without unit, groups by single-select or reference field by (D-336); distinctDays
+ * counts unique days using days.date when grouping by field.
  */
 export type ChartSpec = Pick<
   ChartSource,
@@ -96,14 +104,15 @@ export type ChartSpec = Pick<
 >;
 
 /**
- * 最近 n 段的开始日期（从早到晚，最后一段包含今天）。今天和一周的第一天按 cal（D-286），和数据筛选一样。
+ * Start dates for the most recent n periods (from oldest to newest, with the final period
+ * including today). Today and the start of the week follow cal (D-286), matching data filtering.
  */
 export function periodStarts(
   group: GroupUnit,
   n: number,
   now: Date,
   cal: Calendar,
-  /** 再往前几段（上一期对比用，D-439）：0 是最近 n 段。 */
+  /** Offset for earlier periods (used for previous-period comparison, D-439): 0 represents the most recent n periods. */
   shift = 0,
 ): Date[] {
   const todayNum = todayNumber(now, cal);
@@ -125,12 +134,15 @@ const periodLabel = (group: GroupUnit, d: Date) =>
     : `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 /**
- * 图表的数据。时间分组：最近 group.last 段，每段一个点（没有记录的段是 0）。
- * 单选分组：每个选项一个点（按选项顺序），没选的记录有的话另算一个点（label 用 noChoice）。
- * 引用字段也走这里（D-336）：被引用的表里每条记录一个点，要 linked。
- * previous（D-439，只有时间分组）：不是最近 n 段，而是它前面紧挨着的 n 段，第 i 个点和最近 n 段的第 i 个点对着比。
- * range（D-440，页面上选的时间范围）：不看 group.unit 和 last，按范围的长短自己选按天、周、月（rangeUnit），
- * 每段一个点，范围外的记录不算。
+ * Chart data points. Time grouping: the most recent group.last periods, with one point per period
+ * (0 for periods with no records). Single-select grouping: one point per option (in option
+ * order), with records lacking a selection grouped separately (labeled noChoice). Reference
+ * fields also use this path (D-336): one point per record in the referenced table, requiring
+ * linked records. previous (D-439, time grouping only): represents the n periods immediately
+ * preceding the most recent n periods, allowing direct comparison of the i-th point against the
+ * i-th point of the recent n periods. range (D-440, page-selected time range): ignores group.unit
+ * and last, automatically determining grouping by day, week, or month (rangeUnit) based on range
+ * length, with one point per period and excluding records outside the range.
  */
 export function chartSeries(
   records: readonly DataRecord[],
@@ -170,7 +182,7 @@ export function chartSeries(
     const n = Math.min(MAX_PERIODS, group.last ?? DEFAULT_PERIODS[unit]);
     const shift = previous ? n : 0;
     const starts = periodStarts(unit, n, now, cal, shift).map(localDate);
-    // 上一期结束在最近 n 段开始的前一天。
+    // The previous period ends on the day before the start of the most recent n periods.
     const end = previous
       ? (() => {
           const [y, m, d] = localDate(periodStarts(unit, n, now, cal)[0]!)
@@ -183,7 +195,7 @@ export function chartSeries(
     for (const r of records) {
       const v = recordDay(r, collection, dateRef, now, cal);
       if (v === undefined || v < starts[0]! || v > end) continue;
-      // 落在最后一个开始日期不晚于它的那一段。
+      // Falls within the period whose start date is the latest one not later than it.
       let i = starts.length - 1;
       while (i > 0 && starts[i]! > v) i--;
       buckets[i]!.push(r);
@@ -262,7 +274,7 @@ export function chartSeries(
   return points;
 }
 
-/** 页面上选了时间范围（D-440）：范围里每一段（天 / 周 / 月，按范围长短）一个点；范围外的记录不算，第一段和最后一段可能只有一部分。 */
+/** When a time range is selected on the page (D-440): one data point per period (day/week/month, based on range length) within the range; records outside the range are excluded, and the first and last periods may be partial. */
 function rangeSeries(
   records: readonly DataRecord[],
   collection: Collection,
@@ -288,7 +300,7 @@ function rangeSeries(
   });
 }
 
-/** 饼图：只要正数；超过 MAX_PIE_SLICES 块时最小的几块合成「其他」（other）。 */
+/** Pie chart: positive values only; when exceeding MAX_PIE_SLICES, combines the smallest slices into an "Other" category. */
 export function pieSlices(points: readonly ChartPoint[], other: string): ChartPoint[] {
   const positive = points.filter((p) => p.value > 0);
   if (positive.length <= MAX_PIE_SLICES) return positive;
@@ -300,7 +312,7 @@ export function pieSlices(points: readonly ChartPoint[], other: string): ChartPo
 
 const num = (n: number) => String(Math.round(n * 100) / 100);
 
-/** 折线：值映射到 width × height 的框里（0 在底边，最大值在顶边留 pad）。只有一个点时是一个点。 */
+/** Line chart: maps values into a width × height bounding box (0 at the bottom baseline, maximum value at top with padding). A single point is rendered as a point marker. */
 export function linePath(
   values: readonly number[],
   width: number,
@@ -312,7 +324,7 @@ export function linePath(
   return values.map((v, i) => `${i === 0 ? 'M' : 'L'}${num(x(i))} ${num(y(v))}`).join(' ');
 }
 
-/** 折线和柱子共用的比例尺：最小值不高于 0（有负数时 0 线往上移）。 */
+/** Shared scale for line and bar charts: minimum value is bounded at or below 0 (shifting the 0-line upward when negative values exist). */
 export function lineScale(values: readonly number[], width: number, height: number, padding = 6) {
   const max = Math.max(0, ...values);
   const min = Math.min(0, ...values);
@@ -326,8 +338,9 @@ export function lineScale(values: readonly number[], width: number, height: numb
 }
 
 /**
- * 饼图每一块的路径（圆心 cx, cy，半径 r，从 12 点钟方向顺时针）。只有一块时是整个圆。
- * 块与块之间的白缝由 App 用表面色描边画出来。
+ * SVG path for each slice of a pie chart (centered at cx, cy with radius r, clockwise from 12
+ * o'clock). A single slice forms a full circle. White borders between slices are drawn by the app
+ * using surface-colored strokes.
  */
 export function piePaths(values: readonly number[], cx: number, cy: number, r: number): string[] {
   const total = values.reduce((s, v) => s + Math.max(0, v), 0);
@@ -347,7 +360,7 @@ export function piePaths(values: readonly number[], cx: number, cy: number, r: n
   });
 }
 
-/** 柱状图和折线图的 Y 轴范围（D-438）：总是包含 0（柱子从 0 画起，不截断），最大值上留一点空白。没有数据时 0 到 1。 */
+/** Y-axis range for bar and line charts (D-438): always includes 0 (bars start from 0 without truncation), leaving a small top margin above the maximum value. Defaults to 0 to 1 when no data is present. */
 export function chartYDomain(values: readonly number[]): [number, number] {
   const lo = Math.min(0, ...values);
   const hi = Math.max(0, ...values);
@@ -355,7 +368,7 @@ export function chartYDomain(values: readonly number[]): [number, number] {
   return [lo, hi + (hi - lo) * 0.08];
 }
 
-/** Y 轴刻度上的数字：1200 → 1.2k，2500000 → 2.5M，小数最多一位。只有数字，没有货币符号。 */
+/** Y-axis tick numbers: 1200 → 1.2k, 2500000 → 2.5M, at most one decimal place. Numbers only, no currency symbol. */
 export function axisTickText(value: number): string {
   const a = Math.abs(value);
   const r = (n: number, digits: number) => String(Number(n.toFixed(digits)));

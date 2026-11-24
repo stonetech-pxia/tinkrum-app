@@ -10,7 +10,7 @@ import type { WorkspaceConfig } from './schema';
 import { createStarterWorkspace } from './starter';
 import { registry } from './test-helpers';
 
-// 在 app 里改（D-485，暂定规则）：只能改这个 app 自己的东西，超出的整个拒绝；不带 scope（主页）改整个工作区。
+// Modifications within an app (D-485, provisional rule): Restricted exclusively to the app's own items, rejecting any out-of-scope changes entirely; modifications without a scope (home) apply workspace-wide.
 
 const ctx = (appId?: string): ChangeContext => ({
   registry,
@@ -28,7 +28,7 @@ const table = (id: string, app?: string) => ({
   fields: [text('title')],
 });
 
-/** 主页 + 两个 app（fit、cook），主页有一张共用的表 notes，每个 app 各有一张自己的表。 */
+/** Home + two apps (fit, cook); home has a shared table notes, and each app has its own table. */
 function world(): WorkspaceConfig {
   const ops: Op[] = [
     { op: 'addContainer', app: { id: 'fit', name: 'Fitness' } },
@@ -58,7 +58,7 @@ const issuesOf = (config: WorkspaceConfig, ops: Op[], appId?: string) => {
   return result.ok ? [] : result.issues;
 };
 
-describe('app 范围（D-485）', () => {
+describe('App scope (D-485)', () => {
   it('lets the app change its own pages, tables, bar and style', () => {
     const config = world();
     const result = prepareOps(
@@ -93,7 +93,7 @@ describe('app 范围（D-485）', () => {
       'page:fit-plan',
       'ai',
     ]);
-    // 主页没有被补入口，也没动。
+    // Home was neither populated with entry points nor modified.
     expect(result.after.containers.pages.find((p) => p.id === 'home')).toEqual(
       config.containers.pages.find((p) => p.id === 'home'),
     );
@@ -113,7 +113,7 @@ describe('app 范围（D-485）', () => {
       issuesOf(config, [{ op: 'updateContainer', nav: { bar: ['page:home', 'settings'] } }], 'fit'),
     ).not.toEqual([]);
     expect(issuesOf(config, [{ op: 'setTheme', primaryColor: '#ff0000' }], 'fit')).not.toEqual([]);
-    // 同样的操作从主页改是可以的。
+    // The same operation modified from home is allowed.
     expect(issuesOf(config, [{ op: 'setTheme', primaryColor: '#ff0000' }])).toEqual([]);
   });
 
@@ -126,7 +126,7 @@ describe('app 范围（D-485）', () => {
     expect(
       issuesOf(config, [{ op: 'updateData', table: 'recipes', changes: { name: 'X' } }], 'fit'),
     ).not.toEqual([]);
-    // 删一张别人在用的共用表：连带清理了主页和别的 app 的块，整个拒绝。
+    // Deleting a shared table still in use by others: cleans up dependent blocks on home and other apps, rejecting the entire change.
     const withUse = applyOps(
       config,
       [{ op: 'addContainer', page: 'home', block: listOf('n-list', 'notes') as never }],
@@ -195,8 +195,9 @@ describe('app 范围（D-485）', () => {
       expect(result.after.nav.apps!.find((a) => a.id === 'fit')!.bar).toContain('page:fit-log');
   });
 
-  // 创始人 2026-11-08 在子 App 里点「选风格」、两个预设句子都被拦下：内置规则写的风格没写 app（成了主页风格），
-  // 样板往主页底栏加入口。
+  // Founder encountered issues on 2026-11-08 where selecting "Choose style" inside a sub-app and
+  // both preset sentences were blocked: built-in rule styles lacked an app specification (making
+  // them home styles), and sample apps added entry points to the home bottom bar.
   it('inside an app, a style without "app" is this app\'s style', () => {
     const config = world();
     const ops = opsForApp([{ op: 'setTheme', preset: 'material' }], 'fit');
@@ -207,7 +208,7 @@ describe('app 范围（D-485）', () => {
       THEME_PRESETS.material.theme,
     );
     expect(result.after.theme).toEqual(config.theme);
-    // 写了别的 app 的照样拒绝。
+    // Changes targeting other apps continue to be rejected.
     expect(
       issuesOf(
         config,
@@ -226,7 +227,7 @@ describe('app 范围（D-485）', () => {
       ],
       'fit',
     );
-    // 草稿重新套用时不带范围（draft.ts rebaseDraft）。
+    // Draft reapplication runs without scope constraints (draft.ts rebaseDraft).
     const replayed = prepareOps(config, ops, ctx());
     expect(replayed.ok).toBe(true);
     if (!replayed.ok) return;
@@ -257,7 +258,7 @@ describe('app 范围（D-485）', () => {
       expect(tables.length).toBeGreaterThan(0);
       expect(tools.length).toBeGreaterThan(0);
       for (const thing of [...pages, ...tables, ...tools]) expect(thing.app).toBe('fit');
-      // 主页面进了这个 app 的底栏（Tink 之前）；主页底栏、首页都没动。
+      // Home page added to this app's bottom bar (before Tink); home bottom bar and home page remain untouched.
       expect(after.nav.apps!.find((a) => a.id === 'fit')!.bar).toEqual([
         'page:fit-home',
         `page:${made.mainPageId}`,

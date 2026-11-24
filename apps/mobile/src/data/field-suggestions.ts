@@ -36,33 +36,40 @@ import {
   type AttachmentTextDeps,
 } from './attachment-text';
 
-// 新记录表单的候选值（D-394）：附件里有照片或 PDF 时（表没有关掉 readAttachments，D-397），在后台读出文字，给每个空字段最多 3 个候选，
-// 用户点了才填，从不自动填。文字识别模型装好了就自动读；没装时只显示一行提示，用户点了、
-// 在下载确认框里同意以后才下载（D-064）。离开表单就取消。
-// 点过的候选记在本机 app_meta 的 prefill:picks（这张表这个字段：标签和位置，不记值），
-// 「设置 → 数据 → 预填记忆」能导出、恢复、清空。识别出的文字、文件名和记录都不发给云端 AI。
-// 这张表存过的店名、公司现查记录（底线 14：不另存值，只读）。下载了本机模型（D-396）时，模型的候选后来补上，
-// 表单不知道是哪个引擎。用户点过候选的字段，它的候选不再变（D-388：点过的留在原地）。
-// 文字有两个来源（D-575）：附件里读出来的（上面说的），和快捷操作里用户说的一句话（heard，语音转的文字）。
-// 说的话不用读附件、不用下载识别模型，按「说的话」交给同一个引擎，有把握的候选带 sure，由表单直接填。
+// New record form candidate values (D-394): when attachments contain photos or PDFs (and the table
+// has not disabled `readAttachments`, D-397), reads text in the background, providing up to 3
+// candidates for each empty field, filled only when tapped by the user, never automatically. Reads
+// automatically once the OCR model is installed; otherwise displays a single prompt line,
+// downloading only after the user taps and confirms in the download dialog (D-064). Cancels upon
+// leaving the form. Tapped candidates are recorded locally in `app_meta` under `prefill:picks`
+// (table and field: label and position, not the value); "Settings -> Data -> Prefill memory" allows
+// exporting, restoring, and clearing. Recognized text, file names, and records are never sent to
+// cloud AI. Store names and company lookup records cached by this table (invariant 14: values not
+// duplicated, read-only). When the on-device model (D-396) is downloaded, model candidates populate
+// later; the form is agnostic to the engine. Fields where the user has tapped a candidate keep
+// their candidates static (D-388: tapped items stay in place). Text has two sources (D-575):
+// attachment-derived (described above) and user speech from quick actions (`heard`,
+// speech-to-text). Spoken text requires no attachments or OCR model downloads, is processed by the
+// same engine as `heard`, and confident candidates are marked `sure` to be filled directly by the
+// form.
 
 export interface FieldSuggestionsState {
-  /** 正在读附件。 */
+  /** Currently reading attachments. */
   working: boolean;
-  /** 还缺要下载的东西（文字识别模型、PDF 预览）：表单上面显示一行提示和按钮。 */
+  /** Missing downloadable components (OCR model, PDF preview): displays a prompt line and button above the form. */
   missing: PackNeed[];
   suggestions: FieldSuggestions;
-  /** 下载确认框要问的（点了提示里的按钮以后）。 */
+  /** Confirmation dialog prompts (after tapping the prompt button). */
   asking: PackNeed[] | null;
   ask(): void;
-  /** 确认框关了：下载好了就重新读。 */
+  /** Confirmation dialog closed: re-reads once download completes. */
   answered(left: string[] | null): void;
-  /** 用户点了一个候选：记下这张表这个字段的标签和位置。 */
+  /** User tapped a candidate: records the label and position for this table and field. */
   remember(fieldId: string, suggestion: ValueSuggestion): void;
 }
 
 const NONE: FieldSuggestions = {};
-/** 说的话当成一页一行（引擎只看文字，位置不用）。 */
+/** Treats spoken text as a single page with one line (engine consumes text only, position is ignored). */
 const spokenPage = (text: string): TextPage => ({
   width: 1000,
   height: 40,
@@ -79,16 +86,16 @@ export function useFieldSuggestions({
   onPages,
   heard,
 }: {
-  /** 只在新记录的表单里（编辑已有的记录时不给候选）。 */
+  /** Only in new record forms (candidates are not provided when editing existing records). */
   enabled: boolean;
   collection: Collection | undefined;
   values: Record<string, unknown>;
   locale: Locale;
-  /** 候选从哪里来（D-398）；不给时：有扩展包环境就是代码 + 本机模型（没下载时等于只有代码）。 */
+  /** Source of candidates (D-398); when omitted: in pack environment it equals code + on-device model (equivalent to code only when not downloaded). */
   engine?: PrefillEngine;
-  /** 读出文字时告诉调用方（新建表单页要用它找字段名和推荐预设，D-444），不用再读一遍。 */
+  /** Notifies caller when text is read (used by new form page to find field names and recommended presets, D-444), avoiding re-reading. */
   onPages?: (pages: TextPage[]) => void;
-  /** 用户为这一笔说的话（D-575）：有它时候选从这句话来，不读附件。 */
+  /** User speech for this entry (D-575): when present, candidates originate from this phrase instead of reading attachments. */
   heard?: string | undefined;
 }): FieldSuggestionsState {
   const { repo, files } = useWorkspaceContext();
@@ -98,17 +105,17 @@ export function useFieldSuggestions({
     () => given ?? (store ? modelEngine(openLocalModel(store)) : ruleEngine),
     [given, store],
   );
-  // 每次读的结果都带着这次读的依据（附件和下载次数）；依据变了，旧的结果就不算了。
+  // Each reading result carries the basis of that read (attachments and download count); if the basis changes, old results are discarded.
   const [workingFor, setWorkingFor] = useState<string | null>(null);
   const [needs, setNeeds] = useState<{ run: string; list: PackNeed[] } | null>(null);
   const [found, setFound] = useState<{ run: string; suggestions: FieldSuggestions } | null>(null);
   const [asking, setAsking] = useState<PackNeed[] | null>(null);
-  // 点过候选的字段：点的时候看到的候选。
+  // Fields with tapped candidates: the candidates visible at the time of tapping.
   const [tapped, setTapped] = useState<{ run: string; lists: FieldSuggestions } | null>(null);
-  // 下载完以后加一，重新读一次。
+  // Increments after download completes to trigger a re-read.
   const [installs, setInstalls] = useState(0);
   const picks = useRef<Record<string, FieldPick>>({});
-  // 同一批附件读过就不再读：新建表单页每改一次字段，这里都会重新算候选（D-444）。
+  // Prevents re-reading the same batch of attachments: recalculates candidates here whenever the new form page modifies fields (D-444).
   const read = useRef<{ run: string; pages: TextPage[]; codes: string[] } | null>(null);
   const tellPages = useRef(onPages);
   useEffect(() => {
@@ -116,7 +123,7 @@ export function useFieldSuggestions({
   });
 
   const spoken = enabled && heard !== undefined && heard.trim() !== '' ? heard.trim() : null;
-  // 附件字段里的文件（按字段顺序），作为重新读的依据。
+  // Files in attachment fields (in field order), serving as the basis for re-reading.
   const ids = useMemo(
     () =>
       enabled && spoken === null && collection && collection.readAttachments !== false
@@ -195,14 +202,14 @@ export function useFieldSuggestions({
           (partial) => {
             if (abort.signal.aborted) return;
             setFound({ run, suggestions: partial });
-            // 手上有候选了就不算在读：模型在后面安静地跑；这一行晚收起来，用户点过候选以后下面的字段会往上跳（D-388）。
+            // Stops considering it "reading" once candidates are available; model runs quietly in the background; this line collapses late, causing fields below to shift upward after the user taps a candidate (D-388).
             setWorkingFor(null);
           },
         );
         if (abort.signal.aborted) return;
         setFound({ run, suggestions });
       } catch (e) {
-        // 读不出来就没有候选，不报错。
+        // No candidates if unreadable; throws no errors.
         if (!(e instanceof ReadCancelled) && !abort.signal.aborted)
           setFound({ run, suggestions: NONE });
       } finally {
@@ -233,7 +240,7 @@ export function useFieldSuggestions({
           [fieldId]: suggestions[fieldId] ?? [suggestion],
         },
       }));
-      // 这个值在文字里找不到位置（没有 pick）：不学新标签，字段原来的记忆留着。
+      // Value has no position in text (no pick found): does not learn new labels, field's original memory is preserved.
       const pick = rememberPick(picks.current[fieldId], suggestion, suggestions[fieldId] ?? []);
       if (!pick) return;
       picks.current = { ...picks.current, [fieldId]: pick };

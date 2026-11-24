@@ -1,13 +1,15 @@
 import { requireOptionalNativeModule, type EventSubscription } from 'expo';
 
-// 本地 Expo 模块 MorphMedia（D-141）：在本机处理视频和音频，只用系统框架和官方库。
-// iOS 是 ios/MorphMediaModule.swift（AVFoundation），Android 是 android/…/MorphMediaModule.kt
-// （Jetpack Media3 Transformer，Apache-2.0）。Expo Go 和测试里是 null，视频动作报 needsFullApp。
+// Local Expo module MorphMedia (D-141): Processes video and audio locally using only system
+// frameworks and official libraries. iOS is ios/MorphMediaModule.swift (AVFoundation), Android is
+// android/.../MorphMediaModule.kt (Jetpack Media3 Transformer, Apache-2.0). Returns null in Expo Go
+// and tests, and video operations report needsFullApp.
 //
-// 接口按「视频 + 音频」设计（和音频工具共用）：这一批实现 probe、transcode（mp4 + H.264，声音 AAC 或去掉）、
-// trim、thumbnails、cancel 和进度事件；m4a / wav、只要声音（video: 'drop'）、PCM、concat、waveform
-// 由音频工具补上，没实现的组合原生端抛 ERR_NOT_IMPLEMENTED。
-// 地址：file://（iOS、Android）或 content://（Android 分享进来的文件）。输出总是 file://。
+// Interfaces designed around "video + audio" (shared with audio tools): This batch implements
+// probe, transcode (mp4 + H.264, audio AAC or dropped), trim, thumbnails, cancel, and progress
+// events; m4a/wav, audio-only (video: 'drop'), PCM, concat, waveform are supplemented by audio
+// tools, and unimplemented combinations throw ERR_NOT_IMPLEMENTED on the native side. URIs: file://
+// (iOS, Android) or content:// (Android shared files). Output is always file://.
 
 export type MediaKind = 'video' | 'audio';
 
@@ -17,7 +19,7 @@ export interface MediaInfo {
   size: number;
   hasVideo: boolean;
   hasAudio: boolean;
-  // 视频（width / height 是画面摆正之后的宽高）
+  // Video (width / height are dimensions after video orientation correction)
   width?: number;
   height?: number;
   rotation?: 0 | 90 | 180 | 270;
@@ -25,7 +27,7 @@ export interface MediaInfo {
   hdr?: boolean;
   videoCodec?: string;
   videoBitrateKbps?: number;
-  // 声音（视频的音轨或音频文件）
+  // Audio (video track or audio file)
   audioCodec?: string;
   audioBitrateKbps?: number;
   sampleRate?: number;
@@ -42,18 +44,18 @@ export interface VideoSettings {
   aspectRatio?: number;
   codec: 'h264';
   bitrateKbps?: number;
-  /** 缩小到这个短边像素；只在比原视频小时给（原生端不检查，不放大由调用方保证）。 */
+  /** Scale down to this short-side pixel count; provided only when smaller than the original video (the native side does not check, upscale prevention is guaranteed by the caller). */
   maxShortSide?: number;
   maxFps?: number;
-  /** 拼接时统一输出画布，尺寸必须为正偶数。 */
+  /** Unified output canvas during concatenation; dimensions must be positive even numbers. */
   width?: number;
   height?: number;
-  /** HDR 转成普通画面（BT.709）。H.264 输出总是转。 */
+  /** Convert HDR to standard video (BT.709). H.264 output is always converted. */
   toSdr?: boolean;
 }
 
 export interface AudioSettings {
-  /** mp3：编进 App 的 LAME（D-183）。 */
+  /** mp3: LAME compiled into the app (D-183). */
   codec: 'aac' | 'pcm' | 'mp3';
   bitrateKbps?: number;
   sampleRate?: number;
@@ -62,16 +64,16 @@ export interface AudioSettings {
 
 export interface TranscodeOptions {
   container: 'mp4' | 'm4a' | 'wav' | 'mp3';
-  /** 'drop'：只要声音（音频转格式、从视频取声音）。 */
+  /** 'drop': Audio only (audio format conversion, extracting audio from video). */
   video: VideoSettings | 'drop';
-  /** 'drop'：去掉声音。 */
+  /** 'drop': Remove audio. */
   audio: AudioSettings | 'drop';
-  /** 只要其中一段（重新编码，准确到帧）。 */
+  /** Only a specific segment (re-encoded, frame-accurate). */
   range?: TimeRange;
 }
 
 export interface MediaResult {
-  /** 实际写出的文件（扩展名可能和请求的不同，例如剪切时 MP4 放不下原来的声音改成 MOV）。 */
+  /** The actual written file (file extension may differ from the request, e.g., changing to MOV when MP4 cannot hold the original audio during trimming). */
   uri: string;
   size: number;
   info: MediaInfo;
@@ -85,23 +87,23 @@ export interface GifResult {
   frames: number;
 }
 
-/** 原生端的错误码（error.code）。 */
+/** Native-side error codes (error.code). */
 export const MEDIA_ERRORS = {
-  /** 系统打不开（格式不支持、有版权保护、没有画面和声音）。 */
+  /** System cannot open (format not supported, copy-protected, or missing video/audio tracks). */
   unsupported: 'ERR_MEDIA_UNSUPPORTED',
-  /** cancel(jobId) 取消了。 */
+  /** Cancelled via cancel(jobId). */
   cancelled: 'ERR_MEDIA_CANCELLED',
-  /** 处理时切到了别的 App（iOS 不让后台用视频编码器）。 */
+  /** Switched to another app during processing (iOS does not allow background video encoding). */
   interrupted: 'ERR_MEDIA_INTERRUPTED',
-  /** 这一批还没实现的组合。 */
+  /** Combinations not yet implemented in this batch. */
   notImplemented: 'ERR_NOT_IMPLEMENTED',
-  /** 其他编码 / 写文件失败。 */
+  /** Other encoding/file-writing failures. */
   failed: 'ERR_MEDIA_FAILED',
 } as const;
 
 export interface MorphMediaModule {
   probe(uri: string): Promise<MediaInfo>;
-  /** 压缩、转格式、取声音都走这一个。jobId 用来取消和对应进度事件。 */
+  /** Compression, format conversion, and audio extraction all go through this single method. jobId is used for cancellation and mapping progress events. */
   transcode(
     jobId: string,
     uri: string,
@@ -128,7 +130,7 @@ export interface MorphMediaModule {
     degrees: number,
     options: TranscodeOptions,
   ): Promise<MediaResult>;
-  /** 去掉声音、不重新编码（iOS）；没有时用 transcode 去掉音轨。 */
+  /** Remove audio without re-encoding (iOS); falls back to transcode to strip the audio track when unavailable. */
   mute?(jobId: string, uri: string, output: string): Promise<MediaResult>;
   mixAudio?(
     jobId: string,
@@ -142,25 +144,25 @@ export interface MorphMediaModule {
       musicDurationMs: number;
     },
   ): Promise<MediaResult>;
-  /** 不重新编码地剪一段（视频和音频都能用）。 */
+  /** Trim a segment without re-encoding (supports both video and audio). */
   trim(jobId: string, uri: string, output: string, range: TimeRange): Promise<MediaResult>;
-  /** 保存最接近时间点的一帧，原尺寸 JPEG，已摆正。旧开发构建缺此方法。 */
+  /** Save the single frame closest to the timestamp, original-size JPEG, oriented correctly. Older development builds lack this method. */
   frame?(uri: string, timeMs: number, directory: string): Promise<string>;
-  /** 按时间取画面（已摆正，长边不超过 maxSide），写成 JPEG 放进 directory，返回文件地址。 */
+  /** Extract frames by time (oriented correctly, long side not exceeding maxSide), write as JPEGs into directory, and return file addresses. */
   thumbnails(
     uri: string,
     timesMs: readonly number[],
     maxSide: number,
     directory: string,
   ): Promise<string[]>;
-  /** 动图（D-184）：整段视频按 fps 取画面（宽度不超过 width）写成 GIF。 */
+  /** Animations (D-184): Extract frames from the entire video at given fps (width not exceeding width) and write as a GIF. */
   videoGif(
     jobId: string,
     uri: string,
     output: string,
     options: { width: number; fps: number },
   ): Promise<GifResult>;
-  /** 动图（D-184）：几张图片（长边缩到 maxSide，按第一张的尺寸居中摆放）写成 GIF，每张停 delayMs。 */
+  /** Animations (D-184): Write several images (long side scaled to maxSide, centered using the first image's dimensions) as a GIF, with each frame displayed for delayMs. */
   imagesGif(
     jobId: string,
     uris: readonly string[],
@@ -172,15 +174,15 @@ export interface MorphMediaModule {
     event: 'progress',
     listener: (event: { jobId: string; progress: number }) => void,
   ): EventSubscription;
-  // ---- 音频工具以后实现（调用方先判断方法是否存在）----
-  /** 几段按顺序合成一段：输入格式、采样率可以不同，统一重新编码。 */
+  // ---- Audio tools to be implemented later (caller checks if method exists first) ----
+  /** Concatenate several segments in order: input formats and sample rates can differ, uniformly re-encoded. */
   concat?(
     jobId: string,
     uris: readonly string[],
     output: string,
     options: TranscodeOptions,
   ): Promise<MediaResult>;
-  /** 0–1 的峰值数组，剪一段界面画波形用。 */
+  /** Peak array from 0 to 1, used for drawing waveforms in the UI trim view. */
   waveform?(uri: string, buckets: number, range?: TimeRange): Promise<number[]>;
 }
 

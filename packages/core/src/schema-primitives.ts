@@ -1,20 +1,25 @@
 import { z } from 'zod';
 
-// 配置里最基本的写法（语言、ID、有长度限制的文字）。字段定义（fields/）只依赖这里，
-// 这样 schema-base.ts 可以从字段定义生成字段的结构，不会互相引用。对外从 schema.ts 导出。
+// Basic config primitives (languages, IDs, length-constrained text). Field definitions (`fields/`)
+// depend only on this, allowing `schema-base.ts` to generate field structures from field
+// definitions without circular references. Exported externally from `schema.ts`.
 
 export type Locale = 'en' | 'zh' | 'fr';
 export type Localized = Record<Locale, string>;
 
 export const ID_PATTERN = /^[a-z][a-z0-9-]{0,47}$/;
 /**
- * 「这一条记录」（D-342）：只能写在给某张表的一条记录用的页面（page.recordOf）上，筛选里引用字段 is / isNot
- * 它、新建时引用字段设成它；打开页面时换成那条记录的 ID（record-pages.ts 的 bindRecord）。
+ * "This record" (D-342): Can only be used on pages dedicated to a single record of a table
+ * (`page.recordOf`), referenced via `is` / `isNot` in relation field filters, or set as the
+ * relation field value upon creation; replaced with the record's ID when opening the page
+ * (`bindRecord` in `record-pages.ts`).
  */
 export const RECORD_REF = '$record';
 /**
- * 工具作用的那一条（v34）：列表的这一行、大圆块这一块、通知说的那一条。v33 写作 "row"（只在引用字段上）。
- * $group 是拖到的那一栏 / 那一段的值，$here 是就地添加时「这一段的值 + 列表筛选里的等于条件」。
+ * The row targeted by a tool (v34): this row in a list, this block in a large circle block, the
+ * record mentioned in a notification. Written as "row" in v33 (only on relation fields). `$group`
+ * is the value of the column/segment dragged to, and `$here` is "the value of this segment +
+ * equality conditions in list filters" when adding inline.
  */
 export const ROW_REF = '$row';
 export const GROUP_REF = '$group';
@@ -23,28 +28,31 @@ export const HERE_REF = '$here';
 export const ID_MESSAGE = 'id must be lowercase letters, digits or -';
 export const IdSchema = z.string().regex(ID_PATTERN, ID_MESSAGE);
 
-/** 去掉首尾空白后长度在 min..max 之间的文字。 */
+/** Text trimmed of leading and trailing whitespace with length between `min` and `max`. */
 export const boundedText = (min: number, max: number) => z.string().trim().min(min).max(max);
 
-// 字段定义（汇总字段的筛选和时间段，D-288）也要用到下面这些，所以放在这里。
+// The following definitions are placed here because field definitions (such as rollup field filters and time periods, D-288) also require them.
 
-/** 每条记录都有的系统字段。 */
+/** System fields present on every record. */
 export const SYSTEM_FIELDS = ['createdAt', 'updatedAt'] as const;
 export type SystemField = (typeof SYSTEM_FIELDS)[number];
 export const FieldRefSchema = z.union([IdSchema, z.enum(SYSTEM_FIELDS)]);
 
 /**
- * 日期加几天、几个月里的「加几」（负数是往前）：固定的整数，或这一条记录的一个数字字段。算出来的日期字段（D-542）
- * 和一键记录工具写的日期（D-565）共用。
+ * The offset value (negative for backward) when adding days or months to a date: a fixed integer
+ * or a numeric field of this record. Shared by computed date fields (D-542) and dates written by
+ * one-tap record tools (D-565).
  */
 export const OffsetAddSchema = z.union([z.number().int().min(-36_500).max(36_500), IdSchema]);
 export const OffsetUnitSchema = z.enum(['days', 'months']);
 export type OffsetUnit = z.infer<typeof OffsetUnitSchema>;
 
 /**
- * 时间段（筛选、in.records、file.filter 共用）。最近几天是固定几档（D-285）；thisTwoWeeks 从「设置 → 日期」的
- * 锚定日起每 14 天一段，thisHalfMonth 是 1–15 号或 16 号到月底。按「今天」算，今天从几点开始见 calendar.ts。
- * 往后几天（D-537）：今天到今天 + N − 1，和最近 N 天一样含今天（快到期的合同、证件）。
+ * Time periods (shared by filters, `in.records`, and `file.filter`). Recent days have a few fixed
+ * tiers (D-285); `thisTwoWeeks` spans 14-day intervals starting from the anchor date in "Settings
+ * -> Date", and `thisHalfMonth` is days 1-15 or day 16 to the end of the month. Calculated based
+ * on "today"; see `calendar.ts` for when today starts. Future days (D-537): today through today +
+ * N - 1, including today just like recent N days (for contracts or documents about to expire).
  */
 export const PERIODS = [
   'today',
@@ -61,7 +69,7 @@ export const PERIODS = [
   'next7days',
   'next30days',
   'next90days',
-  // 日历上前后的一整段（D-559）：昨天、上周、上月、去年、明天、下周、下月。
+  // 'yesterday',
   'yesterday',
   'lastWeek',
   'lastMonth',
@@ -72,7 +80,7 @@ export const PERIODS = [
 ] as const;
 export type Period = (typeof PERIODS)[number];
 
-/** 能放进 period 块的选项（都是固定的日历时间段，按「今天」算）。 */
+/** Options that can be placed into a period block (all fixed calendar time periods calculated based on "today"). */
 export const PAGE_PERIODS = [
   'today',
   'thisWeek',
@@ -82,7 +90,7 @@ export const PAGE_PERIODS = [
   'last30days',
   'last90days',
   'last365days',
-  // 已经过去的一整段（D-559）。往后的不放：页面上的范围是看已经记下的。
+  // A fully elapsed time period (D-559). Future periods are excluded: ranges on pages view already recorded entries.
   'yesterday',
   'lastWeek',
   'lastMonth',
@@ -90,17 +98,17 @@ export const PAGE_PERIODS = [
 ] as const;
 export type PagePeriod = (typeof PAGE_PERIODS)[number];
 
-/** 按顺序的聚合（D-284，算法在 sequence.ts）：数字块都能用，图表只能用 distinctDays。 */
+/** Sequential aggregates (D-284, algorithm in `sequence.ts`): usable by all numeric blocks, whereas charts only support `distinctDays`. */
 export const SEQUENCE_AGGREGATES = ['streak', 'daysSince', 'avgInterval', 'distinctDays'] as const;
 export type SequenceAggregate = (typeof SEQUENCE_AGGREGATES)[number];
 export const STREAK_UNITS = ['day', 'week', 'month'] as const;
 export type StreakUnit = (typeof STREAK_UNITS)[number];
 
-/** 筛选条件：白名单比较，多个条件之间是“并且”，没有表达式。 */
+/** Filter condition: whitelist comparison, multiple conditions are combined with logical AND, no expressions. */
 export const ConditionSchema = z.strictObject({
   field: FieldRefSchema,
   op: z.enum(['is', 'isNot', 'contains', 'gt', 'lt', 'isEmpty', 'isNotEmpty', 'inPeriod', 'due']),
-  // is 单选字段可以给 2–8 个选项，是其中一个就算（D-538）。只到这一步：不跨字段「或」，不嵌套。
+  // The `is` operator for single-select fields can take 2-8 options, matching any one of them (D-538). Limited to this level: no cross-field OR operations, no nesting.
   value: z
     .union([
       z.string().max(200),
@@ -112,13 +120,14 @@ export const ConditionSchema = z.strictObject({
 });
 export type Condition = z.infer<typeof ConditionSchema>;
 
-/** 筛选：多个条件之间是「并且」（≤5；汇总字段 ≤6，v33 的 period 迁移成一条 inPeriod，M3）。 */
+/** Filter: multiple conditions are combined with logical AND (≤5; rollup fields ≤6, v33 period migrated to a single `inPeriod`, M3). */
 export const filterSchema = (max = 5) => z.array(ConditionSchema).max(max);
 export type Filter = Condition[];
 
 /**
- * 聚合（v34 一份列表）：每个地方允许哪几种由检查定——数字块全部（latest 从 D-618 起），图表 count / sum / avg /
- * distinctDays，汇总字段全部。
+ * Aggregates (a single list in v34): allowed types per location are determined by validation—all
+ * for numeric blocks (`latest` since D-618), `count` / `sum` / `avg` / `distinctDays` for charts,
+ * and all for rollup fields.
  */
 export const AGGREGATES = [
   'count',
@@ -132,8 +141,10 @@ export const AGGREGATES = [
 export type AggregateKind = (typeof AGGREGATES)[number];
 
 /**
- * 按日子算的参数（v33 在 stat 和 rollup 上各写一遍 dateField / unit / perUnit / skipField / skipOption）。
- * date 不写 = 表里第一个日期字段，没有就第一个日期时间字段，再没有就创建时间；unit、perUnit、skip 只给 streak。
+ * Date-based parameters (previously written separately as `dateField` / `unit` / `perUnit` /
+ * `skipField` / `skipOption` on stat and rollup in v33). If `date` is omitted = the first date
+ * field in the table, falling back to the first datetime field, then creation time; `unit`,
+ * `perUnit`, and `skip` apply only to streak.
  */
 export const DaysSchema = z.strictObject({
   date: FieldRefSchema.optional(),
@@ -143,16 +154,20 @@ export const DaysSchema = z.strictObject({
 });
 export type Days = z.infer<typeof DaysSchema>;
 
-/** 分组的时间单位（列表分段、图表、月历）。 */
+/** Time units for grouping (list sections, charts, monthly calendars). */
 export const GROUP_UNITS = ['day', 'week', 'month'] as const;
 export type GroupUnit = (typeof GROUP_UNITS)[number];
 
 /**
- * 分组（v34 一种写法；v33 有 stat.groupBy、chart.group + choiceField / dateField + periods、
- * recordList.groupField + groupFilter、recordList.groupBy + groupUnit + showEmpty、calendar + dateField 六种）。
- * by：单选、引用每个选项（被引用的每条）一组；日期类按 unit 分；日程按下一次分。不写 by 只写 unit = 第一个日期字段。
- * last：只给图表，最近几段（原 chart.periods）。showEmpty：单选、引用时没有记录的组也列出。
- * filter：引用分组时先筛被引用的表，决定要哪几组（原 groupFilter）。
+ * Grouping (a unified representation in v34; v33 had six variations: `stat.groupBy`,
+ * `chart.group` + `choiceField` / `dateField` + `periods`, `recordList.groupField` +
+ * `groupFilter`, `recordList.groupBy` + `groupUnit` + `showEmpty`, and `calendar` + `dateField`).
+ * `by`: groups by each option of single-select or relation fields (each referenced item); dates
+ * grouped by `unit`; schedules grouped by next occurrence. Omitting `by` and specifying only
+ * `unit` defaults to the first date field. `last`: restricted to charts, recent N periods
+ * (formerly `chart.periods`). `showEmpty`: also lists groups without records for single-select
+ * and relations. `filter`: filters the referenced table first when grouping by relations to
+ * determine which groups to include (formerly `groupFilter`).
  */
 export const GroupingSchema = z.strictObject({
   until: IdSchema.optional(),

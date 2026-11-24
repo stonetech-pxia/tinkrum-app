@@ -1,16 +1,19 @@
 import { packById, packFileUrl, type PackManifest } from '@morph/core';
 
-// 扩展包的下载、校验、存储和删除（D-064，TOOLS_DESIGN §6）。
-// 存在 documentDirectory/packs/<id>/<version>/，不进版本，回滚不受影响；ready.json 写好才算安装完成，
-// 所以中断的下载不会被当成已安装。文件系统和哈希由 App 注入，测试里用内存实现。
-// 随 App 打包的扩展包（D-510）算已安装：第一次用到时从 App 里复制过来（不联网），和下载一样校验大小和 SHA-256。
+// Extension pack download, validation, storage, and deletion (D-064, TOOLS_DESIGN §6). Stored in
+// documentDirectory/packs/<id>/<version>/, excluded from backups so rollbacks are unaffected;
+// ready.json is written last to mark installation complete, preventing interrupted downloads from
+// being treated as installed. File system and hashes are injected by the App, using an in-memory
+// implementation in tests. Packs bundled with the App (D-510) are considered installed: copied from
+// the App upon first use (offline), validating size and SHA-256 just like downloads.
 
 export interface PackFs {
-  /** 下载到 packs 目录下的相对路径，返回下载到的字节。 */
+  /** Downloads to a relative path under the packs directory, returning the downloaded bytes. */
   download(url: string, path: string): Promise<Uint8Array>;
   /**
-   * 大文件（几十到几百 MB 的语音模型）：下载到磁盘，在原生代码里边读边算 SHA-256，不读进 JS 内存；
-   * onBytes 报告已经下载的字节。没有时（Expo Go、测试）退回 download。
+   * Large files (speech models of tens to hundreds of MB): downloads to disk, computing SHA-256
+   * on the fly in native code without reading into JS memory; onBytes reports downloaded bytes.
+   * Falls back to download when unavailable (Expo Go, tests).
    */
   downloadLarge?(
     url: string,
@@ -20,19 +23,20 @@ export interface PackFs {
   exists(path: string): Promise<boolean>;
   readText(path: string): Promise<string>;
   writeText(path: string, text: string): Promise<void>;
-  /** 删除文件或整个目录（不存在时什么也不做）。 */
+  /** Deletes a file or an entire directory (does nothing if it does not exist). */
   remove(path: string): Promise<void>;
-  /** 目录下的子目录名。 */
+  /** Subdirectory names under a directory. */
   listDirs(path: string): Promise<string[]>;
-  /** 某个文件的绝对地址（WebView 读取用）。 */
+  /** Absolute URL of a file (for WebView reading). */
   uri(path: string): string;
   readBytes(path: string): Promise<Uint8Array>;
   /**
-   * 随 App 打包的扩展包（D-510）：App 里的 packs/ 目录，结构和这里一样（<id>/<version>/<文件>），只读。
-   * 返回 App 里这个目录下的子目录名；App 里没带（开发版、Expo Go、测试）时是空的。
+   * Packs bundled with the App (D-510): the packs/ directory inside the App, structured
+   * identically (<id>/<version>/<file>), read-only. Returns subdirectory names under this
+   * directory in the App; empty if not bundled (dev builds, Expo Go, tests).
    */
   bundledDirs?(path: string): Promise<string[]>;
-  /** 把 App 里同一相对路径的文件复制到这里，返回复制后的大小和 SHA-256（原生边读边算）。 */
+  /** Copies the file at the same relative path from the App to here, returning the copied size and SHA-256 (computed on the fly by native code). */
   copyBundled?(path: string): Promise<{ size: number; sha256: string }>;
 }
 
@@ -52,7 +56,7 @@ export interface InstalledPack {
   version: string;
   bytes: number;
   installedAt: number;
-  /** 从 App 里复制来的（D-510），不是下载的。 */
+  /** Copied from the App (D-510), not downloaded. */
   bundled?: true;
 }
 
@@ -64,26 +68,26 @@ export interface PackProgress {
 
 const dirOf = (pack: PackManifest) => `${pack.id}/${pack.version}`;
 
-/** 同时下载的文件数。 */
+/** Number of files downloaded concurrently. */
 const PARALLEL = 6;
 
-/** 超过这个大小的文件走 downloadLarge。 */
+/** Files exceeding this size use downloadLarge. */
 export const LARGE_FILE = 32 * 1024 * 1024;
 
 export class PackStore {
   constructor(
     private readonly fs: PackFs,
     private readonly sha256: Sha256,
-    /** 清单查找（测试里换成测试用的清单）。 */
+    /** Manifest lookup (replaced with test manifest in tests). */
     private readonly lookup: (id: string) => PackManifest | undefined = packById,
     private readonly now: () => number = Date.now,
-    /** 还没定托管地址的扩展包从这里下载（EXPO_PUBLIC_MORPH_PACKS_URL，D-274）。 */
+    /** Packs whose hosting URL is not yet determined are downloaded from here (EXPO_PUBLIC_MORPH_PACKS_URL, D-274). */
     private readonly packsUrl?: string,
   ) {}
 
   private readonly listeners = new Set<() => void>();
 
-  /** 装好或删掉一个扩展包时通知（页面上「要先下载」的提示跟着变，D-456）。返回取消订阅。 */
+  /** Notifies when an extension pack is installed or deleted (updates the "download required" prompt in the UI, D-456). Returns unsubscribe function. */
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => void this.listeners.delete(listener);
@@ -94,8 +98,9 @@ export class PackStore {
   }
 
   /**
-   * ready.json 的内容；没有、或读不懂（写到一半被杀了进程）都当没装好，下次用到时照常再装一次，
-   * 不让一个包的坏清单把整张已安装列表一起拖垮。
+   * Contents of ready.json; if missing or unreadable (process killed mid-write), treated as not
+   * properly installed, reinstalling normally when next used so a bad manifest in one pack does
+   * not break the entire installed list.
    */
   private async readyInfo(
     pack: PackManifest,
@@ -121,13 +126,13 @@ export class PackStore {
     return (await this.readyInfo(pack)) !== null;
   }
 
-  /** App 里带着清单上的这个版本（D-510）；清单换了新版本而 App 里还是旧的，就照旧下载。 */
+  /** App includes this version from the manifest (D-510); if the manifest has a newer version while the App has an older one, downloads normally. */
   private async bundled(pack: PackManifest): Promise<boolean> {
     if (!this.fs.copyBundled) return false;
     return ((await this.fs.bundledDirs?.(pack.id)) ?? []).includes(pack.version);
   }
 
-  /** 装好了，或者随 App 打包（这时先从 App 里复制过来，D-510；复制不成功就当没装）。 */
+  /** Installed, or bundled with the App (in which case copied from the App first, D-510; treated as uninstalled if copy fails). */
   async isInstalled(id: string): Promise<boolean> {
     const pack = this.lookup(id);
     if (!pack) return false;
@@ -141,7 +146,7 @@ export class PackStore {
     }
   }
 
-  /** 已安装的扩展包（只算当前清单里的版本；旧版本目录会在安装新版本时删除），包括随 App 打包的（D-510）。 */
+  /** Installed extension packs (only counting versions in the current manifest; old version directories are deleted when installing a new version), including those bundled with the App (D-510). */
   async installed(): Promise<InstalledPack[]> {
     const out: InstalledPack[] = [];
     const ids = new Set([
@@ -165,13 +170,17 @@ export class PackStore {
   }
 
   /**
-   * 下载并校验一个扩展包（连同它依赖的扩展包）。只能由用户在界面上确认后调用（D-064）。
-   * 随 App 打包的先从 App 里复制（D-510）；复制出来的不对时才下载。appOnly：只从 App 里复制、不下载
-   * （isInstalled 用，没经过用户确认）。任何一个文件的大小或 SHA-256 不对，就删除这个版本目录并报错。
+   * Downloads and validates an extension pack (along with its dependent packs). Can only be
+   * called after user confirmation in the UI (D-064). Bundled packs are copied from the App first
+   * (D-510); downloaded only if the copied files are invalid. appOnly: copies from App only, does
+   * not download (used by isInstalled, without user confirmation). If any file's size or SHA-256
+   * is incorrect, deletes this version directory and throws an error.
    */
   install(id: string, onProgress?: (p: PackProgress) => void, appOnly = false): Promise<void> {
-    // 同一个包正在下载时（点了「后台下载」又在别处要同一个包）不再开始第二次：第二次会把第一次
-    // 下到一半的目录删掉。后来的调用接着看进度，等同一次下载结束。
+    // Prevents starting a second download while the same pack is downloading (e.g. clicking
+    // "Download in background" while requesting the same pack elsewhere): the second call deletes
+    // the half-downloaded directory of the first. Subsequent calls track progress, treating it as a
+    // single download session.
     const running = this.installing.get(id);
     if (running) {
       if (onProgress) running.watchers.add(onProgress);
@@ -193,7 +202,7 @@ export class PackStore {
 
   private readonly backgroundListeners = new Set<(e: { ids: string[]; ok: boolean }) => void>();
 
-  /** 点了「后台下载」的下载结束时通知（成功或失败）。返回取消订阅。 */
+  /** Notifies when a download started via "Download in background" finishes (success or failure). Returns unsubscribe function. */
   onBackgroundEnd(listener: (e: { ids: string[]; ok: boolean }) => void): () => void {
     this.backgroundListeners.add(listener);
     return () => void this.backgroundListeners.delete(listener);
@@ -214,12 +223,12 @@ export class PackStore {
       if (!(await this.isInstalled(dep))) await this.install(dep, onProgress, appOnly);
     }
     if (await this.ready(pack)) return;
-    // 随 App 打包的（D-510）：从 App 里复制，不联网；校验和下载的一样。
+    // Bundled with the App (D-510): copied from the App, offline; validation is identical to downloads.
     if (await this.bundled(pack)) {
       try {
         return await this.put(pack, true, onProgress);
       } catch (e) {
-        // 复制出来的不对：用户确认过的照旧下载，没确认过的不下载。
+        // Copied files are invalid: user-confirmed downloads proceed to download anyway, unconfirmed ones do not.
         if (appOnly) throw e;
       }
     } else if (appOnly) {
@@ -228,7 +237,7 @@ export class PackStore {
     await this.put(pack, false, onProgress);
   }
 
-  /** 把一个扩展包的文件全部放好（从 App 里复制或下载），逐个校验，最后写 ready.json。 */
+  /** Places all files of an extension pack (copied from App or downloaded), validates them individually, and finally writes ready.json. */
   private async put(
     pack: PackManifest,
     fromApp: boolean,
@@ -236,13 +245,13 @@ export class PackStore {
   ): Promise<void> {
     const id = pack.id;
     const dir = dirOf(pack);
-    // 同一个扩展包的其他版本（旧版本或中断的下载）先删掉。
+    // Deletes other versions of the same extension pack (older versions or interrupted downloads) first.
     await this.fs.remove(pack.id);
     const total = pack.files.reduce((sum, f) => sum + f.size, 0);
     let done = 0;
     onProgress?.({ packId: id, doneBytes: 0, totalBytes: total });
     try {
-      // 同时下载几个文件（pdf.js 有一百多个小 cmap 文件，一个一个下太慢）。
+      // Downloads several files concurrently (pdf.js has over a hundred small cmap files; downloading them one by one is too slow).
       const queue = [...pack.files];
       const worker = async () => {
         for (let file = queue.shift(); file; file = queue.shift()) {
@@ -293,7 +302,7 @@ export class PackStore {
     this.changed();
   }
 
-  /** 删除扩展包；删除文字识别包时一起删除各语言包（它们离开识别包用不了）。 */
+  /** Deletes an extension pack; when deleting the OCR pack, also deletes its language packs (which cannot function without the OCR pack). */
   async remove(id: string): Promise<void> {
     await this.fs.remove(id);
     const dependents = (await this.fs.listDirs('')).filter((d) =>
@@ -303,7 +312,7 @@ export class PackStore {
     this.changed();
   }
 
-  /** 已安装扩展包里的一个文件。 */
+  /** Path to a file within an installed extension pack. */
   path(id: string, file: string): string {
     const pack = this.lookup(id);
     if (!pack) throw new PackError('unknown', id);

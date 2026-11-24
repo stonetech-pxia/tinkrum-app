@@ -15,11 +15,13 @@ import type { HomeScreenEntry, HomeScreenPlatform } from '../home-screen/platfor
 import { renderToolsApp } from '../test-utils/render-app';
 import type { WorkspaceStore } from '../workspace/store';
 
-// 手机桌面（D-271）：长按 Tinkrum 图标的菜单跟着正式版本的配置变（AI、撤销、删除、改名）；从桌面打开直接开始；
-// Android 的「添加到桌面」只有用户点了才请求（系统会弹确认框）；iOS 只说明长按 Tinkrum 图标。
+// Home screen (D-271): long-press menu for Tinkrum icon updates dynamically based on current
+// configuration (AI, undo, delete, rename); opening from home screen starts immediately; Android
+// "Add to Home Screen" prompts only when user taps (system shows confirmation dialog); iOS only
+// explains long-pressing the Tinkrum icon.
 
 class FakeHomeScreen implements HomeScreenPlatform {
-  /** 每次整份换掉的菜单。 */
+  /** Menus replaced entirely each time. */
   menus: HomeScreenEntry[][] = [];
   disabledMessage = '';
   pinned: HomeScreenEntry[] = [];
@@ -48,7 +50,7 @@ class FakeHomeScreen implements HomeScreenPlatform {
       this.listener = null;
     };
   }
-  /** 用户点了桌面菜单（App 开着）。 */
+  /** User taps home screen menu (App is running). */
   tap(id: string) {
     this.listener?.(id);
   }
@@ -71,7 +73,7 @@ async function addVisa(store: WorkspaceStore) {
   });
 }
 
-/** 新用户的工作空间加上几个现成的快捷操作：on 里的放到桌面，off 里的不放。 */
+/** New user workspace with several ready-made quick actions: enabled ones placed on home screen, disabled ones not placed. */
 const withPresets =
   (on: number[], off: number[] = []) =>
   (locale: Locale, registry: Registry) => {
@@ -92,13 +94,13 @@ describe('quick actions on the phone home screen (D-271)', () => {
   it('AI puts one there; Android offers “add to home screen” and only asks when tapped', async () => {
     const home = new FakeHomeScreen(true);
     const { store } = await renderToolsApp(undefined, undefined, { homeScreen: home });
-    // 新用户：菜单是空的（也会停用以前留在桌面上的图标）。
+    // New user: menu is empty (also disables previously left home screen icons).
     await waitFor(() => expect(home.menu).toEqual([]));
     await addVisa(store);
     expect(home.menu).toEqual([]);
 
     await askAi('把签证照片放到桌面');
-    // 功能类修改（D-191）：直接应用，打开它的「做好了」，说明怎么用。
+    // Feature modification (D-191): applied directly, opening its "Done" view explaining how to use it.
     const ready = await screen.findByTestId('ready-screen');
     expect(within(ready).getByTestId('home-screen-how')).toHaveTextContent(/长按 Tinkrum 图标/);
     await waitFor(() =>
@@ -107,13 +109,13 @@ describe('quick actions on the phone home screen (D-271)', () => {
       ]),
     );
     expect(home.disabledMessage).toBe('这个快捷操作已经不在桌面上了。');
-    // 不能在应用修改时自己弹系统框。
+    // Must not trigger system dialogs automatically during app modifications.
     expect(home.pinned).toEqual([]);
     await fireEvent.press(screen.getByTestId('home-screen-pin'));
     expect(home.pinned).toEqual([
       expect.objectContaining({ id: 'visa-photo', title: '签证 / 证件照' }),
     ]);
-    // 首页没有因此多一个卡片（「放到桌面」不是「放到首页」，D-109）。
+    // Home page does not gain an extra card as a result ("Add to Home Screen" is not "Add to Home Page", D-109).
     const page = store.getState().config!.containers.pages.find((p) => p.id === 'home')!;
     expect(page.blocks.some((c) => c.look === 'action')).toBe(false);
   });
@@ -155,7 +157,7 @@ describe('quick actions on the phone home screen (D-271)', () => {
       await store.getState().proposeOps([{ op: 'removeTool', tool: 'visa-photo' }], 'rm');
       await store.getState().confirm();
     });
-    // 菜单里没有了；Android 上固定在桌面上的图标由模块停用（不在菜单里的都停用）。
+    // Removed from menu; on Android, home screen pinned icons are disabled by the module (all those not in the menu are disabled).
     await waitFor(() => expect(home.menu).toEqual([]));
   });
 
@@ -171,12 +173,12 @@ describe('quick actions on the phone home screen (D-271)', () => {
     expect(screen.queryByTestId('home-screen-pin')).toBeNull();
   });
 
-  it('“放到首页” still means the home page and puts nothing on the phone', async () => {
+  it('"Add to Home Page" still means the home page and puts nothing on the phone', async () => {
     const home = new FakeHomeScreen(true);
     const { store } = await renderToolsApp(undefined, undefined, { homeScreen: home });
     await addVisa(store);
     await askAi('把签证照片放到首页');
-    // 首页是 App 里的外观，先进草稿（D-190）；草稿里首页多了运行卡片，手机桌面没有变化。
+    // Home page is app-level appearance, enters draft first (D-190); draft home page has an extra run card, home screen remains unchanged.
     const draft = await waitFor(() => store.getState().draft!.steps.at(-1)!.config);
     expect(
       draft.containers.pages.find((p) => p.id === 'home')!.blocks.some((c) => c.look === 'action'),
@@ -190,12 +192,12 @@ describe('quick actions on the phone home screen (D-271)', () => {
     const home = new FakeHomeScreen(true);
     home.launched = 'visa-photo';
     await renderToolsApp(undefined, undefined, { homeScreen: home, seed: withPresets([0]) });
-    // 冷启动：启动完直接是运行页面（和点运行卡片一样开始，D-108），只开一次。
+    // Cold start: launches directly into the run page (starts the same as tapping a run card, D-108), opened only once.
     expect(await screen.findByTestId('run-screen')).toBeTruthy();
     expect(home.launched).toBeNull();
     await act(() => router.back());
     await waitFor(() => expect(screen.queryByTestId('run-screen')).toBeNull());
-    // App 开着时点菜单。
+    // Tap menu while app is running.
     await act(async () => home.tap('visa-photo'));
     expect(await screen.findByTestId('run-screen')).toBeTruthy();
   });

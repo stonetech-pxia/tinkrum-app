@@ -11,13 +11,15 @@ import { View } from 'react-native';
 import type { RenderEnv } from './components';
 import type { RecordBlock } from './data';
 
-// 按值上色（show.color）和警示色（show.highlight，D-541），每种记录外观共用。
-// 选项写了颜色的用它的颜色（D-568），没写的按顺序用分类色（和月历、饼图一样，第 8 个起是中性灰）；没选的不画。
+// Coloring by value (show.color) and highlight color (show.highlight, D-541), shared across record
+// appearances. Options with a specified color use that color (D-568); unassigned options use
+// categorical colors in order (same as calendar and pie charts, neutral gray starting from the
+// 8th); unselected ones are not rendered.
 
 export interface RecordMarks {
-  /** 这一条的选项颜色；没设 show.color 或没选时没有。 */
+  /** The option color for this entry; undefined if show.color is not set or no option is selected. */
   colorOf: (r: DataRecord) => string | undefined;
-  /** 这一条满足 show.highlight 的全部条件。 */
+  /** Whether this entry satisfies all conditions of show.highlight. */
   warns: (r: DataRecord) => boolean;
 }
 

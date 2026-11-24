@@ -13,7 +13,7 @@ import {
 } from './page-period';
 import type { Collection } from './schema';
 
-// 2026-11-04 是星期三；默认一周从周一开始。
+// 2026-11-04 is a Wednesday; default week starts on Monday.
 const now = new Date(2026, 10, 4, 12);
 const range = (period: Parameters<typeof choiceRange>[0]) => choiceRange(period, now);
 
@@ -37,7 +37,7 @@ describe('page period ranges (D-440)', () => {
     expect(prev({ period: 'thisYear' })).toEqual({ start: '2025-01-01', end: '2025-12-31' });
     expect(prev({ period: 'last30days' })).toEqual({ start: '2026-09-06', end: '2026-10-05' });
     expect(prev({ period: 'today' })).toEqual({ start: '2026-11-03', end: '2026-11-03' });
-    // 自定义的：前面同样长的一段（10 天）。
+    // Custom: an equally long preceding period (10 days).
     expect(prev({ start: '2026-11-01', end: '2026-11-10' })).toEqual({
       start: '2026-10-22',
       end: '2026-10-31',

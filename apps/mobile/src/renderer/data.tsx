@@ -132,12 +132,12 @@ import { RecordGallery } from './RecordGallery';
 import { RecordTable } from './RecordTable';
 import { Button, Card } from './ui';
 
-// 数据组件（docs/DATA_DESIGN.md）：记录列表、快速添加表单、统计。
-// 记录只在本机读取和显示，从不进入配置，也从不发给 AI。
+// Data components (docs/DATA_DESIGN.md): record lists, quick-add forms, statistics. Records are
+// only read and displayed locally, never entering the config and never sent to the AI.
 
 type FormValues = Record<string, unknown>;
 
-/** 记录的值 → 表单里的值（数字在编辑时是文字）。 */
+/** Record values -> form values (numbers are text while editing). */
 export function toFormValues(collection: Collection, record: DataRecord | null): FormValues {
   const values: FormValues = {};
   for (const field of collection.fields) {
@@ -150,8 +150,8 @@ export function toFormValues(collection: Collection, record: DataRecord | null):
 }
 
 /**
- * 一键操作打开的新记录表单（D-338）：预设的值（createInput 的输入，JSON）换成表单的写法。
- * 读不出来的、字段已经不在的不填。
+ * New record form opened by a quick action (D-338): preset values (createInput input, JSON) are
+ * converted to form representation. Unreadable fields or fields no longer present are ignored.
  */
 export function prefillFormValues(collection: Collection, json: string): FormValues {
   let input: unknown;
@@ -172,7 +172,7 @@ export function prefillFormValues(collection: Collection, json: string): FormVal
 }
 
 function issueText(locale: RenderEnv['locale'], issue: FieldIssue, field: Field): string {
-  // 超出范围（D-570）：说出界限，金额带货币、时长写成 h:mm。
+  // Out of range (D-570): state the boundaries, include currency for amounts, and format durations as h:mm.
   if ((issue.code === 'tooSmall' || issue.code === 'tooLarge') && issue.limit !== undefined)
     return t(locale, issue.code === 'tooSmall' ? 'fieldTooSmall' : 'fieldTooLarge', {
       limit: formatValue(field, issue.limit, locale),
@@ -187,7 +187,7 @@ function issueText(locale: RenderEnv['locale'], issue: FieldIssue, field: Field)
   );
 }
 
-/** 单个字段的输入控件。 */
+/** Input control for a single field. */
 export function FieldInput({
   field,
   value,
@@ -208,13 +208,13 @@ export function FieldInput({
   locale: RenderEnv['locale'];
   disabled?: boolean;
   testID: string;
-  /** 外面已经有字段名的标签（完整编辑页）。 */
+  /** Label when the field name is already shown externally (full edit page). */
   labeled?: boolean;
-  /** 快速添加（D-352）：单行文字框按键盘上的「完成 / 发送」就是添加。 */
+  /** Quick add (D-352): pressing "Done / Send" on the keyboard for a single-line text box adds the entry. */
   onSubmit?: (() => void) | undefined;
-  /** 底部弹出的添加框打开时，第一个文字框直接弹出键盘（D-352）。 */
+  /** When the bottom-sheet add form opens, the first text box immediately triggers the keyboard (D-352). */
   autoFocus?: boolean | undefined;
-  /** 这个字段所在的表（标签要从这张表的记录里算出已有的标签）。 */
+  /** Table containing this field (tags need to compute existing tags from this table's records). */
   tableId?: string | undefined;
 }) {
   const input = [
@@ -260,37 +260,37 @@ interface FieldInputContext<F extends Field> {
   locale: RenderEnv['locale'];
   disabled: boolean | undefined;
   testID: string;
-  /** 外面已经有字段名的标签；没有时控件自己写上字段名（时长）。 */
+  /** Label indicating whether the field name is already shown externally; if not, the control writes the field name itself (duration). */
   labeled: boolean;
-  /** 输入框的样式。 */
+  /** Style of the input box. */
   input: StyleProp<TextStyle>;
-  /** 选项小块的样式。 */
+  /** Style of option chips. */
   chip: (selected: boolean) => StyleProp<ViewStyle>;
   onSubmit?: (() => void) | undefined;
   autoFocus?: boolean | undefined;
   tableId?: string | undefined;
 }
 
-/** 一种字段在记录表单里怎么填（字段的结构、读写和显示在 core 的 fields/<type>.ts）。 */
+/** How a field type is filled in a record form (field structure, read/write, and display are in core's fields/<type>.ts). */
 interface FieldEditor<F extends Field = Field> {
-  /** 输入控件。按函数调用（不是 React 组件），要用 hook 的放进自己的组件里。没有控件时返回 null。 */
+  /** Input control. Called as a function (not a React component); hooks should be placed inside their own components. Returns null when there is no control. */
   input: (ctx: FieldInputContext<F>) => ReactNode;
-  /** 记录里的值 → 表单里的值（数字在编辑时是文字）。 */
+  /** Record values -> form values (numbers are text while editing). */
   toForm?: (value: FieldValue) => unknown;
-  /** 标签和控件在同一行（勾选）。 */
+  /** Label and control on the same line (checkbox). */
   inline?: true;
-  /** 不能填，显示算出来的值（公式，D-188）。 */
+  /** Read-only, displays computed value (formula, D-188). */
   computed?: true;
 }
 
-/** 电话、邮箱、网址（D-422）的键盘。只是键盘：保存不查格式，什么都能写。 */
+/** Keyboards for phone numbers, emails, and URLs (D-422). Keyboard only: does not validate format on save, anything can be typed. */
 const FORMAT_KEYBOARD = {
   phone: 'phone-pad',
   email: 'email-address',
   url: 'url',
 } as const;
 
-/** 文字、长文本、数字、金额：一个输入框。 */
+/** Text, long text, number, amount: a single input box. */
 function textBox<F extends Field>({
   field,
   value,
@@ -302,7 +302,7 @@ function textBox<F extends Field>({
   onSubmit,
   autoFocus,
 }: FieldInputContext<F>) {
-  // 快速添加里的单行文字框：按键盘上的「完成」就添加（D-352），键盘不收起，接着写下一条。
+  // Single-line text box in quick add: pressing "Done" on the keyboard adds the entry (D-352) without dismissing the keyboard, allowing the next one to be written.
   const submits = onSubmit !== undefined && field.type === 'text';
   return (
     <TextInput
@@ -311,7 +311,7 @@ function textBox<F extends Field>({
       value={typeof value === 'string' ? value : ''}
       onChangeText={onChange}
       autoFocus={autoFocus === true && field.type === 'text'}
-      // 记录的字段不是登录信息：三星保存表单时会问要不要存进密码管家。
+      // Record fields are not login credentials: Samsung asks whether to save forms into the password manager.
       autoComplete="off"
       importantForAutofill="no"
       {...(submits
@@ -342,8 +342,9 @@ function textBox<F extends Field>({
 }
 
 /**
- * 日期：输入框加「今天」「明天」「昨天」；今天按一天从几点开始算（D-286）。框里也可以写「下周五」「Nov 5」
- * 「demain」，离开输入框时在本机换成日期（D-344）。
+ * Date: input box plus "Today", "Tomorrow", "Yesterday"; today is calculated starting from a
+ * given hour (D-286). The box also accepts "next Friday", "Nov 5", "demain", converting to a date
+ * locally upon leaving the input box (D-344).
  */
 function DateInput({
   value,
@@ -422,13 +423,13 @@ export const FIELD_EDITORS: { [T in FieldType]: FieldEditor<FieldOf<T>> } = {
   number: { input: textBox, toForm: String },
   money: { input: textBox, toForm: String },
   date: { input: (ctx) => <DateInput {...ctx} /> },
-  // D-279：几点几分，「现在」填上当前时间。
+  // D-279: Hours and minutes; "Now" fills in the current time.
   time: {
     input: (ctx) => (
       <TimeInput ctx={ctx} placeholder="HH:MM" nowValue={(now) => localDateTime(now).slice(11)} />
     ),
   },
-  // D-279：日期加时间，编辑时写成「2026-10-29 08:30」。
+  // D-279: Date and time, formatted as "2026-10-29 08:30" while editing.
   datetime: {
     input: (ctx) => (
       <TimeInput
@@ -440,7 +441,7 @@ export const FIELD_EDITORS: { [T in FieldType]: FieldEditor<FieldOf<T>> } = {
     ),
     toForm: (v) => String(v).replace('T', ' '),
   },
-  // D-279：时长，小时和分钟两个框，表单里的值是「h:mm」（一边空着算 0）。
+  // D-279: Duration, with separate hours and minutes boxes; form value is "h:mm" (blank side counts as 0).
   duration: {
     input: (ctx) => <DurationInput {...ctx} />,
     toForm: (v) => formatDuration(v as number),
@@ -458,7 +459,7 @@ export const FIELD_EDITORS: { [T in FieldType]: FieldEditor<FieldOf<T>> } = {
       />
     ),
   },
-  // 多选（D-607）：同样的一排选项，点一个加上或去掉，表单里的值是选项 ID 的列表。
+  // Multi-select (D-607): a row of options where tapping one adds or removes it; form value is a list of option IDs.
   choice: {
     input: ({ field, value, onChange, palette, disabled, testID, chip }) => {
       const picked = field.multiple ? pickedOptions(field, value) : [];
@@ -504,13 +505,13 @@ export const FIELD_EDITORS: { [T in FieldType]: FieldEditor<FieldOf<T>> } = {
       />
     ),
   },
-  // 公式不能填，由 FieldsForm 显示算出来的值（D-188）。
+  // Formulas are read-only and displayed by FieldsForm (D-188).
   formula: { computed: true, input: () => null },
-  // 查找、汇总、上一条（D-287–D-289）也是算出来的：记录页显示存好的记录算出来的值。
+  // Lookups, rollups, and previous items (D-287-D-289) are also computed: the record page displays the computed value stored in the record.
   lookup: { computed: true, input: () => null },
   rollup: { computed: true, input: () => null },
   previous: { computed: true, input: () => null },
-  // 算出来的日期（D-542）。
+  // Computed date (D-542).
   dateOffset: { computed: true, input: () => null },
   link: {
     input: ({ field, value, onChange, palette, locale, disabled, testID }) => (
@@ -525,7 +526,7 @@ export const FIELD_EDITORS: { [T in FieldType]: FieldEditor<FieldOf<T>> } = {
       />
     ),
   },
-  // D-296：日程，先选重复方式再填数字或日子。
+  // D-279: Schedule, select recurrence pattern first, then fill in numbers or days.
   schedule: {
     input: ({ field, value, onChange, palette, locale, disabled, testID }) => (
       <ScheduleInput
@@ -590,14 +591,16 @@ export const FIELD_EDITORS: { [T in FieldType]: FieldEditor<FieldOf<T>> } = {
   },
 };
 
-/** 打字时这些字符把前面的字变成一个标签。 */
+/** These characters turn preceding text into a tag while typing. */
 const TAG_BREAK = /[,，、;；\n]/;
-/** 表单里最多列几个已有的标签（打字时按打的字筛）。 */
+/** Maximum number of existing tags listed in the form (filtered by typed text). */
 const MAX_TAG_CHOICES = 24;
 
 /**
- * 标签（创始人 2026-11-04 定）：这条记录的标签（点了移除）、一个输入框（逗号或键盘上的「完成」变成一个标签）、
- * 这张表已有的标签（点了加上，从记录现算）。正在打的字也算在表单的值里（最后一个）：没按「完成」直接保存也不丢。
+ * Tags (decided by founder 2026-11-04): tags for this record (tapping removes), an input box
+ * (commas or "Done" on the keyboard turns text into a tag), and existing tags for this table
+ * (tapping adds, computed on the fly from records). Text currently being typed also counts
+ * towards the form value (as the last item): saving directly without pressing "Done" is not lost.
  */
 function TagsInput({
   field,
@@ -709,10 +712,10 @@ function TagsInput({
   );
 }
 
-/** 时间、日期时间：一个输入框，旁边的「现在」填上当前时间（D-279）。 */
+/** Time, date-time: an input box with an adjacent "Now" button that fills in the current time (D-279). */
 /**
- * 时间、日期时间（D-279）：打字、「现在」，或者从选择器里点（D-543）。日期时间先点一天再点几点几分，
- * 没有的那一半用现在的。
+ * Time, date-time (D-279): typing, "Now", or picking from a picker (D-543). Date-time picks a day
+ * first then hours and minutes; missing halves default to current values.
  */
 function TimeInput<F extends Field>({
   ctx,
@@ -745,7 +748,7 @@ function TimeInput<F extends Field>({
           editable={!disabled}
           value={typeof value === 'string' ? value : ''}
           onChangeText={onChange}
-          // 快速添加表单里没有标签：占位文字写字段名和格式（和金额的「时薪 (CNY)」一样）。
+          // No label in the quick-add form: placeholder displays field name and format (similar to amount's "Hourly rate (CNY)").
           placeholder={`${field.name} (${placeholder})`}
           placeholderTextColor={palette.caption}
           keyboardType="numbers-and-punctuation"
@@ -792,7 +795,7 @@ function TimeInput<F extends Field>({
   );
 }
 
-/** 时长（D-279）：小时、分钟两个数字框，合起来是「h:mm」交给 core 校验（分钟要小于 60）。 */
+/** Duration (D-279): two numeric boxes for hours and minutes, combined as "h:mm" and passed to core for validation (minutes must be under 60). */
 function DurationInput({
   field,
   value,
@@ -839,18 +842,21 @@ function DurationInput({
   );
 }
 
-/** 选一条记录时最多列出几条（按最近修改排序，可以搜索）。 */
+/** Maximum number of items listed when selecting a record (sorted by recently modified, searchable). */
 const LINK_LIST_LIMIT = 30;
 
 /**
- * 输入框是不是画在底部弹出的添加框里（D-352 的 Modal）。弹框盖在页面上面，从里面打开的新页面会被它挡住，
- * 所以那里的引用字段没有「新加一条」（D-546）。
+ * Whether the input box is rendered inside a bottom-sheet add form (D-352 Modal). The modal
+ * overlays the page, and new pages opened from within it would be blocked by it, so reference
+ * fields there lack "Add new" (D-546).
  */
 const InSheet = createContext(false);
 
 /**
- * 引用字段（D-250）：显示选中的那条记录的标题；点开后列出被引用的表里的记录（可以搜索标题），点一条选它。
- * 被引用的记录删掉了显示「已删除的记录」，可以换一条或不选。
+ * Reference field (D-250): displays the title of the selected record; tapping opens the list of
+ * records in the referenced table (searchable by title), and tapping one selects it. If the
+ * referenced record is deleted, displays "Deleted record", allowing a replacement or clearing the
+ * selection.
  */
 function LinkInput({
   field,
@@ -873,14 +879,14 @@ function LinkInput({
   const target = tables?.find((c) => c.id === field.table);
   const cal = useCalendar();
   const now = new Date();
-  // 显示和搜索用算好的（查找、汇总）；选的还是原来的记录 ID。
+  // Display and search use computed results (lookup, rollup); selection still uses the original record ID.
   const { view, records } = useComputedRecords(tables ?? [], target, cal);
   const links = useLinkResolver(view);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const router = useRouter();
   const inSheet = useContext(InSheet);
-  // 「新加一条」（D-546）：新记录页存好以后交回记录 ID，这里选上它。
+  // "Add new" (D-546): after the new record page is saved, it returns the record ID, which is then selected here.
   const [token] = useState(() => Math.random().toString(36).slice(2, 10));
   useEffect(
     () =>
@@ -902,7 +908,7 @@ function LinkInput({
         ? ''
         : t(locale, 'linkDeleted')
     : t(locale, 'linkNone');
-  // 和列表的搜索同一条规则：这张表的每个字段（创始人 2026-11-04 定）。
+  // Follows the same rule as list search: every field in this table (decided by founder 2026-11-04).
   const found = view
     ? searchRecords(records ?? [], query, (r) =>
         recordSearchTexts(r, view, [], locale, links, now, cal),
@@ -1026,10 +1032,10 @@ function LinkInput({
   );
 }
 
-/** 一组字段的输入，带名称和错误提示。记录编辑页和 inline 表单共用。 */
+/** Input for a group of fields, with name and error messages. Shared between record edit page and inline form. */
 const isEmptyValue = (v: unknown) => v === undefined || v === null || v === '';
 
-/** 候选里的日期写出月份（2026年8月11日、Aug 11, 2026、11 août 2026）：日月分不清的两个候选才分得开。 */
+/** Format suggestion dates with month names (e.g., August 11, 2026, Aug 11, 2026, 11 août 2026): distinguishes candidates when day/month order is ambiguous. */
 function suggestionDate(iso: string, locale: RenderEnv['locale']): string {
   const at = new Date(`${iso}T00:00:00Z`);
   if (Number.isNaN(at.getTime())) return iso;
@@ -1041,14 +1047,15 @@ function suggestionDate(iso: string, locale: RenderEnv['locale']): string {
   }).format(at);
 }
 
-/** 候选的值 → 表单里的写法（D-575）：评分是数，别的（金额、数字、日期、时间、时长 h:mm、选项 ID）就是这段文字。 */
+/** Suggestion value -> form representation (D-575): ratings are numbers, others (amounts, numbers, dates, times, durations in h:mm, option IDs) are text strings. */
 export const suggestionFormValue = (field: Pick<Field, 'type'>, value: string): unknown =>
   field.type === 'rating' ? Number(value) : value;
 
 /**
- * 字段下面的候选值（D-394）：安静的小按钮，显示整理过的值（金额带货币、日期写出月份），
- * 太长时截断；点了才填，从不自动填。点了以后候选留在原地（下面的字段不往上跳），和字段里的值
- * 一样的那个标成已选，点另一个就换成另一个。
+ * Suggestion chips below fields (D-394): quiet small buttons displaying formatted values (amounts
+ * with currency, dates with month names), truncated if too long; applied only upon tapping, never
+ * auto-filled. Tapped suggestions stay in place (fields below do not jump up), matching the
+ * field's value is marked as selected, and tapping another switches to it.
  */
 function SuggestionChips({
   field,
@@ -1062,7 +1069,7 @@ function SuggestionChips({
 }: {
   field: Field;
   list: readonly ValueSuggestion[];
-  /** 字段现在的值（和某个候选一样时那个候选标成已选）。 */
+  /** Current value of the field (marked as selected on the matching suggestion chip). */
   current: unknown;
   palette: Palette;
   locale: RenderEnv['locale'];
@@ -1079,7 +1086,7 @@ function SuggestionChips({
         : field.type === 'rating'
           ? formatValue(field, Number(s.value), locale)
           : hasRecordCurrency(field)
-            ? formatNumber(Number(s.value), undefined, locale) // D-429：货币还要用户选，先不写。
+            ? formatNumber(Number(s.value), undefined, locale) // D-429: Currency selection still requires user input, skipped for now.
             : formatValue(field, numeric ? Number(s.value) : s.value, locale) || s.value;
   const isCurrent = (s: ValueSuggestion) =>
     !isEmptyValue(current) &&
@@ -1153,19 +1160,20 @@ export function FieldsForm({
   testPrefix: string;
   showLabels?: boolean;
   /**
-   * 记录页（D-291）：显示用的表和这条记录存好以后算出来的值（查找、汇总、上一条）；新记录是 null，
-   * 这几种字段存了以后才有值。
+   * Record page (D-291): The table used for display and the value computed after this record is
+   * saved (lookup, rollup, previous); null for new records, these field types only have values
+   * after being saved.
    */
   related?: { view: Collection; record: DataRecord | null };
-  /** 快速添加（D-352）：单行文字框按「完成」就添加。 */
+  /** Quick add (D-352): Add immediately when "Done" is pressed on a single-line text input. */
   onSubmit?: (() => void) | undefined;
-  /** 第一个文字框直接弹出键盘（底部弹出的添加框）。 */
+  /** Pop up the keyboard directly on the first text box (bottom-sheet add box). */
   autoFocus?: boolean | undefined;
-  /** 新记录表单的候选值（D-394）：字段 ID → 最多 3 个，只在字段空着时显示，点了才填。 */
+  /** New record form candidate values (D-394): Field ID -> at most 3, shown only when the field is empty, filled only when clicked. */
   suggestions?: Readonly<Record<string, readonly ValueSuggestion[]>> | undefined;
-  /** 用户点了一个候选（已经填进字段）。 */
+  /** User clicked a suggestion (already filled into the field). */
   onSuggestion?: ((fieldId: string, suggestion: ValueSuggestion) => void) | undefined;
-  /** 按用户说的话直接填的字段（D-575）：下面写一行「按你说的填的」，用户改了就不写了。 */
+  /** Fields filled directly from what the user said (D-575): Shows "Filled based on what you said" below; disappears once the user modifies it. */
   heard?: ReadonlySet<string> | undefined;
 }) {
   const cal = useCalendar();
@@ -1173,7 +1181,7 @@ export function FieldsForm({
     (id) => collection.fields.find((f) => f.id === id)?.type === 'text',
   );
   const view = related?.view ?? collection;
-  // 公式按表单里现在的值算（D-188）；查找、汇总、上一条用存好的那条记录算出来的值。
+  // Formula evaluated using current form values (D-188); lookup, rollup, and previous use values computed from the saved record.
   const computed = () => {
     const prepared = prepareRecordValues(collection, values, null, new Date(), cal);
     const saved = related?.record?.values ?? {};
@@ -1217,7 +1225,7 @@ export function FieldsForm({
         }
         const issue = issues.find((i) => i.fieldId === id);
         const inline = editor.inline === true;
-        // 填写提示（D-570）：输入框下面一句短话，配置里的文字。
+        // Input hint (D-570): A short sentence below the input box, using text from the config.
         const hint =
           'hint' in field && field.hint !== undefined ? (
             <Text
@@ -1284,7 +1292,7 @@ export function FieldsForm({
             ) : null}
           </View>
         );
-        // 勾选这样标签和控件在一行的，提示放在这一行下面。
+        // When label and control are on the same line, place the hint below this line.
         return inline && hint ? (
           <View key={id} style={styles.field}>
             {row}
@@ -1303,7 +1311,8 @@ export function useCollection(env: RenderEnv, id: string): Collection | undefine
 }
 
 /**
- * 按引用字段分组（D-336）：被引用的那张表和它的记录。不是引用字段时 undefined，还没读完时 null。
+ * Group by reference field (D-336): The referenced table and its records. Undefined if not a
+ * reference field, null while still loading.
  */
 export function useLinkedGroups(
   env: RenderEnv,
@@ -1318,24 +1327,24 @@ export function useLinkedGroups(
   return records === null ? null : { collection: target, records, locale: env.locale };
 }
 
-/** 记录块（list cards checklist tiles board calendar）：source 读哪张表，show 每条的卡片，tools 每条上的工具。 */
+/** Record block (list cards checklist tiles board calendar): source specifies which table to read, show specifies the card layout for each entry, tools specifies the actions on each entry. */
 export type RecordBlock = BlockOf<RecordLook>;
 
 export const isRecordBlock = (c: Component): c is RecordBlock =>
   isKnownComponent(c) && (RECORD_LOOKS as readonly string[]).includes(c.look);
 
-/** 每一段 / 每一天 / 每一栏下面的「添加」（as addHere，D-349）。 */
+/** "Add" button below each section / day / column (as addHere, D-349). */
 export const addHereOf = (block: RecordBlock) => block.tools?.find((u) => u.as === 'addHere');
 
-/** 「添加」是勾选新建（D-616）：勾另一张表的几条，每条在这里建一条。 */
+/** "Add" is check-and-create (D-616): Check multiple entries from another table, creating a new record here for each. */
 export const isPickAdd = (use: ToolUse | undefined): use is RecordToolUse =>
   use !== undefined && isRecordToolUse(use) && use.do === 'createAll' && use.pick === true;
 
-/** 「添加」上的字：勾选新建写了 label 就用它（例如「添加食材」），否则照旧。 */
+/** Label on the "Add" button: Uses the custom label if specified for check-and-create (e.g., "Add Ingredients"), otherwise falls back to the default. */
 export const addHereLabel = (use: ToolUse | undefined, fallback: string) =>
   isPickAdd(use) && use.label !== undefined ? use.label : fallback;
 
-/** 清单的勾（as check）：勾的是哪个勾选框字段；use 是勾本身（带 also 时由 runCheck 一次写完，D-617）。 */
+/** Checklist checkbox (as check): Which checkbox field is checked; use is the check itself (written in one go via runCheck when accompanied by also, D-617). */
 export function checkOf(
   block: RecordBlock,
 ): { table: string; field: string; use: RecordToolUse } | undefined {
@@ -1345,7 +1354,7 @@ export function checkOf(
     : undefined;
 }
 
-/** 这一条右边显示的按钮（第一个 when 满足的 button / tap）：一键记录工具或「打开」。 */
+/** Button shown on the right side of an entry (first button/tap matching when): A quick record tool or "Open". */
 export function rowToolOf(
   block: RecordBlock,
   record: DataRecord,
@@ -1353,7 +1362,7 @@ export function rowToolOf(
   now: Date,
   cal: Calendar,
 ): RecordToolUse | OpenUse | undefined {
-  // 打卡格（D-610）的点一下作用在格子上，打开一格列出的记录上没有按钮。
+  // Tapping a grid cell (D-610) acts on the cell itself; items listed under an opened cell have no buttons.
   if (block.look === 'grid') return undefined;
   const use = shownRowAction(block.tools, record, view, now, cal);
   return use && (isRecordToolUse(use) || isOpenUse(use)) ? use : undefined;
@@ -1362,23 +1371,25 @@ export function rowToolOf(
 export type Tone = ComponentStyle['tone'];
 
 /**
- * 列表现在选出什么（创始人 2026-11-04 定）：用户临时的搜索、排序、分组、筛选都在这里，只在页面画着的时候有，
- * 什么都不写（底线 15）。状态放在块自己（RecordList），或者页面要把它们画在固定区、把记录交给浮动按钮时放在页面（PageView）。
+ * Current browse selection (defined by founder 2026-11-04): Temporary user search, sort, group,
+ * and filter states reside here, existing only while the page is rendered, with no persistence
+ * (invariant 15). State lives in the block itself (RecordList), or at the page level (PageView)
+ * if the page renders them in a fixed area or passes records to a floating button.
  */
 export interface BrowseSelection {
   block: RecordBlock;
-  /** 搜索框和这几排画在页面的固定区，列表自己不画。 */
+  /** The search box and these rows are rendered in the fixed area of the page, not by the list itself. */
   pinned: boolean;
   collection: Collection | undefined;
   view: Collection | undefined;
   loaded: boolean;
-  /** 筛选、排好序，还没有用户的搜索和筛选。 */
+  /** Filtered and sorted, excluding user search and filter. */
   sorted: DataRecord[];
-  /** 用户的搜索和筛选之后的全部，没有截到一页。 */
+  /** All records matching user search and filter, not paginated to a single page. */
   found: DataRecord[];
   searching: boolean;
   narrowed: boolean;
-  /** 显示几条：有 browse 时每滚到底多一页，换了搜索、筛选、排序回到第一页；没有 browse 时是 limit。 */
+  /** Display limit: Loads one more page per scroll to the bottom when browse is active, returns to the first page when search, filter, or sort changes; equals limit when browse is absent. */
   limit: number;
   group: RecordBlock['source']['group'];
   query: string;
@@ -1389,7 +1400,7 @@ export interface BrowseSelection {
   filterRows: BrowseFilterRow[];
   picked: { field: string; value: string } | null;
   setPicked: (picked: { field: string; value: string } | null) => void;
-  /** 选的时间段（D-437）：null = 全部。 */
+  /** Selected time period (D-437): null = all. */
   period: BrowsePeriod | null;
   setPeriod: (period: BrowsePeriod | null) => void;
 }
@@ -1399,11 +1410,11 @@ export function useBrowseSelection(block: RecordBlock, env: RenderEnv): BrowseSe
   const browse = block.show.browse;
   const [query, setQueryState] = useState('');
   const [sortBy, setSortByState] = useState<string | null>(null);
-  // undefined = 配置里的分组；null = 用户选了不分组。
+  // undefined = grouping from config; null = user selected no grouping.
   const [pickedGroup, setPickedGroup] = useState<string | null | undefined>(undefined);
   const [pickedValue, setPickedValue] = useState<{ field: string; value: string } | null>(null);
   const [period, setPeriodState] = useState<BrowsePeriod | null>(null);
-  // 换了搜索、筛选、排序时从第一页看起：记下那时页面滚到底过几次。
+  // Start viewing from the first page when search, filter, or sort changes: Records how many times the page was scrolled to the bottom at that point.
   const [from, setFrom] = useState(0);
   const pageEnd = env.pageEnd ?? 0;
   const { collection, view, loaded, sorted } = useListRecords(
@@ -1414,14 +1425,14 @@ export function useBrowseSelection(block: RecordBlock, env: RenderEnv): BrowseSe
   const links = useLinkResolver(view);
   const cal = calendarOf(env.config);
   const now = new Date();
-  // 先按时间段收窄：下面的筛选只列这段时间里有记录用的值。
+  // Narrow down by time period first: Subsequent filters only list values that have records within this period.
   const ranged =
     period && view && browse?.period
       ? browsePeriod(sorted, view, browse.period, period, now, cal)
       : sorted;
   const filterRows =
     view && browse?.filter ? browseFilterRows(ranged, view, browse.filter, locale) : [];
-  // 选的那个值已经没有记录用了（刚把它改掉）：回到全部。
+  // The selected value no longer has any associated records (just modified away): Return to all.
   const picked =
     pickedValue &&
     filterRows.some(
@@ -1492,12 +1503,12 @@ export function useBrowseSelection(block: RecordBlock, env: RenderEnv): BrowseSe
   };
 }
 
-/** 记录列表的 list / cards / checklist；月历（D-305）读法不同，是 MonthCalendar（registry 按 display 选）。 */
+/** Record list list / cards / checklist; month calendar (D-305) uses a different reader, MonthCalendar (selected via registry based on display). */
 export function RecordList(props: {
   block: RecordBlock;
   env: RenderEnv;
   tone?: Tone;
-  /** 列表上方的按钮（D-428，ListTools）：拿到这个列表现在选出的全部记录（没有截到 limit）。 */
+  /** Buttons above the list (D-428, ListTools): Receives all currently selected records for this list (not truncated to limit). */
   tools?: (collection: Collection, records: readonly DataRecord[], searching: boolean) => ReactNode;
 }) {
   const hosted = props.env.pageBrowse;
@@ -1521,7 +1532,7 @@ function RecordListBody({
   selection,
 }: Parameters<typeof RecordList>[0] & { selection: BrowseSelection }) {
   const { palette, locale } = env;
-  // 分段标题和列表下面的「添加」压在页面背景上，卡片里的行用 palette（D-409）。
+  // Section headers and "Add" below the list overlay the page background, while rows inside cards use the palette (D-409).
   const page = onPage(palette);
   const router = useRouter();
   const browse = block.show.browse;
@@ -1537,7 +1548,7 @@ function RecordListBody({
     env.interactive
       ? (env.locked ??
         (() =>
-          // 跟着一排选项时（D-573），新的一条预设成选中的那一项。
+          // When following a row of options (D-573), new entries default to selecting the active item.
           openAddHere(
             router,
             collection,
@@ -1560,7 +1571,7 @@ function RecordListBody({
         </Card>
       </View>
     );
-  // D-347：分段。引用字段要等被引用的表读出来（linked 是 null 时还在读）。
+  // D-347: Sectioning. Reference fields must wait for the referenced table to load (linked is null while loading).
   const groupBy = group?.by;
   if (group && groupBy && linked !== null) {
     const groups = listGroups(found, view, group, {
@@ -1571,8 +1582,10 @@ function RecordListBody({
     });
     if (loaded && groups.length === 0)
       return <Empty block={block} env={env} rows={rows} addHere={addHere} />;
-    // 能往下加载的列表：一页是整个列表的条数，从第一段往下数，滚到底再接着往下（段里不会跳）。
-    // 没有 browse 的：limit 是每段最多几条。收起的段不占条数。
+    // Infinitely scrollable list: A page represents the total count for the list, counting down
+    // from the first section, continuing when scrolled to the bottom (sections never split).
+    // Without browse: limit is the maximum items per section. Collapsed sections do not count
+    // towards item limits.
     const sections: { g: (typeof groups)[number]; closed: boolean; shown: DataRecord[] }[] = [];
     for (const g of groups) {
       const closed = collapsed.has(g.key);
@@ -1671,7 +1684,7 @@ function RecordListBody({
   );
 }
 
-/** 列表显示不下全部时说一句：往下滚动还有（有 browse 时 limit 是一页）。 */
+/** Shows a message when the list cannot display everything: Scroll down for more (limit is one page when browse is active). */
 function BrowseMore({
   shown,
   total,
@@ -1692,7 +1705,7 @@ function BrowseMore({
   );
 }
 
-/** 搜索框和可选的排序、分组、筛选（D-424）。只改这个列表画什么；一条记录都没有时不画。 */
+/** Search box and optional sorting, grouping, and filtering (D-424). Only affects what this list renders; hidden when there are zero records. */
 const PERIOD_LABELS = {
   thisWeek: 'browsePeriodThisWeek',
   thisMonth: 'browsePeriodThisMonth',
@@ -1756,7 +1769,7 @@ export function ListBrowseBar({ selection, env }: { selection: BrowseSelection; 
             styles.input,
             page.font('body', 15),
             {
-              // 搜索框是方块：边贴着页面边距，里面的字缩进 inset（D-454）。
+              // Search box is square: Edges align with page margins, text inside has an inset padding (D-454).
               paddingHorizontal: page.inset,
               color: page.text,
               borderColor: page.border,
@@ -1797,7 +1810,7 @@ export function ListBrowseBar({ selection, env }: { selection: BrowseSelection; 
           ])
         : null}
       {filterRows.map((r) => (
-        // 值可能很多：横着滑，不占页面的高度。
+        // Values may be numerous: Horizontal scrolling, does not consume vertical page height.
         <ScrollView
           key={r.field}
           horizontal
@@ -1854,7 +1867,7 @@ function Empty({
   );
 }
 
-/** 列表、月历当天下面的「+ 添加」（D-349）。 */
+/** "+ Add" below lists and calendar days (D-349). */
 export function AddHere({
   label,
   onPress,
@@ -1875,8 +1888,9 @@ export function AddHere({
 }
 
 /**
- * 就地添加（D-349）：打开新记录的表单，预设列表筛选里的「等于」条件（给一条记录用的页面上已经换成这条，
- * D-342）和这一段、这一天的值。用户补完再保存。
+ * In-place add (D-349): Opens the new record form, presetting the "equals" condition from list
+ * filters (replaced with the specific record on record-specific pages, D-342) and values for this
+ * section and day. Saved after user completes filling.
  */
 export function openAddHere(
   router: ReturnType<typeof useRouter>,
@@ -1884,7 +1898,7 @@ export function openAddHere(
   view: Collection,
   source: Pick<RecordBlock['source'], 'filter'>,
   preset: Record<string, unknown> = {},
-  /** 块的「添加」工具：勾选新建（D-616）打开勾选页面，同样的预设值是每条新记录都带上的这一段的值（"$here"）。 */
+  /** Block "Add" tool: Check-and-create (D-616) opens the selection page, where the preset value for every new record is the value of the current section ("$here"). */
   use?: ToolUse,
 ) {
   const prefill = { ...filterPresets(view, source.filter), ...preset };
@@ -1901,21 +1915,21 @@ export function openAddHere(
   });
 }
 
-/** 记录列表要显示的记录：筛选、排好序，还没截到 limit 条（看板按栏截，D-313）。 */
+/** Records to be displayed in the record list: Filtered and sorted, before truncating to limit items (kanban truncates per column, D-313). */
 export function useListRecords(
   block: RecordBlock,
   env: RenderEnv,
-  /** 用户临时换的排序（D-424）；不写用配置里的。 */
+  /** User-overridden temporary sort (D-424); falls back to config if unspecified. */
   sort?: Sort,
 ) {
   const collection = useCollection(env, block.source.table);
   const cal = calendarOf(env.config);
-  // 查找、汇总、上一条（D-291）：显示、筛选、排序用算好的记录和 view；改记录用原来的表。
+  // Lookup, rollup, and previous (D-291): Uses computed records and view for display, filtering, and sorting; modifies records using the original table.
   const { view, records } = useComputedRecords(env.config.data.tables, collection, cal);
   const now = new Date();
-  // 跟着页面上的时间范围（D-561）：和数字卡一样按选的范围筛；页面没有 period 块时照自己的筛选。
+  // Follows the time range on the page (D-561): Filters by the selected range like number cards; falls back to own filters when the page lacks a period block.
   const follow = block.source.period === 'page' ? env.pageRange?.choice : undefined;
-  // 跟着页面上的一排选项（D-573）：多一个「这个字段是选中那一项」的条件；全部时不加。
+  // Follows a row of options on the page (D-573): Adds a condition where "this field equals the selected item"; omitted when "All" is selected.
   const filter = followedFilter(block.source, env.pageChoice);
   const sorted = view
     ? sortRecords(
@@ -1923,7 +1937,7 @@ export function useListRecords(
           ? recordsFollowingRange(records ?? [], view, filter, follow, now, cal)
           : filterRecords(records ?? [], view, filter, now, cal),
         view,
-        // 用户换的排序在前，配置里的（可以是几个，D-560）排一样的。
+        // User-selected sort comes first, matching config sorts (which can be multiple, D-560) afterwards.
         browseSortKeys(sort, block.source.sort),
         now,
         cal,
@@ -1933,8 +1947,9 @@ export function useListRecords(
 }
 
 /**
- * 记录列表一行的画法（普通列表和月历当天的列表共用）：标题、副标题、右侧字段（带 trailingFormat，D-306）、
- * 打勾框和缩略图；点一下打开编辑页。
+ * Rendering a record list row (shared by standard lists and calendar day lists): Title, subtitle,
+ * trailing field (with trailingFormat, D-306), checkbox, and thumbnail; tap to open the edit
+ * page.
  */
 export function useRecordRows(
   block: RecordBlock,
@@ -1949,12 +1964,12 @@ export function useRecordRows(
   const actions = useRecordActions();
   const runner = useRecordActionRunner();
   const links = useLinkResolver(view);
-  // 有附件字段的表：每条记录显示附件里第一张图片的缩略图（D-263，自动判断，组件不用设置）。
+  // Tables with attachment fields: Displays a thumbnail of the first image in attachments for each record (D-263, auto-detected, no component configuration needed).
   const assetIndex = useAssetIndex();
   if (!collection || !view) return null;
   const cal = calendarOf(env.config);
   const hasFiles = collection.fields.some((f) => f.type === 'file');
-  // 勾的写在工具自己的表（关系规则 12），通常就是列表这张表。带 also 的勾（D-617）连同顺带的字段一次写完。
+  // Check state is written to the tool's own table (relation rule 12), usually the list table itself. Checks with also (D-617) are written atomically along with accompanied fields.
   const toggle = (c: NonNullable<ReturnType<typeof checkOf>>, r: DataRecord, next: boolean) => {
     if (tapAlsoOf(c.use).length > 0) return void runner.runCheck(c.use, r);
     const table = env.config.data.tables.find((x) => x.id === c.table);
@@ -1976,9 +1991,9 @@ export function useRecordRows(
       .join(' · ');
     const checked = check ? r.values[check.field] === true : false;
     const thumb = hasFiles && assetIndex ? firstImage(r, collection, assetIndex) : null;
-    // 一键记录工具（D-300）：第一个条件满足的按钮。
+    // One-tap record tool (D-300): The first button whose condition is met.
     const rowAction = rowToolOf(block, r, view, now, cal);
-    // 警示色（D-541）：右侧的值，没有右侧字段时是标题。
+    // Warning color (D-541): values on the right, or the title if no right-side field exists.
     const warn = marks.warns(r);
     const body = (
       <View style={styles.row}>
@@ -2082,7 +2097,7 @@ export function useRecordRows(
     );
   };
 
-  // 表格（D-539）：不写 columns 时是副标题和右侧字段。
+  // Table (D-539): Defaults to subtitle and trailing fields when columns are omitted.
   const columns = show.columns ?? [
     ...(show.subtitles ?? []),
     ...(show.trailing ? [show.trailing] : []),
@@ -2133,8 +2148,9 @@ export function useRecordRows(
 }
 
 /**
- * 右侧字段：没有 trailingFormat 时是它的显示文字；elapsed 是开始到结束（或到现在，每秒在走）的时长；
- * progress 是「值 / 目标」和一个小进度环或进度条（没有值或目标时照常显示文字）。
+ * Trailing field: Displays display text when trailingFormat is absent; elapsed shows duration
+ * from start to end (or present, updating every second); progress shows "value / target" with a
+ * small progress ring or bar (displays text normally when value or target is missing).
  */
 export function Trailing({
   record,
@@ -2149,7 +2165,7 @@ export function Trailing({
   show: RecordBlock['show'];
   env: RenderEnv;
   text: string;
-  /** 满足 show.highlight（D-541）：用警示色。 */
+  /** Satisfies show.highlight (D-541): Rendered in warning color. */
   warn?: boolean;
 }) {
   const { palette, locale } = env;
@@ -2203,7 +2219,7 @@ export function Trailing({
       );
     }
   }
-  // 标签可能很长：一行，不挤标题。
+  // Tags can be long: Single line, without crowding the title.
   const tagged = view.fields.some((f) => f.id === show.trailing && f.type === 'tags');
   return text ? (
     <Text
@@ -2222,12 +2238,13 @@ export function Trailing({
   ) : null;
 }
 
-/** 表单的提交工具：{as: "submit", do: "create", table, ask: [字段], values?, smartDate?}。 */
+/** Form submission tool: {as: "submit", do: "create", table, ask: [fields], values?, smartDate?}. */
 type SubmitTool = Extract<RecordToolUse, { do: 'create' }>;
 
 /**
- * 表单（原 recordForm 的 inline / sheet）：问 ask 里的字段，提交 = 按 tools[0] 新建一条。
- * 按钮模式（打开完整表单）是 button 块（RecordActions.tsx 的 ActionButton）。
+ * Form (inline or sheet style for recordForm): Prompts for fields in ask, submission = creates a
+ * record via tools[0]. Button mode (opening the full form) is a button block (ActionButton in
+ * RecordActions.tsx).
  */
 export function RecordForm({
   block,
@@ -2251,9 +2268,9 @@ export function RecordForm({
   const [issues, setIssues] = useState<FieldIssue[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const cal = useCalendar();
-  // D-344：在本机认出文字里的日期；用户点掉后，这段文字不再认（改了文字再认）。
+  // D-344: Recognizes dates in text locally; once dismissed by the user, this text is no longer recognized (until modified).
   const [dismissed, setDismissed] = useState<string | null>(null);
-  // D-352：底部弹出的添加框开着没有。
+  // D-352: Whether the bottom-sheet add box is open.
   const [open, setOpen] = useState(false);
   if (!collection) return null;
   const smart = submitTool?.smartDate;
@@ -2268,7 +2285,7 @@ export function RecordForm({
   async function submit() {
     if (!collection || !env.interactive) return;
     if (env.locked) return env.locked();
-    // D-343：不显示的预设值（"$record" 在画之前已经换成这条记录）；D-344：认出来的日期填进去，文字里去掉。
+    // D-343: Hidden preset values ("$record" is already replaced with this record before rendering); D-344: Recognized dates are filled in and removed from the text.
     const preset = createInput(collection, submitTool?.values, { now: new Date(), cal });
     const recognised =
       found && smart
@@ -2289,7 +2306,7 @@ export function RecordForm({
       setMessage(t(locale, 'tableFull'));
     } else {
       setIssues(result.issues.filter((i) => fieldIds.includes(i.fieldId)));
-      // 不在这个表单里的必填字段：提示用完整表单添加。
+      // Required fields missing from this form: Prompts to add using the full form.
       if (result.issues.some((i) => !fieldIds.includes(i.fieldId))) {
         setMessage(t(locale, 'useFullForm'));
       }
@@ -2297,8 +2314,10 @@ export function RecordForm({
   }
 
   /**
-   * 键盘上的对勾：写好了就保存（键盘留着接着写，D-352）。必填还空着、或者什么都没写时，
-   * 用户只是想收键盘：不报错，点「保存」按钮才校验。
+   * Keyboard checkmark: Saves when input is complete (keeping the keyboard open to continue
+   * writing, D-352). If required fields are still empty or nothing is written, the user likely
+   * just wants to dismiss the keyboard: no error is thrown, validation only occurs on pressing
+   * the "Save" button.
    */
   function keyboardDone() {
     if (!collection) return;
@@ -2375,8 +2394,9 @@ export function RecordForm({
       </Card>
     );
   }
-  // D-352：右下角一个圆形的「+」（页面把它放在滚动内容外面，PageView），点了从底部弹出添加框；
-  // 添加以后框留着、文字清空，可以接着写下一条，点外面或「关闭」收起。
+  // D-352: A circular "+" at the bottom right (placed outside scrollable content by PageView),
+  // opens the add box from the bottom when tapped; after adding, the box remains open and text is
+  // cleared to write the next entry, dismissed by tapping outside or pressing "Close".
   return (
     <>
       <Pressable
@@ -2412,7 +2432,7 @@ export function RecordForm({
 
 type NumberSource = BlockOf<'number'>['source'];
 
-/** 统计值的显示：金额按币种、数字按单位和小数位，按日子算的带「天」「周」，计数和其他字段只显示数字。 */
+/** Statistic value display: Amounts formatted by currency, numbers by units and decimal places, day-based calculations show "days" or "weeks", counts and other fields display numbers only. */
 export function statText(
   value: number | null,
   aggregate: NumberSource['aggregate'],
@@ -2425,7 +2445,7 @@ export function statText(
   return amountText(value, aggregate === 'count' ? undefined : field, locale);
 }
 
-/** 一个数按字段的写法显示（金额带货币、数字带单位，字段定义的 formatAmount）；没有字段时只是数字。 */
+/** Formatting a number according to field definitions (amounts with currency, numbers with units, formatAmount defined in field); plain number when field is absent. */
 export function amountText(value: number, field: Field | undefined, locale: RenderEnv['locale']) {
   const amount = field && fieldDefinition(field.type).formatAmount;
   return amount ? amount(field, value, locale) : formatNumber(value, undefined, locale);
@@ -2442,7 +2462,7 @@ export function Stat({
   env: RenderEnv;
   tone?: Tone;
   backdrop?: Backdrop | undefined;
-  /** style.size（D-589）：数字的字号比例，不写是中。 */
+  /** style.size (D-589): Number font size scale, defaults to medium if omitted. */
   size?: keyof typeof SIZES | null | undefined;
 }) {
   const scale = SIZES[size ?? 'medium'];
@@ -2451,9 +2471,9 @@ export function Stat({
   const label = block.show.label;
   const table = useCollection(env, src.table);
   const cal = calendarOf(env.config);
-  // 查找、汇总、上一条（D-291）按算好的值统计。
+  // Lookup, rollup, and previous (D-291) statistics calculated from computed values.
   const { view: collection, records } = useComputedRecords(env.config.data.tables, table, cal);
-  // 按引用字段分组（D-336）要被引用的表的记录；减去另一个合计（D-337）要那张表的记录。
+  // Grouping by reference field (D-336) requires records from the referenced table; minus totals (D-337) require records from that table.
   const linked = useLinkedGroups(env, collection, src.group?.by);
   const minus = useComputedRecords(
     env.config.data.tables,
@@ -2477,10 +2497,12 @@ export function Stat({
   );
   if (!collection) return null;
   const now = new Date();
-  // 页面上选的时间范围（D-440）：source.period 是 "page" 且页面有 period 块时，筛选里的 inPeriod 不再用，按选的范围算；
-  // 用哪个日期：原来 inPeriod 用的那个字段，没有就用表里第一个日期字段（和图表一样）。
+  // Time range selected on the page (D-440): When source.period is "page" and the page has a period
+  // block, inPeriod in filters is ignored and calculated based on the selected range; which date
+  // field to use: the one previously used by inPeriod, falling back to the first date field in the
+  // table (same as charts).
   const follow = src.period === 'page' ? env.pageRange?.choice : undefined;
-  // 跟着页面上的一排选项（D-573）：只算选中那一项的记录（minus 不跟）。
+  // Follows a row of options on the page (D-573): Computes records only for the selected item (minus does not follow).
   const filter = followedFilter(src, env.pageChoice);
   const based = filterRecords(
     records ?? [],
@@ -2495,16 +2517,16 @@ export function Stat({
   const matched = follow
     ? recordsInRange(based, collection, dateRef, choiceRange(follow, now, cal), now, cal)
     : based;
-  // 按顺序的聚合（D-284）：日期默认用表里第一个日期字段，没有就用创建时间（和图表一样）。
+  // Sequential aggregation (D-284): Defaults to the first date field in the table, falling back to creation time if absent (same as charts).
   const aggregate = src.aggregate;
   const valueOf = (list: DataRecord[]) =>
     isSequenceAggregate(aggregate)
       ? sequenceValue(list, collection, aggregate, src.days, now, cal)
       : aggregate === 'latest'
-        ? // 最新一条的值（D-618），和汇总字段的 latest 同一个「最新」（core 的 latestNumber）。
+        ? // Value of the latest entry (D-618), sharing the same "latest" definition as rollup fields (core's latestNumber).
           { value: table ? latestNumber(list, table, collection, src, now, cal) : null }
         : { value: aggregateRecords(list, collection, aggregate as Aggregate, src.field) };
-  // 还没读完被减的那张表时先不显示数（和自己的表没读完一样）。
+  // Do not display counts until the subtracted table has finished loading (same as when your own table has not finished loading).
   const extras = [extra0, extra1, extra2];
   const loading =
     records === null ||
@@ -2531,7 +2553,7 @@ export function Stat({
   const text = (v: { value: number | null }) =>
     calculatedText(v.value, src.calc, env.locale) ??
     statText(v.value, aggregate, field, env.locale, src.days?.unit);
-  // 每笔自己选货币（D-429）：按货币分开显示，不把不同货币加在一起。
+  // Per-entry currency selection (D-429): display separately by currency; do not sum different currencies together.
   const listText = (list: DataRecord[]) =>
     perCurrencyText(list, collection, aggregate, src.field, env.locale);
   const bestText = (v: { best?: number }) =>
@@ -2541,7 +2563,7 @@ export function Stat({
           value: statText(v.best, aggregate, field, env.locale, src.days?.unit),
         });
   const field = src.field ? collection.fields.find((f) => f.id === src.field) : undefined;
-  // 目标（D-307）：「值 / 目标」和进度。
+  // Goal (D-307): "Value / Target" and progress.
   const goalProgress = (v: { value: number | null }) => {
     const p = src.goal === undefined ? undefined : progressOf(v.value ?? 0, src.goal);
     return (
@@ -2551,7 +2573,7 @@ export function Stat({
       }
     );
   };
-  // 和上一段同期比（D-308）：把筛选里的时间段换成上一段，再算一次；颜色不分好坏（多花钱和多运动方向相反）。
+  // Compare to the same period in the previous segment (D-308): replace the time range in the filter with the previous segment and recalculate; colors are neutral (spending more and exercising more have opposite directions).
   const previous = !src.compare
     ? null
     : follow
@@ -2600,7 +2622,7 @@ export function Stat({
       {label.toUpperCase()}
     </Text>
   );
-  // D-248：按单选字段分组，每个选项一行。
+  // D-248: Group by single-select field, one row per option.
   const groupBy = src.group?.by;
   if (groupBy) {
     const noChoice = t(env.locale, 'statNoChoice');
@@ -2608,7 +2630,7 @@ export function Stat({
       records === null || linked === null
         ? []
         : groupRecords(matched, collection, groupBy, noChoice, linked);
-    // 和上一段比（D-308）：每个选项和它自己的上一段比。
+    // Compare to previous segment (D-308): each option is compared against its own previous segment.
     const before =
       previous && records !== null
         ? new Map(

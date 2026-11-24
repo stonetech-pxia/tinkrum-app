@@ -14,7 +14,7 @@ import {
   testRegistry,
 } from '../test-utils/render-app';
 
-// 新用户的空白首页（D-231）、工具箱（D-181、D-182）和首页文件入口。
+// New user's blank home screen (D-231), toolbox (D-181, D-182), and home screen file entry point.
 
 describe('starter home and toolbox (UI)', () => {
   const start = () =>
@@ -36,7 +36,7 @@ describe('starter home and toolbox (UI)', () => {
     await screen.findByTestId('nav-settings');
     await act(() => router.push('/page/toolbox'));
     expect(await screen.findByText('照片、视频和声音'.toUpperCase())).toBeTruthy();
-    // 添加过的工具没有「+」，没添加的有。
+    // Added tools lack a "+", while unadded ones have it.
     expect(screen.queryByTestId('toolgrid-add-image')).toBeNull();
     expect(screen.getByTestId('toolgrid-add-zip')).toBeTruthy();
 
@@ -44,7 +44,7 @@ describe('starter home and toolbox (UI)', () => {
     expect(await screen.findByTestId('run-zip-files')).toBeTruthy();
     const config = store.getState().config!;
     expect(config.packages.some((p) => p.id === 'zip')).toBe(true);
-    // 工具箱里已经有它：首页不多出工具入口。
+    // Already in the toolbox: do not duplicate the tool entry on the home screen.
     const home = config.containers.pages.find((p) => p.id === 'home')!;
     expect(JSON.stringify(home)).not.toContain('package:zip');
   });
@@ -56,7 +56,7 @@ describe('home file pickers', () => {
   it('the toolbox entry looks like a settings row (icon, name, arrow) and opens the toolbox', async () => {
     await start();
     const entry = await screen.findByText('工具箱');
-    // 设置页的按钮是带箭头的一行，不是描边按钮。
+    // Settings page buttons are single rows with arrows, not outlined buttons.
     expect(screen.getAllByText('›').length).toBeGreaterThan(0);
     await fireEvent.press(entry);
     expect(await screen.findByText('照片、视频和声音'.toUpperCase())).toBeTruthy();
@@ -93,7 +93,7 @@ describe('home file pickers', () => {
     expect(await screen.findByTestId('share-screen')).toBeTruthy();
     expect(files.lastPickTypes).toEqual(['*/*']);
     await act(() => router.back());
-    // 选择器复制进缓存的那份（picker://）用完就删；相册和「文件」里的原件不受影响。
+    // The picker cache copy (picker://) is deleted immediately after use; originals in the photo library and "Files" are unaffected.
     expect(files.disk.has(pdf.uri)).toBe(false);
     expect(useIncoming.getState().share).toBeNull();
   });
@@ -106,13 +106,13 @@ describe('home file pickers', () => {
     await openPick('media');
     expect(alert).toHaveBeenCalled();
     expect(screen.queryByTestId('share-screen')).toBeNull();
-    // 不收的那一批，选择器的副本也删掉。
+    // For unaccepted items, delete their picker copies as well.
     expect([...files.disk.keys()].some((k) => k.startsWith('picker://'))).toBe(false);
     alert.mockRestore();
   });
 });
 
-// 用户报告（2026-11-06 模拟器）：中文建的工作空间在设置里切到法文后，底栏、首页和工具箱还是中文。
+// User report (2026-11-06 simulator): workspaces created in Chinese still have Chinese bottom bar, home screen, and toolbox after switching interface language to French in settings.
 describe('starter texts follow the interface language', () => {
   it('shows a Chinese starter workspace in French without writing the config', async () => {
     const { store } = await renderToolsApp(new MemoryWorkspaceRepo(), new FakeFiles(), {
@@ -134,7 +134,7 @@ describe('starter texts follow the interface language', () => {
     expect(screen.queryByText('照片、视频和声音'.toUpperCase())).toBeNull();
     const frImage = fr.containers.pages.find((p) => p.package === 'image')!.title;
     expect(screen.getByTestId('toolgrid-image').props.accessibilityLabel).toBe(frImage);
-    // 只在显示时换：配置里还是建立时的中文。
+    // Switch on display only: config remains in the original creation language (Chinese).
     expect(JSON.stringify(store.getState().config)).toBe(before);
   });
 });

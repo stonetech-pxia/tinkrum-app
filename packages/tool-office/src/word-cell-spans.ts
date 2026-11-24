@@ -3,7 +3,7 @@ import { lineShareIn } from './layout';
 import { findLines, type PageLines } from './lines';
 import type { Box, OcrBox, RgbaImage } from './types';
 
-/** CTC 的字符间距证明列边界切在词中间，不能把正常列间空白当成断词。 */
+/** CTC character spacing proves that a column boundary cuts through the middle of a word; normal inter-column whitespace must not be treated as a word break. */
 export function cutsWord(line: OcrBox, x: number): boolean {
   const chars = line.chars;
   if (!chars?.length) return false;
@@ -32,7 +32,7 @@ export function crossesRule(line: OcrBox, x: number, rules: PageLines): boolean 
   );
 }
 
-/** 填写框的短竖线在标签上方结束时，不能把标签也从词中间切开。只合并完整、单排的标签。 */
+/** When a fill-in box's vertical stroke ends above the label, the label must not be split in the middle of a word. Only merge complete, single-row labels. */
 export function restoreWordCellSpans(
   block: DocTable,
   image: RgbaImage,
@@ -60,8 +60,9 @@ export function restoreWordCellSpans(
     if (cells.length < 2 || cells.some((c) => c.row !== cells[0]!.row)) continue;
     const cutWord = cells.slice(1).some((c) => cutsWord(line, c.box!.x));
     if (!cutWord) continue;
-    // 同一粗格可同时含前一个标签的尾部和后一个标签的头部；
-    // 把与候选格相交的完整 OCR 行一起纳入，不能因为边界以外还有字而留下断词。
+    // The same coarse cell may contain both the tail of a preceding label and the head of a
+    // succeeding label; include complete OCR lines intersecting candidate cells together, without
+    // leaving word breaks due to text extending outside boundaries.
     const rowCells = block.table.cells.filter(
       (c) => c.box && c.rowSpan === 1 && c.row === cells[0]!.row,
     );

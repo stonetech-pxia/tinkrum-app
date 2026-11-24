@@ -6,14 +6,13 @@ import { StyleSheet, View } from 'react-native';
 import { useWorkspaceContext } from '../workspace/context';
 import type { Palette } from './theme';
 
-// 图片背景（D-258）：卡片类组件和页面可以用用户选的一张图片代替底色。图片上盖一层原来底色的遮罩，
-// 不透明度由 overlayOpacity 算（不管图片什么样，正文都过对比度检查）；图片上的文字一律用正文色（onPicture）。
-// 图片是用户文件，配置里只有它的 ID；选的时候已经缩到显示用的尺寸（Android 解码时就缩，见 pickImage）。
+// Maximum side length to scale to when selecting a backdrop image: cards don't need to be too
+// large, entire pages must fill the screen.
 
-/** 选背景图片时缩到的最长边：卡片不用太大，整页要铺满屏幕。 */
+/** Maximum side length to scale to when selecting a backdrop image: cards don't need to be too large, entire pages must fill the screen. */
 export const BACKDROP_SIDE = { card: 1200, page: 2048 } as const;
 
-/** 有背景图片时的配色：灰字、说明、主色字、提示框的字都换成正文色（遮罩只保证正文色的对比度）。 */
+/** Color scheme when backdrop image is present: gray text, captions, primary color text, prompt box text all switched to body text color (mask only guarantees body text contrast). */
 export function onPicture(palette: Palette, backdrop: Backdrop | undefined): Palette {
   if (!backdrop?.assetId) return palette;
   const { text } = palette;
@@ -26,14 +25,14 @@ export function onPicture(palette: Palette, backdrop: Backdrop | undefined): Pal
     onSecondaryTint: text,
     onTertiaryTint: text,
   };
-  // 卡片有自己的文字色时（D-409），图片页面上的卡片也同样换。
+  // When cards have their own text color (D-409), cards on image pages are similarly updated.
   if (palette.surfacePalette) {
     shown.surfacePalette = { ...onPicture(palette.surfacePalette, backdrop), pagePalette: shown };
   }
   return shown;
 }
 
-/** 用户文件的显示地址。undefined：读取中或没有；null：文件不在这台设备上。 */
+/** Display URI for user files. undefined: loading or none; null: file not on this device. */
 export function useAssetUri(assetId: string | undefined): string | null | undefined {
   const { repo, files } = useWorkspaceContext();
   const [loaded, setLoaded] = useState<{ id: string; uri: string | null } | null>(null);
@@ -51,8 +50,9 @@ export function useAssetUri(assetId: string | undefined): string | null | undefi
 }
 
 /**
- * 铺满父视图的图片和遮罩（父视图要 overflow: hidden 并设好圆角）。color 是不透明的底色：
- * 毛玻璃卡片的底色是半透明的，遮罩用它不透明的那个颜色。没有图片或图片不在这台设备上时什么都不画。
+ * Image and mask filling parent view (parent view needs overflow: hidden and border radius set).
+ * color is opaque background color: translucent frosted glass cards have translucent backgrounds,
+ * mask uses its opaque color counterpart. Draws nothing if no image or image not on this device.
  */
 export function BackdropFill({
   backdrop,
@@ -63,7 +63,7 @@ export function BackdropFill({
   backdrop: Backdrop;
   color: string;
   palette: Palette;
-  /** 卡片的圆角：图片自己裁圆角，卡片不设 overflow（iOS 上会把阴影也裁掉）。 */
+  /** Card border radius: image clips its own corners, card does not set overflow (which would clip shadows on iOS). */
   radius?: number;
 }) {
   const uri = useAssetUri(backdrop.assetId);
@@ -76,7 +76,7 @@ export function BackdropFill({
       <Image
         source={{ uri }}
         contentFit="cover"
-        // 解码成显示的尺寸（Android 默认就这样，这里写明）。
+        // Decode to display dimensions (Android default behavior, explicitly stated here).
         allowDownscaling
         style={StyleSheet.absoluteFill}
         accessible={false}

@@ -24,9 +24,12 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { deskTool } from '../test-utils/desk-toolbar';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 文件房间 R2（file-room DESIGN §9、§11，D-366、D-367）：桌上的 Excel、Word 就是编辑器（点一下选中、
-// 再点一下编辑，选中时工具栏换成编辑层）；连续的编辑合成一个版本，撤销先一步步退编辑、合上后整段退；
-// 存成用户文件时带着中间格式和原图，从存储空间放回桌上还能改；结果页的「放到桌上」代替「查看和编辑」。
+// File room R2 (file-room DESIGN §9, §11, D-366, D-367): Excel and Word files on the desk act as
+// editors (tap to select, tap again to edit, toolbar switches to editing layer when selected);
+// consecutive edits are merged into a single version, undoing steps backward through edits first,
+// then reverting the entire block upon closing; saved as user files preserving intermediate formats
+// and original images, allowing further edits when placed back on the desk from storage; result
+// page's "Place on desk" replaces "View and edit".
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -34,7 +37,7 @@ const box = (x: number, y: number, width = 100, height = 20) => ({ x, y, width, 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-/** 第 1 页：一行表外的文字（标题），下面一张 cells×cells 的表；第 2 页只有文字。 */
+/** Page 1: a line of non-table text (title), followed by a cells×cells table; Page 2 contains only text. */
 function tableDoc(cells = 2): TableDoc {
   const table: TableBlock = {
     kind: 'table',
@@ -125,7 +128,7 @@ function wordDoc(src?: string): DocDoc {
   };
 }
 
-/** 运行目录里的一份转 Excel / 转 Word 的结果（和结果页上的一样）。 */
+/** An export-to-Excel or export-to-Word result inside the run directory (matching the result page). */
 function runResult(files: FakeFiles, kind: 'table' | 'doc', doc: TableDoc | DocDoc): RunItem {
   files.disk.set('runs/r1/page.jpg', new Uint8Array([9, 9, 9]));
   const ext = kind === 'table' ? 'xlsx' : 'docx';
@@ -142,7 +145,7 @@ function runResult(files: FakeFiles, kind: 'table' | 'doc', doc: TableDoc | DocD
   };
 }
 
-/** 放到桌上（结果页的「放到桌上」），打开房间。 */
+/** Place on desk ("Place on desk" on the result page), opening the room. */
 async function openOnDesk(kind: 'table' | 'doc', doc: TableDoc | DocDoc, files = new FakeFiles()) {
   const item = runResult(files, kind, doc);
   const desk = await placeResultsOnDesk(files, [item], Date.now(), 'editdesk');
@@ -172,8 +175,8 @@ async function editTo(id: string, text: string) {
   await fireEvent.press(screen.getByTestId('desk-edit-ok'));
 }
 
-describe('放到桌上：结果页和存储（D-366）', () => {
-  it('结果页的转 Excel、转 Word 结果有「放到桌上」（代替「查看和编辑」）；后面的步骤生成了别的文件时没有', async () => {
+describe('Placed on desk: result page and storage (D-366)', () => {
+  it('Result page Convert to Excel and Convert to Word results have "Place on desk" (replacing "View and edit"); absent when subsequent steps generate other files', async () => {
     const putOnDesk = jest.fn(async () => undefined);
     const item: RunItem = {
       uri: 'runs/r/1/a.xlsx',
@@ -217,7 +220,7 @@ describe('放到桌上：结果页和存储（D-366）', () => {
     expect(view.queryByTestId('result-desk')).toBeNull();
   });
 
-  it('放到桌上只复制：结果页的文件还在；中间格式的图片换成桌面里的相对路径', async () => {
+  it('Place on desk copies only: file remains on result page; intermediate format images replaced with relative paths within desk', async () => {
     const files = new FakeFiles();
     const item = runResult(files, 'table', tableDoc());
     const desk = await placeResultsOnDesk(files, [item], 1, 'copydesk');
@@ -230,8 +233,8 @@ describe('放到桌上：结果页和存储（D-366）', () => {
   });
 });
 
-describe('Excel 在桌上就是表格编辑器', () => {
-  it('转 Excel 剪下来的图片显示在表格里，点一下选中（显示原图），可以删掉；「完成」后 xlsx 里没有这张图（D-520）', async () => {
+describe('Excel on desk is a spreadsheet editor', () => {
+  it('Images cropped during Excel conversion are displayed in the table, selectable on tap (showing original image), and can be deleted; after "Done", the image is absent from xlsx (D-520)', async () => {
     const files = new FakeFiles();
     files.disk.set('runs/r1/fig.jpg', new Uint8Array([5, 5, 5]));
     const doc = tableDoc();
@@ -243,14 +246,14 @@ describe('Excel 在桌上就是表格编辑器', () => {
       box: box(0, 100, 400, 200),
     });
     await openOnDesk('table', doc, files);
-    // 图片排在表格下面：标题一行、表两行，第 4 行起。
+    // Image placed below table: title on line 1, table on two lines, starting from line 4.
     const image = screen.getByTestId('table-cell-3-0');
     expect(image).toBeTruthy();
     expect(screen.getByTestId('table-image-3-0')).toBeTruthy();
     await fireEvent.press(image);
     expect(screen.getByTestId('desk-edit-bar')).toBeTruthy();
     expect(screen.getByTestId('table-crop')).toBeTruthy();
-    // 图片没有字可改：再点一下还是选着，没有编辑框；只能删。
+    // Image has no text to edit: tapping again still selects it, with no edit box; can only delete.
     await fireEvent.press(image);
     expect(screen.queryByTestId('desk-edit-input')).toBeNull();
     expect(screen.queryByTestId('desk-row-below')).toBeNull();
@@ -260,11 +263,11 @@ describe('Excel 在桌上就是表格编辑器', () => {
     const file = currentFiles(await deskNow(files))[0]!;
     const zip = unzipSync(files.disk.get(`desk/editdesk/${file.path}`)!);
     expect(Object.keys(zip).some((n) => n.includes('media'))).toBe(false);
-    // 「完成」的面板合上：不留着打开的面板给下一个测试。
+    // "Done" panel closed: do not leave an open panel for the next test.
     await fireEvent.press(screen.getByTestId('desk-sheet-backdrop'));
   });
 
-  it('点一下选中（工具栏换成编辑层、显示原图），再点一下编辑；编辑中撤销一步步退；「完成」时合成一个版本', async () => {
+  it('Tap to select (toolbar changes to edit layer, shows original image), tap again to edit; undo steps back during editing; merges into a single version on "Done"', async () => {
     const { files } = await openOnDesk('table', tableDoc());
     await fireEvent.press(screen.getByTestId('table-cell-1-0'));
     expect(screen.getByTestId('desk-edit-bar')).toBeTruthy();
@@ -277,17 +280,17 @@ describe('Excel 在桌上就是表格编辑器', () => {
     expect(screen.getByText('A & 1')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('desk-row-below'));
     expect(screen.getByTestId('table-cell-3-0')).toBeTruthy();
-    // 没合上：桌上还是一个版本，「编辑中」写进了桌面（防丢）。
+    // Not closed: desk still has one version, "Editing" written to desk (preventing loss).
     expect((await deskNow(files)).versions).toHaveLength(1);
     await waitFor(() => expect(files.disk.has('desk/editdesk/editing.json')).toBe(true));
-    // 撤销一步步退编辑。
+    // Undo steps back edits one by one.
     await fireEvent.press(screen.getByTestId('desk-undo'));
     expect(screen.queryByTestId('table-cell-3-0')).toBeNull();
     await fireEvent.press(screen.getByTestId('desk-undo'));
     expect(screen.getByText('a')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('desk-redo'));
     expect(screen.getByText('A & 1')).toBeTruthy();
-    // 插入行以后不再选中：工具栏回来了。
+    // No longer selected after inserting a row: toolbar is back.
     expect(screen.getByTestId('desk-toolbar')).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('desk-done'));
@@ -297,20 +300,20 @@ describe('Excel 在桌上就是表格编辑器', () => {
     expect(desk.versions.some((v) => v.open)).toBe(false);
     expect(await xlsxText(files)).toContain('<t>A &amp; 1</t>');
     expect(files.disk.has('desk/editdesk/editing.json')).toBe(false);
-    // 合上以后撤销整段一起退。
+    // After closing, undo rolls back the entire section together.
     await fireEvent.press(screen.getByTestId('desk-sheet-backdrop'));
     await fireEvent.press(screen.getByTestId('desk-undo'));
     await waitFor(() => expect(screen.getByText('a')).toBeTruthy());
     expect((await deskNow(files)).current).toBe(0);
   });
 
-  it('撤销跨编辑和工具：编辑后转 PDF，先退回改过的表格，再整段退回原来的', async () => {
+  it('Undo across edits and tools: converting to PDF after editing rolls back the modified table first, then rolls back the entire section to the original', async () => {
     const files = new FakeFiles();
     files.documents.extensions = ['docx', 'xlsx'];
     await openOnDesk('table', tableDoc(), files);
     await editTo('table-cell-1-1', '改过');
     await fireEvent.press(screen.getByTestId('desk-deselect'));
-    // 用别的工具前先合上编辑；文档转 PDF 不问纸张，直接跑（D-363）。
+    // Close editing before using other tools; document-to-PDF runs directly without asking about page size (D-363).
     await fireEvent.press(await deskTool('desk-tool-pdf.fromDocument'));
     await waitFor(() => expect(screen.getByTestId('desk-preview-pdf')).toBeTruthy());
     expect((await deskNow(files)).versions.map((v) => v.by.kind)).toEqual([
@@ -327,12 +330,12 @@ describe('Excel 在桌上就是表格编辑器', () => {
     expect(await screen.findByText('改过')).toBeTruthy();
   });
 
-  it('插删列、删表外的文字；点「完成」合上；没保存就离开先问「放弃修改？」', async () => {
+  it('Insert/delete columns, delete text outside table; tap "Done" to close; leaving without saving prompts "Discard changes?"', async () => {
     const { files } = await openOnDesk('table', tableDoc());
     await fireEvent.press(screen.getByTestId('table-cell-1-0'));
     await fireEvent.press(screen.getByTestId('desk-col-delete'));
     await fireEvent.press(screen.getByTestId('table-cell-0-0'));
-    // 表外的文字：没有插删行列，只有编辑和删除。
+    // Text outside the table: no row/column insertion or deletion, only edit and delete.
     expect(screen.queryByTestId('desk-row-below')).toBeNull();
     await fireEvent.press(screen.getByTestId('desk-block-delete'));
     const ask = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
@@ -349,11 +352,11 @@ describe('Excel 在桌上就是表格编辑器', () => {
     const blocks = doc.pages[0]!.blocks;
     expect(blocks.map((b) => b.kind)).toEqual(['table']);
     expect((blocks[0] as TableBlock).cells.map((c) => c.text)).toEqual(['b', 'd']);
-    // 原图只存一份，新版本还用着它。
+    // Original image is stored only once; new version still uses it.
     expect(file.source!.assets).toHaveLength(1);
   });
 
-  it('识别范围和页签；一页超过 2000 格只能看', async () => {
+  it('Recognition range and tabs; pages exceeding 2000 cells are view-only', async () => {
     await openOnDesk('table', tableDoc());
     await fireEvent.press(screen.getByTestId('table-scope-tables'));
     expect(screen.queryByText('标题')).toBeNull();
@@ -361,13 +364,13 @@ describe('Excel 在桌上就是表格编辑器', () => {
     expect(screen.getByText('只有文字')).toBeTruthy();
   });
 
-  it('超过 2000 格的页只能看：格子点不了', async () => {
+  it('Pages exceeding 2000 cells are view-only: cells cannot be tapped', async () => {
     await openOnDesk('table', tableDoc(46));
     expect(screen.getByText(/超过 2000 个格子/)).toBeTruthy();
     expect(screen.getByTestId('table-cell-1-0')).toBeDisabled();
   });
 
-  it('格子照原图对齐；表外很长的一行按屏幕折行', async () => {
+  it('Cells aligned with original image; long lines outside table wrap according to screen width', async () => {
     const doc = tableDoc(20);
     const table = doc.pages[0]!.blocks[1] as TableBlock;
     table.cells[0]!.align = 'center';
@@ -384,7 +387,7 @@ describe('Excel 在桌上就是表格编辑器', () => {
     expect(cell.width).toBeLessThanOrEqual(Dimensions.get('window').width - 40);
   });
 
-  it('App 被关掉时没合上的编辑：下次打开房间合成一个版本，能撤销', async () => {
+  it('Unclosed edits when app is killed: next time room is opened, merges into a single version with undo support', async () => {
     const files = new FakeFiles();
     const item = runResult(files, 'table', tableDoc());
     const desk = await placeResultsOnDesk(files, [item], Date.now(), 'editdesk');
@@ -400,7 +403,7 @@ describe('Excel 在桌上就是表格编辑器', () => {
   });
 });
 
-/** 桌上 Word 的编辑页（D-465）：用 jsdom 跑真的页面脚本，改 DOM，把页面交回来的样子发给 App。 */
+/** Word editing page on desk (D-465): runs real page scripts using jsdom, modifies DOM, and sends the modified page representation back to the app. */
 function wordPage() {
   const view = screen.getByTestId('word-editor-page');
   const dom = new JSDOM(view.props.source.html, { runScripts: 'dangerously' });
@@ -411,23 +414,23 @@ function wordPage() {
     });
   return {
     q: (sel: string) => window.document.querySelector(sel) as HTMLElement,
-    /** 浏览器的 input 事件：交回整页。 */
+    /** Browser input event: returns the full page. */
     input: () => send({ type: 'doc', pages: window.__wordPages() }),
     state: (state: object) => send({ type: 'state', ...state }),
-    /** 原图小窗上的「换成原件」（D-469）。 */
+    /** "Replace with original" on the original image floating window (D-469). */
     swap: () => send({ type: 'swap' }),
     window,
   };
 }
 
-describe('Word 在桌上就是整页编辑器（D-465）', () => {
-  it('整页直接改：改字、加粗几个字、回车分段；光标在表格里能插行；撤销；合上时生成新的 docx', async () => {
+describe('Word on desk is a full-page editor (D-465)', () => {
+  it('Direct page editing: edit text, bold text, enter for new paragraphs; insert rows when cursor is in table; undo; generate new docx upon closing', async () => {
     const { files } = await openOnDesk('doc', wordDoc());
     const page = wordPage();
-    // 没有点选、没有文字框：页面里每一块都能直接改。
+    // No taps selected, no text box: every block in the page can be edited directly.
     expect(screen.queryByTestId('desk-edit-input')).toBeNull();
     expect(screen.queryByTestId('word-format-bar')).toBeNull();
-    // 光标放进页面：房间的工具栏收起，换成格式按钮。
+    // Cursor placed inside the page: room's toolbar collapses and is replaced by formatting buttons.
     await page.state({ focus: true, bold: false, align: 'left', cell: null });
     expect(screen.getByTestId('word-format-bar')).toBeTruthy();
     expect(screen.getByTestId('word-bold')).toBeTruthy();
@@ -440,14 +443,14 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
     page.q('[data-ref="0-1"]').after(second);
     page.q('[data-ref="0-3"] td[data-i="1"]').textContent = '合计';
     await page.input();
-    // 字改到一半，光标到了表格里：多一排插删行列；点「下面插入一行」，改的字也在。
+    // Mid-edit, cursor moved into the table: extra options for inserting/deleting rows and columns appear; tapping "Insert row below" preserves the edits made so far.
     await page.state({ focus: true, cell: { ref: '0-3', i: 1 } });
     await fireEvent.press(screen.getByTestId('desk-row-below'));
     const html = screen.getByTestId('word-editor-page').props.source.html as string;
     expect(html).toContain('合计');
     expect(html).toContain('回车分出来的');
     expect(html.match(/<tr>/g)).toHaveLength(2);
-    // 撤销退掉插入的行，再重做。
+    // Undo rolls back the inserted row, then redo.
     await fireEvent.press(screen.getByTestId('desk-undo'));
     expect(
       (screen.getByTestId('word-editor-page').props.source.html as string).match(/<tr>/g),
@@ -469,7 +472,7 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
     expect(table?.kind === 'table' && table.table.rows).toBe(2);
   });
 
-  it('打了字马上点「完成」：还没合成一步的字也写进 docx', async () => {
+  it('Tapping "Done" immediately after typing: unmerged single-character edits are also written into docx', async () => {
     const { files } = await openOnDesk('doc', wordDoc());
     const page = wordPage();
     await page.state({ focus: true });
@@ -480,43 +483,43 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
     expect(await docxXml(files)).toContain('刚打的标题');
   });
 
-  it('格式按钮把命令交给页面', async () => {
+  it('Formatting buttons delegate commands to the page', async () => {
     await openOnDesk('doc', wordDoc());
     const page = wordPage();
     const inject = jest.fn();
     screen.getByTestId('word-editor-page').props.injectJavaScript = inject;
     await page.state({ focus: true, align: 'left' });
-    // 替身 WebView 没有 injectJavaScript 也不出错。
+    // Placeholder WebView does not throw errors even without injectJavaScript.
     await fireEvent.press(screen.getByTestId('word-bold'));
     await fireEvent.press(screen.getByTestId('word-bigger'));
     expect(screen.getByTestId('word-format-bar')).toBeTruthy();
   });
 
-  it('桌上的 Word 转 PDF 按编辑页的版面打印，改过的字和样式都在（2026-11-06 三星真机：转出来的 PDF 全部靠左、字号全丢，D-466）', async () => {
+  it('Word to PDF on desk prints according to editing page layout, preserving edited text and styles (2026-11-06 Samsung real device: converted PDF entirely left-aligned with lost font sizes, D-466)', async () => {
     const { files } = await openOnDesk('doc', wordDoc());
     const page = wordPage();
     page.q('[data-ref="0-1"]').innerHTML = '改过的 <b>正文</b>';
     await page.input();
     await fireEvent.press(await deskTool('desk-tool-pdf.fromDocument'));
     await waitFor(() => expect(screen.getByTestId('desk-preview-pdf')).toBeTruthy());
-    // 没交给通用的 Word 排版（Android 的 mammoth）。
+    // Not passed to the general Word layout engine (Android mammoth).
     expect(files.documents.converted).toHaveLength(0);
     const html = files.printedHtml.at(-1)!;
     expect(html).toContain('class="paper"');
     expect(html).not.toContain('contenteditable');
     expect(html).not.toContain('<script');
     expect(html).toContain('改过的 <b>正文</b>');
-    // 字号按磅（A4 宽 595 磅），标题居中的位置照原图。
+    // Font size in points (A4 width 595 pt), centered title position matches the original image.
     expect(html).toMatch(/font-size:\d+(\.\d+)?pt/);
     expect(html).not.toMatch(/font-size:\d+(\.\d+)?px/);
   });
 
-  it('「这里用原图」：被认成字的签名、印章换成原图里剪下来的那一块，合上时搬进桌面、嵌进 docx（D-467）', async () => {
+  it('"Use original here": signatures and stamps recognized as text are replaced by the cropped segment from the original image, moved into desk and embedded into docx upon closing (D-467)', async () => {
     const files = new FakeFiles();
     files.imageSizes.set('runs/r1/page.jpg', { width: 2000, height: 2800 });
     await openOnDesk('doc', wordDoc(), files);
     const page = wordPage();
-    // 按钮在页面里的原图小窗上（D-469），不在格式栏里。
+    // Button is on the page's original image floating window (D-469), not in the formatting bar.
     expect(screen.getByTestId('word-editor-page').props.source.html).toContain(
       '"swap":{"one":"换成原件","lines":"换成原件（{n} 行）","primary":',
     );
@@ -530,7 +533,7 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
         ),
       ).toBe(true),
     );
-    // 新剪的图也读进页面（模拟器上第一次只画了灰块）。
+    // Newly cropped image is also read into the page (simulator only draws gray blocks on first render).
     await waitFor(() =>
       expect(screen.getByTestId('word-editor-page').props.source.html as string).toMatch(
         /data-ref="0-1" data-kind="image"[^>]*><img src="data:image\/jpeg;base64,/,
@@ -542,7 +545,7 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
     await fireEvent.press(screen.getByTestId('desk-done'));
     await screen.findByTestId('desk-save');
     const file = currentFiles(await deskNow(files))[0]!;
-    // 剪下来的图搬进了桌面，嵌进了 docx。
+    // Cropped image moved into desk and embedded into docx.
     const doc = parseDocDoc(decodeUtf8(files.disk.get(`desk/editdesk/${file.source!.path}`)!))!;
     const image = doc.pages[0]!.blocks[1]!;
     expect(image.kind).toBe('image');
@@ -553,12 +556,12 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
     expect(Object.keys(unzipSync(files.disk.get(`desk/editdesk/${file.path}`)!))).toContain(
       'word/media/image1.jpg',
     );
-    // 剪的是原图里这一段的位置（按原图的大小换算，四周多留一点）。
+    // Crop position corresponds to this segment in the original image (scaled by original size with extra padding around).
     expect(image.box.x).toBeLessThan(100);
     expect(image.box.width).toBeGreaterThan(800);
   });
 
-  it('换成原件以后点「完成」、接着改、再存：图还在页面上，存的文件放回桌上还能改（2026-11-06 三星：存了再打开就显示不了）', async () => {
+  it('Tapping "Done" after replacing with original, continuing edits, and saving again: image remains on page, saved file can be edited again when placed back on desk (2026-11-06 Samsung: display failed after save and reopen)', async () => {
     const files = new FakeFiles();
     files.imageSizes.set('runs/r1/page.jpg', { width: 1000, height: 1400 });
     const { repo } = await openOnDesk('doc', wordDoc(), files);
@@ -574,20 +577,20 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
     await fireEvent.press(screen.getByTestId('desk-done'));
     await screen.findByTestId('desk-save');
     await fireEvent.press(screen.getByTestId('desk-sheet-cancel'));
-    // 合上以后剪的图搬进了桌面：页面上还是这张图，不是灰块。
+    // Cropped image moved into desk after closing: page still shows this image, not gray blocks.
     await waitFor(() =>
       expect(screen.getByTestId('word-editor-page').props.source.html as string).toMatch(
         /data-ref="0-1" data-kind="image"[^>]*><img src="data:image/,
       ),
     );
-    // 接着改字，再存成用户文件。
+    // Continue editing text, then save again as a user file.
     page = wordPage();
     page.q('[data-ref="0-0"]').textContent = '第二次改的标题';
     await page.input();
     await fireEvent.press(await deskTool('desk-tool-room-save'));
     expect(await screen.findByTestId('desk-saved')).toBeTruthy();
     const [asset] = await repo.listAssets();
-    // 存的 docx 里有两张图（换的这张、原来剪好的那张）；放回桌上还带着中间格式，能改。
+    // Saved docx contains two images (the replaced one and the originally cropped one); placing back on desk retains intermediate format for further editing.
     const desk = await placeAssetOnDesk(files, asset!, 3, 'again');
     expect(desk).not.toBeNull();
     const file = currentFiles(desk!)[0]!;
@@ -596,7 +599,7 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
     expect(doc.pages[0]!.blocks.filter((b) => b.kind === 'image')).toHaveLength(2);
     expect(JSON.stringify(doc)).toContain('第二次改的标题');
 
-    // 从最近文件打开（文件预览页）：按编辑页的版面显示；点「编辑」放上桌，还是 Word 编辑器（D-470）。
+    // Opened from recent files (file preview page): displays according to editing page layout; tapping "Edit" places it on desk as a Word editor (D-467 / D-470).
     await act(() => router.dismissAll());
     await act(() => openAsset(files, router, asset!));
     const preview = await screen.findByTestId('word-preview-page');
@@ -607,7 +610,7 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
     expect(editor.props.source.html).toContain('第二次改的标题');
   });
 
-  it('选中几行再点「用原图」：一起换成一张图（2026-11-06 三星真机：一个签名被切成了好几份，D-468）', async () => {
+  it('Selecting multiple rows then tapping "Use original": replaced together as a single image (2026-11-06 Samsung real device: signature split into multiple parts, D-468)', async () => {
     const files = new FakeFiles();
     files.imageSizes.set('runs/r1/page.jpg', { width: 1000, height: 1400 });
     await openOnDesk('doc', wordDoc(), files);
@@ -622,7 +625,7 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
     const html = screen.getByTestId('word-editor-page').props.source.html as string;
     expect(html).not.toContain('正文第一段。');
     expect(html).not.toContain('甲');
-    // 一张图包住两块（段落 y 120–180、列表 y 200–220，四周多留一点）。
+    // Single image wrapping two blocks (paragraph y 120–180, list y 200–220, with extra padding around).
     await page.state({ focus: false });
     await fireEvent.press(screen.getByTestId('desk-done'));
     await screen.findByTestId('desk-save');
@@ -635,7 +638,7 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
     expect(swapped.box.y + swapped.box.height).toBeGreaterThan(220);
   });
 
-  it('剪好嵌进 docx 的图片：图片写进页面；合上时再嵌一次', async () => {
+  it('Cropped images embedded into docx: image written to page; embedded again upon closing', async () => {
     const files = new FakeFiles();
     files.disk.set('runs/r1/crop.jpg', new Uint8Array([7, 7, 7, 7]));
     files.imageSizes.set('runs/r1/crop.jpg', { width: 600, height: 400 });
@@ -653,14 +656,14 @@ describe('Word 在桌上就是整页编辑器（D-465）', () => {
       'word/media/image1.jpg',
     );
     expect(await docxXml(files)).not.toContain('年度报告');
-    // 原图和剪好的图片都还在桌面的 assets 里。
+    // Both original and cropped images remain in desk assets.
     expect(file.source!.assets).toHaveLength(2);
   });
 });
 
-// 2026-11-09 用户测试：桌上「完成」和「文件」里只有存进 App 自己的文件库，用户到「文件」App 里找不到。
-describe('桌上的文件能存到手机（复制进「文件」App 里选的文件夹）', () => {
-  it('「完成」里和「文件」页签里都有，每次让用户选文件夹', async () => {
+// 2026-11-09 user test: "Done" and "Files" on desk only saved to the app's internal document library, making them hard for users to find in the system "Files" app.
+describe('Files on desk can be saved to phone (copied into selected folder in "Files" app)', () => {
+  it('Available in both "Done" and "Files" tab, prompting user to select a folder every time', async () => {
     const { files } = await openOnDesk('table', tableDoc());
     await fireEvent.press(screen.getByTestId('desk-done'));
     await fireEvent.press(await screen.findByTestId('desk-folder'));
@@ -676,14 +679,14 @@ describe('桌上的文件能存到手机（复制进「文件」App 里选的文
     expect(files.folderPicks).toBe(2);
   });
 
-  // 2026-11-09 PDF 用户复测：存到手机以后点返回，还问「放弃修改？」，以为刚改好的文件要丢。
-  it('存到手机以后离开不再问「放弃修改？」；取消选文件夹、存完又改了，照常问', async () => {
+  // 2026-11-09 PDF user retest: after saving to phone and going back, it still asked "Discard changes?", leading to the misconception that the newly edited file would be lost.
+  it('Leaving after saving to phone no longer prompts "Discard changes?"; cancelling folder selection or editing after saving still prompts', async () => {
     const { files } = await openOnDesk('table', tableDoc());
     await fireEvent.press(screen.getByTestId('table-cell-1-0'));
     await fireEvent.press(screen.getByTestId('desk-col-delete'));
     const ask = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
 
-    // 取消选文件夹：什么都没存，照常问。
+    // Cancel folder selection: nothing saved, asks as usual.
     files.folderChoice = 'cancel';
     await fireEvent.press(screen.getByTestId('desk-done'));
     await fireEvent.press(await screen.findByTestId('desk-folder'));
@@ -691,7 +694,7 @@ describe('桌上的文件能存到手机（复制进「文件」App 里选的文
     await fireEvent.press(screen.getByTestId('desk-close'));
     expect(ask.mock.lastCall?.[0]).toBe('放弃修改？');
 
-    // 存完又改了：照常问。
+    // Edited again after saving: asks as usual.
     files.folderChoice = 'pick';
     await fireEvent.press(screen.getByTestId('desk-done'));
     await fireEvent.press(await screen.findByTestId('desk-folder'));
@@ -703,7 +706,7 @@ describe('桌上的文件能存到手机（复制进「文件」App 里选的文
     await fireEvent.press(screen.getByTestId('desk-close'));
     expect(ask.mock.lastCall?.[0]).toBe('放弃修改？');
 
-    // 存到手机以后没再改：直接离开。
+    // No further changes after saving to phone: leaves directly.
     await fireEvent.press(screen.getByTestId('desk-done'));
     await fireEvent.press(await screen.findByTestId('desk-folder'));
     await waitFor(() => expect(files.folderPicks).toBe(3));
@@ -715,8 +718,8 @@ describe('桌上的文件能存到手机（复制进「文件」App 里选的文
   });
 });
 
-describe('存成用户文件以后还能放回桌上改（D-367）', () => {
-  it('保存时中间格式和原图跟着存；存储空间里算在这个文件上，能放回桌上改；删文件一起删', async () => {
+describe('Can be placed back on desk for editing after saving as user file (D-367)', () => {
+  it('Intermediate format and original image saved along upon saving; accounted toward storage space, can be placed back on desk for editing, and deleted together with file', async () => {
     const { files, repo } = await openOnDesk('table', tableDoc());
     await editTo('table-cell-1-0', '存之前改的');
     await fireEvent.press(screen.getByTestId('desk-deselect'));
@@ -732,13 +735,13 @@ describe('存成用户文件以后还能放回桌上改（D-367）', () => {
         `assets/${asset!.id}/morph-source.json`,
       ].sort(),
     );
-    // 保存前合上了编辑：存的是改过的。
+    // Editing closed before saving: saves the modified version.
     expect(strFromU8(unzipSync(files.disk.get(asset!.path)!)['xl/sharedStrings.xml']!)).toContain(
       '存之前改的',
     );
 
     await act(() => router.push('/storage'));
-    // 大小算上中间格式和原图。
+    // Size accounts for intermediate format and original image.
     const row = await screen.findByTestId(`storage-file-${asset!.id}`);
     expect(row).toHaveTextContent(/表格|其他|文件/);
     jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
@@ -747,7 +750,7 @@ describe('存成用户文件以后还能放回桌上改（D-367）', () => {
     await fireEvent.press(row);
     expect(await screen.findByText('存之前改的')).toBeTruthy();
     expect(screen.getByTestId('desk-editor')).toBeTruthy();
-    // 放回桌上是复制：用户文件不动。
+    // Placing back on desk is a copy: user file remains untouched.
     expect(files.disk.has(asset!.path)).toBe(true);
 
     await editTo('table-cell-1-1', '放回来再改');
@@ -765,10 +768,10 @@ describe('存成用户文件以后还能放回桌上改（D-367）', () => {
     expect([...files.disk.keys()].filter((k) => k.startsWith(`assets/${asset!.id}/`))).toEqual([]);
   });
 
-  it('结果页的「保存」、快捷操作的保存步骤也带中间格式和原图（D-400）：存储空间能放回桌上改', async () => {
+  it('Result page "Save" and quick action save steps also include intermediate format and original image (D-400): available in storage to be placed back on desk for editing', async () => {
     const files = new FakeFiles();
     const repo = new MemoryWorkspaceRepo();
-    // 转 Word 的结果：页面原图和剪下来的图片各一张。
+    // Result of Word conversion: one page original image and one cropped image.
     files.disk.set('runs/r1/cut.png', new Uint8Array([7, 7]));
     const word = runResult(files, 'doc', wordDoc('runs/r1/cut.png'));
     const [saved] = await saveItems({ files, repo, grantee: 'w1' }, [word], {
@@ -785,9 +788,9 @@ describe('存成用户文件以后还能放回桌上改（D-367）', () => {
         'assets/a1/morph-source.json',
       ].sort(),
     );
-    // 运行目录里的结果不动（运行页关掉时才删）。
+    // Results in run directory remain untouched (deleted only when run page is closed).
     expect(files.disk.has('runs/r1/明细.json')).toBe(true);
-    // 存储空间里算在这个文件上：两张图 + 中间格式。
+    // Accounted toward storage space for this file: two images + intermediate format.
     expect(await savedSourceBytes(files, asset!)).toBeGreaterThan(4);
     const desk = await placeAssetOnDesk(files, asset!, 2, 'backdesk');
     expect(desk).not.toBeNull();
@@ -797,7 +800,7 @@ describe('存成用户文件以后还能放回桌上改（D-367）', () => {
     const doc = parseDocDoc(decodeUtf8(files.disk.get(`desk/backdesk/${file.source!.path}`)!))!;
     expect(doc.pages[0]!.blocks.map((b) => b.kind)).toContain('table');
 
-    // 后面的步骤改过文件（中间格式不再对应它）、普通文件：只存文件。
+    // Subsequent steps modified the file (intermediate format no longer matches it), ordinary file: save file only.
     const renamed = { ...runResult(files, 'table', tableDoc()), uri: 'runs/r1/明细.xlsx' };
     renamed.tableDoc = { ...renamed.tableDoc!, for: 'runs/r1/别的.xlsx' };
     await saveItems({ files, repo, grantee: 'w1' }, [renamed], {
@@ -809,7 +812,7 @@ describe('存成用户文件以后还能放回桌上改（D-367）', () => {
     ]);
   });
 
-  it('普通文件（没有中间格式）在存储空间里没有「放到桌上」', async () => {
+  it('Ordinary files (without intermediate format) do not have "Place on desk" in storage', async () => {
     const files = new FakeFiles();
     const repo = new MemoryWorkspaceRepo();
     files.disk.set('assets/x1/a.pdf', new Uint8Array([1]));

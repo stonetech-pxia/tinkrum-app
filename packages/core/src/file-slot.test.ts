@@ -6,7 +6,7 @@ import type { WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 文件位（D-257）：look entry、opens {file}；配置里只有标题、提示、外观和用户文件 ID（null = 空位）。
+// File slot (D-257): look entry, opens {file}; config contains only title, prompt, appearance, and user file ID (null = empty slot).
 
 const add: Op = {
   op: 'addContainer',

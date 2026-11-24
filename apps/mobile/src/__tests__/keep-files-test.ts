@@ -2,8 +2,9 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { keepIncomingFiles } from '../storage/keep-files';
 import { FakeFiles } from '../test-utils/fake-files';
 
-// R01：打开、分享进来的文件存进文档库（D-455），同一份内容再打开不重复存；
-// 同名同大小但内容不同的是另一个文件，不能关联到旧的那份。
+// R01: Files opened or shared in are saved to the document library (D-455); opening the exact same
+// content again does not duplicate it; files with the same name and size but different content are
+// treated as distinct files and cannot be linked to the old one.
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 
@@ -18,8 +19,8 @@ async function setup() {
   return { repo, files, keep };
 }
 
-describe('打开的文件存进文档库时认内容', () => {
-  it('同名、同大小、内容不同：是两个文件，各自存一份，存成记录时用的是自己的内容', async () => {
+describe('Recognize content when saved opened files into the document library', () => {
+  it('Same name, same size, different content: treated as two files, saved separately, and their own content is used when saving as a record', async () => {
     const { repo, files, keep } = await setup();
     const a = await keep('report.txt', 'AAAA');
     const b = await keep('report.txt', 'BBBB');
@@ -30,7 +31,7 @@ describe('打开的文件存进文档库时认内容', () => {
     expect(await repo.listAssets()).toHaveLength(2);
   });
 
-  it('同名、同大小、内容也一样（再打开同一份）：不重复存，用已有的', async () => {
+  it('Same name, same size, identical content (re-opening the same file): not duplicated, uses the existing one', async () => {
     const { repo, keep } = await setup();
     const a = await keep('report.txt', 'AAAA');
     const again = await keep('report.txt', 'AAAA');
@@ -38,7 +39,7 @@ describe('打开的文件存进文档库时认内容', () => {
     expect(await repo.listAssets()).toHaveLength(1);
   });
 
-  it('大小不一样、名字不一样：直接存新的，不去读文件内容', async () => {
+  it('Different size, different name: directly save the new one without reading file content', async () => {
     const { files, keep } = await setup();
     await keep('report.txt', 'AAAA');
     const digest = jest.spyOn(files, 'contentDigest');
@@ -49,7 +50,7 @@ describe('打开的文件存进文档库时认内容', () => {
     expect(digest).not.toHaveBeenCalled();
   });
 
-  it('选出来的文件读不了内容：当成新文件存一份，不关联到旧的', async () => {
+  it('Content of selected file cannot be read: save as a new file without linking to the old one', async () => {
     const { repo, files, keep } = await setup();
     const a = await keep('report.txt', 'AAAA');
     jest.spyOn(files, 'contentDigest').mockRejectedValue(new Error('unreadable'));
@@ -58,7 +59,7 @@ describe('打开的文件存进文档库时认内容', () => {
     expect(await repo.listAssets()).toHaveLength(2);
   });
 
-  it('已经有文档库副本的（assetId）直接用；没有大小的当新文件', async () => {
+  it('Use existing document library copy (assetId) directly; treat files without size as new files', async () => {
     const { repo, files, keep } = await setup();
     const a = await keep('report.txt', 'AAAA');
     const [again] = await keepIncomingFiles(

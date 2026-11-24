@@ -7,8 +7,9 @@ import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 列表上的搜索、能换的排序和分组（show.browse，D-424）：只在块里，离开页面就回到配置里的样子。
-// 三种状态：还没有记录、有记录、边界（搜不到、超过 limit、没填的字段）。
+// Search, sortable sorting, and grouping on the list (show.browse, D-424): restricted to the block,
+// resetting to config defaults upon leaving the page. Three states: no records, has records, and
+// edge cases (no search results, exceeding limit, unfilled fields).
 
 const LIMIT = 3;
 

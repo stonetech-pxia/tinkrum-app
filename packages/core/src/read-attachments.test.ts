@@ -7,8 +7,10 @@ import type { WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 表上的「自动读取附件」（D-397）：新记录表单读附件给候选，默认打开，只有写 false 才关。
-// 是配置里唯一和它有关的东西：只读、不写，所以不是工作流，也指不到任何工具。
+// "Automatic attachment reading" on a table (D-397): new record form reads attachments to populate
+// candidates, enabled by default, turned off only by setting false. It is the only
+// configuration-related feature: read-only, no writing, so it is not a workflow and points to no
+// tools.
 
 function withTable(): WorkspaceConfig {
   const config = workspace('en');

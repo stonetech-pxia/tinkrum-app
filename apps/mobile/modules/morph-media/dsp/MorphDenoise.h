@@ -7,7 +7,7 @@ extern "C" {
 typedef struct MorphDenoiser MorphDenoiser;
 MorphDenoiser *morph_denoise_create(int channels);
 int morph_denoise_process(MorphDenoiser *state, const float *input, float *output);
-/* 创建时的声道数：每次 process 读写 480 × channels 个样本。 */
+/* Channel count at creation: each process reads and writes 480 * channels samples. */
 int morph_denoise_channels(const MorphDenoiser *state);
 void morph_denoise_destroy(MorphDenoiser *state);
 #ifdef __cplusplus

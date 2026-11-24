@@ -1,6 +1,6 @@
 import { PDF_GRAPHICS_SCRIPT } from '../packs/pages/pdf-graphics';
 
-// 对真实固定页面中的分析函数喂独立几何；不替换 PDF.js 的绘图路径。
+// Feed independent geometry to analysis functions in real fixed pages; do not replace PDF.js drawing paths.
 const plan = new Function('handlers', PDF_GRAPHICS_SCRIPT + ';return planNativeGraphics;')({});
 const decoration = new Function('handlers', PDF_GRAPHICS_SCRIPT + ';return decorativeOperation;')(
   {},
@@ -182,7 +182,7 @@ describe('digital PDF graphics ownership', () => {
   });
   it('reads a rounded card as a fill under its text, but not a circle or a slanted shape', () => {
     const shape = new Function('handlers', PDF_GRAPHICS_SCRIPT + ';return pathShape;')({});
-    // 浏览器把每个圆角拆成好几段曲线；四条边横平竖直。
+    // Browser splits each rounded corner into multiple curve segments; all four sides are strictly horizontal and vertical.
     const corner = (x: number, y: number) => [2, x, y, x, y, x, y, 2, x, y, x, y, x, y];
     const card = [
       ...[0, 68, 909, 1, 68, 874],
@@ -286,7 +286,7 @@ describe('digital PDF graphics ownership', () => {
       { ...input, candidates: [figure] },
     );
     expect(result.owned).toEqual([figure]);
-    // 图里的无编码字形跟着这张图；图外的是正文，由可编辑文字承载。
+    // Unencoded glyphs in the figure follow this figure; those outside the figure are body text, carried by editable text.
     expect(result.keep.has(6)).toBe(true);
     expect(result.keep.has(7)).toBe(false);
     expect(cropOperation(inside, result)).toBe(true);
@@ -295,7 +295,7 @@ describe('digital PDF graphics ownership', () => {
     expect(backgroundOperation({ i: 8, name: 'setFont' }, box(0, 0, 600, 800))).toBe(true);
   });
   it('does not take a watermark pieced from small images over body text as a picture (EU sample 071)', () => {
-    // 斜着的「MUSTER」由二十条互相重叠的小位图拼成，压在 12 行原生正文上；右上角另有一个标志。
+    // The slanted "MUSTER" is composed of twenty overlapping small bitmaps, overlaid on 12 lines of native body text; there is another badge in the upper right corner.
     const body = Array.from({ length: 12 }, (_, k) =>
       text(k + 1, box(60, 200 + 20 * k, 480, 12), 'Der Anhang enthält keine Werturteile über'),
     );
@@ -313,11 +313,11 @@ describe('digital PDF graphics ownership', () => {
     expect(result.owned).toEqual([logo.box]);
     expect(result.watermarks).toHaveLength(1);
     expect(result.keep.size).toBe(0);
-    // 水印笔画认出来的「字」不当正文；正文行都留着。
+    // "Words" recognized from watermark strokes are not treated as body text; all body text lines are kept.
     expect(result.watermarkInk).toEqual([12]);
   });
   it('owns only the logo, not a letterhead region around it that holds stacked lines of text (EU sample 097)', () => {
-    // 成绩单的抬头：两个框，左边学校地址和一个小位图标志，右边四行「标签 : 值」；版面模型把整个抬头框成一张图。
+    // Transcript header: two boxes, school address and small bitmap logo on the left, four lines of "label : value" on the right; the layout model frames the entire header as a single image.
     const header = box(30, 30, 540, 110);
     const logo = { i: 50, image: true, box: box(200, 45, 60, 50) };
     const lines = [

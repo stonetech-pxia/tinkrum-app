@@ -13,7 +13,7 @@ export default function QuickActionCategoryRoute() {
   const palette = usePalette(useAppTheme());
   const { kind, shared } = useLocalSearchParams<{ kind: string; shared?: string }>();
   const valid = isQuickActionKind(kind);
-  // 链接里的分类不对：这一页用不上带进来的文件，照样释放（分类页面没挂上，它自己的清理不会跑）。
+  // Incorrect category in link: page cannot use incoming files, released anyway (category page not mounted, its own cleanup does not run).
   useEffect(() => {
     if (!valid && shared) void releaseShare(files, Number(shared));
   }, [valid, shared, files]);

@@ -7,7 +7,7 @@ import { WorkflowEditor } from '@/run/WorkflowEditor';
 import { workflowEntry } from '@/shell/ai-entry';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
 
-/** 编辑一个工作流（参数、每次运行时问、步骤）。保存生成一个可撤销的版本。 */
+/** Edit a workflow (parameters, prompt on each run, steps). Saving generates an undoable version. */
 export default function WorkflowRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { locale, registry } = useWorkspaceContext();
@@ -28,7 +28,7 @@ export default function WorkflowRoute() {
       <Stack.Screen
         options={{ title: workflow.name, headerRight: workflowEntry(config, workflow.id, palette) }}
       />
-      {/* 换了工作流（例如复制后）时重新建草稿。 */}
+      {/* Rebuild draft when workflow changes (e.g., after duplication). */}
       <WorkflowEditor
         key={workflow.id}
         workflow={workflow}

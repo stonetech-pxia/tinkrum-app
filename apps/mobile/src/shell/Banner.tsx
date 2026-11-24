@@ -5,14 +5,16 @@ import { t } from '../i18n';
 import type { Palette } from '../renderer/theme';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 
-/** 「已应用」提示条显示多久后自动消失（D-106）；之后仍可在「设置 → 改动记录」撤销。 */
+/** Duration after which the "Applied" banner automatically disappears (D-106); still undoable afterwards in "Settings -> Change History". */
 export const APPLIED_BANNER_MS = 6000;
 
 /**
- * 版本提示条：已应用 / 已回退，带「撤销」。外壳和独立页面都显示。
- * 「已应用」几秒后自动消失，免得之后被当成撤销别的操作；回退、冲突等警告要用户自己关。
- * 浮在内容上（绝对定位），不占布局：出现和消失时页面不动，不会因为内容上跳点错。
- * 放在所在容器的顶部；容器上方还有别的东西时用 BannerAnchor。
+ * Version banner: applied / reverted, with "Undo". Shown on both shell and standalone pages.
+ * "Applied" automatically disappears after a few seconds to avoid being mistaken for undoing
+ * other operations; warnings such as reverts and conflicts require manual user dismissal. Floats
+ * over content (absolute positioning) without taking up layout space: page does not shift when
+ * appearing and disappearing, preventing misclicks from content jumping. Placed at the top of its
+ * container; uses BannerAnchor when there are other elements above the container.
  */
 export function Banner({ palette }: { palette: Palette }) {
   const { locale } = useWorkspaceContext();
@@ -66,7 +68,7 @@ export function Banner({ palette }: { palette: Palette }) {
   );
 }
 
-/** 草稿的提示（D-190）：重新套用时去掉了几步、某一步显示不出来已经撤掉。 */
+/** Draft notice (D-190): steps removed when re-applying, or a step that could no longer be displayed has been discarded. */
 export function DraftNotice({ palette }: { palette: Palette }) {
   const { locale } = useWorkspaceContext();
   const notice = useWorkspace((s) => s.draftNotice);
@@ -106,7 +108,7 @@ export function BannerAnchor({ palette }: { palette: Palette }) {
 }
 
 const styles = StyleSheet.create({
-  // 高度是 0 的定位点：提示条从这里往下浮，不占位置。
+  // Zero-height anchor: the banner floats down from here without taking up layout space.
   anchor: { height: 0, zIndex: 50 },
   floating: {
     position: 'absolute',
@@ -123,7 +125,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
   },
-  // 撤销和关闭至少 44 见方、彼此不重叠，点「撤销」不会落到「关闭」上。
+  // Undo and close are at least 44 square points and non-overlapping, so tapping "Undo" does not land on "Close".
   action: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   banner: {
     flexDirection: 'row',

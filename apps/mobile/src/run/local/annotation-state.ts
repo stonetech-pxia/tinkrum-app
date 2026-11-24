@@ -3,7 +3,7 @@ import type { ImageAnnotation, AnnotationPoint } from '../../runtime/annotations
 
 export type AnnotationTool = ImageAnnotation['kind'] | 'note';
 type TextMark = Extract<ImageAnnotation, { kind: 'text' }>;
-/** 文字框的大小（原图点）：排版交给调用方（Skia），没给时按字数估一个。 */
+/** Size of the text box (original image points): layout is handled by the caller (Skia); if not provided, estimated based on character count. */
 export type Measure = (text: string, fontSize: number) => Size;
 const estimate: Measure = (text, fontSize) => ({
   width: [...text].length * fontSize * 0.7 + fontSize * 0.4,
@@ -12,14 +12,16 @@ const estimate: Measure = (text, fontSize) => ({
 export const NOTE_FILL = '#FDE68A';
 
 type Size = { width: number; height: number };
-/** 页面上认出的一行字的框（原图点）。 */
+/** Bounding box of a recognized line of text on the page (original image points). */
 export type LineBox = { x: number; y: number; width: number; height: number };
 
-/** 文件页上新写的字默认多大：约是短边的 1.9%，A4、Letter 上接近 11 磅的正文。 */
+/** Default font size for newly written text on document pages: approximately 1.9% of the short side, close to 11 pt body text on A4 and Letter. */
 const DOCUMENT_FONT = 0.019;
 
 /**
- * 点附近那一行字（原图点）：同一行的优先（竖直距离算两倍），再看左右离得多远。没有认出字时是 undefined。
+ * The line of text near a point (original image points): prefers the same line (vertical distance
+ * weighted double), then checks horizontal distance. Returns undefined when no text is
+ * recognized.
  */
 export function nearestLine(lines: readonly LineBox[], p: AnnotationPoint): LineBox | undefined {
   let best: LineBox | undefined;
@@ -36,7 +38,7 @@ export function nearestLine(lines: readonly LineBox[], p: AnnotationPoint): Line
   return best;
 }
 
-/** 照着点附近那一行字定新文字的字号：认出的行框比字号高一些（上下留白），取行高的 3/4。 */
+/** Determine the font size for new text based on the line of text near the point: recognized line boxes are slightly taller than the font size (with vertical padding), so take 3/4 of the line height. */
 export function lineFontSize(lines: readonly LineBox[], p: AnnotationPoint): number | undefined {
   const line = nearestLine(lines, p);
   return line ? line.height * 0.75 : undefined;
@@ -50,13 +52,13 @@ export interface AnnotationState {
   color: string;
   text: string;
   start: AnnotationPoint | null;
-  /** 选中的文字（这一页第几个标注）和是不是正在拖它。 */
+  /** Selected text (which annotation on this page) and whether it is currently being dragged. */
   selected?: number | null;
   drag?: boolean;
-  /** 开始拖时文字的位置（拖动是从这里加上手指移动的距离）。 */
+  /** Text position at the start of the drag (dragging starts from here plus finger movement). */
   dragFrom?: AnnotationPoint | null;
   draft: Exclude<ImageAnnotation, { kind: 'text' }> | null;
-  /** 每页认出的行（原图点），新写的字照最近的一行定字号；还在认或认不出时是空的。 */
+  /** Recognized lines per page (original image points); newly written text determines its font size from the nearest line; empty while recognizing or if unrecognized. */
   lines?: Record<number, readonly LineBox[]>;
 }
 export type AnnotationAction =
@@ -69,11 +71,11 @@ export type AnnotationAction =
       x: number;
       y: number;
       defaultText?: string;
-      /** 新写的字的字号（原图点）；不给时照 lines 里最近的那一行，再没有时按页面大小。 */
+      /** Font size for newly written text (original image points); if not provided, uses the nearest line in lines, or falls back to page size. */
       fontSize?: number;
-      /** 这一页认出的行（原图点），用来定字号。 */
+      /** Recognized lines on this page (original image points), used to determine font size. */
       lines?: readonly LineBox[];
-      /** 是文件的页面（PDF）：没认出字时按正文大小写，不按照片上的标签大小。 */
+      /** Is a document page (PDF): when text is not recognized, writes at body text size rather than photo label size. */
       document?: boolean;
     }
   | { type: 'style'; patch: Partial<Pick<TextMark, 'text' | 'fontSize' | 'color' | 'rotation'>> }
@@ -118,7 +120,7 @@ export function reduceAnnotations(
     const mark = pageMarks[at];
     return mark?.kind === 'text' ? { at, mark } : null;
   };
-  /** 点中了哪个文字（从最上面一个找起）：把点转回文字框没转之前的位置再比。 */
+  /** Hit test for which text was clicked (searching from topmost downward): transforms the point back to the unrotated coordinate space of the text box before comparing. */
   const hitText = (p: AnnotationPoint): number => {
     for (let i = pageMarks.length - 1; i >= 0; i--) {
       const mark = pageMarks[i]!;
@@ -199,7 +201,7 @@ export function reduceAnnotations(
           draft: null,
         };
       }
-      // 选着一段字时点空白处：只是取消选中，不再放一段（2026-11-09 用户测试：想「点一下完成」却多了一段）。
+      // Tapping blank space while a text span is selected: only clears the selection without creating a new span (2026-11-09 user testing: intended to "tap Done" but accidentally created an extra span).
       if (texty && state.selected != null)
         return { ...state, selected: null, drag: false, start: null, draft: null };
       if (pageMarks.length >= 100) return state;
@@ -212,7 +214,7 @@ export function reduceAnnotations(
           lineFontSize(action.lines ?? state.lines?.[state.index] ?? [], point) ??
           (action.document ? short * DOCUMENT_FONT : Math.max(12, short * 0.045));
         const box = measure(text, fontSize);
-        // 字从点的地方开始、底边落在点上：点在一条横线上，字就写在这条线上，手指也不挡住要写的地方。
+        // Text starts at the point and its baseline lands on the point: if the point is on a horizontal line, the text is written directly on that line, and the finger does not obscure the writing area.
         const mark: TextMark = {
           kind: 'text',
           point: {
@@ -243,7 +245,7 @@ export function reduceAnnotations(
         draft: {
           kind: tool,
           points: [point, { x: point.x + 0.01, y: point.y + 0.01 }],
-          // 荧光笔：粗一些、半透明，盖在文字上还看得见字。
+          // Highlighter pen: thicker and translucent, allowing text underneath to remain readable.
           width: Math.max(2, Math.min(size.width, size.height) * (highlight ? 0.028 : 0.007)),
           color: highlight
             ? `${state.color}66`
@@ -260,7 +262,7 @@ export function reduceAnnotations(
         const sel = selectedMark();
         if (!sel || !scale) return state;
         const box = measure(sel.mark.text, sel.mark.fontSize);
-        // 起点是按下时的位置：这里用「按下时文字的位置 + 手指移动」，所以先还原按下时的位置。
+        // Start point is the position at press time: uses "text position at press time + finger movement", so first restore the position at press time.
         const origin = state.dragFrom ?? sel.mark.point;
         const point = {
           x: clamp(origin.x + action.dx / scale, 0, Math.max(0, size.width - box.width)),
@@ -319,7 +321,7 @@ export function reduceAnnotations(
   }
 }
 
-/** 一笔最多这么多点；到了就隔一个丢一个（保留首尾），笔画形状不变，不会把后半段拉成直线。 */
+/** Maximum number of points per stroke; drops alternate points when reached (preserving start and end) to keep stroke shape unchanged without straightening the second half. */
 const MAX_PEN_POINTS = 1000;
 function thin<T>(points: readonly T[]): readonly T[] {
   if (points.length < MAX_PEN_POINTS) return points;

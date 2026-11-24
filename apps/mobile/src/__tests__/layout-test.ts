@@ -2,8 +2,9 @@ import { LAYOUT_LABELS } from '@morph/tool-office';
 
 import { createLayoutDetector, type LayoutIo } from '../runtime/layout';
 
-// 转 Word 的版面分析（D-328）：扩展包没装时不跑；输入、输出走临时文件，用完不管成功失败都删掉；
-// 输出的框按找线那张图的大小换算回来。
+// Word conversion layout analysis (D-328): does not run when the pack is not installed; inputs and
+// outputs use temporary files and are deleted regardless of success or failure; output bounding
+// boxes are scaled back according to the line detection image size.
 
 function setup(output: number[], shape: number[], installed = true) {
   const disk = new Map<string, Uint8Array>();
@@ -20,9 +21,9 @@ function setup(output: number[], shape: number[], installed = true) {
     {
       async modelRun(model, input, inShape, out) {
         calls.push(`modelRun ${model.split('/').pop()} ${inShape.join('×')}`);
-        // 输入是 1×3×480×480 的 float32。
+        // Input is a 1x3x480x480 float32.
         expect(disk.get(input)!.byteLength).toBe(3 * 480 * 480 * 4);
-        // 原生读回来的字节不一定从 4 的倍数开始：放在一个偏移过的缓冲里。
+        // Bytes read back from native might not start at a multiple of 4: placed in an offset buffer.
         const raw = new Uint8Array(new Float32Array(output).buffer);
         const shifted = new Uint8Array(raw.length + 1);
         shifted.set(raw, 1);

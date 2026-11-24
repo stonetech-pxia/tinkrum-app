@@ -11,7 +11,7 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 
-// 按条件筛选（D-242）：在真正的执行器里跑，选择器没给的尺寸和时长要在本机补上再筛。
+// Condition-based filtering (D-242): runs in the actual executor, dimensions and durations not provided by the selector must be computed locally before filtering.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const NONE = {

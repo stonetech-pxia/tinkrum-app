@@ -15,7 +15,7 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 收据样板（D-437，创始人 2026-11-04 在对话里定）在 App 里走一遍：新用户、有数据、边界。
+// Receipts sample (D-437, decided by the founder in conversation on 2026-11-04) walked through in the app: new user, existing data, and edge cases.
 
 const seed = (locale: Locale, registry: Registry) => {
   const base = createStarterWorkspace(locale, registry);
@@ -71,7 +71,7 @@ const day = (offset: number) => {
 
 describe('in the app shell', () => {
   it('the pinned buttons sit right above the navigation bar, not a bar-height higher', async () => {
-    // 导航栏在页面下面（不是盖在页面上），下方固定区不能再给它留一份高度（手机上两者之间一大片空白）。
+    // Navigation bar is at the bottom of the page (not overlaying the page); the lower fixed area cannot reserve an extra height for it (which would create a large blank space between them on mobile).
     const repo = new MemoryWorkspaceRepo();
     await repo.setMeta('guide', 'done');
     await act(() => useGuide.getState().load(repo));
@@ -114,7 +114,7 @@ describe('new user', () => {
       expect(within(screen.getByTestId('dial-main')).getByText(scan)).toBeTruthy();
       await fireEvent.press(screen.getByTestId('dial-toggle'));
       expect(screen.getByText(byHand)).toBeTruthy();
-      // 语音记一笔（D-576）：录音 → 转文字 → 记一笔，表单按说的话直接填（D-575）。
+      // Voice log (D-576): record audio -> transcribe to text -> log an entry; form fills directly based on spoken words (D-575).
       expect(screen.getByText(byVoice)).toBeTruthy();
     },
   );
@@ -196,7 +196,7 @@ describe('with data', () => {
 });
 
 describe('the spending page follows the time range (D-439, D-440)', () => {
-  // 固定一个「今天」：2026-11-18（周三）。本周 11-16 到 11-22，本月 11 月，本年 2026。
+  // Fixed "today": 2026-11-18 (Wednesday). This week is 11-16 to 11-22, this month is November, this year is 2026.
   const records = [
     {
       table: 'receipts',
@@ -244,7 +244,7 @@ describe('the spending page follows the time range (D-439, D-440)', () => {
 
   it('the total is compared with the previous period, month to date', async () => {
     await open('spending', records);
-    // 本月到 18 号：¥30；上个月 1–18 号：¥5。
+    // This month up to the 18th: ¥30; last month 1st–18th: ¥5.
     await screen.findByTestId('period-thisMonth');
     expect(screen.getByTestId('stat-compare-receipts-上一期：¥5.00')).toBeTruthy();
   });
@@ -252,13 +252,13 @@ describe('the spending page follows the time range (D-439, D-440)', () => {
   it('the chart reads out today with the previous period, and the pie follows the range', async () => {
     await open('spending', records);
     const [trend] = await screen.findAllByTestId('chart-readout-receipts');
-    // 11-18 当天 ¥10；上个月同一格（10-18）没有。
+    // 11-18 itself is ¥10; same cell last month (10-18) has none.
     expect(trend).toHaveTextContent(/11-18：¥10\.00（上一期：¥0\.00）/);
-    // 本月的饼图只有餐饮和交通。
+    // This month's pie chart contains only dining and transportation.
     expect(screen.getByTestId('chart-slice-dining')).toHaveTextContent(/¥10\.00/);
     expect(screen.getByTestId('chart-slice-transport')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('period-thisYear'));
-    // 本年：餐饮 10 + 30 + 5。
+    // This year: dining 10 + 30 + 5.
     expect(screen.getByTestId('chart-slice-dining')).toHaveTextContent(/¥45\.00/);
   });
 
@@ -269,7 +269,7 @@ describe('the spending page follows the time range (D-439, D-440)', () => {
     await fireEvent.changeText(screen.getByTestId('period-end'), '2026-02-01');
     expect(screen.getByTestId('period-invalid')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('period-apply'));
-    // 没有应用：还是本月。
+    // No app applied: remains this month.
     expect(spent()).toHaveTextContent('¥30.00');
     await fireEvent.changeText(screen.getByTestId('period-end'), '2026-03-31');
     expect(screen.queryByTestId('period-invalid')).toBeNull();
@@ -279,7 +279,7 @@ describe('the spending page follows the time range (D-439, D-440)', () => {
     expect(screen.getByTestId('period-range')).toHaveTextContent('2026-03-01 到 2026-03-31');
   });
 
-  // 2026-11-09 用户测试：点了「自定义」，「本月」和「自定义」两个同时亮着。
+  // 2006-11-09 user testing: after tapping "Custom", both "This month" and "Custom" are lit simultaneously.
   it('while picking custom dates only Custom is lit; closing it lights this month again', async () => {
     await open('spending', records);
     const selected = (id: string, on: boolean) =>

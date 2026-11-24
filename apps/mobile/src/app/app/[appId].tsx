@@ -5,9 +5,10 @@ import { useEffect } from 'react';
 import { useNavigate } from '@/shell/navigation';
 
 /**
- * morph://app/<id>（D-485）：直接打开一个 App。iOS 用户可以在「快捷指令」里做一个打开这个地址的桌面图标；
- * 小组件、通知也可以用。这一页本身不显示，先退回去，再像点了主页上的入口一样进那个 App；
- * App 已经不在了就停在首页。
+ * morph://app/<id> (D-485): directly open an app. iOS users can create a desktop shortcut via
+ * Shortcuts to open this URL; widgets and notifications can also use it. This page itself is
+ * invisible, first goes back, then enters that app just like tapping its home screen entry point;
+ * stays on the home screen if the app no longer exists.
  */
 export default function OpenAppRoute() {
   const { appId } = useLocalSearchParams<{ appId: string }>();

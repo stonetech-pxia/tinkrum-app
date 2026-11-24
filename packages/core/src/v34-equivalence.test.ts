@@ -11,9 +11,11 @@ import { readChart, readNumber, readRecords, readTable, type SourceContext } fro
 import { fromV33, v33Fixture } from './test-helpers';
 import { sampleRecords, V33_NOW } from './test-records';
 
-// v33 → v34 等价（D-368）：fixtures/v33/ 里每份有数据表的配置，迁移成 v34，用同样的记录
-// 经 source.ts 读出来，和 v33 代码当时算出来的（fixtures/v33/derived/）逐块比：列表的行和顺序、分段、看板、
-// 月历、数字（值、最佳、上一段、每组）、图表、算出来的字段、提醒。v33 的生成器里「未选」写的是 "none"。
+// v33 → v34 equivalence (D-368): configurations with data tables in fixtures/v33/ are migrated to
+// v34, read out via source.ts using the same records, and compared block-by-block against the
+// baseline calculated by v33 code at the time (fixtures/v33/derived/): list rows and ordering,
+// sections, kanban boards, calendars, numbers (value, best, previous period, per group), charts,
+// computed fields, and reminders. The v33 generator outputs "none" for unselected values.
 
 const DERIVED = join(__dirname, 'fixtures', 'v33', 'derived');
 const names = readdirSync(DERIVED)
@@ -22,7 +24,7 @@ const names = readdirSync(DERIVED)
 
 type Json = Record<string, unknown>;
 const ids = (list: readonly DataRecord[]) => list.map((r) => r.id);
-/** 存成 JSON 再读回来（undefined 的键去掉），和存下来的 fixture 一样比。 */
+/** Serializes to JSON and reads back (stripping undefined keys) to compare against the saved fixture. */
 const plain = (v: unknown): unknown =>
   v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 const NONE = 'none';

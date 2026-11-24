@@ -39,21 +39,29 @@ import { BUILTIN_TOOLS } from './tools';
 import { handedInput, workflowProblems } from './workflow/check';
 import { missingPlace, stepRefs } from './workflow/refs';
 
-// 工具检查（AGENT_PLAN §3.1–§3.4、§3.8）：用代码判断 App 里的工具能不能用。校验（validate.ts）只管配置合法，
-// 这里管「用户点得到、填得完、看得见」。纯函数，只读配置；只提醒，不拒绝，不改配置（底线 15、19）。
-// 工具分三种：文件工具（快捷操作）、记录工具（以表为单位）、文件进记录（含 out.addRecord 的快捷操作）。
-// blocker = 这个工具现在用不了；warning = 可能有问题。message 用英文，将来发给模型。
+// Tool check (AGENT_PLAN §3.1-§3.4, §3.8): uses code to determine whether tools in the app are
+// usable. Validation (validate.ts) only checks if the config is valid, whereas this checks whether
+// the user can "tap it, fill it, and see it". Pure function, read-only config; warns only, never
+// rejects, never modifies config (invariants 15, 19). Tools are of three kinds: file tools (quick
+// actions), record tools (table-based), and file-to-record (quick actions containing
+// out.addRecord). blocker = this tool is currently unusable; warning = there may be an issue.
+// Messages are in English, destined for the model in the future.
 //
-// 入口按 App 的实际代码算，不是猜的：
-// - 「设置 → 快捷操作」（WorkflowsScreen）列出配置里全部快捷操作，所以快捷操作永远到得了：没摆出来只是 warning。
-// - 「设置 → 数据」（app/data.tsx）只能导出和恢复，不能添加，所以不算记录的入口。
-// - AI 刚建好表时的「数据表做好了」（TableReadyScreen）只出现一次，不算。
-// - 收件页面「存成记录」（ShareScreen，D-392）列出有附件字段的表，算入口，但要先有文件。
-// - 工具包的页面在「设置 → 工具」里到得了；页面没有总列表，别的页面只能靠导航、入口、提醒。
+// Entry points are determined by the app's actual code, not guessed:
+// - "Settings -> Quick Actions" (WorkflowsScreen) lists all quick actions in the config, so quick
+// actions are always reachable: unplaced ones are merely warnings.
+// - "Settings -> Data" (app/data.tsx) only supports export and restore, not addition, so it does
+// not count as a record entry point.
+// - "Table is ready" (TableReadyScreen) when the AI has just created a table appears only once, so
+// it does not count.
+// - Inbox "Save as record" (ShareScreen, D-392) lists tables with attachment fields, counts as an
+// entry point, but requires files to be present first.
+// - Pack pages are reachable via "Settings -> Tools"; pages have no master list, and other pages
+// rely on navigation, entry points, and reminders.
 
 export type ToolKind = 'file' | 'record' | 'fileToRecord';
 
-/** 表刚建好、页面还在下一步（next 或计划的后面几步）时，这些问题是预期的，不算没做好。 */
+/** When a table has just been created and the page is still in a subsequent step (next or later planned steps), these issues are expected and not considered incomplete. */
 export const FIXED_BY_A_LATER_STEP: ReadonlySet<string> = new Set([
   'add-missing',
   'view-missing',
@@ -67,42 +75,42 @@ export type ToolIssueSeverity = 'blocker' | 'warning';
 export interface ToolIssue {
   severity: ToolIssueSeverity;
   code: string;
-  /** quickAction:<id>、table:<id>、page:<id>、reminder:<id>、block:<页面>/<块>、field:<表>.<字段>。 */
+  /** quickAction:<id>, table:<id>, page:<id>, reminder:<id>, block:<page>/<block>, field:<table.field>. */
   target: string;
   message: string;
 }
 
 export interface FileToolChecks {
-  /** 第一步是输入动作。 */
+  /** The first step is an input action. */
   firstStepIsInput: boolean;
-  /** 相邻步骤类型接得上。 */
+  /** Adjacent step types are compatible. */
   chain: boolean;
-  /** 动作都登记过，每步参数齐。 */
+  /** Actions are registered and parameters for each step are complete. */
   params: boolean;
-  /** 摆在哪里：placed = 页面、手机桌面、工具包或预设库里摸得到；settings = 只在「设置 → 快捷操作」。 */
+  /** Placement: placed = reachable in a page, home screen, toolkit, or preset library; settings = only in "Settings -> Quick Actions". */
   entry: 'placed' | 'settings';
   entryVia: string[];
 }
 
 export interface RecordToolChecks {
-  /** 记在哪：表有名字，有能填的字段。 */
+  /** Where it is recorded: the table has a name and fillable fields. */
   where: boolean;
-  /** 怎么记：有添加入口，而且填得完必填字段。 */
+  /** How it is recorded: has an addition entry point, and mandatory fields can be filled. */
   add: boolean;
   addVia: string[];
-  /** 怎么看：有读这张表的块，而且页面进得去。 */
+  /** How it is viewed: has blocks reading this table, and the page is accessible. */
   view: boolean;
   viewVia: string[];
-  /** 怎么提醒：没有提醒时是 null。 */
+  /** How it is reminded: null when there is no reminder. */
   remind: boolean | null;
 }
 
 export interface FileToRecordChecks extends FileToolChecks {
-  /** 目标表存在。 */
+  /** Target table exists. */
   target: boolean;
-  /** 表里有放这个值的字段（文件 → 附件，文字 → 文字）。 */
+  /** Table has a field to store this value (file -> attachment, text -> text). */
   place: boolean;
-  /** 目标表这个记录工具本身能用（用户确认保存后看得到）。 */
+  /** The record tool itself on the target table is usable (visible after user confirms save). */
   recordSide: boolean;
   tables: string[];
 }
@@ -122,39 +130,39 @@ export interface ToolCheckResult {
   issues: ToolIssue[];
 }
 
-// ---- 读写关系 ----
+// ---- Read/Write Relationships ----
 
-/** 能给一张表添加记录的一个地方。 */
+/** A place where records can be added to a table. */
 interface AddPath {
   via: string;
   reachable: boolean;
-  /** 只有 source 表已经有记录时才出现（每一条上的按钮、大圆块）。 */
+  /** Appears only when the source table already has records (buttons on each row, large circular block). */
   needsRowOf?: string;
 }
 
 interface TableUse {
-  /** 读这张表的块（页面上的），和 App 里到不到得了。 */
+  /** Blocks reading this table (on pages) and whether they are reachable in the app. */
   readers: { via: string; reachable: boolean }[];
-  /** 别的表用引用、查找、汇总读它；快捷操作读它（打印）。 */
+  /** Other tables read it via relations, lookup, or rollup; quick actions read it (printing). */
   indirect: { via: string; host?: string }[];
   adds: AddPath[];
-  /** 显示、筛选、排序、分组、汇总、公式读到的字段。 */
+  /** Fields read by display, filtering, sorting, grouping, rollups, and formulas. */
   read: Set<string>;
-  /** 表单问的字段。 */
+  /** Fields requested by forms. */
   asked: Set<string>;
-  /** 有完整表单（ask "all"、out.addRecord）：每个字段都问。 */
+  /** Has a complete form (ask "all", out.addRecord): every field is requested. */
   askedAll: boolean;
-  /** 工具写的字段（预设值、set、toggle、increment、setAll、smartDate）。 */
+  /** Fields written by tools (presets, set, toggle, increment, setAll, smartDate). */
   written: Set<string>;
-  /** 点一条打开内置编辑页的块（在进得去的页面上）。 */
+  /** A block that opens the built-in edit page when tapped (on an accessible page). */
   editor: boolean;
-  /** 有提醒看着这张表。 */
+  /** A reminder is monitoring this table. */
   watched: boolean;
-  /** 进得去的页面上读这张表的统计和图表，和它们依赖的字段。 */
+  /** Table statistics and charts read on accessible pages, and the fields they depend on. */
   stats: StatUse[];
 }
 
-/** 统计或图表依赖的一个字段。soft：没有值时只是少一块（分组全在「未设置」、减数是 0），不是空的。 */
+/** A field depended upon by a statistic or chart. soft: missing value just means a missing section (grouping all in "Unset", subtractor is 0), not empty. */
 interface StatInput {
   table: string;
   field: string;
@@ -180,7 +188,7 @@ const newUse = (): TableUse => ({
   stats: [],
 });
 
-/** 页面上真正显示的块（藏起来的和它的子块都不算）。 */
+/** Blocks actually displayed on the page (hidden blocks and their sub-blocks do not count). */
 function visibleBlocks(page: Page): Component[] {
   const walk = (list: readonly Component[]): Component[] =>
     list.flatMap((c) => (c.hidden ? [] : [c, ...walk(childrenOf(c))]));
@@ -191,7 +199,7 @@ const usesOf = (c: KnownComponent): ToolUse[] => (c as { tools?: ToolUse[] }).to
 
 const isRecordLook = (c: KnownComponent) => (RECORD_LOOKS as readonly string[]).includes(c.look);
 
-/** 这个块点了能到的页面。 */
+/** Pages reachable by tapping this block. */
 function pagesOpenedBy(c: Component): string[] {
   if (!isKnownComponent(c)) return [];
   const out: string[] = [];
@@ -206,7 +214,7 @@ function pagesOpenedBy(c: Component): string[] {
   return out;
 }
 
-/** 从导航、提醒和工具包页面走得到的页面（别的页面上的入口要它自己到得了才算）。 */
+/** Pages reachable from navigation, reminders, and toolkit pages (entry points on other pages require their own reachability). */
 function reachablePages(config: WorkspaceConfig): Set<string> {
   const pages = config.containers.pages;
   const seen = new Set<string>();
@@ -217,10 +225,10 @@ function reachablePages(config: WorkspaceConfig): Set<string> {
     queue.push(id);
   };
   for (const target of [...config.nav.bar, ...config.nav.floating]) visit(pageIdOf(target));
-  // 每个 app 的底栏也是根（D-485）；app 本身从主页的入口和设置里的「我的 App」进。
+  // Each app's bottom bar is also a root (D-485); the app itself is accessed from home screen entry points and "My Apps" in settings.
   for (const app of config.nav.apps ?? []) for (const target of app.bar) visit(pageIdOf(target));
   for (const r of remindersOf(config)) visit(pageIdOf(r.opens));
-  // 工具包的页面在「设置 → 工具」里；工具箱是内核的系统入口（和 page-entries.ts 一样不算孤立页面）。
+  // Toolkit pages are under "Settings -> Tools"; the toolbox is a core system entry point (like page-entries.ts, not considered an isolated page).
   for (const p of pages) if (p.package || p.id === TOOLBOX_PAGE_ID) visit(p.id);
   while (queue.length > 0) {
     const id = queue.pop();
@@ -230,7 +238,7 @@ function reachablePages(config: WorkspaceConfig): Set<string> {
   return seen;
 }
 
-/** 这个字段没有值也能存（有默认值，或者新记录自带）。 */
+/** This field can be saved even without a value (has default value or auto-populated for new records). */
 function hasDefault(f: Field): boolean {
   return (
     ('default' in f && f.default !== undefined) || fieldDefinition(f.type).emptyNew !== undefined
@@ -248,13 +256,13 @@ class Analysis {
   readonly reachable: Set<string>;
   private readonly uses = new Map<string, TableUse>();
   readonly issues: { key: string | null; issue: ToolIssue }[] = [];
-  /** 快捷操作摆在哪（块、提醒、手机桌面、文件桌面）。 */
+  /** Where quick actions are placed (blocks, reminders, home screen, file desk). */
   readonly placed = new Map<string, Set<string>>();
-  /** 只摆在进不去的页面上的快捷操作。 */
+  /** Quick actions placed only on inaccessible pages. */
   readonly placedUnreachable = new Map<string, string>();
-  /** 每个页面读写的表（提醒对照用）。 */
+  /** Tables read and written by each page (for reminder comparison). */
   readonly pageTables = new Map<string, Set<string>>();
-  /** 有快捷操作库块或导航入口：kind 是 null 时是全部。 */
+  /** Has quick action library blocks or navigation entry points: all when kind is null. */
   readonly libraries: (string | null)[] = [];
 
   constructor(
@@ -299,7 +307,7 @@ class Analysis {
     if ([...nav.bar, ...nav.floating].includes('quickActions')) this.libraries.push(null);
     for (const id of nav.phoneHomeScreen ?? [])
       if (!id.startsWith('app:')) this.place(id, 'phone home screen');
-    // 记录页顶部的按钮（D-428）。
+    // Buttons at the top of the record page (D-428).
     for (const table of this.config.data.tables)
       for (const item of table.recordRow ?? []) this.place(item.tool, `entry page of ${table.id}`);
     for (const r of remindersOf(this.config)) {
@@ -362,7 +370,7 @@ class Analysis {
           if (id !== undefined) use.read.add(id);
         const format = show.format;
         if (format?.kind === 'elapsed' && format.until) use.read.add(format.until);
-        // 打卡格（D-610）的目标是行那张表（被引用的表）的字段。
+        // The target of a grid tile (D-610) is fields in the row's table (referenced table).
         const goalUse = look === 'grid' ? this.linkedUse(source) : use;
         if (format?.kind === 'progress' && typeof format.goal === 'string')
           goalUse?.read.add(format.goal);
@@ -384,7 +392,7 @@ class Analysis {
       if (use) {
         use.readers.push({ via: where, reachable });
         for (const id of c.show.fields) use.read.add(id);
-        // 块上有「编辑」。
+        // Block has "Edit".
         if (reachable) use.editor = true;
       }
     } else if (c.look === 'number' || c.look === 'chart') {
@@ -446,14 +454,14 @@ class Analysis {
         if (wf) for (const ref of stepRefs(wf, this.registry)) tables.add(ref.table);
       }
       if (!isRecordToolUse(u)) continue;
-      // 点一下的几处（D-566）都算写。
+      // All tap locations (D-566) count as writes.
       for (const tool of tapWrites(u, sourceTable ?? u.table)) {
         tables.add(tool.table);
         this.readTool(tool, {
           via: u.as ? `${u.as} tool of ${where}` : where,
           reachable,
           target: `block:${page.id}/${c.id}`,
-          // 打卡格（D-610）的格子不用表里先有记录：行来自选项或被引用的表。
+          // Grid tiles (D-610) do not require existing records in the table: rows come from options or referenced tables.
           ...(sourceTable !== null && u.as !== 'addHere' && c.look !== 'grid'
             ? { needsRowOf: sourceTable }
             : {}),
@@ -463,7 +471,7 @@ class Analysis {
     }
   }
 
-  /** 统计或图表要算出东西，哪些字段要有值：算的值、按日子的日子、要有值才成立的筛选、分组。 */
+  /** Fields required to compute values for statistics or charts: calculated value, date field for days, equality conditions required for valid filters, grouping. */
   private statInputs(c: Extract<KnownComponent, { look: 'number' | 'chart' }>): StatInput[] {
     const { table: id, aggregate, field, filter, group, days } = c.source;
     const table = this.table(id);
@@ -489,13 +497,13 @@ class Analysis {
     return inputs;
   }
 
-  /** 打卡格（D-610）按引用字段分行时，被引用那张表的用法。 */
+  /** Usage of the referenced table when grid tiles (D-610) are grouped by a relation field. */
   private linkedUse(source: { table: string; group?: { by?: string | undefined } | undefined }) {
     const link = this.table(source.table)?.fields.find((f) => f.id === source.group?.by);
     return link?.type === 'link' ? this.uses.get(link.table) : undefined;
   }
 
-  /** 就地添加（"$here"）会带上的字段：这一段的值和列表筛选里的等于条件；打卡格还有这一天（D-610）。 */
+  /** Fields included in local addition ("$here"): value of this segment and equality conditions in list filters; plus the current date for grid tiles (D-610). */
   private herePresets(c: KnownComponent): string[] {
     if (!isRecordLook(c)) return [];
     const { source } = c as Extract<KnownComponent, { look: 'list' }>;
@@ -526,16 +534,16 @@ class Analysis {
     const use = this.uses.get(tool.table);
     const table = this.table(tool.table);
     if (!use || !table) return;
-    // 批量新建（D-567）：读来源表的筛选，写的是预设的字段（必填的检查在 record-ops.ts）。
+    // Batch creation (D-567): reads source table filters, writes preset fields (mandatory field checks are in record-ops.ts).
     if (tool.do === 'createAll') {
       const from = this.uses.get(tool.from);
       if (from) this.readFilter(from, tool.filter);
       for (const id of Object.keys(tool.values)) use.written.add(id);
-      // 勾选新建（D-616）还写这一段的值（列表筛选里的等于条件、分段）。
+      // Checked creation (D-616) also writes values of this segment (equality conditions in list filters, grouping).
       if (tool.pick) for (const id of at.herePresets ?? []) use.written.add(id);
       return;
     }
-    // 移到「最近删除」（D-610）不写字段。
+    // Moving to "Recently Deleted" (D-610) does not write fields.
     if (tool.do === 'remove') return;
     if (tool.do !== 'create') {
       use.written.add(tool.field);
@@ -556,7 +564,7 @@ class Analysis {
       return;
     }
     for (const id of tool.ask ?? []) use.asked.add(id);
-    // 必填又没有默认值、表单没问也没预设的字段：这个表单（按钮）永远存不进去。
+    // Mandatory fields with no default value, unrequested by forms and without presets: this form (button) can never be saved.
     const covered = new Set([...presets, ...(tool.ask ?? [])]);
     if (tool.smartDate) covered.add(tool.smartDate.to);
     const missing = requiredFields(table).filter((f) => !covered.has(f.id) && !hasDefault(f));
@@ -576,7 +584,7 @@ class Analysis {
       if (!use) continue;
       if (ref.field !== undefined) use.read.add(ref.field);
       else if ('receives' in ref) {
-        // out.addRecord 打开完整的新记录表单：每个字段都问。
+        // out.addRecord opens the complete new record form: every field is requested.
         use.adds.push({ via: `quick action ${wf.id}`, reachable: true });
         use.askedAll = true;
       } else use.indirect.push({ via: `quick action ${wf.id}` });
@@ -606,7 +614,7 @@ class Analysis {
       });
   }
 
-  /** 公式、汇总、查找、上一条和引用字段：算在读写关系里。 */
+  /** Formulas, rollups, lookups, previous record, and relation fields: counted in read/write relationships. */
   private readFields(table: Collection) {
     const use = this.uses.get(table.id)!;
     for (const f of table.fields) {
@@ -645,7 +653,7 @@ class Analysis {
     }
   }
 
-  /** 一跳之内的相关表（引用、查找、汇总，两个方向）。 */
+  /** Related tables within one hop (relations, lookups, rollups, in both directions). */
   relatedTables(id: string): Set<string> {
     const out = new Set([id]);
     for (const t of this.config.data.tables)
@@ -658,11 +666,13 @@ class Analysis {
   }
 }
 
-// ---- 记录工具 ----
+// ---- Record Tools ----
 
 /**
- * 还有工具或块在用的表。什么都没在用的表可能是刚建好还没接上，也可能是用户不要了、数据留着（底线 5：
- * 「不要记账了」之后记录还在「设置 → 数据」里）。单看配置分不出来，所以只给 warning，绝不逼着把它接回去。
+ * Tables still in use by tools or blocks. Unused tables might be newly created and not yet
+ * connected, or unwanted by the user while data is retained (invariant 5: after "stop
+ * bookkeeping", records remain in "Settings -> Data"). Cannot distinguish solely from config, so
+ * only warnings are issued, never forcing reconnection.
  */
 function liveTables(a: Analysis): Set<string> {
   const live = new Set<string>();
@@ -676,7 +686,7 @@ function liveTables(a: Analysis): Set<string> {
     )
       live.add(t.id);
   }
-  // 在用的表引用、汇总的表也算在用。
+  // Tables referenced or summarized by in-use tables are also considered in use.
   for (let grew = true; grew;) {
     grew = false;
     for (const t of a.config.data.tables) {
@@ -691,7 +701,7 @@ function liveTables(a: Analysis): Set<string> {
 
 const FUNCTIONLESS = new Set(['header', 'text', 'notice', 'divider', 'spacer', 'image']);
 
-/** 进不去的页面。工具包的页面、工具箱不算（有别的入口）。 */
+/** Inaccessible pages. Toolkit pages and the toolbox are excluded (have other entry points). */
 function checkPages(a: Analysis) {
   for (const page of a.config.containers.pages) {
     if (a.reachable.has(page.id)) continue;
@@ -735,12 +745,12 @@ function checkTable(a: Analysis, table: Collection, live: Set<string>): RecordTo
     return { where, add: false, addVia: [], view: false, viewVia: [], remind: null };
   }
 
-  // 怎么记。每一条上的按钮要先有记录：写自己这张表的（复制一条）开不了头。
+  // How to record. Buttons on each row require existing records: those writing to their own table (copy record) cannot serve as starters.
   const starters = use.adds.filter((p) => p.needsRowOf !== table.id);
   const reachableAdds = starters.filter((p) => p.reachable);
   const hasFileField = table.fields.some((f) => f.type === 'file');
   const addVia = reachableAdds.map((p) => p.via);
-  // 每一条上的「新建这张表」：一条都没有时按钮不出现，第一条永远加不进去（S2 里真实发生过）。
+  // "Create in this table" on each row: button does not appear when there are zero rows, and the first row can never be added (occurred in S2).
   const selfRow = use.adds.find((p) => p.needsRowOf === table.id);
   if (reachableAdds.length === 0 && selfRow) {
     a.report(
@@ -778,7 +788,7 @@ function checkTable(a: Analysis, table: Collection, live: Set<string>): RecordTo
     );
   }
 
-  // 怎么看。
+  // How to view.
   const shown = use.readers.filter((r) => r.reachable);
   const hosted = use.indirect.filter(
     (x) => x.host === undefined || a.use(x.host)?.readers.some((r) => r.reachable),
@@ -807,7 +817,7 @@ function checkTable(a: Analysis, table: Collection, live: Set<string>): RecordTo
     (x) =>
       x.key === key && x.issue.severity === 'blocker' && x.issue.code !== 'add-missing-required',
   );
-  // 表都没人写、没人读时，字段的提醒只是噪音。
+  // When no one writes or reads the table, field reminders are just noise.
   if (!blockers) checkFields(a, table);
   return {
     where,
@@ -856,9 +866,11 @@ function checkFields(a: Analysis, table: Collection) {
 }
 
 /**
- * 统计、图表依赖的字段有没有地方填（REPORT3「读书图表按完成日期统计，表单却不问完成日期」）。
- * 哪里都填不到又没有默认值：统计永远是空的，blocker。只能打开一条的编辑页（或收件页面的表单）填：能填，
- * 但用户记的时候不会填到，warning。只影响分组或减数的（soft）：不是空的，warning。
+ * Check whether fields required by statistics and charts can be populated (REPORT3: "Reading
+ * chart stats by completion date, but the form does not ask for completion date"). Unfillable
+ * with no default value: statistics are always empty, blocker. Fillable only by opening a single
+ * record's edit page (or inbox form): fillable, but users won't fill it during entry, warning.
+ * Affects only grouping or subtractions (soft): not empty, warning.
  */
 function checkStatInputs(a: Analysis, table: Collection) {
   const key = `table:${table.id}`;
@@ -888,7 +900,7 @@ function checkStatInputs(a: Analysis, table: Collection) {
     }
 }
 
-/** entry = 记的时候就有值（默认值、表单、工具写的）；edit = 只能之后打开编辑；none = 哪里都填不到。 */
+/** entry = has value upon entry (default value, form, tool writes); edit = can only be opened for editing afterwards; none = unfillable anywhere. */
 function statInputLevel(a: Analysis, tableId: string, fieldId: string): 'entry' | 'edit' | 'none' {
   const table = a.table(tableId);
   const use = a.use(tableId);
@@ -899,7 +911,7 @@ function statInputLevel(a: Analysis, tableId: string, fieldId: string): 'entry' 
   return use.editor || table.fields.some((x) => x.type === 'file') ? 'edit' : 'none';
 }
 
-/** 算出来的字段依赖的、要有人填的字段。 */
+/** Fields that computed fields depend on and that must be filled by someone. */
 function computedInputs(a: Analysis, table: Collection, f: Field) {
   const here = (field: string) => ({ table: table.id, field });
   if (f.type === 'formula') {
@@ -929,11 +941,11 @@ function fieldHasInput(a: Analysis, tableId: string, fieldId: string): boolean {
   return use.askedAll || use.editor || use.asked.has(fieldId) || use.written.has(fieldId);
 }
 
-// App 跑在 Hermes 上：这个文件不用 Unicode 属性类和后行断言（同 route.ts）。
-/** 名字里不算数的空白和标点（ASCII、通用标点、中文标点、全角标点）。 */
+// App runs on Hermes: this file does not use Unicode property escapes and lookbehind assertions (same as route.ts).
+/** Whitespace and punctuation ignored in names (ASCII, general punctuation, Chinese punctuation, full-width punctuation). */
 const NAME_PUNCTUATION = /[\s!-/:-@[-`{-~¡-¿‐-‧‰-⁞　-〿！-／：-＠［-｀｛-･]/g;
 
-/** 名字或字段高度相近，就是同一个用途的两张表。 */
+/** If names or fields are very similar, they represent two tables for the same purpose. */
 function similarTables(a: Collection, b: Collection): boolean {
   const norm = (s: string) => s.toLowerCase().replace(NAME_PUNCTUATION, '');
   const [x, y] = [norm(a.name), norm(b.name)];
@@ -946,7 +958,7 @@ function similarTables(a: Collection, b: Collection): boolean {
   return shared / new Set([...p, ...q]).size >= 0.6;
 }
 
-/** 同用途的两张表，一张只被写、一张只被读：写进去的看不到，看到的是空的。 */
+/** Two tables for the same purpose where one is only written to and one is only read from: what is written cannot be seen, and what is seen is empty. */
 function checkDuplicates(a: Analysis) {
   const tables = a.config.data.tables;
   const written = (t: Collection) => a.use(t.id)!.adds.length > 0;
@@ -970,9 +982,9 @@ function checkDuplicates(a: Analysis) {
     }
 }
 
-// ---- 提醒 ----
+// ---- Reminders ----
 
-/** 这个页面的入口再走一跳能到的页面。 */
+/** Pages reachable within one hop from this page's entry point. */
 function nextPages(a: Analysis, pageId: string): string[] {
   const page = a.config.containers.pages.find((p) => p.id === pageId);
   return page ? visibleBlocks(page).flatMap(pagesOpenedBy) : [];
@@ -1009,7 +1021,7 @@ function checkReminder(a: Analysis, r: Reminder): Set<string> {
           `reminder ${r.id} watches ${watched}, but page ${pageId} only links to a page that shows it; open that page directly`,
         );
       else if (pageId === 'home')
-        // 规则 35 让新表的提醒先开首页，页面下一步才有：点得开，不算用不了。
+        // Rule 35 makes new table reminders open the home screen first, with page navigation following: since it is clickable, it is considered usable.
         a.report(
           null,
           'warning',
@@ -1029,7 +1041,7 @@ function checkReminder(a: Analysis, r: Reminder): Set<string> {
       }
     }
   } else if (pageId !== null) {
-    // 每天 / 每周的提醒不绑表，看不出该打开哪里：页面什么都不读、不写时才提醒；标题点了表名时对照一下。
+    // Daily/weekly reminders are not bound to a table, making it unclear where to open: remind only when the page reads and writes nothing; cross-reference when the title clicks a table name.
     const tables = a.pageTables.get(pageId);
     const page = a.config.containers.pages.find((p) => p.id === pageId);
     const useful = page?.blocks.some(
@@ -1055,7 +1067,7 @@ function checkReminder(a: Analysis, r: Reminder): Set<string> {
         `reminder ${r.id} is about ${named.id} ("${r.title}") but page ${pageId} doesn't show that table`,
       );
   }
-  // 「完成」写的表和「今天不再提醒」看的表要是同一张，否则点了完成明天照样响。
+  // The table written to by "Done" and the table read by "Don't remind again today" must be the same, otherwise clicking Done will still make it trigger tomorrow.
   if (r.done && r.unless && r.done.table !== r.unless.table && watched) {
     failed.add(watched);
     a.report(
@@ -1069,7 +1081,7 @@ function checkReminder(a: Analysis, r: Reminder): Set<string> {
   return failed;
 }
 
-// ---- 快捷操作 ----
+// ---- Quick actions ----
 
 function checkQuickAction(
   a: Analysis,
@@ -1161,7 +1173,7 @@ function checkQuickAction(
   };
 }
 
-/** 用户在 App 里看得到这张表的记录吗：有块在读，而且那一页到得了。 */
+/** Can the user see this table's records in the app: there is a block reading it, and that page is reachable. */
 export function tableIsShown(
   config: WorkspaceConfig,
   tableId: string,
@@ -1172,8 +1184,9 @@ export function tableIsShown(
 }
 
 /**
- * 工具检查：列出配置里的工具（快捷操作、含 out.addRecord 的快捷操作、每张表）和它们的问题。
- * 配置应该已经通过 validateWorkspace；这里不重复校验，只判断能不能用。
+ * Tool check: list tools in the config (quick actions, quick actions containing out.addRecord,
+ * each table) and their issues. The config should already pass validateWorkspace; this does not
+ * re-validate, only determines if they are usable.
  */
 export function checkTools(config: WorkspaceConfig, registry: Registry): ToolCheckResult {
   const a = new Analysis(config, registry);
@@ -1201,10 +1214,13 @@ export function checkTools(config: WorkspaceConfig, registry: Registry): ToolChe
   return { tools: [...quick, ...tables], issues: a.issues.map((x) => x.issue) };
 }
 
-// ---- 用户句子里说的数和词，有没有落到这次改动上 ----
+// ---- Numbers and words mentioned in the user's sentence: did they make it into this change? ----
 
-// 只查高把握的：大小、像素、倍速、页数、目标语言、证件照底色、分辨率。这次改动没碰快捷操作的步骤时不查（不是这句话管的）；
-// 有两个以上同类的数时（「500MB 的视频压到 20MB」）只要一个对得上就算对；前面有否定词的不算。宁可漏也不误报。
+// Check only high-confidence items: size, pixels, playback speed, page count, target language, ID
+// photo background color, resolution. Not checked when the change doesn't touch quick action steps
+// (not governed by this sentence); when there are two or more similar numbers ("compress a 500MB
+// video to 20MB"), matching either one counts as a match; preceding negation words do not count.
+// Prefer false negatives over false positives.
 
 const CHECK_REGISTRY = createRegistry(BUILTIN_TOOLS);
 
@@ -1218,7 +1234,7 @@ interface ScopeStep {
   }[];
 }
 
-/** 这次改动碰到的快捷操作（新加的，或者步骤变了的）。 */
+/** Quick actions touched by this change (newly added or whose steps changed). */
 function touchedActions(before: WorkspaceConfig, after: WorkspaceConfig) {
   const old = new Map(quickActionsOf(before).map((w) => [w.id, JSON.stringify(w.steps)]));
   const touched = quickActionsOf(after).filter((w) => old.get(w.id) !== JSON.stringify(w.steps));
@@ -1235,7 +1251,7 @@ function scopeSteps(actions: readonly QuickAction[]): ScopeStep[] {
   );
 }
 
-/** 参数现在起不起作用（「按大小」时质量不算，showIf）。 */
+/** Whether parameters currently take effect (e.g., quality does not count when "by size", showIf). */
 function fieldActive(params: Record<string, unknown>, f: ScopeStep['fields'][number]): boolean {
   if (!f.showIf || params[f.showIf.key] === undefined) return true;
   return f.showIf.equals.includes(params[f.showIf.key] as string | number | boolean);
@@ -1259,7 +1275,7 @@ const ZH_DIGITS: Record<string, string> = {
   九: '9',
 };
 
-/** 单位前面的中文数字换成阿拉伯数字（「两兆」「两倍速」）。 */
+/** Convert Chinese numbers before units into Arabic numerals ("two megs", "double speed"). */
 function normalizeNumbers(input: string): string {
   return input
     .replace(/一点五(?=\s*倍)/g, '1.5')
@@ -1269,11 +1285,11 @@ function normalizeNumbers(input: string): string {
 
 const num = (s: string) => Number(s.replace(',', '.'));
 
-/** 这个数紧跟在别的数字（或小数点、逗号）后面：是更长的数的尾巴，不算（代替后行断言）。 */
+/** This number immediately follows another number (or decimal point, comma): it is the tail of a longer number and does not count (replaces lookbehind assertions). */
 const afterNumber = (input: string, index: number, chars: string) =>
   index > 0 && chars.includes(input[index - 1]!);
 
-/** 句子里说的大小，换算成 KB（1 MB = 1024 KB）。 */
+/** Size mentioned in the sentence, converted to KB (1 MB = 1024 KB). */
 function sizeMentions(input: string, locale: Locale): number[] {
   const out: number[] = [];
   const re =
@@ -1283,9 +1299,9 @@ function sizeMentions(input: string, locale: Locale): number[] {
     const low = unit.toLowerCase();
     const n = num(m[1]!);
     if (afterNumber(input, m.index, '0123456789.,') || isNegated(input, m.index)) continue;
-    // 「2 mo」英语里是两个月，「5 go」是动词：小写时只认法语。
+    // "2 mo" in English means two months, "5 go" is a verb: when lowercase, recognize French only.
     if ((low === 'mo' || low === 'go' || low === 'ko') && unit === low && locale !== 'fr') continue;
-    // 只有一个字母时要大写而且紧贴数字（2M、500K）；4K、8K 是分辨率。
+    // When there is a single letter, it must be uppercase and immediately adjacent to the number (2M, 500K); 4K and 8K are resolutions.
     if (
       (low === 'm' || low === 'k') &&
       (unit !== unit.toUpperCase() || !m[0].endsWith(m[1]! + unit))
@@ -1326,7 +1342,7 @@ function checkSizes(
   const said = mentions.map((kb) => (kb >= 1024 ? `${kb / 1024} MB` : `${kb} KB`)).join(', ');
   const target = `quickAction:${steps[0]!.wf.id}`;
   if (values.length === 0) {
-    // 整条链上没有能放大小的参数：只有新建的快捷操作、句子明确要压到多大时才算丢了。
+    // No parameters on the entire chain can accommodate size: only newly created quick actions or when the sentence explicitly specifies a target size count as a loss.
     if (
       added.length === 0 ||
       !(SIZE_LIMIT.test(input) || /压|compress|shrink|réduire/i.test(input))
@@ -1341,7 +1357,7 @@ function checkSizes(
       },
     ];
   }
-  // 1 MB 按 1024 KB 或 1000 KB 算都认（差 2.4%）。「不超过 1 MB」写 900 KB 也对。
+  // 1 MB calculated as either 1024 KB or 1000 KB is accepted (2.4% difference). Writing 900 KB for "no more than 1 MB" is also correct.
   const limit = SIZE_LIMIT.test(input);
   const matches = (kb: number) =>
     values.some((v) => Math.abs(v - kb) / Math.max(v, kb) <= 0.025 || (limit && v <= kb));
@@ -1373,7 +1389,7 @@ function checkPixels(input: string, steps: readonly ScopeStep[]): ToolIssue[] {
     mentions.add(Number(m[2]));
   }
   if (mentions.size === 0) return [];
-  // 证件照、打印排版、裁剪的尺寸由规格定（600×600 是 us-passport），对不上不一定错。
+  // Dimensions for ID photos, print layouts, and cropping are determined by specifications (600x600 is us-passport), so mismatches are not necessarily incorrect.
   if (steps.some((s) => /^image\.(idPhoto|printSheet|crop)$/.test(s.step.action))) return [];
   const values: number[] = [];
   for (const { step, fields } of steps)
@@ -1455,7 +1471,7 @@ function checkPageCounts(input: string, steps: readonly ScopeStep[]): ToolIssue[
   if (range && ranged.length > 0) {
     const from = range[1] ?? range[3];
     const to = range[2] ?? range[4];
-    // 「第 1 页」可以写成 rule first，不查。
+    // "Page 1" can be written as rule first; do not check.
     if (to !== undefined || from !== '1') {
       const has = (s: ScopeStep) => {
         const text = String(s.step.params.range ?? '');
@@ -1478,7 +1494,7 @@ function checkPageCounts(input: string, steps: readonly ScopeStep[]): ToolIssue[
   return issues;
 }
 
-/** 语言的叫法 → translate.text 的 to。中文两种都算（没说繁简时）。 */
+/** Language designations -> translate.text's `to`. Both types of Chinese count (when traditional/simplified is unspecified). */
 const LANGUAGE_WORDS: readonly [RegExp, readonly string[]][] = [
   [/^(?:繁体中文|繁体|繁體|traditional chinese|chinois traditionnel)/i, ['zh-Hant']],
   [/^(?:简体中文|简体|simplified chinese|chinois simplifié)/i, ['zh-Hans']],
@@ -1498,10 +1514,10 @@ const LANGUAGE_WORDS: readonly [RegExp, readonly string[]][] = [
 const TRANSLATE_TARGET =
   /(?:翻译|翻|译)\s*(?:成|为|到)\s*|translat\w*\b[^.。!?]{0,60}?\b(?:in)?to\s+|tradui\w*\b[^.。!?]{0,60}?\b(?:en|vers(?:\s+l['’]|\s+le\s+)?)\s*/gi;
 
-/** 没说「翻译」的说法（「变成英文 PDF」）：只有计划里已经有翻译步骤时才算，不然「改成中文」可能是别的意思。 */
+/** Phrases omitting "translate" ("turn into an English PDF"): only counts if the plan already contains a translation step, otherwise "change to Chinese" might mean something else. */
 const LOOSE_TARGET = /(?:变成|转成|换成|改成|做成)\s*/g;
 
-/** 句子里说的翻译目标（每个说法一组能接受的语言）。 */
+/** Translation targets mentioned in the sentence (a group of accepted languages for each phrasing). */
 function languageMentions(input: string, loose: boolean): (readonly string[])[] {
   const out: (readonly string[])[] = [];
   for (const m of [
@@ -1591,8 +1607,9 @@ function checkResolution(input: string, steps: readonly ScopeStep[]): ToolIssue[
 }
 
 /**
- * 用户句子里明确说的数和词有没有落到这次改动上。input 是用户的原话（只在本机用，不发出去）。
- * 只报高把握的，对不上就是 blocker；不确定就不报。
+ * Whether numbers and words explicitly mentioned in the user's sentence made it into this change.
+ * `input` is the user's exact wording (used locally only, never sent out). Report high-confidence
+ * matches only; a mismatch is a blocker; do not report if uncertain.
  */
 export function checkRequestParams(
   input: string,

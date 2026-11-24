@@ -22,8 +22,9 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
-// 卡片单独的文字颜色（D-409）：放在卡片上的文字用 surfaceText，放在页面背景上的用 text。
-// 断言看真正画出来的颜色，每种块都要走到；没设 surfaceText 的主题一个像素都不变。
+// Card-specific text color (D-409): text on cards uses surfaceText, text on page backgrounds uses
+// text. Assertions check the actually rendered colors, covering every block type; themes without
+// surfaceText set leave every pixel unchanged.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const PAGE = '#F5EFE0';
@@ -45,7 +46,7 @@ const memorySecrets = (): SecretStore => {
 const color = (text: string) =>
   StyleSheet.flatten(screen.getByText(text).props.style).color as string;
 
-/** 一张表、一页把每种放卡片和放页面上的块都摆上。 */
+/** A table and page containing every block type placed on cards and on page backgrounds. */
 const BLOCKS: Op[] = [
   {
     op: 'addData',
@@ -183,11 +184,11 @@ describe('card text color (D-409)', () => {
     await renderHome(FOREST);
     const card = onSurface(makePalette(FOREST, false));
     const page = makePalette(FOREST, false);
-    // 页面背景上的。
+    // On page backgrounds.
     expect(color('页面标题')).toBe(PAGE);
     expect(color('页面副标题')).toBe(page.muted);
     expect(color('家里')).toBe(PAGE);
-    // 卡片上的。
+    // On cards.
     expect(color('入口标题')).toBe(INK);
     expect(color('入口说明')).toBe(card.muted);
     expect(color('提示标题')).toBe(INK);

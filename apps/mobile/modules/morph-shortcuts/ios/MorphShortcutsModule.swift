@@ -1,14 +1,16 @@
 import ExpoModulesCore
 import UIKit
 
-// 长按 Morph 图标的菜单（D-271）：iOS Home Screen Quick Actions。菜单项的 type 是快捷操作的 ID。
-// 点了菜单项：SDK 58 的 ExpoAppSceneDelegate 把冷启动（connectionOptions.shortcutItem）和 App 开着时的点按
-// 都转成 application(_:performActionFor:)，由下面的订阅者收到。JS 还没准备好（冷启动）时先记着，
-// 启动完由 takeLaunched 取走；JS 在听时直接发 onOpen。
+// Long-press menu for the Morph icon (D-271): iOS Home Screen Quick Actions. The type of each menu
+// item is the quick action ID. When a menu item is tapped: SDK 58's ExpoAppSceneDelegate converts
+// both cold starts (connectionOptions.shortcutItem) and taps while the app is running into
+// application(_:performActionFor:), received by the subscriber below. If JS is not yet ready (cold
+// start), stores it first so it can be retrieved via takeLaunched after startup; if JS is
+// listening, emits onOpen directly.
 
 let morphShortcutOpened = Notification.Name("MorphShortcutsOpened")
 
-/** 订阅者（主线程）和 JS 线程都会读写，用锁保护。 */
+/** Protected by a lock as it is read and written by both the subscriber (main thread) and the JS thread. */
 final class ShortcutLaunch {
   static let shared = ShortcutLaunch()
   private let lock = NSLock()
@@ -21,7 +23,7 @@ final class ShortcutLaunch {
     lock.unlock()
   }
 
-  /** JS 在听就返回 true（由调用方发通知）；不在听就记下来，等 takeLaunched 取走。 */
+  /** Returns true if JS is listening (the caller emits a notification); if not listening, records it to be retrieved later by takeLaunched. */
   func deliver(_ id: String) -> Bool {
     lock.lock()
     defer { lock.unlock() }
@@ -63,7 +65,7 @@ public class MorphShortcutsModule: Module {
       }
     }.runOnQueue(.main)
 
-    // iOS 没有让 App 在桌面上放图标的接口。
+    // iOS does not provide an API for apps to place icons on the desktop.
     Function("canPin") { false }
 
     AsyncFunction("pin") { (_: ShortcutItemRecord) in false }

@@ -7,7 +7,7 @@ import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 页面上的时间范围也管记录列表（D-561）：选了哪一段，下面的列表只剩那一段的；什么都不写（底线 15）。
+// Time range on the page also controls the record list (D-561): whichever period is selected, the list below contains only items from that period; doing nothing writes nothing (invariant 15).
 
 const seed = (locale: Locale, registry: Registry) => {
   const r = applyOps(
@@ -98,7 +98,7 @@ describe('a list following the page time range (D-561)', () => {
       { name: '没有日期' },
     ]);
     await screen.findByTestId('period-thisWeek');
-    // 跟着的列表：只有这周的；不跟着的卡片：三条都在。
+    // Following list: only items from this week; unrelated cards: all three present.
     expect(screen.getAllByText('这周的')).toHaveLength(2);
     expect(screen.getAllByText('去年的')).toHaveLength(1);
     expect(screen.getAllByText('没有日期')).toHaveLength(1);
@@ -106,7 +106,7 @@ describe('a list following the page time range (D-561)', () => {
     await settle();
     expect(screen.getAllByText('这周的')).toHaveLength(1);
     expect(screen.getAllByText('去年的')).toHaveLength(2);
-    // 选时间范围什么都不写。
+    // Selecting time range writes nothing.
     const stored = await repo.listRecords('bills');
     expect(stored.map((r) => r.updatedAt)).toEqual([100, 101, 102]);
   });

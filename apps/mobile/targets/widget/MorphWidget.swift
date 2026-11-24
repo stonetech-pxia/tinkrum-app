@@ -2,11 +2,13 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-// Morph 的桌面小组件（D-321）。用户在 App 里长按组件选「放到桌面」，组件就出现在「编辑小组件」的列表里；
-// 没选时显示最近放的那个。点按钮或圆块：RunWidgetOp 把操作写进 App Group 的 queue/，不打开 App（D-323）；
-// 系统随后重画，画面换成 App 预先算好的「点了以后」那份。
+// Morph desktop widget (D-321). When the user long-presses a widget in the app and selects "Add to
+// Desktop", it appears in the "Edit Widget" list; shows the most recently placed one when none is
+// selected. Tapping a button or circle: `RunWidgetOp` writes the operation into the App Group's
+// `queue/` without opening the app (D-323); the system subsequently redraws, changing the view to
+// the app's pre-computed "after tap" version.
 
-// MARK: - 选哪个组件
+// MARK: - Which widget to select
 
 struct WidgetItemEntity: AppEntity {
   let id: String
@@ -36,7 +38,7 @@ struct PickWidgetItem: WidgetConfigurationIntent {
   var item: WidgetItemEntity?
 }
 
-// MARK: - 点一下
+// MARK: - Tap
 
 struct RunWidgetOp: AppIntent {
   static var title: LocalizedStringResource = "Record in Tinkrum"
@@ -49,7 +51,7 @@ struct RunWidgetOp: AppIntent {
   init(op: String) { self.op = op }
 
   func perform() async throws -> some IntentResult {
-    // 只记下点了什么；值在 App 打开时按点的时间算（D-323）。
+    // Records only what was tapped; values are calculated based on the tap timestamp when the app opens (D-323).
     if let def = SharedFiles.snapshot()?.ops[op] {
       try SharedFiles.enqueue(
         QueuedOp(
@@ -60,7 +62,7 @@ struct RunWidgetOp: AppIntent {
   }
 }
 
-// MARK: - 时间线
+// MARK: - Timeline
 
 struct MorphEntry: TimelineEntry {
   let date: Date
@@ -68,7 +70,7 @@ struct MorphEntry: TimelineEntry {
   let stale: Bool
   let staleText: String
   let palette: SnapshotColors?
-  /** 没放过任何组件（或还没打开过 App）。 */
+  /** No widget has ever been placed (or the app has not been opened yet). */
   let empty: Bool
 }
 
@@ -86,7 +88,7 @@ struct MorphProvider: AppIntentTimelineProvider {
   > {
     let now = Date()
     var entries = [entry(for: configuration, at: now)]
-    // App 预先算好了明天的那份（跨天，D-322）：到点换上，不用等 App 打开。
+    // The app pre-calculated tomorrow's view (day crossing, D-322): Swaps in at the appointed time without waiting for the app to open.
     for state in SharedFiles.snapshot()?.states ?? [] where state.from > now.timeIntervalSince1970 * 1000 {
       entries.append(entry(for: configuration, at: Date(timeIntervalSince1970: state.from / 1000)))
     }
@@ -105,7 +107,7 @@ struct MorphProvider: AppIntentTimelineProvider {
   }
 }
 
-// MARK: - 小组件
+// MARK: - Widget
 
 struct MorphWidget: Widget {
   var body: some WidgetConfiguration {

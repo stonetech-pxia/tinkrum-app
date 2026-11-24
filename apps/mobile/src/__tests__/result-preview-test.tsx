@@ -6,7 +6,7 @@ import { screen } from 'expo-router/testing-library';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp, testRegistry } from '../test-utils/render-app';
 
-// 结果页点缩略图打开全屏预览（D-277）：图片在 App 里全屏看、左右滑；PDF 等用系统预览。
+// Tap a thumbnail on the result page to open full-screen preview (D-277): view images full-screen and swipe left/right within the app; use system preview for PDFs, etc.
 
 const photos: Workflow = {
   kind: 'quickAction',
@@ -47,7 +47,7 @@ it('opens the result images full screen from their thumbnails, swiping through a
   await run(photos, files);
   await fireEvent.press(screen.getByTestId('result-open-scan-2.jpg'));
   expect(await screen.findByTestId('share-viewer')).toBeTruthy();
-  // 从点的那一张开始，一共两张。
+  // Starting from the tapped image, 2 total.
   expect(screen.getByTestId('share-viewer-count')).toHaveTextContent('2 / 2');
   await fireEvent.press(screen.getByTestId('share-viewer-close'));
   expect(screen.queryByTestId('share-viewer')).toBeNull();

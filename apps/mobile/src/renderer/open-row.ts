@@ -1,6 +1,6 @@
 import type { useRouter } from 'expo-router';
 
-// 打开一条记录：编辑页，或者给一条记录用的页面（D-342）。
+// Open a record: editor page, or a page dedicated to a single record (D-342).
 
 export function openEditor(
   router: ReturnType<typeof useRouter>,
@@ -13,7 +13,7 @@ export function openEditor(
   });
 }
 
-/** 点一条记录：opens 是页面 ID 时打开给这条记录用的页面（D-342），"record" 或不写时打开编辑页。 */
+/** Tap a record: when opens is a page ID, open the page dedicated to that record (D-342); when opens is "record" or omitted, open the editor page. */
 export function openRow(
   router: ReturnType<typeof useRouter>,
   opens: string | undefined,

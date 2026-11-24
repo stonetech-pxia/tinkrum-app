@@ -12,7 +12,7 @@ import {
   type RgbaImage,
 } from './ppocr';
 
-/** 一个转了 deg 度的矩形里的整数点。 */
+/** Integer points within a rectangle rotated by deg degrees. */
 function rotatedRectPoints(cx: number, cy: number, w: number, h: number, deg: number): Point[] {
   const a = (deg * Math.PI) / 180;
   const pts: Point[] = [];
@@ -27,7 +27,7 @@ function rotatedRectPoints(cx: number, cy: number, w: number, h: number, deg: nu
   return pts;
 }
 
-/** 概率图：给定的矩形区域是 230（约 0.9），其余是 0。 */
+/** Probability map: specified rectangular regions are 230 (approx. 0.9), and the rest are 0. */
 function probMap(width: number, height: number, rects: Point[][]): Uint8Array {
   const map = new Uint8Array(width * height);
   for (const pts of rects) for (const p of pts) map[p.y * width + p.x] = 230;
@@ -85,14 +85,14 @@ describe('text boxes from the probability map (D-269)', () => {
     ]);
     const boxes = textBoxes(map, w, h, { width: 400, height: 240 });
     expect(boxes).toHaveLength(3);
-    // 换算到 2 倍大的原图，同一行里左边的在前。
+    // Scaled to the 2x larger original image, the one on the left in the same line comes first.
     expect(boxes[0]!.quad[0].x).toBeLessThan(boxes[1]!.quad[0].x);
     expect(boxes[0]!.quad[0].x).toBeGreaterThan(20);
     expect(boxes[0]!.quad[0].x).toBeLessThan(80);
-    // 第三行中心在 y = 90（原图 180），往外扩约 8 像素、再转 3°，左上角在原图 140 左右。
+    // The center of the third line is at y = 90 (original image 180), expanded outward by about 8 pixels and rotated by 3 degrees, with the top-left corner around x = 140 on the original image.
     expect(boxes[2]!.quad[0].y).toBeGreaterThan(125);
     expect(boxes[2]!.quad[0].y).toBeLessThan(155);
-    // 往外扩了：比文字本身宽。
+    // Expanded outward: wider than the text itself.
     const width = boxes[2]!.quad[1].x - boxes[2]!.quad[0].x;
     expect(width).toBeGreaterThan(300);
     for (const b of boxes) expect(b.score).toBeGreaterThan(0.8);
@@ -102,13 +102,13 @@ describe('text boxes from the probability map (D-269)', () => {
     const w = 100;
     const h = 60;
     const map = probMap(w, h, [rotatedRectPoints(20, 20, 2, 2, 0)]);
-    // 一块很淡的（低于框的门槛 0.6，但高于像素门槛 0.3）。
+    // A faint region (below the box threshold of 0.6, but above the pixel threshold of 0.3).
     for (let y = 40; y < 50; y++) for (let x = 40; x < 90; x++) map[y * w + x] = 100;
     expect(textBoxes(map, w, h, { width: w, height: h })).toEqual([]);
   });
 
   it('keeps a bent line (photo of a curved screen or a book page)', () => {
-    // 一行字，中间比两头低 24 像素，字高 14：外接矩形里一半以上是空白，但这一行本身很清楚。
+    // A line of text, middle is 24 pixels lower than both ends, font height 14: more than half of the bounding rectangle is blank, but the line itself is very clear.
     const w = 400;
     const h = 80;
     const map = new Uint8Array(w * h);
@@ -137,7 +137,7 @@ describe('model inputs (D-269)', () => {
   it('normalizes in BGR order, the same with and without resizing', () => {
     const exact = detectionInput(image(64, 96, [255, 0, 0]), 32);
     const plane = 64 * 96;
-    // 红色：B 通道（第 0 个）是 0，R 通道（第 2 个）是 255。
+    // Red: B channel (index 0) is 0, R channel (index 2) is 255.
     expect(exact.tensor[0]).toBeCloseTo((0 - 0.485) / 0.229, 4);
     expect(exact.tensor[2 * plane]).toBeCloseTo((1 - 0.406) / 0.225, 4);
     const resized = detectionInput(image(70, 100, [255, 0, 0]), 32);
@@ -148,7 +148,7 @@ describe('model inputs (D-269)', () => {
 
   it('crops lines to 48 pixels high, at least 320 wide, and turns tall boxes', () => {
     const page = image(400, 400, [255, 255, 255]);
-    // 左边一列是黑的：横着的框里它在左边，竖着的框转过之后它在下面。
+    // A black column on the left: it is on the left in horizontal boxes, and at the bottom after rotated vertical boxes.
     for (let y = 0; y < 400; y++) page.data.set([0, 0, 0], (y * 400 + 10) * 4);
     const wide = [
       { x: 10, y: 10 },
@@ -166,16 +166,16 @@ describe('model inputs (D-269)', () => {
     expect(input.width).toBe(320);
     const plane = 48 * 320;
     expect(input.tensor).toHaveLength(2 * 3 * plane);
-    // 第一条：最左一列是黑（-1），右边是白（1），补零的地方是 0。
+    // First entry: leftmost column is black (-1), right side is white (1), padded zeros are 0.
     expect(input.tensor[20 * 320]).toBeCloseTo(-1, 1);
     expect(input.tensor[20 * 320 + 100]).toBeCloseTo(1, 1);
     expect(input.tensor[20 * 320 + 300]).toBe(0);
-    // used：每一条实际有内容的宽度，后面都是补的 0（字的位置按它换算，D-272）。
+    // used: the actual content width of each entry, followed by padding zeros (character positions are calculated based on it, D-272).
     const used = input.used[0]!;
     expect(used).toBeLessThan(320);
     expect(input.tensor[20 * 320 + used - 1]).not.toBe(0);
     expect(input.tensor[20 * 320 + used]).toBe(0);
-    // 第二条（逆时针转 90°）：原来最左的一列到了最下面一行。
+    // Second entry (rotated 90 degrees counter-clockwise): the original leftmost column moved to the bottom row.
     const second = 3 * plane;
     expect(input.tensor[second + 47 * 320 + 100]).toBeLessThan(0);
     expect(input.tensor[second + 10 * 320 + 100]).toBeCloseTo(1, 1);
@@ -185,13 +185,13 @@ describe('model inputs (D-269)', () => {
 describe('CTC decoding (D-269)', () => {
   it('drops blanks and repeats, and averages the kept probabilities', () => {
     const dict = ['a', 'b', 'c'];
-    // 时间步：a a 空 a b b 空
+    // Time steps: a a blank a b b blank
     const index = [1, 1, 0, 1, 2, 2, 0];
     const prob = [0.9, 0.8, 0.99, 0.7, 0.6, 0.5, 0.99];
     const r = ctcDecode(index, prob, 7, 0, dict);
     expect(r.text).toBe('aab');
     expect(r.score).toBeCloseTo((0.9 + 0.7 + 0.6) / 3);
-    // 每个字在第几个时间步（连续重复的取中间）：转 Excel 时按它切开横跨竖线的行（D-272）。
+    // Time step index for each character (taking the middle for consecutive duplicates): split lines crossing vertical lines based on this when converting to Excel (D-272).
     expect(r.at).toEqual([0.5, 3, 4.5]);
     expect(ctcDecode([0, 0], [1, 1], 2, 0, dict)).toEqual({ text: '', score: 0, at: [] });
   });
@@ -211,7 +211,7 @@ describe('recognizePage (D-269)', () => {
       },
       async recognize(_input, count, width) {
         seen.push({ count, width });
-        // 第一条认成「你好」，第二条置信度太低。
+        // First entry recognized as Chinese characters for "hello", second entry has too low confidence.
         const steps = 4;
         return {
           steps,
@@ -224,10 +224,10 @@ describe('recognizePage (D-269)', () => {
     expect(seen).toEqual([{ count: 2, width: expect.any(Number) }]);
     expect(lines).toHaveLength(1);
     expect(lines[0]!.text).toBe('你好');
-    // 框换算回原图（检测时放大了 736 / 128 倍）。
+    // Box coordinates mapped back to the original image (scaled up by 736 / 128 during detection).
     expect(lines[0]!.y).toBeLessThan(50);
     expect(lines[0]!.width).toBeGreaterThan(50);
-    // 每个字的大致位置：时间步的中心占这一行的比例（D-272）。
+    // Approximate position of each character: the center of the time step as a proportion of the line width (D-272).
     expect(lines[0]!.chars!.map((c) => c.text)).toEqual(['你', '好']);
     const [first, second] = lines[0]!.chars!.map((c) => c.at);
     expect(first).toBeGreaterThan(0);

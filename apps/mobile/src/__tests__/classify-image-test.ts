@@ -1,8 +1,8 @@
 import { classifyImageWith, tidyLabels } from '../runtime/classify-image';
 
-// 原生图像分类的 JS 部分：取消时 Promise 一定结束（原生那边可能一直不回），两个平台的结果统一整理。
+// JS part of native image classification: ensures the Promise always settles on cancellation (since the native side might never respond), and standardizes results across both platforms.
 
-/** 假的原生模块：classifyImage 一直挂着，直到测试自己 resolve / reject。 */
+/** Mock native module: classifyImage hangs until the test explicitly resolves or rejects it. */
 function hangingNative() {
   const pending: {
     taskId: string;
@@ -67,9 +67,9 @@ describe('classifyImageWith', () => {
     });
     controller.abort();
     await expect(result).rejects.toMatchObject({ code: 'cancelled' });
-    // 也通知原生停下，用的是这次的 taskId。
+    // Also notifies the native side to stop, using the current taskId.
     expect(fake.cancelled).toEqual([fake.pending[0]!.taskId]);
-    // 原生晚到的错误没人等，不会变成未处理的 Promise 错误。
+    // A late native error is ignored and does not become an unhandled Promise rejection.
     fake.pending[0]!.reject(
       Object.assign(new Error('Cancelled'), { code: 'ERR_VISION_CANCELLED' }),
     );

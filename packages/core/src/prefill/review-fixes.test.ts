@@ -8,7 +8,7 @@ import { modelEngine, ruleEngine } from './engine';
 import { modelRequest, type OpenModel } from './model';
 import { invoiceNoByKey, upperAmount, upperToNumber } from './zh-rules';
 
-// 审核 D-399 时发现的问题，每条都是「应该怎样」（每条在修之前的代码上都失败过）。
+// Issues found when reviewing D-399; each item describes the expected behavior (each had failed in the code prior to the fix).
 
 const AMOUNT: Field = { id: 'total', name: 'Amount', type: 'money', currency: 'USD' };
 const IDR: Field = { id: 'total', name: 'Amount', type: 'money', currency: 'IDR' };
@@ -33,37 +33,37 @@ const planOf = (field: Field, rows: string[], locale: 'en' | 'fr' | 'zh' = 'en')
   planDocument({ rules: 'receipt', fields: [field], pages: [pageOf(rows)], locale, now })
     .fields[0]!;
 
-describe('单号：通用的 No 不吃别的号码（第 1 条）', () => {
+describe('No.: generic No does not consume other numbers (item 1)', () => {
   it.each([
     'Tel No: 03-12345678',
     'Co No: 123456-X',
     'Reg No: 200301012345',
     'No. 12A-3, Jalan Bukit',
     '流水号 NO 998877',
-  ])('%s 不是单号', async (row) => {
+  ])('%s is not an order/invoice number', async (row) => {
     expect(invoiceNoByKey([row])).toBeNull();
     const p = planOf(NUMBER, [row]);
     expect(p.code.map((s) => s.value)).toEqual([]);
   });
 
-  it('明确的键名赢过通用的 No，字母开头超过 2 个字母也取得到', () => {
+  it('Explicit key names beat generic No; starting with letters and having more than 2 letters can also be retrieved', () => {
     expect(invoiceNoByKey(['Invoice No: INV12345'])).toBe('INV12345');
     expect(invoiceNoByKey(['No: 998877', 'Invoice No: INV12345'])).toBe('INV12345');
     expect(invoiceNoByKey(['Receipt No: RCP-2026-77'])).toBe('RCP-2026-77');
   });
 
-  it('认 N°', () => {
+  it('Recognize N°', () => {
     expect(invoiceNoByKey(['FACTURE N° 2026-0451'])).toBe('2026-0451');
     expect(invoiceNoByKey(['N° 2026-0451'])).toBe('2026-0451');
   });
 
-  it('原来认得的还认得', () => {
+  it('Previously recognized items are still recognized', () => {
     expect(invoiceNoByKey(['NO 11112222'])).toBe('11112222');
     expect(invoiceNoByKey(['No.8039067169'])).toBe('8039067169');
     expect(invoiceNoByKey(['Ticket No 12345678'])).toBe('12345678');
   });
 
-  it('真实票据上 OCR 把几格接成一排：只看 No 自己的那一段（SIBR）', () => {
+  it('OCR on real receipts joins multiple boxes into a single line: look only at No\'s own segment (SIBR)', () => {
     expect(invoiceNoByKey(['业务流水号： 医疗类型： NO. 2007092215'])).toBe('2007092215');
     expect(invoiceNoByKey(['业务流水号： NO 2038022056'])).toBe('2038022056');
     expect(invoiceNoByKey(['备流水号 U9649201 医疗类型城市医保 NO 7912778710'])).toBe('7912778710');
@@ -74,46 +74,46 @@ describe('单号：通用的 No 不吃别的号码（第 1 条）', () => {
     expect(invoiceNoByKey(['Beijing Invoice 24718066052020', 'No.25407626'])).toBe('25407626');
   });
 
-  it('文字里有单号的键名但代码取不到值：没把握，要问模型；什么键名都没有才算没有', () => {
+  it('Key name for document number exists in text but code cannot retrieve value: unsure, ask the model; only considered absent if no key name exists at all', () => {
     expect(planOf(NUMBER, ['Invoice No: ABC', 'Total 5.00']).ask).toBe(true);
     expect(planOf(NUMBER, ['Thank you', 'Total 5.00']).ask).toBe(false);
   });
 
-  it('模型的回答同样不能来自公司号、地址那一排', () => {
+  it('Model responses also cannot come from the company name or address row', () => {
     expect(checkAnswer(NUMBER, '123456-X', ['Co No: 123456-X'], 'en')).toBeNull();
     expect(checkAnswer(NUMBER, '12A-3', ['No. 12A-3, Jalan Bukit'], 'en')).toBeNull();
   });
 });
 
-describe('算术：付款和小计不排到合计前面（第 2 条）', () => {
+describe('Arithmetic: payment and subtotal do not precede total (item 2)', () => {
   const items = ['Coffee 5.00', 'Cake 10.00'];
 
-  it('有明细没有找零：现金不是总额', async () => {
+  it('Has line items but no change: cash is not the total amount', async () => {
     const rows = [...items, 'Total 15.00', 'Cash 20.00'];
     expect(amountChain(rows, false, 'en')?.value).not.toBe(20);
     expect(Number(await first(AMOUNT, rows))).toBe(15);
   });
 
-  it('付款排也不算小计', async () => {
+  it('Payment rows do not count as subtotal', async () => {
     const rows = ['Coffee 12.00', 'Cake 8.00', 'Total 19.00', 'Visa 20.00'];
     expect(amountChain(rows, false, 'en')?.value).not.toBe(20);
     expect(Number(await first(AMOUNT, rows))).toBe(19);
   });
 
-  it('负数的优惠要算', async () => {
+  it('Negative discounts must be included', async () => {
     const rows = ['Tea 12.00', 'Cake 8.00', 'Subtotal 20.00', 'Discount -5.00', 'Total 15.00'];
     expect(amountChain(rows, false, 'en')).toEqual({ value: 15, how: 'subtotalAdjust' });
     expect(Number(await first(AMOUNT, rows))).toBe(15);
     expect(Number(await first(AMOUNT, ['Subtotal 20', 'Discount -5.00', 'Total 15']))).not.toBe(20);
   });
 
-  it('找零比总额大也认（写着合计的那排）；现金可以没有小数', () => {
+  it('Recognize change even if larger than total (the row stating total); cash may have no decimals', () => {
     const chain = { value: 28.9, how: 'payMinusChange' };
     expect(amountChain(['Total 28.90', 'Cash 100.00', 'Change 71.10'], false, 'en')).toEqual(chain);
     expect(amountChain(['Total 28.90', 'Cash 100', 'Change 71.10'], false, 'en')).toEqual(chain);
   });
 
-  it('合计那排 OCR 没读出数时，付款排的数可以是总额（真实小票）', () => {
+  it('When OCR fails to read numbers on the total row, the number on the payment row can be the total amount (real receipt)', () => {
     const rows = [
       'A 100.00',
       'B 44.68',
@@ -125,24 +125,24 @@ describe('算术：付款和小计不排到合计前面（第 2 条）', () => {
     expect(amountChain(rows, false, 'en')?.value).toBe(153.35);
   });
 
-  it('不写合计的一排不靠大额找零算成总额', () => {
+  it('Rows without a total label should not be treated as total based on large change amounts', () => {
     const rows = ['Coffee 5.00', 'Cash 100.00', 'Change 95.00'];
     expect(amountChain(rows, false, 'en')?.how).not.toBe('payMinusChange');
   });
 });
 
-describe('酒店取最晚日期的判断（第 3 条）', () => {
-  it('room 要是一个词：Mushroom Cafe 不是酒店', async () => {
+describe('Hotel latest date determination (item 3)', () => {
+  it('\'room\' must be a single word: Mushroom Cafe is not a hotel', async () => {
     const rows = ['Mushroom Cafe', 'Departure board', 'Date 2026-01-01', 'Next visit 2026-03-01'];
     expect(await first(DATE, rows)).toBe('2026-01-01');
   });
 
-  it('机票、接送的 departure 不算酒店', async () => {
+  it('Flight and transfer departures do not count as hotels', async () => {
     const rows = ['Booking date 2026-11-01', 'Guest details', 'Departure', 'Return 2027-01-05'];
     expect(await first(DATE, rows)).toBe('2026-11-01');
   });
 
-  it('英文的到期字样也不算', async () => {
+  it('English expiry wording does not count either', async () => {
     const rows = [
       'Guest folio',
       'Invoice date 2026-03-01',
@@ -160,32 +160,32 @@ describe('酒店取最晚日期的判断（第 3 条）', () => {
     expect(out.day?.map((s) => s.value)).not.toContain('2030-01-31');
   });
 
-  it('分不清日月时不取两种读法里较晚的，按语言先给的读法', async () => {
+  it('When day, month, and year order is ambiguous, do not pick the later of two interpretations; follow the order given by the language first', async () => {
     const rows = ['Guest folio', 'Departure 03/04/2026'];
     expect(await first(DATE, rows, 'en')).toBe('2026-03-04');
     expect(await first(DATE, rows, 'fr')).toBe('2026-04-03');
   });
 
-  it('真的酒店账单还是取最晚的', async () => {
+  it('Actual hotel bills still pick the latest date', async () => {
     const rows = ['Guest folio', 'Date 2026-03-01', 'Departure', 'Closed 2026-03-04'];
     expect(await first(DATE, rows)).toBe('2026-03-04');
   });
 
-  it('打印日期不进最晚日期（D-403）', async () => {
+  it('Print date is not included in the latest date (D-403)', async () => {
     const rows = ['Guest folio', 'Date 2026-03-01', 'Departure', 'Time printed 2026-03-04'];
     expect(await first(DATE, rows)).toBe('2026-03-01');
   });
 });
 
-describe('大写金额要看那一排（第 4 条）', () => {
-  it('实收、押金的大写不算', () => {
+describe('Amount in words must be checked from that row (item 4)', () => {
+  it('Words for received amount or deposit do not count', () => {
     expect(upperAmount(['合计 128', '实收大写 贰佰元整', '实收 200.00'])?.sure ?? false).toBe(
       false,
     );
     expect(upperAmount(['押金伍元整', '押金 5.00'])?.sure ?? false).toBe(false);
   });
 
-  it('有合计类的那一个就取它', () => {
+  it('If there is a total-like category, pick it', () => {
     expect(upperAmount(['服务费 壹拾元整 10.00', '价税合计 壹佰壹拾元整 110.00'])).toEqual({
       value: 110,
       sure: true,
@@ -196,13 +196,13 @@ describe('大写金额要看那一排（第 4 条）', () => {
     });
   });
 
-  it('没写标签的那一个还认；两个对不上的不认', () => {
+  it('Unlabeled ones are still recognized; mismatched pairs are rejected', () => {
     expect(upperAmount(['人民币 贰拾捌元玖角', '28.90'])).toEqual({ value: 28.9, sure: true });
     const two = upperAmount(['壹拾元整 10.00', '贰拾元整 20.00']);
     expect(two?.sure ?? false).toBe(false);
   });
 
-  it('「合计（大写）」和大写金额折成两排时还认（SIBR）', () => {
+  it('Recognized even when \'Total (in words)\' and the amount in words are split into two rows (SIBR)', () => {
     expect(upperAmount(['金额合计（大写）：', '收款： 肆拾肆元肆角伍分', '44.45'])).toEqual({
       value: 44.45,
       sure: true,
@@ -213,13 +213,13 @@ describe('大写金额要看那一排（第 4 条）', () => {
     });
   });
 
-  it('表单第一个候选不是押金、实收的大写', async () => {
+  it('Form\'s first candidate is not the amount in words for deposits or received amounts', async () => {
     expect(
       Number(await first(money('金额'), ['押金伍元整', '押金 5.00', '合计 88.00'], 'zh')),
     ).toBe(88);
   });
 
-  it('零、繁体能解析', () => {
+  it('Can parse zero and traditional Chinese numerals', () => {
     expect(upperToNumber('贰拾捌元零伍分')).toBe(28.05);
     expect(upperToNumber('壹佰元零伍角')).toBe(100.5);
     expect(upperToNumber('貳拾元整')).toBe(20);
@@ -227,7 +227,7 @@ describe('大写金额要看那一排（第 4 条）', () => {
   });
 });
 
-describe('金额核对按整个数（第 6 条，D-396「能核对到」）', () => {
+describe('Amount verification checks the entire number (item 6, D-396 \'verifiable\')', () => {
   it.each([
     ['8.90', ['Total 28.90']],
     ['1.25', ['Total 11.25']],
@@ -235,7 +235,7 @@ describe('金额核对按整个数（第 6 条，D-396「能核对到」）', ()
     ['30', ['Date 2026-10-30']],
     ['12', ['Time 12:30']],
     ['1234', ['Tel 012-1234']],
-  ])('%s 对 %j 核对不到', (answer, rows) => {
+  ])('%s cannot be matched against %j', (answer, rows) => {
     expect(checkAnswer(AMOUNT, answer, rows, 'en')).toBeNull();
   });
 
@@ -248,11 +248,11 @@ describe('金额核对按整个数（第 6 条，D-396「能核对到」）', ()
     ['1,234.50', ['Total 1234.50'], '1234.5'],
     ['1.234,50', ['Total 1.234,50'], '1234.5'],
     ['1234.50', ['Total 1 234,50'], '1234.5'],
-  ])('%s 对 %j 核对得到', (answer, rows, value) => {
+  ])('%s is successfully matched against %j', (answer, rows, value) => {
     expect(checkAnswer(AMOUNT, answer, rows, 'en')).toBe(value);
   });
 
-  it('合计排上 OCR 读坏的分隔符（真实小票）；一段数字要整个对上', () => {
+  it('OCR-damaged separators on the total row (real receipt); a sequence of digits must match entirely', () => {
     expect(checkAnswer(IDR, '20000', ['TOTAL 20 0 0 0'], 'en')).toBe('20000');
     expect(checkAnswer(IDR, '36000', ['TOTAL 36-000'], 'en')).toBe('36000');
     expect(checkAnswer(AMOUNT, '19.8', ['NET TOTAL: 19-80'], 'en')).toBeNull();
@@ -260,7 +260,7 @@ describe('金额核对按整个数（第 6 条，D-396「能核对到」）', ()
     expect(checkAnswer(AMOUNT, '9.80', ['NET TOTAL: 19-80'], 'en')).toBeNull();
   });
 
-  it('无小数币种：千分位', () => {
+  it('Currencies without decimals: thousands separator', () => {
     expect(checkAnswer(IDR, '32.000', ['Total 32.000'], 'en')).toBe('32000');
     expect(checkAnswer(IDR, '32000', ['Total Rp 32.000'], 'en')).toBe('32000');
     expect(checkAnswer(IDR, '32,000.00', ['Total 32,000.00'], 'en')).toBe('32000');
@@ -268,15 +268,15 @@ describe('金额核对按整个数（第 6 条，D-396「能核对到」）', ()
   });
 });
 
-describe('模型候选的记忆（第 7 条）', () => {
-  it('只有模型给的候选带真实的标签和位置，不写死 relY 0', async () => {
+describe('Model candidate memory (item 7)', () => {
+  it('Only candidates provided by the model carry real labels and positions; do not hardcode relY 0', async () => {
     const rows = ['Header line', 'Note x', 'Store: Cafe Royal', 'Total 5.00'];
     const open: OpenModel = async () => ({
       generate: async () => 'Cafe Royal',
       release: async () => undefined,
     });
     const out = await modelEngine(open)({
-      // 公司字段规则有候选也问模型（店名有候选就不问了，D-404）。
+      // Company field rules also ask the model even if there are candidates (store name doesn't ask if there are candidates, D-404).
       fields: [{ id: 'merchant', name: 'Company', type: 'text' }],
       pages: [pageOf(rows)],
       locale: 'en',
@@ -286,7 +286,7 @@ describe('模型候选的记忆（第 7 条）', () => {
     expect(hit?.pick?.relY).toBeGreaterThan(0.3);
   });
 
-  it('找不到位置就不记，不是记一个假的页面顶部', () => {
+  it('Do not record if position cannot be found, rather than recording a fake page top', () => {
     const plan = planDocument({
       rules: 'receipt',
       fields: [MERCHANT],
@@ -300,7 +300,7 @@ describe('模型候选的记忆（第 7 条）', () => {
   });
 });
 
-describe('给模型的文字按字段（第 8 条）', () => {
+describe('Text given to the model by field (item 8)', () => {
   const COUPON = money('优惠金额');
   const CASH = money('现金');
 
@@ -313,12 +313,12 @@ describe('给模型的文字按字段（第 8 条）', () => {
     [text('Phone'), 'Tel: 03-12345678'],
     [text('Email'), 'hello@acme.com'],
     [money('Discount'), 'Discount 5.00'],
-  ])('%j 问它自己的那一排：%s', (field, row) => {
+  ])('%j queried for its own row: %s', (field, row) => {
     expect(keepForModel(row, field)).toBe(true);
     expect(modelRequest(field, [row, 'Total 9.00']).prompt).toContain(row);
   });
 
-  it('别的字段还是不给看；总额字段和测量时一样', () => {
+  it('Other fields remain hidden; total field is same as during measurement', () => {
     expect(keepForModel('优惠 -5.00', AMOUNT)).toBe(false);
     expect(keepForModel('现金 100.00', money('金额'))).toBe(false);
     expect(keepForModel('实收 100.00', money('金额'))).toBe(false);
@@ -326,7 +326,7 @@ describe('给模型的文字按字段（第 8 条）', () => {
     expect(keepForModel('电话 010-1234567', COUPON)).toBe(false);
   });
 
-  it('自建字段的答案在自己那一排也过得了核对', () => {
+  it('Answers for custom fields pass verification in their own row', () => {
     expect(checkAnswer(COUPON, '5.00', ['优惠 -5.00', '合计 95.00'], 'zh')).toBe('5');
     expect(checkAnswer(CASH, '100.00', ['合计 95.00', '现金 100.00', '找零 5.00'], 'zh')).toBe(
       '100',
@@ -335,7 +335,7 @@ describe('给模型的文字按字段（第 8 条）', () => {
   });
 });
 
-describe('值记忆要有边界（第 9 条）', () => {
+describe('Value memory must have boundaries (item 9)', () => {
   const remembered = (known: string[], rows: string[]) =>
     planDocument({
       rules: 'receipt',
@@ -346,51 +346,51 @@ describe('值记忆要有边界（第 9 条）', () => {
       known: { merchant: known },
     }).fields[0]!.remembered?.value;
 
-  it('英文要整个词', () => {
+  it('English requires whole words', () => {
     expect(remembered(['Apple'], ['PINEAPPLE JUICE BAR'])).toBeUndefined();
     expect(remembered(['Apple'], ['APPLE STORE KLCC'])).toBe('Apple');
     expect(remembered(['Acme Coffee'], ['ACMECOFFEE 12'])).toBe('Acme Coffee');
     expect(remembered(['Acme'], ['ACME2'])).toBeUndefined();
   });
 
-  it('中文要整排或足够长', () => {
+  it('Chinese requires entire rows or sufficient length', () => {
     expect(remembered(['中国'], ['中国银行'])).toBeUndefined();
     expect(remembered(['中国'], ['中国'])).toBe('中国');
     expect(remembered(['中国银行'], ['中国银行北京分行'])).toBe('中国银行');
   });
 
-  it('不许跨排凑', () => {
+  it('Cross-row combination is prohibited', () => {
     expect(remembered(['Apple Store'], ['Apple', 'Store'])).toBeUndefined();
     expect(remembered(['中国银行'], ['中国', '银行'])).toBeUndefined();
   });
 });
 
-describe('商品明细不是店名（模型的回答）', () => {
+describe('Product line items are not store names (model response)', () => {
   const rows = ['MUSHROOM CAFE', 'Latte 4.50', 'A4 CLR COPY 8 0.53 4.24 SR', 'BAKERY 24'];
-  it.each(['Latte 4.50', 'Latte', 'A4 CLR COPY 8 0.53 4.24 SR'])('%s 不是店名', (answer) => {
+  it.each(['Latte 4.50', 'Latte', 'A4 CLR COPY 8 0.53 4.24 SR'])('%s is not a store name', (answer) => {
     expect(checkAnswer(MERCHANT, answer, rows, 'en')).toBeNull();
   });
-  it('真的店名还在，别的文字字段不受影响', () => {
+  it('Real store name remains, other text fields are unaffected', () => {
     expect(checkAnswer(MERCHANT, 'MUSHROOM CAFE', rows, 'en')).toBe('MUSHROOM CAFE');
     expect(checkAnswer(MERCHANT, 'BAKERY 24', rows, 'en')).toBe('BAKERY 24');
     expect(checkAnswer(text('Item'), 'Latte 4.50', rows, 'en')).toBe('Latte 4.50');
   });
 });
 
-describe('去标签（第 10 条）', () => {
-  it('12:30 不是「标签：值」', () => {
+describe('Strip labels (item 10)', () => {
+  it('12:30 is not \'label: value\'', () => {
     expect(checkAnswer(NOTE_TIME, '12:30', ['Open 12:30'], 'en')).toBe('12:30');
   });
 
-  it('真的标签还是去掉', () => {
+  it('Real labels are still stripped', () => {
     expect(checkAnswer(MERCHANT, 'Store: Cafe Royal', ['Store: Cafe Royal'], 'en')).toBe(
       'Cafe Royal',
     );
   });
 });
 
-describe('点选记忆只调整顺序，不放进新候选', () => {
-  // 手机上发现的真实小票（SROIE）：点过第一个候选以后，多出了地址和 0.00、4.00。
+describe('Tap selection memory only adjusts order, does not add to new candidates', () => {
+  // Real receipt found on mobile (SROIE): after tapping the first candidate, address and 0.00, 4.00 appeared extra.
   const page = {
     width: 736,
     height: 1248,
@@ -426,7 +426,7 @@ describe('点选记忆只调整顺序，不放进新候选', () => {
   const values = (o: Awaited<ReturnType<typeof ruleEngine>>, id: string) =>
     (o[id] ?? []).map((s) => s.value);
 
-  it('点过以后，候选还是没点过时那些', async () => {
+  it('After tapping, candidates remain those from before the tap', async () => {
     const before = await ruleEngine(input);
     const picks = { merchant: before.merchant![0]!.pick!, total: before.total![0]!.pick! };
     const after = await ruleEngine({ ...input, picks });
@@ -434,7 +434,7 @@ describe('点选记忆只调整顺序，不放进新候选', () => {
     expect(values(after, 'total').sort()).toEqual(values(before, 'total').sort());
   });
 
-  it('记忆还能决定先后：点过第二个，下次它排第一', async () => {
+  it('Memory can also determine priority: tapped the second one, next time it ranks first', async () => {
     const before = await ruleEngine(input);
     const second = before.merchant![1]!;
     const after = await ruleEngine({ ...input, picks: { merchant: second.pick! } });

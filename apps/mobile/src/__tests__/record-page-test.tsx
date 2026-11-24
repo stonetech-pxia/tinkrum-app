@@ -16,7 +16,7 @@ import { renderToolsApp } from '../test-utils/render-app';
 
 type Router = Awaited<ReturnType<typeof renderToolsApp>>['router'];
 
-// 给一条记录用的页面（D-342）和快速添加的预设值（D-343）：点一个项目打开它的页面。
+// Page for a single record (D-342) and preset values for quick add (D-343): tap an item to open its page.
 
 const tables: Collection[] = [
   {
@@ -100,7 +100,7 @@ const seed = (locale: Locale, registry: Registry) => {
 const put = (repo: MemoryWorkspaceRepo, id: string, collectionId: string, values: object) =>
   repo.insertRecord({ id, collectionId, values: { ...values }, createdAt: 1, updatedAt: 1 });
 
-/** 点列表里的一行，等它的页面打开。先等列表读完、算好（之后不再重画），再点。 */
+/** Tap a row in the list, wait for its page to open. Wait for list to finish loading and computing (no redraws afterwards) before tapping. */
 async function openFromList(router: Router, testID: string) {
   await screen.findByTestId(testID);
   await act(async () => {});
@@ -108,7 +108,7 @@ async function openFromList(router: Router, testID: string) {
   await waitFor(() => expect(router.getPathname()).toBe('/page/project'));
 }
 
-// 打开、在页面上添加、回到首页、打开一个刚被删掉的项目：一条连着走完。
+// Open, add on page, return to home, open a just-deleted project: sequential walkthrough.
 it('tapping a project opens its page with only its tasks; a project deleted meanwhile says so', async () => {
   const repo = new MemoryWorkspaceRepo();
   await put(repo, 'p1', 'projects', { name: '装修' });
@@ -122,7 +122,7 @@ it('tapping a project opens its page with only its tasks; a project deleted mean
   expect(await screen.findByText('买瓷砖')).toBeTruthy();
   expect(screen.queryByText('订机票')).toBeNull();
   expect(screen.getByTestId('page-record-edit')).toBeTruthy();
-  // 页面上的快速添加：任务挂在这个项目下（预设值 "$record"），「后天」在本机认出来。
+  // Quick add on page: task linked under this project (preset value "$record"), "day after tomorrow" recognized locally.
   await fireEvent.changeText(screen.getByTestId('form-add-here-title'), '后天量尺寸');
   expect(screen.getByTestId('form-add-here-smart')).toHaveTextContent(/认出「后天」/);
   await fireEvent.press(screen.getByTestId('form-add-here-submit'));
@@ -140,7 +140,7 @@ it('tapping a project opens its page with only its tasks; a project deleted mean
 
   await testRouter.back();
   await waitFor(() => expect(router.getPathname()).toBe('/'));
-  // 列表还没刷新时项目被删了（例如在别处删的）：页面说明，不会列出所有任务。
+  // Project deleted before list refreshed (e.g., deleted elsewhere): page explains, does not list all tasks.
   await repo.deleteRecord('p2', Date.now());
   await openFromList(router, 'record-p2');
   expect(await screen.findByText(/这条记录已经删除/)).toBeTruthy();

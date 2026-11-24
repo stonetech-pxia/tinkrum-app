@@ -9,7 +9,7 @@ import { type OcrBox, type TableCell } from './types';
 import { withBullets } from './word-bullets';
 import { findFillIns, joinShadedBlanks, withFillIns } from './word-fill-ins';
 
-/** 接回填写处和列表记号，保留识别行与原图的对应。 */
+/** Reconnect fill-in areas and list markers, preserving the correspondence between recognized lines and the original image. */
 export function prepareTextLines(
   state: Pick<RuledTablesState, 'ruled' | 'placedIn' | 'tables' | 'rejected'> &
     Pick<
@@ -41,15 +41,18 @@ export function prepareTextLines(
     rejected,
   } = state;
 
-  // 按实际放进格子的行算（D-501）：表格边线外面、横跨列线的字没放进表，照样排成正文，不丢。
+  // Calculated based on lines actually placed inside cells (D-501): text outside table borders or spanning column lines that was not placed into a table is formatted as regular body text and is not lost.
   const inTable = new Set(ruled.flatMap((t) => placedIn.get(t) ?? []));
-  // 整页的倾斜（D-471）：照片拍歪、纸弯了时按斜线分行；拉平以后的行只用来分行、分段、排位置，
-  // 量笔画、颜色、下划线还是看原图里原来的位置。
+  // Page-wide skew (D-471): when photos are tilted or paper is warped, split lines along oblique
+  // vectors. Flattened lines are used solely for line-splitting, paragraph-splitting, and
+  // positioning; measuring stroke width, color, and underlines still relies on original positions
+  // in the source image.
   const outside = available.filter((l) => !inTable.has(l) && !isStray(l, lines, lineHeight, image));
-  // 竖排、旋转的字（页边的竖排标志、侧边的说明、条码旁的编号）：认出来的字多半是乱的，
-  // 放进正文又会把字号撑得很大。整块剪成图片，原样保留。
+  // Vertical and rotated text (margin vertical markers, side callouts, barcode identifiers):
+  // recognized text is mostly garbage, and placing it in the main body would inflate font sizes.
+  // Crop the entire block as an image and preserve it as-is.
   const upright = outside.filter((l) => !isVertical(l));
-  // 表单的填写处（一串点、标签右边的横线）接进同一排的标签后面，或者自成一行（EU 样本 021、030）。
+  // Form fill-in locations (a string of dots, a horizontal line to the right of a label) are attached behind the label in the same row, or form their own row (EU samples 021, 030).
   const fills = findFillIns(
     working,
     dots,
@@ -59,13 +62,13 @@ export function prepareTextLines(
     [...tables.map((t) => t.box), ...figures.map((f) => f.box)],
   );
   const withFills = withFillIns(upright, fills, lineHeight);
-  // 句子中间一块块要填的底色（EU 样本 082）：隔开的几段接回一行。
+  // Shaded background blocks interspersed within sentences (EU sample 082): reconnect separated segments into a single line.
   const shaded = joinShadedBlanks(image, withFills.lines, lineHeight);
   const filled = shaded.lines;
   const fillSource = new Map(withFills.source);
   for (const [l, from] of shaded.source) fillSource.set(l, withFills.source.get(from) ?? from);
   const synthetic = new Set(filled.filter((l) => !fillSource.has(l) && !upright.includes(l)));
-  // 识别漏了的列表记号（「•」「-」）补在行的前面（EU 样本 026、027）。
+  // Restore missed list markers ("•", "-") in front of lines (EU samples 026, 027).
   const { lines: kept, source: bulletSource } = withBullets(image, filled);
   const verticals = verticalBoxes(outside.filter(isVertical), cropLineHeight, {
     width: image.width,
@@ -74,7 +77,7 @@ export function prepareTextLines(
   const originalOf = new Map<OcrBox, OcrBox>();
   const leveled = levelLines(kept, lineHeight, image.width / 2);
   leveled.forEach((flat, k) => originalOf.set(flat, kept[k]!));
-  // 原来的识别行（接了填写处的行换回识别出的那一行：量笔画、颜色、下划线，找它在哪张表里）。
+  // Original recognition line (replace lines with attached fill-ins back with the recognized line: measure strokes, color, underlines, and determine which table it belongs to).
   const orig = (l: OcrBox) => {
     const o = originalOf.get(l) ?? l;
     const b = bulletSource.get(o) ?? o;
@@ -84,8 +87,10 @@ export function prepareTextLines(
   for (const table of rejected) {
     const placed = placedIn.get(table) ?? [];
     const cellOf = (l: OcrBox) => table.cells.find((c) => c.box && lineShareIn(l, c.box) >= 0.5);
-    // 上下两格之间没画横线（字之间是白纸）时算同一格：信的外框右边每行一个小刻度，网格一行字切一排，
-    // 去掉网格以后照样一行一段（EU 样本 075）。真画了横线的（议程的格子）仍是各自一条。
+    // Treat adjacent vertical cells without drawn horizontal lines (white space between text) as
+    // the same cell: e.g., small ticks on the right outer border of a letter, where grid lines
+    // slice a row of text, preserving row-by-row paragraphs after grid removal (EU sample 075).
+    // Cells with actual drawn horizontal lines (agenda grid cells) remain separate.
     const same = new Map<TableCell, TableCell>();
     for (const cell of [...table.cells].sort((a, b) => a.row - b.row)) {
       const above = table.cells.find(

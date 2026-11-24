@@ -7,12 +7,14 @@ import { useWorkspaceContext } from '../workspace/context';
 import type { RenderEnv } from './components';
 import { Icon } from './Icon';
 
-/** 最多几个。 */
+/** Maximum count. */
 const MAX = 4;
 
 /**
- * 最近用过的快捷操作（look library，source.recent，D-452）：读已有的运行记录（tool_runs，成功的那些，
- * 按最后一次运行从新到旧），一行小胶囊，点一下打开运行页面。没有用过时整块不显示。只读（底线 15）。
+ * Recently used quick actions (look library, source.recent, D-452): reads existing run logs
+ * (tool_runs, successful ones, ordered from newest to oldest run), displayed as a row of small
+ * capsules, tapping opens run page. Hidden entirely when none have been used. Read-only
+ * (Invariant 15).
  */
 export function RecentActions({ title, env }: { title: string | undefined; env: RenderEnv }) {
   const { repo } = useWorkspaceContext();
@@ -20,7 +22,7 @@ export function RecentActions({ title, env }: { title: string | undefined; env: 
   const [ids, setIds] = useState<string[]>([]);
   const { palette, locale, registry } = env;
 
-  // 回到这一页时重新读一次：刚运行完回来就能看到。
+  // Re-read on returning to this page: visible immediately upon returning after running.
   useFocusEffect(
     useCallback(() => {
       let alive = true;
@@ -85,7 +87,7 @@ export function RecentActions({ title, env }: { title: string | undefined; env: 
 
 const styles = StyleSheet.create({
   block: { gap: 8 },
-  // 标题和小胶囊在方块外面：贴着页面边距（D-454）。
+  // Title and small capsules outside the box: hugging page margins (D-454).
   row: { gap: 8 },
   chip: {
     flexDirection: 'row',

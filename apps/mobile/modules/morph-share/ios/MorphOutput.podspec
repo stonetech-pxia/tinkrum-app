@@ -1,6 +1,7 @@
-# 本地 Expo 模块（D-119）：用 iOS 自带的分享面板和文档选择器一次分享多个文件、存到「文件」里的文件夹。
-# 只依赖 Apple 系统框架，没有第三方代码。
-# pod 名叫 MorphOutput，不叫 MorphShare：iOS 分享扩展的 target 叫 MorphShare（D-114），同名的 Swift 模块会冲突。
+# Local Expo module (D-119): uses native iOS share sheet and document picker to share multiple files
+# at once and save them to folders in the Files app. Relies solely on Apple system frameworks with
+# no third-party code. Named MorphOutput instead of MorphShare because the iOS share extension
+# target is named MorphShare (D-114), and Swift modules with the same name would conflict.
 
 Pod::Spec.new do |s|
   s.name           = 'MorphOutput'

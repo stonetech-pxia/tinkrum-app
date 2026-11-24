@@ -5,8 +5,8 @@ import { IdSchema } from '../schema-primitives';
 import { defineField, fieldBase, type FieldDefinitionOf } from './define';
 
 /**
- * 「上次完成」可以来自同一张表的哪些字段（D-293）：日期、日期时间，或者汇总字段（D-288，用被汇总的那些
- * 记录的全部日子，见 data.ts 的 rollupDays）。
+ * Which fields in the same table can serve as "Last done" (D-293): date, datetime, or rollup
+ * fields (D-288, using all dates of the aggregated records, see data.ts rollupDays).
  */
 export const SCHEDULE_LAST_DONE_TYPES: readonly string[] = ['date', 'datetime', 'rollup'];
 
@@ -15,14 +15,16 @@ const schema = z.strictObject({
   type: z.literal('schedule'),
   default: ScheduleRuleSchema.optional(),
   lastDone: IdSchema.optional(),
-  /** 提前做了算这一次（D-341），待办、家务用；账单不用（提前付了下个月仍要付）。 */
+  /** Doing things early counts as completion for this instance (D-341), used for todos and chores; not used for bills (paying early still requires paying next month). */
   countEarly: z.literal(true).optional(),
 });
 
 /**
- * D-292：日程，每条记录存一份重复规则（用户在表单里设，default 是新记录的规则）。显示成「规则 · 下一次」；
- * 筛选（due、inPeriod、gt / lt）、排序和公式按算出来的下一次（D-294、D-295）。lastDone 是同一张表里
- * 记「上次完成」的日期或日期时间字段（D-293）；没有它就只按规则本身算。
+ * D-292: Schedule, storing a recurrence rule per record (set by the user in the form, default is
+ * the rule for new records). Displayed as "rule · next due"; filtering (due, inPeriod, gt / lt),
+ * sorting, and formulas use the calculated next due date (D-294, D-295). lastDone is the date or
+ * datetime field recording "Last done" in the same table (D-293); without it, calculations are
+ * based solely on the rule itself.
  */
 export const scheduleField: FieldDefinitionOf<'schedule', typeof schema> = defineField({
   type: 'schedule',
@@ -34,7 +36,7 @@ export const scheduleField: FieldDefinitionOf<'schedule', typeof schema> = defin
     return rule ? { value: rule } : { issue: 'invalid' };
   },
   initial: (f) => f.default,
-  // 只有规则；记录上的「· 下一次」由 data.ts 的 formatRef 加上（要整条记录才能算）。
+  // Rules only; the "· next due" on records is appended by data.ts formatRef (requires the full record to calculate).
   format: (_f, v, locale) => scheduleText(v as ScheduleRule, locale),
   formula: 'date',
   filter: { is: () => false, compare: 'date', period: true, schedule: true },

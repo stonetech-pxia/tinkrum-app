@@ -30,7 +30,7 @@ export { NumberSourceSchema, type NumberSource } from './number';
 export { ChartSourceSchema, type ChartSource } from './chart';
 export { SMART_DATE_TYPES } from './form';
 
-/** 全部外观：可以放进分组的，加上分组本身。 */
+/** All appearances: items nestable in groups, plus the group appearance itself. */
 export const COMPONENTS = [...LEAF_COMPONENTS, groupComponent] as const;
 
 export const ComponentSchema = z.discriminatedUnion('look', [
@@ -38,14 +38,16 @@ export const ComponentSchema = z.discriminatedUnion('look', [
   groupComponent.schema,
 ]);
 
-/** 不会和任何外观名相等的标记（运行时是原来的字符串）。 */
+/** A marker symbol guaranteed not to equal any appearance name (represented as the original string at runtime). */
 type UnknownLook = symbol & { readonly unknownLook: never };
 
 /**
- * 这个版本的 App 不认识的块（D-254）：更新的 App 加的外观，或者 v33 迁移过来的不认识的组件
- * （look "$unknown"，raw 是原来的 JSON，M8）。读取已存的配置时原样保留（保存时写回原来的 JSON），
- * 页面上显示「需要更新 App」的占位，只能移动和删除；AI 不能新加、也不能修改它。
- * 运行时 look 是原来的字符串；类型上是一个独有的标记，按外观判断时必须单独处理它（isKnownComponent）。
+ * Blocks unrecognized by this app version (D-254): appearances added by newer apps, or
+ * unrecognized components migrated from v33 (look "$unknown", raw contains original JSON, M8).
+ * Preserved as-is when reading existing configs (written back as original JSON on save), displays
+ * an "App update required" placeholder on screen, movable and deletable only; cannot be added or
+ * modified by the AI. Runtime look is the original string; treated as a unique marker in types
+ * and must be handled separately when checking appearances (isKnownComponent).
  */
 export interface UnknownComponent {
   id: string;
@@ -53,31 +55,31 @@ export interface UnknownComponent {
   hidden?: boolean;
 }
 
-/** v33 不认识的组件迁移成的外观（M8）。 */
+/** Appearance migrated from unrecognized v33 components (M8). */
 export const UNKNOWN_LOOK = '$unknown';
 
 export type LeafComponent = z.infer<typeof LeafComponentSchema>;
 export type InnerGroupComponent = Omit<z.infer<typeof InnerGroupSchema>, 'children'> & {
   children: (LeafComponent | UnknownComponent)[];
 };
-/** 分组里也可能有不认识的块（D-254），还可能有一层分组（Q3）。 */
+/** Groups may also contain unrecognized blocks (D-254) and nested group levels (Q3). */
 export type GroupComponent = Omit<z.infer<typeof groupComponent.schema>, 'children'> & {
   children: (LeafComponent | InnerGroupComponent | UnknownComponent)[];
 };
 export type KnownComponent = LeafComponent | GroupComponent | InnerGroupComponent;
-/** AI 的修改操作和模版能新加的块：只有这个版本认识的，分组里也是（D-254）。 */
+/** Blocks that can be newly added by AI modification operations and templates: only those recognized by this version, including within groups (D-254). */
 export type NewComponent = z.infer<typeof ComponentSchema>;
-/** 页面上的块：认识的，或者更新的 App 加的（D-254）。 */
+/** Blocks on the page: recognized components, or those added by newer apps (D-254). */
 export type Component = KnownComponent | UnknownComponent;
 export type ComponentType = KnownComponent['look'];
 export type ComponentOf<T extends ComponentType> = Extract<KnownComponent, { look: T }>;
-/** v34 的名字：块、外观。 */
+/** v34 nomenclature: block, appearance. */
 export type Block = Component;
 export type KnownBlock = KnownComponent;
 export type Look = ComponentType;
 export type BlockOf<T extends Look> = ComponentOf<T>;
 
-/** 登记表里的一份定义，回调的参数统一成块（按外观取出来以后用）。 */
+/** A definition in the registry, unifying callback parameters as blocks (extracted by appearance for use). */
 export interface ComponentDefinition extends LookMeta {
   look: ComponentType;
   refs?: Readonly<Record<string, ComponentRef | undefined>>;
@@ -90,7 +92,7 @@ export interface ComponentDefinition extends LookMeta {
   schema: z.ZodObject;
 }
 
-/** 可以用图片代替底色的卡片类外观（edit.backdrop，D-258）。 */
+/** Card-type appearance that can use an image instead of a background color (edit.backdrop, D-258). */
 export const BACKDROP_TYPES: readonly ComponentType[] = COMPONENTS.filter(
   (d) => (d.edit as ComponentEdit).backdrop,
 ).map((d) => d.look);
@@ -99,17 +101,17 @@ const BY_LOOK = new Map<string, ComponentDefinition>(
   COMPONENTS.map((d) => [d.look, d as unknown as ComponentDefinition]),
 );
 
-/** 这种外观的定义。 */
+/** Definition of this appearance. */
 export function componentDefinition(look: ComponentType): ComponentDefinition {
   return BY_LOOK.get(look)!;
 }
 
-/** 这个版本认识的块（D-254）。 */
+/** Blocks recognized by this version (D-254). */
 export function isKnownComponent(c: Component): c is KnownComponent {
   return BY_LOOK.has(c.look as unknown as string);
 }
 
-/** 块里引用某一类东西的值（例如 table → 数据表 ID）。不认识的块没有引用。 */
+/** Values in a block that reference a certain kind of thing (e.g. table -> table ID). Unrecognized blocks have no references. */
 export function componentRefs(c: Component, to: ComponentRef['to']): unknown[] {
   if (!isKnownComponent(c)) return [];
   const refs = componentDefinition(c.look).refs ?? {};

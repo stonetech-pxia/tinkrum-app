@@ -2,8 +2,8 @@ import { File, Paths } from 'expo-file-system';
 
 import type { AttemptStore } from './attempts';
 
-// 启动计数文件在 Documents 里、数据库外面。用同步读写（Android 上 File.write 是异步的，
-// 写到一半闪退就没记上）。
+// Boot attempt counter file resides in Documents, outside the database. Uses synchronous read/write
+// (File.write is asynchronous on Android; a crash midway would leave it unrecorded).
 
 const file = () => new File(Paths.document, 'boot-attempts.json');
 

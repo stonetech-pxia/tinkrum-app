@@ -1,10 +1,12 @@
 import AVFoundation
 import ExpoModulesCore
 
-// 文字转语音（D-270）：只用 iOS 自带的 AVSpeechSynthesizer，在本机把文字读成音频文件，不播放。
-// 每段一个 AVSpeechUtterance，write(_:toBufferCallback:) 交回的 PCM 依次写进同一个 WAV（16 位）。
-// 声音用系统里这种语言质量最好的一个（用户在「设置 → 辅助功能 → 朗读内容 → 声音」里下载的增强 / 高级声音优先），
-// 不用 Albert 这类趣味声音和个人声音。文字只交给系统朗读，不写日志。
+// Text-to-speech (D-270): uses only the built-in iOS AVSpeechSynthesizer to read text into an audio
+// file on-device without playing it. Each segment is an AVSpeechUtterance; PCM data returned by
+// write(_:toBufferCallback:) is written sequentially into a single WAV (16-bit). Selects the
+// highest quality system voice for the language (preferring enhanced/premium voices downloaded by
+// the user in Settings → Accessibility → Spoken Content → Voices), avoiding novelty or personal
+// voices like Albert. Text is passed exclusively to the system speech engine and never logged.
 
 private func ttsError(_ code: String, _ reason: String) -> Exception {
   Exception(name: "TTSError", description: reason, code: code)
@@ -14,7 +16,7 @@ private let noVoice = { (voice: String) in ttsError("ERR_TTS_NO_VOICE", "No voic
 private let cancelled = { ttsError("ERR_TTS_CANCELLED", "Cancelled") }
 private let failed = { (detail: String) in ttsError("ERR_TTS_FAILED", detail) }
 
-/** 一段多久没有新的声音就算卡住（系统朗读比实时快很多，正常不会停这么久）。 */
+/** Duration of silence without new audio before considering a synthesis stalled (system speech is much faster than real-time, so it should not normally pause this long). */
 private let stallSeconds: TimeInterval = 30
 
 struct SynthesizeOptions: Record {
@@ -25,7 +27,7 @@ struct SynthesizeOptions: Record {
 }
 
 public class MorphTTSModule: Module {
-  /** 正在进行的朗读，取消用（用 lock 保护）。 */
+  /** Ongoing speech synthesis tasks, used for cancellation (protected by a lock). */
   private var running: [String: TTSJob] = [:]
   private let lock = NSLock()
 
@@ -34,7 +36,7 @@ public class MorphTTSModule: Module {
 
     Events("onProgress")
 
-    // iOS 的声音由系统管理：有就是 installed，没有就是 unsupported（没有「还没下载」这一态可查）。
+    // iOS voices are managed by the system: present means installed, absent means unsupported (there is no downloadable state queryable).
     AsyncFunction("voiceStatus") { (voice: String) -> String in
       Self.pickVoice(voice) == nil ? "unsupported" : "installed"
     }
@@ -51,7 +53,7 @@ public class MorphTTSModule: Module {
     }
   }
 
-  /** 这种语言（BCP 47：zh-CN）质量最好的系统声音。中文不退到别的地区（zh-HK 是粤语）。 */
+  /** Highest quality system voice for the given language (BCP 47: zh-CN). Chinese does not fall back to other regions (e.g., zh-HK is Cantonese). */
   static func pickVoice(_ tag: String) -> AVSpeechSynthesisVoice? {
     let wanted = tag.lowercased().replacingOccurrences(of: "_", with: "-")
     let base = String(wanted.prefix { $0 != "-" })
@@ -71,7 +73,7 @@ public class MorphTTSModule: Module {
     return candidates.max { $0.quality.rawValue < $1.quality.rawValue }
   }
 
-  /** 1 是正常语速：AVSpeechUtterance 的语速不是线性的（默认 0.5，范围 0–1），按两边分别换算。 */
+  /** 1 is normal speed: AVSpeechUtterance speed is non-linear (default 0.5, range 0–1), scaled separately for values below and above normal. */
   static func utteranceRate(_ rate: Double) -> Float {
     let r = Float(min(2, max(0.5, rate)))
     let normal = AVSpeechUtteranceDefaultSpeechRate
@@ -116,7 +118,7 @@ public class MorphTTSModule: Module {
         "channels": result.channels,
       ]
     } catch {
-      // 失败、取消都不留半个文件。
+      // Neither failure nor cancellation leaves partial files behind.
       _ = writer.finish()
       try? FileManager.default.removeItem(at: output)
       if job.isCancelled || error is CancellationError { throw cancelled() }
@@ -133,14 +135,15 @@ public class MorphTTSModule: Module {
 }
 
 /**
- * 一次朗读：每段等系统交回最后一个（空的）缓冲区或 didFinish；取消、出错、卡住时都让等待结束，
- * 所以 synthesize 的 Promise 一定会结束。
+ * A single speech synthesis task: waits for the system to return the final (empty) buffer or
+ * didFinish for each segment; cancellation, errors, and stalls all terminate the wait so the
+ * synthesize Promise always settles.
  */
 private final class TTSJob: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
   private let synthesizer = AVSpeechSynthesizer()
   private let lock = NSLock()
   private var continuation: CheckedContinuation<Void, Error>?
-  /** 正在等的那一段：上一段晚到的 didFinish 不能结束这一段。 */
+  /** Currently awaited segment: a late didFinish from a previous segment must not terminate the current one. */
   private var current: AVSpeechUtterance?
   private var cancelled = false
   private var lastActivity = Date()
@@ -172,7 +175,7 @@ private final class TTSJob: NSObject, AVSpeechSynthesizerDelegate, @unchecked Se
       synthesizer.write(utterance) { [weak self] buffer in
         guard let self else { return }
         guard let pcm = buffer as? AVAudioPCMBuffer else { return }
-        // 最后交回一个空的缓冲区：这一段读完了。
+        // Final callback received an empty buffer: this segment is complete.
         if pcm.frameLength == 0 {
           self.finish(nil, of: utterance)
           return
@@ -210,7 +213,7 @@ private final class TTSJob: NSObject, AVSpeechSynthesizerDelegate, @unchecked Se
     lock.unlock()
   }
 
-  /** 结束这一段的等待（只结束一次，后到的忽略）；of 不是正在等的那一段时什么都不做。 */
+  /** Finishes waiting for this segment (only finishes once, ignoring later calls); does nothing if not the currently awaited segment. */
   private func finish(_ error: Error?, of utterance: AVSpeechUtterance? = nil) {
     lock.lock()
     if let utterance, utterance !== current {
@@ -224,7 +227,7 @@ private final class TTSJob: NSObject, AVSpeechSynthesizerDelegate, @unchecked Se
     if let error { cont?.resume(throwing: error) } else { cont?.resume() }
   }
 
-  /** 卡住检查：每秒看一次，太久没有新的声音就当作失败。 */
+  /** Stall check: inspected every second; failing if no new audio is received for too long. */
   private func watch(_ utterance: AVSpeechUtterance) {
     DispatchQueue.global().asyncAfter(deadline: .now() + 1) { [weak self] in
       guard let self else { return }
@@ -243,7 +246,7 @@ private final class TTSJob: NSObject, AVSpeechSynthesizerDelegate, @unchecked Se
   }
 }
 
-/** 把系统交回的 PCM 写进一个 16 位 WAV；格式变了（极少见）时换成第一段的格式再写。 */
+/** Writes PCM data returned by the system into a 16-bit WAV; if the format changes (very rare), switches to the first segment's format before continuing. */
 private final class WavWriter: @unchecked Sendable {
   private let url: URL
   private var file: AVAudioFile?
@@ -296,7 +299,7 @@ private final class WavWriter: @unchecked Sendable {
     return out
   }
 
-  /** 关上文件；一点声音都没写时返回 nil。 */
+  /** Closes the file; returns nil if no audio was written. */
   func finish() -> (durationMs: Double, sampleRate: Double, channels: Int)? {
     guard let file else { return nil }
     let format = file.fileFormat
@@ -305,7 +308,7 @@ private final class WavWriter: @unchecked Sendable {
       sampleRate: format.sampleRate,
       channels: Int(format.channelCount)
     )
-    // AVAudioFile 在释放时写好 WAV 头、关上文件。
+    // AVAudioFile writes the WAV header and closes the file upon deallocation.
     self.file = nil
     converter = nil
     return frames > 0 ? result : nil

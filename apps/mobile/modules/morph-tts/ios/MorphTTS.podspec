@@ -1,5 +1,5 @@
-# 本地 Expo 模块（D-270）：用 iOS 自带的 AVSpeechSynthesizer 在本机把文字读成音频文件。
-# 只依赖 Apple 系统框架，没有第三方代码。
+# Local Expo module (D-270): reads text into an audio file on-device using iOS's built-in
+# AVSpeechSynthesizer. Relies entirely on Apple system frameworks with no third-party code.
 
 Pod::Spec.new do |s|
   s.name           = 'MorphTTS'

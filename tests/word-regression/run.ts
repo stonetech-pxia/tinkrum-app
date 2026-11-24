@@ -1,6 +1,7 @@
-// PDF 转 Word 的防倒退测试：pdfs/ 里每一页是一个用例（cases.ts），用 App 里真正的转换动作
-// OCR_IMPLS['ocr.toWord'] 转，再查转出来的 DocDoc 和 docx。
-// 用法见 README.md：npx tsx tests/word-regression/run.ts [--only a,b] [--record] [--render]
+// PDF-to-Word regression tests: each page in pdfs/ represents a test case (cases.ts), converted
+// using the actual app conversion action OCR_IMPLS['ocr.toWord'], and verifying the resulting
+// DocDoc and docx. Usage instructions are in README.md: npx tsx tests/word-regression/run.ts
+// [--only a,b] [--record] [--render]
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -49,7 +50,7 @@ try {
     const manifest: { page: number; id: string; sha256: string }[] = JSON.parse(
       readFileSync(`${HERE}/pdfs/${suite}.json`, 'utf8'),
     );
-    // 一份 PDF 只渲染一次。
+    // Renders each PDF only once.
     const pages = await renderPdf(client, pdfPath);
     for (const c of selected.filter((x) => x.suite === suite)) {
       const entry = manifest.find((m) => m.id === c.id);

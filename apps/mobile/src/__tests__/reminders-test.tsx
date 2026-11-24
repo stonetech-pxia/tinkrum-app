@@ -21,7 +21,7 @@ import { FakeNotifications } from '../test-utils/fake-notifications';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
-// 提醒（D-251）：本地通知只按配置和本机的记录排；第一次真有提醒时才问权限；点提醒绝不运行快捷操作。
+// Reminders (D-251): Local notifications are scheduled solely based on config and local records; permission is requested only when an actual reminder is due; tapping a reminder never runs a quick action.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -137,7 +137,7 @@ describe('syncing reminders', () => {
   });
 
   it('two syncs at the same time never mix: the later one wins and nothing old is left', async () => {
-    // 像系统那样一条一条取消、一条一条排（每一步都会让出），两次同时开始时会交错。
+    // Cancelling and scheduling one by one like the system (yielding at each step) can interleave when two start simultaneously.
     class SlowNotifications extends FakeNotifications {
       pending = new Set<string>();
       override async replaceAll(planned: readonly PlannedNotification[]) {

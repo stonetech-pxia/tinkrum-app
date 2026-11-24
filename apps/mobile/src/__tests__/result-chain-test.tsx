@@ -93,7 +93,7 @@ it('continues without saving or picking again; two transfers offer AI with both 
     const incoming = useIncoming.getState().share!;
     expect(incoming.source).toBe('result');
     expect(app.files.disk.has(incoming.files[0]!.uri)).toBe(true);
-    // 上一页的运行目录已经删除，只有独立交接副本留下。
+    // The previous page's run directory has been deleted, leaving only independent handoff copies.
     expect(
       [...app.files.disk.keys()]
         .filter((k) => k.startsWith('runs/'))
@@ -135,7 +135,7 @@ it('combining with a built-in quick action saves it first so AI can see both (D-
     await screen.findByTestId('run-result', {}, { timeout: 3000 });
     await fireEvent.press(screen.getByTestId('result-continue'));
     await screen.findByTestId('share-screen');
-    // 面板里列出所有收这份文件的快捷操作（D-457），不再有「查看全部」。
+    // List all quick actions receiving this file in the panel (D-457), removing "View All".
     await fireEvent.press(await screen.findByTestId('preview-more'));
     await fireEvent.press(await screen.findByTestId('share-run-email-photos'));
     await fireEvent.press(await screen.findByTestId('prompt-ok', {}, { timeout: 3000 }));

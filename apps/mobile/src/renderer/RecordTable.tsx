@@ -5,8 +5,10 @@ import type { RenderEnv } from './components';
 import { ColorDot, type RecordMarks } from './record-marks';
 import { Card } from './ui';
 
-// 表格外观（D-539）：表头是字段名，每条一行；第一列（title）固定在左边，其余的列左右滑动。
-// 格子只读，点一行和列表一样打开这一条（编辑在记录页）。看什么都不写（底线 15）。
+// Table appearance (D-539): table header shows field names, one row per entry; the first column
+// (title) is fixed on the left, while remaining columns scroll horizontally. Cells are read-only;
+// tapping a row opens the entry just like the list view (editing is done on the entry page).
+// Displays nothing when viewing (invariant 15).
 
 const ROW_HEIGHT = 44;
 const TITLE_WIDTH = 140;
@@ -36,7 +38,7 @@ export function RecordTable({
   titleOf: (r: DataRecord) => string;
   cellOf: (r: DataRecord, field: string) => string;
   marks: RecordMarks;
-  /** 警示色画在哪一列（右侧字段在列里时）；null 时画在标题上（D-541）。 */
+  /** Determines which column displays the warning color (when right-side fields are displayed within columns); defaults to the title column when null (D-541). */
   warnColumn: string | null;
   open: ((r: DataRecord) => void) | undefined;
 }) {
@@ -128,7 +130,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   fixed: { borderRightWidth: StyleSheet.hairlineWidth },
   cell: { height: ROW_HEIGHT, justifyContent: 'center', paddingHorizontal: 12 },
-  // 右边每一行和左边那一格一样高（都含上边线）：不写的话每行多出一条线，行多了左右对不齐。
+  // Makes every row on the right match the height of the left grid cell (including the top border): without this, each extra row adds an extra line, causing alignment issues between left and right columns when there are many rows.
   tall: { height: ROW_HEIGHT },
   body: { justifyContent: 'center', paddingHorizontal: 12 },
 });

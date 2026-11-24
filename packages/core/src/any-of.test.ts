@@ -4,7 +4,7 @@ import { conditionProblems } from './conditions';
 import { filterRecords, type DataRecord } from './data';
 import { ConditionSchema, type Collection } from './schema';
 
-// D-538：一个单选字段「是其中一个」（is 给 2–8 个选项）。不跨字段，不嵌套。
+// D-538: A single-select field "is one of" (is with 2–8 options). Does not cross fields, non-nested.
 
 const tasks: Collection = {
   id: 'tasks',
@@ -53,7 +53,7 @@ describe('is any of on a choice field (D-538)', () => {
     expect(p('status', 'isNot', ['todo', 'doing'])).not.toEqual([]);
     expect(p('title', 'is', ['a', 'b'])).not.toEqual([]);
     expect(p('title', 'contains', ['a', 'b'])).not.toEqual([]);
-    // 标签名是记录内容，AI 不能写（只能 isEmpty / isNotEmpty）。
+    // Tag names are record content and cannot be written by the AI (only isEmpty / isNotEmpty allowed).
     expect(p('tags', 'is', ['a', 'b'])).not.toEqual([]);
   });
 

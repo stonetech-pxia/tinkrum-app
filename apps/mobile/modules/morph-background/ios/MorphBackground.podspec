@@ -1,5 +1,6 @@
-# 本地 Expo 模块（D-160–D-163）：长任务切到后台也继续。iOS 26 的 BGContinuedProcessingTask（默认关着）。
-# 只依赖 Apple 系统框架（BackgroundTasks），没有第三方代码。
+# Local Expo module (D-160–D-163): long-running tasks continue even when switched to the background.
+# iOS 26 BGContinuedProcessingTask (disabled by default). Depends only on Apple system frameworks
+# (BackgroundTasks) with no third-party code.
 
 Pod::Spec.new do |s|
   s.name           = 'MorphBackground'

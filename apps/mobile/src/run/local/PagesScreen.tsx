@@ -6,8 +6,9 @@ import { t } from '../../i18n';
 import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 
-// 整理 PDF 页面（TOOLS_DESIGN §4 pages）：去掉不要的页、调整顺序、旋转。
-// 没有 PDF 预览包时按页码显示（方块的形状反映横竖），有预览包时显示缩略图。
+// Organize PDF pages (TOOLS_DESIGN §4 pages): remove unwanted pages, adjust order, rotate. When the
+// PDF preview pack is missing, displays by page number (block shape reflects portrait/landscape);
+// when preview pack is present, displays thumbnails.
 
 type Rotation = 0 | 90 | 180 | 270;
 
@@ -73,7 +74,7 @@ export function PagesScreen({
       <ScrollView contentContainerStyle={styles.list}>
         {rows.map((row, pos) => {
           const page = input.pages[row.index]!;
-          // pageInfo 的宽高已经是用户看到的方向；再转 90° 时横竖互换。
+          // pageInfo width and height already reflect the user-facing orientation; rotating another 90° swaps width and height.
           const landscape =
             row.rotate % 180 === 90 ? page.height > page.width : page.width > page.height;
           const thumb = input.thumbnails?.[row.index];

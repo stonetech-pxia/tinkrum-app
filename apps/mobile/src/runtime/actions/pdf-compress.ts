@@ -12,29 +12,32 @@ import { formatBytes } from './image';
 import { MB, fileItems, freshName, readItem, type RunServices } from './helpers';
 import { guard, renderPages, writePdf } from './pdf';
 
-// 压缩 PDF（D-145）：先只重新压缩里面的图片（文字、链接、表格都保留）；压不到目标时按 whenTooBig：
-// 问用户（「转成图片 / 就用现在的」）、把每页转成图片（要用 PDF 预览下载内容），或保留文字。
-// 图片的缩小和编码用系统编码器（expo-image-manipulator），所有图片共用一个质量和缩放（D-073）。
+// Compress PDF (D-145): Initially recompress internal images only (preserving text, links, and
+// tables); when target size is not met, follow whenTooBig: ask the user ("Convert to images / Use
+// current"), render each page as an image (requires PDF preview to download content), or preserve
+// text. Image downscaling and encoding use the system encoder (expo-image-manipulator), sharing a
+// single quality and scale across all images (D-073).
 
 type Impl = ActionImpl<RunServices>;
 type Ctx = Parameters<Impl>[2];
 
-/** 图片的长边先限制在这里：手机拍的扫描件常有 4000 像素，屏幕上看和打印都用不着。 */
+/** Initial limit for the long side of images: phone-captured scans are often 4000 pixels, which is unnecessary for screen viewing or printing. */
 const MAX_PICTURE_SIDE = 2400;
-/** 转成图片时每页渲染的长边。 */
+/** Long side of each rendered page when converting to images. */
 const PAGE_SIDE = 2000;
 const MAX_QUALITY = 0.8;
 /**
- * 保留文字时图片最多缩到这么小（相对长边 2400，约 960 像素，A4 上约 115 dpi，字还看得清）；
- * 再小就不如停下来问用户要不要转成图片。
+ * Maximum downscaling factor for images when preserving text (relative to 2400 long side, approx
+ * 960 pixels, approx 115 dpi on A4, text still readable); smaller than this stops to ask the user
+ * whether to convert to images.
  */
 const MIN_PICTURE_SCALE = 0.4;
-/** 转成图片时每页最多缩到这么小（约 600 像素）。 */
+/** Maximum downscaling factor per page when converting to images (approx 600 pixels). */
 const MIN_PAGE_SCALE = 0.3;
 
 const fileName = (item: RunItem) => `${item.name}.${item.ext}`;
 
-/** 压不到目标时问的一句（文字写在这里，不是 AI 生成的）。 */
+/** Prompt string used when target size cannot be reached (text is written here, not AI-generated). */
 function tooBigQuestion(
   locale: import('@morph/core').Locale,
   name: string,
@@ -48,7 +51,7 @@ function tooBigQuestion(
   };
 }
 
-/** 保留文字，只压图片：返回压好的 PDF（可能还是比目标大）。 */
+/** Preserve text and compress images only: returns the compressed PDF (which may still exceed the target). */
 async function recompressPictures(
   ctx: Ctx,
   item: RunItem,
@@ -59,7 +62,7 @@ async function recompressPictures(
   const compressor = await guard(fileName(item), () => openForCompression(bytes, fileName(item)));
   if (compressor.pictures.length === 0)
     return guard(fileName(item), () => compressor.build(new Map()));
-  // 原图写成临时文件，交给系统编码器。
+  // Original images written as temporary files and passed to the system encoder.
   const sources: { id: number; uri: string; width: number; height: number; stored: number }[] = [];
   for (const p of compressor.pictures) {
     ctx.throwIfCancelled();
@@ -106,7 +109,7 @@ async function recompressPictures(
             freshName(`${item.name}-${s.id}`, 'jpg'),
           );
         } catch {
-          // 系统解不开的图片（少见的颜色格式）原样保留。
+          // Images that the system cannot decode (uncommon color formats) are preserved as-is.
           total += s.stored;
           continue;
         }
@@ -124,11 +127,11 @@ async function recompressPictures(
       return total;
     },
   });
-  // 搜索的最后一次编码就是选中的参数（size-search 保证）。
+  // The final encoding search uses the selected parameters (guaranteed by size-search).
   return guard(fileName(item), () => compressor.build(chosen));
 }
 
-/** 每页渲染成图片，按原来的纸张大小重新排成 PDF，压到目标以内。 */
+/** Render each page as an image, re-layout as PDF according to the original paper size, compressed within the target limit. */
 async function picturePages(
   ctx: Ctx,
   item: RunItem,
@@ -203,7 +206,7 @@ export const PDF_COMPRESS_IMPLS: Record<string, Impl> = {
     for (const [i, item] of items.entries()) {
       ctx.throwIfCancelled();
       ctx.progress(i, items.length);
-      // 本来就够小：原样交给下一步。
+      // Already small enough: pass as-is to the next step.
       if (item.size <= target) {
         out.push(item);
         continue;

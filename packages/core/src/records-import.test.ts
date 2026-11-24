@@ -19,8 +19,10 @@ import {
 import { t } from './messages';
 import type { Collection, Field } from './schema';
 
-// 表格文件的行导进已有的表（D-574）：读 CSV、按名字对列、宽容地读每一格再交给字段自己的 write、汇总导不进去的行。
-// xlsx 的读取在 tool-office（readXlsxRows），整条路在 mobile 的 import-records-test.tsx。
+// Import spreadsheet rows into an existing table (D-574): read CSV, match columns by name,
+// leniently read each cell before passing to the field's own write method, aggregate unimportable
+// rows. XLSX reading is handled in tool-office (readXlsxRows), and the full pipeline is in mobile's
+// import-records-test.tsx.
 
 const orders: Collection = {
   id: 'orders',
@@ -66,7 +68,7 @@ describe('reading the text of a CSV', () => {
   });
 
   it('another encoding is refused instead of guessed; a zip or binary file is not a spreadsheet', () => {
-    // Latin-1 的 é（0xE9）不是 UTF-8。
+    // Latin-1 é (0xE9) is not UTF-8.
     expect(decodeSheetText(new Uint8Array([0x63, 0x61, 0x66, 0xe9]))).toEqual({
       ok: false,
       error: 'encoding',
@@ -155,7 +157,7 @@ describe('reading a cell for a field', () => {
     expect(readCellFor(on, { text: '', number: 46296, date: true }, 'dmy')).toEqual({
       value: '2026-10-01',
     });
-    // 数字不是日期格式的不当日期。
+    // Numbers not in date format are not treated as dates.
     expect(readCellFor(on, { text: '46296', number: 46296 }, 'dmy')).toEqual({ invalid: true });
     expect(readCellFor(on, { text: '2026-10-01' }, 'mdy')).toEqual({ value: '2026-10-01' });
     expect(readCellFor(on, { text: '2026年10月1日' }, 'dmy')).toEqual({ value: '2026-10-01' });

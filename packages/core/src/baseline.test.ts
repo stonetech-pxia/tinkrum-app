@@ -18,16 +18,17 @@ import { describeChange, describeRestore } from './describe';
 import type { Op } from './ops-schema';
 import { apply, fromV33, registry, snapshotLines, v33Fixture, workspace } from './test-helpers';
 
-// 组件登记表重构的基线（2026-10-27）：配置的 JSON Schema 和四个页面模版生成的 ops。
-// 重构只换写法，这些输出必须逐字不变；真要改结构时，先想清楚再更新快照。
-// 架构清理（2026-10-27）：Schema 只快照结构摘要（outline：路径、类型、可选值、范围、必填），
-// 模版的 ops 一项一行（snapshotLines）。
+// Baseline for component registry refactoring (2026-10-27): JSON Schema of config and ops generated
+// from four page templates. Refactoring only changes syntax; these outputs must remain verbatim.
+// When changing structure intentionally, update snapshots deliberately. Architecture cleanup
+// (2026-10-27): Schema snapshots only structural outline (outline: paths, types, optional values,
+// ranges, required), template ops one item per line (snapshotLines).
 
 const LOCALES: Locale[] = ['en', 'zh', 'fr'];
-// 导航目标、提醒目标是 z.custom，JSON Schema 里写不出来，记成 {}。
+// Navigation and reminder targets use `z.custom`, which cannot be expressed in JSON Schema and is recorded as `{}`.
 const JSON_SCHEMA = { unrepresentable: 'any' } as const;
 
-/** 导航栏还有空位的配置：模版页面放进导航栏（另一条分支是在首页加快捷入口）。 */
+/** Config where navigation bar still has space: template pages placed in navigation bar (alternative branch is adding quick triggers on the home screen). */
 function roomyNav(locale: Locale): WorkspaceConfig {
   return apply(
     workspace(locale),
@@ -61,8 +62,9 @@ type Schema = {
 };
 
 /**
- * JSON Schema 的结构摘要：一个属性一行（路径、类型、可选值、范围、是否必填）。
- * 组件在配置里出现的地方写成 <Component>，组件本身单独列一份。
+ * Structural summary of JSON Schema: one property per line (path, type, optional values, range,
+ * required). Component occurrences in config written as `<Component>`, with components themselves
+ * listed separately.
  */
 function outline(schema: Schema, component?: string): string {
   const lines: string[] = [];
@@ -83,7 +85,7 @@ function outline(schema: Schema, component?: string): string {
       s.default !== undefined ? `default ${JSON.stringify(s.default)}` : '',
       s.additionalProperties && typeof s.additionalProperties === 'object' ? 'record' : '',
     ].filter(Boolean);
-  /** 已经列过的子结构：再出现时写「= 第一次出现的路径」（例如分组里的组件）。 */
+  /** Already listed substructures: subsequent occurrences written as `= first occurrence path` (e.g., components inside groups). */
   const seen = new Map<string, string>();
   const walk = (s: Schema, path: string, required: boolean) => {
     const { $schema: _, ...rest } = s as Schema & { $schema?: string };
@@ -139,7 +141,7 @@ describe('baseline', () => {
           ['default', workspace(locale)],
           ['roomyNav', roomyNav(locale)],
         ] as const) {
-          // 已有同名的表和页面：再建一次要换成不重复的 ID。
+          // Tables and pages with existing duplicate names: rebuilding requires assigning non-conflicting IDs.
           const taken = apply(config, templateOps(template, config, locale), locale);
           const tableOnly = apply(config, [templateCollectionOp(template, config, locale)], locale);
           results[name] = {
@@ -160,9 +162,12 @@ describe('baseline', () => {
   }
 });
 
-// 修改说明（describe.ts）：每个 v34 操作一句话。v34 迁移时逐条和 v33 代码（main 415a340）对同一个修改
-// （v33 的操作、v33 的配置）的说明比过，三种语言 129 句逐字一样（2026-10-30）；改文字时想清楚再更新快照。
-// 名字是原来的 v33 操作。配置是「出国办证」样板（fixtures/v33/sample-visa-docs-zh.json 迁移来的）。
+// Change descriptions (describe.ts): one sentence per v34 operation. During v34 migration, compared
+// item-by-item against v33 code (main 415a340) descriptions for identical modifications (v33
+// operations, v33 config); all 129 sentences match verbatim across three languages (2026-10-30);
+// think carefully before updating snapshots when modifying text. Names correspond to original v33
+// operations. Config comes from the "visa application" sample (migrated from
+// `fixtures/v33/sample-visa-docs-zh.json`).
 const DESCRIBED: [string, Op[]][] = [
   [
     'addCollection',
@@ -404,7 +409,7 @@ const DESCRIBED: [string, Op[]][] = [
     ],
   ],
   ['removeWorkflowStep', [{ op: 'removeTool', tool: 'scan-paper-log', step: 'log' }]],
-  // v34 才有的写法（没有 v33 对应，新文案 v34desc*）。
+  // Syntax exclusive to v34 (no v33 counterpart, new copy `v34desc*`).
   [
     'v34 desk',
     [

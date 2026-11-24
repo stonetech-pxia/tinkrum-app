@@ -1,9 +1,11 @@
 import ExpoModulesCore
 import Foundation
 
-// 整体导出和恢复的 iOS 实现（D-600）：把目录和文件写成一个标准 zip，把 zip 安全地解到一个目录。
-// 读写都是流式的（ZipCodec.swift），不把文件读进内存；一次只做一件事；cancel() 让正在做的事在下一块数据处停下，
-// 删掉没写完的文件后以 ERR_ARCHIVE_CANCELLED 结束。只用本机文件，不联网。文件名和内容不写日志。
+// iOS implementation of full export and restore (D-600): write directories and files into a
+// standard ZIP, and safely extract a ZIP to a directory. Both read and write are streaming
+// (ZipCodec.swift) without loading files into memory; one task at a time; cancel() stops ongoing
+// work at the next data chunk, deletes unfinished files, and terminates with ERR_ARCHIVE_CANCELLED.
+// Local files only, no networking. File names and contents are not logged.
 
 final class ArchiveException: Exception, @unchecked Sendable {
   private let errorCode: String
@@ -45,7 +47,7 @@ public class MorphArchiveModule: Module {
       self.lock.unlock()
     }
 
-    // 这些目录里有多少个文件、一共多少字节（不跟随符号链接）。
+    // Number of files and total bytes in these directories (does not follow symlinks).
     AsyncFunction("scanTree") { (uris: [URL], promise: Promise) in
       self.perform(promise) {
         var files = 0
@@ -61,7 +63,7 @@ public class MorphArchiveModule: Module {
       }
     }
 
-    // sources：{ dir, prefix } 目录里的全部文件放在 prefix/ 下；{ file, name } 一个文件；{ text, name } 一段文字。
+    // sources: all files in directory { dir, prefix } placed under prefix/; single file { file, name }; text block { text, name }.
     AsyncFunction("createArchive") { (dest: URL, sources: [[String: Any]], promise: Promise) in
       self.perform(promise) {
         var items: [Item] = []
@@ -85,8 +87,9 @@ public class MorphArchiveModule: Module {
       }
     }
 
-    // 读压缩包的目录并逐条检查（不解压）：名字、符号链接、加密、压缩方式、大小。
-    // 返回每个文件的名字和大小，以及 tinkrum-backup.json 的内容（没有时为 null）。
+    // Reads archive directory and inspects entries sequentially (without extraction): name,
+    // symlink, encryption, compression method, size. Returns name and size for each file, along
+    // with tinkrum-backup.json content (null if absent).
     AsyncFunction("inspectArchive") { (src: URL, promise: Promise) in
       self.perform(promise) {
         try Self.withReading(src) { url -> [String: Any] in
@@ -111,7 +114,7 @@ public class MorphArchiveModule: Module {
       }
     }
 
-    // 把压缩包解到 dest（必须还不存在）。出错或取消时 dest 整个删掉。
+    // Extracts archive to dest (which must not yet exist). On error or cancellation, dest is completely deleted.
     AsyncFunction("extractArchive") { (src: URL, dest: URL, promise: Promise) in
       self.perform(promise) {
         let fm = FileManager.default
@@ -130,7 +133,7 @@ public class MorphArchiveModule: Module {
             for entry in reader.entries {
               var target = dest
               for part in entry.name.split(separator: "/") { target = target.appendingPathComponent(String(part)) }
-              // 解出来的位置必须在 dest 里面（名字已经检查过，这里再挡一次）。
+              // The extracted path must reside inside dest (names already checked, blocked here as a secondary safeguard).
               guard target.standardizedFileURL.path.hasPrefix(base) else { throw ZipFail.unsafe("path") }
               try reader.extract(
                 entry, to: target, shouldCancel: { self.isCancelled },
@@ -151,7 +154,7 @@ public class MorphArchiveModule: Module {
       }
     }
 
-    // 改名移动（同一个卷里，瞬间完成，不复制）：to 必须还不存在。恢复时换数据目录用。
+    // Rename/move (in the same volume, instantaneous, no copy): 'to' must not exist yet. Used when changing data directory during restore.
     AsyncFunction("moveTree") { (from: URL, to: URL, promise: Promise) in
       DispatchQueue.global(qos: .utility).async {
         do {
@@ -177,7 +180,7 @@ public class MorphArchiveModule: Module {
     return cancelRequested
   }
 
-  /// 一次只做一件事；放到后台线程；错误换成带代码的异常。
+  /// Do only one thing at a time; run on a background thread; replace errors with code-bearing exceptions.
   private func perform(_ promise: Promise, _ body: @escaping () throws -> Any?) {
     lock.lock()
     if running {
@@ -216,7 +219,7 @@ public class MorphArchiveModule: Module {
     }
   }
 
-  /// iCloud 云盘里还没下载的文件要经过文件协调才会下载；选择器给的原件地址要先打开安全范围。
+  /// Files in iCloud Drive that have not been downloaded yet require file coordination before downloading; original item URLs obtained from pickers must first be accessed within a security-scoped resource.
   private static func withReading<T>(_ url: URL, _ body: (URL) throws -> T) throws -> T {
     let scoped = url.startAccessingSecurityScopedResource()
     defer { if scoped { url.stopAccessingSecurityScopedResource() } }
@@ -230,7 +233,7 @@ public class MorphArchiveModule: Module {
     return try result.get()
   }
 
-  /// 目录里的全部普通文件（含 . 开头的），按名字排序；符号链接和别的特殊文件不要。
+  /// All regular files in the directory (including those starting with .), sorted by name; ignore symbolic links and other special files.
   private static func walk(_ dir: URL, prefix: String) throws -> [Item] {
     var items: [Item] = []
     let keys: Set<URLResourceKey> = [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]

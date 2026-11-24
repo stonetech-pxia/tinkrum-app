@@ -10,15 +10,17 @@ import {
 } from '@morph/planner';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
-// AI 设置（设备级，不属于工作空间配置，不进入版本历史）。
-// 用户自带的 API key 存在系统安全存储（iOS 钥匙串 / Android Keystore），只在本机使用。
-// 自带 key 有两种（D-241）：Anthropic，或 OpenAI 兼容接口（用户填 Base URL 和模型名）。
-// 两种的 key 分开存：Anthropic 的 key 只发给 api.anthropic.com，不会因为切换而发到用户填的地址。
+// AI settings (device-level, not part of workspace config, excluded from version history).
+// User-provided API keys are stored in secure storage (iOS Keychain / Android Keystore) and used
+// only locally. Two types of custom keys are supported (D-241): Anthropic, or OpenAI-compatible
+// interfaces (user provides Base URL and model name). The keys for both are stored separately:
+// Anthropic's key is sent exclusively to api.anthropic.com and will not be sent to user-provided
+// custom endpoints due to switching.
 
 export type AIMode = 'mock' | 'server' | 'byok';
 export type ByokProvider = 'anthropic' | 'openai';
 
-/** 安全存储接口：App 中由 expo-secure-store 实现，测试中用内存实现。 */
+/** Secure storage interface: implemented via expo-secure-store in the App, and in-memory in tests. */
 export interface SecretStore {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
@@ -38,7 +40,7 @@ const KEYS = {
   needsButton: 'morph.ai.needsButton',
 };
 
-/** 用户主动发来的一条需求（D-189）：只有这句话和没有身份信息的元数据。 */
+/** A requirement submitted proactively by a user (D-189): contains only this text and metadata stripped of identity info. */
 export interface Need {
   text: string;
   locale: 'en' | 'zh' | 'fr';
@@ -46,7 +48,7 @@ export interface Need {
   ai: AIMode;
 }
 
-/** 把一条需求发给 Morph 的服务器；成功返回 true。 */
+/** Send a requirement to Morph's server; returns true on success. */
 export type NeedSender = (need: Need) => Promise<boolean>;
 
 export type ConnectionResult =
@@ -61,44 +63,44 @@ export type EndpointResult =
 export interface AISettingsState {
   loaded: boolean;
   mode: AIMode;
-  /** Anthropic 时用的 Claude 模型。 */
+  /** Claude model used when using Anthropic. */
   model: string;
   provider: ByokProvider;
-  /** OpenAI 兼容接口的地址和模型名；没填时为空字符串。 */
+  /** Base URL and model name for OpenAI-compatible interfaces; empty string when not filled. */
   baseUrl: string;
   customModel: string;
-  /** 当前 provider 已保存的 key 的末四位，用于显示；没有 key 时为 null。 */
+  /** Last four characters of the saved key for the current provider, for display purposes; null when no key exists. */
   keyHint: string | null;
-  /** 是否配置了 Morph 服务器地址。 */
+  /** Whether a Morph server endpoint is configured. */
   serverAvailable: boolean;
-  /** AI 做不到时显示「把这个需求告诉我们」（D-189，默认显示；点了才发送）。 */
+  /** Display "Send this feedback to us" when AI cannot handle it (D-189, shown by default; sent only upon tapping). */
   needsButton: boolean;
-  /** 能不能发需求（配置了服务器地址）。 */
+  /** Whether requirements can be sent (server URL is configured). */
   canSendNeeds: boolean;
 
   load(): Promise<void>;
   setMode(mode: AIMode): Promise<void>;
   setModel(model: string): Promise<void>;
   setProvider(provider: ByokProvider): Promise<void>;
-  /** 保存 OpenAI 兼容接口的地址和模型名；地址换了就删掉旧 key，免得把它发到新地址。 */
+  /** Save the endpoint URL and model name for OpenAI-compatible interfaces; delete the old key if the URL changes to avoid sending it to the new address. */
   saveEndpoint(baseUrl: string, model: string): Promise<EndpointResult>;
   setNeedsButton(on: boolean): Promise<void>;
   sendNeed(need: Omit<Need, 'ai'>): Promise<boolean>;
-  /** 保存当前 provider 的 key。 */
+  /** Save the key for the current provider. */
   saveKey(key: string): Promise<boolean>;
   clearKey(): Promise<void>;
-  /** 当前 provider 的 key。 */
+  /** Key for the current provider. */
   getKey(): Promise<string | null>;
-  /** 向已保存的地址要模型列表（只发 key，不带任何数据）；只有 OpenAI 兼容接口。 */
+  /** Request model list from the saved endpoint (sends only the key, no data); applicable only to OpenAI-compatible interfaces. */
   listModels(): Promise<ModelListResult>;
   testConnection(): Promise<ConnectionResult>;
 }
 
 export type AISettingsStore = StoreApi<AISettingsState>;
 
-/** 粗略检查格式，避免把明显不是 key 的内容存进去。真正是否可用由“测试连接”判断。 */
+/** Rough format check to avoid storing obvious non-keys. Actual usability is determined by 'test connection'. */
 export const looksLikeApiKey = (key: string) => /^sk-ant-[A-Za-z0-9_-]{20,}$/.test(key);
-/** 各家 key 格式不同，只要求没有空白、不太短。 */
+/** Key formats vary by provider; only requires no whitespace and not too short. */
 export const looksLikeOtherApiKey = (key: string) => /^[\x21-\x7e]{8,}$/.test(key);
 
 const keySlot = (provider: ByokProvider) =>
@@ -242,7 +244,7 @@ export function createAISettingsStore(deps: {
       };
       try {
         if (provider === 'openai') {
-          // 本地模型可以不填 key。
+          // Local models can leave the API key empty.
           if (!baseUrl || !customModel) return { ok: false, kind: 'no_endpoint' };
           await checkOpenAICompatible(customModel, { baseUrl, apiKey, ...transport });
           return { ok: true };

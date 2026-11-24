@@ -15,7 +15,7 @@ import { findBarcodes, findTextTables } from './text-table';
 import { type OcrBox } from './types';
 import { findPageGutter, sideOfGutter } from './word-gutter';
 
-/** 补无框表和条形码，必要时回到未修复的整页。 */
+/** Reconstruct borderless tables and barcodes, falling back to the unpatched full page when necessary. */
 export function buildTextTables(
   state: Pick<TextLinesState, 'leveled' | 'orig' | 'kept'> &
     Pick<RuledTablesState, 'ruled' | 'rejected' | 'tables' | 'inBox'> &
@@ -50,15 +50,19 @@ export function buildTextTables(
     inBox,
   } = state;
 
-  // 没有线的表（D-471）：几排按三列以上对齐的，排成没有边框的表，不接成一句话。
-  // 模型只提供范围，不能凭模型直接造表。范围内仍要有三列、多排同时对齐；
-  // 已经被带线表接管的范围不重建，整页其余的字沿用原来的严格规则。
+  // Borderless tables (D-471): rows aligned across three or more columns are formatted as
+  // borderless tables rather than joined into a single sentence. The model only provides the
+  // bounding region and cannot construct tables directly. The region must contain at least three
+  // columns and multiple rows aligned simultaneously; regions already claimed by bordered tables
+  // are not rebuilt, and remaining text on the page follows original strict rules.
   const boundedLines = new Set<OcrBox>();
-  // 整页左右两栏、两栏的行一排一排对齐（EU 样本 044）：先找中缝，没有线的表只在每一栏里找
-  // （不然两栏同一高度的标签对齐成一张横跨两栏的表）。后面有了图片区域再核对一次。
+  // Find left and right page gutters with row-by-row alignment (EU sample 044): first locate the
+  // gutter; for borderless tables, search only within each column (otherwise, labels at the same
+  // height across two columns might align into a single table spanning both columns). Re-verify
+  // once image regions are available later.
   const early = findPageGutter(
     leveled,
-    // 模型的图片区域还没清理（整页的小表单常被框成一张大图），不算；后面用清理过的再核对。
+    // Model image regions that have not been cleaned up yet (small page forms are often boxed into a large image) are excluded; re-verified later using cleaned regions.
     [...ruled.map((t) => t.box), ...figures.map((f) => f.box)],
     lineHeight,
     image,
@@ -97,8 +101,8 @@ export function buildTextTables(
       box: t.box,
     });
   }
-  // 条形码（D-471）：剪成图片，里面认出来的零星的字不要。
-  // 带线的表里一段没字的地方（几条平行的列线）不是条形码（D-501）。
+  // Barcodes (D-471): cropped as images; ignore sporadic text recognized within them. Gaps without
+  // text inside bordered tables (several parallel column lines) are not barcodes (D-501).
   const oldBarcodes = findBarcodes(working, kept, lineHeight);
   const barcodes = (
     repairBarcodes && !oldBarcodes.length
@@ -107,7 +111,7 @@ export function buildTextTables(
   ).filter(
     (b) =>
       !tables.some((t) => !t.borderless && inBox(b, t.box)) &&
-      // 横跨并排的几张表（中间隔着白缝，EU 样本 090）的一条：大半在表里，也不是条形码。
+      // One of several side-by-side tables spanning across white gutters (EU sample 090): if the majority is inside the table, it is not a barcode either.
       tables.reduce((n, t) => n + (t.borderless ? 0 : lineShareIn(b, t.box)), 0) < 0.5,
   );
   if (repairBarcodes && protectFigures && repairTables && !oldBarcodes.length && barcodes.length) {

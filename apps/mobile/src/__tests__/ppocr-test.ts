@@ -1,7 +1,9 @@
 import { coversLanguage, createPpocr, type PpocrIo, type PpocrNative } from '../runtime/ppocr';
 
-// PP-OCRv6 的胶水层（D-269）：张量写进临时文件交给原生模块，原生把结果写回文件；用完删掉。
-// 这里用内存里的「文件」和假的原生模块，检查文件格式（小端 float32 / int32）和清理。
+// PP-OCRv6 glue layer (D-269): tensors are written to temporary files and passed to the native
+// module, which writes the results back to files and cleans them up after use. Here, in-memory
+// "files" and a mock native module are used to verify file formats (little-endian float32 / int32)
+// and cleanup.
 
 function setup() {
   const disk = new Map<string, Uint8Array>();
@@ -25,7 +27,7 @@ function setup() {
     },
     write: async (uri, bytes) => void disk.set(uri, bytes.slice()),
     read: async (uri) => disk.get(uri)!,
-    // 识别要的大小（32 的倍数，短边至少 736）。
+    // Required size for recognition (multiple of 32, shortest side at least 736).
     pixels: async () => {
       calls.push('decode');
       return { width: 736, height: 736, data: new Uint8Array(736 * 736 * 4) };
@@ -37,9 +39,9 @@ function setup() {
     },
     async ocrDetect(input, width, height, output) {
       calls.push('detect');
-      // 输入是 [1, 3, h, w] 的 float32。
+      // Input is [1, 3, h, w] float32.
       expect(disk.get(input)!.byteLength).toBe(3 * width * height * 4);
-      // 一行字：y 100–140，x 100–600。
+      // A line of text: y 100–140, x 100–600.
       const prob = new Uint8Array(width * height);
       for (let y = 100; y < 140; y++) for (let x = 100; x < 600; x++) prob[y * width + x] = 240;
       disk.set(output, prob);
@@ -47,7 +49,7 @@ function setup() {
     async ocrRecognize(input, count, width, output) {
       calls.push('recognize');
       expect(disk.get(input)!.byteLength).toBe(count * 3 * 48 * width * 4);
-      // 两个时间步：「你」「好」，概率 0.9；先 int32 类别，再 float32 概率（小端）。
+      // Two time steps: "you", "good", probability 0.9; first int32 category, then float32 probability (little-endian).
       const steps = 2;
       const buffer = new ArrayBuffer(count * steps * 8);
       const view = new DataView(buffer);
@@ -80,7 +82,7 @@ describe('PP-OCRv6 glue (D-269)', () => {
     expect(calls).toEqual(['load det.onnx rec.onnx', 'decode', 'detect', 'recognize']);
     expect(dirs).toEqual([{ uri: 'file:///cache/ocr/0', removed: true }]);
     expect([...disk.keys()]).toEqual([]);
-    // 每个字的大致位置（D-272）。
+    // Approximate position of each character (D-272).
     expect(result.lines[0]!.chars?.map((c) => c.text)).toEqual(['你', '好']);
   });
 

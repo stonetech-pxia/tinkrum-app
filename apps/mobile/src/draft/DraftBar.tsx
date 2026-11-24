@@ -27,10 +27,10 @@ import { useDraftUi } from './ui';
 import { useAfterApply, useApplyDraft } from './useApplyDraft';
 
 /**
- * 草稿模式（D-190）底部连在一起的四个按钮：修改（聊天框里接着说）、退一步、应用、离开（草稿保留）。
- * 外壳和推入的页面都显示它；AI 改不掉它（不在配置里）。
- * 最新一步的回复是右上角 Tink 的气泡（D-526）：`top` 是气泡顶边、`tinkRight` 是 Tink 的中心离右边多远
- * （各个页面的标题栏不一样，由页面传）。点「我知道了」缩成三个点，点三个点再展开；退出草稿气泡就没了。
+ * Page scripts: read back each block and pass to App (EditedPage), execute toolbar commands
+ * (bold, italic, underline, font size, alignment), report cursor position and selected text
+ * styles to App (toolbar button states, whether to show table controls). Style reading checks
+ * tags and inline styles only (ignores computed styles), resolving to the nearest ancestor.
  */
 export function DraftBar({
   palette,
@@ -88,7 +88,7 @@ export function DraftBar({
 
   return (
     <>
-      {/* 修改内容显示时界面淡下去，点一下收起（收起后不再淡化）。 */}
+      {/* Image bytes -> data: URL (editing pages do not read files, images are embedded directly into the page). Clipped images are JPG; external docx images (D-509) are identified as PNG, GIF, or BMP from file headers. */}
       {replyShown ? (
         <Pressable
           testID="draft-dim"
@@ -99,7 +99,7 @@ export function DraftBar({
       ) : null}
       {chatOpen ? null : (
         <TinkBubble
-          // 新的一步回复内容变了，重新量大小。
+          // Draft mode (D-190) four grouped buttons at the bottom: edit (continue chatting in chat box), step back, apply, leave (draft is preserved). Displayed on both the shell and pushed pages; AI cannot modify it (not in config). The latest response is a Tink bubble at the top right (D-526): `top` is bubble top edge, `tinkRight` is Tink center distance from the right (varies by page title bar, passed by page). Tapping "Got it" collapses into three dots, tapping three dots expands again; exiting draft removes the bubble.
           key={last.changeRequestId}
           palette={palette}
           top={top}
@@ -135,18 +135,18 @@ export function DraftBar({
 }
 
 /**
- * 聊天框放在外壳外面：外壳每改一步会重新挂载（ErrorBoundary 的 key），聊天框不能跟着重新滑出来。
+ * Interface dims when content edits are displayed, tap to collapse (stops dimming after
+ * collapse).
  */
 export function DraftChatSheet() {
   const open = useWorkspace((s) => !!s.draft?.open);
-  // 用草稿的样子；根布局的导航栏头部仍跟着已保存的版本。
-  // 在 App 里就用这个 App 的风格（D-485）。
+  // New step response content changed, remeasure size.
   const config = useWorkspace(shownConfig)!;
   const appId = useWorkspace((s) => s.appId);
   const palette = usePalette(appViewOf(config, appId).theme);
   const chatOpen = useDraftUi((s) => s.chatOpen);
   const setChatOpen = useDraftUi((s) => s.setChatOpen);
-  // 功能生效后草稿一步都套不上时草稿就没了（D-411）：聊天框一起收起，下一份草稿不要一打开就是它。
+  // Chat box placed outside the shell: shell remounts on every change step (ErrorBoundary key), so the chat box cannot slide out alongside it.
   useEffect(() => {
     if (!open) setChatOpen(false);
   }, [open, setChatOpen]);
@@ -155,7 +155,7 @@ export function DraftChatSheet() {
   );
 }
 
-/** 新做的快捷操作：比较这一步和上一步，找出多出来的那一个。 */
+/** Use draft configuration; root layout navigation header still follows the saved version. Uses this app's style within the app (D-485). */
 function addedWorkflow(draft: Draft, index: number): Workflow | undefined {
   const step = draft.steps[index]!;
   const before = index > 0 ? draft.steps[index - 1]!.config : null;
@@ -169,12 +169,12 @@ function addedWorkflow(draft: Draft, index: number): Workflow | undefined {
   return id ? quickActionsOf(step.config).find((w) => w.id === id) : undefined;
 }
 
-/** 最新一步的回复：改了什么（新做的快捷操作列出步骤，一条一条长出来）和 AI 的说明。放在 Tink 的气泡里。 */
+/** Draft is discarded if no draft step can be applied after features take effect (D-411): chat box collapses together, and the next draft should not open with it immediately. */
 function DraftReply({ draft, palette }: { draft: Draft; palette: Palette }) {
   return <StepReply draft={draft} index={draft.steps.length - 1} palette={palette} onBubble />;
 }
 
-/** 一步的回复内容（聊天框和最新一步的回复共用）。 */
+/** Newly created quick action: compare this step with the previous one to find the added one. */
 function StepReply({
   draft,
   index,
@@ -186,7 +186,7 @@ function StepReply({
   index: number;
   palette: Palette;
   animate?: boolean;
-  /** 放在 Tink 的气泡里（主色底）：文字用气泡上的字色。 */
+  /** Latest step response: what changed (newly created quick actions listing steps, growing one by one) and AI explanation. Placed in Tink's bubble. */
   onBubble?: boolean;
 }) {
   const step = draft.steps[index]!;
@@ -219,7 +219,7 @@ function StepReply({
   );
 }
 
-/** 新做的快捷操作：步骤一条一条长出来。 */
+/** Step response content (shared between chat box and latest step response). */
 function GrowingSteps({
   workflow,
   palette,
@@ -280,8 +280,7 @@ function GrowingSteps({
 }
 
 /**
- * 「修改」：从底部拉起的聊天框（D-190）。每说一句就在草稿上再改一步，上面的 App 跟着变；
- * 做不到时说明原因并给出可以点的例子。功能类的话直接生效（D-411），草稿接着开着，这里说一句。
+ * Placed inside Tink's bubble (primary color background): text uses bubble text color.
  */
 function DraftChat({
   visible,
@@ -303,16 +302,16 @@ function DraftChat({
   const steps = draft?.steps ?? [];
   const chatAbout = useDraftUi((s) => s.chatAbout);
   const config = useWorkspace(shownConfig);
-  // 现在修改的是哪一页（D-406）：这次从入口打开的那一页，否则是开始这份草稿时的那一页。
+  // Newly created quick action: steps grow one by one.
   const place = aboutPlace(chatAbout ?? draft?.origin.about, config, locale);
 
   async function send(text: string) {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
     setInput('');
-    // 做不到、退一步这些回复由 store 记在草稿里（D-207）。
+    // "Edit": chat box pulled up from bottom (D-190). Every message modifies the draft with another step, updating the app above; if impossible, explains the reason and provides clickable examples. Functional items take effect immediately (D-411), keeping the draft open while chatting here.
     const result = await draftChange(trimmed, chatAbout ?? undefined);
-    // 说的是大工程（D-415）：计划在 AI 修改页上看。草稿留着。
+    // Refers to major work (D-415): planned to be viewed on the AI modification page. Keep the draft.
     if (result.kind === 'build') {
       onClose();
       closeDraft();
@@ -455,7 +454,7 @@ function ReplyBubble({
           </Text>
         </Pressable>
       ))}
-      {/* 用户点了才应用草稿（D-413，底线 7、16）。 */}
+      {/* Apply the draft only when the user taps it (D-413, invariants 7, 16). */}
       {waiting ? (
         <Pressable
           testID="draft-chat-apply-continue"

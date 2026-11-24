@@ -9,15 +9,17 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 
-// 跑一个只有一个 float32 输入、一个 float32 输出的 ONNX 模型（D-274：扫描展平的 UVDoc 网格模型），
-// 和 iOS 的 ModelRunner.swift 一样：输入、输出都走本次运行的临时文件（float32 小端），前后处理在 JS。
-// 模型按路径缓存（同一时间只留一个，换模型时释放旧的）。
+// Runs an ONNX model with a single float32 input and a single float32 output (D-274: scanning
+// flattened UVDoc mesh models), matching iOS's ModelRunner.swift: both inputs and outputs use
+// temporary files from the current run (little-endian float32), with pre- and post-processing
+// handled in JS. Models are cached by path (only one kept at a time, releasing the old one when
+// switching).
 object ModelRunner {
   private val env: OrtEnvironment by lazy { OrtEnvironment.getEnvironment() }
   private var loaded: String? = null
   private var session: OrtSession? = null
 
-  /** 返回输出的形状；输出写成 float32 文件。 */
+  /** Returns output shape; writes output as a float32 file. */
   @Synchronized
   fun run(model: String, input: File, shape: LongArray, output: File): List<Long> {
     if (loaded != model || session == null) {

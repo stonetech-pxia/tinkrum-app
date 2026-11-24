@@ -28,19 +28,27 @@ import shopOrders from './samples/shop-orders.json';
 import studyHelper from './samples/study-helper.json';
 import visaDocs from './samples/visa-docs.json';
 
-// 样板 App（D-260）：新手引导最后一步让用户整套套用一个，看到 Morph 能变成什么样的 App，再在上面改。
-// 一个样板是 samples/<id>.json（v34 写法），比页面模版（D-255）多：几张数据表、几个页面、快捷操作、首页入口、提醒。
+// Sample Apps (D-260): The final step of onboarding lets users apply a complete set at once to see
+// what kind of app Morph can become, and modify it from there. A sample is defined in
+// samples/<id>.json (v34 format), extending page templates (D-255) with: data tables, pages, quick
+// actions, home screen entries, and reminders.
 //
-// - ids：占位符 → 基本 ID。占位符写成 $table.<名字>、$page.<名字>、$tool.<名字>（快捷操作和提醒都在 tools[]，
-//   一套 ID）；配置里已经有同名的就加 -2、-3……（预设快捷操作的 ID 和用户自己添加时一样，见下面）。
-//   引用写占位符本身（source.table、就地工具的 table、{tool}），或者 page:$page.x、tool:$tool.x（opens）。
-// - tables、pages：addData {table}、addContainer {page} 的内容；表之间的引用字段（D-250）也写占位符。
-//   表要按引用的顺序排：被引用的表在前面。
-// - tools：快捷操作和提醒。{id, preset, params?} 按 D-259 展开成预设的副本，和用户自己添加时完全一样；
-//   预设里没有的快捷操作写完整的 {id, kind: "quickAction", name, icon?, steps}；提醒写完整的 {kind: "reminder", …}。
-// - main：样板的主页面。entry: nav = 主页面放进导航栏，满了在首页加快捷入口（和模版一样，entryOps）。
-// - home：另外放到首页的块（排在首页最后）。
-// - 给用户看的文字写成 { en, zh, fr }，按界面语言取一种。不改主题：用户选好的样子保持不变。
+// - ids: placeholders → base IDs. Placeholders are written as $table.<name>, $page.<name>,
+// $tool.<name> (quick actions and reminders share tools[], forming a single ID set); if tables with
+// the same name already exist in the config, append -2, -3, etc. (preset quick action IDs match
+// user-added ones, see below). References use the placeholder itself (source.table, inline tool
+// table, {tool}), or page:$page.x, tool:$tool.x (opens).
+// - tables, pages: contents of addData {table}, addContainer {page}; inter-table reference fields
+// (D-250) also use placeholders. Tables must be ordered by reference dependency: referenced tables
+// come first.
+// - tools: quick actions and reminders. {id, preset, params?} expand into preset copies per D-259,
+// identical to user-added ones; quick actions not in presets are written fully as {id, kind:
+// "quickAction", name, icon?, steps}; reminders are written fully as {kind: "reminder", …}.
+// - main: sample main page. entry: nav = place main page in nav bar, if full add quick entry on
+// home screen (same as templates, entryOps).
+// - home: additional blocks placed on home screen (at the end of home screen).
+// - User-facing text is written as { en, zh, fr }, selected by UI language. Theme is unmodified:
+// user's chosen appearance remains unchanged.
 
 export const SAMPLE_APPS = [
   'expense-helper',
@@ -56,7 +64,7 @@ export type SampleApp = (typeof SAMPLE_APPS)[number];
 interface SampleJson {
   icon: IconValue;
   name: Localized;
-  /** 一句话说明它包含什么（引导第 3 步的列表里显示）。 */
+  /** Summary: Localized; a one-sentence description of what it contains (displayed in the step 3 onboarding list). */
   summary: Localized;
   ids: Record<string, string>;
   tables: unknown[];
@@ -86,7 +94,7 @@ const SAMPLES: Record<SampleApp, SampleJson> = {
   receipts: receipts as SampleJson,
 };
 
-/** 配置的上限（schema.ts 的 WorkspaceConfigSchema；页面的块 PageSchema）。 */
+/** Configuration limits (WorkspaceConfigSchema in schema.ts; PageSchema blocks). */
 const LIMITS = { tables: 20, pages: 20, workflows: MAX_WORKFLOWS, reminders: MAX_REMINDERS };
 
 export type SampleProblem = 'tables' | 'pages' | 'workflows' | 'reminders' | 'home';
@@ -95,12 +103,12 @@ export type SampleResult =
   | {
       ok: true;
       ops: Op[];
-      /** 套用后样板的主页面：应用后回到这里。 */
+      /** Main page ID of the sample after application: returns here after applying. */
       mainPageId: string;
     }
   | { ok: false; problem: SampleProblem; message: string };
 
-/** 引导第 3 步的列表里显示的：图标、名字、一句话说明。 */
+/** Displayed in the step 3 onboarding list: icon, name, one-sentence description. */
 export function sampleInfo(
   sample: SampleApp,
   locale: Locale,
@@ -121,7 +129,7 @@ const isLocalized = (v: object) => {
   return keys.length === 3 && keys.join() === 'en,fr,zh';
 };
 
-/** 换掉占位符、按语言取文字（模版的 fill 加上 page: / tool: 前缀）。没有换成 ID 的占位符是样板写错了。 */
+/** Replace placeholders and select text by language (template fill plus page: / tool: prefix). Placeholders not replaced by IDs indicate a sample authoring error. */
 function fill(value: unknown, locale: Locale, ids: ReadonlyMap<string, string>): unknown {
   if (typeof value === 'string') {
     const m = PLACEHOLDER.exec(value);
@@ -148,10 +156,13 @@ function uniqueId(base: string, taken: Set<string>): string {
 }
 
 /**
- * 把一个样板换成一组修改操作：按当前配置换成不重复的 ID、引用跟着换、给主页面一个入口。
- * 表、页面、快捷操作、提醒或首页放不下时不套用，返回原因（给用户看的一句话）。
- * appId：在这个 app 里做（D-485）：不碰主页的底栏和首页，主页面由 prepareOps 放进这个 app 的底栏
- * （addMissingPageEntries）；页面、表、快捷操作归这个 app 由调用的地方写（opsForApp）。
+ * Convert a sample into a set of modification operations: remap to unique IDs against current
+ * config, update references accordingly, and provide an entry point for the main page. If tables,
+ * pages, quick actions, reminders, or home slots overflow, application is aborted and a reason
+ * (user-facing sentence) is returned. appId: executed within this app (D-485): leaves home screen
+ * bottom bar and home screen untouched; main page is placed in this app's bottom bar by
+ * prepareOps (addMissingPageEntries); pages, tables, and quick actions belonging to this app are
+ * written by the caller (opsForApp).
  */
 export function sampleOps(
   sample: SampleApp,
@@ -190,7 +201,7 @@ export function sampleOps(
     return { ok: false, problem, message: t(locale, SAMPLE_PROBLEM_MESSAGES[problem], { name }) };
   }
 
-  // 先定下所有 ID，再填进内容（按钮、提醒可能引用排在后面的页面和快捷操作）。
+  // Determine all IDs first before filling in contents (buttons and reminders may reference subsequent pages and quick actions).
   const ids = new Map<string, string>();
   const tables = new Set(config.data.tables.map((c) => c.id));
   const pageIds = new Set(pages.map((p) => p.id));
@@ -198,9 +209,10 @@ export function sampleOps(
     if (placeholder.startsWith('$table.')) ids.set(placeholder, uniqueId(base, tables));
     else if (placeholder.startsWith('$page.')) ids.set(placeholder, uniqueId(base, pageIds));
   }
-  // 工具（快捷操作和提醒共用一套 ID）：快捷操作先定（它们的 ID 被运行记录引用得更多，M1）。
-  // 预设的 ID 和用户自己添加时一样（预设 ID，用过了加 -2，newWorkflowId）；自己写的也不和内设快捷操作的
-  // 预设 ID 重名，不然会盖住内设的那个（D-236）。
+  // Tools (quick actions and reminders share an ID set): quick actions are assigned first (their
+  // IDs are referenced more heavily by run logs, M1). Preset IDs match user-added ones (preset IDs,
+  // append -2 if taken, newWorkflowId); custom ones also avoid name collisions with built-in quick
+  // action preset IDs to prevent overriding built-in ones (D-236).
   const taken: { id: string }[] = [...config.tools];
   for (const tool of json.tools) {
     if (isReminderJson(tool)) continue;
@@ -220,7 +232,7 @@ export function sampleOps(
   for (const table of json.tables)
     ops.push({ op: 'addData', table: fill(table, locale, ids) as OpOf<'addData'>['table'] });
 
-  // 预设按 D-259 展开：和用户自己添加时同一个函数（presetWorkflow），params 按步骤 ID 合进参数。
+  // Presets expanded per D-259: uses the same function as user additions (presetWorkflow), merging params into parameters by step ID.
   for (const tool of json.tools) {
     if (isReminderJson(tool)) continue;
     let quickAction: QuickAction;
@@ -272,9 +284,13 @@ export function sampleOps(
 }
 
 /**
- * 新建表单页选了「购物凭证」、字段和表名都没改时，建整套样板「收据」（D-479）：同一张表，页面带搜索、
- * 时间、排序、分类筛选、开销图表、扫描和导出。返回修改和建出来的那张表（ID 已按当前配置换过，记录放这张）。
- * 改过字段或表名、选的是别的预设、样板放不下（表、页面、快捷操作超限）：null，照预设自己的页面建。
+ * When 'shopping voucher' is selected in the new form page and neither fields nor table name were
+ * modified, build the full 'Receipts' sample template (D-479): single table with views for
+ * search, time, sorting, category filtering, expense chart, scanning, and export. Returns
+ * modifications and the created table (ID remapped to current config, records placed here). If
+ * fields or table name were modified, another preset was selected, or sample overflows limits
+ * (tables, pages, quick actions exceeded): returns null, building via default preset pages
+ * instead.
  */
 export function draftReceiptSample(
   table: Collection,
@@ -293,7 +309,7 @@ export function draftReceiptSample(
   if (!result.ok) return null;
   const added = result.ops.find((op): op is OpOf<'addData'> => op.op === 'addData');
   if (!added || !('table' in added)) return null;
-  // 金额的货币跟草稿（D-548：用文件建表时按文件上的符号定的）。
+  // Currency of amount follows the draft (D-548: determined by symbol on the file when creating a table from a file).
   const currency = new Map(
     table.fields.flatMap((f) => (f.type === 'money' ? [[f.id, f.currency] as const] : [])),
   );

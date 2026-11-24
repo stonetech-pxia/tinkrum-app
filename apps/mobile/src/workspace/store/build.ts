@@ -11,13 +11,17 @@ import type { Kernel } from './kernel';
 import type { SessionStore } from './session';
 import type { BuildRun, BuildRunStep, ChangeResult, WorkspaceState } from './types';
 
-// 大工程的搭建计划（AGENT_PLAN §3.9、D-415）。模型先回计划，用户看过、可以删掉几步，点「开始」。这一次点击算一次用户操作
-// （底线 16 的解释，D-416）：一步一次 planner.plan，带工具清单和当前配置；功能直接生效，外观进草稿（底线 7 不变）；
-// 一步失败就停下，由用户选重试、跳过或停止。App 进后台或重启后停在没做完的那一步，用户点了才继续。
+// Large engineering build plan (AGENT_PLAN §3.9, D-415). The model returns the plan first, the user
+// reviews it, can delete a few steps, and taps "Start". This click counts as one user action
+// (interpretation of Invariant 16, D-416): one step per planner.plan, with tool list and current
+// configuration; features take effect directly, appearances enter the draft (Invariant 7 remains
+// unchanged); stops if a step fails, and the user chooses to retry, skip, or stop. App stays at the
+// unfinished step after entering the background or restarting, and the user continues only after
+// tapping.
 
 const BUILD_META_KEY = 'build';
 
-/** 这一步做完功能后，最多再接着做几句（next）。 */
+/** After completing the feature in this step, at most how many subsequent sentences (next) to continue executing. */
 const NEXT_TURNS = 1;
 
 function parseBuild(stored: string | null): BuildRun | null {
@@ -35,7 +39,7 @@ type Turn = ReturnType<typeof createAIChange>['aiChange'];
 export function createBuild(k: Kernel, session: SessionStore) {
   const { deps, repo, registry, locale, set, get, msg } = k;
   let turn: Turn;
-  /** 用户点了停止（或 App 进后台）：做完手上这一步就停，模型回来了也不应用。 */
+  /** User tapped stop (or app entered background): Stop after finishing the current step on hand, and do not apply even if the model returns. */
   let stopRequested = false;
   let looping = false;
 
@@ -87,21 +91,21 @@ export function createBuild(k: Kernel, session: SessionStore) {
         return { kind: 'failed', reason: result.message, needsDraft: true };
       if (result.kind === 'invalid') return { kind: 'failed', reason: msg('buildFailedInvalid') };
       if (result.kind === 'rejected') {
-        // 配置已经是这样了：这一步不用做。
+        // Configuration is already like this: This step does not need to be executed.
         if (result.reason === 'noChange') {
           if (itemId) await session.update((s) => setItemStatus(s, itemId, 'done'));
-          // 这一步自己的那句没改到任何东西：前面已经做了。接着做剩下的外观时不算。
+          // This step's own sentence did not modify anything: It was already done previously. Not counted when subsequently executing remaining appearances.
           return { kind: 'done', ...(isNext ? {} : { already: true }) };
         }
         return { kind: 'failed', reason: result.message };
       }
-      // 代码判定做好了没有（D-414），不看模型怎么说。
+      // Code determines whether it is done (D-414), regardless of what the model says.
       const item = get().session.items.find((i) =>
         itemId ? i.id === itemId : i.text === input && i.status !== 'todo',
       );
       if (item?.status === 'failed')
         return { kind: 'failed', reason: item.reason ?? msg('buildFailedInvalid') };
-      // 这句话里剩下的外观（next）：还算这一步，不用用户再点（同一次「开始」）。还剩的留在清单里。
+      // Remaining appearances in this sentence (next): Still counts as this step, without requiring the user to tap again (same "Start"). Remaining items stay in the checklist.
       const next = get().next;
       if (!next || next === input || extra === NEXT_TURNS) return { kind: 'done' };
       await patchStep(step.id, { status: 'running', current: next });
@@ -113,13 +117,13 @@ export function createBuild(k: Kernel, session: SessionStore) {
 
   async function finish() {
     const planned = get().draft?.steps.at(-1)?.config ?? get().config!;
-    // 整体检查：中间放过的「页面在下一步」这时要算了。
+    // Overall check: Deferred "page in next" items are evaluated at this point.
     await session.update((s) => recheckItems(s, planned, registry, locale, { all: true }));
     const build = get().build;
     if (build) await save({ ...build, phase: 'finished' });
   }
 
-  /** 从第一个没做完的步骤接着做，直到做完、失败或停下。 */
+  /** Continue from the first unfinished step until completed, failed, or stopped. */
   async function run() {
     if (looping) return;
     looping = true;
@@ -236,14 +240,14 @@ export function createBuild(k: Kernel, session: SessionStore) {
 
   return {
     actions,
-    /** ai-change.ts 要用 showBuild，这里要用它的一句话：建好之后再接上。 */
+    /** ai-change.ts needs showBuild, and it needs its sentence here: reconnect after building is complete. */
     useTurn(fn: Turn) {
       turn = fn;
     },
     async showBuild({ summary, steps, origin }: Pick<BuildRun, 'summary' | 'steps' | 'origin'>) {
       await save({ summary, steps, origin, phase: 'review' });
     },
-    /** 启动：上次在做的算停下了，用户点了才继续（底线 16）。 */
+    /** Startup: What was being done last time is considered stopped, and the user continues only after tapping (Invariant 16). */
     async loadBuild() {
       const build = parseBuild(await repo.getMeta(BUILD_META_KEY));
       if (!build) return;

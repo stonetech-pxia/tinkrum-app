@@ -1,5 +1,6 @@
-// 防倒退用例清单：每个套件（pdfs/<suite>.pdf）一个文件，在 cases/ 里。
-// 每修一次转 Word 的问题，就在 pages/<suite>/ 加一页、在对应的文件里加一条（见 README.md）。
+// Regression test case list: one file per suite (pdfs/<suite>.pdf), located in cases/. Every time a
+// Word conversion issue is fixed, add a page in pages/<suite>/ and an entry in the corresponding
+// file (see README.md).
 import type { Case } from './lib/case';
 import { FONTS } from './cases/fonts';
 import { FORMS } from './cases/forms';

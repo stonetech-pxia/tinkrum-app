@@ -1,23 +1,23 @@
 import type { Check } from './checks';
 
-/** 一个防倒退用例：pages/<suite>/NN-<id>.* 这一页转 Word 后要满足的断言。 */
+/** A regression test case: assertions that page pages/<suite>/NN-<id>.* must satisfy after converting to Word. */
 export interface Case {
-  /** 和来源文件名里的用例名一致（pages/<suite>/NN-<id>.html 等）。 */
+  /** Matches the case name in the source filename (e.g., pages/<suite>/NN-<id>.html). */
   id: string;
-  /** 放在哪一份 PDF 里（pdfs/<suite>.pdf）。 */
+  /** Which PDF file it belongs to (pdfs/<suite>.pdf). */
   suite: string;
-  /** 守的是哪一次修复：提交号、D 编号。 */
+  /** Which fix it guards: commit hash, D number. */
   fix: string;
-  /** 一句话：这一页考什么，以前错成什么样。 */
+  /** One sentence describing what this page tests and what it previously failed as. */
   what: string;
-  /** 识别语言（ocr.toWord 的 lang 参数），默认 eng。 */
+  /** Recognition language (lang parameter for ocr.toWord), defaulting to eng. */
   lang?: string;
-  /** App 语言，默认 en。 */
+  /** App language, defaulting to en. */
   locale?: string;
   checks: Check[];
-  /** 通用的「字都在、不重复」检查的阈值（默认 0.97 / 0.02）。 */
+  /** Threshold for the general "all text present, no duplicates" check (defaults to 0.97 / 0.02). */
   recall?: number;
   extra?: number;
-  /** 现在已知会失败（等修）：写原因。修好后去掉，运行结果会提示。 */
+  /** Currently known failure (pending fix): describe the reason. Remove after fixing, and test execution will remind you. */
   knownFailure?: string;
 }

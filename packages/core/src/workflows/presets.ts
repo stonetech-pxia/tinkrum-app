@@ -6,13 +6,16 @@ import type { IconName, Locale, Localized, Workflow } from '../schema';
 import type { SharedFileInfo } from '../share';
 import { speechLangFor } from '../tools/audio';
 
-// 内置的预设工作流（D-081）：不随版本，用户在「工作流」页点「添加」时复制进配置，
-// 之后就和用户自己的工作流一样，可以改参数、改步骤、复制、放到页面上、删除；编辑页可以「恢复预设」。
-// 预设只用登记过的动作，不要求先安装对应的工具（跨工具的用户工作流，§2）。
+// Built-in preset workflows (D-081): version-independent, copied into configuration when the user
+// taps "Add" on the workflow page, after which they behave just like user workflows (editable
+// parameters, steps, duplication, placement on pages, deletion); edit pages support "Restore
+// preset". Presets use only registered actions and do not require prior installation of
+// corresponding tools (cross-tool user workflows, §2).
 
 /**
- * 预设按生活场景分组（D-130）：普通人说不清要什么，但看到「出国办证」「报销」就知道。
- * 顺序就是快捷操作页上的顺序。
+ * Presets grouped by life scenarios (D-130): ordinary people cannot articulate what they want,
+ * but seeing "Apply for visa" or "Expense reimbursement" makes it clear. Order matches the quick
+ * actions page.
  */
 export const PRESET_SCENARIOS = [
   { id: 'ids', name: { en: 'Visas and IDs', zh: '出国办证', fr: 'Visas et pièces d’identité' } },
@@ -32,7 +35,7 @@ export const PRESET_SCENARIOS = [
       fr: 'Envoi de photos et de vidéos',
     },
   },
-  // 音频（D-156）：录音转文字、合成、按日期归档放「学习工作」；压小、剪一段、取视频的声音放「发声音」。
+  // Audio (D-156): speech-to-text, synthesis, and date-based archiving go under "Study and work"; compression, trimming, and extracting audio from video go under "Sound effects".
   { id: 'study', name: { en: 'Study and work', zh: '学习工作', fr: 'Études et travail' } },
   { id: 'sound', name: { en: 'Sending audio', zh: '发声音', fr: 'Envoi d’audio' } },
 ] as const satisfies readonly { id: string; name: Localized }[];
@@ -44,15 +47,15 @@ export interface WorkflowPreset {
   scenario: PresetScenario;
   kinds?: readonly QuickActionKind[];
   name: Localized;
-  /** 一句话说明，显示在预设库里，也发给 AI。 */
+  /** One-sentence description, displayed in the preset library and sent to the AI. */
   description: Localized;
   icon: IconName;
-  /** 需要下载的扩展包（第一次运行时会请用户确认），只用于在预设库里提示。 */
+  /** Packs requiring download (user confirmation requested on first run), used only for preset library hints. */
   packs?: readonly string[];
   steps(locale: Locale): Workflow['steps'];
-  /** 内置规则（mock AI）除了名字还认的叫法（「添加签证快捷操作」「把照片发邮件放到首页」），D-265。 */
+  /** Alternative phrasings recognized by built-in rules (mock AI) in addition to names ("Add visa quick action", "Put photo email on home screen"), D-265. */
   words?: RegExp;
-  /** 别的预设的叫法也认得这个短语时先查它（「证件照打印」不是签证照片）。 */
+  /** Check this first when other presets also recognize the phrase ("ID photo print" is not a visa photo). */
   wordsFirst?: boolean;
 }
 
@@ -73,34 +76,34 @@ const rename = (template: string, ask = true) => ({
   ...(ask ? { ask: ['template'] } : {}),
 });
 
-// 翻译预设（D-173）用的步骤。
+// Steps used by translation presets (D-173).
 const recognize = (lang: string, ask = true) => ({
   id: 'read',
   action: 'ocr.recognize',
   params: { lang },
   ...(ask ? { ask: ['lang'] } : {}),
 });
-/** 翻成界面语言：中文界面翻成中文，英文界面翻成英文。 */
+/** Translate to interface language: Chinese interface translates to Chinese, English interface translates to English. */
 const translateTo = (locale: Locale) => ({
   id: 'translate',
   action: 'translate.text',
   params: { from: 'auto', to: locale === 'zh' ? 'zh-Hans' : locale === 'fr' ? 'fr' : 'en' },
 });
-/** 文字转语音（D-270）：自动识别语言、正常语速、M4A。 */
+/** Text-to-speech (D-270): automatic language recognition, normal speech rate, M4A. */
 const speak = {
   id: 'speak',
   action: 'audio.fromText',
   params: { lang: 'auto', rate: 1, format: 'm4a' },
 };
 const textPdf = { id: 'pdf', action: 'text.toPdf', params: { pageSize: 'a4', fontSize: 12 } };
-/** 转 Excel（D-272）：默认界面语言、全部内容，每次运行时问语言。 */
-// 语言自动识别，运行时不问（D-278）。
+/** Convert to Excel (D-272): default interface language, all content, prompt for language on each run. */
+// Automatic language recognition, unprompted at runtime (D-278).
 const toExcel = {
   id: 'excel',
   action: 'ocr.toExcel',
   params: { lang: 'auto', scope: 'all' },
 };
-/** 转 Word（D-328）：语言自动识别，运行时不问。 */
+/** Convert to Word (D-328): automatic language recognition, unprompted at runtime. */
 const toWord = { id: 'word', action: 'ocr.toWord', params: { lang: 'auto' } };
 
 export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
@@ -230,7 +233,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
     ],
   },
   {
-    // D-272：拍纸质表格，做成 Excel；结果页可以查看和修改。
+    // D-272: Photograph paper tables to create Excel sheets; result page allows viewing and editing.
     id: 'scan-table-excel',
     scenario: 'paperwork',
     name: {
@@ -243,7 +246,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
       zh: '扫描纸质表格（自动拉正，或确认四个角）→ 变清楚 → 转成 Excel，每页一张工作表 → 在结果页核对和修改。带线的表格效果最好。',
       fr: 'Numérisez une grille imprimée (redressement automatique, ou vérifiez les coins) → améliorez la lisibilité → classeur Excel, une feuille par page → vérifiez-le et modifiez-le sur la page de résultat. Les grilles à lignes donnent les meilleurs résultats.',
     },
-    // D-552：首页宫格里三个扫描的图标分开：PDF = scan，Word = text，Excel = table。
+    // D-552: Separate three scan icons in home screen grid: PDF = scan, Word = text, Excel = table.
     icon: 'table',
     packs: ['scan'],
     steps: () => [
@@ -254,7 +257,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
     ],
   },
   {
-    // D-272：相册里的表格照片、截图做成 Excel。
+    // D-272: Convert table photos and screenshots from the photo library into Excel sheets.
     id: 'image-table-excel',
     scenario: 'paperwork',
     name: { en: 'Table picture to Excel', zh: '图片转 Excel', fr: 'Image de grille en Excel' },
@@ -267,7 +270,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
     steps: () => [photos(1, 20), toExcel],
   },
   {
-    // D-328：拍纸质文档（信件、书页、表单），做成 Word；结果页可以查看和修改。
+    // D-328: Photograph paper documents (letters, book pages, forms) to create Word documents; result page allows viewing and editing.
     id: 'scan-doc-word',
     scenario: 'paperwork',
     name: {
@@ -290,7 +293,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
     ],
   },
   {
-    // D-328：相册里的文档照片、截图做成 Word。
+    // D-328: Convert document photos and screenshots from the photo library into Word documents.
     id: 'image-doc-word',
     scenario: 'paperwork',
     name: { en: 'Document picture to Word', zh: '图片转 Word', fr: 'Image de document en Word' },
@@ -365,7 +368,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
     ],
   },
   {
-    // D-197：扫一张收据，接到上次的报销单后面，合成一份。
+    // D-197: Scan a receipt and append it to the previous expense report, combining them into one.
     id: 'expense-report',
     scenario: 'receipts',
     name: {
@@ -590,10 +593,10 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
     ],
   },
   {
-    // D-199：扫老照片。找边拉正，不增强、不压缩，存回相册。
+    // D-199: Scan old photos. Straighten edges without enhancement or compression, and save back to the photo library.
     id: 'old-photos',
     scenario: 'photos',
-    // 输入是扫描（归文档），但做出来的是照片：两个分类里都放。
+    // Input is scanning (classified as document), but output is a photo: place in both categories.
     kinds: ['image', 'document'],
     name: { en: 'Scan old photos', zh: '扫老照片', fr: 'Numériser d’anciennes photos' },
     description: {
@@ -632,7 +635,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
       { id: 'sheet', action: 'image.printSheet', params: { sheet: '4x6', guides: true } },
     ],
   },
-  // ---- 翻译（D-173）：只出纯文字（可以排成 PDF），用来看懂意思，不是正式翻译 ----
+  // ---- Translation (D-173): text-only output (formattable as PDF), intended for understanding meaning rather than formal translation ----
   {
     id: 'foreign-pdf',
     scenario: 'paperwork',
@@ -725,7 +728,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
       { id: 'copy', action: 'text.copy', params: {} },
     ],
   },
-  // ---- 音频（D-156）----
+  // ---- Audio (D-156) ----
   {
     id: 'audio-to-text',
     scenario: 'study',
@@ -796,7 +799,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
       { id: 'save', action: 'out.saveToFolder', params: {} },
     ],
   },
-  // ---- 文字转语音（D-270）：系统声音在本机读成音频文件，只出文件，不做播放器 ----
+  // ---- Text-to-speech (D-270): system voice reads text into audio files locally, outputting only files without a built-in player ----
   {
     id: 'pdf-to-audio',
     scenario: 'study',
@@ -816,7 +819,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
     ],
   },
   {
-    // 预览页的「转 Word」（D-457）：扫描件 PDF 先变成图片再认字；不是电子版 PDF 保留版面的转换（D-186 不做）。
+    // Preview page "Convert to Word" (D-457): PDF scans are first converted to images before recognition; layout-preserving conversion for non-electronic PDFs is not supported (D-186).
     id: 'pdf-doc-word',
     scenario: 'paperwork',
     name: { en: 'PDF to Word', zh: 'PDF 转 Word', fr: 'PDF en Word' },
@@ -834,7 +837,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
     ],
   },
   {
-    // 预览页「更多」里的转 Excel：和 pdf-doc-word 一样，扫描件 PDF 先变成图片再识别表格。
+    // Preview page "More" convert to Excel: same as pdf-doc-word, PDF scans are first converted to images before table recognition.
     id: 'pdf-doc-excel',
     scenario: 'paperwork',
     name: { en: 'PDF to Excel', zh: 'PDF 转 Excel', fr: 'PDF en Excel' },
@@ -865,7 +868,7 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
     steps: (locale) => [
       photos(1, 20, 'scanner'),
       { id: 'edges', action: 'scan.detect', params: {} },
-      // 读的是用户自己的材料：语言自动识别，运行时不问（D-278）。
+      // Reading user's own materials: automatic language recognition, unprompted at runtime (D-278).
       recognize('auto', false),
       speak,
       share,
@@ -1104,8 +1107,10 @@ export const WORKFLOW_PRESETS: readonly WorkflowPreset[] = [
 ];
 
 /**
- * 容器用的内设快捷操作（D-428）：第一步收容器交的值，所以不进预设库、不进快捷操作列表（它们自己跑不了），
- * 只能放在记录页、记录块、单条记录块上。不用添加，用 ID 引用；表、块上写的就是这些 ID。
+ * Container-specific built-in quick actions (D-428): receive container-handed values in the first
+ * step, so they are excluded from the preset library and quick action list (they cannot run
+ * independently) and can only be placed on record pages, record blocks, or single-record blocks.
+ * No need to add; referenced by ID; written directly in tables and blocks.
  */
 export const CONTAINER_PRESETS: readonly WorkflowPreset[] = [
   {
@@ -1203,11 +1208,11 @@ export const CONTAINER_PRESETS: readonly WorkflowPreset[] = [
 export const presetById = (id: string) =>
   WORKFLOW_PRESETS.find((p) => p.id === id) ?? CONTAINER_PRESETS.find((p) => p.id === id);
 
-/** 一个场景里的预设，按 WORKFLOW_PRESETS 的顺序。 */
+/** Presets within a scenario, ordered according to WORKFLOW_PRESETS. */
 export const presetsIn = (scenario: PresetScenario) =>
   WORKFLOW_PRESETS.filter((p) => p.scenario === scenario);
 
-/** 从预设复制一个快捷操作（不属于任何工具包，记住 preset 以便恢复）。 */
+/** Copy a quick action from a preset (not belonging to any tool pack; retain preset reference for restoration). */
 export function presetWorkflow(preset: WorkflowPreset, locale: Locale, id: string): Workflow {
   return {
     id,
@@ -1219,9 +1224,10 @@ export function presetWorkflow(preset: WorkflowPreset, locale: Locale, id: strin
   };
 }
 
-// 收件页面没用过时先推荐哪几个（D-237）：按文件类型、一个还是多个，最常见的排前面。
-// 依据是 Smallpdf、iLovePDF、iLoveIMG 的热门工具和国内常见场景，还没有访谈验证。
-// 一张照片：扫描、转 Excel 排第二、第三（D-297）。不看照片内容，只按类型和个数。
+// Initial recommendations when inbox page is unused (D-237): ranked by file type, single vs.
+// multiple files, with most common first. Based on popular tools from Smallpdf, iLovePDF, iLoveIMG
+// and common domestic scenarios; awaiting user interview validation. Single photo: scan, convert to
+// Excel ranked second and third (D-297). Ignores photo content, based solely on type and count.
 const SHARE_ORDER: Partial<Record<MediaKind, { one: string[]; many: string[] }>> = {
   image: {
     one: ['email-photos', 'scan-document', 'scan-table-excel', 'document-packet', 'visa-photo'],
@@ -1253,7 +1259,7 @@ const SHARE_ORDER: Partial<Record<MediaKind, { one: string[]; many: string[] }>>
   },
 };
 
-/** 这批文件先推荐的内设快捷操作 ID（最多 5 个）；类型混在一起或别的文件时为空。 */
+/** Recommended built-in quick action IDs for this batch of files (max 5); empty when types are mixed or other files are present. */
 export function sharePresetOrder(files: readonly SharedFileInfo[]): string[] {
   const kinds = new Set(files.map((f) => mediaKindOf(f.mimeType, f.name)));
   const order = kinds.size === 1 ? SHARE_ORDER[[...kinds][0]!] : undefined;
@@ -1262,8 +1268,9 @@ export function sharePresetOrder(files: readonly SharedFileInfo[]): string[] {
 }
 
 /**
- * 内设的快捷操作（D-236）：预设不用添加，直接用预设 ID 运行，运行记录也记在这个 ID 下。
- * 配置里有它的副本（改过、放到首页、旧版本添加过的）或同 ID 的快捷操作时，用配置里的。
+ * Built-in quick actions (D-236): presets do not need to be added, run directly using preset IDs,
+ * with run logs recorded under that ID. If config contains a copy (modified, placed on home
+ * screen, added in older versions) or a quick action with the same ID, use the one from config.
  */
 export function builtInWorkflows(workflows: readonly Workflow[], locale: Locale): Workflow[] {
   return WORKFLOW_PRESETS.filter(
@@ -1276,7 +1283,7 @@ function containerPreset(id: string, locale: Locale): Workflow | undefined {
   return preset && presetWorkflow(preset, locale, id);
 }
 
-/** 按 ID 找快捷操作：先找配置里的（quickActionsOf(config)），再找内设的。 */
+/** Find quick action by ID: check config first (quickActionsOf(config)), then built-ins. */
 export function findWorkflow(
   workflows: readonly Workflow[],
   id: string,
@@ -1290,8 +1297,9 @@ export function findWorkflow(
 }
 
 /**
- * 入口（按钮、快捷入口）指向的快捷操作（D-256）：和 findWorkflow 一样；指向内设快捷操作（预设 ID）、
- * 用户改过它以后配置里是 ID 不同的副本时，找到的是副本。
+ * Target of an entry point (button, quick entry) (D-256): same as findWorkflow; if it points to a
+ * built-in quick action (preset ID) and the user has modified it so that the config contains a
+ * different ID copy, it finds the copy.
  */
 export function findWorkflowTarget(
   workflows: readonly Workflow[],
@@ -1304,7 +1312,7 @@ export function findWorkflowTarget(
   );
 }
 
-/** 新工作流的 ID：基于名字（预设 ID 等），已用过时加序号。 */
+/** New workflow ID: based on name (preset ID, etc.), appends a sequence number if already used. */
 export function newWorkflowId(base: string, taken: readonly { id: string }[]): string {
   const clean =
     base

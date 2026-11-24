@@ -8,16 +8,18 @@ export interface GroupRow {
   testID: string;
   label: string;
   value?: string;
-  /** 行尾的小字（条数之类）。 */
+  /** Small text at the end of a row (such as entry count). */
   trailing?: string;
   onPress?: () => void;
-  /** 行尾的按钮（预设的「⋯」）：有它时点这一行仍走 onPress。 */
+  /** Button at the end of a row (preset "..."): when present, tapping this row still triggers onPress. */
   extra?: ReactNode;
 }
 
 /**
- * 一张卡片里的几行，中间用细线隔开（D-614）：系统层的列表（数据里的表、预设）一行一个卡片太高，表一多就要往下拉。
- * 只在设置这类系统页面里用，不进配置。
+ * Several rows in a card, separated by thin lines (D-614): system-layer lists (tables in data,
+ * presets) take up too much vertical space if each row is a separate card, and scrolling becomes
+ * tedious when there are many tables. Used only in system pages like settings, not part of
+ * configuration.
  */
 export function RowGroup({ palette: pagePalette, rows }: { palette: Palette; rows: GroupRow[] }) {
   const palette = onSurface(pagePalette);

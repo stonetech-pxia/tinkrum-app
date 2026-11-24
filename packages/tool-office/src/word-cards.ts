@@ -2,8 +2,9 @@ import type { DocBlock, DocPage, DocParagraph, DocTable } from './doc';
 import type { Box, OcrBox, RgbaImage, TableCell } from './types';
 import { lineShareIn } from './layout';
 
-// 没有模型图框的卡片插图：只认同一网格里反复出现的、完全没有 OCR 文字的大块图像。
-// 字仍用原单元格的完整内容；不把字段或带字的底色截图，也不改变普通数据表。
+// Card illustrations without model bounding boxes: recognize only large image blocks with no OCR
+// text that repeatedly appear within the same grid. Text remains the complete content of the
+// original cell; do not crop fields or background colors with text, nor modify regular data tables.
 function pictureInCell(
   image: RgbaImage,
   cell: Box,

@@ -14,8 +14,9 @@ import { Icon, iconSource, iosSymbolName } from '../renderer/Icon';
 import { makePalette } from '../renderer/theme';
 import { AppIconPicker } from '../shell/AppMenu';
 
-// 画出来的图标（D-625）：my:<id> 从图标库取路径用 Skia 画；库里没有或读不了时只占位，大小不变。
-// Jest 里没有 Skia：这里的替身只认以 M 开头的路径，用来测查找和分支，不测像素。
+// Drawn icon (D-625): my:<id> fetches path from icon library and draws using Skia; when missing or
+// unreadable from library, shows placeholder only with size unchanged. Skia is absent in Jest: mock
+// here recognizes only paths starting with M, used to test lookups and branches, not pixels.
 
 jest.mock('@shopify/react-native-skia', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports

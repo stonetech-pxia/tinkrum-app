@@ -4,7 +4,7 @@ import { screen } from 'expo-router/testing-library';
 import { FakeBackground } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 视频工具的界面旅程（D-140–D-143）：工具页 → 压缩 → 结果页（播放、存到相册）；剪一段的界面。
+// Video tool UI journey (D-140–D-143): tool page -> compression -> result page (playback, save to photo library); trim interface.
 
 const MB = 1024 * 1024;
 
@@ -28,7 +28,7 @@ describe('video journeys (UI)', () => {
 
     files.nextVideos = [files.offerVideo('IMG_0001.MOV', { size: 120 * MB })];
     await fireEvent.press(screen.getByTestId('run-video-compress'));
-    // 运行时问：按大小（默认）→ 点「20 MB」。按画质的选项这时不显示。
+    // Runtime query: by size (default) -> tap "20 MB". Quality-based options are not displayed at this time.
     await fireEvent.press(await screen.findByTestId('ask-preset-20mb'));
     expect(screen.queryByTestId('ask-quality-720p')).toBeNull();
     await fireEvent.press(screen.getByTestId('prompt-ok'));
@@ -38,7 +38,7 @@ describe('video journeys (UI)', () => {
     expect(screen.getByTestId('result-smaller')).toHaveTextContent(
       /^原来 120\.0 MB，现在 1\d\.\d MB$/,
     );
-    // 视频不能打印，但能存到相册。
+    // Videos cannot be printed, but can be saved to the photo library.
     expect(screen.queryByTestId('result-print')).toBeNull();
     await fireEvent.press(screen.getByTestId('result-photos'));
     expect(files.savedToPhotos).toHaveLength(1);
@@ -76,7 +76,7 @@ describe('video journeys (UI)', () => {
     expect(screen.getByTestId('trim-end')).toHaveTextContent('1:00.0');
     for (let i = 0; i < 3; i++) await fireEvent.press(screen.getByTestId('trim-start-plus'));
     for (let i = 0; i < 2; i++) await fireEvent.press(screen.getByTestId('trim-end-minus'));
-    // 开始不能早于 0。
+    // Start time cannot be earlier than 0.
     for (let i = 0; i < 5; i++) await fireEvent.press(screen.getByTestId('trim-start-minus'));
     await fireEvent.press(screen.getByTestId('trim-start-plus'));
     expect(screen.getByTestId('trim-start')).toHaveTextContent('0:01.0');
@@ -93,7 +93,7 @@ describe('video journeys (UI)', () => {
     const { files } = await openVideoTool();
     files.nextVideos = [files.offerVideo('trip.mov', { size: 60 * MB })];
     await fireEvent.press(screen.getByTestId('run-video-trim'));
-    // 没有后台模块（像 iOS 现在）：请留在 Tinkrum 里。
+    // No background module (like iOS currently): please stay within Tinkrum.
     await screen.findByTestId('trim-start', {}, { timeout: 3000 });
     expect(screen.getByTestId('run-background-hint')).toHaveTextContent(
       '处理时请留在 Tinkrum 里。',
@@ -102,7 +102,7 @@ describe('video journeys (UI)', () => {
     await screen.findByText(/^1:00 · /);
     expect(screen.queryByTestId('run-background-hint')).toBeNull();
 
-    // Android：可以切走。
+    // Android: can switch away.
     files.background = new FakeBackground();
     files.nextVideos = [files.offerVideo('trip.mov', { size: 60 * MB })];
     await fireEvent.press(screen.getByTestId('run-again'));

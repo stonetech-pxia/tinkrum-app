@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
-/** 流式重采样到 48kHz，逐声道降噪，补偿 RNNoise 的 20ms 延迟。 */
+/** Streaming resample to 48kHz, channel-by-channel noise reduction, compensating for the 20ms delay of RNNoise. */
 object AudioDenoise {
   fun prepare(context: Context, uri: Uri, output: File, cancelled: AtomicBoolean, durationMs: Double, progress: (Double) -> Unit) {
     var handle = 0L
@@ -42,7 +42,7 @@ object AudioDenoise {
         if (filled == 480) process()
       }
       if (total > 0) {
-        // 降噪这一遍占进度的前 50%。
+        // Noise reduction pass accounts for the first 50% of progress.
         val percent = (written * 50 / total).toInt().coerceIn(0, 50)
         if (percent > shown) { shown = percent; progress(percent / 100.0) }
       }
@@ -50,7 +50,7 @@ object AudioDenoise {
     fun drain() { processor?.let { consume(it.output) } }
     try {
       AudioPcm.visitTimeline(context, uri, durationMs, { cancelled.get() }) { chunk ->
-        // 多于两个声道（5.1 等）先混成立体声：偶数号声道进左边，奇数号进右边，各自取平均，和 iOS 一样只降噪两路。
+        // More than two channels (such as 5.1) are first mixed to stereo: even-numbered channels go to the left, odd-numbered to the right, each averaged; just like iOS, only two channels undergo noise reduction.
         val wide = chunk.channels > 2
         val samples = if (wide) downmix(chunk.samples, chunk.count, chunk.channels) else chunk.samples
         val count = if (wide) chunk.count / chunk.channels * 2 else chunk.count
@@ -73,7 +73,7 @@ object AudioDenoise {
       processor?.queueEndOfStream(); drain()
       if (filled > 0) { input.fill(0f, filled * channels); process() }
       input.fill(0f)
-      // 补齐尾端模型延迟，以及重采样最多一个采样点的取整误差。
+      // Pad remaining tail model latency, and up to one sample of rounding error from resampling.
       while (written < total) process()
       complete = true
       if (shown < 50) progress(0.5)

@@ -1,5 +1,5 @@
-# 本地 Expo 模块（D-600）：整体导出和恢复用的 zip 读写。只依赖 Apple 系统自带的 Foundation、libcompression
-# 和 libz（只用它的 crc32），没有第三方代码。
+# Local Expo module (D-600): ZIP read/write for full export and restore. Depends only on Apple's
+# system Foundation, libcompression, and libz (using only its crc32), with zero third-party code.
 
 Pod::Spec.new do |s|
   s.name           = 'MorphArchive'
@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
   s.frameworks = 'Foundation'
-  # Compression 和 libz 是系统的动态库，不是 framework。
+  # Compression and libz are system dynamic libraries, not frameworks.
   s.libraries = 'compression', 'z'
 
   s.source_files = '**/*.{h,m,swift}'

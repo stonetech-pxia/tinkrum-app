@@ -14,28 +14,29 @@ import type { FilePlatform, PickedFile } from '../platform';
 import type { PackRuntime } from '../../packs/bridge';
 import type { LocalUi } from '../local';
 
-// 动作实现共用的工具函数和运行环境。
+// Environment and utility functions injected into action implementations per run.
 
-/** 一次运行注入给动作实现的环境。 */
+/** Environment injected into action implementations per run. */
 export interface RunServices {
   runId: string;
   files: FilePlatform;
   repo: WorkspaceRepo;
-  /** 保存的文件授权给谁：工具 ID，或用户自己的工作流 `workflow:<id>`（§7G）。 */
+  /** Who is authorized to access saved files: tool ID, or the user's own workflow `workflow:<id>` (§7G). */
   grantee: string;
   ui: LocalUi;
-  /** 当前配置里的数据表（读取记录、生成报表用）。 */
+  /** Data tables in the current config (used for reading records and generating reports). */
   collections: readonly Collection[];
-  /** 一天、一周从什么时候开始（D-286）；没有时是 0 点、周一。 */
+  /** When a day or week starts (D-286); defaults to midnight and Monday when absent. */
   calendar?: Calendar;
-  /** 扩展包（WebView 里的 pdf.js、OpenCV、tesseract）；没有时为 null。 */
+  /** Packs (pdf.js in WebView, OpenCV, tesseract); null when absent. */
   packs: { runtime: PackRuntime; isInstalled(id: string): Promise<boolean> } | null;
   /**
-   * 动作执行到一半才知道要不要下载内容时用（压缩 PDF 转成图片要 PDF 预览，D-145）：
-   * 已下载或用户确认下载完成返回 true，用户拒绝返回 false。
+   * Used when an action only discovers the need to download content midway through execution
+   * (converting compressed PDF to images requires PDF preview, D-145): returns true if already
+   * downloaded or user confirms download completion, false if user declines.
    */
   ensurePack?: (packId: string, options?: { optional?: boolean }) => Promise<boolean>;
-  /** 从别的 App 分享进来的文件：第一步（in.photos / in.files）直接用它们，不打开选择器（D-115）。 */
+  /** Files shared from other apps: step one (in.photos / in.files) uses them directly without opening a picker (D-115). */
   incoming?: readonly PickedFile[] | null;
 }
 
@@ -43,7 +44,7 @@ export const MB = 1024 * 1024;
 
 export { baseName, extOf, extOfMime, isImageMime, mimeOf, mimeOfExt } from '../mime';
 
-/** 输入一定是文件（校验器保证了类型）。 */
+/** Input is guaranteed to be files (validator ensures the type). */
 export function fileItems(input: RunValue | null): RunItem[] {
   if (!isFileValue(input)) throw new RunError('unexpected', { detail: 'no files' });
   return input.items;
@@ -51,13 +52,14 @@ export function fileItems(input: RunValue | null): RunItem[] {
 
 let counter = 0;
 /**
- * 临时文件的相对路径：每个中间结果放在自己的子目录里（不会覆盖前一步的输入），
- * 文件名就是显示名，所以分享、存到「文件」时对方看到的是正确的名字。
+ * Relative path for temporary files: each intermediate result is placed in its own subdirectory
+ * (preventing overwriting previous inputs), with the display name as the filename, ensuring
+ * correct names are displayed when sharing or saving to Files.
  */
 export const freshName = (name: string, ext: string) =>
   `${++counter}/${sanitizeFileName(name)}.${ext}`;
 
-/** 把一段字节写成本次运行的临时文件。 */
+/** Write a block of bytes into a temporary file for the current run. */
 export async function writeItem(
   services: RunServices,
   bytes: Uint8Array,
@@ -71,7 +73,7 @@ export async function writeItem(
   return { ...item, uri: stored.uri, size: stored.size };
 }
 
-// 大小检查在 core（file-size-check.ts）：快捷操作和全部文件页面的合并 PDF 共用，阈值只有一份。
+// Size checks reside in core (file-size-check.ts): shared between quick actions and the all-files page PDF merger, with a single unified threshold.
 export { checkSizes, isMediaFile } from '@morph/core';
 
 export async function readItem(services: RunServices, item: RunItem): Promise<Uint8Array> {
@@ -82,23 +84,24 @@ export async function readItem(services: RunServices, item: RunItem): Promise<Ui
   }
 }
 
-/** 识别文字用的图（D-267）：scan.enhance 记下的增强前的图，只在这张图还是增强出来的那张时有效。 */
+/** Image used for text recognition (D-267): pre-enhancement image recorded by scan.enhance, valid only if the image is still the pre-enhanced version. */
 export function ocrSourceOf(item: RunItem): NonNullable<RunItem['ocrSource']> | null {
   return item.ocrSource && item.ocrSource.for === item.uri ? item.ocrSource : null;
 }
 
-/** 增强前的那张图当作一个运行项（大小未知，用到时再读）。 */
+/** Pre-enhancement image treated as a run item (size unknown, read on demand). */
 export function ocrSourceItem(item: RunItem, source: NonNullable<RunItem['ocrSource']>): RunItem {
   const { width: _w, height: _h, ocrSource: _o, ...rest } = item;
   return { ...rest, uri: source.uri };
 }
 
-/** 本次运行的临时文件 → 文件名（报错时显示）。 */
+/** Temporary file from current run -> filename (displayed on errors). */
 export const displayName = (item: RunItem) => `${item.name}.${item.ext}`;
 
 /**
- * 送进扩展包页面（WebView）的图片：重新编码成 JPG（摆正方向、去掉元数据，WebView 不一定认识 HEIC），
- * 缩到 iOS canvas 的 1677 万像素以内，长边不超过 maxSide。
+ * Images sent to pack pages (WebView): re-encoded to JPG (straightening orientation, removing
+ * metadata as WebViews may not recognize HEIC), scaled down below iOS canvas 16.7 million pixel
+ * limit, with the long side not exceeding maxSide.
  */
 export async function imageForPage(
   services: RunServices,
@@ -135,5 +138,5 @@ export async function imageForPage(
   }
 }
 
-/** 扩展包页面返回的 base64 → 字节。 */
+/** Base64 from pack page -> bytes. */
 export const fromBase64 = (data: string) => Uint8Array.from(atob(data), (c) => c.charCodeAt(0));

@@ -20,13 +20,17 @@ import { createStarterWorkspace } from './starter';
 import { checkTools, type ToolIssue } from './tool-check';
 import { issueLines } from './zod-issues';
 
-// 检查一份 App 文件（tinkrum-app，D-485）能不能导入，说清楚哪里不对（D-593）：给用别的 AI（Claude、ChatGPT）
-// 写 App 文件的人用，网站上的检查页和 App 里导入失败时说的是同一套。走的就是 App 导入的路：读文件（旧版本迁移）、
-// 做成导入操作、在新用户的工作区上 prepareOps（和「从文件导入」一样带 fromAppFile）。只看结构，不碰记录和文件。
+// Check whether an app file (tinkrum-app, D-485) can be imported, clearly explaining what is wrong
+// (D-593): for users writing app files with other AIs (Claude, ChatGPT); the website check page and
+// app import failure messages use the same set of checks. Follows the app import path: reads file
+// (migration from older versions), creates import operations, calls prepareOps on the new user's
+// workspace (same as "Import from file" with fromAppFile). Inspects structure only, does not touch
+// records or files.
 
 /**
- * App 文件的形状（当前版本），用来生成给别的 AI 看的 JSON Schema，也用来在导入前逐项说出哪里不对。
- * 外层的 exportedAt、uses 可有可无：导入不读它们（uses 只用来说缺什么，D-556）。
+ * App file shape (current version), used to generate JSON schema for other AIs to view, and to
+ * itemize errors before import. Outer exportedAt and uses are optional: import ignores them (uses
+ * is only used to indicate missing dependencies, D-556).
  */
 export const AppFileSchema = z.object({
   format: z.literal(APP_FILE_FORMAT),
@@ -38,7 +42,7 @@ export const AppFileSchema = z.object({
   pages: z.array(PageSchema).min(1),
   tables: z.array(CollectionSchema),
   tools: z.array(ToolSchema),
-  /** 画出来的图标（D-625）：内容里写 "my:<id>" 的，定义在这里。 */
+  /** Drawn icons (D-625): items containing "my:<id>" in their content are defined here. */
   icons: DrawnIconsSchema.optional(),
 });
 
@@ -56,15 +60,15 @@ export type AppFileCheck =
       file: AppFile;
       summary: AppFileSummary;
       warnings: string[];
-      /** 设计建议（D-602）：能用，但用起来可以更顺手的地方。不挡导入。 */
+      /** Design hints (D-602): places where functionality works, but can be made smoother. Does not block import. */
       hints: string[];
     }
   | { ok: false; problems: string[] };
 
-/** 最多说这么多条：再多对改文件也没帮助，先改前面的。 */
+/** Maximum number of issues to report: reporting more does not help fix the file; fix the earlier ones first. */
 const MAX_PROBLEMS = 20;
 
-/** 别的 AI 常把 JSON 包在代码块里，或者前后多一句话：取第一个 { 到最后一个 }。 */
+/** Other AIs often wrap JSON in code blocks or add surrounding text: extracts from the first { to the last }. */
 export function appFileJsonText(text: string): string {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
@@ -97,8 +101,11 @@ export function checkAppFileText(
     return fail([
       `schemaVersion ${raw.schemaVersion} is newer than this checker knows (${CURRENT_SCHEMA_VERSION}); write schemaVersion ${CURRENT_SCHEMA_VERSION}`,
     ]);
-  // 先按当前版本的形状逐项查（路径从文件的顶层算起）；旧版本的文件先迁移，形状交给导入时的校验。
-  // 迁移只改了版本号的旧文件（之后的版本只加了新的可选值，例如 39 → 40，D-607）照当前版本逐项查。
+  // First check item by item according to the current version's shape (paths counted from the
+  // file's top level); older version files are migrated first, and their shape is handled by import
+  // validation. Files migrated only by updating their version number (subsequent versions only
+  // added new optional values, e.g., 39 → 40, D-607) are checked item by item against the current
+  // version.
   const older = typeof raw.schemaVersion === 'number' && raw.schemaVersion < CURRENT_SCHEMA_VERSION;
   const file = readAppFile(JSON.stringify(raw));
   if (!older || (file && onlyVersionMoved(raw, file))) {
@@ -118,7 +125,7 @@ export function checkAppFileText(
   const prepared = prepareOps(starter, plan.ops, { ...ctx, fromAppFile: true });
   if (!prepared.ok) return fail(explainProblems(prepared.issues, file, ctx.registry));
 
-  // 能导入了。下面的只提醒（和「我的预设」上的完成度一样，D-417）：导入后才有的、用不了的地方。
+  // Importable. The following are reminders only (similar to completion percentage on "My Presets", D-417): unusable features that only exist post-import.
   const after = prepared.after;
   const issueText = (i: ToolIssue) => `${i.target}: ${i.message}`;
   const blockers = (config: WorkspaceConfig) =>
@@ -144,7 +151,7 @@ export function checkAppFileText(
   };
 }
 
-/** 迁移到当前版本以后，文件里的主题、页面、表和快捷操作一个字没变。 */
+/** After migrating to the current version, themes, pages, tables, and quick actions in the file remain completely unchanged. */
 function onlyVersionMoved(raw: Record<string, unknown>, file: AppFile): boolean {
   const app = raw.app as { theme?: unknown } | undefined;
   return (

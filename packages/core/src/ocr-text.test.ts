@@ -9,7 +9,7 @@ import {
   type OcrLine,
 } from './ocr-text';
 
-/** 一行字：第几行（行高 40、行距 50），左右边界。 */
+/** Text line: row number (row height 40, line spacing 50), left and right boundaries. */
 const line = (text: string, row: number, left = 100, right = 1100): OcrLine => ({
   text,
   x: left,
@@ -25,7 +25,7 @@ describe('joinOcrParagraph', () => {
       line('18.', 1, 100, 160),
     ];
     expect(joinOcrParagraph(lines)).toBe('[1] Martin, E. Document analysis. 2024. pp. 12-18.');
-    // 普通 OCR 和 Excel 仍自行判断段落，不跟着 Word 的已定段落路径改变。
+    // Standard OCR and Excel continue to determine paragraphs independently, without following Word's pre-defined paragraph paths.
     expect(layoutOcrLines(lines)).toContain('\n18.');
   });
 
@@ -71,9 +71,9 @@ describe('layoutOcrLines (D-268)', () => {
     const text = layoutOcrLines([
       line('漏掉一整行，往往不是因为字认不出来，而是找文字行时，那一行的边界刚好落在模型的判断', 0),
       line('线附近。', 1, 100, 260),
-      // 缩进两个字：新的一段。
+      // Indented by two characters: new paragraph.
       line('所以并不是越大越好，而是有一个最合适的字高。图片大小只是间接决定了字有多高。', 2, 180),
-      // 空了一行多：新的一段。
+      // Spaced by more than a line: new paragraph.
       line('对 Tinkrum 的意义', 4, 100, 500),
       line('• 现在拉正后的页面长边是 2400，识别前最大送 3500，A4 上的正文大约在 25 到 35 像素', 5),
       line('高，大体在合适的范围内。', 6, 140, 600),
@@ -132,7 +132,7 @@ describe('toSimplifiedChinese (D-268)', () => {
   });
 
   it('leaves characters that simplified Chinese also uses', () => {
-    // 乾隆、於（姓）、著作：简体里也写这些字。
+    // Qianlong, Yu (surname), works: these characters are also written this way in Simplified Chinese.
     expect(toSimplifiedChinese('乾隆年间，於先生的著作')).toBe('乾隆年间，於先生的著作');
     expect(toSimplifiedChinese('Total 12,50 € café')).toBe('Total 12,50 € café');
   });
@@ -147,7 +147,7 @@ describe('cjkPunctuation (D-268)', () => {
       '拍屏幕时的摩尔纹（屏幕像素格子产生的波纹），会干扰识别',
     );
     expect(cjkPunctuation('要我加上并推送吗?')).toBe('要我加上并推送吗？');
-    // 左右括号一起换。
+    // Opening and closing brackets changed together.
     expect(cjkPunctuation('行高约55像素(px),缩到一半')).toBe('行高约55像素（px），缩到一半');
   });
 

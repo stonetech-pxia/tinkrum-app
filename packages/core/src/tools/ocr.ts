@@ -6,20 +6,25 @@ import type { ToolDefinition } from '../registry';
 import type { Locale, Localized, Workflow } from '../schema';
 import type { ActionDefinition } from '../workflow/contract';
 
-// 文字识别工具的清单（T5）：中文、日文、英法德西葡意用 PP-OCRv6（D-269，iOS 和 Android 都是，第一次用时下载模型）；
-// 韩文等用系统自带的（iOS Vision，D-085；Android 只剩韩文用 ML Kit，D-087）；
-// 系统也识别不了的语言（Android 上的俄文、越南文）和 Expo Go 用文字识别包里的 tesseract.js（WebView），每种语言一个语言包。
-// 识别出的文字只留在本机（RunValue 'text'）：复制、存成文件、生成 PDF，绝不发给 AI（D-036）。
+// Manifest of text recognition tools (T5): Chinese, Japanese, English, French, German, Spanish,
+// Portuguese, Italian use PP-OCRv6 (D-269, on both iOS and Android, models downloaded on first
+// use); Korean and others use system-native ones (iOS Vision, D-085; Android retains ML Kit only
+// for Korean, D-087); languages unsupported by the system (Russian, Vietnamese on Android) and Expo
+// Go use tesseract.js from the OCR package (WebView), with one language pack per language.
+// Recognized text remains strictly on-device (RunValue 'text'): copy, save to file, generate
+// PDF—never sent to the AI (D-036).
 
 export const OCR_TOOL_ID = 'ocr';
 
-/** 转 Excel 的识别范围（D-272）：全部内容（默认）或仅表格内容。 */
+/** Recognition scope for Excel conversion (D-272): entire content (default) or table content only. */
 export const TABLE_SCOPES = ['all', 'tables'] as const;
 export const OCR_PAGE_ID = 'tool-ocr';
 
 /**
- * 识别语言的参数（D-278）：auto（默认，不问用户）或指定一种。auto 在手机上按手机语言选引擎：
- * PP-OCRv6 一个模型认中日英法德西葡意（字典里都有），手机是韩文、俄文、越南文时用系统的。
+ * Recognition language parameter (D-278): auto (default, does not prompt user) or specify one. On
+ * mobile, auto selects the engine based on system language: PP-OCRv6 uses a single model covering
+ * Chinese, Japanese, English, French, German, Spanish, Portuguese, and Italian (all included in
+ * its dictionary), while Korean, Russian, and Vietnamese use system APIs.
  */
 export const OCR_LANGUAGE_CHOICES = ['auto', ...OCR_LANGUAGES] as const;
 export type OcrLanguageChoice = (typeof OCR_LANGUAGE_CHOICES)[number];
@@ -56,7 +61,7 @@ export const OCR_ACTIONS: readonly ActionDefinition[] = [
         key: 'lang',
         label: { en: 'Language', zh: '语言', fr: 'Langue' },
         kind: 'choice',
-        // 自动就对，不问（D-278、D-363）。
+        // Automatic correctness without prompting (D-278, D-363).
         ask: false,
         options: [
           { value: 'auto', label: { en: 'Auto', zh: '自动', fr: 'Automatique' } },
@@ -65,11 +70,13 @@ export const OCR_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     pack: 'ocr',
-    // 语言包依赖识别包：确保语言包就会连同识别包一起下载。系统能识别的语言不需要（engine 的 packNotNeeded）。
-    // auto 时用哪个由手机决定（App 的 devicePack / packNotNeeded），这里退回识别包本身。
+    // Language pack depends on recognition package: ensures downloading the language pack also
+    // downloads the recognition package together. Not required for system-supported languages
+    // (engine's packNotNeeded). Device determines which to use when set to auto (app's devicePack /
+    // packNotNeeded), falling back to the recognition package itself here.
     packFor: (params) => (params.lang === 'auto' ? undefined : ocrPackId(String(params.lang))),
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match: /^(?:识别文字|文字识别|提取文字)$|^(?:recognize|read|extract) (?:the )?text$/i,
@@ -78,7 +85,7 @@ export const OCR_ACTIONS: readonly ActionDefinition[] = [
     ],
   },
   {
-    // 扫描件转 Excel（D-272）：只认带线的表（加只有横线的表），不加新模型；结果页可以查看和修改。
+    // Scanned document to Excel (D-272): recognizes bordered tables only (plus tables with horizontal lines only), without adding new models; results page allows viewing and editing.
     id: 'ocr.toExcel',
     label: { en: 'Convert to Excel', zh: '转 Excel', fr: 'Convertir en classeur Excel' },
     description: {
@@ -88,14 +95,14 @@ export const OCR_ACTIONS: readonly ActionDefinition[] = [
     },
     input: ['images'],
     output: 'files',
-    // 语言和「识别文字」一样，默认 auto、不问（D-278）。
+    // Language and scope same as text recognition, defaults to auto without prompting (D-278).
     params: z.strictObject({ lang: z.enum(OCR_LANGUAGE_CHOICES), scope: z.enum(TABLE_SCOPES) }),
     fields: [
       {
         key: 'lang',
         label: { en: 'Language', zh: '语言', fr: 'Langue' },
         kind: 'choice',
-        // 自动就对，不问（D-278、D-363）。
+        // Automatic correctness without prompting (D-278, D-363).
         ask: false,
         options: [
           { value: 'auto', label: { en: 'Auto', zh: '自动', fr: 'Automatique' } },
@@ -116,7 +123,7 @@ export const OCR_ACTIONS: readonly ActionDefinition[] = [
         ],
       },
     ],
-    // 要每行文字的位置：只用本机的识别（PP-OCRv6 或系统的），不用文字识别包（tesseract 只给文字）。
+    // Requires line text coordinates: uses on-device recognition only (PP-OCRv6 or system), excluding the OCR package (tesseract provides text only).
     requires: [],
     ai: '"Photo / scan of a table to Excel, a spreadsheet from a paper table, 表格转 Excel" → in.photos (source "scanner" for paper, then scan.detect → scan.enhance mode "auto"; library photos and screenshots go straight in) → ocr.toExcel; lang "auto" unless they name the language of the table, scope "all" unless they want only the tables. A scanned PDF: in.files accept "pdf" → pdf.toImages first. It makes one .xlsx with a sheet per page, which the user can check and edit on the result page; only tables with ruled lines (or only horizontal rules) become cells, everything else comes out as rows of text. Handwriting and tables without lines are not supported yet.',
     phrases: [
@@ -128,8 +135,10 @@ export const OCR_ACTIONS: readonly ActionDefinition[] = [
     ],
   },
   {
-    // 扫描件转 Word（D-328）：版面分析（扩展包 layout，不下载也能转，只是不分标题和图片）+ 认字 + 带线的表格，
-    // 做成一个 docx；结果页可以查看和修改。和电子版 PDF 转 Word（D-186 不做）不是一回事。
+    // Scanned document to Word (D-328): layout analysis (layout expansion pack, can convert without
+    // downloading though without title/image distinction) + text recognition + bordered tables,
+    // compiled into a docx; results page allows viewing and editing. Distinct from electronic PDF
+    // to Word conversion (which D-186 does not do).
     id: 'ocr.toWord',
     label: { en: 'Convert to Word', zh: '转 Word', fr: 'Convertir en document Word' },
     description: {
@@ -139,14 +148,14 @@ export const OCR_ACTIONS: readonly ActionDefinition[] = [
     },
     input: ['images'],
     output: 'files',
-    // 语言和「识别文字」一样，默认 auto、不问（D-278）。
+    // Language and scope same as text recognition, defaults to auto without prompting (D-278).
     params: z.strictObject({ lang: z.enum(OCR_LANGUAGE_CHOICES) }),
     fields: [
       {
         key: 'lang',
         label: { en: 'Language', zh: '语言', fr: 'Langue' },
         kind: 'choice',
-        // 自动就对，不问（D-278、D-363）。
+        // Automatic correctness without prompting (D-278, D-363).
         ask: false,
         options: [
           { value: 'auto', label: { en: 'Auto', zh: '自动', fr: 'Automatique' } },
@@ -154,7 +163,7 @@ export const OCR_ACTIONS: readonly ActionDefinition[] = [
         ],
       },
     ],
-    // 要每行文字的位置：只用本机的识别（和转 Excel 一样）；版面分析模型由 App 另外问（可选）。
+    // Requires line text coordinates: uses on-device recognition only (same as Excel conversion); layout analysis model is queried separately by the app (optional).
     requires: [],
     ai: '"Photo / scan of a document, letter or book page to Word, 拍文档转 Word, 图片转 Word" → in.photos (source "scanner" for paper, then scan.detect → scan.enhance mode "auto"; library photos and screenshots go straight in) → ocr.toWord; lang "auto" unless they name the language. A scanned PDF: in.files accept "pdf" → pdf.toImages first. It makes one .docx (a page per image) that the user can check and edit on the result page. For a digital PDF, use in.files accept "pdf" → pdf.toImages → ocr.toWord too: available source graphics and paper size are retained locally, while body text is reconstructed as editable paragraphs and tables. Exact fonts and reading order are not guaranteed.',
     phrases: [
@@ -168,13 +177,14 @@ export const OCR_ACTIONS: readonly ActionDefinition[] = [
 ];
 
 const CJK = '\u3000-\u303f\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef';
-// 韩文词之间本来就有空格，不算在内。不用后行断言：用捕获组保留前一个字。
+// Korean words naturally contain spaces, so they are excluded. Avoids lookbehind: uses a capturing group to preserve the preceding character.
 const CJK_THEN = new RegExp(`([${CJK}]) +(?=[${CJK}0-9])`, 'g');
 const DIGIT_THEN_CJK = new RegExp(`([0-9]) +(?=[${CJK}])`, 'g');
 
 /**
- * 整理识别结果（在本机做）：tesseract 在中日韩文字之间会插空格（「租约 续签 通知」），去掉这些空格；
- * 拉丁文字之间的空格保留；去掉每行首尾空白和多余的空行。
+ * Clean up OCR results (done on-device): Tesseract inserts spaces between CJK characters (e.g.,
+ * "lease renewal notice"), remove these spaces; preserve spaces between Latin characters; trim
+ * leading/trailing whitespace from each line and remove redundant empty lines.
  */
 export function tidyOcrText(text: string): string {
   return text
@@ -185,7 +195,7 @@ export function tidyOcrText(text: string): string {
     .trim();
 }
 
-/** 单功能工作流（D-061）。语言自动（D-278），运行时不问；用户可以在「调整设置」里指定。 */
+/** Single-feature workflow (D-061). Automatic language (D-278), not prompted at runtime; users can specify it in "Adjust Settings". */
 export function ocrWorkflows(locale: Locale): Workflow[] {
   const wf = (id: string, name: [string, string], steps: Workflow['steps']): Workflow => ({
     id,

@@ -5,7 +5,7 @@ import { useDataOverview } from '@/data/useDataOverview';
 import { t } from '@/i18n';
 import { Card, Pill } from '@/renderer/ui';
 
-/** 「数据 → 最近删除」（D-037，D-614 起单独一页）：保留 30 天，能恢复。系统层，AI 不能修改（底线 8）。 */
+/** 'Data -> Recently Deleted' (D-037, separate page since D-614): kept for 30 days, restorable. System layer, cannot be modified by AI (invariant 8). */
 export default function DataDeletedRoute() {
   const { locale, palette, deleted, known, name, actions } = useDataOverview();
   const caption = [palette.font('body', 13), { color: palette.muted }];

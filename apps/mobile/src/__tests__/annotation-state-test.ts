@@ -66,7 +66,7 @@ it('keeps outline rectangles and freehand paths, ignores tiny accidental arrows,
   expect(state.marks[0]).toHaveLength(1);
   state = reduceAnnotations(state, { type: 'tool', tool: 'pen' }, sizes);
   state = reduceAnnotations(state, { type: 'grant', x: 20, y: 10 }, sizes);
-  // 先往右画、再往下画：超过上限后形状要保留（拐角还在），点数不超过上限。
+  // Draw right first, then down: shape must be preserved (corners remain) and point count cannot exceed the limit once exceeded.
   for (let n = 0; n < 900; n++)
     state = reduceAnnotations(state, { type: 'move', dx: n / 10, dy: 0 }, sizes);
   for (let n = 0; n < 900; n++)
@@ -76,12 +76,12 @@ it('keeps outline rectangles and freehand paths, ignores tiny accidental arrows,
   const corner = points.some((p) => Math.abs(p.x - points[points.length - 1]!.x) < 1 && p.y < 60);
   expect(corner).toBe(true);
   expect(points[points.length - 1]!.y).toBeGreaterThan(points[0]!.y + 100);
-  // 末尾不能是一条从旧点直接拉到手指的直线。
+  // The end cannot be a straight line dragged directly from an old point to the finger.
   const [a, b] = points.slice(-2);
   expect(Math.hypot(b!.x - a!.x, b!.y - a!.y)).toBeLessThan(5);
 });
 
-describe('文字：选中、拖动、改样式、删除', () => {
+describe('text: select, drag, modify style, delete', () => {
   const textState = () => reduceAnnotations(initial(), { type: 'tool', tool: 'text' }, sizes);
   const placed = () => {
     let state = reduceAnnotations(textState(), { type: 'text', text: '你好' }, sizes);
@@ -110,7 +110,7 @@ describe('文字：选中、拖动、改样式、删除', () => {
     state = reduceAnnotations(state, { type: 'move', dx: 40, dy: 10 }, sizes);
     state = reduceAnnotations(state, { type: 'end' }, sizes);
     const moved = state.marks[0]![0] as { point: { x: number; y: number } };
-    // 按下时的位置加手指移动的总距离（200 点的框对应 1000 点的页：每个屏幕点 5 个页面点）。
+    // Position at press plus total finger movement distance (a 200-point box corresponds to a 1000-point page: 5 page points per screen point).
     expect(moved.point).toEqual({ x: at.point.x + 200, y: at.point.y + 50 });
     expect(state.selected).toBe(0);
   });
@@ -144,7 +144,7 @@ describe('文字：选中、拖动、改样式、删除', () => {
     state = reduceAnnotations(state, { type: 'remove' }, sizes);
     expect(state.marks[0]).toEqual([]);
     expect(state.selected).toBeNull();
-    // 一长条文字转 90° 后竖起来：原来的位置（横着的两端）点不中，竖着的两端点得中。
+    // Rotating a long strip of text by 90° vertically: original positions (ends of horizontal bar) are unclickable, vertical ends become clickable.
     state = reduceAnnotations(textState(), { type: 'text', text: '你好你好你好' }, sizes);
     state = reduceAnnotations(state, { type: 'grant', x: 100, y: 50 }, sizes);
     state = reduceAnnotations(state, { type: 'style', patch: { rotation: 90 } }, sizes);
@@ -157,12 +157,12 @@ describe('文字：选中、拖动、改样式、删除', () => {
     const tap = (x: number, y: number) =>
       reduceAnnotations(state, { type: 'grant', x: x / 5, y: y / 5 }, sizes);
     expect(tap(cx, cy + 90).drag).toBe(true);
-    // 横着的一端点不中：只是取消选中，不再多放一个（2026-11-09）。
+    // Tapping the horizontal end is a miss: it only deselects, without placing an extra one (2026-11-09).
     expect(tap(cx + 90, cy).selected).toBeNull();
     expect(tap(cx + 90, cy).marks[0]).toHaveLength(1);
   });
 
-  // 2026-11-09 用户测试：放好一段字后点空白处想「取消选中」，结果又多了一段；字以手指为中心，落不到线上。
+  // 2026-11-09 user test: after placing text, tapping an empty spot to "deselect" instead creates another one; text centers on the finger and cannot land precisely on the line.
   it('tapping an empty spot while a text is selected only deselects it; the next tap adds one', () => {
     let state = placed();
     expect(state.selected).toBe(0);
@@ -170,7 +170,7 @@ describe('文字：选中、拖动、改样式、删除', () => {
     state = reduceAnnotations(state, { type: 'end' }, sizes);
     expect(state.marks[0]).toHaveLength(1);
     expect(state.selected).toBeNull();
-    // 没有选中的时候再点空白处：照写好的字再放一段（同一个日期写在两处）。
+    // Tapping an empty spot when nothing is selected: places another segment following the written text (same date written in two places).
     state = reduceAnnotations(state, { type: 'grant', x: 180, y: 90 }, sizes);
     expect(state.marks[0]).toHaveLength(2);
     expect(state.marks[0]![1]).toMatchObject({ text: '你好' });
@@ -180,7 +180,7 @@ describe('文字：选中、拖动、改样式、删除', () => {
     let state = reduceAnnotations(textState(), { type: 'text', text: 'Date' }, sizes);
     state = reduceAnnotations(state, { type: 'grant', x: 40, y: 60, fontSize: 20 }, sizes);
     const mark = state.marks[0]![0] as { point: { x: number; y: number }; fontSize: number };
-    // 200 点的框对应 1000 点的页：点在页面 (200, 300)。
+    // 200-point box corresponds to a 1000-point page: point at page (200, 300).
     expect(mark.fontSize).toBe(20);
     expect(mark.point.x).toBe(200);
     expect(mark.point.y + 20 * 1.6).toBe(300);
@@ -193,7 +193,7 @@ describe('文字：选中、拖动、改样式、删除', () => {
       { type: 'grant', x: 40, y: 60, document: true },
       sizes,
     );
-    // 短边 500：约 1.9%，接近 A4 上 11 磅的字。
+    // Short side 500: about 1.9%, close to 11 pt font size on A4.
     expect((placedDoc.marks[0]![0] as { fontSize: number }).fontSize).toBeCloseTo(9.5, 1);
     const photo = reduceAnnotations(doc, { type: 'grant', x: 40, y: 60 }, sizes);
     expect((photo.marks[0]![0] as { fontSize: number }).fontSize).toBeCloseTo(22.5, 1);

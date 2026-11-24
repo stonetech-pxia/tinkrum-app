@@ -7,25 +7,26 @@ import { boundedText, DaysSchema, filterSchema, GroupingSchema, IdSchema } from 
 import { followChoiceProblems } from './choices';
 import { type LookDefinitionOf, defineLook, isSystemField, NUMERIC_FIELD_TYPES } from './define';
 
-/** 图表读什么：一张表，按时间段或单选 / 引用字段分组（group 必填），每组一个数。 */
+/** Chart data source: a table, grouped by time period or single-choice / reference field (group is required), with one value per group. */
 export const ChartSourceSchema = z.strictObject({
   table: IdSchema,
-  // v33 结构里的 streak / daysSince / avgInterval 在合法配置里不可能出现（E3），v34 去掉。
+  // streak / daysSince / avgInterval in v33 structures cannot appear in valid configuration (E3), removed in v34.
   aggregate: z.enum(['count', 'sum', 'avg', 'min', 'max', 'latest', 'distinctDays']),
   field: IdSchema.optional(),
   filter: filterSchema().optional(),
-  /** distinctDays 按哪个日期算（按单选分组时）；按时间分组时就是 group.by。 */
+  /** Date field used for distinctDays calculation (when grouping by single-choice); for time grouping, it is group.by. */
   days: z.strictObject({ date: DaysSchema.shape.date }).optional(),
   group: GroupingSchema,
   running: z.enum(['shown', 'all']).optional(),
   split: z.strictObject({ by: IdSchema }).optional(),
-  /** 和上一期比（D-439）：画上一个同样长的时间段，只有时间分组的柱状图和折线图。 */
+  /** Compare to previous period (D-439): renders an equally long preceding time period, only for time-grouped bar and line charts. */
   compare: z.literal('previous').optional(),
-  /** 跟着页面上的时间范围（D-440）：同一页要有一个 period 块；按选的范围画，group.unit 和 last 不再用（按范围长短自己选按天、周、月）。 */
+  /** Follows the page-level time range (D-440): the page must have a period block; renders according to the selected range, ignoring group.unit and last (automatically selects day, week, or month based on range length). */
   period: z.literal('page').optional(),
   /**
-   * 跟着页面上的一排选项（D-573）：同一页要有一个 choices 块，读的是同一张表；只算这个字段是选中那一项的记录
-   * （「全部」不加条件）。按同一个字段分组的不行。
+   * Follows the page-level option tabs (D-573): the page must have a choices block reading the
+   * same table; calculates only records where this field matches the selected item ("All" adds no
+   * condition). Grouping by the same field is not allowed.
    */
   choice: z.literal('page').optional(),
 });
@@ -36,8 +37,10 @@ const shape = {
     kind: z.enum(['bar', 'line', 'pie']),
     title: boundedText(1, 60),
     /**
-     * 点一根柱子 / 一个点，页面上的时间范围就改成它那一段（D-585）：同一页要有一个带 custom 的 period 块，
-     * 这页上跟着时间范围的数字卡、列表、图表一起变。图表自己按 group.unit 分段，不跟着页面范围（没有 source.period）。
+     * Tapping a bar/point updates the page time range to that period (D-585): the page must have
+     * a period block with custom, synchronizing number cards, lists, and charts on the page that
+     * follow the time range. Charts segment themselves by group.unit independently of the page
+     * range (no source.period).
      */
     pickPeriod: z.literal(true).optional(),
   }),
@@ -45,9 +48,11 @@ const shape = {
 };
 
 /**
- * 图表（D-249）：一张表的记录按时间段（最近几天 / 周 / 月，group.unit）或单选字段（group.by）分组，
- * 柱状、折线或饼图。饼图只能按单选分。D-336：也可以是引用字段，被引用的表里每条记录一个点。
- * 只有固定几种画法和聚合，没有表达式；记录只在本机读取。
+ * Chart (D-249): records of a table grouped by time period (recent days/weeks/months, group.unit)
+ * or single-choice field (group.by), displayed as bar, line, or pie charts. Pie charts support
+ * only single-choice grouping. D-336: can also be reference fields, with one point per record in
+ * the referenced table. Fixed set of visualizations and aggregations only, no expressions;
+ * records are read locally.
  */
 export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLook({
   look: 'chart',
@@ -61,7 +66,7 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
     'source.filter': { to: 'filter' },
     'source.split.by': { to: 'field', types: ['choice'], one: true },
   },
-  // D-249：求和、平均要数字字段；按单选分时要单选字段；按时间分时用日期字段；饼图只能按单选分。
+  // D-249: sum and average require numeric fields; single-choice grouping requires single-choice fields; time grouping requires date fields; pie charts require single-choice grouping.
   check: (c, { collection, page }) => {
     const problems: string[] = [...followChoiceProblems(c.source, page)];
     if (c.source.group?.until) problems.push('source.group.until only applies to a calendar');
@@ -98,7 +103,7 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
       const f = c.source.field ? field(c.source.field) : undefined;
       if (!f || !NUMERIC_FIELD_TYPES.includes(f.type))
         problems.push(`${aggregate} needs field set to a number, money, rating or formula field`);
-      // D-429：一张图只有一条数轴，不同货币不能画在一起。用数字块（分货币显示）或数笔数。
+      // D-429: a chart has only a single value axis, different currencies cannot be rendered together. Use numeric blocks (displayed per currency) or record counts.
       if (hasRecordCurrency(f))
         problems.push(
           `${aggregate} can't chart ${f!.id}: each entry has its own currency, and amounts in different currencies can't be added up; use a number block or aggregate "count"`,
@@ -121,7 +126,7 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
       problems.push('a chart groups by time (unit) or by a choice or link field (by)');
     if (group.unit === undefined) {
       const type = group.by ? field(group.by)?.type : undefined;
-      // 多选（D-607）：一条记录算进几块，各块加起来超过整个圆。
+      // Multiple choice (D-607): a single record counts toward multiple slices, causing the sum of slices to exceed the full circle.
       if (c.show.kind === 'pie' && isMultipleChoice(group.by ? field(group.by) : undefined))
         problems.push(
           `a pie chart can't be grouped by ${group.by}: it ${MULTIPLE_CHOICE_NOT_ONE} and the slices would add up to more than the whole; use a bar chart`,

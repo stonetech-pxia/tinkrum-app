@@ -11,8 +11,9 @@ import { registry } from './test-helpers';
 import { validateWorkspace } from './validate';
 import { FieldSchema, fieldDefinition, type Collection } from './schema';
 
-// D-568：单选选项可以带一个数（value）和一个有名字的颜色（color）。颜色只在 option-colors.ts 定义一次；
-// 没写颜色的选项照旧按顺序取分类色。排序仍然按选项顺序，不看 value。
+// D-568: Single-choice options can have a value and a named color (color). Colors are defined only
+// once in option-colors.ts; options without a color fall back to sequential category colors as
+// before. Sorting still follows option order, ignoring value.
 
 const plan: Collection = {
   id: 'subs',
@@ -63,7 +64,7 @@ describe('choice options carry a number and a named colour (D-568)', () => {
     expect(optionColor(monthly, 0, true)).toBe(OPTION_COLORS.blue.dark);
     expect(optionColor(yearly, 1, false)).toBe(CHART_COLORS.light[1]);
     expect(optionColor(weekly, 2, true)).toBe(OPTION_COLORS.red.dark);
-    // 没选、第 8 个起：中性灰，和以前一样。
+    // Unselected, from the 8th onward: neutral gray, same as before.
     expect(optionColor(undefined, -1, false)).toBe(CHART_COLORS.other.light);
     expect(optionColor({}, 7, true)).toBe(CHART_COLORS.other.dark);
   });

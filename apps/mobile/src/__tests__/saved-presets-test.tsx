@@ -28,7 +28,7 @@ import {
 } from '../test-utils/render-app';
 import { V4_FIXED_NAME } from '../../../../packages/core/src/fixtures/v4';
 
-// 「设置 → 我的预设」（D-410）：存整个 App，不带记录和文件；换回来走恢复版本的流程，能撤销。
+// Settings -> My Presets (D-410): stores the entire app without records and files; restoring it goes through the version recovery flow and can be undone.
 
 const FILE = 'presetfile01';
 const PORTAL = join(__dirname, '../../../../packages/core/src/fixtures/portal-apps');
@@ -132,7 +132,7 @@ it('the whole path: save, change the app, apply and come back, undo, rename, del
   const { repo, store } = await app();
   const original = store.getState().config!;
   await openPresets();
-  // 空名字存不了。
+  // Cannot save with an empty name.
   await saveThroughScreen('   ');
   expect(await repo.listPresets()).toEqual([]);
 
@@ -146,12 +146,12 @@ it('the whole path: save, change the app, apply and come back, undo, rename, del
   )[0]!;
   expect(preset.name).toBe('我的笔记');
   expect(preset.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
-  // 保存不产生新版本，也不带文件引用。
+  // Saving does not produce a new version, nor does it carry file references.
   expect(JSON.stringify(preset.config)).not.toContain(FILE);
   expect(store.getState().config).toEqual(original);
   expect(await screen.findByTestId(`preset-${preset.id}`)).toBeTruthy();
 
-  // 改主题、移走表。
+  // Change theme, remove table.
   await act(() =>
     changeApp(store, [
       { op: 'setTheme', primaryColor: '#336699' },
@@ -161,7 +161,7 @@ it('the whole path: save, change the app, apply and come back, undo, rename, del
   expect(store.getState().config!.data.tables.map((t) => t.id)).not.toContain('notes');
   const changedHead = store.getState().head!.id;
 
-  // 先确认：取消就什么都不变。
+  // Confirm first: cancelling leaves everything unchanged.
   const alert = jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
     buttons?.find((b) => b.style === 'cancel')?.onPress?.();
   });
@@ -179,20 +179,20 @@ it('the whole path: save, change the app, apply and come back, undo, rename, del
   expect(applied.theme.primaryColor).toBe(original.theme.primaryColor);
   expect(store.getState().head!.source).toBe('restore');
   expect(store.getState().head!.summary).toContain('我的笔记');
-  // 文件位还在，是空的。
+  // The file slot is still there and is empty.
   expect(JSON.stringify(applied)).not.toContain(FILE);
   expect(JSON.stringify(applied)).toContain('"slot"');
-  // 记录还在；回到首页，提示条能撤销。
+  // Records are still there; returning to the home screen shows an undoable banner.
   expect(await repo.listRecords('notes')).toHaveLength(1);
   expect(await screen.findByText(/我的笔记/)).toBeTruthy();
   await act(() => store.getState().undo());
   expect(store.getState().config!.theme.primaryColor).toBe('#336699');
   expect(await repo.listRecords('notes')).toHaveLength(1);
 
-  // 回到预设页改名、删除并撤销。
+  // Return to the presets page to rename, delete, and undo.
   await act(() => store.getState().dismissBanner());
   await openPresets();
-  // 「⋯」里选改名、删除（D-614）。
+  // Select rename and delete in "..." (D-614).
   const pickInMenu = async (label: string) => {
     jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
       buttons?.find((b) => b.text === label)?.onPress?.();
@@ -216,7 +216,7 @@ it('the whole path: save, change the app, apply and come back, undo, rename, del
   expect(await screen.findByTestId(`preset-${preset.id}`)).toBeTruthy();
 });
 
-it('a table the preset does not have: its entries stay and show under Settings → Data (底线 5)', async () => {
+it('a table the preset does not have: its entries stay and show under Settings → Data (Invariant 5)', async () => {
   const repo = new MemoryWorkspaceRepo();
   await repo.insertRecord(noteRecord);
   const { store } = await renderToolsApp(repo, undefined, { seed });
@@ -232,19 +232,19 @@ it('a table the preset does not have: its entries stay and show under Settings �
   expect(await repo.listRecords('notes')).toHaveLength(1);
   await fireEvent.press(await screen.findByTestId('nav-settings'));
   await fireEvent.press(await screen.findByTestId('settings-data'));
-  // 不在界面里的表单独一页（D-614）。
+  // Tables not in the UI get their own page (D-614).
   await fireEvent.press(await screen.findByTestId('data-unused'));
   expect(await screen.findByTestId('orphan-notes')).toBeTruthy();
 });
 
-it('a preset from an old format is upgraded first, and applying it works (底线 12)', async () => {
+it('a preset from an old format is upgraded first, and applying it works (Invariant 12)', async () => {
   const { repo, store } = await app();
   await repo.insertPreset(stored('oldpreset', { config: V4_FIXED_NAME, schemaVersion: 4 }));
   const result = await act(() => store.getState().proposePreset('oldpreset'));
   expect(result.kind).toBe('preview');
   await act(async () => void (await store.getState().confirm()));
   expect(store.getState().config!.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
-  // 存着的那份没被改。
+  // The stored preset is unmodified.
   expect((await repo.getPreset('oldpreset'))!.schemaVersion).toBe(4);
 });
 
@@ -300,13 +300,13 @@ it('French: the settings row and the screen use the French words', async () => {
   expect(await screen.findByText('Garder l’app actuelle comme préréglage')).toBeTruthy();
 });
 
-// 保存时显示工具检查的结果（D-417）：只提醒，不阻止（底线 19）。
-describe('保存预设时的检查', () => {
-  // 路由状态是模块级的，上一个测试可能还停在预设页：直接打开。
+// Display tool check results when saving (D-417): warns only, does not block (Invariant 19).
+describe('saving preset checks', () => {
+  // Route state is module-level, and the previous test might still be on the presets page: open directly.
   const openCheck = async () => {
     await act(async () => router.push('/presets'));
     const screenEl = await screen.findByTestId('presets-screen');
-    // 「保存现在的样子」点了才展开（D-614）。
+    // Expanded only when "Save current state" is tapped (D-614).
     await fireEvent.press(screen.getByTestId('preset-new'));
     return screenEl;
   };
@@ -333,7 +333,7 @@ describe('保存预设时的检查', () => {
     return r.config;
   };
 
-  it('空的 App：0 个工具，没有问题，按钮是「保存」', async () => {
+  it('empty app: 0 tools, no issues, button says "Save"', async () => {
     await renderToolsApp(new MemoryWorkspaceRepo());
     await openCheck();
     expect(screen.getByTestId('preset-check-tools').props.children).toBe('0 个工具');
@@ -341,7 +341,7 @@ describe('保存预设时的检查', () => {
     expect(screen.queryByText('仍然保存')).toBeNull();
   });
 
-  it('工具包自带的快捷操作不算：个数是用户自己的工具', async () => {
+  it('quick actions built into tool packs do not count: count is the user\'s own tools', async () => {
     await renderToolsApp(new MemoryWorkspaceRepo(), undefined, {
       seed: seedWith([{ op: 'setPackage', package: 'pdf', do: 'add' }, ...orphan]),
     });
@@ -349,7 +349,7 @@ describe('保存预设时的检查', () => {
     expect(screen.getByTestId('preset-check-tools').props.children).toBe('1 个工具');
   });
 
-  it('问题很多也只列前几条', async () => {
+  it('only lists the first few items even if there are many issues', async () => {
     const many = Array.from({ length: 6 }, (_, n): Op[] =>
       JSON.parse(JSON.stringify(orphan).replaceAll('books', `books${n}`)),
     ).flat();
@@ -361,7 +361,7 @@ describe('保存预设时的检查', () => {
     expect(screen.getAllByTestId('preset-check-problem')).toHaveLength(4);
   });
 
-  it('法语', async () => {
+  it('French', async () => {
     await renderToolsApp(new MemoryWorkspaceRepo(), undefined, {
       locale: 'fr',
       seed: seedWith(orphan),
@@ -371,7 +371,7 @@ describe('保存预设时的检查', () => {
     expect(screen.getByTestId('preset-check-tools').props.children).toBe('1 outil');
   });
 
-  it('有问题：列出来，按钮变成「仍然保存」，点了照样存下', async () => {
+  it('issues found: listed, button changes to "Save anyway", tapping saves successfully', async () => {
     const repo = new MemoryWorkspaceRepo();
     await renderToolsApp(repo, undefined, { seed: seedWith(orphan) });
     await openCheck();
@@ -388,9 +388,9 @@ describe('保存预设时的检查', () => {
   });
 });
 
-// 「从文件导入」：门户下载的预设文件存成一个新预设，点「应用」才换（D-485）。
+// "Import from file": a preset file downloaded from the portal is saved as a new preset, and only takes effect when "Apply" is tapped (D-485).
 describe('import a preset from a file', () => {
-  // 前面的测试留下的 Alert.alert 监视和调用记录不能带进来。
+  // Alert.alert spies and call logs left by previous tests must not carry over.
   beforeEach(() => jest.restoreAllMocks());
   const PICKED = 'file:///cache/DocumentPicker/收据.json';
   const pickFile = (
@@ -410,7 +410,7 @@ describe('import a preset from a file', () => {
   };
   const exported = (config: unknown = seed()) =>
     appConfigFile(config as WorkspaceConfig, new Date(2026, 10, 7));
-  // 路由状态是模块级的，上一个测试可能还停在预设页，也可能回到了首页：哪种都能打开。
+  // Route state is module-level; the previous test might still be on the presets page or back on the home screen: handle both.
   const openScreen = async () => {
     if (await screen.findByTestId('presets-screen', {}, { timeout: 300 }).catch(() => null))
       return screen.getByTestId('presets-screen');
@@ -427,7 +427,7 @@ describe('import a preset from a file', () => {
   it('stores a new preset named after the file, changes nothing else, and applies only on request', async () => {
     const { repo, files, store } = await app();
     const text = exported();
-    // 先把 App 改成和文件里不一样的样子。
+    // First, modify the app to differ from the file.
     await act(() => changeApp(store, [{ op: 'removeData', table: 'notes' }]));
     const before = store.getState().config!;
     const head = store.getState().head!.id;
@@ -444,13 +444,13 @@ describe('import a preset from a file', () => {
     expect(preset.name).toBe('收据');
     expect(preset.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(JSON.stringify(preset.config)).not.toContain(FILE);
-    // 只选了文件的类型，没联网；当前的 App 一点没变，也没有新版本。
+    // Only file types are selected, no network access; the current app remains entirely unchanged, and no new version is created.
     expect(files.lastPickTypes).toContain('application/json');
     expect(store.getState().config).toEqual(before);
     expect(store.getState().head!.id).toBe(head);
     expect(await screen.findByTestId(`preset-${preset.id}`)).toBeTruthy();
 
-    // 点「应用」：先问，确认后换，记录还在，能撤销。
+    // Tap "Apply": asks first, applies upon confirmation, records remain, and can be undone.
     acceptNextAlert();
     await fireEvent.press(screen.getByTestId(`preset-${preset.id}`));
     await waitFor(() => expect(store.getState().head!.id).toBeGreaterThan(head));
@@ -470,7 +470,7 @@ describe('import a preset from a file', () => {
     expect((await repo.listPresets()).map((p) => p.name).sort()).toEqual(['收据', '收据 2']);
   });
 
-  it('an older file is upgraded before it is stored (底线 12)', async () => {
+  it('an older file is upgraded before it is stored (Invariant 12)', async () => {
     const { repo, files } = await app();
     pickFile(files, exported(V4_FIXED_NAME), { name: 'old.json' });
     await importThroughScreen();
@@ -511,7 +511,7 @@ describe('import a preset from a file', () => {
     expect(store.getState().head!.id).toBe(head);
   });
 
-  it('refuses a configuration that does not hold together, listing the reasons (底线 18)', async () => {
+  it('refuses a configuration that does not hold together, listing the reasons (Invariant 18)', async () => {
     const { repo, files } = await app();
     const broken = JSON.parse(JSON.stringify(seed())) as WorkspaceConfig;
     broken.containers.pages[0]!.blocks.push({
@@ -556,7 +556,7 @@ describe('import a preset from a file', () => {
       await repo.insertPreset(stored(`preset${i}`, { createdAt: i }));
     await openScreen();
     expect(await screen.findByTestId('presets-full')).toBeTruthy();
-    // App 文件不占预设的名额，所以入口还在；整份配置存不下，只提示。
+    // App files do not count toward the preset limit, so the entry point remains; if the entire configuration cannot be stored, only a notice is shown.
     await fireEvent.press(await screen.findByTestId('preset-add'));
     expect(screen.getByTestId('preset-import')).toBeTruthy();
     pickFile(files, exported());
@@ -568,14 +568,14 @@ describe('import a preset from a file', () => {
   });
 
   describe('an App file (D-485: one app, tinkrum-app)', () => {
-    // 门户上的 App 文件是在新用户的起始配置上做的（要有它的工具包和页面），所以用起始配置当底子。
+    // Portal app files are built on top of the new user's starting configuration (must include its tool package and pages), so use the starting configuration as the base.
     const starterApp = () =>
       renderToolsApp(new MemoryWorkspaceRepo(), undefined, {
         seed: starterAfterGuide,
         locale: 'zh',
       });
-    // 门户里现成的一份 App 文件（Clay）。
-    // 先问「导入主页」还是「做成新 App」：选做成新 App（第二个按钮）。
+    // An existing app file in the portal (Clay). First asks whether to "Import to home screen" or
+    // "Make as new app": choose make as new app (second button).
     const chooseNewApp = () =>
       jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
         buttons?.[1]?.onPress?.();
@@ -591,13 +591,13 @@ describe('import a preset from a file', () => {
       await importThroughScreen();
       await waitFor(() => expect(store.getState().config!.nav.apps?.[0]?.id).toBe('clay'));
       expect(await repo.listPresets()).toEqual([]);
-      // 原来的页面和表一个不少。
+      // Not a single original page or table is missing.
       const after = store.getState().config!;
       for (const p of before.containers.pages)
         expect(after.containers.pages.some((x) => x.id === p.id)).toBe(true);
       for (const tb of before.data.tables)
         expect(after.data.tables.some((x) => x.id === tb.id)).toBe(true);
-      // 能在改动记录里撤销，撤销后没有这个 App。
+      // Can be undone in change history, and after undoing, this app no longer exists.
       await act(() => store.getState().undo());
       expect(store.getState().config!.nav.apps ?? []).toEqual([]);
     });
@@ -616,7 +616,7 @@ describe('import a preset from a file', () => {
       expect(await repo.listPresets()).toEqual([]);
     });
 
-    // D-611：同一个 App 第二次导入不再报错，而是问要不要更新它（默认更新）；取消就什么都不变。
+    // D-611: Importing the same app a second time asks whether to update it instead of throwing an error (defaults to updating); cancelling leaves everything unchanged.
     it('the same app twice: asks to update it, and cancelling changes nothing', async () => {
       const { files, store } = await starterApp();
       pickFile(files, clay(), { name: 'tinkrum-app-clay.json' });
@@ -627,7 +627,7 @@ describe('import a preset from a file', () => {
       const head = store.getState().head!.id;
       await openScreen();
       pickFile(files, clay(), { name: 'tinkrum-app-clay.json' });
-      // 第一次导入时 acceptNextAlert 装的监视还在，调用记录要清掉再看这一次。
+      // The spy set up by acceptNextAlert during the first import is still active, so clear call logs before checking this time.
       const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       alert.mockClear();
       await fireEvent.press(await screen.findByTestId('preset-add'));
@@ -641,8 +641,10 @@ describe('import a preset from a file', () => {
       expect(store.getState().proposal).toBeNull();
     });
 
-    // 这个版本不认识的外观（D-545）：整份不导入，按文件里的位置说哪里不对，和网站、自检脚本一样（D-595）。
-    // 文件没有说自己用到了什么（D-556 的 uses）时，不知道它是新版本做的还是写错了，所以不说「先更新」。
+    // Looks unknown to this build (D-545): entire configuration is not imported, explains what is
+    // wrong based on file positions, matching the website and self-test script (D-595). When a file
+    // does not state what it uses (uses in D-556), it is unclear whether it was made by a newer
+    // version or contains an error, so do not suggest "Update first".
     it('a file using something this build does not know names the place and imports nothing', async () => {
       const { files, store } = await starterApp();
       const head = store.getState().head!.id;
@@ -662,8 +664,10 @@ describe('import a preset from a file', () => {
       expect(store.getState().proposal).toBeNull();
     });
 
-    // 别的 AI 写的文件（创始人 2026-11-19 在手机上遇到）：字段 ID 写成了大写和下划线。说的是文件里的位置
-    // （tables.1.fields.3.id），不是导入操作的编号（1.table.fields.3.id），也不怪版本。
+    // A wrong field ID from another AI (encountered by the founder on mobile on 2026-11-19): field
+    // ID written with uppercase letters and underscores. Refers to the location in the file
+    // (tables.1.fields.3.id) rather than the import operation index (1.table.fields.3.id), and does
+    // not blame the version.
     it('a wrong field id from another AI is named by its place in the file, and can be copied', async () => {
       const { files, store } = await starterApp();
       const head = store.getState().head!.id;
@@ -681,7 +685,7 @@ describe('import a preset from a file', () => {
       expect(String(message)).not.toContain('1.table.fields');
       expect(String(message)).not.toContain('新版本');
       buttons!.find((b) => b.text === '复制问题')!.onPress!();
-      // 复制给 AI 的带着改法（D-597）。
+      // Copied to the AI with the modification method (D-597).
       await waitFor(() => expect(files.clipboard).toContain('write "note-text"'));
       await waitFor(() =>
         expect(files.clipboard).toContain('- tables.1.fields.3.id: "Note_Text" is not a valid id'),
@@ -690,7 +694,7 @@ describe('import a preset from a file', () => {
       expect(store.getState().config!.nav.apps ?? []).toEqual([]);
     });
 
-    // 文件外层带了「用到了什么」（D-556）：缺的东西准确地说出来，不再是笼统的「用不了」。
+    // A file listing its uses specifies exactly what this build is missing (D-556), rather than a generic "cannot use".
     it('a file that lists what it uses names what this build is missing', async () => {
       const { files, store } = await starterApp();
       const head = store.getState().head!.id;
@@ -713,7 +717,7 @@ describe('import a preset from a file', () => {
       expect(store.getState().proposal).toBeNull();
     });
 
-    // 从剪贴板粘贴（D-593）：别的 AI 在对话里写的 App 文件，复制过来就能导入；写错了能把原因复制回去。
+    // Pasted from the clipboard (D-593): app files written by other AIs in chat can be imported immediately when pasted; errors can be copied back.
     describe('pasted from the clipboard', () => {
       const paste = async () => {
         await openScreen();
@@ -744,7 +748,7 @@ describe('import a preset from a file', () => {
         expect(store.getState().head!.id).toBe(head);
       });
 
-      // 新 App 不带工作区内容；附带的指南、patterns 和检查器也不含用户数据。
+      // New apps do not carry workspace content; the accompanying guide, patterns, and checker also contain no user data.
       it('sending instructions shares the version-matched kit and changes no workspace data', async () => {
         const { store, files } = await starterApp();
         const head = store.getState().head!.id;
@@ -772,7 +776,7 @@ describe('import a preset from a file', () => {
         expect(JSON.stringify(store.getState().config)).toBe(config);
       });
 
-      // D-611：别的 AI 改完交回来的同一个 App（ID 不变）：先问，默认更新它；改动照文件来，记录都留着，能撤销。
+      // D-611: The same app (same ID) modified and returned by another AI: asks first, defaults to updating it; changes follow the file, records are preserved, and can be undone.
       it('a changed file of an installed app updates that app, keeps its entries, and can be undone', async () => {
         const { repo, files, store } = await starterApp();
         const wallet = readFileSync(join(PORTAL, 'tinkrum-app-wallet.json'), 'utf8');
@@ -789,7 +793,7 @@ describe('import a preset from a file', () => {
           updatedAt: 1,
         });
         const installedHead = store.getState().head!.id;
-        // AI 改了：首页标题、分类表的一个字段名，还加了一个字段。
+        // Modified by AI: home title, a field name in the category table, and added a field.
         const changed = JSON.parse(wallet) as {
           pages: { id: string; title: string }[];
           tables: { id: string; fields: { id: string; name: string; type: string }[] }[];
@@ -799,7 +803,7 @@ describe('import a preset from a file', () => {
         categories.fields.find((f) => f.id === 'budget')!.name = 'Monthly budget';
         categories.fields.push({ id: 'note', name: 'Note', type: 'text' });
         files.clipboard = `\`\`\`json\n${JSON.stringify(changed)}\n\`\`\``;
-        // 先问：第一个按钮是「更新『Wallet』」。
+        // Ask first: the first button is "Update 'Wallet'".
         jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons) => {
           buttons?.[0]?.onPress?.();
         });
@@ -849,7 +853,7 @@ describe('import a preset from a file', () => {
         expect(store.getState().head!.id).toBe(head);
         expect(store.getState().proposal).toBeNull();
         expect(await repo.listPresets()).toEqual([]);
-        // 没点之前剪贴板还是用户自己复制的；点了「复制问题」才换成给 AI 的话。
+        // Before tapping, the clipboard still contains what the user copied; tapping "Copy question" switches it to the prompt for the AI.
         expect(files.clipboard).toBe(JSON.stringify(data));
         buttons!.find((b) => b.text === '复制问题')!.onPress!();
         await waitFor(() =>
@@ -943,7 +947,7 @@ describe('import a preset from a file', () => {
 
 it('a whole setup coming back from another AI keeps the user’s own pictures in place; the list still empties them', async () => {
   const { repo, store } = await app();
-  // 整套设置发出去时文件引用清掉了（存成预设就是这样）；换回来时，同一个位置原来用户选的文件放回去。
+  // When exporting the full setup, file references are cleared (standard behavior when saved as a preset); upon restoration, the user's originally selected files are put back in their respective places.
   await repo.insertPreset({
     id: 'fromai01',
     name: 'AI 改好的',
@@ -959,7 +963,7 @@ it('a whole setup coming back from another AI keeps the user’s own pictures in
   expect(JSON.stringify(store.getState().proposal!.after)).toContain(FILE);
   expect(store.getState().proposal!.after.theme.radius).toBe(8);
   await store.getState().cancel();
-  // 从预设列表换预设：照旧清空（D-410）。
+  // Switching presets from the preset list: clears as usual (D-410).
   const list = await store.getState().proposePreset('fromai01');
   expect(list.kind).toBe('preview');
   expect(JSON.stringify(store.getState().proposal!.after)).not.toContain(FILE);

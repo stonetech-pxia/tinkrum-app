@@ -243,7 +243,7 @@ describe('Word table evidence', () => {
     const tables = leafBlocks(page).filter((b) => b.kind === 'table');
     expect(tables).toHaveLength(1);
     expect(tables[0]!.table.rows).toBe(4);
-    // 右边空着的填写栏留着，不并进标签格（EU 样本 006）。
+    // Leave the empty fill-in box on the right as is, do not merge it into the label cell (EU sample 006).
     for (let r = 0; r < 4; r++) {
       const row = tables[0]!.table.cells.filter((c) => c.row === r).sort((a, b) => a.col - b.col);
       expect(row.map((c) => c.text)).toEqual([lines[r]!.text, '']);
@@ -252,7 +252,7 @@ describe('Word table evidence', () => {
   });
 
   it('keeps a blank item grid whose headers are printed above it, with the headers as its first row', () => {
-    // 发票模板的商品栏（EU 样本 001）：网格里一个字也没有，表头在网格上边线的上面。
+    // Invoice template item column (EU sample 001): no characters in the grid, headers are placed above the top border of the grid.
     const headers = [
       word('Ref', 130, 76, 60),
       word('Description', 330, 76, 160),
@@ -294,7 +294,7 @@ describe('Word table evidence', () => {
   });
 
   it('keeps a numbered blank grid with a header row as a table (registration form)', () => {
-    // 德国的登记表（EU 样本 004）：表头一排，下面每排只有左边的编号 1–4。
+    // German registration form (EU sample 004): a single header row, followed by rows where only the left-hand number 1-4 is present.
     const lines = [
       word('No.', 110, 112, 30),
       word('Family name', 180, 112, 160),
@@ -321,8 +321,9 @@ describe('Word table evidence', () => {
   });
 
   it('keeps an open numbered blank grid (no outer column lines, header above the first rule) as a table (EU sample 031)', () => {
-    // 德国的雇主证明（EU 样本 031）：只有横线和内部列线，外边没有竖线；表头写在第一条横线上面，
-    // 内部列线从表头上边画下来。
+    // German employer certificate (EU sample 031): only horizontal lines and internal column lines,
+    // no vertical lines on the outside; headers are written above the first horizontal line, and
+    // internal column lines extend down from the top of the headers.
     const lines = [
       word('Nr.', 110, 70, 30),
       word('Datum von', 180, 70, 140),
@@ -392,7 +393,7 @@ describe('Word table evidence', () => {
   });
 
   it('reflows a letter in a plain frame instead of one paragraph per line (EU sample 075)', () => {
-    // 只有四条边的框里是一封信：地址一排一行，「Datum」在右边，下面两段折行的正文。
+    // The box with only four borders contains a letter: a single-line address, "Datum" on the right, followed by two wrapped body paragraphs.
     const lines = [
       word('Absender:', 130, 120, 120),
       word('Klara Beispiel', 130, 150, 170),
@@ -443,7 +444,7 @@ describe('Word table evidence', () => {
   });
 
   it('keeps a frame of short form labels as a table, not as loose text (EU sample 061)', () => {
-    // 病假单上的「Krankenkasse」框：里面的细线没认出来，只剩外框；字都是短标签，不是折行的正文。
+    // "Krankenkasse" box on the sick leave certificate: thin internal lines were not recognized, leaving only the outer border; all text consists of short labels rather than wrapped body text.
     const lines = [
       word('Krankenkasse bzw. Kostenträger', 110, 110, 260),
       word('AOK Rheinland/Hamburg', 120, 140, 230),
@@ -488,7 +489,7 @@ describe('Word table evidence', () => {
   });
 
   it('splits a framed registration form into its blank sub-tables', () => {
-    // 登记表（EU 样本 004）：外框里两张表上下叠着、列不一样，连成一张又空又大的网格；分开以后各是一张空白表格。
+    // Registration form (EU sample 004): two vertically stacked tables with different columns inside an outer border, merged into a single large empty grid; once separated, each becomes a blank table.
     const lines = [
       word('No.', 108, 108, 40),
       word('Family name', 180, 108, 150),

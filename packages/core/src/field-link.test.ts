@@ -10,7 +10,7 @@ import type { Collection, Field } from './schema';
 import { registry } from './test-helpers';
 import { linkTarget } from './richtext';
 
-// 文字字段的 format（D-422）：只可能出 tel:、mailto:、http(s)://；对不上就不能点。
+// Text field format (D-422): restricted to tel:, mailto:, and http(s)://; unmatching values are unclickable.
 
 const field = (format?: 'phone' | 'email' | 'url'): Field => ({
   id: 'v',
@@ -119,7 +119,7 @@ describe('url', () => {
     'a b.com',
     'x.com/a b',
     'x.com\n/a',
-    // 看着是一个网站，其实去另一个：不去掉、不猜，不能点。
+    // Looks like a website but points elsewhere: neither stripped nor guessed, unclickable.
     'https://x.com@evil.com',
     'https://x.com:pw@evil.com',
     'x.com@evil.com',

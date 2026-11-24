@@ -6,7 +6,7 @@ import { unitRange } from './page-period';
 import type { Collection } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// 点一根柱子，页面的时间范围改成它那一段（D-585）：只在按时间分、不跟着页面范围、同一页有带 custom 的 period 块时才行。
+// Tapping a bar updates the page's time range to match that period (D-585): permitted only when grouped by time, independent of page range, and when the current page contains a period block with custom options.
 
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 17) };
 const tx: Collection = {

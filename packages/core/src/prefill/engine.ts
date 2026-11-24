@@ -13,23 +13,28 @@ import { isMultipleChoice, type Field } from '../schema';
 import type { SuggestInput, ValueSuggestion } from './rank';
 import { mergeSpoken, planSpoken } from './spoken';
 
-// 新记录表单的候选值从哪里来（D-398）：表单只认这个接口，规则和本机模型都写成这个形状，换引擎不动表单。
-// 输入是按页、带位置的文字和这张表的字段；输出是结构化的候选，只进表单，用户点了才填（D-394）。
-// 用户为这一笔说的话（spoken，D-575）走另一份规则（spoken.ts），有把握的候选标 sure，表单直接填。
-// 这不是快捷操作的一步：步骤之间只传一个值，走到这里文件就没了，输出也会流到分享、存文件这些步骤（D-396）。
+// Where new record form candidate values originate (D-398): forms consult only this interface;
+// rules and on-device models adhere to this schema so engine swaps do not affect forms. Input is
+// page-based text with positions and table fields; output is structured candidates fed exclusively
+// to forms, populated only upon user tap (D-394). User-spoken input for this entry (spoken, D-575)
+// follows a separate rule set (spoken.ts), where confident candidates are marked sure and
+// auto-filled by the form. This is not a quick action step: steps pass a single value, files are
+// gone by this stage, and outputs flow into subsequent steps like sharing or saving files (D-396).
 
-/** 单行文字字段放不下换行（多行地址）：表单上显示和填进去的都用逗号隔开。 */
+/** Single-line text fields cannot wrap lines (multiline addresses): commas separate values displayed and entered in forms. */
 export const suggestionForField = (field: Pick<Field, 'type'>, s: ValueSuggestion) =>
   field.type === 'text' && s.value.includes('\n')
     ? { ...s, value: s.value.replace(/\n+/g, ', ') }
     : s;
 
-/** 字段 ID → 候选（好的在前，最多 MAX_SUGGESTIONS 个）。 */
+/** Field ID -> candidates (highest quality first, up to MAX_SUGGESTIONS). */
 export type FieldSuggestions = Record<string, ValueSuggestion[]>;
 
 /**
- * signal 取消时引擎应该尽快结束；结果和报错这时都不会再用。
- * 要跑一会儿的引擎用 onPartial 先给手上有的（可以调多次，每次是当时全部的候选），最后的结果在返回值里。
+ * Engines should terminate promptly when signal is cancelled; results and errors are discarded.
+ * Engines running longer tasks provide intermediate results via onMultiple/onPartial callbacks
+ * (invoked multiple times with all current candidates), returning final results in the return
+ * value.
  */
 export type PrefillEngine = (
   input: SuggestInput,
@@ -49,17 +54,17 @@ function suggestionsOf(
   return out;
 }
 
-/** 一次要做的：现在的候选，和要问模型的字段（问一个、核对一个；回答用上了给 true）。 */
+/** Job execution state: current candidates and fields to query model against (one query/verification at a time; answers set to true when used). */
 interface Job {
   current(): FieldSuggestions;
   asks: { request(): ModelRequest; take(answer: string): boolean }[];
 }
 
-/** 从文件读出的文字：规则按版面打分，再问规则拿不准的字段。 */
+/** Text read from files: rules score based on layout, followed by model queries for uncertain fields. */
 function documentJob(input: SuggestInput, limits: ModelLimits): Job {
   const plan = planDocument(input);
   const answers = new Map<FieldPlan, readonly string[]>();
-  // 没有文字（只有二维码的图、文字识别没装）：模型没东西可读，不加载。
+  // No text (image with QR code only, OCR uninstalled): model has nothing to read, do not load.
   const asks = plan.rows.length === 0 ? [] : plan.fields.filter((f) => f.ask);
   return {
     current: () => suggestionsOf(plan, answers),
@@ -77,7 +82,7 @@ function documentJob(input: SuggestInput, limits: ModelLimits): Job {
   };
 }
 
-/** 用户说的一句话（D-575）：代码读值，模型截文字、挑选项。 */
+/** User-spoken utterance (D-575): code reads values, model extracts text and selects options. */
 function spokenJob(input: SuggestInput): Job {
   const plan = planSpoken(input);
   const answers = new Map<string, readonly ValueSuggestion[]>();
@@ -95,18 +100,19 @@ function spokenJob(input: SuggestInput): Job {
   };
 }
 
-/** 多选字段（D-607）不给候选：候选是一个值，点了填进去；多选要用户自己选几项。 */
+/** Multi-select fields (D-607) receive no candidates: candidates represent single values populated on tap, whereas multi-select requires users to pick multiple items. */
 const jobOf = (raw: SuggestInput, limits: ModelLimits): Job => {
   const input = { ...raw, fields: raw.fields.filter((f) => !isMultipleChoice(f)) };
   return input.spoken ? spokenJob(input) : documentJob(input, limits);
 };
 
-/** 只用代码：规则打分、算术、中文规则、值记忆。模型没装时用的就是这些。 */
+/** Code-only engine: rule scoring, arithmetic, Chinese rules, and value memory. Used when no model is installed. */
 export const ruleEngine: PrefillEngine = async (input) => jobOf(input, MODEL_LIMITS).current();
 
 /**
- * 等 work，但 stop 取消或到时间就不等了（给 undefined）。work 自己可能永远不回来（原生卡住），
- * 表单不能跟着等（取消一定要让 Promise 结束）。
+ * Wait for work, but stop waiting if cancelled or timeout occurs (returns undefined). Work itself
+ * might never return (native hang), and the form must not wait indefinitely (cancellation must
+ * ensure the Promise settles).
  */
 export function bounded<T>(
   work: Promise<T>,
@@ -140,8 +146,10 @@ export function bounded<T>(
 export const free = (session: ModelSession) => void session.release().catch(() => undefined);
 
 /**
- * 代码 + 本机模型（D-396）：先给代码的候选，再一个字段一个字段地问代码拿不准的，答完一个补一个。
- * 没装、内存不够、加载失败、超时、取消：一律安静结束，留着已经有的候选，不报错。
+ * Code + on-device model (D-396): provide candidates from code first, then query the model field
+ * by field for uncertain ones, supplying them one by one. If uninstalled, low memory, load
+ * failure, timeout, or cancellation: silently finish, retain existing candidates, and do not
+ * throw errors.
  */
 export function modelEngine(open: OpenModel, limits: ModelLimits = MODEL_LIMITS): PrefillEngine {
   return async (input, signal, onPartial) => {
@@ -150,7 +158,7 @@ export function modelEngine(open: OpenModel, limits: ModelLimits = MODEL_LIMITS)
     onPartial?.(current);
     if (job.asks.length === 0 || signal?.aborted) return current;
 
-    // 调用方取消和总时间都走这一个信号，生成也跟着停。
+    // Caller cancellation and total timeout both use this single signal, stopping generation as well.
     const stop = new AbortController();
     const abort = () => stop.abort();
     signal?.addEventListener('abort', abort);
@@ -158,7 +166,7 @@ export function modelEngine(open: OpenModel, limits: ModelLimits = MODEL_LIMITS)
     let session: ModelSession | null | undefined;
     try {
       const opening = open(stop.signal);
-      // 不等加载了（取消、超时）：它回来以后也要释放。
+      // Stop waiting for loading (cancellation, timeout): release resources once it returns.
       session = await bounded(opening, stop.signal, limits.openMs);
       if (session === undefined) {
         void opening.then((late) => late && free(late)).catch(() => undefined);
@@ -172,7 +180,7 @@ export function modelEngine(open: OpenModel, limits: ModelLimits = MODEL_LIMITS)
           stop.signal,
           limits.callMs,
         );
-        // 卡住或取消：后面的字段也不问了。
+        // Hang or cancellation: do not query subsequent fields.
         if (answer === undefined) {
           stop.abort();
           break;
@@ -182,7 +190,7 @@ export function modelEngine(open: OpenModel, limits: ModelLimits = MODEL_LIMITS)
         onPartial?.(current);
       }
     } catch {
-      // 退回已经有的候选（D-396）：模型出问题不影响表单。
+      // Fall back to existing candidates (D-396): model issues do not affect the form.
     } finally {
       clearTimeout(total);
       signal?.removeEventListener('abort', abort);

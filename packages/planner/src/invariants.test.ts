@@ -3,15 +3,17 @@ import { describe, expect, it } from 'vitest';
 
 import { buildSystemPrompt, PROMPT_ROUTES } from './prompt';
 
-// 底线 19（创始人 2026-10-31，对话）：用户要的事都能做到；AI 不能因为「不合理」拒绝做得到的组合，最多提醒一句。
-// 串联本身（类型对得上的动作都能串）在 core 的 invariants.test.ts。
+// Invariant 19 (founder, 2026-10-31, conversation): what the user wants can be done; the AI cannot
+// refuse a combination that can be done because it is "unreasonable", at most adding a reminder.
+// Chaining itself (any actions whose types match can be chained) is tested in core's
+// invariants.test.ts.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const REFUSE = /\b(reject|refuse|decline|leave (it|them) out|drop)\b/i;
 const UNREASONABLE =
   /unreasonable|pointless|unnecessary|odd\b|silly|makes? no sense|doesn't make sense|not sensible/i;
 
-describe('底线 19：AI 不拒绝做得到的组合', () => {
+describe('Invariant 19: AI does not refuse combinations that can be done', () => {
   it.each(PROMPT_ROUTES)(
     '%s prompt: no rule refuses a feasible chain for being unreasonable',
     (route) => {

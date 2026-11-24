@@ -23,13 +23,17 @@ import { Toast } from '@/shell/Toast';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '@/workspace/context';
 
 /**
- * 勾选新建（D-616）：列表下面的「添加」是 {do: "createAll", pick: true} 时打开这一页，勾另一张表（from）的几条，
- * 每条在列表那张表里建一条，带上这一段的值（here，"$here"）。这一段里已经连着的显示成「已添加」，不能再勾。
- * 只看不写（底线 15）：勾选只在这一页的内存里；下面的按钮写明条数和表，就是先问的那一句（底线 11，创始人 2026-11-21），
- * 点了直接建，建好了关掉这一页，提示条能撤回这一批。一次最多勾 MAX_CREATE_ALL 条。
+ * Check-to-create (D-616): "Add" at the bottom of the list opens this page when {do: "createAll",
+ * pick: true}, selects entries from another table (from), creates an entry in the list table for
+ * each, carrying the values from this section (here, "$here"). Already linked entries in this
+ * section show as "Added" and cannot be re-selected. Read-only (invariant 15): selections exist
+ * only in this page's memory; the bottom button specifies count and table, serving as the
+ * preliminary confirmation prompt (invariant 11, founder 2026-11-21). Tapping builds immediately,
+ * closes the page upon completion, and the prompt bar can undo the batch. Maximum of
+ * MAX_CREATE_ALL entries per batch.
  */
 
-/** 多于这个数才显示搜索框（和放进已有的记录一样，D-443）。 */
+/** Show search box only when count exceeds this threshold (same as putting into existing records, D-443). */
 const SEARCH_FROM = 8;
 
 function parse<T>(text: string | undefined): T | undefined {
@@ -60,7 +64,7 @@ export default function PickRecordsRoute() {
   const { view, records } = useComputedRecords(config.data.tables, source, cal);
   const { records: existing } = useComputedRecords(config.data.tables, target, cal);
   const [query, setQuery] = useState('');
-  // 按勾的顺序（新的几条也按这个顺序建）。
+  // In selection order (new entries are also created in this order).
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 

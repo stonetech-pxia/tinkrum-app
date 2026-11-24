@@ -20,7 +20,7 @@ import {
   type SourceContext,
 } from './source';
 
-// 共用的读法（source.ts）：每种外观从 source 读出什么。2026-10-22 是周四。
+// Shared reader logic (source.ts): what each appearance reads from source. 2026-10-22 is Thursday.
 const now = new Date(2026, 9, 22, 9);
 
 const projects: Collection = {
@@ -178,10 +178,10 @@ describe('records blocks', () => {
       ['Work', ['t2']],
       ['Not set', ['t5', 't4']],
     ]);
-    // 不写 by：第一个日期字段。
+    // Without by specified: the first date field.
     const months = list({ group: { unit: 'month' } });
     expect(months.by).toBe('due');
-    // 段的先后跟着排序走（默认创建时间从新到旧：九月的在前）。
+    // Segment order follows sorting (default creation time newest to first: September comes first).
     expect(months.groups!.map((g) => [g.label, g.count])).toEqual([
       ['September 2026', 2],
       ['October 2026', 3],
@@ -272,7 +272,7 @@ describe('number blocks', () => {
   });
 
   it('a streak with its best, by days.date', () => {
-    // 10 月 20 日、22 日（今天）有：今天做到了，连续 1，最佳 1。
+    // Oct 20 and Oct 22 (today) have entries: done today, streak 1, best 1.
     expect(number({ aggregate: 'streak', days: { date: 'due' } })).toMatchObject({
       value: 1,
       best: 1,
@@ -293,7 +293,7 @@ describe('number blocks', () => {
       group: { by: 'status' },
     });
     expect(read.value).toBe(13);
-    // 9 月 1–22 日：只有 t5（没有 cost）。
+    // Sep 1-22: only t5 (no cost).
     expect(read.previous).toEqual({ period: 'thisMonth', value: 0 });
     expect(read.groups!.map((g) => [g.optionId, g.label, g.count, g.value, g.previous])).toEqual([
       ['todo', 'To do', 2, 6, 0],

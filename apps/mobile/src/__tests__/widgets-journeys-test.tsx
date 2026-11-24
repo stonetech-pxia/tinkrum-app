@@ -10,8 +10,9 @@ import { actionHash } from '../widgets/ops';
 import { useWidgetPlacement } from '../widgets/placed';
 import type { WidgetPlatform, WidgetSnapshot } from '../widgets/types';
 
-// 桌面小组件在 App 里（D-323、D-325）：打开 App 时执行小组件上点了的操作，一起撤销；
-// 长按组件「放到桌面」只记在本机，画面跟着写出去；不支持的组件说明能放哪几种。
+// Home screen widgets in app (D-323, D-325): execute widget tap operations upon app opening, undo
+// together; long-pressing a component to "Pin to Home Screen" only records locally, writing visuals
+// out accordingly; document supported component types and their placements.
 
 const action = { do: 'create', table: 'water', values: { day: 'today' } } as const;
 const seed = (locale: Locale, registry: Registry) => {
@@ -48,7 +49,7 @@ const seed = (locale: Locale, registry: Registry) => {
   return result.config as never;
 };
 
-/** 假的小组件平台。队列像真的一样：读不删，removeQueue 才删（R07）；每条点按一个文件、有自己的 id。 */
+/** Mock widget platform. Queue behaves like the real one: reads without deleting, removed only via removeQueue (R07); each tap has a file and its own id. */
 function fakeWidgets(queue: string[] = [], canPin = false) {
   const written: string[] = [];
   const entries = queue.map((text, i) => ({ id: `q${i + 1}`, text }));
@@ -78,7 +79,7 @@ async function openEditSheet(id: string) {
   expect(await screen.findByTestId('edit-sheet')).toBeTruthy();
 }
 
-// 整页编辑入口在 App 里关着（D-235），测试里打开它进组件的操作面板。
+// Full-page editing entry point is disabled in app (D-235); enable it in tests to access the component operation panel.
 beforeAll(() => {
   directEditEntry.pageButton = true;
 });
@@ -92,7 +93,7 @@ it('Add to Home Screen is the user’s own step: kept on this device, written to
   const repo = new MemoryWorkspaceRepo();
   const widgets = fakeWidgets();
   await renderToolsApp(repo, undefined, { seed, widgets });
-  // 新用户：还没放过，画面里没有组件。
+  // New user: not placed yet, no components on screen.
   await waitFor(() => expect(widgets.written.length).toBeGreaterThan(0));
   expect(last(widgets).items).toEqual([]);
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
@@ -104,11 +105,11 @@ it('Add to Home Screen is the user’s own step: kept on this device, written to
   ]);
   await waitFor(() => expect(last(widgets).items.map((i) => i.id)).toEqual(['drink']));
   expect(last(widgets).states[0]!.views.drink).toMatchObject({ kind: 'button', op: 'b:drink' });
-  // 再点一次是移除。
+  // Tapping again removes it.
   expect(screen.getByTestId('edit-widget')).toHaveTextContent('从桌面移除');
   await fireEvent.press(screen.getByTestId('edit-widget'));
   await waitFor(() => expect(last(widgets).items).toEqual([]));
-  // AI 改不到：配置里没有任何放到桌面的记录。
+  // AI cannot modify: configuration contains no home-screen placement records.
   expect(JSON.stringify(await repo.getHead())).not.toContain('widgets.placed');
 });
 

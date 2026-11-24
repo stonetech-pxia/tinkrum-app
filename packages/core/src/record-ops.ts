@@ -41,13 +41,15 @@ import {
 
 export * from './record-ops-schema';
 
-// 一键记录工具（D-300–D-304，v34 D-370 规则 7）：检查（validate.ts 调）、执行前算出要写的值（App 调）。
-// 删字段删表时找出用到它的工具在 ops.ts。AI 只配置工具；值在用户点了以后才在本机写进记录。
+// Fields usable with increment (D-302). Quick-action tool (D-300–D-304, v34 D-370 Rule 7): checked
+// (called by validate.ts), calculates the value to write before execution (called by App). When
+// deleting a field or table, ops.ts identifies tools using it. The AI only configures tools; values
+// are written to records on the device only after user tap.
 
-/** increment 能用的字段（D-302）。 */
+/** Fields usable with increment (D-302). */
 export const INCREMENT_FIELD_TYPES: readonly FieldType[] = ['number', 'money', 'duration'];
 
-/** 每种字段能预设成什么（D-301）。不在这里的类型不能预设：文字是用户的内容，算出来的字段不能写。 */
+/** What each field type can be preset to (D-301). Types not listed here cannot be preset: text is user content, and computed fields cannot be written. */
 const PRESET_RULES: Partial<Record<FieldType, { expect: string; ok: (v: unknown) => boolean }>> = {
   date: { expect: '"today" or null', ok: (v) => v === 'today' },
   datetime: { expect: '"now" or null', ok: (v) => v === 'now' },
@@ -68,42 +70,48 @@ const PRESET_RULES: Partial<Record<FieldType, { expect: string; ok: (v: unknown)
 const PRESETTABLE =
   'choice, number, money, duration, rating, checkbox, date ("today"), time or datetime ("now") fields';
 
-/** 工具在哪、作用在什么上（检查用）。 */
+/** Where a tool is located and what it acts upon (for validation). */
 export interface ToolWhere {
-  /** 问题文字的开头，例如 `list l1 button "Done"`。 */
+  /** Beginning of the problem text, e.g., `list l1 button "Done"`. */
   label: string;
   /**
-   * 工具作用的这一条（"$row"）是哪张表的：记录块的 source 表，提醒「完成」的 when.each.table。
-   * 按钮、表单没有（它们写自己那张表，关系规则 12）。原样的表（不是换过查找的）。
+   * Which table the entry acted upon by the tool ("$row") belongs to: the source table of the
+   * record block, or when.each.table for reminder completion. Buttons and forms do not have this
+   * (they write to their own table, relation rule 12). The original table (not a lookup-replaced
+   * one).
    */
   rowOf?: Collection;
-  /** 块所在页面给哪张表的一条记录用（D-342，page.of）："$record" 指那条记录。 */
+  /** Which table's record the page containing the block is for (D-342, page.of): "$record" refers to that record. */
   recordOf?: string;
-  /** 表单块的提交（look form）：ask 是表单里问的字段。 */
+  /** Form block submission (look form): ask specifies fields prompted in the form. */
   form?: boolean;
-  /** 提醒的「完成」：在通知上点了直接做，不打开 Morph（不能 ask）。 */
+  /** Reminder "Done": executed directly upon tapping the notification without opening Tinkrum (cannot ask). */
   direct?: boolean;
-  /** 看板的拖动：value "$group" 写进的字段（source.group.by）。 */
+  /** Kanban drag-and-drop: value written to the "$group" field (source.group.by). */
   dragField?: string;
-  /** 打卡格（D-610）上的点一下：可以 values "$here"（这一行、这一天）和 remove，标签可以不写。 */
+  /** Check-in grid (D-610) tap: supports values "$here" (this row, this day) and remove, label can be omitted. */
   grid?: boolean;
-  /** 打卡格上 "$here" 一定会填的字段（这一行、这一天、筛选里的等于条件）：必填的检查算它们有值。 */
+  /** Fields guaranteed to be filled with "$here" on the check-in grid (this row, this day, equality conditions in filters): required validation checks that they have values. */
   hereFields?: readonly string[];
   /**
-   * 列表分段、看板分栏、月历选中那天写进的字段（D-616）：在这一段勾选新建时 "$here" 可能填它（有的段没有值，
-   * 例如「未分」），所以不算必填有值，但 values 不能再写它。
+   * Field written by list sectioning, kanban column, or calendar selected date (D-616): when
+   * creating within this section, "$here" may populate it (some sections have no value, e.g.,
+   * "Uncategorized"), so it is not counted as required-filled, but values cannot write to it
+   * again.
    */
   hereGroup?: string;
 }
 
 interface ValueWhere extends ToolWhere {
-  /** 是新建（create）：null 没有意义。 */
+  /** Is a creation (create): null has no meaning. */
   creating?: boolean;
-  /** 新记录一定带上 "$here" 的值（勾选新建，D-616）：hereFields 算必填有值。 */
+  /** New record must include the value of "$here" (checked creation, D-616): hereFields counts as required-filled. */
   hereFilled?: boolean;
   /**
-   * 「这一条」（D-565，换过的表：查找、汇总换成它们显示的那种字段）：抄的字段、日期的起点和加数从它读。
-   * 工具作用的那一条（rowOf），没有时是记录页的那一条（recordOf）；setAll、表单和不在记录页上的按钮没有。
+   * "This entry" (D-565, substituted table: lookup or rollup replaced with displayed field
+   * types): copied fields, date start, and addend are read from it. The entry acted upon by the
+   * tool (rowOf), defaulting to the entry on the record page (recordOf) when absent; absent for
+   * setAll, forms, and buttons not on the record page.
    */
   entry?: Collection;
 }
@@ -111,7 +119,7 @@ interface ValueWhere extends ToolWhere {
 const NEEDS_ENTRY =
   "needs this entry: it only works in a tool on each entry of a list, a reminder's done, or a button on a page for one entry";
 
-/** 抄过来时字段的值是哪一种（换过的表里）：公式是数字，算出来的日期是日期，计数、连续这些汇总是数字。 */
+/** Field value type when copied (in substituted tables): formulas are numbers, computed dates are dates, count/continuous rollups are numbers. */
 function valueKind(f: Field): FieldType | undefined {
   if (f.type === 'formula' || f.type === 'rollup') return 'number';
   if (f.type === 'dateOffset') return 'date';
@@ -119,7 +127,7 @@ function valueKind(f: Field): FieldType | undefined {
   return f.type;
 }
 
-/** 不能用「抄」写进去的字段：文件归用户自己选（底线 3），日程是一整套规则。算出来的字段本来就写不进去。 */
+/** Fields that cannot be written via "copy": files are chosen by the user (invariant 3), and schedules are complex rule sets. Computed fields are inherently unwritable. */
 const NO_COPY_INTO: readonly FieldType[] = ['file', 'schedule'];
 
 function copyProblem(
@@ -194,14 +202,14 @@ function valueProblem(
     return `${where.label}: ${fieldId} is not a field of ${collection.id} (fields: ${collection.fields.map((f) => f.id).join(', ')})`;
   }
   const name = `${collection.id}.${fieldId}`;
-  // 从今天或这一条起算的日期、抄这一条的字段（D-565）。
+  // Dates calculated from today or this entry, or copying a field from this entry (D-565).
   if (isCopyValue(value)) return copyProblem(field, name, value, where);
   if (isDateValue(value)) return dateValueProblem(field, name, value, where);
-  // 拖到的那一栏（看板）：只给拖动，写进分栏的字段。
+  // Column dropped into (kanban): restricted to dragging, writes to the group-by field.
   if (value === GROUP_REF) {
     if (where.dragField !== fieldId)
       return `${where.label}: "${GROUP_REF}" (the column a card is dragged to) only works in a board's {as: "drag", do: "set", field: <source.group.by>}`;
-    // 多选（D-607）：一张卡片在几栏里，拖走说不清是加还是换，这种看板只能看。
+    // Multiple choice (D-607): a card residing in multiple columns cannot determine whether dragging away means adding or replacing, so such kanbans are read-only.
     return isMultipleChoice(field)
       ? `${where.label}: ${name} ${MULTIPLE_CHOICE_NOT_ONE}; a board grouped by it shows a card in each of its columns and can't be dragged: leave the drag tool out`
       : null;
@@ -212,7 +220,7 @@ function valueProblem(
       where.creating === true &&
       where.rowOf !== undefined &&
       field.table === where.rowOf.id;
-    // D-342：给一条记录用的页面上，新建时引用字段可以设成这条记录。
+    // D-342: On a page dedicated to a record, reference fields can default to this record during creation.
     const page =
       value === RECORD_REF &&
       where.creating === true &&
@@ -234,7 +242,7 @@ function valueProblem(
     return where.creating ? `${where.label}: leave ${name} out instead of null` : null;
   }
   const ids = field.type === 'choice' ? field.options.map((o) => o.id).join(', ') : '';
-  // 多选（D-607）：一组选项 ID（不重复），替换原来选的；一个 ID 不行（说不清是加上还是换成它）。
+  // Multiple choice (D-607): set of option IDs (unique), replacing current selections; a single ID is invalid (ambiguous whether to add or replace).
   if (field.type === 'choice' && field.multiple) {
     if (
       Array.isArray(value) &&
@@ -280,7 +288,7 @@ function createProblems(
       `${where.label}: ask: [fields] only works in a form block; use ask: "all" to open the full form`,
     );
   if (tool.smartDate) problems.push(...smartDateProblems(tool, collection, where));
-  // 必填、又没有默认值的字段：点一下存不进去。打开表单的（D-338）由用户填。
+  // Fields that are required yet lack a default value: cannot be saved on a single tap. Form openers (D-338) are filled by the user.
   if (ask !== undefined) return problems;
   for (const f of collection.fields) {
     const def = fieldDefinition(f.type);
@@ -297,7 +305,7 @@ function createProblems(
   return problems;
 }
 
-/** smartDate（D-344，原 recordForm.smartDate）：只给表单，从问的一个文字字段认出日期，填进日期类字段。 */
+/** smartDate (D-344, formerly recordForm.smartDate): forms only, parses a date from a text field input and populates date-type fields. */
 function smartDateProblems(
   tool: Extract<RecordTool, { do: 'create' }>,
   collection: Collection,
@@ -336,8 +344,10 @@ function fieldProblem(
 }
 
 /**
- * 关系规则 12：块上的工具只能写块读的那张表（"$row" 是它的一条），或者在另一张表里新建一条、用引用字段
- * 连回这一条（"$row"）或记录页的那一条（"$record"）。按钮、表单没有 source，写自己那张表。
+ * Relation rule 12: A tool on a block can only write to the table read by that block ("$row" is
+ * one of its entries), or create a new entry in another table linked back to this entry ("$row")
+ * or the record page entry ("$record") via a reference field. Buttons and forms have no source
+ * and write to their own table.
  */
 function scopeProblem(tool: RecordTool, collection: Collection, where: ToolWhere): string | null {
   const row = where.rowOf;
@@ -355,7 +365,7 @@ function scopeProblem(tool: RecordTool, collection: Collection, where: ToolWhere
     : `${where.label}: creates an entry in ${tool.table}, but this block shows ${row.id}; a tool here can only add to ${row.id}, or add to another table with a link field set to "${ROW_REF}" (this entry)`;
 }
 
-/** 一个一键记录工具的问题（文字发给 AI）。 */
+/** Problems with a quick-action tool (text sent to AI). */
 export function recordToolProblems(
   tool: RecordTool,
   config: WorkspaceConfig,
@@ -363,13 +373,13 @@ export function recordToolProblems(
 ): string[] {
   const collection = config.data.tables.find((c) => c.id === tool.table);
   if (!collection) return [`${where.label}: data table ${tool.table} does not exist`];
-  // 「这一条」（D-565）：工具作用的那一条，没有时是记录页的那一条；表单没有。
+  // "This entry" (D-565): the entry acted upon by the tool, falling back to the record page entry if absent; absent for forms.
   const entryTable = where.form
     ? undefined
     : (where.rowOf ?? config.data.tables.find((c) => c.id === where.recordOf));
   if (entryTable)
     where = { ...where, entry: expandCollection(config.data.tables, entryTable) } as ValueWhere;
-  // 移到「最近删除」（D-610）：这一版只给打卡格上的点一下，别处（每一条的按钮、按钮块、提醒的完成、快捷操作）都不行。
+  // Move to "Recently Deleted" (D-610): in this version restricted to tapping on check-in grids; prohibited elsewhere (row buttons, button blocks, reminder completion, quick actions).
   if (tool.do === 'remove' && !where.grid)
     return [
       `${where.label}: remove only works as a tap on a grid ({as: "tap", do: "remove", table: <the grid's table>}); elsewhere the user deletes an entry from the entry page`,
@@ -390,7 +400,7 @@ export function recordToolProblems(
         return [
           `${where.label}: done acts on this entry ("${ROW_REF}"); use create, set, toggle or increment, not setAll`,
         ];
-      // 一次改很多条，没有「这一条」：日期只能从今天算。
+      // Editing multiple entries without "this entry": dates can only be calculated relative to today.
       const p = valueProblem(collection, tool.field, tool.value, { label: where.label });
       return [
         ...(p ? [p] : []),
@@ -405,7 +415,7 @@ export function recordToolProblems(
       const p = valueProblem(collection, tool.field, tool.value, where);
       return p ? [p] : [];
     }
-    // 只写格子读的那张表（关系规则 12，scopeProblem 已经查过）。
+    // Write only to the table read by the grid (relation rule 12, already checked by scopeProblem).
     case 'remove':
       return [];
     case 'toggle': {
@@ -415,7 +425,7 @@ export function recordToolProblems(
     case 'increment': {
       const p = fieldProblem(collection, tool.field, where, INCREMENT_FIELD_TYPES, 'increment');
       if (p) return [p];
-      // 加这一条的一个数字字段（D-565）。
+      // Add to a numeric field of this entry (D-565).
       const entry = (where as ValueWhere).entry;
       if (typeof tool.by !== 'string' || !entry) return [];
       const by = entry.fields.find((f) => f.id === tool.by);
@@ -428,8 +438,10 @@ export function recordToolProblems(
 }
 
 /**
- * 批量新建（D-567）：来源表要在，筛选按来源表检查（可以用 "$record"），值按新建检查，"$row" 和抄的字段都是来源的那一条。
- * 必填又没有默认值的字段要预设（没有表单可问）。提醒的「完成」不能用（它只改这一条）。
+ * Batch creation (D-567): source table must exist, filters are validated against the source table
+ * (can use "$record"), values are validated as creation, "$row" and copied fields come from the
+ * source entry. Required fields without default values must be preset (no form available to
+ * prompt). Reminder "Done" cannot be used (it only modifies a single entry).
  */
 function createAllProblems(
   tool: Extract<RecordTool, { do: 'createAll' }>,
@@ -448,7 +460,7 @@ function createAllProblems(
     label: where.label,
     rowOf: source,
     entry: view,
-    // 勾选新建（D-616）：新记录带上这一段的值，列表筛选里的等于条件算必填有值。
+    // Checked creation (D-616): new record includes values from this section, equality conditions in list filters count as required-filled.
     ...(tool.pick && where.hereFields ? { hereFields: where.hereFields, hereFilled: true } : {}),
   };
   return [
@@ -459,8 +471,10 @@ function createAllProblems(
 }
 
 /**
- * 勾选新建（D-616）：values 里正好一个指向来源表的引用字段是 "$row"（勾的那一条；「已添加」也按它算）；
- * 这一段会填的字段（列表筛选里的等于条件、分段的字段）不能再写，否则新的一条不在用户点的这一段里。
+ * Checked creation (D-616): exactly one reference field in values pointing to the source table
+ * must be "$row" (the checked entry; "added" counts similarly); fields populated by this section
+ * (equality conditions in list filters, section field) cannot be written again, otherwise the new
+ * entry would fall outside the user-selected section.
  */
 function pickProblems(
   tool: Extract<RecordTool, { do: 'createAll' }>,
@@ -482,12 +496,14 @@ function pickProblems(
   return problems;
 }
 
-/** 按钮上的字最长几个字（表单的提交 30，其余 20）。 */
+/** Maximum length of button labels (form submit is 30, others 20). */
 export const toolLabelMax = (as: ToolUse['as']) => (as === 'submit' ? 30 : 20);
 
 /**
- * 块上一个就地工具的问题：按出现方式（as）的要求、按钮上的字、when 条件，再加工具本身（recordToolProblems）。
- * 外观允许哪些 as、do、几个，在 validate.ts 按登记表查。
+ * Problems with an inline tool on a block: validated against presentation mode (as) requirements,
+ * button label, when conditions, plus tool-specific validation (recordToolProblems). Allowed
+ * presentation modes (as), actions (do), and counts are checked in validate.ts against the
+ * registry.
  */
 export function recordToolUseProblems(
   use: RecordToolUse,
@@ -499,12 +515,12 @@ export function recordToolUseProblems(
   const row = where.rowOf;
   if (use.label !== undefined && use.label.length > toolLabelMax(use.as))
     problems.push(`${where.label}: label can be at most ${toolLabelMax(use.as)} characters`);
-  // 打卡格的格子由读屏说出是哪一行、哪一天（D-610），不用标签。
+  // Check-in grid cells announce their row and day via screen readers (D-610), omitting labels.
   if ((use.as === 'button' || use.as === 'tap') && use.label === undefined && !where.grid)
     problems.push(`${where.label}: needs a label (shown on the button and read by screen readers)`);
-  // $here：就地添加（这一段的值 + 列表筛选里的等于条件）；打卡格上是点的那一格（这一行、这一天，D-610）。
+  // $here: inline addition (section values + equality conditions in list filters); on check-in grids, the tapped cell (this row, this day, D-610).
   const here = tool.do === 'create' && tool.values === HERE_REF;
-  // 勾选新建（D-616）：只给列表下面的「添加」，写列表自己那张表（底线 17），新记录带上这一段的值。
+  // Checked creation (D-616): restricted to "Add" at the bottom of lists, writing to the list's own table (invariant 17), with the new record inheriting section values.
   const picking = tool.do === 'createAll' && tool.pick === true;
   const pickShape = `{as: "addHere", do: "createAll", table: ${row?.id ?? '<the list table>'}, from: <the table to pick from>, pick: true, filter?, values: {<a link field to it>: "${ROW_REF}"}}`;
   if (picking && use.as !== 'addHere')
@@ -541,7 +557,7 @@ export function recordToolUseProblems(
           (x) => `${where.label} when: ${x}`,
         ),
       );
-      // 写的是日程的「上次完成」时，「为空才显示」会让按钮做过一次就消失，重复的事下次没法完成。
+      // When writing to a schedule's "last completed" field, "hide when empty" would make the button disappear after a single use, preventing completion of recurring items next time.
       const written = tool.do === 'set' ? tool.field : undefined;
       const schedule =
         written !== undefined && use.when.some((w) => w.field === written && w.op === 'isEmpty')
@@ -558,8 +574,10 @@ export function recordToolUseProblems(
 }
 
 /**
- * 点一下改几处（D-566）：只给每一条上的按钮和点一下（as button、tap）；顺带的改动改这一条，或者新建一条连回这一条；
- * 最多一条新建；同一个字段不改两次；不打开表单（几处一起成功或一起不做）。
+ * Multi-field updates on a single tap (D-566): restricted to row buttons and taps (as button,
+ * tap); incidental modifications update this entry or create a linked entry; at most one new
+ * entry; same field cannot be modified twice; no form opening (all changes succeed or fail
+ * together).
  */
 function alsoProblems(use: RecordToolUse, config: WorkspaceConfig, where: ToolWhere): string[] {
   const row = where.rowOf;
@@ -615,9 +633,11 @@ function alsoProblems(use: RecordToolUse, config: WorkspaceConfig, where: ToolWh
 }
 
 /**
- * 清单的勾带 also（D-617，创始人 2026-11-21「做前三个」）：勾上时顺带设这一条的一两个字段（例如完成日期 = 今天），取消时
- * 把它们清空，所以取消就是把勾上做的全部拿回来（底线 11，不弹撤销）。只能 set 这一条的字段；勾上就清空的值（null、
- * 勾选框的 false）和必填的字段不行：取消清空以后放不回原来的值、存不进去。
+ * Checklist completion with also (D-617, founder 2026-11-21 "do the first three"): checking sets
+ * one or two fields on this entry (e.g., completion date = today), unchecking clears them, so
+ * unchecking fully reverts the check action (invariant 11, no undo banner). Can only set fields
+ * on this entry; clearing fields upon checking (null, checkbox false) or required fields are
+ * prohibited: once cleared, unchecking cannot restore previous values and saving would fail.
  */
 function checkAlsoProblems(
   use: RecordToolUse,
@@ -657,20 +677,21 @@ function checkAlsoProblems(
   return problems;
 }
 
-// ---- 执行（App 在用户点了以后调）----
+// ---- Execution (called by App after user tap) ----
 
 export interface ActionContext {
   now: Date;
   cal?: Calendar;
-  /** 工具作用的这一条（"$row"）的 ID。 */
+  /** ID of the entry acted upon by the tool ("$row"). */
   rowId?: string;
-  /** 记录页打开的那一条（"$record"）的 ID。 */
+  /** ID of the entry opened on the record page ("$record"). */
   recordId?: string;
-  /** 拖到的那一栏（"$group"）：选项 ID、被引用的那条的 ID，null 是「未分」。 */
+  /** Column dropped into ("$group"): option ID, referenced entry ID, or null for "Uncategorized". */
   group?: string | null;
   /**
-   * 「这一条」（D-565）：算好的记录（公式、查找、汇总都有值）和换过的表。抄的字段、日期的起点和加数从它读；
-   * 没有时这些值不写。
+   * "This entry" (D-565): evaluated record (formulas, lookups, and rollups all have values) and
+   * substituted tables. Copied fields, date start, and addend are read from it; when absent,
+   * these values are not written.
    */
   entry?: { record: DataRecord; view: Collection };
 }
@@ -678,8 +699,9 @@ export interface ActionContext {
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
- * 工具里的值 → 表单输入（prepareRecordValues 再按字段严格检查）。null = 清空（勾选框是不勾）。
- * undefined = 这一项不写（D-565：读「这一条」的值，但没有这一条，或者日期的起点、加数没有值）。
+ * Value in tool -> form input (prepareRecordValues performs strict field-level validation). null
+ * = clear (unchecked checkbox). undefined = omit this item (D-565: read value from "this entry",
+ * but when missing, or when date start/addend lack values).
  */
 export function actionInput(field: Field, value: RecordToolValue, ctx: ActionContext): unknown {
   if (isCopyValue(value)) {
@@ -707,7 +729,7 @@ function entryValue(ctx: ActionContext, fieldId: string) {
     : undefined;
 }
 
-/** {from, add, unit}（D-565）：从今天或这一条的日期起，加几天或几个月（和算出来的日期同一段算法）。 */
+/** {from, add, unit} (D-565): add days or months starting from today or this entry's date (using the same algorithm segment as computed dates). */
 function dateInput(value: DateValue, ctx: ActionContext): string | undefined {
   const cal = ctx.cal ?? DEFAULT_CALENDAR;
   const start =
@@ -720,8 +742,9 @@ function dateInput(value: DateValue, ctx: ActionContext): string | undefined {
 }
 
 /**
- * create：新记录的表单输入（只含预设的字段，其余由 prepareRecordValues 套默认值）。
- * values 是 "$here"（就地添加）时由 App 按这一段算，这里没有。
+ * create: form input for new record (contains preset fields only; remaining fields populated with
+ * defaults by prepareRecordValues). When values is "$here" (inline addition), computed by App
+ * from the section; not present here.
  */
 export function createInput(
   collection: Collection,
@@ -739,8 +762,8 @@ export function createInput(
 }
 
 /**
- * {do: "create", ask: "all", values}：打开的新记录表单里先填好的值（Q6：v33 的「添加」按钮忽略预设值，
- * v34 预填）。表已经不在了时为空。
+ * {do: "create", ask: "all", values}: pre-filled values in the opened new-record form (Q6: v33
+ * "Add" button ignores preset values, v34 pre-fills them). Empty if table no longer exists.
  */
 export function createPrefill(
   tool: Extract<RecordTool, { do: 'create' }>,
@@ -752,8 +775,8 @@ export function createPrefill(
 }
 
 /**
- * set / toggle / increment：这一条记录（存着的值）要改成什么。字段已经不在了（旧配置）返回 null。
- * 结果再交给 prepareRecordValues。
+ * set / toggle / increment: target values for this record (stored values). Returns null if field
+ * no longer exists (legacy config). Result is passed to prepareRecordValues.
  */
 export function rowUpdateInput(
   tool: Extract<RecordTool, { do: 'set' | 'toggle' | 'increment' }>,
@@ -770,21 +793,23 @@ export function rowUpdateInput(
   if (tool.do === 'toggle') return { [field.id]: values[field.id] !== true };
   const raw = values[field.id];
   const current = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
-  // 加这一条的一个数字字段（D-565）：没有值时什么都不改。
+  // Add to a numeric field of this entry (D-565): modifies nothing if value is absent.
   const by =
     typeof tool.by === 'number' ? tool.by : ctx.entry ? entryValue(ctx, tool.by) : values[tool.by];
   if (typeof by !== 'number' || !Number.isFinite(by)) return {};
   const decimals = field.type === 'money' ? 2 : field.type === 'number' ? (field.decimals ?? 4) : 0;
   let next = round(current + by, decimals);
-  // 时长不能是负数：减到 0 为止。
+  // Duration cannot be negative: clamped to 0.
   if (field.type === 'duration') next = Math.max(0, next);
   return { [field.id]: next };
 }
 
 /**
- * 清单的勾（D-617）：这一条要改成什么。勾上 = 勾选框 true 加上 also 的值（读「这一条」的值是空的就不写那一项）；
- * 取消 = 勾选框 false，also 写的字段清空。一条记录一次写完（App 用 patch，同一个事务）。字段已经不在了（旧配置）返回 null。
- * 结果再交给 prepareRecordValues。
+ * Checklist check (D-617): target updates for this entry. Checking = checkbox true plus also
+ * values (if reading "this entry" yields empty, omit that item); unchecking = checkbox false,
+ * clearing also-specified fields. Written in a single transaction per record (App uses patch).
+ * Returns null if field no longer exists (legacy config). Result is passed to
+ * prepareRecordValues.
  */
 export function checkInput(
   use: RecordToolUse,
@@ -811,8 +836,10 @@ const isEmptyStored = (v: unknown) =>
   v === undefined || v === null || v === '' || v === false || (Array.isArray(v) && v.length === 0);
 
 /**
- * 勾上时 also 盖掉了原来有的、不一样的值（D-617）：取消只会清空，放不回原来的值，所以这一次 App 弹撤销（底线 11）。
- * before、after 是存的值（prepareRecordValues 前后）。取消不算：它清空的是勾上时写的值，再勾一下就回来。
+ * Checking overwrites existing differing values with also (D-617): unchecking only clears and
+ * cannot restore previous values, so App displays an undo banner this time (invariant 11). before
+ * and after are stored values (before and after prepareRecordValues). Unchecking is excluded: it
+ * clears values written during checking, and re-checking restores them.
  */
 export function checkOverwrites(
   use: RecordToolUse,
@@ -829,8 +856,9 @@ export function checkOverwrites(
 }
 
 /**
- * 这一条显示哪个按钮（as button，大圆块是 tap）：第一个条件都满足的（没有条件就总是）。
- * view 是换过的表（条件可以用查找来的值）。
+ * Which button to display for this item (as a button, large circle block is a tap): the first
+ * condition that evaluates to true (always if no conditions). view is the switched table
+ * (conditions can use values from lookups).
  */
 export function shownRowAction(
   uses: readonly ToolUse[] | undefined,
@@ -853,8 +881,10 @@ export interface SetAllChange {
 }
 
 /**
- * setAll：筛出来、值真的会变的记录，连同改前改后存的值（撤销用改前的）。records 是算好的记录
- * （筛选可以用查找来的值）；写的时候算出来的值会被 prepareRecordValues 去掉。存不进去的记录跳过。
+ * setAll: filters records whose values actually change, saving the stored values before and after
+ * changes (using the pre-change values for undo). records are the computed records (filtering can
+ * use lookup values); values calculated during write are stripped by prepareRecordValues. Records
+ * that cannot be saved are skipped.
  */
 export function setAllChanges(
   tool: Extract<RecordTool, { do: 'setAll' }>,
@@ -883,8 +913,10 @@ export function setAllChanges(
 }
 
 /**
- * 批量新建（D-567）：筛出来的每一条来源（算好的记录，筛选可以用查找来的值）各一份新记录的表单输入，按来源的顺序。
- * "$row" 是这条来源，抄的、日期起点也读它（D-565）。结果再交给 prepareRecordValues。
+ * Batch creation (D-567): generates a form input for a new record for each filtered source item
+ * (computed records, filtering can use lookup values) in source order. "$row" refers to the
+ * source item, and copies/date starts also read from it (D-565). The result is then passed to
+ * prepareRecordValues.
  */
 export function createAllInputs(
   tool: Extract<RecordTool, { do: 'createAll' }>,
@@ -908,7 +940,7 @@ export function createAllInputs(
     }));
 }
 
-/** 勾选新建（D-616）：values 里设成 "$row"、指向来源表的引用字段（检查保证正好一个）。 */
+/** Check-and-create (D-616): sets values in values to "$row", a reference field pointing to the source table (checks to ensure exactly one exists). */
 export function pickLinkFields(
   tool: Extract<RecordTool, { do: 'createAll' }>,
   target: Collection,
@@ -922,7 +954,7 @@ export function pickLinkFields(
     .map(([id]) => id);
 }
 
-/** 来源表里能勾的（按 tool.filter，D-616）：records 是算好的记录（筛选可以用查找来的值）。 */
+/** Available sources to check in the source table (according to tool.filter, D-616): records are computed records (filtering can use lookup values). */
 export function pickChoices(
   tool: Extract<RecordTool, { do: 'createAll' }>,
   sourceView: Collection,
@@ -935,7 +967,7 @@ export function pickChoices(
   );
 }
 
-/** 一个存着的值是不是这一段的值（"$here"）：多选是都选了，勾选框没存当不勾。 */
+/** Whether a stored value equals the value for this segment ("$here"): multi-select checks if all are selected, and unselected checkboxes are treated as unchecked. */
 function sameHere(stored: unknown, here: unknown): boolean {
   if (Array.isArray(here) && Array.isArray(stored)) return here.every((v) => stored.includes(v));
   if (typeof here === 'boolean') return (stored === true) === here;
@@ -943,8 +975,10 @@ function sameHere(stored: unknown, here: unknown): boolean {
 }
 
 /**
- * 勾选新建（D-616）：这一段里已经连着哪些来源（显示成「已添加」，不再建）。targets 是目标表现有的记录，
- * here 是这一段的值（列表筛选里的等于条件和这一段，同 hereValues）：每个值都对得上的，才算在这一段里。
+ * Check-and-create (D-616): which sources are already linked in this segment (displayed as
+ * "Added", not created again). targets are existing records in the target table, here is the
+ * value of this segment (equality conditions in list filtering and this segment, same as
+ * hereValues): only when every value matches is it considered part of this segment.
  */
 export function pickedAlready(
   tool: Extract<RecordTool, { do: 'createAll' }>,
@@ -965,8 +999,10 @@ export function pickedAlready(
 }
 
 /**
- * 勾选新建（D-616）：用户勾的每一条来源（按勾的顺序，已添加的跳过）各一份新记录的表单输入：这一段的值加上
- * values（"$row" 是勾的那一条，抄的、日期起点也读它）。结果再交给 prepareRecordValues。
+ * Check-and-create (D-616): generates a form input for a new record for each source checked by
+ * the user (in check order, skipping already added ones): combines the value of this segment with
+ * values ("$row" is the checked item, and copies/date starts also read from it). The result is
+ * then passed to prepareRecordValues.
  */
 export function pickCreateInputs(
   tool: Extract<RecordTool, { do: 'createAll' }>,
@@ -992,7 +1028,7 @@ export function pickCreateInputs(
     }));
 }
 
-/** 记录里存着的值（去掉算出来的字段：算好的记录副本里有它们）。 */
+/** Values stored in the record (excluding computed fields: they exist in the computed record copy). */
 export function storedValues(
   collection: Collection,
   values: Record<string, unknown>,

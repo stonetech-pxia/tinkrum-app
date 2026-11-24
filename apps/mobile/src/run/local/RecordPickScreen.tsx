@@ -8,10 +8,13 @@ import { useCalendar } from '../../workspace/context';
 import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 
-// 放进已有的记录（D-443）：运行到「记一笔」的这一步时，从这张表现有的记录里选一条。只显示每条的标题
-// （和别处一样，没有标题字段时是日期），最近改过的在前；记录多的时候可以按标题搜。选完才能确定，取消什么都不改。
+// Pick existing record (D-443): when reaching the "log an entry" step during a quick action, pick
+// an entry from existing records in this table. Displays only the title of each entry (as
+// elsewhere, defaults to the date when there is no title field), with recently modified ones first;
+// allows searching by title when records are numerous. Confirmed upon selection; canceling changes
+// nothing.
 
-/** 多于这个数才显示搜索框。 */
+/** Display search bar only when the count exceeds this number. */
 const SEARCH_FROM = 8;
 
 export function RecordPickScreen({

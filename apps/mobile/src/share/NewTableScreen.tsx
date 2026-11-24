@@ -54,9 +54,13 @@ import { deleteUserFiles } from '../storage/user-files';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '../workspace/context';
 import { holdFormCopies, takeFormCopies } from './save-as-record';
 
-// 导入文件后新建表单（D-444，创始人 2026-11-05 在对话里定）：匹配到预设和没匹配到是同一个页面，只是一开始的字段不同。
-// 规则给预设排序；本机 2B 算完只显示一行推荐，不移动别的东西，用户点了才用。候选值只用规则，点了才填（D-394）。
-// 表在点「记下」时才建，之前什么都不写（底线 15）。文字和字段名选项只在本机（底线 1、2）；Tink 只看建好的表结构。
+// Create a new form after importing files (D-444, decided by founder in conversation on
+// 2026-11-05): matched presets and unmatched cases use the same page, with only the initial fields
+// differing. Rules sort the presets; local 2B calculation displays only one recommendation row
+// without shifting other items, and is applied only when the founder taps it. Candidate values rely
+// solely on rules and are filled only upon tap (D-394). The table is created only when tapping
+// 'Log', writing nothing beforehand (invariant 15). Text and field name options remain strictly
+// local (invariants 1 and 2); Tink only inspects the created table structure.
 
 function keepFor(next: Collection, prev: Collection): Collection {
   const added = prev.fields.filter((f) => f.id.startsWith('field-'));
@@ -80,7 +84,7 @@ export function NewTableScreen() {
   const packs = usePacks();
 
   const [copied] = useState(() => takeFormCopies(copies));
-  // 要附上的文件：这一次新复制的，加上打开时已经存进文档库的（D-455，那些不是这一页的副本，放弃时不删）。
+  // Files to attach: newly copied files for this session, plus those already stored in the document library when opened (D-455, those are not copies belonging to this page and are not deleted upon cancellation).
   const [attachedIds] = useState(() => {
     try {
       const ids: unknown = attached ? JSON.parse(attached) : null;
@@ -96,8 +100,10 @@ export function NewTableScreen() {
     [fileField(draftTable('blank', config, locale))]: attachedIds,
   }));
   const [pages, setPages] = useState<TextPage[]>([]);
-  // 推荐的类型：规则的是读出的文字（pages）算出来的，本机模型的答案另存、带着它回答的那批文字；
-  // 用户自己选过类型、或者换了文件（pages 变了），旧答案和旧推荐都不再用。
+  // Recommended type: rule-based recommendations are calculated from extracted text (`pages`),
+  // whereas local model answers are stored separately alongside the text batch they answered; if
+  // the user manually selects a type or changes the file (`pages` change), both old answers and old
+  // recommendations are discarded.
   const ruled = useMemo(() => (pages.length === 0 ? null : rulePreset(pages)), [pages]);
   const [modelPick, setModelPick] = useState<{
     pages: TextPage[];
@@ -107,7 +113,7 @@ export function NewTableScreen() {
   const recommended: NewTablePreset | null =
     chosenFor === pages ? null : ((modelPick?.pages === pages ? modelPick.preset : null) ?? ruled);
   const [working, setWorking] = useState(false);
-  // 手机能用本机模型却还没下载：问一次要不要下载（点了才下，D-064），下完重新判断。
+  // Local model is available on the device but not yet downloaded: prompt once to ask whether to download (downloaded only upon tap, D-064), and re-evaluate upon completion.
   const [modelMissing, setModelMissing] = useState(false);
   const [askingModel, setAskingModel] = useState(false);
   const [installs, setInstalls] = useState(0);
@@ -121,10 +127,10 @@ export function NewTableScreen() {
   const [issues, setIssues] = useState<FieldIssue[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // 表建好了（记录没存成、要接着改）：再点「记下」只存记录。
+  // Table already created (records failed to save, needing further edits): tapping 'Log' again saves only the records.
   const created = useRef<Collection | null>(null);
 
-  // 离开时没存进记录、也没交给下一页的文件删掉（和记录页一样）。
+  // Delete files that were neither saved to records nor handed over to the next page upon exit (same as the records page).
   const owned = useRef<Set<string>>(new Set(copied));
   const [formFiles] = useState(() => ({
     hold: (ids: readonly string[]) => ids.forEach((id) => owned.current.add(id)),
@@ -140,8 +146,10 @@ export function NewTableScreen() {
     [repo, files, bumpAssets],
   );
 
-  // 读出文字后问一次本机模型；模型没装、内存不够就不显示「正在判断」。
-  // 很明显的小票先由规则推荐（没有模型也有）；模型有答案时换成模型的，没有答案时规则的留着。
+  // Query the local model after extracting text; if the model is not installed or memory is
+  // insufficient, do not display 'Determining'. Obvious receipts are recommended by rules first
+  // (available even without a model); when the model provides an answer, replace it with the
+  // model's answer, otherwise retain the rule-based one.
   const store = packs?.store;
   useEffect(() => {
     if (pages.length === 0) return;
@@ -168,10 +176,10 @@ export function NewTableScreen() {
   const names = useMemo(() => extractFieldNames(pages), [pages]);
   const rows = useMemo(() => originalRows(pages), [pages]);
   const offered = names.filter((n) => !draftHasField(draft, n));
-  // 文件里认出的字段名多时先显示前几个，其余点「展开」看。
+  // When there are many field names recognized in the file, display the first few initially, and tap 'Expand' to view the rest.
   const [allNames, setAllNames] = useState(false);
   const shownNames = allNames ? offered : offered.slice(0, FIRST_NAMES);
-  // 推荐购物凭证时，已经有带收据规则的表（例如样板「收据」，D-421）就放进那张，不再建第二张（D-477）。
+  // When recommending shopping receipts, if a table with receipt rules already exists (e.g., sample 'Receipt', D-421), insert into that one instead of creating a second table (D-477).
   const receiptTable = config.data.tables.find(
     (c) => c.prefillRules === 'receipt' && c.fields.some((f) => f.type === 'file'),
   )?.id;
@@ -191,16 +199,16 @@ export function NewTableScreen() {
   ];
 
   function choose(next: NewPreset) {
-    // 金额的货币跟文件上的符号（D-548），认不出才按界面语言。
+    // Currency for amounts matches the symbol on the file (D-548), falling back to the UI language only if unrecognized.
     const currency = fileCurrency(pages, locale);
     const base = draftTable(next, config, locale);
     const made = keepFor(currency ? withCurrency(base, currency) : base, draft);
-    // 购物凭证建的是整套「收据」（D-479）：表名先写成「收据」，建出来的就是这个名字。
+    // Shopping receipt creation builds an entire 'Receipt' set (D-479): the table name is initially set to 'Receipt', and the resulting table takes this name.
     const table =
       next === 'purchase' && made.name === templateTableName('purchase', locale)
         ? { ...made, name: sampleInfo('receipts', locale).name }
         : made;
-    // 同样的字段留着已经填的值；文件搬到新表的附件字段。
+    // Retain existing filled values for matching fields; move files to the attachment field of the new table.
     const kept = Object.fromEntries(
       table.fields.flatMap((f) =>
         f.type !== 'file' && values[f.id] !== undefined ? [[f.id, values[f.id]] as const] : [],
@@ -221,7 +229,7 @@ export function NewTableScreen() {
     const name = fieldNameFromText(selected.join(' '));
     setSelected([]);
     if (looksLikeValue(name)) {
-      // 点到的是值：不把它当字段名（配置里不放值，底线 14），请用户起一个。
+      // Tapped on a value: do not treat it as a field name (values are not stored in config, invariant 14), and prompt the user to name it.
       setAdding(true);
       setValueHint(true);
       return;
@@ -229,7 +237,7 @@ export function NewTableScreen() {
     addField(name);
   }
 
-  /** 建表（用户的一次修改，能撤销）。 */
+  /** Create a table (a single user modification, undoable). */
   async function createTable(): Promise<Collection | null> {
     if (created.current) return created.current;
     const fallback =
@@ -237,7 +245,7 @@ export function NewTableScreen() {
         ? draftTable('blank', config, locale).name
         : templateTableName(preset, locale);
     const typed = { ...draft, name: draft.name.trim() || fallback };
-    // 选了购物凭证又没改字段和表名：建整套「收据」（D-479），记录放进它建出来的那张表。
+    // When a shopping receipt is selected without changing fields or table name: build the complete 'Receipt' set (D-479), placing records into the generated table.
     const sample = draftReceiptSample(typed, preset, config, locale);
     const table = sample ? sample.table : typed;
     const proposed = await proposeOps(
@@ -273,10 +281,10 @@ export function NewTableScreen() {
     }
   }
 
-  /** 把文件交给记录页（下一页负责没保存时删掉）。 */
+  /** Hand over files to the records page (the next page is responsible for deleting them if not saved). */
   function handOff(table: Collection, field: string, extra: Record<string, unknown>) {
     const ids = attachmentIds(values[fileField(draft)]);
-    // 只把这一页的副本交给记录页（打开时已经在文档库的不算，D-455）。
+    // Hand over only the copies belonging to this page to the records page (those already in the document library upon opening are excluded, D-455).
     const mine = ids.filter((id) => owned.current.has(id));
     owned.current = new Set();
     router.replace({
@@ -294,7 +302,7 @@ export function NewTableScreen() {
     if (table) handOff(table, fileField(table), {});
   }
 
-  /** Tink 改的是建好的表（只看结构，看不到文件，底线 2）：先建表，表单换成记录页，再打开 AI 页。 */
+  /** Tink modifies the created table (inspects structure only, cannot view files, invariant 2): create the table first, switch the form to the records page, then open the AI page. */
   async function askTink() {
     if (busy) return;
     setBusy(true);
@@ -342,7 +350,7 @@ export function NewTableScreen() {
             {t(locale, 'newTableWorking')}
           </Text>
         ) : null}
-        {/* 类型已经定了（点了推荐或自己选了），就不再提议下载模型来判断类型。 */}
+        {/* Once the type is determined (either via recommendations or manual selection), stop proposing model downloads for type determination. */}
         {modelMissing && !recommended && chosenFor !== pages && !working ? (
           <View testID="new-table-model-need" style={{ gap: 8, alignItems: 'flex-start' }}>
             <Text style={muted}>{t(locale, 'newTableModelNeed')}</Text>
@@ -446,7 +454,7 @@ export function NewTableScreen() {
           </View>
         ) : null}
 
-        {/* 改字段时藏起来，不卸载：卸载了要重新认一遍字。 */}
+        {/* Hide when editing fields, do not uninstall: uninstalling would require re-recognizing text. */}
         <View style={editing ? styles.hidden : styles.form}>
           <FormFilesContext.Provider value={formFiles}>
             <SuggestedFields
@@ -611,7 +619,7 @@ export function NewTableScreen() {
   );
 }
 
-/** 「文件里还有」先显示几个字段名。 */
+/** Number of field names initially displayed in 'Also in file'. */
 const FIRST_NAMES = 4;
 
 const styles = StyleSheet.create({

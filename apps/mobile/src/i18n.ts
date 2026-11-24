@@ -3,15 +3,16 @@ import { hasMessage, localize, t, type Locale, type Localized } from '@morph/cor
 import { getLocales } from 'expo-localization';
 export { t, type StringKey } from '@morph/core';
 
-// 界面文案在 core/messages/（en.ts、zh.ts、fr.ts）；英文、简体中文、法语跟随系统语言。
-// 用户自己的内容（页面标题等）存放在工作空间配置里，不经过这里。
+// UI copy is located in core/messages/ (en.ts, zh.ts, fr.ts); English, Simplified Chinese, and
+// French follow the system language. User content (page titles, etc.) is stored in the workspace
+// config and does not pass through here.
 
 export function getDeviceLocale(): Locale {
   const [primary] = getLocales();
   return primary?.languageCode === 'zh' ? 'zh' : primary?.languageCode === 'fr' ? 'fr' : 'en';
 }
 
-/** 手机设置里的语言（BCP 47，按用户的顺序），例如 ['zh-Hant-TW', 'en-US']。 */
+/** Languages in phone settings (BCP 47, in user order), e.g., ['zh-Hant-TW', 'en-US']. */
 export function deviceLanguageTags(): string[] {
   return getLocales().map((l) => l.languageTag);
 }
@@ -31,7 +32,7 @@ const FILE_KIND_NAMES: Record<string, Localized> = {
   documents: { en: 'Office document', zh: '办公文档', fr: 'document Office' },
 };
 
-/** 运行错误的提示（detail 里的权限名等内部词换成用户看得懂的说法）。 */
+/** Runtime error prompts (internal terms such as permission names in detail are replaced with user-friendly wording). */
 export function runErrorText(
   locale: Locale,
   code: string,
@@ -50,7 +51,7 @@ export function runErrorText(
   });
 }
 
-/** 改动记录里的时间（D-112）：今天 / 昨天 13:51，更早的显示日期，不显示秒。 */
+/** Timestamps in change history (D-112): today / yesterday 13:51, earlier entries show dates without seconds. */
 export function formatWhen(locale: Locale, at: Date, now: Date): string {
   const time = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
   const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -65,13 +66,15 @@ export function formatWhen(locale: Locale, at: Date, now: Date): string {
     day: 'numeric',
     ...(sameYear ? {} : { year: 'numeric' }),
   });
-  // 法语写「25 oct. à 13:51」。
+  // French formats as "25 oct. à 13:51".
   return locale === 'fr' ? `${date} à ${time}` : `${date}, ${time}`;
 }
 
 /**
- * 存到手机时文件夹的显示名（D-583）：iOS「我的 iPhone」和 iCloud 云盘的最上层在文件系统里另有名字
- * （File Provider Storage、com~apple~CloudDocs），按「文件」App 里的叫法显示；别的文件夹用它自己的名字。
+ * Folder display name when saved to the phone (D-583): iOS "On My iPhone" and iCloud Drive
+ * top-level folders have different names in the file system (File Provider Storage,
+ * com~apple~CloudDocs), displayed according to the "Files" app naming; other folders use their
+ * own names.
  */
 export function folderName(locale: Locale, name: string): string {
   if (name === 'File Provider Storage') return t(locale, 'folderOnMyIPhone');

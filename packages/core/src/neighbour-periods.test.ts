@@ -10,7 +10,7 @@ import { choiceRange, previousFullRange, previousToDateRange } from './page-peri
 import { PAGE_PERIODS, PERIODS, type Collection, type Locale, type Period } from './schema';
 import { registry } from './test-helpers';
 
-// 日历上前后的时间段（D-559）：昨天、上周、上月、去年、明天、下周、下月。和已有的一样按「设置 → 日期」（D-286）算。
+// Calendar relative periods (D-559): yesterday, last week, last month, last year, tomorrow, next week, next month. Calculated based on "Settings -> Date" (D-286) just like existing ones.
 
 const NEIGHBOURS = [
   'yesterday',
@@ -22,7 +22,7 @@ const NEIGHBOURS = [
   'nextMonth',
 ] as const;
 
-// 2026-11-04 是星期三；默认一周从周一开始、一天从 0 点开始。
+// November 4, 2026 is Wednesday; default week starts on Monday, day starts at 0:00.
 const now = new Date(2026, 10, 4, 12);
 const range = (p: string, at = now, cal: Calendar = DEFAULT_CALENDAR) =>
   periodRange(p as Period, at, cal);
@@ -63,7 +63,7 @@ describe('periods before and after the current one (D-559)', () => {
     const sunday: Calendar = { ...DEFAULT_CALENDAR, weekStart: 'sunday' };
     expect(range('lastWeek', now, sunday)).toEqual(['2026-10-25', '2026-10-31']);
     expect(range('nextWeek', now, sunday)).toEqual(['2026-11-08', '2026-11-14']);
-    // 一天从 2 点开始：11 月 1 日 1:30 还算 10 月 31 日，所以「上个月」是 9 月。
+    // Day starts at 2:00: 1:30 AM on November 1 still counts as October 31, so "last month" is September.
     const twoAm: Calendar = { ...DEFAULT_CALENDAR, dayStartHour: 2 };
     expect(range('lastMonth', new Date(2026, 10, 1, 1, 30), twoAm)).toEqual([
       '2026-09-01',
@@ -84,7 +84,7 @@ describe('periods before and after the current one (D-559)', () => {
     expect(prev('tomorrow')).toEqual(['2026-11-04', '2026-11-04']);
     expect(prev('nextWeek')).toEqual(['2026-11-02', '2026-11-08']);
     expect(prev('nextMonth')).toEqual(['2026-11-01', '2026-11-30']);
-    // 31 天的月份前面是 30 天的月份，不是往前数 31 天。
+    // A 31-day month precedes a 30-day month, rather than counting back 31 days.
     expect(
       previousPeriodRange('lastMonth' as Period, new Date(2026, 7, 10), DEFAULT_CALENDAR),
     ).toEqual(['2026-06-01', '2026-06-30']);

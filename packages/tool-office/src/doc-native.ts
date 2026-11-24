@@ -2,14 +2,14 @@ import { leafBlocks, type DocLeaf, type DocPage } from './doc';
 import type { Box } from './types';
 
 export interface NativeGraphics {
-  /** PDF 点坐标；App 只读取用户选择的原件副本。 */
+  /** PDF point coordinates; app only reads user-selected originals copies. */
   owned: Box[];
   colors: { box: Box; color: string }[];
   fills?: { box: Box; color: string }[];
-  /** 这些框所在的 PDF 页大小（点）；Word 的纸缩过时（fitPaper）和 page.paper 不一样。 */
+  /** PDF page size (in points) where these boxes are located; Word paper fit (fitPaper) differs from page.paper. */
   paper?: { width: number; height: number };
 }
-/** 旋转文字的整图所有权还不能可靠推断，仍用已有的文字方向/裁图路径。 */
+/** Ownership of the entire image containing rotated text cannot be reliably inferred yet; continue using existing text direction / cropping paths. */
 export function canUseNativeGraphics(page: DocPage): boolean {
   return !leafBlocks(page).some((b) => b.kind === 'table' && b.direction !== undefined);
 }
@@ -20,8 +20,11 @@ const overlap = (a: Box, b: Box) =>
   Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
 
 /**
- * 几个框在 box 里一共盖住多大面积，重叠的地方只算一次：PDF 常把同一条粗边画好几遍（每格一段，再按整张表画一段），
- * 框还都往外放宽了几个像素；按面积直接相加，一条边就「盖满」了旁边很窄的一格（EU 样本 016 的整列黑格子）。
+ * Total area covered by multiple boxes within box, counting overlapping regions only once: PDFs
+ * often draw the same thick border multiple times (segmenting each grid cell, then drawing a
+ * segment for the entire table), and boxes are also expanded outward by several pixels. Summing
+ * areas directly causes a single border to 'fully cover' a very narrow adjacent cell (EU sample
+ * 016 full-column black grid).
  */
 function coveredArea(box: Box, rects: readonly Box[]): number {
   const parts = rects
@@ -56,12 +59,12 @@ function coveredArea(box: Box, rects: readonly Box[]): number {
   return total;
 }
 
-/** 底色和字至少差这么多（WCAG 的对比度，1 是一样，21 是黑白）。 */
+/** Minimum contrast difference between background and text (WCAG contrast: 1 is identical, 21 is black and white). */
 const MIN_FILL_CONTRAST = 2;
-/** 字框比这段字高这么多倍以上就是压在页上的大字（水印），不是这段字自己的字。 */
+/** If the text box is taller than this multiplier relative to the text line, it is treated as large text placed on the page (watermark) rather than the text's own content. */
 const WATERMARK_HEIGHT = 3;
 
-/** 两种颜色（六位十六进制）的对比度。 */
+/** Contrast ratio between two colors (six-digit hex). */
 function contrast(a: string, b: string): number {
   const luminance = (hex: string) => {
     const [r, g, b] = [0, 2, 4].map((i) => {
@@ -74,7 +77,7 @@ function contrast(a: string, b: string): number {
   return (hi! + 0.05) / (lo! + 0.05);
 }
 
-/** 给已隔离、参与正文排版的整图接上原生剪图；只有纯装饰可以留在页底。 */
+/** Attach native clipping to isolated full images participating in body layout; only pure decorations may remain at the page footer. */
 export function applyNativeGraphics(
   page: DocPage,
   graphics: NativeGraphics,
@@ -97,9 +100,12 @@ export function applyNativeGraphics(
   const fills = (graphics.fills ?? [])
     .filter((c) => /^[0-9A-F]{6}$/i.test(c.color))
     .map((c) => ({ ...c, box: pixel(c.box) }));
-  // 按重叠面积投票。比这段字高出好几倍的字框（斜着压在页上的大水印字「PROJET」，EU 样本 080）和一小行字
-  // 重叠的面积比这行字自己的字还多，但它几乎全在别处：只按它有多大一部分在这里算，不能让这行字变成水印的浅灰。
-  // 跨两行的普通字框照常算（EU 样本 068）。
+  // Vote by overlapping area. A text box significantly taller than the text line (a large watermark
+  // text 'PROJET' skewed across the page, EU sample 080) overlapping a short text line has an
+  // overlap area larger than the text line's own size, but it is almost entirely elsewhere:
+  // calculate only based on the portion present here, preventing this text line from inheriting the
+  // watermark's light gray. Standard text boxes spanning two lines are calculated normally (EU
+  // sample 068).
   const colorOf = (box: Box) => {
     const votes = new Map<string, number>();
     for (const c of colors) {
@@ -112,8 +118,10 @@ export function applyNativeGraphics(
       ? entries[0][0]
       : undefined;
   };
-  // 从小到大累计每种颜色盖住的面积：先盖满八成的颜色在最上面。一段字横跨同色的几张卡片时，
-  // 合起来算（不然会落到卡片下面整页的深色底上，深色字写在深色底上看不见）。
+  // Accumulate area covered by each color from smallest to largest: colors covering 80% first are
+  // on top. When a text segment spans multiple cards of the same color, calculate them combined
+  // (otherwise it might fall onto the dark background of the entire page beneath the cards, making
+  // dark text invisible on dark backgrounds).
   const bySize = [...fills].sort((a, b) => area(a.box) - area(b.box));
   const fillOf = (box: Box) => {
     const covered = new Map<string, Box[]>();
@@ -125,8 +133,9 @@ export function applyNativeGraphics(
     }
     return undefined;
   };
-  // 底色和字的颜色差不多（黑字落在 PDF 用黑色实心框画出来的边框上，EU 样本 062）：字会看不见，宁可不加底色。
-  // 不知道字的颜色时照旧。
+  // When background color and text color are too similar (e.g., black text falling on borders drawn
+  // with solid black PDF boxes, EU sample 062): text would become invisible, so omit the background
+  // color rather than risking it. Fall back to normal when text color is unknown.
   const legibleFill = (fill: string | undefined, color: string | undefined) =>
     fill && fill !== 'FFFFFF' && (!color || contrast(fill, color) >= MIN_FILL_CONTRAST)
       ? fill

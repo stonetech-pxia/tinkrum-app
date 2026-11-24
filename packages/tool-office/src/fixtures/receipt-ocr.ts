@@ -1,4 +1,4 @@
-// 创始人 2026-11-06 发来的一张小票（Lidl），macOS 系统识别（Vision）认出来的行（D-471 的测试用）。
+// A receipt (Lidl) sent by the founder on 2026-11-06, with lines recognized by macOS system text recognition (Vision) (for D-471 tests).
 
 import type { OcrBox } from '../types';
 

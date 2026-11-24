@@ -2,7 +2,7 @@ import { formatValue, recordValue, type DataRecord, type LinkResolver } from './
 import { fieldForRecord } from './money-currency';
 import type { Collection, Locale } from './schema';
 
-/** 用户写的占位符只替换一遍；值里的花括号不是新的模板，不解释表达式。 */
+/** Placeholders written by users are replaced only once; braces inside values are not new templates and do not evaluate expressions. */
 export function fillRecordTemplate(
   template: string,
   collection: Collection,

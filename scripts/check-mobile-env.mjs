@@ -1,4 +1,4 @@
-// 只检查官方 App 发布构建；源码版可以不配中继地址或选用自己的 AI 服务。
+// Checks official app release builds only; source versions can omit the relay address or use their own AI service.
 const MOBILE_RELEASE_ENV = [
   'EXPO_PUBLIC_MORPH_API_URL',
   'EXPO_PUBLIC_MORPH_TOOLS_URL',

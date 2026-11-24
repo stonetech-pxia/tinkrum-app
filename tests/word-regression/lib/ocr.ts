@@ -1,6 +1,9 @@
-// 识别结果（PP-OCR 的行 + 版面模型的区域）按「PDF 内容 + 页码 + 图的大小」存在 fixtures/ 里。
-// 平时只读这些记录，不需要模型，几秒跑完；转换器改了不影响记录（记录是转换器的输入）。
-// --record 时用和 App 相同的模型重新识别并写回（换了识别模型、加了新页时用）。
+// Recognition results (PP-OCR lines + layout model regions) are stored in fixtures/ based on "PDF
+// content + page number + image size". Normally these records are read directly without running the
+// model, finishing in a few seconds; changing the converter does not affect the records (as records
+// are the converter's input).
+// When --record is specified, re-recognize using the same model as the app and write back (used
+// when changing the recognition model or adding new pages).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
@@ -25,13 +28,13 @@ interface Line {
 }
 
 export interface PageRecord {
-  /** 这一页来源文件（pages/ 里）的 sha256：来源改了，记录作废。 */
+  /** SHA-256 of the source file for this page (in pages/): if the source changes, the record becomes invalid. */
   sourceSha256: string;
   recognize: { width: number; height: number; lines: Line[] }[];
   layout: { width: number; height: number; regions: LayoutRegion[] }[];
 }
 
-// canvaskit 解码、缩放和 App 的 tablePixels 一样：长边不超过 2000，再按识别要求取整。
+// CanvasKit decoding, scaling, and app tablePixels match: the long side does not exceed 2000, and is then rounded according to recognition requirements.
 const req = createRequire(import.meta.url);
 const CK = await req('canvaskit-wasm/bin/full/canvaskit.js')();
 export { CK };
@@ -138,7 +141,7 @@ async function liveLines(px: Pixels): Promise<Line[]> {
     },
     m.dictionary,
   );
-  // 和 App 的 expo-vision 适配器一样：不带 score。
+  // Same as the app's expo-vision adapter: omits score.
   return raw.map(({ text, x, y, width, height, chars }: Line) => ({
     text,
     x,
@@ -157,7 +160,7 @@ async function liveLayout(px: Pixels): Promise<LayoutRegion[]> {
   return parseLayout(res[m.layout.outputNames[0]!]!.data, px, 480);
 }
 
-/** 一页的识别记录：读 fixtures，没有（或 --record）时现场识别。 */
+/** Recognition records for a single page: read from fixtures, or perform live recognition if absent (or when --record is set). */
 export class OcrStore {
   private record: PageRecord;
   dirty = false;
@@ -206,7 +209,7 @@ export class OcrStore {
   }
 }
 
-/** 不读不写记录，每次现场识别（转任意样本用）。 */
+/** Does not read or write records, performs live recognition every time (used for converting arbitrary samples). */
 export const liveOcr = {
   lines: async (px: Pixels) => ({ width: px.width, height: px.height, lines: await liveLines(px) }),
   regions: liveLayout,

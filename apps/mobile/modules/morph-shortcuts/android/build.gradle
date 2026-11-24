@@ -1,5 +1,5 @@
-// 本地 Expo 模块的 Android 部分（D-271）：ShortcutManagerCompat（androidx.core，随 react-android 带进来）的
-// 动态快捷方式和固定到桌面的图标。只用系统接口。
+// Android portion of the local Expo module (D-271): dynamic shortcuts using ShortcutManagerCompat
+// (from androidx.core, bundled with react-android) and pinned desktop icons. Uses system APIs only.
 plugins {
   id 'com.android.library'
   id 'expo-module-gradle-plugin'

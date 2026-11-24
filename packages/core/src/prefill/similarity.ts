@@ -1,16 +1,17 @@
-// 新记录表单的候选值（D-394）：标签和关键词的字符相似度（测量里的变体 A，照搬
-// side-session-notes/prefill-ranking/scripts/score.py）。不分大小写、去掉重音和空格标点，
-// 所以 OCR 吞掉空格（`Amountpaid`）和小的错字（`Totel`）都还算得上；短的拉丁词（tel、no、to）
-// 必须是一个完整的词。
+// Candidate values for new record form (D-394): character similarity between labels and keywords
+// (Variant A from measurements, copied from side-session-notes/prefill-ranking/scripts/score.py).
+// Case-insensitive, stripping accents and whitespace/punctuation, so OCR swallowed spaces
+// ('Amountpaid') and minor typos ('Totel') still match; short Latin words (tel, no, to) must be a
+// complete word.
 
-/** 统一写法：NFKC、小写、去掉重音，只留字母和数字。 */
+/** Canonical normalization: NFKC, lowercase, strip accents, keep only letters and digits. */
 export function norm(s: string): string {
   return unicode(unicode(s, 'NFKC').toLowerCase(), 'NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^\p{L}\p{N}]/gu, '');
 }
 
-/** 引擎不支持 normalize 时原样返回（只是重音和全角字少认一点）。 */
+/** Return as-is if engine does not support normalize (recognizes fewer accents and full-width characters). */
 function unicode(s: string, form: 'NFKC' | 'NFD'): string {
   try {
     return s.normalize(form);
@@ -19,7 +20,7 @@ function unicode(s: string, form: 'NFKC' | 'NFD'): string {
   }
 }
 
-/** 按空格和常见的分隔符切成词（每个词再统一写法）。 */
+/** Split into tokens by whitespace and common separators (applying canonical normalization to each token). */
 export function tokens(s: string): string[] {
   return s
     .split(/[\s:：/\-–·.,()[\]|]+/)
@@ -55,7 +56,7 @@ const latinShort = (kw: string) => {
   return n.length <= 3 && !CJK.test(n);
 };
 
-/** 关键词出现在标签里的程度：0.75·覆盖 + 0.25·精确（标签里多余的字越多越低）。 */
+/** Degree to which keyword appears in label: 0.75 * coverage + 0.25 * precision (lower as extra characters in label increase). */
 export function charSim(label: string, kw: string): number {
   if (!label || !kw) return 0;
   const nl = norm(label);
@@ -70,7 +71,7 @@ export function charSim(label: string, kw: string): number {
   return (0.75 * inter) / Math.max(1, total(gk)) + (0.25 * inter) / Math.max(1, total(gl));
 }
 
-/** 排除词：几乎整个出现在标签里（覆盖 ≥ 0.75）才算，否则 0。 */
+/** Excluded term: counts only if almost entirely present in label (coverage >= 0.75), otherwise 0. */
 export function charCover(label: string, kw: string): number {
   if (!label || !kw) return 0;
   if (latinShort(kw)) return tokens(label).includes(norm(kw)) ? 1 : 0;
@@ -79,10 +80,10 @@ export function charCover(label: string, kw: string): number {
   return cov >= 0.75 ? cov : 0;
 }
 
-/** 部分字偶然相同（bigram 撞上）不给分：(s − 0.4) / 0.6，截到 0..1。 */
+/** Give no score for accidental partial character matches (bigram collision): (s - 0.4) / 0.6, clamped to 0..1. */
 const A0 = 0.4;
 
-/** 标签分 0..1：和关键词最像的那个（校准后）减去和排除词最像的那个。 */
+/** Label score 0..1: similarity to the closest keyword (calibrated) minus similarity to the closest exclusion term. */
 export function labelScore(
   label: string,
   keywords: readonly string[],
@@ -97,12 +98,12 @@ export function labelScore(
   return Math.max(0, Math.min(1, p - e));
 }
 
-/** 标签明明白白是这个字段的排除词（覆盖 ≥ 0.75，和 labelScore 整个减掉的门槛一样）：小计、找零、优惠。 */
+/** Label is explicitly an exclusion term for this field (coverage >= 0.75, same threshold subtracted in labelScore): subtotal, change, discount. */
 export function isExcludedLabel(label: string, exclude: readonly string[]): boolean {
   return !!label && exclude.some((k) => charCover(label, k) >= 0.75);
 }
 
-/** 两段文字有多像（0..1，编辑距离）；单选的选项比对用（difflib 的近似）。 */
+/** How similar two text strings are (0..1, edit distance); used for single-choice option comparison (difflib-like approximation). */
 export function ratio(a: string, b: string): number {
   if (a === b) return 1;
   if (!a.length || !b.length) return 0;

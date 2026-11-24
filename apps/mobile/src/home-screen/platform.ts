@@ -1,36 +1,36 @@
 import type { DrawnIcon, IconValue } from '@morph/core';
 
-// 手机桌面（D-271）：长按 Morph 图标的菜单和 Android 桌面上单独的图标。App 里由本地模块 MorphShortcuts
-// 实现（native.ts），测试里换成假的。
+// Mobile desktop (D-271): long-press menu on Morph icon and separate icon on Android desktop.
+// Implemented by local module MorphShortcuts in the app (native.ts), replaced with mock in tests.
 
-/** 桌面图标上画的东西（D-606）：这个图标，画在这个底色上。 */
+/** Things drawn on the desktop icon (D-606): this icon drawn on this background color. */
 export interface HomeScreenArt {
   icon: IconValue;
   background: string;
   foreground: string;
-  /** icon 是 my:<id> 时它的路径（D-625）；图标库里没有就不写，只画底色。 */
+  /** Path when icon is my:<id> (D-625); omitted if not in icon library, drawing only the background color. */
   drawn?: DrawnIcon;
 }
 
 export interface HomeScreenEntry {
-  /** 快捷操作的 ID，或 app:<id>。 */
+  /** Quick action ID, or app:<id>. */
   id: string;
   title: string;
-  /** iOS 菜单里的 SF Symbol 名字。 */
+  /** SF Symbol name in iOS menu. */
   symbol?: string;
-  /** App 才有（D-606）：Android 的长按菜单和桌面上单独的图标画它；没有时用 Tinkrum 的图标。 */
+  /** App-only (D-606): drawn by Android's long-press menu and standalone desktop icon; falls back to Tinkrum's icon when absent. */
   art?: HomeScreenArt;
 }
 
 export interface HomeScreenPlatform {
-  /** 整份换掉菜单；Android 上不在菜单里的已固定图标停用，点了显示 disabledMessage。 */
+  /** Replaces the menu entirely; pinned icons missing from the menu on Android are disabled, tapping them shows disabledMessage. */
   setItems(items: readonly HomeScreenEntry[], disabledMessage: string): Promise<void>;
-  /** 能不能在桌面上单独放一个图标（只有 Android 能）。 */
+  /** Whether a separate icon can be placed on the desktop (Android only). */
   canPin(): boolean;
-  /** 弹系统的确认框，只能在用户点了按钮之后调用。返回请求有没有发出去。 */
+  /** Pops up the system confirmation dialog, can only be called after the user taps the button. Returns whether the request was sent. */
   pin(item: HomeScreenEntry): Promise<boolean>;
-  /** 冷启动时是从哪个快捷操作打开的；只返回一次。 */
+  /** Which quick action opened the app on cold start; returned only once. */
   takeLaunched(): string | null;
-  /** App 开着时点了桌面菜单或图标；返回取消订阅的函数。 */
+  /** Desktop menu or icon tapped while app is open; returns unsubscribe function. */
   onOpen(listener: (workflowId: string) => void): () => void;
 }

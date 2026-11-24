@@ -33,7 +33,7 @@ import { APPLIED_BANNER_MS } from '../shell/Shell';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
-// 在真实路由和渲染器上走一遍用户旅程（数据存储换成内存实现）。
+// Walk through the user journey on real router and renderer (data storage replaced with in-memory implementation).
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -85,7 +85,7 @@ async function renderApp(
   return { repo, store, files, aiSettings, router };
 }
 
-/** 卸载工具要在系统确认框里确认；测试中直接点“应用更改”。其他工具操作直接应用。 */
+/** Uninstalling a tool must be confirmed in the system confirmation dialog; in tests, tap "Apply changes" directly. Other tool operations apply directly. */
 function acceptNextAlert() {
   jest.spyOn(Alert, 'alert').mockImplementationOnce((_title, _message, buttons) => {
     buttons?.find((b) => b.style !== 'cancel')?.onPress?.();
@@ -98,7 +98,7 @@ async function askAi(text: string) {
   await fireEvent.press(screen.getByTestId('change-submit'));
 }
 
-/** 草稿模式（D-190）底部的「应用」。 */
+/** "Apply" at the bottom of draft mode (D-190). */
 async function applyDraft() {
   await fireEvent.press(await screen.findByTestId('draft-apply'));
 }
@@ -112,13 +112,13 @@ describe('user journeys (UI)', () => {
   it('B + A + undo: install PDF, reshape the home page in a draft, apply, then undo', async () => {
     const { store } = await renderApp();
 
-    // 旅程 B：在工具目录安装 PDF，首页出现入口。
+    // Journey B: Install PDF in the tool catalog, entry point appears on home screen.
     await fireEvent.press(screen.getByTestId('nav-tools'));
     await fireEvent.press(await screen.findByTestId('install-pdf'));
     await fireEvent.press(await screen.findByTestId('nav-page:home'));
     expect(await screen.findByTestId('component-card-pdf')).toBeTruthy();
 
-    // 旅程 A：自然语言 → 直接进入草稿模式（D-190）：App 显示改完后的样子，已保存的版本没变。
+    // Journey A: Natural language -> direct entry into draft mode (D-190): app shows the updated look, saved version unchanged.
     await askAi('把首页改成文件工作台，导航栏只保留首页、工具、设置');
     expect(await screen.findByTestId('draft-bar')).toBeTruthy();
     expect(screen.getAllByText('文件工作台').length).toBeGreaterThan(0);
@@ -126,10 +126,11 @@ describe('user journeys (UI)', () => {
     expect(store.getState().config!.nav.bar).toHaveLength(5);
     expect(screen.getByTestId('draft-reply')).toHaveTextContent(/\S/);
     expect(screen.getByTestId('draft-reply')).not.toHaveTextContent(/才会生效/);
-    // 修改内容是右上角 Tink 的气泡（D-526）：显示时界面淡下去，Tink 在动；点「我知道了」缩成三个点，
-    // 不再淡化，点三个点能再打开。
+    // Modification content is the Tink bubble in the top right (D-526): interface dims when
+    // displayed, Tink animates; tap "Got it" to shrink into three dots, no longer dims, tapping
+    // three dots opens it again.
     expect(screen.getByTestId('tink-lively')).toBeTruthy();
-    // 淡化层和其他弹层同一种遮罩色，不再自写纯黑。
+    // Dimming layer uses the same mask color as other modal layers, no longer custom pure black.
     expect(screen.getByTestId('draft-dim')).toHaveStyle({
       backgroundColor: makePalette(createDefaultWorkspace('zh').theme, false).scrim,
     });
@@ -141,11 +142,11 @@ describe('user journeys (UI)', () => {
     expect(screen.getByTestId('draft-reply')).toHaveTextContent(/\S/);
     expect(screen.getByTestId('draft-reply')).not.toHaveTextContent(/才会生效/);
     expect(screen.getByTestId('tink-lively')).toBeTruthy();
-    // 点淡下去的界面也是收起。
+    // Tapping the dimmed interface also collapses it.
     await fireEvent.press(screen.getByTestId('draft-dim'));
     expect(screen.queryByTestId('draft-reply')).toBeNull();
     expect(screen.getByTestId('draft-reply-show')).toHaveProp('accessibilityLabel', '看修改内容');
-    // 再展开，然后应用草稿：退出草稿，气泡一起没了。
+    // Expand again, then apply draft: exit draft, bubbles disappear together.
     await fireEvent.press(screen.getByTestId('draft-reply-show'));
 
     await applyDraft();
@@ -153,7 +154,7 @@ describe('user journeys (UI)', () => {
     expect(screen.queryByTestId('draft-reply-show')).toBeNull();
     expect(screen.queryByTestId('tink-lively')).toBeNull();
 
-    // 同一个 App 的首页立即变化：页面标题与导航标签都已更新，AI 和历史不在导航栏里。
+    // Home screen of the same app changes immediately: page title and navigation tabs are updated, AI and history are not in the navigation bar.
     expect(await screen.findAllByText('文件工作台')).toHaveLength(2);
     expect(screen.queryByTestId('draft-bar')).toBeNull();
     expect(screen.queryByTestId('nav-ai')).toBeNull();
@@ -161,12 +162,12 @@ describe('user journeys (UI)', () => {
     expect(screen.queryByTestId('floating-ai')).toBeNull();
     expect(await screen.findByTestId('banner')).toBeTruthy();
 
-    // AI 修改和历史仍然可以从设置里打开。
+    // AI modifications and history can still be opened from settings.
     await fireEvent.press(screen.getByTestId('nav-settings'));
     expect(await screen.findByTestId('settings-ai')).toBeTruthy();
     expect(screen.getByTestId('settings-history')).toBeTruthy();
 
-    // 应用后可撤销。
+    // Undoable after applying.
     await fireEvent.press(screen.getByText('撤销'));
     expect(await screen.findByTestId('nav-ai')).toBeTruthy();
     expect(store.getState().head).toMatchObject({ source: 'restore' });
@@ -191,13 +192,13 @@ describe('user journeys (UI)', () => {
 
   it('a new workflow is made right away and goes on the home page; “ready” comes first', async () => {
     const { store } = await renderApp();
-    // 从设置页打开 AI 修改。快捷操作是功能，不进草稿，直接做好（D-191）。
+    // Open AI modifications from settings page. Quick actions are features, do not enter draft, complete directly (D-191).
     await fireEvent.press(screen.getByTestId('nav-settings'));
     await askAi('添加签证照片工作流');
-    // 先看到「做好了」（D-125），说明首页上也有入口；「先不用」回到首页，运行卡片就在标题下面。
+    // See "Done" first (D-125), indicating an entry point is also on the home screen; "Not now" returns to home, run card is below the title.
     expect(await screen.findByTestId('ready-screen')).toHaveTextContent(/首页上也放了入口/);
     expect(screen.getByTestId('ready-name')).toHaveTextContent(/签证 \/ 证件照/);
-    // 「做好了」页面上也有「已改好 · 撤销」（不然提示条在下面的 App 里自己消失了）。
+    // "Done" page also has "Modified · Undo" (otherwise the toast disappears by itself in the app below).
     expect(
       await within(screen.getByTestId('ready-screen')).findByTestId('banner'),
     ).toHaveTextContent(/撤销/);
@@ -206,7 +207,7 @@ describe('user journeys (UI)', () => {
     const id = quickActionsOf(store.getState().config!)[0]!.id;
     await fireEvent.press(screen.getByTestId('ready-later'));
     expect(await screen.findByTestId(`run-${id}`)).toBeTruthy();
-    // 顶部照常可以撤销。
+    // Can undo at the top as usual.
     expect(await screen.findByTestId('banner')).toHaveTextContent(/撤销/);
   });
 
@@ -217,7 +218,7 @@ describe('user journeys (UI)', () => {
     expect(store.getState().config!.theme.primaryColor).not.toBe('#2F9E44');
     expect(screen.getByTestId('next-card')).toHaveTextContent(/主题换成绿色/);
     await fireEvent.press(screen.getByTestId('next-go'));
-    // 句子自动打进 AI 修改页并发送，外观进草稿。
+    // Sentence is automatically typed into the AI modification page and sent, look enters draft.
     expect(await screen.findByTestId('draft-bar', {}, { timeout: 4000 })).toBeTruthy();
     expect(store.getState().draft!.steps[0]!.config.theme.primaryColor).toBe('#2F9E44');
     expect(store.getState().next).toBeNull();
@@ -252,7 +253,7 @@ describe('user journeys (UI)', () => {
     await fireEvent.press(screen.getByTestId(`run-${id}`));
     expect(await screen.findByTestId('toast')).toHaveTextContent(/应用之后才能用/);
     expect(screen.queryByTestId('run-screen')).toBeNull();
-    // 切换页面照常。
+    // Switching pages works as usual.
     await fireEvent.press(screen.getByTestId('nav-tools'));
     expect(await screen.findByTestId('install-pdf')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('install-pdf'));
@@ -269,7 +270,7 @@ describe('user journeys (UI)', () => {
           : plan;
       },
     });
-    // 直接做好的功能：说明在「做好了」页面上；草稿里的外观修改：说明在回复里。
+    // Directly completed features: explanation on the "Done" page; look modifications in draft: explanation in reply.
     await askAi('添加签证照片工作流');
     expect(await screen.findByTestId('ready-note-0')).toHaveTextContent(/每月需要你自己点一次/);
     await fireEvent.press(screen.getByTestId('ready-later'));
@@ -295,7 +296,7 @@ describe('user journeys (UI)', () => {
     await fireEvent.press(await screen.findByTestId('change-suggest-0'));
     expect(screen.getByTestId('change-input').props.value).toBe('主题换成绿色');
 
-    // 点了一条、这次没给新的建议：只去掉点过的那条，另一条留着。
+    // Tapped one, didn't give new suggestions this time: remove only the tapped one, leave the other.
     await fireEvent.press(screen.getByTestId('change-submit'));
     await applyDraft();
     expect(store.getState().suggest).toEqual(['做一个看板']);
@@ -308,7 +309,7 @@ describe('user journeys (UI)', () => {
   it('leave keeps the draft; the AI page continues or deletes it', async () => {
     const { store } = await renderApp();
     await askAi('主题换成绿色');
-    // 草稿里点会真的做事的东西只提示；离开时提示一起收掉。
+    // Tapping things that actually do work inside draft only prompts; prompts dismiss together upon leaving.
     await fireEvent.press(await screen.findByTestId('nav-settings'));
     await fireEvent.press(await screen.findByTestId('settings-data'));
     expect(await screen.findByTestId('toast')).toHaveTextContent(/应用之后才能用/);
@@ -343,13 +344,13 @@ describe('user journeys (UI)', () => {
     const reply = await screen.findByTestId('draft-chat-reply-1');
     expect(within(reply).getByText(/#2F9E44/)).toBeTruthy();
     expect(store.getState().draft!.steps).toHaveLength(2);
-    // 做不到的说明原因。
+    // Explain the reason for things that cannot be done.
     await fireEvent.changeText(screen.getByTestId('draft-chat-input'), '帮我订一张机票');
     await fireEvent.press(screen.getByTestId('draft-chat-send'));
     const rejected = await screen.findByTestId('draft-chat-rejected');
     expect(within(rejected).getByText(/暂时无法理解/)).toBeTruthy();
     await fireEvent.press(screen.getByTestId('draft-chat-close'));
-    // 回复记在草稿里（D-207）：再拉开还在；退掉它前面那一步时一起去掉。
+    // Replies are recorded in the draft (D-207): pulling back down still there; removed together when reverting the step before it.
     await fireEvent.press(screen.getByTestId('draft-edit'));
     expect(await screen.findByTestId('draft-chat-rejected')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('draft-chat-close'));
@@ -367,7 +368,7 @@ describe('user journeys (UI)', () => {
     );
   });
 
-  /** 设置里选的 AI（这里假装是远程模型）：什么都拒绝，用来确认风格选择器的原句没有交给它。 */
+  /** AI selected in settings (pretending to be remote model here): refuse everything, used to confirm style selector's raw text is not sent to it. */
   const configuredAI = () => ({
     plan: jest.fn<ReturnType<AIProvider['plan']>, Parameters<AIProvider['plan']>>(async () => ({
       kind: 'reject' as const,
@@ -404,13 +405,13 @@ describe('user journeys (UI)', () => {
     await fireEvent.press(screen.getByTestId('nav-ai'));
     await fireEvent.press(await screen.findByTestId('change-pick-style'));
     expect(await screen.findByText('选一个风格')).toBeTruthy();
-    // 默认的 Clay 不是预设，没有格子被标为当前风格。
+    // Default Clay is not a preset, no cell is marked as current style.
     expect(screen.getByTestId('style-brutalist').props.accessibilityState.selected).toBe(false);
 
     await fireEvent.press(screen.getByTestId('style-brutalist'));
     expect(await screen.findByTestId('draft-bar')).toBeTruthy();
     expect(ai.plan).not.toHaveBeenCalled();
-    // 草稿期间已保存的版本没有变化。
+    // Saved version unchanged during draft.
     expect(store.getState().config!.theme.primaryColor).toBe('#C8623A');
 
     await applyDraft();
@@ -420,7 +421,7 @@ describe('user journeys (UI)', () => {
     const [latest] = await store.getState().listRevisions();
     expect(latest!.summary).toBe('换成新粗野风格');
 
-    // 回到 AI 页，新粗野被标为当前风格。
+    // Return to AI page, new Brutalist is marked as current style.
     await fireEvent.press(screen.getByTestId('nav-ai'));
     await fireEvent.press(await screen.findByTestId('change-pick-style'));
     expect((await screen.findByTestId('style-brutalist')).props.accessibilityState.selected).toBe(
@@ -461,14 +462,14 @@ describe('user journeys (UI)', () => {
 
     await fireEvent.press(await screen.findByTestId('nav-settings'));
     await fireEvent.press(await screen.findByTestId('settings-history'));
-    // 单独的页面：Android 的返回键和左上角的返回都回到设置，不会退出 App。
+    // Separate page: Android back button and top-left back both return to settings, do not exit app.
     expect(router.getPathname()).toBe('/history');
-    // 改动记录（D-112）：没有编号和秒数，说明是谁改的。
+    // Change history (D-112): no numbers and seconds, indicates who modified it.
     const entry = await screen.findByTestId('revision-2');
     expect(entry).toHaveTextContent(/Tink 改的/);
     expect(entry).not.toHaveTextContent(/#\d|:\d\d:\d\d/);
     expect(screen.getByTestId('restore-1')).toHaveTextContent('回到这时候的样子');
-    // 先问一句（说明文件不受影响），确认后立即生效（D-190）。
+    // Ask first (indicating files are unaffected), takes effect immediately upon confirmation (D-190).
     let message: string | undefined;
     jest.spyOn(Alert, 'alert').mockImplementationOnce((_title, msg, buttons) => {
       message = msg ?? undefined;
@@ -480,7 +481,7 @@ describe('user journeys (UI)', () => {
     expect(await screen.findByTestId('nav-ai')).toBeTruthy();
     expect(store.getState().head).toMatchObject({ id: 3, source: 'restore' });
     expect(store.getState().head!.summary).toMatch(/^回到 .+ 的样子$/);
-    // 回到设置：撤销的提示条在外壳上，留在改动记录页就看不到了。
+    // Return to settings: undo toast is on the shell, staying on change history page would make it invisible.
     expect(router.getPathname()).toBe('/');
     expect(await screen.findByTestId('banner')).toBeTruthy();
     expect(screen.getByTestId('settings-history')).toBeTruthy();
@@ -489,11 +490,11 @@ describe('user journeys (UI)', () => {
   it('going back from tools opened in settings lands on settings', async () => {
     const { router } = await renderApp();
     await fireEvent.press(await screen.findByTestId('nav-settings'));
-    // 设置页不再列「工具」（隐藏了入口），页面本身还在：直接打开。
+    // Settings page no longer lists "Tools" (entry hidden), page itself still exists: open directly.
     await testRouter.push('/tools');
     expect(router.getPathname()).toBe('/tools');
     expect(await screen.findByTestId('page-ai')).toBeTruthy();
-    // 在这里加工具：撤销的提示条也要看得到。
+    // Add tool here: undo toast must also be visible.
     await fireEvent.press(await screen.findByTestId('install-pdf'));
     expect(await screen.findByTestId('banner')).toBeTruthy();
     await testRouter.back();
@@ -516,7 +517,7 @@ describe('user journeys (UI)', () => {
     await fireEvent.press(screen.getByTestId('nav-tools'));
     await fireEvent.press(await screen.findByTestId('install-pdf'));
 
-    // 从首页的工具入口打开同一个 App 里的 PDF 工具页。
+    // Open PDF tool page in the same app from the home screen tool entry point.
     await fireEvent.press(await screen.findByTestId('nav-page:home'));
     await fireEvent.press((await screen.findAllByText('PDF'))[0]!);
     expect(await screen.findByTestId('run-pdf-merge')).toBeTruthy();
@@ -526,14 +527,14 @@ describe('user journeys (UI)', () => {
       files.offer('附录.pdf', await makePdf(2)),
     ];
     await fireEvent.press(screen.getByTestId('run-pdf-merge'));
-    // 运行页面打开即开始；「命名」步骤：确认建议的名字。
+    // Run page starts upon opening; "Naming" step: confirm suggested name.
     expect(await screen.findByDisplayValue('报告-合并')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('prompt-ok'));
     expect(await screen.findByText('已存到 Tinkrum：「报告-合并.pdf」（3 页）')).toBeTruthy();
     await testRouter.back();
     expect(await screen.findByTestId('file-报告-合并.pdf')).toBeTruthy();
 
-    // 卸载工具：入口和页面消失，文件全部保留，授权被撤销。
+    // Uninstall tool: entry points and pages disappear, all files retained, authorizations revoked.
     const merged = (await repo.listAssets())[0]!;
     await testRouter.back();
     await fireEvent.press(await screen.findByTestId('nav-tools'));
@@ -542,7 +543,7 @@ describe('user journeys (UI)', () => {
     await fireEvent.press(await screen.findByTestId('nav-page:home'));
     expect(screen.queryByTestId('component-card-pdf')).toBeNull();
     expect(await screen.findByTestId('file-报告-合并.pdf')).toBeTruthy();
-    // 只有合并结果成为用户文件（D-063）。
+    // Only the merged result becomes a user file (D-063).
     expect((await repo.listAssets()).map((a) => a.name)).toEqual(['报告-合并.pdf']);
     expect(await repo.hasGrant('pdf', merged.id)).toBe(false);
   });
@@ -560,7 +561,7 @@ describe('user journeys (UI)', () => {
       '把 PDF 工具首页简化成上传和合并两个步骤，完成后自动按照‘合并-日期’命名',
     );
     await fireEvent.press(screen.getByTestId('change-submit'));
-    // 改快捷操作是功能，直接生效（D-191）：回到同一个工具页，顶部可以撤销，仍然只有一个工具实例。
+    // Modifying a quick action is a feature change, taking effect directly (D-191): returns to the same tool page where it can be undone at the top, and there is still only one tool instance.
     expect(await screen.findByTestId('banner')).toHaveTextContent(/撤销/);
     expect(await screen.findByTestId('run-pdf-merge')).toBeTruthy();
     expect(store.getState().draft).toBeNull();
@@ -589,7 +590,7 @@ describe('user journeys (UI)', () => {
     expect(screen.queryByTestId('nav-history')).toBeNull();
     expect(screen.queryByTestId('floating-ai')).toBeNull();
 
-    // 从设置进入 AI 修改说「撤销」：没有草稿时直接回到上一个版本。
+    // Saying "Undo" when entering AI modification from settings: returns directly to the previous version when there is no draft.
     await fireEvent.press(screen.getByTestId('nav-settings'));
     await fireEvent.press(await screen.findByTestId('settings-ai'));
     await fireEvent.changeText(await screen.findByTestId('change-input'), '撤销刚才的修改');
@@ -669,10 +670,10 @@ describe('user journeys (UI)', () => {
     expect(result.kind).toBe('preview');
     await store.getState().confirm();
 
-    // 网格里的快捷入口：笔记页不在导航栏里，推入一个新页面。
+    // Quick entry in the grid: the notes page is not in the navigation bar; pushes a new page.
     await fireEvent.press(await screen.findByText('去笔记'));
     expect(await screen.findByTestId('component-notes-title')).toBeTruthy();
-    // 页面里的按钮打开外壳里的设置。
+    // Button within the page opens settings in the shell.
     await fireEvent.press(screen.getByText('打开设置'));
     expect(await screen.findByTestId('settings-ai')).toBeTruthy();
 
@@ -710,11 +711,11 @@ describe('user journeys (UI)', () => {
     await fireEvent.press(screen.getByTestId('nav-settings'));
     await fireEvent.press(await screen.findByText('内置规则（离线）'));
     await fireEvent.press(await screen.findByTestId('ai-mode-byok'));
-    // Anthropic 时：发到 api.anthropic.com。
+    // When using Anthropic: sends to api.anthropic.com.
     expect(await screen.findByText(/会发到 api.anthropic.com/)).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('byok-preset-custom'));
-    // 没有 Claude 专属的警告；地址没存之前 key 框在，但存不了（先存地址）；也不显示 Claude 模型。
+    // No Claude-specific warning; before the address is saved the key box is present but cannot be saved (save the address first); Claude models are also not displayed.
     expect(await screen.findByTestId('api-key-input')).toBeTruthy();
     expect(screen.queryByTestId('model-claude-haiku-5-5')).toBeNull();
 

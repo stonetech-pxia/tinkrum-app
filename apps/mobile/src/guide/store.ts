@@ -4,21 +4,22 @@ import { create } from 'zustand';
 
 import type { WorkspaceRepo } from '../storage/types';
 
-// 新手引导（D-149、D-231、D-260）：划屏介绍 → 第 1 步发一句话加上两个文件入口（直接生效）→ 第 2 步打开图片或文件
-// → 第 3 步选一个样板 App 整套套用（先进草稿）。
-// 进度存在本机的 app_meta 里；没有记录就是第一次打开。「设置 → 重新看新手引导」从头再来。
+// Newcomer guidance (D-149, D-231, D-260): onboarding slider -> step 1 sends a sentence plus two
+// file entry points (takes effect immediately) -> step 2 opens an image or file -> step 3 picks a
+// sample app to apply entirely (enters draft first). Progress is stored in local app_meta; no
+// records means first launch. "Settings -> Re-watch onboarding guide" starts over.
 
-/** intro：要显示划屏介绍；look：第 1 步；goal：第 2 步；samples：第 3 步（D-260）；done：看完或关掉了。 */
+/** intro: onboarding slider to be displayed; look: step 1; goal: step 2; samples: step 3 (D-260); done: finished watching or closed. */
 export type GuideStage = 'intro' | 'look' | 'goal' | 'samples' | 'done';
 
 const STAGES: readonly GuideStage[] = ['intro', 'look', 'goal', 'samples', 'done'];
 const META_KEY = 'guide';
 
 interface GuideState {
-  /** null：还没读（测试里不读，引导就不出现）。 */
+  /** null: not read yet (not read in tests, guidance doesn't appear). */
   stage: GuideStage | null;
   repo: Pick<WorkspaceRepo, 'getMeta' | 'setMeta'> | null;
-  /** 划屏介绍已经推出来、还没关（不存）：外壳按新版本重新挂载时不再推一次（D-392 真机发现）。 */
+  /** Onboarding slider has been pushed and not closed (not persisted): shell doesn't push it again when remounting for a new version (discovered on real device in D-392). */
   introOpen: boolean;
   load(repo: Pick<WorkspaceRepo, 'getMeta' | 'setMeta'>): Promise<void>;
   setStage(stage: GuideStage): Promise<void>;
@@ -30,7 +31,7 @@ export const useGuide = create<GuideState>()((set, get) => ({
   introOpen: false,
   async load(repo) {
     const saved = await repo.getMeta(META_KEY);
-    // 以前的「新手任务」小卡片（later）已经去掉（D-231）：当作看完了。
+    // Previous "Newcomer Tasks" small card (later) has been removed (D-231): treated as finished.
     const stage = saved === 'later' ? 'done' : saved;
     set({ repo, stage: STAGES.includes(stage as GuideStage) ? (stage as GuideStage) : 'intro' });
   },
@@ -41,9 +42,11 @@ export const useGuide = create<GuideState>()((set, get) => ({
 }));
 
 /**
- * 第 1 步的句子（D-231、D-449）：首页是空的，先加上「扫描」「打开文件」两个图标按钮。
- * 三种语言都是内置规则认得的（测试逐句检查），引导固定用内置规则，不调用设置里的 AI：
- * 结果稳定、马上出来，也不需要 key（改 D-228：以前法语交给设置里的 AI）。
+ * Sentences for step 1 (D-231, D-449): Home screen is empty, first add "Scan" and "Open file"
+ * icon buttons. All three languages are recognized by built-in rules (checked sentence by
+ * sentence in tests), guidance uses built-in rules fixedly without calling settings AI: results
+ * are stable and immediate, and no key is needed (revision of D-228: previously French was
+ * delegated to settings AI).
  */
 export const LOOK_PROMPTS: readonly Localized[] = [
   {
@@ -53,14 +56,14 @@ export const LOOK_PROMPTS: readonly Localized[] = [
   },
 ];
 
-/** 打开引导第一步的那句话（D-447：点气泡或右上角的 Tink 都走这里）。 */
+/** Opens the sentence for step 1 of the guide (D-447: tapping either the speech bubble or Tink in the top right goes here). */
 export function openLookGuide(router: {
   push(href: { pathname: '/change'; params: { guide: string } }): void;
 }) {
   router.push({ pathname: '/change', params: { guide: 'look-0' } });
 }
 
-/** 从引导打开 AI 修改时带的参数（`look-0` 这样的第 1 步句子）对应的句子。 */
+/** Sentence corresponding to the parameter carried when opening AI modification from the guide (step 1 sentences like `look-0`). */
 export function guideText(param: string | undefined, locale: Locale): string | null {
   const look = /^look-(\d+)$/.exec(param ?? '');
   return look ? (localize(LOOK_PROMPTS[Number(look[1])], locale) ?? null) : null;

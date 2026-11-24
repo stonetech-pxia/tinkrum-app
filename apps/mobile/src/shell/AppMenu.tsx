@@ -9,10 +9,12 @@ import { Icon } from '../renderer/Icon';
 import type { Palette } from '../renderer/theme';
 import { Button } from '../renderer/ui';
 
-// 「设置 → 我的 App」里长按一个 App 弹出的菜单（D-485、D-606）。系统层，AI 改不了（底线 8）。
-// 不用系统弹窗：Android 的系统弹窗最多三个按钮，后面的项会被丢掉，而这里最多有五项加「取消」。
+// Menu sliding up from the bottom: App name, contents, "Cancel". Dismisses when tapped outside.
+// System layer, cannot be modified by AI (Invariant 8). Avoids system popups: Android system popups
+// support at most three buttons, dropping subsequent items, whereas here we support up to five
+// items plus "Cancel".
 
-/** 从下面升起的菜单：App 的名字、里面的内容、「取消」。点外面也收起。 */
+/** Menu sliding up from the bottom: App name, contents, "Cancel". Dismisses when tapped outside. */
 export function AppMenuSheet({
   palette,
   locale,
@@ -60,7 +62,7 @@ export function AppMenuSheet({
   );
 }
 
-/** 菜单里的一行。 */
+/** A single row in the menu. */
 export function AppMenuRow({
   id,
   label,
@@ -88,8 +90,9 @@ export function AppMenuRow({
 }
 
 /**
- * 换图标（D-606）：点一个内置图标，或者填一个表情。配置里的图标本来就是这两种（D-048），这里只是让用户
- * 自己选；选了就是确认，不再问。
+ * Change icon (D-606): tap a built-in icon or enter an emoji. Icons in the config are already one
+ * of these two types (D-048), this simply allows user selection; selection acts as confirmation
+ * without further prompts.
  */
 export function AppIconPicker({
   palette,
@@ -104,7 +107,7 @@ export function AppIconPicker({
 }) {
   const [emoji, setEmoji] = useState('');
   const [invalid, setInvalid] = useState(false);
-  // 配置里画出来的图标（D-625）排在列表后面。
+  // Drawn icons from the config (D-625) are listed at the end.
   const drawn = Object.keys(useDrawnIcons()).map((id): IconValue => `my:${id}`);
   const applyEmoji = () => {
     const icon = emoji.trim();
@@ -188,8 +191,9 @@ const styles = StyleSheet.create({
   row: { minHeight: 48, justifyContent: 'center' },
   emojiRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   input: { flex: 1, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, minHeight: 52 },
-  // 七个一行（宽度比七分之一略小一点，不然舍入以后一行只排得下六个）：49 个内置图标正好七行，
-  // 不用滚；以后图标多了格子自己滚。
+  // Seven items per row (width slightly less than one-seventh, otherwise rounding leaves only six
+  // per row): 49 built-in icons fit exactly in seven rows without scrolling; as icons increase, the
+  // grid scrolls itself.
   gridScroll: { maxHeight: 360 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: '14.28%', height: 48, alignItems: 'center', justifyContent: 'center' },

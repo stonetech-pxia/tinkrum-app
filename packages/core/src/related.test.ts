@@ -16,7 +16,7 @@ import { validateWorkspace } from './validate';
 
 const workspace = (locale: 'en') => fromV33(v33Fixture(`default-${locale}`));
 
-// 查找、汇总、上一条（D-287–D-289）：值只在本机由记录算出来，配置里只有结构。
+// Lookup, aggregation, previous entry (D-287-D-289): values are computed locally on device from records, config only contains structure.
 
 const NOW = new Date(2026, 9, 29, 10);
 
@@ -195,15 +195,15 @@ describe('rollup (D-288)', () => {
       rec('habits', 'new', { name: 'New' }),
     ],
     checkins: [
-      // 跑步：26、27（跳过）、28、29 → 连续 4 天里 3 天做到、1 天跳过，当前连续 3。
+      // Running: 26, 27 (skipped), 28, 29 -> 3 days achieved and 1 day skipped out of 4 consecutive days, current streak is 3.
       rec('checkins', 'c1', { habit: 'run', date: day(26), status: 'done' }),
       rec('checkins', 'c2', { habit: 'run', date: day(27), status: 'skip' }),
       rec('checkins', 'c3', { habit: 'run', date: day(28), status: 'done' }),
       rec('checkins', 'c4', { habit: 'run', date: day(29), status: 'done' }),
-      // 读书：20、21，之后断了。
+      // Reading: 20th, 21st, then stopped.
       rec('checkins', 'c5', { habit: 'read', date: day(20), status: 'done' }),
       rec('checkins', 'c6', { habit: 'read', date: day(21), status: 'done' }),
-      // 引用了已删除的习惯、没有引用：都不算进任何一个习惯。
+      // References to a deleted habit or unreferenced: counted toward no habit.
       rec('checkins', 'c7', { habit: 'gone', date: day(29), status: 'done' }),
       rec('checkins', 'c8', { date: day(29), status: 'done' }),
     ],
@@ -221,7 +221,7 @@ describe('rollup (D-288)', () => {
     expect(get('read', 'streak')).toBe(0);
     expect(get('run', 'last')).toBe(day(29));
     expect(get('read', 'last')).toBe(day(21));
-    // 本周（周一 26 号起）。
+    // This week (starting Monday the 26th).
     expect(get('run', 'times')).toBe(4);
     expect(get('read', 'times')).toBe(0);
     const run = records.find((r) => r.id === 'run')!;
@@ -385,11 +385,11 @@ describe('previous (D-289)', () => {
     expect(get('f1', 'prev')).toBeUndefined();
     expect(get('f3', 'prev')).toBe(1000);
     expect(get('f3', 'km')).toBe(500);
-    // 中间那条没有里程：用再往前一条有值的。
+    // The middle entry has no mileage: use the previous entry that has a value.
     expect(get('f5', 'prev')).toBe(1500);
-    // 另一辆车自己算。
+    // Calculate for another car independently.
     expect(get('f2', 'prev')).toBeUndefined();
-    // 没有日期的不排进去。
+    // Entries without a date are excluded from the ranking.
     expect(get('f6', 'prev')).toBeUndefined();
     expect(
       formatRef(
@@ -595,7 +595,7 @@ describe('checks (D-290)', () => {
     ).toEqual([
       'habits.x: days.date habit must be a date or datetime field of checkins or "createdAt"',
     ]);
-    // v33 的 period 迁移成 filter 里的一条 inPeriod：汇总字段没有 period 这个键了。
+    // Migrate v33 period into an inPeriod condition in the filter: rollup fields no longer have a period key.
     expect(
       problems([withField(habits, rollup({ aggregate: 'count', period: 'thisWeek' })), ...others]),
     ).not.toEqual([]);
@@ -679,7 +679,7 @@ describe('checks (D-290)', () => {
       'a.x: uses itself through a.x → b.y → a.x; a lookup, rollup or previous field can never come back to itself',
       'b.y: uses itself through b.y → a.x → b.y; a lookup, rollup or previous field can never come back to itself',
     ]);
-    // 计算的时候也不会死循环。
+    // Does not result in an infinite loop during computation.
     const records = computeRecords(
       [a, b],
       'a',
@@ -767,7 +767,7 @@ describe('many records', () => {
     expect(out).toHaveLength(50);
     expect(recordValue(out[0]!, expandCollection(ALL, habits), 'last')).toMatch(/^2026-/);
     expect(ms).toBeLessThan(1000);
-    // 每条打卡算「上一条」也要按表建索引：5000 条一次排序，不是每条扫一遍。
+    // Calculating the "previous" entry for each check-in must also be indexed by table: sort 5000 entries once instead of scanning every entry.
     const fuelRecords = Array.from({ length: 5000 }, (_, i) =>
       rec('fuel', `f${i}`, {
         car: i % 2 ? 'a' : 'b',
@@ -826,14 +826,16 @@ describe('a schedule counting from a rollup (D-288 + D-293)', () => {
   });
 
   it('knows how many days of this week are done, not just the latest one', () => {
-    // 2026-10-29 是周四：周一、周二做了，还差一次；周一到周三都做了，这周够了。
+    // 2026-10-29 is Thursday: done on Monday and Tuesday, one more needed; done from Monday to Wednesday, enough for this week.
     expect(status(['2026-10-26', '2026-10-27'])?.dueToday).toBe(true);
     expect(status(['2026-10-26', '2026-10-27', '2026-10-28'])?.dueToday).toBe(false);
   });
 });
 
-// 汇总的筛选条件用日程的 due，而日程的 lastDone 指向来源表里的另一个汇总：先要把那个汇总算出来，
-// 否则做完的任务也算「没做完」（展示预设的会话里发现；规则 47 推荐的「项目里数没做完的任务」就是这个写法）。
+// The rollup filter condition uses the schedule due status, and the schedule's lastDone points to
+// another rollup in the source table: that rollup must be computed first, otherwise completed tasks
+// are incorrectly treated as "incomplete" (discovered during preset session tests; the "incomplete
+// tasks in project count" pattern recommended in rule 47 uses this approach).
 describe('a rollup that filters by a schedule counting from another rollup', () => {
   const projects: Collection = {
     id: 'projects',
@@ -881,7 +883,7 @@ describe('a rollup that filters by a schedule counting from another rollup', () 
   const data = {
     projects: [rec('projects', 'p1', { name: 'A' })],
     tasks: [
-      // 做过一次的一次性任务：已经完成，不算没做完。
+      // One-off task done once: already completed, not counted as incomplete.
       rec('tasks', 't1', {
         title: 'finished',
         project: 'p1',

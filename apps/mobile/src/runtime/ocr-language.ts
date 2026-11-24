@@ -1,9 +1,12 @@
 import type { Locale, OcrLanguage } from '@morph/core';
 import { getLocales } from 'expo-localization';
 
-// 识别语言选「自动」时用哪一种（D-278）：按手机语言列表的第一种（没有时按界面语言）。
-// PP-OCRv6 一个模型就认中日英法德西葡意，选哪一种只决定识别后怎么整理（简体还是繁体、全角标点）；
-// 韩文、俄文、越南文它认不了，手机是这几种语言时改用系统的识别（或文字识别包）。
+// Language used when OCR language is set to "Auto" (D-278): defaults to the first item in the
+// device language list (falls back to interface language if absent). PP-OCRv6 recognizes Chinese,
+// English, Japanese, French, German, Spanish, Portuguese, and Italian with a single model;
+// selection only determines post-recognition formatting (Simplified/Traditional, full-width
+// punctuation); Korean, Russian, and Vietnamese are unrecognized, falling back to system
+// recognition (or OCR pack) when device language matches those.
 
 const BY_LANGUAGE: Record<string, OcrLanguage> = {
   ko: 'kor',
@@ -18,7 +21,7 @@ const BY_LANGUAGE: Record<string, OcrLanguage> = {
   en: 'eng',
 };
 
-/** languageTags：手机的语言列表（BCP 47，按偏好排）。 */
+/** languageTags: device language list (BCP 47, ordered by preference). */
 export function autoOcrLanguage(languageTags: readonly string[], locale: Locale): OcrLanguage {
   const tag = (languageTags[0] ?? locale).toLowerCase();
   const code = tag.split('-')[0]!;
@@ -26,7 +29,7 @@ export function autoOcrLanguage(languageTags: readonly string[], locale: Locale)
   return BY_LANGUAGE[code] ?? 'eng';
 }
 
-/** 参数里的语言；auto 换成按手机语言选的那一种。 */
+/** Language from parameters; converts "auto" to the one selected based on device language. */
 export function resolveOcrLanguage(lang: unknown, locale: Locale): OcrLanguage {
   if (lang !== 'auto') return lang as OcrLanguage;
   const tags = getLocales()

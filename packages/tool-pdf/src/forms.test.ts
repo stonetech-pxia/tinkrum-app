@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { fillForm, listFormFields } from './index';
 import { pageContent } from './test-helpers';
 
-/** 用 pdf-lib 生成真实表单：文本、多行文本、复选框、下拉、单选、只读文本。 */
+/** Generate a real form using pdf-lib: text, multi-line text, checkboxes, dropdowns, radios, and read-only text. */
 async function makeForm(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([600, 800]);

@@ -7,15 +7,17 @@ import {
 } from '@morph/core';
 import { OfficeImportFailure, readXlsxRows } from '@morph/tool-office';
 
-// 读用户选的表格文件（导进表，D-574）：只在本机读，不联网、不进配置、不发给 AI（底线 1、2、14）。
-// 按文件名的扩展名分（Android 的 content:// 地址里没有扩展名，名字里有）；没有扩展名时看 MIME 类型。
+// Reads user-selected spreadsheet files (imported into tables, D-575 / D-574): reads entirely
+// on-device, offline, excluded from config and never sent to AI (invariants 1, 2, 14). Categorized
+// by file extension (Android content:// URIs lack extensions, but names have them); falls back to
+// MIME type when extension is missing.
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const CSV_MIME = /^text\/(csv|comma-separated-values|tab-separated-values|plain)$/i;
 
 export type SpreadsheetKind = 'xlsx' | 'csv';
 
-/** 按名字（和 MIME 类型）看是哪种表格文件；不是能导入的返回 null。 */
+/** Determines spreadsheet type from name (and MIME type); returns null if unsupported for import. */
 export function spreadsheetKind(name: string, mimeType: string | null): SpreadsheetKind | null {
   const ext = /\.([a-z0-9]+)$/i.exec(name.trim())?.[1]?.toLowerCase();
   if (ext === 'xlsx') return 'xlsx';
@@ -25,7 +27,7 @@ export function spreadsheetKind(name: string, mimeType: string | null): Spreadsh
   return mimeType && CSV_MIME.test(mimeType) ? 'csv' : null;
 }
 
-/** 文件的字节 → 每张工作表的行（CSV 是一张）。读不了时说为什么。 */
+/** File bytes -> rows for each worksheet (CSV counts as one). Describes reasons for read failures. */
 export function readSpreadsheet(
   kind: SpreadsheetKind,
   bytes: Uint8Array,

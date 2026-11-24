@@ -9,7 +9,7 @@ import { usePalette } from '@/renderer/theme';
 import { Button, Card } from '@/renderer/ui';
 import { useAppTheme, useWorkspace, useWorkspaceContext } from '@/workspace/context';
 
-/** 来自任何人的链接都是不可信输入。打开只解码、检查、显示；点查看后才进入共用导入预览。 */
+/** Links from anyone are untrusted input. Opening only decodes, checks, and displays; entering the shared import preview requires tapping view. */
 export default function OpenRoute() {
   const { a } = useLocalSearchParams<{ a?: string | string[] }>();
   const { registry, locale } = useWorkspaceContext();

@@ -42,15 +42,16 @@ import { createSpeech } from './speech';
 import { createSpeaker } from './expo-tts';
 import { expoPackFs, expoPackStore } from '../packs/expo-pack-fs';
 
-/** 只用来找语音模型的文件（下载由 App 根布局负责，D-064）；和根布局是同一个（D-510）。 */
+/** Used solely to locate speech model files (downloading is handled by the app root layout, D-064); shares the same instance as the root layout (D-510). */
 const speechPacks = expoPackStore;
 
-// FilePlatform 的 Expo 实现。用户文件存放在 App 文档目录的 assets/<id>/<文件名>，
-// 数据库只保存相对路径，与配置版本完全分开（§7G）。
+// Expo implementation of FilePlatform. User files are stored in app documents directory under
+// assets/<id>/<filename>, with databases storing only relative paths, completely decoupled from
+// configuration versions (§7G).
 
 const ROOT = 'assets';
 
-/** 分享扩展复制进共享目录的文件名（plugins/share-extension/ShareViewController.swift）。 */
+/** Filename format for files copied by the share extension (plugins/share-extension/ShareViewController.swift). */
 const SHARED_COPY = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\.[A-Za-z0-9]+$/i;
 
 function assetDir(assetId: string): Directory {
@@ -61,9 +62,9 @@ function assetDir(assetId: string): Directory {
 
 const fileAt = (path: string) => new File(Paths.document, ...path.split('/'));
 
-/** PDF 第一页的缩略图（D-451）：和文件放在同一个 assets/<id>/ 里，删文件时一起删。 */
+/** Thumbnail of the first page of a PDF (D-451): stored in the same assets/<id>/ directory as the file and deleted together with it. */
 const THUMB = '.thumb.jpg';
-/** 文件里的文字（D-455）：同一个目录，删文件时一起删。 */
+/** Extracted text from files (D-455): in the same directory, deleted together with the file. */
 const TEXT = '.text.txt';
 const besideAsset = (path: string, name: string) => {
   const parts = path.split('/');
@@ -71,17 +72,17 @@ const besideAsset = (path: string, name: string) => {
   return new File(Paths.document, ...parts);
 };
 
-/** 存进用户文件时（用户的一次操作）给 PDF 画第一页；打不开（损坏、要密码）就没有缩略图，显示图标。 */
+/** Render the first page of a PDF when saving into user files (as part of a user action); if it fails to open (corrupted, password-protected), no thumbnail is created and an icon is displayed instead. */
 async function makePdfThumbnail(file: File, dir: Directory): Promise<void> {
   if (!/\.pdf$/i.test(file.name) || !MorphVision) return;
   try {
     await MorphVision.pdfThumbnail(file.uri, new File(dir, THUMB).uri, 360);
   } catch {
-    // 没有缩略图，列表显示 PDF 图标。
+    // No thumbnail available, display PDF icon in the list.
   }
 }
 
-/** 本次运行里的一个临时文件（D-063）。relPath 形如 `3/报告.pdf`，目录按需创建。 */
+/** Temporary file in the current run (D-063). relPath looks like 3/report.pdf, directories are created on demand. */
 function runFile(runId: string, relPath: string): File {
   const parts = relPath.split('/');
   const dir = new Directory(Paths.cache, 'runs', runId, ...parts.slice(0, -1));
@@ -91,7 +92,7 @@ function runFile(runId: string, relPath: string): File {
   return file;
 }
 
-/** EXIF 日期「2026:10:22 09:00:00」→ 毫秒（设备本地时间）。 */
+/** EXIF date "2026:10:22 09:00:00" -> milliseconds (device local time). */
 function exifDate(exif: Record<string, unknown> | null | undefined): number | undefined {
   const raw = exif?.DateTimeOriginal ?? exif?.DateTime;
   const m =
@@ -111,7 +112,7 @@ function pickedPhoto(a: ImagePickerAsset): PickedFile {
     mimeType: a.mimeType ?? null,
     width: a.width,
     height: a.height,
-    // 只读拍摄时间（命名用）；EXIF 里的其他信息（包括位置）不保存。
+    // Read capture timestamp only (used for naming); other EXIF data (including location) is not saved.
     ...(takenAt !== undefined ? { takenAt } : {}),
   };
 }
@@ -154,8 +155,8 @@ const shareOne = (item: { uri: string; mimeType: string }) =>
     ...(UTI[item.mimeType] ? { UTI: UTI[item.mimeType] } : {}),
   });
 
-/** 分享和存到文件夹（D-119、D-120）：有 MorphShare 用它，Expo Go 里退回 expo-sharing / expo-file-system。 */
-/** Android 的 FileProvider 开放的缓存目录（modules/morph-share/android/src/main/res/xml/morph_share_paths.xml）。 */
+/** Cache directory exposed by Android FileProvider (modules/morph-share/android/src/main/res/xml/morph_share_paths.xml). */
+/** Cache directories exposed by Android FileProvider (modules/morph-share/android/src/main/res/xml/morph_share_paths.xml). */
 const SHAREABLE_DIRS = ['runs/', 'preview/', 'share/'];
 
 const SHARE: ShareDeps = {
@@ -168,11 +169,11 @@ const SHARE: ShareDeps = {
   },
   async stageCopy(uri, name, first) {
     const dir = new Directory(Paths.cache, 'share');
-    // 每次分享只留这一次的副本。
+    // Keep only the copy for the current share operation.
     if (first && dir.exists) dir.delete();
     if (!dir.exists) dir.create({ intermediates: true });
     const target = new File(dir, name);
-    // copy 在 Android 上是异步的：不等它复制完就交给分享目标，对方打开时文件还不在（Gmail「无法添加附件」）。
+    // copy on Android is asynchronous: handing over to the share target before copying completes results in the file missing when opened by the recipient (Gmail "Failed to add attachment").
     await new File(uri).copy(target);
     return target.uri;
   },
@@ -208,13 +209,13 @@ const SHARE: ShareDeps = {
   },
 };
 
-/** 照片最长边（D-047）：足够全屏清晰显示，又不会占用太多空间。 */
+/** Maximum image side length (D-047): large enough for clear full-screen display without consuming excessive space. */
 const MAX_IMAGE_SIDE = 2048;
 
 let documents: FilePlatform['documents'] | null = null;
 
 export const expoFilePlatform: FilePlatform = {
-  // Android 的 Word 转 PDF 要用下面的 htmlToPdf，第一次用时再建。
+  // Android Word-to-PDF conversion requires htmlToPdf defined below, initialized on first use.
   get documents() {
     documents ??= expoDocuments(
       (runId, relPath) => runFile(runId, relPath).uri,
@@ -227,7 +228,7 @@ export const expoFilePlatform: FilePlatform = {
   media: expoMedia((runId, relPath) => runFile(runId, relPath).uri),
   background: expoBackground(),
   desk: expoDeskFs,
-  // Android 的识别模型在下载内容里（D-151）；iOS 用系统识别，不用下载内容。
+  // speech: createSpeech(MorphSpeech, { Android recognition models are located in downloaded content (D-151); iOS uses system recognition without needing downloaded content.
   speech: createSpeech(MorphSpeech, {
     isInstalled: (id) => speechPacks.isInstalled(id),
     uri: (id, file) => expoPackFs.uri(speechPacks.path(id, file)),
@@ -242,8 +243,10 @@ export const expoFilePlatform: FilePlatform = {
     });
     if (result.canceled || !result.assets[0]) return null;
     const picked = result.assets[0];
-    // 重新编码为 JPEG：统一格式（Android 不能显示 HEIC）、缩小到最长边 maxSide，并去掉位置等元数据（D-047）。
-    // 解码时就缩小（maxWidth / maxHeight）：几千万像素的照片原样解码一份就要几百 MB，Android 上会内存不足。
+    // Reencode to JPEG: unify format (Android cannot display HEIC), downscale to max side maxSide,
+    // and strip metadata such as location (D-047). Downscale during decoding (maxWidth /
+    // maxHeight): decoding tens of megapixels of raw photos as-is takes hundreds of MB, causing
+    // out-of-memory errors on Android.
     let image = await ImageManipulator.manipulate(picked.uri, {
       maxWidth: maxSide,
       maxHeight: maxSide,
@@ -272,7 +275,7 @@ export const expoFilePlatform: FilePlatform = {
 
   async saveAssetText(path, text) {
     const file = besideAsset(path, TEXT);
-    // 文件已经被删了（目录不在）就不写。
+    // If the file has already been deleted (parent directory does not exist), do not write.
     if (!file.parentDirectory.exists) return;
     file.write(text);
   },
@@ -285,8 +288,9 @@ export const expoFilePlatform: FilePlatform = {
   async importFile(file, assetId, name) {
     const dir = assetDir(assetId);
     const dest = new File(dir, name);
-    // 原生复制，边读边写，大文件也不进 JS 内存（文件入口 D-257 可能是几 GB 的视频）。
-    // 复制失败（空间不够、读不到）时不留下半个文件。
+    // Native copy with streaming read/write, avoiding loading large files into JS memory (file
+    // entry D-257 might be a multi-GB video). Leaves no partial file on copy failure (insufficient
+    // space, read error).
     try {
       await new File(file.uri).copy(dest);
     } catch (e) {
@@ -298,13 +302,13 @@ export const expoFilePlatform: FilePlatform = {
   },
 
   async contentDigest(uri) {
-    // File.digest 是原生的（iOS 64 KB 一块、Android 同样），但 expo-file-system 58 的类型里没声明。
+    // File.digest is native (iOS 64 KB chunks, Android similarly), but it is not declared in expo-file-system 58 types.
     const file = new File(uri) as File & { digest(algorithm: 'SHA-256'): Promise<string> };
     return file.digest('SHA-256');
   },
 
   async removeAssetFile(path) {
-    // 只删 assets/<id>/ 这一层目录：用户文件都放在自己的目录里（importFile、writeBytes、saveRunFile）。
+    // Delete only the assets/<id>/ directory layer: user files are stored in their own directories (importFile, writeBytes, saveRunFile).
     const [root, id] = path.split('/');
     if (root !== ROOT || !id || id === '.' || id === '..') return;
     const dir = new Directory(Paths.document, ROOT, id);
@@ -324,12 +328,12 @@ export const expoFilePlatform: FilePlatform = {
     try {
       return await file.text();
     } finally {
-      // 只删选择器放在缓存里的副本；不在缓存里的（原件、content://）不碰。
+      // Delete only copies placed in cache by selectors; do not touch items outside cache (originals, content://).
       if (uri.startsWith(Paths.cache.uri) && uri.includes('/DocumentPicker/')) {
         try {
           file.delete();
         } catch {
-          // 已经不在了。
+          // Already gone.
         }
       }
     }
@@ -351,7 +355,7 @@ export const expoFilePlatform: FilePlatform = {
   async shareWithAi({ file, prompt, pointer }) {
     const send = MorphShare?.shareFilesWithText?.bind(MorphShare);
     if (!send) {
-      // Expo Go、比这个功能早的开发版：只发文字，App 文件写在后面。
+      // Expo Go, dev builds older than this feature: send text only, with app files appended afterward.
       await Share.share({
         message:
           prompt({ attached: false, checker: false }) +
@@ -359,7 +363,7 @@ export const expoFilePlatform: FilePlatform = {
       });
       return;
     }
-    // 放在缓存的 share/ 里：Android 的 FileProvider 只开放这里（D-466）；每次分享前清掉上一次的。
+    // Stored in cache share/: exposed exclusively by Android's FileProvider (D-466); cleared before each share operation.
     const dir = new Directory(Paths.cache, 'share');
     if (dir.exists) dir.delete();
     dir.create({ intermediates: true, idempotent: true });
@@ -374,7 +378,7 @@ export const expoFilePlatform: FilePlatform = {
     }
     let checker = false;
     try {
-      // prebuild 时打包进 App 的检查器（plugins/with-agent-checker.js）；没有（老的开发版）就不带。
+      // Checker packaged into the app during prebuild (plugins/with-agent-checker.js); omitted if absent (older dev builds).
       const copy = new File(dir, CHECKER_FILE_NAME);
       await new File(Paths.bundle, 'agent', CHECKER_FILE_NAME).copy(copy);
       uris.push(copy.uri);
@@ -395,11 +399,12 @@ export const expoFilePlatform: FilePlatform = {
       types.push(...copies.map(() => 'text/plain'));
       docs = true;
     } catch (e) {
-      // 老的开发版没有指南时，提示词退回带当天版本的网址，不声称有附件。
+      // When older dev builds lack the guide, prompt falls back to the URL with the current date version, without claiming attachments.
       if (__DEV__) console.warn('[share] no bundled guide', e);
     }
-    // 提示词做成第一个附件：Claude 收到多个文件时丢掉分享的文字（真机 2026-11-23），文件不会丢；
-    // 分享的文字只是指一下它，ChatGPT 这类收文字的 App 里也看得见。
+    // Makes the prompt the first attachment: Claude drops shared text when receiving multiple files
+    // (on-device 2026-11-23), but attachments are never lost; the shared text merely points to it,
+    // remaining visible in text-accepting apps like ChatGPT.
     const request = new File(dir, HANDOFF_REQUEST_FILE);
     request.create();
     await request.write(prompt({ attached: file !== undefined, checker, docs }));
@@ -443,7 +448,7 @@ export const expoFilePlatform: FilePlatform = {
       allowsMultipleSelection: max > 1,
       selectionLimit: max,
       orderedSelection: true,
-      // 原样拿到视频（HEVC 也不转），不然大视频要在选的时候先等系统转码（D-142）。
+      // Keep video as-is (do not transcode HEVC), otherwise large videos cause the user to wait for system transcoding during selection (D-142).
       videoExportPreset: VideoExportPreset.Passthrough,
       preferredAssetRepresentationMode: UIImagePickerPreferredAssetRepresentationMode.Current,
       shouldDownloadFromNetwork: true,
@@ -453,7 +458,7 @@ export const expoFilePlatform: FilePlatform = {
   },
 
   async takePhoto() {
-    // 开发版里没有相机时（模拟器）系统选择器会抛出原生异常让 App 崩溃，不能靠下面的 catch。
+    // When the camera is unavailable in dev builds (simulators), the system picker throws a native exception crashing the app, which cannot be caught by the catch block below.
     if (MorphVision && !MorphVision.isCameraAvailable()) throw new RunError('cameraUnavailable');
     const permission = await requestCameraPermissionsAsync();
     if (!permission.granted) throw new RunError('permissionDenied', { what: 'camera' });
@@ -461,7 +466,7 @@ export const expoFilePlatform: FilePlatform = {
     try {
       result = await launchCameraAsync({ mediaTypes: ['images'], exif: true });
     } catch {
-      // 模拟器没有相机。
+      // Simulator has no camera.
       throw new RunError('cameraUnavailable');
     }
     if (result.canceled || !result.assets[0]) return null;
@@ -480,7 +485,7 @@ export const expoFilePlatform: FilePlatform = {
       name: a.name,
       size: a.size ?? null,
       mimeType: a.mimeType ?? null,
-      // 按日期筛选用（D-242）；有的提供方给 0，当作没有。
+      // Used for date filtering (D-242); some providers return 0, treated as absent.
       ...(a.lastModified > 0 ? { modifiedAt: a.lastModified } : {}),
     }));
   },
@@ -492,7 +497,7 @@ export const expoFilePlatform: FilePlatform = {
   },
 
   async removeRunFile(uri) {
-    // 只删运行目录里的（用户的原件、分享进来的副本不碰）。
+    // Delete only files in the run directory (do not touch user originals or copies shared in).
     if (!uri.startsWith(new Directory(Paths.cache, 'runs').uri)) return;
     const file = new File(uri);
     if (file.exists) file.delete();
@@ -502,26 +507,26 @@ export const expoFilePlatform: FilePlatform = {
     const dest = runFile(runId, fileName);
     dest.create();
     await dest.write(bytes);
-    // 刚写完时 size 可能还是 0，直接用字节数。
+    // Size may still be 0 right after writing, so use byte length directly.
     return { uri: dest.uri, size: bytes.length };
   },
 
   async adoptIntoRun(uri, runId, fileName, keepSource = false) {
     const source = new File(uri);
-    // 选择器放在缓存里的副本：移进本次运行的临时目录，运行结束一起删掉。
+    // Copies placed in cache by selectors: move into the temporary directory for this run, and delete together upon run completion.
     if (!keepSource && uri.startsWith(Paths.cache.uri) && source.exists) {
-      // 移动之前读大小：移动后新地址的 File 对象读到的可能还是 0。
+      // Read size before moving: File objects at the new path after move may still read as 0.
       const size = source.size;
       const dest = runFile(runId, fileName);
       source.move(dest);
       return { uri: dest.uri, size };
     }
-    // 分享进来的（共享目录、content://）：原地使用，不复制（D-116 另外负责删除）。
+    // Files shared in (shared directory, content://): used in place without copying (deletion handled separately by D-116).
     let size = 0;
     try {
       size = source.size;
     } catch {
-      // content:// 不一定读得到大小，之后由 probe 补上。
+      // content:// size may not be readable, to be populated later by probe.
     }
     return { uri, size };
   },
@@ -547,8 +552,10 @@ export const expoFilePlatform: FilePlatform = {
   },
 
   async removeShared(keep = [], copies = []) {
-    // 分享扩展把文件复制到 App Group 共享目录的最上层，文件名是 UUID.扩展名。只删这种文件：
-    // 共享目录里还有系统的文件（例如容器的元数据，删了系统会重建整个目录）和 Library 子目录。
+    // Share extensions copy files to the top level of the App Group shared directory with names
+    // formatted as UUID.extension. Delete only these files: the shared directory also contains
+    // system files (such as container metadata; deleting them causes the system to rebuild the
+    // entire directory) and Library subdirectories.
     const keepNames = new Set(keep.map((uri) => uri.split('/').pop()));
     for (const container of Object.values(Paths.appleSharedContainers ?? {})) {
       for (const entry of container.list()) {
@@ -561,7 +568,7 @@ export const expoFilePlatform: FilePlatform = {
       const copy = new File(uri);
       if (copy.uri.startsWith(Paths.cache.uri) && copy.exists) copy.delete();
     }
-    // Android 预览时 MorphShare 复制进缓存 preview/ 的那一份（D-238），这一批放掉时一起删。
+    // The copy placed in cache preview/ by MorphShare during Android previews (D-238); deleted together when this batch is released.
     const preview = new Directory(Paths.cache, 'preview');
     if (preview.exists) preview.delete();
   },
@@ -576,7 +583,7 @@ export const expoFilePlatform: FilePlatform = {
   },
 
   async removeStalePickerCopies() {
-    // expo-image-picker 和 expo-document-picker（58.x）把选中的文件复制到缓存目录下的这两个文件夹。
+    // expo-image-picker and expo-document-picker (58.x) copy selected files to these two folders under the cache directory.
     for (const name of ['ImagePicker', 'DocumentPicker']) {
       const dir = new Directory(Paths.cache, name);
       if (dir.exists) dir.delete();
@@ -610,7 +617,7 @@ export const expoFilePlatform: FilePlatform = {
       await printAsync({ uri: item.uri });
       return;
     }
-    // 图片：WKWebView 里不能引用本地文件，内联成 data URI（open-tool-research #17）。
+    // Images: local files cannot be referenced inside WKWebView, inline as data URIs (open-tool-research #17).
     const base64 = await new File(item.uri).base64();
     await printAsync({
       html: `<html><body style="margin:0"><img style="width:100%" src="data:${item.mimeType};base64,${base64}"></body></html>`,
@@ -645,7 +652,7 @@ export const expoFilePlatform: FilePlatform = {
   async saveSignature(png, aspect) {
     const dir = new Directory(Paths.document, 'signatures');
     dir.create({ idempotent: true, intermediates: true });
-    // 最多保留 3 个：最旧的删掉。
+    // Keep at most 3: delete the oldest.
     const old = dir
       .list()
       .filter((e): e is File => e instanceof File)
@@ -709,7 +716,7 @@ export const expoFilePlatform: FilePlatform = {
   },
 
   async htmlToPdf(html, page, runId, relPath, margins) {
-    // iOS 的打印排版不认 CSS 的 @page 边距，要在这里给（单位是点）。
+    // iOS print layout ignores CSS @page margins, so they must be specified here (in points).
     const printed = await printToFileAsync({
       html,
       width: page.width,

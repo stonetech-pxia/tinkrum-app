@@ -4,14 +4,15 @@ import { PdfError, assertNumber, assertPageIndices, canEncodeStandardText, loadP
 import { type ImageKind, embedImage } from './images';
 import { type PageView, pageView, placeBox } from './view';
 
-// 在已有页面上叠加内容：页码、文字水印 / 印章、图片（签名、中文印章）。
-// 位置一律按用户看到的方向计算：带 /Rotate 的页面上，内容会随之旋转，看起来依然是正的。
+// Overlay content on existing pages: page numbers, text watermarks / stamps, images (signatures,
+// Chinese seals). Positions are always calculated in the user-visible direction: on pages with
+// /Rotate, content rotates accordingly to remain visually upright.
 
 export type EdgePosition =
   'bottomCenter' | 'bottomRight' | 'bottomLeft' | 'topCenter' | 'topRight' | 'topLeft';
 export type StampPosition = EdgePosition | 'center';
 
-/** [水平, 垂直] 锚点：0 = 左 / 下，0.5 = 居中，1 = 右 / 上。 */
+/** [horizontal, vertical] anchor: 0 = left / bottom, 0.5 = center, 1 = right / top. */
 const ANCHORS: Record<StampPosition, [number, number]> = {
   bottomLeft: [0, 0],
   bottomCenter: [0.5, 0],
@@ -22,7 +23,7 @@ const ANCHORS: Record<StampPosition, [number, number]> = {
   center: [0.5, 0.5],
 };
 
-/** 文字框（基线左端为 p, q）在视图中的位置。 */
+/** Position of the text box (baseline left end at p, q) in the view. */
 function anchorRect(view: PageView, position: StampPosition, w: number, h: number, margin: number) {
   const anchor: [number, number] | undefined = ANCHORS[position];
   if (!anchor) throw new PdfError('badOption');
@@ -69,8 +70,8 @@ export interface PageNumberOptions {
   fontSize: number;
   marginPt: number;
   /**
-   * 只给这些页（0 起）编号；编号按它们在列表中的顺序从 startAt 起递增，
-   * 总数 = startAt + 页数 - 1。例如跳过封面：pages = [1..n-1]、startAt = 1。
+   * Number only these pages (0-based); numbering increments starting from startAt in list order,
+   * total = startAt + pageCount - 1. E.g. skipping cover: pages = [1..n-1], startAt = 1.
    */
   pages?: number[];
 }
@@ -81,7 +82,7 @@ function formatNumber(format: PageNumberOptions['format'], n: number, total: num
   return `Page ${n} of ${total}`;
 }
 
-/** 用 Helvetica 加页码，黑色。 */
+/** Add page numbers using Helvetica in black. */
 export async function addPageNumbers(
   bytes: Uint8Array,
   opts: PageNumberOptions,
@@ -109,7 +110,7 @@ export async function addPageNumbers(
 }
 
 export interface StampTextOptions {
-  /** 只支持标准字体可编码的单行文字，见 canEncodeStandardText。 */
+  /** Supports only single-line text encodable by standard fonts; see canEncodeStandardText. */
   text: string;
   position: StampPosition;
   fontSize: number;
@@ -117,13 +118,13 @@ export interface StampTextOptions {
   color: string;
   /** 0–1 */
   opacity: number;
-  /** 绕文字中心逆时针旋转（用户所见方向），如 45 做斜向水印。 */
+  /** Rotate counter-clockwise around text center (user-visible direction), e.g. 45 for diagonal watermarks. */
   rotateDeg?: number;
-  /** 0 起；不传则所有页。 */
+  /** 0-based; defaults to all pages if omitted. */
   pages?: number[];
 }
 
-/** 文字离页边的固定距离（半英寸）。 */
+/** Fixed distance from text to page edge (half an inch). */
 const STAMP_MARGIN_PT = 36;
 
 function parseColor(hex: string): ReturnType<typeof rgb> {
@@ -132,7 +133,7 @@ function parseColor(hex: string): ReturnType<typeof rgb> {
   return rgb(((n >> 16) & 0xff) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255);
 }
 
-/** 用 Helvetica 盖文字；标准字体无法编码时抛 unsupportedText。 */
+/** Stamp text using Helvetica; throws unsupportedText if standard fonts cannot encode it. */
 export async function stampText(bytes: Uint8Array, opts: StampTextOptions): Promise<Uint8Array> {
   if (opts.text.length < 1) throw new PdfError('badOption');
   if (!canEncodeStandardText(opts.text)) throw new PdfError('unsupportedText');
@@ -163,16 +164,16 @@ export async function stampText(bytes: Uint8Array, opts: StampTextOptions): Prom
 export interface StampImageOptions {
   image: { bytes: Uint8Array; kind: ImageKind };
   pageIndex: number;
-  /** 图片左上角，占页面宽 / 高的比例（0–1，原点为用户所见的左上角）。 */
+  /** Top-left of the image as a proportion of page width / height (0–1, origin at user-visible top-left). */
   x: number;
   y: number;
-  /** 图片宽度占页宽的比例；高度按图片比例计算。 */
+  /** Image width as a proportion of page width; height is calculated based on the image aspect ratio. */
   width: number;
-  /** 绕图片中心逆时针旋转（用户所见方向），如 45 做斜向水印。 */
+  /** Rotate counter-clockwise around image center (user-visible direction), e.g. 45 for diagonal watermarks. */
   rotateDeg?: number;
 }
 
-/** 把图片（签名、Skia 渲染的中文印章）放到某一页上；旋转过的页面按用户所见方向放置。 */
+/** Place an image (signature, Chinese seal rendered with Skia) onto a page; rotated pages are placed in the direction seen by the user. */
 export async function stampImage(bytes: Uint8Array, opts: StampImageOptions): Promise<Uint8Array> {
   assertNumber(opts.x, 0, 1);
   assertNumber(opts.y, 0, 1);
@@ -191,8 +192,10 @@ export async function stampImage(bytes: Uint8Array, opts: StampImageOptions): Pr
 }
 
 /**
- * 把一页换成一张图（按用户所见的页面大小和方向）。擦除、打码的页面要这样处理：
- * 盖一层图只是挡住，下面的文字还能选中、复制；换成图以后原来的文字就没有了。
+ * Replace a page with an image (using the page size and orientation seen by the user). Redacted
+ * or censored pages are handled this way: a covering image only blocks the view, and the text
+ * underneath can still be selected and copied; after replacing with an image, the original text
+ * is gone.
  */
 export async function replacePageWithImage(
   bytes: Uint8Array,

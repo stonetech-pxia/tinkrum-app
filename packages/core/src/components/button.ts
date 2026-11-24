@@ -11,7 +11,7 @@ const shape = {
     variant: z.enum(['filled', 'outline', 'text', 'icon', 'row']),
     icon: IconValueSchema.optional(),
   }),
-  /** 一个就地的一键记录工具（D-300，原 action）：和 opens 二选一，点了在本机改记录（不弹撤销，D-385）。 */
+  /** An inline one-tap record tool (D-300, formerly action): mutually exclusive with opens, modifies records locally on tap (no undo banner shown, D-385). */
   tools: z.array(ToolUseSchema).min(1).max(1).optional(),
   opens: openTargetSchema('opens must be a page, a system entry, tool:<id> or app:<id>', [
     'tool',
@@ -20,8 +20,10 @@ const shape = {
 };
 
 /**
- * 按钮：点击后打开一个页面、系统入口或快捷操作（opens），或者执行一个一键记录工具（tools，D-300）。
- * icon 显示在文字前面；variant 为 icon 时只显示圆形图标，文字留给读屏（D-230）；variant 为 row 时画成设置页那样的一整行（D-483，只配 opens）。
+ * Button: tap to open a page, system entry point, or quick action (opens), or execute an inline
+ * one-tap record tool (tools, D-300). Icon displays before text; variant icon shows only a
+ * circular icon, leaving text for screen readers (D-230); variant row renders as a full row like
+ * settings pages (D-483, opens-only).
  */
 export const buttonComponent: LookDefinitionOf<'button', typeof shape> = defineLook({
   look: 'button',

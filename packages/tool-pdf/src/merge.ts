@@ -9,9 +9,9 @@ import {
   embedImage,
 } from './images';
 
-// 合并：纯 PDF 合并，以及 PDF 与图片混合合并。
+// Merge: pure PDF merging, as well as mixed PDF and image merging.
 
-/** 按输入顺序合并 PDF。加密或损坏的文件会以 PdfError 报告具体文件名。 */
+/** Merge PDFs in input order. Encrypted or corrupted files report specific filenames via PdfError. */
 export async function mergePdfs(inputs: readonly PdfInput[]): Promise<MergeResult> {
   if (inputs.length < 2) throw new PdfError('tooFew');
   const merged = await PDFDocument.create();
@@ -43,8 +43,8 @@ const DEFAULT_IMAGE_PAGE: ImagePageOptions = {
 };
 
 /**
- * 按顺序合并 PDF 与图片（图片各占一页，排版同 imagesToPdf）。至少 1 个输入。
- * 无法读取的 PDF / 图片会报告 fileName。
+ * Merge PDFs and images in order (each image occupies one page, layout matches imagesToPdf). At
+ * least 1 input. Unreadable PDFs / images report fileName.
  */
 export async function mergeDocuments(
   inputs: readonly DocumentInput[],

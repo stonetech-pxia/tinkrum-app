@@ -16,26 +16,26 @@ const MERCHANT: Field = { id: 'merchant', name: 'Merchant', type: 'text' };
 const NUMBER: Field = { id: 'no', name: 'Number', type: 'text' };
 const EMAIL: Field = { id: 'mail', name: 'Email', type: 'text' };
 
-describe('核对模型的回答（D-396）', () => {
-  it('文字里没有的值丢掉', () => {
+describe('Check model answers (D-396)', () => {
+  it('Discard values not present in text', () => {
     expect(checkAnswer(MERCHANT, 'Starbucks', ['Acme Coffee'], 'en')).toBeNull();
     expect(checkAnswer(AMOUNT, '99.00', ['Total 12.50'], 'en')).toBeNull();
     expect(checkAnswer(DATE, '2026-01-02', ['Total 12.50'], 'en')).toBeNull();
   });
 
-  it('半个词不算（手机上模型给 Noor Haddad 的接种人答了 No）', () => {
+  it('Incomplete words do not count (mobile model answered "No" for Noor Haddad\'s vaccinator)', () => {
     const person: Field = { id: 'person', name: '接种人', type: 'text' };
     expect(checkAnswer(person, 'No', ['Patient: Noor Haddad'], 'en')).toBeNull();
     expect(checkAnswer(person, 'Noor Haddad', ['Patient: Noor Haddad'], 'en')).toBe('Noor Haddad');
     expect(checkAnswer(person, '周明', ['投保人：周明远'], 'zh')).toBe('周明');
   });
 
-  it('null、空回答丢掉', () => {
+  it('Discard null or empty answers', () => {
     expect(checkAnswer(MERCHANT, 'null', ['null'], 'en')).toBeNull();
     expect(checkAnswer(MERCHANT, '  ', ['x'], 'en')).toBeNull();
   });
 
-  it('付款、找零那一排的数不是金额；有合计排时金额要在合计排；金额不能是 0', () => {
+  it('Numbers in payment/change rows are not amounts; when a total row exists, amounts must be in the total row; amount cannot be 0', () => {
     const rows = ['Total 12.50', 'Cash 20.00', 'Change 7.50'];
     expect(checkAnswer(AMOUNT, '20.00', rows, 'en')).toBeNull();
     expect(checkAnswer(AMOUNT, '12.50', rows, 'en')).toBe('12.5');
@@ -43,46 +43,46 @@ describe('核对模型的回答（D-396）', () => {
     expect(checkAnswer(AMOUNT, '0.00', ['Rounding 0.00'], 'en')).toBeNull();
   });
 
-  it('税要在有税字样的那一排', () => {
+  it('Tax must be in the row labeled with tax terms', () => {
     expect(checkAnswer(TAX, '1.20', ['Coffee 1.20'], 'en')).toBeNull();
     expect(checkAnswer(TAX, '1.20', ['GST 6% 1.20'], 'en')).toBe('1.2');
   });
 
-  it('印尼盾的 .00 不是小数', () => {
+  it('.00 in Indonesian Rupiah is not a decimal', () => {
     expect(checkAnswer(IDR, '31.000,00', ['Total 31.000,00'], 'en')).toBe('31000');
   });
 
-  it('有效期那排的日期不是单据日期，但可以是到期日', () => {
+  it('Dates in validity rows are not document dates, but can be expiry dates', () => {
     const rows = ['本票据使用至 2021-12-31'];
     expect(checkAnswer(DATE, '2021-12-31', rows, 'zh')).toBeNull();
     expect(checkAnswer(DUE, '2021-12-31', rows, 'zh')).toBe('2021-12-31');
   });
 
-  it('日期按另一种日月读法也算读得出', () => {
+  it('Dates are also considered recognizable under alternative day-month readings', () => {
     expect(checkAnswer(DATE, '2026-03-04', ['Date 04/03/2026'], 'en')).toBe('2026-03-04');
     expect(checkAnswer(DATE, '2026-04-03', ['Date 04/03/2026'], 'en')).toBe('2026-04-03');
   });
 
-  it('单号：流水号那排不要，像金额或商品的不要，地址不要，NO 前缀去掉', () => {
+  it('Document numbers: exclude serial number rows, amount-like or product-like rows, addresses, and strip the NO prefix', () => {
     expect(checkAnswer(NUMBER, '77001234', ['业务流水号 77001234'], 'zh')).toBeNull();
     expect(checkAnswer(NUMBER, '1,234.50', ['No 1,234.50'], 'en')).toBeNull();
     expect(checkAnswer(NUMBER, '12号', ['No 12号'], 'zh')).toBeNull();
     expect(checkAnswer(NUMBER, 'NO8039067', ['票据号 NO8039067'], 'zh')).toBe('8039067');
   });
 
-  it('半截店名补全成整排；别的标签那一排、地址、标签本身都不要', () => {
+  it('Complete partial store names into full rows; exclude other label rows, addresses, and labels themselves', () => {
     expect(checkAnswer(MERCHANT, 'Acme', ['Acme Coffee Bar'], 'en')).toBe('Acme Coffee Bar');
     expect(checkAnswer(MERCHANT, 'Sam', ['Cashier: Sam'], 'en')).toBeNull();
     expect(checkAnswer(MERCHANT, 'Jalan Besar', ['Jalan Besar'], 'en')).toBeNull();
     expect(checkAnswer(MERCHANT, 'Merchant', ['Merchant'], 'en')).toBeNull();
   });
 
-  it('邮箱要有 @', () => {
+  it('Email must contain @', () => {
     expect(checkAnswer(EMAIL, 'acme.com', ['acme.com'], 'en')).toBeNull();
     expect(checkAnswer(EMAIL, 'a@acme.com', ['a@acme.com'], 'en')).toBe('a@acme.com');
   });
 
-  it('一次回答里的几个候选分别核对，去重，最多 3 个', () => {
+  it('Verify multiple candidates in a single answer individually, deduplicate, maximum of 3', () => {
     const rows = ['Acme', 'Beta', 'Gamma', 'Delta'];
     expect(modelAnswers(MERCHANT, 'Acme | Fake | Acme | Beta', rows, 'en')).toEqual([
       'Acme',
@@ -91,7 +91,7 @@ describe('核对模型的回答（D-396）', () => {
     expect(modelAnswers(MERCHANT, 'Acme | Beta | Gamma | Delta', rows, 'en').length).toBe(3);
   });
 
-  it('误导排不给模型看，有合计字样的排留着', () => {
+  it('Misleading rows are hidden from the model, rows with total keywords are kept', () => {
     expect(keepForModel('Tel: 012345')).toBe(false);
     expect(keepForModel('Thank you')).toBe(false);
     expect(keepForModel('现金 50.00')).toBe(false);
@@ -100,15 +100,15 @@ describe('核对模型的回答（D-396）', () => {
   });
 });
 
-describe('算术找总额', () => {
-  it('付款 − 找零', () => {
+describe('Arithmetic to find total amount', () => {
+  it('Payment − change', () => {
     expect(amountChain(['A 3.00', 'Sum 19.00', 'Cash 20.00', 'Change 1.00'], false, 'en')).toEqual({
       value: 19,
       how: 'payMinusChange',
     });
   });
 
-  it('小计 − 优惠 = 总额；减的那排没写优惠时取大的（含税总额 − 不含税 = 税额）', () => {
+  it('Subtotal − discount = total; when the subtracted row lacks a discount, take the larger value (gross total − net = tax amount)', () => {
     const rows = ['A 6.00', 'B 4.00', 'Subtotal 10.00'];
     expect(amountChain([...rows, 'Discount 1.00', 'Net 9.00'], false, 'en')).toEqual({
       value: 9,
@@ -117,13 +117,13 @@ describe('算术找总额', () => {
     expect(amountChain([...rows, 'Excl 9.00', 'Tax 1.00'], false, 'en')?.value).toBe(10);
   });
 
-  it('小计 + 税', () => {
+  it('Subtotal + tax', () => {
     expect(
       amountChain(['A 6.00', 'B 4.00', 'Subtotal 10.00', 'Tax 1.00', 'Total 11.00'], false, 'en'),
     ).toEqual({ value: 11, how: 'subtotalAdjust' });
   });
 
-  it('小计本身；算不出来是 null', () => {
+  it('Subtotal itself; returns null if it cannot be calculated', () => {
     expect(amountChain(['A 6.00', 'B 4.00', 'Total 10.00'], false, 'en')).toEqual({
       value: 10,
       how: 'subtotal',
@@ -131,31 +131,31 @@ describe('算术找总额', () => {
     expect(amountChain(['Hello', 'A 6.00'], false, 'en')).toBeNull();
   });
 
-  it('没有小数的币种：千位分隔读成整数，差 1 算相等', () => {
+  it('Currencies without decimals: read thousands separator as integer, difference of 1 counts as equal', () => {
     expect(amountChain(['A 6.000', 'B 4.000', 'Total 10.001'], true, 'en')?.value).toBe(10001);
   });
 
-  it('数太多的单据不算（不让手机卡住）', () => {
+  it('Ignore documents with too many numbers (to prevent UI freezing)', () => {
     const rows = Array.from({ length: 200 }, (_, i) => `Item ${i} ${i + 1}.00`);
     expect(amountChain(rows, false, 'en')).toBeNull();
   });
 });
 
-describe('中文规则', () => {
-  it('大写金额', () => {
+describe('Chinese rules', () => {
+  it('Uppercase amount in words', () => {
     expect(upperToNumber('贰拾捌元玖角')).toBe(28.9);
     expect(upperToNumber('壹拾元整')).toBe(10);
     expect(upperToNumber('壹万贰仟叁佰元伍角陆分')).toBe(12300.56);
     expect(upperToNumber('今天元')).toBeNull();
   });
 
-  it('带小数的小写也在文字里才算有把握；整数碰巧撞上不算', () => {
+  it('Decimal amounts in lowercase are only considered reliable if inside text; integers accidentally matching do not count', () => {
     expect(upperAmount(['合计 贰 拾捌元 玖角', '28.90'])).toEqual({ value: 28.9, sure: true });
     expect(upperAmount(['合计 壹拾元整', '10'])).toEqual({ value: 10, sure: false });
     expect(upperAmount(['合计 12.50'])).toBeNull();
   });
 
-  it('单号按键名优先级', () => {
+  it('Document number key priority', () => {
     expect(invoiceNoByKey(['NO 11112222', '票据号 NO33334444'])).toBe('33334444');
     expect(invoiceNoByKey(['合计 28.90'])).toBeNull();
     expect(stripNoPrefix('N4510498')).toBe('4510498');
@@ -163,10 +163,10 @@ describe('中文规则', () => {
   });
 });
 
-describe('值记忆（底线 14：现查，不另存）', () => {
+describe('Value memory (invariant 14: queried on demand, not stored separately)', () => {
   const fields: Field[] = [MERCHANT, AMOUNT, { id: 'co', name: 'Company', type: 'text' }];
 
-  it('只取店名、公司字段，去重', () => {
+  it('Take only store name and company fields, deduplicate', () => {
     expect(
       knownValues(fields, [
         { values: { merchant: 'Acme', amount: '5', co: 'Beta Ltd' } },
@@ -176,7 +176,7 @@ describe('值记忆（底线 14：现查，不另存）', () => {
     ).toEqual({ merchant: ['Acme'], co: ['Beta Ltd'] });
   });
 
-  it('文字里没有的不给，一排里的空格多少不算，跨排不算', () => {
+  it('Values missing from text are rejected; spacing variations within a row do not count, and values spanning across rows do not count', () => {
     const page = {
       width: 100,
       height: 100,

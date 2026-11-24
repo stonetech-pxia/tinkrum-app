@@ -17,7 +17,7 @@ import { lineShareIn, readingOrder } from './layout';
 import { type OcrBox } from './types';
 import { FILL_RUN } from './word-fill-ins';
 
-/** 排列阅读顺序，只替换已确认的修表范围。 */
+/** Arrange reading order, replacing only confirmed table-repair ranges. */
 export function composePage(
   state: Pick<PageBuildContext, 'input'> &
     Pick<PreparePageState, 'image' | 'paper' | 'lineHeight' | 'lines'> &
@@ -48,7 +48,7 @@ export function composePage(
     ...(paper ? { paper } : {}),
     bodySize,
     blocks: arrangeColumns(units, lineHeight, gutter, {
-      // 密集页沿用原来的局部并排行；长表格的标题 keepNext 会改变跨页行为，另行处理分页。
+      // Dense pages retain original local side-by-side layout; long table titles with keepNext change pagination behavior, so handle pagination separately.
       dense: lines.length >= DENSE_LINES,
       onColumns: (row) => {
         let left = row.box.x;
@@ -68,11 +68,15 @@ export function composePage(
   };
   page.blocks = joinListContinuations(page.blocks, lineHeight);
   if (repairBaseline) {
-    // 组表会改变整页字号、分组统计。只替换修复范围中的顶层块，范围外继续用原来的
-    // 段落和并排行（包括它们的顺序和样式），避免修一张表挪动上方的日期、署名。
-    // 按识别行归属换块：两边分段不同（修复范围上面的段落接进了网格的第一行）时，
-    // 一行字所在的块两边一起换，直到两边换的块装着同一批行，不丢字也不重复。
-    // 自成一行的填写处（一串点）也算一行，它在哪一块里按位置找。
+    // Table grouping changes page-wide font sizes and group statistics. Replace only top-level
+    // blocks within the repair range; outside the range, continue using original paragraphs and
+    // side-by-side layouts (including their order and styles) to avoid shifting dates or signatures
+    // above when repairing a table. Swap blocks based on recognition row ownership: when both sides
+    // have different paragraph splits (paragraphs above the repair range merged into the first row
+    // of the grid), replace blocks containing the text rows on both sides together until both
+    // sides' blocks contain the same set of rows, without losing or duplicating text. Fill-in areas
+    // forming a single line (a string of dots) are also treated as a line, locating their block by
+    // position.
     const every = [...lines, ...synthetic];
     const linesOf = (b: DocBlock) => {
       const boxes = leafBlocks({ blocks: [b] }).map((leaf) => leaf.box);
@@ -104,7 +108,7 @@ export function composePage(
       lineHeight * 0.3,
       lineHeight,
     );
-    // 拼好以后的字必须和整页重建的字一样多：对不上（行和块对不准）就不修这一页。
+    // The text after composition must have the same length as the text from full-page reconstruction; if they do not match (rows and blocks misaligned), this page is not repaired.
     const words = (blocks: readonly DocBlock[]) =>
       leafBlocks({ blocks })
         .flatMap((b) =>
@@ -117,7 +121,7 @@ export function composePage(
                 : [],
         )
         .join(' ')
-        // 填写处（「....」「____」）的长短跟着它接在哪一行，不算字。
+        // Length of fill-in areas ('....', '____') matches the line they attach to, and they are not counted as text characters.
         .replace(FILL_RUN, ' ')
         .split(/\s+/)
         .filter(Boolean)

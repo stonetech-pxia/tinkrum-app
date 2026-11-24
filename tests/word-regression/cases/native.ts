@@ -1,4 +1,4 @@
-// native 套件：数字 PDF 的原生绘图（pdfview 的 graphics，D-534/D-535）：装饰底图、内嵌图、表头色带、图章、退回识别。
+// native suite: native rendering of digital PDFs (graphics in pdfview, D-534/D-535): decorative background graphics, embedded images, table header color bands, stamps, fallback recognition.
 import {
   anchoredDrawings,
   backgrounds,
@@ -14,7 +14,7 @@ import {
 } from '../lib/checks';
 import type { Case } from '../lib/case';
 
-/** 含这处字的每个表格格子都有深色底，字是白的（白字没有留在白纸上）。 */
+/** Every table cell containing this text has a dark background and white text (white text is not left on white paper). */
 const whiteOnFill = (text: string) =>
   custom(`"${text}" is white text on a filled cell`, (c) => {
     const cells = [...c.xml.matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)].filter((m) =>
@@ -175,7 +175,7 @@ export const NATIVE: Case[] = [
       times('6 kVA', 1),
       custom('no text is written in a colour that is unreadable on white', (c) => {
         const pale: string[] = [];
-        // 有底色的段落（色条上的白字）不算。
+        // Paragraphs with background color (white text on color bars) are excluded.
         for (const p of c.xml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)) {
           if (/<w:shd [^>]*w:fill="(?!FFFFFF|auto)/i.test(p[0])) continue;
           for (const r of p[0].matchAll(/<w:r>[\s\S]*?<\/w:r>/g)) {

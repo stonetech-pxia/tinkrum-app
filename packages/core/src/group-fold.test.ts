@@ -4,8 +4,10 @@ import { prepareOps } from './change';
 import type { Op } from './ops';
 import { registry, workspace } from './test-helpers';
 
-// 分组可以收起（D-578）：show.fold 让分组的标题变成一个能点的头，点一下收起或展开里面的块；
-// 它的值是一开始的样子。只是看的方式（底线 15），不写任何数据，所以收起的状态不存。
+// Groupings can be collapsed (D-578): show.fold turns the group title into a clickable header that
+// collapses or expands the blocks inside when tapped; its value represents the initial state. This
+// is purely a display preference (invariant 15) and does not modify data, so collapsed states are
+// not persisted.
 
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 17) };
 const text = { id: 't', look: 'text', show: { text: 'hello' } };

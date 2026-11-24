@@ -6,18 +6,24 @@ import MorphDsp
 import UIKit
 import UniformTypeIdentifiers
 
-// 视频和音频的 iOS 实现（D-141）：只用 AVFoundation，全部在本机处理，不联网。
-// - probe：AVURLAsset 读时长、宽高、方向、帧率、码率、编码、是否 HDR。
-// - transcode：AVAssetReader（经过 AVVideoComposition：摆正、缩小、限帧率、HDR 转 BT.709）
-//   + AVAssetWriter（H.264 + AAC，MP4），自己指定码率。
-// - trim：AVAssetExportSession 的 Passthrough + timeRange，不重新编码。
+// iOS implementation for video and audio (D-141): Uses AVFoundation exclusively, processing
+// everything locally without network requests.
+// - probe: Uses AVURLAsset to read duration, dimensions, orientation, framerate, bitrate, codec,
+// and HDR status.
+// - transcode: Uses AVAssetReader (via AVVideoComposition: orientation correction, scaling,
+// framerate limiting, HDR to BT.709) + AVAssetWriter (H.264 + AAC, MP4) with custom bitrate
+// specification.
+// - trim: Uses AVAssetExportSession Passthrough + timeRange without re-encoding.
 // - thumbnails：AVAssetImageGenerator。
-// - MP3（D-183）：AVFoundation 不能写 MP3，解成 PCM 后交给编进 App 的 LAME（MorphLame pod）。
-// - GIF（D-184）：视频用 AVAssetImageGenerator 按帧率取画面，图片用 ImageIO 读（摆正、缩小），
-//   ImageIO 写 GIF（每帧自己的调色板，循环播放）。
-// 视频编码器不能在后台用：处理时切到别的 App 会失败，报 ERR_MEDIA_INTERRUPTED（D-148）。
-// 例外：morph-background 拿到了 iOS 26 的后台任务时（D-163，默认关着），切到后台不算中断；
-// 系统收回后台时间时，正在处理的任务按中断结束。
+// - MP3 (D-183): AVFoundation cannot write MP3; decoded to PCM and passed to the app-embedded LAME
+// (MorphLame pod).
+// - GIF (D-184): Video uses AVAssetImageGenerator to extract frames at framerate, images are read
+// via ImageIO (oriented, scaled), and ImageIO writes the GIF (per-frame custom palettes, looping
+// playback). Video encoders cannot be used in the background: switching to another app during
+// processing will fail, reporting ERR_MEDIA_INTERRUPTED (D-148). Exception: when morph-background
+// acquires an iOS background task (D-163, disabled by default), switching to the background is not
+// considered an interruption; when the system reclaims background time, tasks currently in progress
+// end as interrupted.
 
 final class MediaUnsupportedException: GenericException<String>, @unchecked Sendable {
   override var code: String { "ERR_MEDIA_UNSUPPORTED" }
@@ -44,7 +50,7 @@ final class MediaFailedException: GenericException<String>, @unchecked Sendable 
   override var reason: String { "Processing failed: \(param)" }
 }
 
-/** 一个正在进行的任务：能取消，记得有没有切到后台过。 */
+/** An ongoing task: can be cancelled, remembers whether it was switched to the background. */
 private final class Job: @unchecked Sendable {
   private let lock = NSLock()
   private var _cancelled = false
@@ -52,7 +58,7 @@ private final class Job: @unchecked Sendable {
   private var _interrupted = false
   private var _onCancel: (() -> Void)?
 
-  /** 取消时要做的事（停止读写或导出）；设置时已经取消了就马上做。 */
+  /** Actions to perform upon cancellation (stop reading/writing or exporting); if already cancelled when set, executes immediately. */
   var onCancel: (() -> Void)? {
     get { lock.withLock { _onCancel } }
     set {
@@ -78,7 +84,7 @@ private final class Job: @unchecked Sendable {
 
   func markBackgrounded() { lock.withLock { _backgrounded = true } }
 
-  /** 系统收回了后台时间：停下来，按「切到后台」报错。 */
+  /** System reclaimed background time: stop and report an error as "switched to background". */
   func interrupt() {
     let handler: (() -> Void)? = lock.withLock {
       _backgrounded = true
@@ -89,14 +95,14 @@ private final class Job: @unchecked Sendable {
   }
 }
 
-/** 和 morph-background 约定的通知名（两个模块互相看不到对方的代码）。 */
+/** Notification name agreed upon with morph-background (the two modules cannot see each other's code). */
 private let continuedChangedNotification = Notification.Name("MorphContinuedProcessingChanged")
 private let continuedExpiredNotification = Notification.Name("MorphContinuedProcessingExpired")
 
 public class MorphMediaModule: Module {
   private let jobsLock = NSLock()
   private var jobs: [String: Job] = [:]
-  /** morph-background 拿到了后台任务（D-163）：这期间切到后台不算中断。 */
+  /** morph-background acquired a background task (D-163): switching to background during this period is not considered an interruption. */
   private var continued = false
   private var continuedObservers: [NSObjectProtocol] = []
 
@@ -251,7 +257,7 @@ public class MorphMediaModule: Module {
       }
     }
 
-    // 音频（D-153、D-155，音频会话）：几段接成一段、波形。
+    // Audio (D-153, D-155, audio sessions): concatenating segments, waveforms.
     AsyncFunction("concat") {
       (jobId: String, uris: [URL], output: URL, options: [String: Any], promise: Promise) in
       let job = self.start(jobId)
@@ -276,7 +282,7 @@ public class MorphMediaModule: Module {
       }
     }
 
-    // 动图（D-184）
+    // Animations (D-184)
     AsyncFunction("videoGif") {
       (jobId: String, uri: URL, output: URL, options: [String: Double], promise: Promise) in
       let job = self.start(jobId)
@@ -309,11 +315,11 @@ public class MorphMediaModule: Module {
     }
   }
 
-  // MARK: - 任务
+  // MARK: - Tasks
 
   private func start(_ jobId: String) -> Job {
     let job = Job()
-    // 切到后台时记一下：之后编码失败就是因为这个（iOS 不让后台用视频编码器）。有后台任务时不算。
+    // Record when switching to background: subsequent encoding failures are caused by this (iOS disallows video encoders in the background). Not counted if a background task is active.
     let token = NotificationCenter.default.addObserver(
       forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil
     ) { [weak self] _ in
@@ -463,7 +469,7 @@ public class MorphMediaModule: Module {
         end: CMTime(seconds: end / 1000, preferredTimescale: 600))
     }
 
-    // 输出尺寸：摆正之后按短边缩小，不放大；H.264 要偶数宽高。
+    // Output dimensions: after orientation correction, scale down by the short side without enlarging; H.264 requires even width and height.
     let (natural, transform, nominalFps) = try await videoTrack.load(.naturalSize, .preferredTransform, .nominalFrameRate)
     let shown = natural.applying(transform)
     let frameW = suppliedComposition?.renderSize.width ?? abs(shown.width)
@@ -483,15 +489,16 @@ public class MorphMediaModule: Module {
     let composition = AVMutableVideoComposition()
     composition.renderSize = CGSize(width: outW, height: outH)
     composition.frameDuration = CMTime(seconds: 1 / fps, preferredTimescale: 6000)
-    // 普通画面（BT.709）：HDR 视频在这里转换，否则发到别处会发灰或过暗。
+    // Standard video (BT.709): HDR video is converted here, otherwise it will appear grey or underexposed when sent elsewhere.
     composition.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
     composition.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
     composition.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
     let instruction = AVMutableVideoCompositionInstruction()
     instruction.timeRange = CMTimeRange(start: .zero, duration: duration)
     let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
-    // 摆正：preferredTransform 不一定带平移（不是 iPhone 拍的视频常常只有旋转），
-    // 按转过之后的外框把画面挪回原点，再缩放到输出尺寸。
+    // Orientation correction: preferredTransform does not necessarily include translation (videos
+    // not shot on iPhone often only have rotation), move the frame back to the origin based on the
+    // post-rotation bounding box, then scale to output dimensions.
     let bounds = CGRect(origin: .zero, size: natural).applying(transform)
     let upright = transform.concatenating(
       CGAffineTransform(translationX: -bounds.minX - (frameW - shownW) / 2, y: -bounds.minY - (frameH - shownH) / 2))
@@ -550,7 +557,7 @@ public class MorphMediaModule: Module {
     var audioIn: AVAssetWriterInput?
     if !audioTracks.isEmpty, let audioOptions {
       let kbps = audioOptions["bitrateKbps"] as? Double ?? 128
-      // AAC 低码率时用单声道、低采样率，否则编码器不接受。
+      // For low-bitrate AAC, use mono and low sample rate, otherwise the encoder rejects it.
       let channels = (audioOptions["channels"] as? NSNumber)?.intValue ?? (kbps < 64 ? 1 : 2)
       let sampleRate = (audioOptions["sampleRate"] as? Double) ?? (kbps < 64 ? 22050 : 44100)
       let out = AVAssetReaderAudioMixOutput(
@@ -607,7 +614,7 @@ public class MorphMediaModule: Module {
       }
     }
 
-    // 两路（画面、声音）各自在自己的队列上搬运，都搬完再收尾。
+    // Two parallel pipelines (video and audio) process on their respective queues, wrapping up only after both finish.
     await withTaskGroup(of: Void.self) { group in
       group.addTask {
         await Self.pump(videoOut, into: videoIn, queue: DispatchQueue(label: "morph.media.video"), onSample: report)
@@ -637,7 +644,7 @@ public class MorphMediaModule: Module {
     return try await Self.result(output)
   }
 
-  /** 把一路样本从 reader 搬到 writer，直到读完或写入失败。 */
+  /** Pump samples from reader to writer for one stream until reading completes or writing fails. */
   private static func pump(
     _ output: AVAssetReaderOutput, into input: AVAssetWriterInput, queue: DispatchQueue,
     onSample: ((CMTime) -> Void)? = nil
@@ -669,11 +676,12 @@ public class MorphMediaModule: Module {
     return ["uri": url.absoluteString, "size": fileSize(url), "info": info]
   }
 
-  // MARK: - 音频（D-153、D-155）
+  // MARK: - Audio (D-153, D-155)
 
   /**
-   * 把几路声音（混在一起；合成时它们首尾相接）编码成 M4A（AAC）或 WAV（16 位 PCM）。
-   * AAC 低码率时用单声道、低采样率，否则编码器不接受（和视频的声音一样）。
+   * Encode multiple audio streams (mixed together, or concatenated head-to-tail during synthesis)
+   * into M4A (AAC) or WAV (16-bit PCM). Low-bitrate AAC uses mono and low sample rate, otherwise
+   * the encoder rejects it (same as video audio).
    */
   private func writeAudio(
     _ job: Job, jobId: String, asset: AVAsset, tracks: [AVAssetTrack], timeRange: CMTimeRange,
@@ -688,7 +696,7 @@ public class MorphMediaModule: Module {
       throw NotImplementedException("\(container) with \(codec)")
     }
     let kbps = audio["bitrateKbps"] as? Double ?? 128
-    // JS 的数字到这里是 Double，`as? Int` 取不到：用 NSNumber 读。
+    // JS numbers are Double here, `as? Int` fails: read using NSNumber.
     let channels = (audio["channels"] as? NSNumber)?.intValue ?? (codec == "aac" && kbps < 64 ? 1 : 2)
     let sampleRate = audio["sampleRate"] as? Double ?? (codec == "aac" && kbps < 48 ? 22050 : 44100)
     let pcm: [String: Any] = [
@@ -774,8 +782,9 @@ public class MorphMediaModule: Module {
   }
 
   /**
-   * MP3（D-183）：AVAssetReader 把声音解成 44.1 kHz 的 16 位 PCM（需要时系统重采样），LAME 编码，边编边写文件。
-   * LAME 的 quality 用 2（好，比默认的 5 慢一点）。
+   * MP3 (D-183): AVAssetReader decodes audio to 44.1 kHz 16-bit PCM (system resampled when
+   * needed), LAME encoded, written on-the-fly. LAME quality is set to 2 (high quality, slightly
+   * slower than default 5).
    */
   private func writeMp3(
     _ job: Job, jobId: String, asset: AVAsset, tracks: [AVAssetTrack], timeRange: CMTimeRange,
@@ -844,7 +853,7 @@ public class MorphMediaModule: Module {
         _ = CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: length, destination: raw.baseAddress!)
       }
       let frames = Int32(pcm.count / channels)
-      // LAME 要求的最坏情况：1.25 × 样本数 + 7200 字节。
+      // Worst-case requirement by LAME: 1.25 * sample count + 7200 bytes.
       let capacity = Int(frames) * 5 / 4 + 7200
       if mp3.count < capacity { mp3 = [UInt8](repeating: 0, count: capacity) }
       let written = pcm.withUnsafeMutableBufferPointer { samples in
@@ -882,8 +891,9 @@ public class MorphMediaModule: Module {
   }
 
   /**
-   * 一个文件里要处理的那条音轨。多语言、空间音频（立体声 + APAC）的视频有好几条，全部混在一起声音会重叠发虚：
-   * 取第一条启用的，没有启用的取第一条。
+   * The audio track to process in a file. Multi-language and spatial audio (stereo + APAC) videos
+   * have multiple tracks, and mixing them all together results in overlapping, hollow sound: take
+   * the first enabled track, or the first track if none are enabled.
    */
   static func mainAudioTrack(_ tracks: [AVAssetTrack]) async -> AVAssetTrack? {
     let audio = tracks.filter { $0.mediaType == .audio }
@@ -891,7 +901,7 @@ public class MorphMediaModule: Module {
     return audio.first
   }
 
-  /** 主音轨是单声道时为 1，其他为 2（多声道混成立体声）。单声道复制成双声道会被测得响 3 dB。 */
+  /** 1 when the main audio track is mono, 2 otherwise (multi-channel mixed to stereo). Mono duplicated to dual-channel sounds 3 dB louder when measured. */
   private static func pcmChannels(_ uri: URL) async -> Int {
     guard let tracks = try? await AVURLAsset(url: uri).load(.tracks),
           let audio = await mainAudioTrack(tracks),
@@ -900,7 +910,7 @@ public class MorphMediaModule: Module {
     return asbd.mChannelsPerFrame == 1 ? 1 : 2
   }
 
-  /** 解成 48 kHz、channels 个声道的交错 Float PCM；按时间戳补静音，视频的声音不会被提前。 */
+  /** Decoded into 48 kHz, n-channel interleaved Float PCM; insert silence by timestamp so the video sound is not advanced. */
   private func readPcm(_ job: Job, uri: URL, channels: Int = 2, consume: (UnsafePointer<Float>, Int) throws -> Void) async throws {
     if job.cancelled { throw MediaCancelledException() }
     if job.interrupted { throw MediaInterruptedException() }
@@ -951,7 +961,7 @@ public class MorphMediaModule: Module {
         if contiguous >= length {
           try consume(UnsafeRawPointer(data).assumingMemoryBound(to: Float.self).advanced(by: skip * channels), frames)
         } else {
-          // 不连续的块：先拷成一段再读，不能越过第一段的末尾。
+          // Discontinuous blocks: copy to a single segment first then read, without crossing the end of the first segment.
           var copy = [Float](repeating: 0, count: length / 4)
           let status = copy.withUnsafeMutableBytes { CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: length, destination: $0.baseAddress!) }
           guard status == kCMBlockBufferNoErr else { throw MediaFailedException("PCM buffer") }
@@ -967,7 +977,7 @@ public class MorphMediaModule: Module {
     try pad(to: totalFrames)
   }
 
-  /** 语音识别用无损 WAV，按视频时间轴补静音；不能丢掉开头的音轨延迟。 */
+  /** Speech recognition uses lossless WAV, padding silence along the video timeline; do not drop the initial track delay. */
   private func speechAudio(_ job: Job, jobId: String, uri: URL, output: URL) async throws -> [String: Any] {
     try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
     let format = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 2)!
@@ -1000,7 +1010,7 @@ public class MorphMediaModule: Module {
     try await readPcm(job, uri: uri, channels: ch) { samples, frames in
       if morph_meter_add_float(meter, samples, frames * ch) != 0 { throw MediaFailedException("loudness analysis") }
       measured += frames
-      // 第一遍（测响度）占进度的前 25%。
+      // First pass (loudness measurement) takes the first 25% of progress.
       let percent = seconds > 0 ? Int(min(25, Double(measured) / 48000 / seconds * 25)) : 0
       if percent > shown { shown = percent; progress(jobId, Double(percent) / 100) }
     }
@@ -1025,9 +1035,9 @@ public class MorphMediaModule: Module {
     return try await encodeProcessedAudio(job, jobId: jobId, uri: uri, pcm: pcm, output: output, options: options, channels: ch)
   }
 
-  /** RNNoise 每次处理 10ms；丢掉前 20ms 算法延迟、补尾帧，保持原始时间轴。 */
+  /** RNNoise processes 10ms chunks; drop the first 20ms algorithmic delay and pad the trailing frame to maintain the original timeline. */
   private func denoiseAudio(_ job: Job, jobId: String, uri: URL, output: URL, options: [String: Any]) async throws -> [String: Any] {
-    // 单声道只跑一遍 RNNoise；其他按立体声。
+    // Mono runs RNNoise only once; others run as stereo.
     let ch = await Self.pcmChannels(uri)
     guard let denoiser = morph_denoise_create(Int32(ch)) else { throw MediaFailedException("denoiser") }
     defer { morph_denoise_destroy(denoiser) }
@@ -1064,7 +1074,7 @@ public class MorphMediaModule: Module {
         filled += count; offset += count
         if filled == 480 { try process() }
       }
-      // 降噪这一遍占进度的前 50%。
+      // Noise reduction pass accounts for the first 50% of progress.
       let percent = seconds > 0 ? Int(min(50, Double(total) / 48000 / seconds * 50)) : 0
       if percent > shown { shown = percent; progress(jobId, Double(percent) / 100) }
     }
@@ -1089,7 +1099,7 @@ public class MorphMediaModule: Module {
     return try await transcode(job, jobId: jobId, uri: pcm, output: output, options: encode)
   }
 
-  /** 变速同时缩放视频和音频的时间；varispeed 让声音按同样比例变调。 */
+  /** Speed change scales video and audio time simultaneously; varispeed makes audio pitch shift proportionally. */
   private func speedVideo(_ job: Job, jobId: String, uri: URL, output: URL, options: [String: Any], factor: Double) async throws -> [String: Any] {
     guard factor.isFinite, (0.5...4).contains(factor) else { throw MediaUnsupportedException("invalid speed") }
     if job.cancelled { throw MediaCancelledException() }
@@ -1115,7 +1125,7 @@ public class MorphMediaModule: Module {
     return try await transcode(job, jobId: jobId, uri: uri, output: output, options: options, sourceAsset: asset, suppliedTimePitch: .varispeed)
   }
 
-  /** 配乐在运行时由用户选；原音轨按指定比例混入，音乐可循环，输出时长始终跟随视频。 */
+  /** Background music is chosen by the user at runtime; original audio is mixed in at a specified ratio, music loops, and output duration always follows the video. */
   private func mixVideoAudio(
     _ job: Job, jobId: String, uri: URL, music: URL, output: URL, options: [String: Any]
   ) async throws -> [String: Any] {
@@ -1164,7 +1174,7 @@ public class MorphMediaModule: Module {
     return try await transcode(job, jobId: jobId, uri: uri, output: output, options: options, sourceAsset: asset, suppliedAudioMix: mix)
   }
 
-  /** 视频首尾拼接：每段独立摆正并按第一段画布等比留边；无声片段不插入音轨。 */
+  /** Video concatenation: each segment is individually straightened and letterboxed proportionally to the first segment's canvas; silent segments do not insert an audio track. */
   private func concatVideo(
     _ job: Job, jobId: String, uris: [URL], output: URL, options: [String: Any]
   ) async throws -> [String: Any] {
@@ -1227,7 +1237,7 @@ public class MorphMediaModule: Module {
                                sourceAsset: asset, suppliedComposition: composition)
   }
 
-  /** 几段接成一段：每段放进合成里自己的一路，首尾相接，读的时候混成一路（格式、采样率可以不同）。 */
+  /** Concatenating multiple segments into one: each segment is placed in its own track during composition, connected end-to-end, and mixed into a single track upon reading (formats and sample rates can differ). */
   private func concat(
     _ job: Job, jobId: String, uris: [URL], output: URL, options: [String: Any]
   ) async throws -> [String: Any] {
@@ -1260,7 +1270,7 @@ public class MorphMediaModule: Module {
       container: options["container"] as? String ?? "m4a", audio: options["audio"] as? [String: Any] ?? [:])
   }
 
-  /** 波形：解成 8 kHz 单声道，每一份取最大的音量，再按最响的一份归一到 0–1。 */
+  /** Waveform: decoded to 8 kHz mono, taking the maximum volume per bucket, then normalized to 0-1 relative to the loudest bucket. */
   static func waveform(_ uri: URL, buckets: Int, range: [String: Double]?) async throws -> [Double] {
     let asset = AVURLAsset(url: uri)
     let (duration, tracks) = try await asset.load(.duration, .tracks)
@@ -1336,7 +1346,7 @@ public class MorphMediaModule: Module {
     ["uri": output.absoluteString, "size": fileSize(output), "width": width, "height": height, "frames": frames]
   }
 
-  /** 视频 → GIF：从头到尾按 fps 取画面（已摆正，宽度不超过 width），整段都要（长度由调用方先检查）。 */
+  /** Video to GIF: extracts frames from start to end at the specified fps (already straightened, width not exceeding width), using the entire segment (length checked by caller in advance). */
   private func videoGif(
     _ job: Job, jobId: String, uri: URL, output: URL, options: [String: Double]
   ) async throws -> [String: Any] {
@@ -1348,7 +1358,7 @@ public class MorphMediaModule: Module {
     let count = max(1, Int(duration.seconds * fps))
     let generator = AVAssetImageGenerator(asset: asset)
     generator.appliesPreferredTrackTransform = true
-    // 宽度不超过 width，高度不限（竖着的视频按宽度缩）。
+    // Width does not exceed width, height is unlimited (vertical videos are scaled by width).
     generator.maximumSize = CGSize(width: width, height: width * 20)
     let tolerance = CMTime(seconds: 0.5 / fps, preferredTimescale: 600)
     generator.requestedTimeToleranceBefore = tolerance
@@ -1374,7 +1384,7 @@ public class MorphMediaModule: Module {
     return Self.gifResult(output, width: Int(size.width), height: Int(size.height), frames: count)
   }
 
-  /** 图片 → GIF：画布是第一张（长边缩到 maxSide），每张按比例放进画布居中，空的地方白色。 */
+  /** Images -> GIF: Canvas is the first image (long side scaled to maxSide), each image is centered and scaled proportionally within the canvas, with empty areas filled with white. */
   private func imagesGif(
     _ job: Job, jobId: String, uris: [URL], output: URL, options: [String: Double]
   ) throws -> [String: Any] {
@@ -1421,7 +1431,7 @@ public class MorphMediaModule: Module {
     return Self.gifResult(output, width: Int(canvas.width), height: Int(canvas.height), frames: uris.count)
   }
 
-  /** iOS 只改容器里的方向信息，编码样本原样保留。 */
+  /** iOS only modifies orientation metadata in the container; encoding samples are kept as-is. */
   private func rotateVideo(_ job: Job, jobId: String, uri: URL, output: URL, degrees: Int) async throws -> [String: Any] {
     guard [90, 180, 270].contains(degrees) else { throw MediaUnsupportedException("invalid rotation") }
     if job.cancelled { throw MediaCancelledException() }
@@ -1446,7 +1456,7 @@ public class MorphMediaModule: Module {
     return try await trim(job, jobId: jobId, uri: uri, output: output, range: ["startMs": 0, "endMs": range.duration.seconds * 1000], sourceAsset: asset, metadataFrom: source)
   }
 
-  /** 去掉声音：只放画面轨、原样导出，不重新编码（HDR 和画质不变），拍摄时间、地点等信息照旧。 */
+  /** Remove sound: keeps only the video track, exports as-is, without re-encoding (HDR and quality remain unchanged), preserving capture time, location, and other metadata. */
   private func muteVideo(_ job: Job, jobId: String, uri: URL, output: URL) async throws -> [String: Any] {
     if job.cancelled { throw MediaCancelledException() }
     let source = AVURLAsset(url: uri)
@@ -1476,12 +1486,12 @@ public class MorphMediaModule: Module {
       end: CMTime(seconds: endMs / 1000, preferredTimescale: 600))
     try? FileManager.default.createDirectory(
       at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
-    // 先按要求的容器（一般是 MP4）；原来的声音放不进 MP4（例如 PCM）时改成 MOV。
+    // Start with the requested container (usually MP4); switch to MOV when the original audio cannot be placed into MP4 (e.g. PCM).
     var targets = [output]
     if output.pathExtension.lowercased() == "mp4" {
       targets.append(output.deletingPathExtension().appendingPathExtension("mov"))
     }
-    // 新建的合成不带原文件的拍摄时间、地点等信息，从原文件拿过来。
+    // New compositions do not carry the original file's capture time, location, etc.; copy them over from the original file.
     let metadata = metadataFrom == nil ? nil : try? await metadataFrom!.load(.metadata)
     var lastError: Error?
     for target in targets {
@@ -1546,7 +1556,7 @@ public class MorphMediaModule: Module {
     let generator = AVAssetImageGenerator(asset: asset)
     generator.appliesPreferredTrackTransform = true
     generator.maximumSize = CGSize(width: maxSide, height: maxSide)
-    // 时间轴上的缩略图不需要准确到帧，放宽一点快很多。
+    // Thumbnails on the timeline do not need frame accuracy; relaxing the tolerance speeds things up significantly.
     let tolerance = precise ? CMTime.zero : CMTime(seconds: 0.5, preferredTimescale: 600)
     generator.requestedTimeToleranceBefore = tolerance
     generator.requestedTimeToleranceAfter = tolerance

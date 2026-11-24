@@ -9,7 +9,7 @@ import { workflowEntry } from '@/shell/ai-entry';
 import { ReadyScreen } from '@/shell/ReadyScreen';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
 
-/** AI 新做的快捷操作（D-125）。被撤销后打开时说明它已经不在了。 */
+/** AI-created quick action (D-125). Displays a notice when opened after being undone, stating it no longer exists. */
 export default function ReadyRoute() {
   const { workflowId, notes } = useLocalSearchParams<{ workflowId: string; notes?: string }>();
   const { locale } = useWorkspaceContext();

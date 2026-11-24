@@ -4,7 +4,7 @@ import { defineField, fieldBase, isText, type FieldDefinitionOf } from './define
 
 const schema = z.strictObject({ ...fieldBase, type: z.literal('note') });
 
-/** 长文本（最多 5000 字，可以换行）。 */
+/** Long text (up to 5000 characters, supports line breaks). */
 export const noteField: FieldDefinitionOf<'note', typeof schema> = defineField({
   type: 'note',
   schema,

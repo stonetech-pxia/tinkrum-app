@@ -18,11 +18,16 @@ import { FieldsForm, suggestionFormValue } from './data';
 import type { Palette } from './theme';
 import { Pill } from './ui';
 
-// 新记录表单的字段（D-394、D-397）：记录页和快捷操作的「记一笔」用同一份。附件里的照片、PDF 由表单自己读，
-// 给每个空字段候选，点了才填；快捷操作的步骤里不用写识别文字。表关掉 readAttachments 时不读。
-// D-570：字段按表上的 form 分段画，有条件的段按表单里现在的值显示或藏起来（边填边变）；藏起来的段里的值不清空。
-// D-575：快捷操作交来用户说的一句话（heard）时，候选从这句话来；有把握的直接填进用户还没动过的字段，
-// 下面写「按你说的填的」；没把握的照旧是候选。存不存还是用户点「保存」。
+// Fields for new entry forms (D-394, D-397): entry pages and quick action "Log an expense" share
+// the same configuration. Photos and PDFs in attachments are read automatically by the form to
+// provide suggestions for each empty field, which are filled only when tapped; quick action steps
+// do not require recognizing text. Skipped when the form disables readAttachments. D-570: fields
+// are rendered in sections according to the form configuration, with conditional sections showing
+// or hiding based current form values (updating dynamically as the user types); values in hidden
+// sections are not cleared. D-575: when a quick action receives a spoken sentence from the user
+// (heard), suggestions are derived from it; high-confidence values are directly filled into fields
+// the user hasn't touched yet, accompanied by "Filled based on your input"; low-confidence items
+// remain as suggestions. Saving still requires the user to tap "Save".
 
 export function SuggestedFields({
   suggest: enabled,
@@ -38,7 +43,7 @@ export function SuggestedFields({
   onPages,
   heard,
 }: {
-  /** 只有新记录的表单给候选（编辑已有的记录不给）。 */
+  /** Suggestions are provided only for new entry forms (not when editing existing entries). */
   suggest: boolean;
   collection: Collection;
   values: Record<string, unknown>;
@@ -48,10 +53,10 @@ export function SuggestedFields({
   locale: Locale;
   testPrefix: string;
   related?: ComponentProps<typeof FieldsForm>['related'];
-  /** 新建表单页（D-444）：候选只用规则，字段一改就重新算，不能每次加载模型。 */
+  /** New entry form page (D-444): suggestions rely solely on rules and recalculate whenever a field changes, without reloading the model on each change. */
   engine?: PrefillEngine;
   onPages?: (pages: TextPage[]) => void;
-  /** 用户为这一笔说的话（D-575）。 */
+  /** Spoken text provided by the user for this entry (D-575). */
   heard?: string | undefined;
 }) {
   const packs = usePacks();
@@ -66,7 +71,7 @@ export function SuggestedFields({
     ...(onPages ? { onPages } : {}),
     heard,
   });
-  // 有把握、用户没动过（打字、点候选）的字段：直接填的值。填过的字段写一行提示，用户一改就不写了。
+  // Fields with high confidence that the user has not touched (via typing or tapping suggestions): directly filled with values. Fields that are auto-filled display a hint line, which disappears once the user modifies them.
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
   const sure: Record<string, unknown> = {};
   if (enabled && heard !== undefined) {

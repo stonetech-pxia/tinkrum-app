@@ -12,7 +12,7 @@ const shape = {
   }),
 };
 
-/** 提示框：带底色的说明。 */
+/** Notice box: description with a background color. */
 export const noticeComponent: LookDefinitionOf<'notice', typeof shape> = defineLook({
   look: 'notice',
   shape,

@@ -7,22 +7,24 @@ import {
 
 import type { PromptRoute } from './prompt';
 
-// 提示词按需加载的本机路由：只看用户这句话、从哪里打开的 AI、之前说过的话和当前配置里的名字，
-// 挑出要发给模型的提示词部分（prompt.ts 的 ROUTE_PARTS）。只用字符串和简单正则（Hermes 只有一部分
-// Intl，这里一个也不用；也不用 Unicode 属性类和后行断言）；拿不准、几类混在一起就发完整的提示词。
-// 路由错了也不会做错事：省掉的部分在提示词末尾有目录，模型回 needMore 时规划器换成完整的再问，
-// 校验没过的修正也用完整的提示词。
+// Local routing for prompt on-demand loading: examines user input, AI entry point, dialogue
+// history, and current configuration names to select prompt sections to send to the model
+// (ROUTE_PARTS in prompt.ts). Uses only strings and simple regex (Hermes supports only a subset of
+// Intl, none used here; no Unicode property classes or lookbehind assertions); falls back to full
+// prompt if unsure or if categories mix. Incorrect routes do not cause errors: omitted sections
+// have a catalog at the end of the prompt, and when the model returns `needMore`, the planner
+// switches to full prompt and re-queries; validation failure corrections also use the full prompt.
 
-/** 一类请求。look 是页面和外观（包含 records 的全部部分），files 是快捷操作和文件，style 是主题。 */
+/** Request category. look covers pages and appearance (including all record sections), files covers quick actions and files, style covers themes. */
 export type RouteCategory = 'files' | 'records' | 'look' | 'style';
 
-/** 拉丁字母的词：前后不能紧挨着字母（含法语重音字母），词尾可以带 s / es。 */
+/** Latin words: cannot be immediately adjacent to letters (including French accented letters), can have s / es at the end. */
 function words(list: readonly string[]): RegExp {
   const body = list.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
   return new RegExp(`(^|[^a-z\\u00c0-\\u024f])(${body})(e?s)?(?![a-z\\u00c0-\\u024f])`, 'i');
 }
 
-/** 中文和符号：直接找子串。 */
+/** Chinese characters and symbols: match substrings directly. */
 function anyOf(list: readonly string[]): (text: string) => boolean {
   return (text) => list.some((w) => text.includes(w));
 }
@@ -117,7 +119,7 @@ const SIGNALS: Record<RouteCategory, Signals> = {
       'tool',
       'home screen',
       'step',
-      // 法语
+      // French
       'vidéo',
       'enregistrement',
       'compresser',
@@ -286,7 +288,7 @@ const SIGNALS: Record<RouteCategory, Signals> = {
       'progress',
       'timer',
       'done',
-      // 法语
+      // French
       'tableau',
       'champ',
       'entrée',
@@ -409,7 +411,7 @@ const SIGNALS: Record<RouteCategory, Signals> = {
       'library',
       'settings',
       'history',
-      // 法语
+      // French
       'accueil',
       'carte',
       'bouton',
@@ -495,7 +497,7 @@ const SIGNALS: Record<RouteCategory, Signals> = {
       'terracotta',
       'navy',
       'look',
-      // 法语
+      // French
       'couleur',
       'thème',
       'sombre',
@@ -554,7 +556,7 @@ const SIGNALS: Record<RouteCategory, Signals> = {
   },
 };
 
-/** 这句话里出现了哪几类的词，加上配置里的名字（快捷操作名 → files，表名和字段名 → records，页面标题 → look）。 */
+/** Categories appearing in the input sentence, plus configuration names (quick action name → files, table and field names → records, page title → look). */
 export function routeCategories(input: string, config?: WorkspaceConfig): Set<RouteCategory> {
   const text = input.toLowerCase();
   const found = new Set<RouteCategory>();
@@ -572,7 +574,7 @@ export function routeCategories(input: string, config?: WorkspaceConfig): Set<Ro
   return found;
 }
 
-/** 几类合起来用哪种路由：files 和其他任何一类混在一起、或一类都没有，就是 full。 */
+/** Route choice for combined categories: mixing files with any other category, or having no categories, results in full. */
 function routeOf(found: ReadonlySet<RouteCategory>): PromptRoute {
   if (found.size === 0) return 'full';
   if (found.has('files')) return found.size === 1 ? 'files' : 'full';
@@ -580,7 +582,7 @@ function routeOf(found: ReadonlySet<RouteCategory>): PromptRoute {
   return found.has('records') ? 'records' : 'style';
 }
 
-/** 路由 a 的部分是不是包含路由 b 的（look ⊇ records、look ⊇ style，full 包含一切）。 */
+/** Whether route a covers route b (look ⊇ records, look ⊇ style, full covers everything). */
 export function routeCovers(a: PromptRoute, b: PromptRoute): boolean {
   if (a === b || a === 'full') return true;
   return a === 'look' && (b === 'records' || b === 'style');
@@ -593,7 +595,7 @@ export interface RouteInput {
   earlier?: readonly PlanEarlier[] | undefined;
 }
 
-/** 从哪里打开的 AI 算哪一类：页面和文件桌面是 look，表是 records；工具页没有固定的一类，只看这句话。 */
+/** Determine category from AI entry point: pages and file desk are look, tables are records; tool pages have no fixed category, determined by input text alone. */
 function aboutCategory(about: PlanAbout): RouteCategory | null {
   if (about.kind === 'page' || about.kind === 'desk') return 'look';
   if (about.kind === 'table') return 'records';
@@ -602,9 +604,10 @@ function aboutCategory(about: PlanAbout): RouteCategory | null {
 }
 
 /**
- * 挑提示词路由。从快捷操作或分享的文件打开 AI 时是 files（这句话又说到别的就 full）；
- * 草稿里的后续一句沿用第一句的路由：这句话自己拿不准（「再大一点」）就照第一句，
- * 能被第一句的路由盖住也照第一句，否则 full。
+ * Select prompt route. Quick actions or shared file AI entry points default to files (unless
+ * input mentions other things, resulting in full); follow-up messages in drafts inherit the first
+ * message's route: ambiguous follow-ups ("make it bigger") follow the first message, and inputs
+ * covered by the first message's route also follow it, otherwise full.
  */
 export function routeRequest({ input, config, about, earlier }: RouteInput): PromptRoute {
   const found = routeCategories(input, config);

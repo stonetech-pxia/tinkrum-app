@@ -45,18 +45,19 @@ import {
 } from './helpers';
 import { resolveOcrLanguage } from '../ocr-language';
 
-// 文字识别（T5）：系统能识别这种语言时用系统的（iOS 的 Vision，D-085；Android 的 ML Kit，D-087）；
-// 否则每张图片送进文字识别包页面（tesseract.js）。
-// 结果只留在本机（D-036）。
+// OCR (T5): Use system OCR when the system supports the language (iOS Vision, D-085; Android ML
+// Kit, D-087); otherwise, send each image to the OCR pack page (tesseract.js). Results stay
+// on-device only (D-036).
 
 type Impl = ActionImpl<RunServices>;
 
-/** 送进识别的图片长边：再大识别率不会更好，只会更慢。 */
+/** Long side of the image sent for OCR: larger sizes do not improve recognition rate, only slow it down. */
 const OCR_INPUT_SIDE = 3500;
 
 /**
- * 识别语言 → Vision 的语言代码（BCP 47）。第一种是用户选的语言；
- * 中日韩等文字里常夹着英文（品牌、网址、型号），补上英文。
+ * Recognition language -> Vision language code (BCP 47). The first is the user's selected
+ * language; add English when CJK or other scripts often contain English (brands, URLs, model
+ * numbers).
  */
 export const VISION_LANGUAGES: Record<OcrLanguage, readonly string[]> = {
   eng: ['en-US'],
@@ -73,13 +74,13 @@ export const VISION_LANGUAGES: Record<OcrLanguage, readonly string[]> = {
   vie: ['vi', 'en-US'],
 };
 
-/** 识别结果按语言整理（D-268）：简体中文把混进来的繁体字换回简体，中文用全角标点。 */
+/** Format OCR results by language (D-268): Convert incorrectly introduced traditional Chinese characters back to simplified Chinese in simplified Chinese, and use full-width punctuation for Chinese. */
 function polish(text: string, lang: OcrLanguage): string {
   const kind = lang === 'chi_sim' ? 'zh-Hans' : lang === 'chi_tra' ? 'zh-Hant' : 'other';
   return polishOcrText(tidyOcrText(text), kind);
 }
 
-/** 识别框按比例换到另一张图的大小上（字的位置是这一行里的比例，不用换）。 */
+/** Scale bounding boxes proportionally to the size of another image (character positions are relative proportions within the line, so no conversion is needed). */
 function scaleLines(
   lines: readonly RecognizedLine[],
   from: { width: number; height: number },
@@ -97,8 +98,10 @@ function scaleLines(
 }
 
 /**
- * 转 Excel 一页的识别结果，坐标是找线那张图（pixels）的：有增强前的图时在它上面认（D-267，更准），
- * 框换算到增强后的图上；读不了或宽高比对不上时在这张图上认，直接用找线时解码的像素。
+ * Convert OCR results for a page to Excel. Coordinates belong to the line-detection image
+ * (pixels): when an unenhanced image is available, perform recognition on it (D-267, more
+ * accurate) and map boxes to the enhanced image; when unreadable or aspect ratio mismatches,
+ * recognize on this image directly using pixels decoded during line detection.
  */
 async function tableLines(
   vision: VisionPlatform,
@@ -117,7 +120,7 @@ async function tableLines(
         return { lines: scaleLines(lines, canvas, pixels), enhanced: true };
       }
     } catch {
-      // 用这张图认。
+      // Recognize using this image.
     }
   }
   const layer = await vision.recognizeLines(item.uri, languages, pixels);
@@ -125,9 +128,11 @@ async function tableLines(
 }
 
 /**
- * 图片区域从原图剪下来（转 Word、转 Excel 共用，D-328、D-520）：框按比例换到原图上，剪成 JPG（本次运行的文件），
- * 路径记进图片块的 src，字节放进 images。剪不出来的图片不写进文件（块留着，编辑页能看到原图里的位置）。
- * page 是框所在的那张图（找线那张）的大小。
+ * Crop image regions from the original image (shared between Word and Excel conversion, D-328,
+ * D-520): map boxes proportionally to the original, crop to JPG (file for the current run),
+ * record path in the image block's src, put bytes in images. Uncropable images are not written to
+ * files (blocks remain, and their position in the original image can be seen in the editor). page
+ * is the size of the box's source image (line-detection image).
  */
 async function cropPictures(
   services: RunServices,
@@ -170,15 +175,15 @@ async function cropPictures(
         height: out.height,
       });
     } catch {
-      // 剪不出来的图片不写进文件。
+      // Uncropable images are not written to files.
     }
   }
 }
 
-/** 机器起的名字：UUID 或一长串十六进制。 */
+/** Machine-generated name: UUID or a long hex string. */
 const MACHINE_NAME = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{16}/i;
 
-/** a 有多大一部分落在 b 里。 */
+/** Fraction of a's area that falls within b. */
 function shareIn(a: Box, b: Box): number {
   const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
   const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
@@ -186,16 +191,17 @@ function shareIn(a: Box, b: Box): number {
 }
 
 export const OCR_IMPLS: Record<string, Impl> = {
-  // 扫描件转 Excel（D-272）：每张图找表格线、认字、组表，做成一个 xlsx（每页一张工作表），
-  // 旁边存一份 TableDoc 给结果页的「放到桌上」和文件房间的编辑用（D-366）。识别出的文字只在本机。
+  // Scanned document to Excel (D-272): Find table lines, recognize text, and build tables for each
+  // image, producing an xlsx file (one worksheet per page), alongside a TableDoc stored for the
+  // result page's "Put on desk" and file room editing (D-366). Recognized text stays on-device.
   async 'ocr.toExcel'(input, params, ctx) {
     const items = fileItems(input);
-    // 「自动」按手机语言选（D-278）。
+    // "Auto" chooses based on phone language (D-278).
     const lang = resolveOcrLanguage(params.lang, ctx.locale);
     const scope = params.scope === 'tables' ? 'tables' : 'all';
     const languages = VISION_LANGUAGES[lang];
     const vision = ctx.services.files.vision;
-    // 要每一行的位置：文字识别包（tesseract）只给文字，不能用。
+    // Requires line positions: tesseract only provides text and cannot be used.
     if (!vision?.tablePixels || !vision.supportsLanguage(languages[0]!)) {
       throw new RunError('tableUnsupported');
     }
@@ -216,7 +222,7 @@ export const OCR_IMPLS: Record<string, Impl> = {
         throw new RunError('unexpected', { detail: String(e instanceof Error ? e.message : e) });
       }
       ctx.throwIfCancelled();
-      // 版面分析（D-520）：图片区域剪成图片，表单、文字区域的网格不当表格。出错时不让整个运行失败：照旧只认表格和文字。
+      // Layout analysis (D-520): Image regions are cropped into pictures; forms and text region grids are not treated as tables. Errors do not cause the entire run to fail: continue recognizing tables and text as usual.
       let regions: LayoutRegion[] | null = null;
       try {
         regions = (await vision.detectLayout?.(pixels)) ?? null;
@@ -231,7 +237,7 @@ export const OCR_IMPLS: Record<string, Impl> = {
           ...(regions ? { regions } : {}),
           name: t(ctx.locale, 'tableSheetName', { n: i + 1 }),
           source: item.uri,
-          // 增强过的图已经按 findSkew 转正；没增强过的照片在这里估倾斜。
+          // Enhanced images have already been straightened via findSkew; unenhanced photos estimate skew here.
           ...(found.enhanced ? { skew: 0 } : {}),
         },
         { joinLines: (lines) => polish(layoutOcrLines(lines), lang) },
@@ -251,8 +257,9 @@ export const OCR_IMPLS: Record<string, Impl> = {
       throw new RunError('notFound', { name: displayName(items[0]!) });
     }
     const doc: TableDoc = { version: 3, scope, pages };
-    // 一张照片、名字是人起的就用它；名字是一串编号（分享进来的照片常这样）或几页合成一个文件时
-    // 用「表格-日期」，和扫描的「扫描-日期」一样。
+    // Name: if it's a photo with a user-provided name, use it; if the name is a series of numbers
+    // (common for shared-in photos) or multiple pages merged into one file, use "Table-Date",
+    // matching scanned "Scan-Date".
     const name =
       items.length === 1 && !MACHINE_NAME.test(items[0]!.name)
         ? items[0]!.name
@@ -283,17 +290,19 @@ export const OCR_IMPLS: Record<string, Impl> = {
     };
   },
 
-  // 扫描件转 Word（D-328）：每张图认字、版面分析（模型没装时只按位置分段）、找带线的表格，
-  // 图片区域从原图剪下来，做成一个 docx（每张图一页），旁边存一份 DocDoc 给结果页的「放到桌上」和文件房间的编辑用（D-366）。
-  // 识别出的文字只在本机。
+  // Scanned document to Word (D-328): Recognize text for each image, perform layout analysis
+  // (segment by position only when models are not installed), find lined tables, crop image regions
+  // from the original image, and create a docx file (one page per image), alongside a DocDoc stored
+  // for the result page's "Put on desk" and file room editing (D-366). Recognized text stays
+  // on-device.
   async 'ocr.toWord'(input, params, ctx) {
     const items = fileItems(input);
-    // 「自动」按手机语言选（D-278）。
+    // "Auto" chooses based on phone language (D-278).
     const lang = resolveOcrLanguage(params.lang, ctx.locale);
     const languages = VISION_LANGUAGES[lang];
     const { files } = ctx.services;
     const vision = files.vision;
-    // 要每一行的位置：文字识别包（tesseract）只给文字，不能用。
+    // Requires line positions: tesseract only provides text and cannot be used.
     if (!vision?.tablePixels || !vision.supportsLanguage(languages[0]!)) {
       throw new RunError('wordUnsupported');
     }
@@ -314,7 +323,7 @@ export const OCR_IMPLS: Record<string, Impl> = {
         throw new RunError('unexpected', { detail: String(e instanceof Error ? e.message : e) });
       }
       ctx.throwIfCancelled();
-      // 版面分析出错时不让整个运行失败：只按位置分段。
+      // Layout analysis errors do not cause the entire run to fail: segment by position only.
       let regions: LayoutRegion[] | null = null;
       try {
         regions = (await vision.detectLayout?.(pixels)) ?? null;
@@ -330,7 +339,7 @@ export const OCR_IMPLS: Record<string, Impl> = {
         ...(item.pageSize?.for === item.uri
           ? { paper: { width: item.pageSize.width, height: item.pageSize.height } }
           : {}),
-        // 增强过的图已经按 findSkew 转正；没增强过的照片在这里估倾斜。
+        // Enhanced images have already been straightened via findSkew; unenhanced photos estimate skew here.
         ...(found.enhanced ? { skew: 0 } : {}),
       };
       const buildOptions: Parameters<typeof buildDocPage>[1] = {
@@ -338,12 +347,12 @@ export const OCR_IMPLS: Record<string, Impl> = {
         joinParagraph: (lines) => polish(joinOcrParagraph(lines), lang),
       };
       let page = buildDocPage(pageInput, buildOptions);
-      // PDF 的原始绘图只读本次明确授权的源文件；改过图片后 for 不匹配，照旧走扫描路径。
+      // PDF source drawing reads only source files explicitly authorized for this run; if images are modified, forces don't match, falling back to the scan path.
       const pdf = item.pdfSource;
       const runtime = ctx.services.packs?.runtime;
       if (pdf?.for === item.uri && runtime && canUseNativeGraphics(page)) {
         try {
-          // 原生绘图按 PDF 自己的点坐标；Word 的纸可能已经缩过（比 A3 大的页，fitPaper）。
+          // Native drawing uses PDF's own point coordinates; Word pages may already be scaled (pages larger than A3, fitPaper).
           const paper = pageInput.paper ?? page.paper!;
           const toPoints = (box: Box) => ({
             x: (box.x / page.width) * paper.width,
@@ -414,7 +423,7 @@ export const OCR_IMPLS: Record<string, Impl> = {
             page = buildDocPage(
               {
                 ...pageInput,
-                // 水印（EU 样本 071 的「MUSTER」）不是图：版面模型在那里找到的图片区域不要，水印笔画认出来的字也不是正文。
+                // Watermarks ("MUSTER" in EU sample 071) are not graphics: ignore image regions found there by the layout model, and text recognized from watermark strokes is not body text.
                 lines: found.lines.filter((_, k) => !native.watermarkInk?.includes(k)),
                 ...(regions
                   ? {
@@ -427,7 +436,7 @@ export const OCR_IMPLS: Record<string, Impl> = {
                   : {}),
                 prior: page,
                 nativeFigures: native.owned.map(toPixels),
-                // 没画进剪图的原生字（colors 只列这些）：图里和它重叠的识别行留作正文。
+                // Native text not rendered into crops (colors lists only these): overlapping recognized lines in the image are kept as body text.
                 nativeText: native.colors.map((c) => toPixels(c.box)),
               },
               buildOptions,
@@ -435,11 +444,11 @@ export const OCR_IMPLS: Record<string, Impl> = {
             page = applyNativeGraphics(page, native, sources, background);
           }
         } catch {
-          // 不支持的字体裁剪、扫描页或绘图失败都保留原来的可编辑 OCR 结果。
+          // Unsupported font cropping, scanned pages, or drawing failures preserve the original editable OCR results.
           ctx.throwIfCancelled();
         }
       }
-      // 图片区域：按比例换到原图上剪下来（JPG，本次运行的文件）。并排行（D-331）里的图片也要剪。
+      // Image regions: map proportionally to the original and crop (JPG, file for the current run). Images in side-by-side rows (D-331) must also be cropped.
       await cropPictures(
         ctx.services,
         item,
@@ -455,7 +464,7 @@ export const OCR_IMPLS: Record<string, Impl> = {
       throw new RunError('notFound', { name: displayName(items[0]!) });
     }
     const doc: DocDoc = { version: 5, pages };
-    // 文件名和转 Excel 一样（D-298）：一张照片、名字是人起的就用它，否则「文档-日期」。
+    // File names are the same as Excel conversion (D-298): Use user-provided name for a photo if available, otherwise "Document-Date".
     const name =
       items.length === 1 && !MACHINE_NAME.test(items[0]!.name)
         ? items[0]!.name
@@ -475,18 +484,19 @@ export const OCR_IMPLS: Record<string, Impl> = {
 
   async 'ocr.recognize'(input, params, ctx) {
     const items = fileItems(input);
-    // 「自动」按手机语言选（D-278）。
+    // "Auto" chooses based on phone language (D-278).
     const lang = resolveOcrLanguage(params.lang, ctx.locale);
     const { packs } = ctx.services;
-    // 系统识别不了的语言（Android 的 ML Kit 不认俄文）退回文字识别包。
+    // Languages unsupported by system recognition (e.g., Russian on Android ML Kit) fall back to the OCR pack.
     const native = ctx.services.files.vision;
     const vision = native?.supportsLanguage(VISION_LANGUAGES[lang][0]!) ? native : null;
     if (!vision && !packs) throw new RunError('packFailed', { detail: 'ocr' });
     const texts: string[] = [];
     for (const [i, original] of items.entries()) {
       ctx.throwIfCancelled();
-      // 系统识别用增强前的图（D-267：增强对它没有帮助，黑白还会抹掉淡字）；读不了时用这张。
-      // 文字识别包（Tesseract）反而在增强后的图上认得更准，照旧。
+      // System recognition uses the unenhanced image (D-267: enhancement offers no help, and
+      // black-and-white erases faint text); use this image when unreadable. Tesseract recognizes
+      // more accurately on enhanced images as before.
       const source = vision ? ocrSourceOf(original) : null;
       if (source) {
         try {
@@ -500,7 +510,7 @@ export const OCR_IMPLS: Record<string, Impl> = {
           ctx.progress(i + 1, items.length);
           continue;
         } catch {
-          // 退回用增强后的图。
+          // Fall back to using the enhanced image.
         }
       }
       const item = await imageForPage(ctx.services, original, OCR_INPUT_SIDE);
@@ -525,7 +535,7 @@ export const OCR_IMPLS: Record<string, Impl> = {
       ctx.progress(i + 1, items.length);
     }
     if (texts.length === 0) throw new RunError('notFound', { name: displayName(items[0]!) });
-    // 文字只留在本机：结果页可以复制，后面的步骤可以存成文件或生成 PDF，绝不发给 AI。
+    // Text stays on-device only: results can be copied on the result page, subsequent steps can save as files or generate PDFs, and it is never sent to the AI.
     return { type: 'text', text: texts.join('\n\n'), name: items[0]!.name };
   },
 };

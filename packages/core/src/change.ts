@@ -10,26 +10,30 @@ import { addMissingPageEntries } from './page-entries';
 import { referenceProblems } from './reference-checks';
 import { issueLines } from './zod-issues';
 
-// ChangeRequest → Plan → Validate → Preview（§5.3）中与平台无关的部分。
-// 无论修改来自 mock AI、真实模型还是界面按钮，都走这里。
+// Platform-agnostic portion of ChangeRequest -> Plan -> Validate -> Preview (§5.3). Handled
+// uniformly whether the modification originates from the mock AI, the real model, or UI buttons.
 
 export interface ChangeContext {
   registry: Registry;
   locale: Locale;
   now: Date;
   /**
-   * 修改来自 AI（底线 3）：不能多出指向用户文件的引用（文件位、图片、图片背景只能由用户自己选）。
-   * 用户在界面上的修改不带这一项。
+   * Modification originates from the AI (invariant 3): prohibits introducing new references to
+   * user files (file slots, images, and image backgrounds can only be chosen directly by the
+   * user). User-initiated modifications from the UI omit this flag.
    */
   fromAI?: boolean;
   /**
-   * 在某个 app 里改（D-485）：只能改这个 app 自己的页面、表、快捷操作、底栏和风格，超出的整个拒绝。
-   * 从主页改不带这一项（整个工作区）。
+   * Scoped modification within a specific app (D-485): restricted to modifying only that app's
+   * own pages, tables, quick actions, tab bar, and styles; any out-of-scope changes are
+   * completely rejected. Modifications originating from the home screen omit this scope (applying
+   * to the entire workspace).
    */
   scope?: { appId: string };
   /**
-   * 操作来自一个 App 文件（导入、恢复初始样子，D-554）：不受一次修改 30 步的限制，配置本身的上限照管。
-   * 和 fromAI 一起出现时不算（AI 的计划永远最多 30 步）。
+   * Operation originates from an app file (import, factory reset, D-554): exempt from the 30-step
+   * modification limit, governed instead by configuration-level caps. Ignored when combined with
+   * fromAI (AI plans are always capped at a maximum of 30 steps).
    */
   fromAppFile?: boolean;
 }
@@ -38,7 +42,7 @@ export type PreparedChange =
   | { ok: true; after: WorkspaceConfig; lines: string[] }
   | { ok: false; stage: 'parse' | 'apply' | 'validate' | 'migrate'; issues: string[] };
 
-/** 校验来自任意来源（包括不可信模型输出）的操作列表，并生成预览所需的结果。 */
+/** Validates a list of operations from any source (including untrusted model outputs) and generates the results required for previewing. */
 export function prepareOps(
   before: WorkspaceConfig,
   rawOps: unknown,
@@ -51,11 +55,11 @@ export function prepareOps(
   }
   const applied = applyOps(before, parsed.data, ctx);
   if (!applied.ok) return { ok: false, stage: 'apply', issues: [applied.error] };
-  // AI 看到的文件 ID 是占位符；原样写回来的换回原来的文件。
+  // File IDs seen by the AI are placeholders; they are mapped back to the original files when written back.
   const config = restoreFileRefs(before, applied.config);
-  // 在 app 里新加的页面、表、快捷操作没写 app 的，归到这个 app（模型常忘了写）。
+  // Newly added pages, tables, and quick actions within an app that lack an explicit app ID are assigned to the current app (as models frequently omit them).
   if (ctx.scope) tagNewForApp(before, config, ctx.scope.appId);
-  // 修改里新加的页面没有任何地方能打开时，在首页补一个入口（AI 常忘了加）。
+  // When a newly added page in a modification has no entry point to open it, a fallback entry is added to the home screen (since the AI frequently forgets to add one).
   const notes = [
     ...applied.notes,
     ...addMissingPageEntries(before, config).map((page) => ({
@@ -75,7 +79,7 @@ export function prepareOps(
         ),
       };
   }
-  // 修改前就有的、这个版本不认识的组件（D-254）原样留着；修改不能新加或改动它们。
+  // Pre-existing components from older versions that are unrecognized by the current version (D-254) are preserved as-is; modifications cannot add or alter them.
   const valid = validateWorkspace(config, ctx.registry, { unknownComponents: before });
   if (!valid.ok)
     return { ok: false, stage: 'validate', issues: valid.issues.map((i) => i.message) };
@@ -83,7 +87,7 @@ export function prepareOps(
     const out = scopeProblems(before, valid.config, ctx.scope.appId, ctx.registry);
     if (out.length > 0) return { ok: false, stage: 'validate', issues: out };
   }
-  // 校验器不查的引用（底线 18）：修改不能多出新的；修改前就有的不拦（底线 12，旧配置照常能改）。
+  // References not checked by the validator (invariant 18): modifications cannot introduce new broken references, but pre-existing ones are permitted (invariant 12, allowing older configurations to be modified normally).
   const old = new Set(referenceProblems(before, ctx.registry));
   const added = referenceProblems(valid.config, ctx.registry).filter((p) => !old.has(p));
   if (added.length > 0) return { ok: false, stage: 'validate', issues: added };
@@ -94,11 +98,11 @@ export function prepareOps(
   };
 }
 
-/** 把历史快照（可能是旧 schemaVersion）迁移并校验为当前可用的配置（§7E）。 */
+/** Migrates and validates historical snapshots (potentially from older schema versions) into a current usable configuration (§7E). */
 export function prepareSnapshot(raw: unknown, registry: Registry): PreparedChange {
   const migrated = migrateWorkspace(raw);
   if (!migrated.ok) return { ok: false, stage: 'migrate', issues: [migrated.error] };
-  // 更新的 App 加的组件（D-254）原样保留，保存时写回去。
+  // Components added by updated apps (D-254) are preserved as-is and written back upon saving.
   const valid = validateWorkspace(migrated.config, registry, { unknownComponents: 'keep' });
   if (!valid.ok)
     return { ok: false, stage: 'validate', issues: valid.issues.map((i) => i.message) };

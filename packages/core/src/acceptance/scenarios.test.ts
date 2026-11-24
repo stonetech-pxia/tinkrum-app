@@ -38,8 +38,11 @@ import {
 } from './fixtures';
 import { SCENARIOS, nextAsk, scoreScenario, type Scenario } from './index';
 
-// 三件事：正例（配置走校验器，合格），多种实现（同一需求别的建法也算过），反例（缺这项就不过，证明它真在查）。
-// 每个场景第一种建法是完整的（可选项也过），后面的只要合格。
+// Three things: positive examples (config runs through validator, qualified), multiple
+// implementations (other ways of building the same requirement also count as passing),
+// counterexamples (missing this item fails, proving it is actually checked). The first build method
+// for each scenario is complete (optional items also pass), subsequent ones only need to be
+// qualified.
 
 const app = (...ops: object[]) => buildConfig([...ops, navTo('app')]);
 
@@ -63,7 +66,7 @@ const fromSample = (sample: Parameters<typeof sampleOps>[0], locale: Locale = 'e
   return prepared.after;
 };
 
-// ---- 打卡 ----
+// ---- Check-in ----
 
 const simpleButton = () =>
   app(
@@ -191,7 +194,7 @@ const weeklyRing = () =>
     ]),
   );
 
-// ---- 日历 ----
+// ---- Calendar ----
 
 const moodForm = () =>
   app(
@@ -252,7 +255,7 @@ const medsButton = () =>
     addTool(reminder('morning', { every: 'day', at: '08:00' }, 'page:app')),
   );
 
-// ---- 待办 ----
+// ---- Todo ----
 
 const todoChecklist = () =>
   app(
@@ -290,7 +293,7 @@ const todoStatus = () =>
     ]),
   );
 
-/** 真实结果：完成表，列表上的按钮新建一条完成记录，一次性任务完成后从 due 列表消失。 */
+/** Actual results: completion table, buttons on the list create a new completion record, one-off tasks disappear from the due list after completion. */
 const todoCompletions = (extra: { done?: object; source?: object } = {}) =>
   app(
     addTable('tasks', [
@@ -433,7 +436,7 @@ const boardLink = () =>
     ]),
   );
 
-// ---- 记账 ----
+// ---- Expense Tracking ----
 
 const ledgerChoice = () =>
   app(
@@ -518,7 +521,7 @@ const budgetGoal = () =>
     ]),
   );
 
-/** 真实结果：目标是独立的一张表，和支出用同一套单选分类，有添加入口。 */
+/** Actual results: budgets are an independent table, using the same choice categories as expenses, with an add entry point. */
 const budgetTable = (budgets = ['food', 'rent']) =>
   app(
     addTable('expenses', [money(), choice('category', ['food', 'rent']), date()]),
@@ -534,7 +537,7 @@ const budgetTable = (budgets = ['food', 'rent']) =>
     ]),
   );
 
-/** 零基预算（真实结果 S2-06）：目标来自另一张分配表。 */
+/** Zero-based budgeting (actual result S2-06): targets come from another allocation table. */
 const budgetAllocations = () =>
   app(
     addTable('categories', [text('name', { required: true })]),
@@ -572,7 +575,7 @@ const budgetAllocations = () =>
     ]),
   );
 
-// ---- 文件进记录 ----
+// ---- Files to Records ----
 
 const receiptTable = () =>
   addTable('claims', [
@@ -627,12 +630,12 @@ const contractScan = () =>
     ),
   );
 
-// ---- 表：每个场景的建法和反例 ----
+// ---- Table: Build methods and counterexamples for each scenario ----
 
 interface Plan {
-  /** 第一种是完整的（可选项也过）。 */
+  /** The first one is complete (optional items also pass). */
   builds: Record<string, () => WorkspaceConfig>;
-  /** 要求 → 在第一种建法上去掉这一项。 */
+  /** Requirement -> Remove this item from the first build method. */
   without: Record<string, (c: Json) => void>;
 }
 
@@ -783,8 +786,8 @@ const score = (s: Scenario, config: WorkspaceConfig) => scoreScenario(s, config,
 const passOf = (s: Scenario, config: WorkspaceConfig, id: string) =>
   score(s, config).requirements.find((r) => r.id === id)!.pass;
 
-describe('场景表', () => {
-  it('12 个以内，五类都有，语言轮换', () => {
+describe('Scenario table', () => {
+  it('Under 12, all five categories, alternating languages', () => {
     expect(SCENARIOS.length).toBeLessThanOrEqual(12);
     expect(new Set(SCENARIOS.map((s) => s.id)).size).toBe(SCENARIOS.length);
     expect(new Set(SCENARIOS.map((s) => s.category))).toEqual(
@@ -793,7 +796,7 @@ describe('场景表', () => {
     expect(new Set(SCENARIOS.map((s) => s.locale))).toEqual(new Set(['zh', 'en', 'fr']));
   });
 
-  it('每项要求有三种语言的一句话，每个场景有 core 项', () => {
+  it('Each requirement has a single-sentence description in three languages, each scenario has core items', () => {
     for (const s of SCENARIOS) {
       expect(s.requirements.some((r) => r.core)).toBe(true);
       for (const r of s.requirements)
@@ -802,7 +805,7 @@ describe('场景表', () => {
     }
   });
 
-  it('每个场景都有至少 2 种建法，每项要求都有反例', () => {
+  it('Each scenario has at least 2 build methods, every requirement has a counterexample', () => {
     for (const s of SCENARIOS) {
       const plan = PLANS[s.id]!;
       expect(Object.keys(plan.builds).length, s.id).toBeGreaterThanOrEqual(2);
@@ -817,20 +820,20 @@ describe.each(SCENARIOS.map((s) => [s.id, s] as const))('%s', (_id, s) => {
   const plan = PLANS[s.id]!;
   const [first] = Object.values(plan.builds) as [() => WorkspaceConfig];
 
-  it('第一种建法：全部要求都过（可选项也过），没有 blocker', () => {
+  it('First build method: all requirements pass (optional items also pass), no blockers', () => {
     const r = score(s, first());
     expect(r.requirements.filter((x) => !x.pass).map((x) => x.id)).toEqual([]);
     expect(r.qualified).toBe(true);
     expect(r.blockers).toEqual([]);
   });
 
-  it.each(Object.entries(plan.builds).slice(1))('别的建法也合格：%s', (_name, build) => {
+  it.each(Object.entries(plan.builds).slice(1))('Alternative construction methods are also valid: %s', (_name, build) => {
     const r = score(s, build());
     expect(r.missingCore).toEqual([]);
     expect(r.qualified).toBe(true);
   });
 
-  it.each(s.requirements.map((r) => [r.id, r] as const))('缺 %s 就不过', (id, r) => {
+  it.each(s.requirements.map((r) => [r.id, r] as const))('Fails if %s is missing', (id, r) => {
     const config = first();
     const broken = changed(config, plan.without[id]!);
     expect(passOf(s, config, id)).toBe(true);
@@ -838,41 +841,41 @@ describe.each(SCENARIOS.map((s) => [s.id, s] as const))('%s', (_id, s) => {
     if (r.core) expect(score(s, broken).qualified).toBe(false);
   });
 
-  it('新配置什么都不算过', () => {
+  it('New config passes nothing', () => {
     const r = score(s, createDefaultWorkspace(s.locale));
     expect(r.passed).toBe(0);
     expect(r.qualified).toBe(false);
   });
 });
 
-describe('todo-simple：用完成表标做完', () => {
+describe('todo-simple: use completion table to mark as done', () => {
   const s = SCENARIOS.find((x) => x.id === 'todo-simple')!;
 
-  it('行按钮新建完成记录：能标做完；一次性任务完成后从 due 列表消失，也算藏起来', () => {
+  it('Row buttons create completion records: can mark as done; one-off tasks disappear from due list after completion, also considered hidden', () => {
     const config = todoCompletions();
     expect(passOf(s, config, 'check-off')).toBe(true);
     expect(passOf(s, config, 'hide-done')).toBe(true);
   });
 
-  it('列表不跟着完成记录变：能标做完，但没有藏起来', () => {
+  it('List does not follow completion records: can mark as done, but not hidden', () => {
     const config = todoCompletions({ source: {} });
     expect(passOf(s, config, 'check-off')).toBe(true);
     expect(passOf(s, config, 'hide-done')).toBe(false);
   });
 
-  it('按钮要用户选是哪一条（没有指回这一条）：不算', () => {
+  it('Button requires user to select which row (does not point back to this row): does not count', () => {
     const config = changed(todoCompletions(), (c) => {
       blockIn(c, 'list').tools[0].values = {};
     });
     expect(passOf(s, config, 'check-off')).toBe(false);
   });
 
-  it('按钮要填东西（写评论也是这样连回来的）：不算', () => {
+  it('Button requires filling in things ("Write a comment" connects back this way too): does not count', () => {
     const done = { values: { task: '$row' }, ask: 'all' };
     expect(passOf(s, todoCompletions({ done }), 'check-off')).toBe(false);
   });
 
-  it('只有通知上的「完成」，列表上标不了：不算', () => {
+  it('Only "Complete" on notifications, list cannot be marked: does not count', () => {
     const config = changed(todoCompletions(), (c) => {
       delete blockIn(c, 'list').tools;
       c.tools.push(
@@ -884,7 +887,7 @@ describe('todo-simple：用完成表标做完', () => {
     expect(passOf(s, config, 'check-off')).toBe(false);
   });
 
-  it('按钮写的是这张表以外、没有连回来的表：不算', () => {
+  it('Button writes to a table other than this one without pointing back: does not count', () => {
     const config = changed(todoCompletions(), (c) => {
       const t = tableIn(c, 'completions');
       t.fields = t.fields.map((f: Json) => (f.id === 'task' ? { ...text('task') } : f));
@@ -893,14 +896,14 @@ describe('todo-simple：用完成表标做完', () => {
   });
 });
 
-describe('money-budget：独立的目标表', () => {
+describe('money-budget: independent target table', () => {
   const s = SCENARIOS.find((x) => x.id === 'money-budget')!;
 
-  it('一张表每条选分类、填金额，有添加入口：算有目标', () => {
+  it('Selecting category and entering amount per row in a table, with an add entry point: considered to have targets', () => {
     expect(passOf(s, budgetTable(), 'targets')).toBe(true);
   });
 
-  it('没有目标时不过：只有支出表，什么目标都没有', () => {
+  it('Fails when no targets: only expense table, no targets at all', () => {
     const config = app(
       addTable('expenses', [money(), choice('category', ['food', 'rent']), date()]),
       addPage('app', [form('add', 'expenses', ['amount', 'category'])]),
@@ -908,34 +911,34 @@ describe('money-budget：独立的目标表', () => {
     expect(passOf(s, config, 'targets')).toBe(false);
   });
 
-  it('目标表加不进去（没有入口）：不算', () => {
+  it('Target table cannot be added (no entry point): does not count', () => {
     const config = changed(budgetTable(), (c) => dropBlock(c, 'add-budget'));
     expect(passOf(s, config, 'targets')).toBe(false);
   });
 
-  it('目标表不分类（只有一个总额）：不算', () => {
+  it('Target table unclassified (only a grand total): does not count', () => {
     const config = changed(budgetTable(), (c) => {
       blockIn(c, 'add-budget').tools[0].ask = ['budget'];
     });
     expect(passOf(s, config, 'targets')).toBe(false);
   });
 
-  it('金额填不了：不算', () => {
+  it('Amount cannot be entered: does not count', () => {
     const config = changed(budgetTable(), (c) => {
       blockIn(c, 'add-budget').tools[0].ask = ['category'];
     });
     expect(passOf(s, config, 'targets')).toBe(false);
   });
 
-  it('分类和支出不是同一套：不算', () => {
+  it('Categories and expenses are mismatched: does not count', () => {
     expect(passOf(s, budgetTable(['savings']), 'targets')).toBe(false);
   });
 });
 
-describe('接起来才算', () => {
+describe('Must be accepted to count', () => {
   const streaks = SCENARIOS.find((s) => s.id === 'habit-streaks')!;
 
-  it('连续天数读的不是圆块写的那张表：不算', () => {
+  it('Streak count does not read the table written by the circle block: does not count', () => {
     const config = changed(streaksNumber(), (c) => {
       tableIn(c, 'habits').fields.push({ id: 'd', name: 'd', type: 'date', default: 'today' });
       blockIn(c, 'streak').source = { table: 'habits', aggregate: 'streak' };
@@ -943,7 +946,7 @@ describe('接起来才算', () => {
     expect(passOf(streaks, config, 'streak')).toBe(false);
   });
 
-  it('打卡的日子写不进去：连续天数不算', () => {
+  it('Check-in days cannot be written: streak count does not count', () => {
     const config = changed(streaksNumber(), (c) => {
       delete fieldIn(c, 'checkins', 'date').default;
     });
@@ -951,24 +954,24 @@ describe('接起来才算', () => {
     expect(passOf(streaks, config, 'streak')).toBe(false);
   });
 
-  it('习惯加不进去：圆块上永远没有东西，打卡不算', () => {
+  it('Habit cannot be added: nothing is ever on the circle block, check-in does not count', () => {
     const config = changed(streaksRollup(), (c) => dropBlock(c, 'add-habit'));
     expect(passOf(streaks, config, 'circles')).toBe(false);
     expect(passOf(streaks, config, 'tap-checks-in')).toBe(false);
   });
 
-  it('提醒打开的页面看不到这张表：不算', () => {
+  it('Table cannot be seen from the page opened by the reminder: does not count', () => {
     const config = changed(streaksRollup(), (c) => (toolIn(c, 'nine').opens = 'page:home'));
     expect(passOf(streaks, config, 'reminder-time')).toBe(false);
   });
 
-  it('图表按日期算，日期写入口填不到：图表不算', () => {
+  it('Charts are calculated by date, but date cannot be filled from entry: chart does not count', () => {
     const s = SCENARIOS.find((x) => x.id === 'money-ledger')!;
     const config = changed(ledgerChoice(), (c) => delete fieldIn(c, 'expenses', 'date').default);
     expect(passOf(s, config, 'by-month')).toBe(false);
   });
 
-  it('藏起来的、进不去的不算', () => {
+  it('Hidden or inaccessible ones do not count', () => {
     const s = SCENARIOS.find((x) => x.id === 'todo-board')!;
     expect(
       score(
@@ -984,20 +987,20 @@ describe('接起来才算', () => {
     ).toBe(false);
   });
 
-  it('快捷操作只在设置里：文件进不来', () => {
+  it('Quick action is only in settings: file cannot enter', () => {
     const s = SCENARIOS.find((x) => x.id === 'file-receipt')!;
     const config = changed(receiptScan(), (c) => dropBlock(c, 'run-scan'));
     expect(passOf(s, config, 'capture')).toBe(false);
   });
 
-  it('不绑定表名、字段 ID：全换掉照样过', () => {
+  it('No table name or field ID binding: passes even if everything is replaced', () => {
     const rename = (json: string) =>
       json
         .replaceAll('habits', 'xiguan')
         .replaceAll('checkins', 'jilu')
         .replaceAll('"habit"', '"which"')
         .replaceAll('"streak"', '"lianxu"');
-    // 聚合的值是枚举，换回来。
+    // Aggregated value is an enum, switch back.
     const config = JSON.parse(
       rename(JSON.stringify(streaksRollup())).replaceAll(
         '"aggregate":"lianxu"',
@@ -1008,7 +1011,7 @@ describe('接起来才算', () => {
     expect(r.qualified).toBe(true);
   });
 
-  it('用户说的话按顺序：说过的先跳过', () => {
+  it('User statements in order: skip what was already said', () => {
     const s = SCENARIOS.find((x) => x.id === 'todo-todoist')!;
     const r = score(s, createDefaultWorkspace('zh'));
     const first = nextAsk(s, r, new Set())!;
@@ -1020,7 +1023,7 @@ describe('接起来才算', () => {
   });
 });
 
-describe('工具检查：统计依赖的字段（REPORT3 读书图表的例子）', () => {
+describe('Tool check: statistics dependent fields (REPORT3 reading chart example)', () => {
   const stat = (config: WorkspaceConfig) =>
     checkTools(config, registry).issues.filter((i) => i.code.startsWith('stat-'));
   const reading = (ask: string[], extra: object[] = []) =>
@@ -1052,7 +1055,7 @@ describe('工具检查：统计依赖的字段（REPORT3 读书图表的例子�
     group: { unit: 'month', by: 'finished' },
   });
 
-  it('按完成日期统计，写入口和编辑页都填不到：统计永远是空的，blocker', () => {
+  it('Statistics by completion date, but neither entry nor edit page can fill it: statistics are always empty, blocker', () => {
     const issues = stat(noEditor(reading(['title'], [byMonth])));
     expect(issues).toEqual([
       expect.objectContaining({
@@ -1064,7 +1067,7 @@ describe('工具检查：统计依赖的字段（REPORT3 读书图表的例子�
     expect(issues[0]!.message).toMatch(/books\.finished/);
   });
 
-  it('表单不问，但能打开一条再填：不是永远空，warning', () => {
+  it('Form does not prompt, but an existing entry can be opened and filled: not always empty, warning', () => {
     const issues = stat(reading(['title'], [byMonth]));
     expect(issues).toEqual([
       expect.objectContaining({ severity: 'warning', code: 'stat-input-only-in-editor' }),
@@ -1108,7 +1111,7 @@ describe('工具检查：统计依赖的字段（REPORT3 读书图表的例子�
         fieldIn(c, 'books', 'finished').default = 'today';
       }),
     ],
-  ])('%s：没有问题', (_name, config) => {
+  ])('%s: no issues', (_name, config) => {
     expect(stat(config)).toEqual([]);
   });
 
@@ -1122,13 +1125,13 @@ describe('工具检查：统计依赖的字段（REPORT3 读书图表的例子�
       }),
     ],
     ['连续天数的日子', number('n', 'books', { aggregate: 'streak', days: { date: 'finished' } })],
-  ])('%s填不到：blocker', (_name, block) => {
+  ])('%s cannot be filled: blocker', (_name, block) => {
     expect(stat(noEditor(reading(['title'], [block])))).toEqual([
       expect.objectContaining({ severity: 'blocker', code: 'stat-input-missing' }),
     ]);
   });
 
-  it('只影响分组（全在「未设置」）、空着也成立的筛选：不是空的', () => {
+  it('Filters that only affect grouping (all under "Unset") and hold even when empty: not empty', () => {
     const grouped = number('n', 'books', { aggregate: 'count', group: { by: 'genre' } });
     expect(stat(noEditor(reading(['title'], [grouped])))).toEqual([]);
     const unset = chart('pie', 'books', 'pie', { aggregate: 'count', group: { by: 'genre' } });
@@ -1148,7 +1151,7 @@ describe('工具检查：统计依赖的字段（REPORT3 读书图表的例子�
     expect(stat(noEditor(reading(['title'], [empty])))).toEqual([]);
   });
 
-  it('样板和模版没有误报', () => {
+  it('No false positives in samples and templates', () => {
     const configs: WorkspaceConfig[] = [];
     for (const locale of ['en', 'zh', 'fr'] as const) {
       for (const sample of [

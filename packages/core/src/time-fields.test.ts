@@ -20,7 +20,7 @@ import type { Collection, Field, WorkspaceConfig } from './schema';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 时间、日期时间、时长字段（D-279）和公式升级（D-280、D-281）。
+// Time, datetime, and duration fields (D-279) and formula upgrades (D-280, D-281).
 
 const shifts: Collection = {
   id: 'shifts',
@@ -75,7 +75,7 @@ describe('time fields (D-279)', () => {
       expect(write('in', bad)).toBe('invalid');
     const fresh = prepareRecordValues(shifts, {}, null, new Date(2026, 9, 29, 7, 3));
     expect(fresh.ok && fresh.values.in).toBe('2026-10-29T07:03');
-    // 没有 default 的不填。
+    // Fields without a default are left empty.
     expect(fresh.ok && 'out' in fresh.values).toBe(false);
   });
 
@@ -100,7 +100,7 @@ describe('time fields (D-279)', () => {
   });
 
   it('reads nothing when the stored value no longer fits (restored an older version)', () => {
-    // 字段以前是别的类型：值留着，只是不显示。
+    // Field was previously a different type: value is preserved but hidden.
     expect(readValue(field('start'), '2026-10-29T08:30')).toBeUndefined();
     expect(readValue(field('start'), 480)).toBeUndefined();
     expect(readValue(field('in'), '2026-10-29')).toBeUndefined();

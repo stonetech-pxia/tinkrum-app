@@ -1,32 +1,35 @@
 import { localDate, formatDuration } from '../field-values';
 
-// 说出来的一句话里的值（D-575）：金额、数字、日期、时间、时长、评分，中文、英文、法语。
-// 语音转出来的字常常是汉字数字或英文、法文的数词（「二十三块五」「twelve fifty」「quarante-deux euros」），
-// 先把数字统一成阿拉伯数字（记住每个字在原话里的位置），再按种类找；只用代码，不问模型。
-// 每处值给出表单的写法（日期 YYYY-MM-DD、时间 HH:mm、时长 h:mm、金额和数字是文字），说不准的（「三点」是
-// 下午还是半夜）给两种读法，第一种更可能。正则不用 lookbehind（Hermes）。
+// Values in a spoken sentence (D-575): amount, number, date, time, duration, rating, in Chinese,
+// English, and French. Speech-to-text output often contains Chinese numerals or English/French
+// number words (e.g., "twenty-three point five", "twelve fifty", "quarante-deux euros"); first
+// normalize numbers to Arabic digits (recording each word's position in the original utterance),
+// then match by kind; code-only, no model queries. Output each value in form-compatible format
+// (date YYYY-MM-DD, time HH:mm, duration h:mm; amounts and numbers as plain text); for ambiguous
+// cases (e.g., whether "three o'clock" means afternoon or midnight), provide two interpretations,
+// with the first being more likely. Avoid regex lookbehind (Hermes).
 
 export type SpokenKind = 'money' | 'number' | 'date' | 'time' | 'duration' | 'rating';
 
 export interface SpokenValue {
   kind: SpokenKind;
-  /** 表单的写法；不止一种读法时第一种更可能。 */
+  /** Form representations; when multiple readings exist, the first is more likely. */
   values: readonly string[];
-  /** 原话里的这一段。 */
+  /** This segment in the original speech. */
   raw: string;
   start: number;
   end: number;
-  /** 数字后面的单位（「公里」「km」「瓶」），比对字段的单位用。 */
+  /** Unit following a number (e.g., "kilometer", "km", "bottle"), used for matching field units. */
   unit?: string;
-  /** 金额：说了货币（块、元、euros、$）。没说的数字是 number，只在没有说了货币的金额时才当金额。 */
+  /** Amount: currency was explicitly stated (e.g., Chinese yuan character, "euros", "$"). Unspecified numbers are treated as numbers, and only treated as amounts when no currency-specified amounts exist. */
   marked?: boolean;
 }
 
-// ---------- 第一步：数字统一成阿拉伯数字 ----------
+// ---------- Step 1: Normalize numbers to Arabic numerals ----------
 
 interface Normalized {
   text: string;
-  /** 统一后第 i 个字对应原话的开头和结尾。 */
+  /** Start and end indices in the original speech corresponding to the i-th normalized character. */
   from: number[];
   to: number[];
 }
@@ -47,11 +50,11 @@ const ZH_DIGIT: Record<string, number> = {
 };
 const ZH_UNIT: Record<string, number> = { 十: 10, 百: 100, 千: 1000, 万: 10000 };
 
-/** 「二十三」「一百二」（口语：120）「两万三」「一三八」→ 数字；读不出时 null。 */
+/** Chinese numbers ("twenty-three", colloquial "one-twenty" for 120, "twenty-three thousand", "one-three-eight") -> number; returns null if unparseable. */
 export function zhNumber(s: string): number | null {
   if (!s) return null;
   if (![...s].some((c) => c in ZH_UNIT)) {
-    // 没有十百千万：一个一个念的数字（一三八、二〇二六）。
+    // Without tens, hundreds, thousands: digits read one by one (e.g., "one-three-eight", "two-zero-two-six").
     let out = '';
     for (const c of s) {
       const d = ZH_DIGIT[c];
@@ -83,7 +86,7 @@ export function zhNumber(s: string): number | null {
     digit = null;
   }
   if (digit !== null) {
-    // 一百二 = 120、一千五 = 1500、两万三 = 23000：最后一个数字跟在百、千、万后面，是下一位。
+    // "one-two-zero" = 120, "one-thousand-five" = 1500, "twenty-three thousand" = 23000: the last digit following hundred, thousand, or ten-thousand represents the next position.
     section += lastUnit >= 100 ? digit * (lastUnit / 10) : digit;
   }
   return total + section;
@@ -153,12 +156,12 @@ const MULTIPLIERS: Record<string, number> = {
   cents: 100,
   mille: 1000,
 };
-/** 「one」「un」「a」单独出现多半不是数（「one coffee」「un café」），后面跟着这些词时才算。 */
+/** 'one', 'un', 'a' appearing alone are mostly not numbers ('one coffee', 'un café'), counted as numbers only when followed by these words. */
 const LONE_ONE = /^(?:one|un|une|a|an)$/;
 const AFTER_ONE =
   /^\s*(?:-?\s*)(?:hours?|hour|minutes?|euros?|dollars?|bucks?|stars?|heures?|étoiles?|demi|half|hundred|thousand|cents?|mille)\b/i;
 
-/** 英文、法文的数词一个一个读：一串数词合成一个数；「twelve fifty」这样两个都 ≥ 10 的分开成两个数。 */
+/** English and French number words read one by one: a sequence of number words combined into a single number; two numbers both >= 10 like 'twelve fifty' are split into two numbers. */
 function wordNumbers(text: string, out: { start: number; end: number; value: number }[]): void {
   const word = /[a-zà-ÿ]+(?:-[a-zà-ÿ]+)*/gi;
   let m: RegExpExecArray | null;
@@ -169,7 +172,7 @@ function wordNumbers(text: string, out: { start: number; end: number; value: num
   }
   const toks: Tok[] = [];
   while ((m = word.exec(text)) !== null) {
-    // 带连字符的（twenty-five、quatre-vingt-dix、dix-sept）拆开。
+    // Split hyphenated numbers (twenty-five, quatre-vingt-dix, dix-sept).
     let at = m.index;
     for (const part of m[0].split('-')) {
       toks.push({ start: at, end: at + part.length, word: part.toLowerCase() });
@@ -191,7 +194,7 @@ function wordNumbers(text: string, out: { start: number; end: number; value: num
       i++;
       continue;
     }
-    // 一串：数词、hundred/thousand/cent/mille，中间可以有 and / et（vingt et un、one hundred and five）。
+    // Sequence: numerals, hundred/thousand/cent/mille, with optional and/et in between (vingt et un, one hundred and five).
     let total = 0;
     let current = isA ? 1 : 0;
     let last = isA ? 1 : -1;
@@ -200,7 +203,7 @@ function wordNumbers(text: string, out: { start: number; end: number; value: num
     if (isA) j++;
     for (; j < toks.length; j++) {
       const t = toks[j]!;
-      // 两个词之间只能是空白或连字符。
+      // Only whitespace or hyphens are allowed between two words.
       if (j > i && !/^[\s-]*$/.test(text.slice(toks[j - 1]!.end, t.start))) break;
       if ((t.word === 'and' || t.word === 'et') && j > i) {
         const next = toks[j + 1];
@@ -230,13 +233,13 @@ function wordNumbers(text: string, out: { start: number; end: number; value: num
       const v = valueOf(j);
       if (v === null) break;
       if (j > i && last >= 0) {
-        // 十位后面只能接个位（法语 60、80 后面能接 10–19）；十几后面不能再接数。
+        // Tens can only be followed by units (French 60 and 80 can be followed by 10-19); teens cannot be followed by further numbers.
         const tens = last >= 20 && last < 100 && last % 10 === 0;
         const ok =
           (last >= 100 && v < 100) ||
           (tens && v < 10) ||
           (tens && (last === 60 || last === 80) && v >= 10 && v < 20) ||
-          // 法语 dix-sept、soixante-dix-neuf：10 后面接 7–9。
+          // French dix-sept, soixante-dix-neuf: 10 followed by 7-9.
           (last === 10 && v >= 7 && v <= 9 && /^(?:sept|huit|neuf)$/.test(t.word));
         if (!ok) break;
       }
@@ -252,7 +255,7 @@ function wordNumbers(text: string, out: { start: number; end: number; value: num
   }
 }
 
-// 单独一个汉字数字（一、两、三）后面跟着这些才当数（「一起」「统一」不是数）；周一、星期三也算。
+// A single Chinese digit (yi, liang, san) is considered a number only when followed by these (yiqi and tongyi are not numbers); Monday and Wednesday also count.
 const ZH_FOLLOW =
   /^[块元圆毛角个瓶件杯份本张次斤克米升人位盒包袋支双条只顿页章集岁天周月年号日点小分星颗倍折碗碟盘根台部篇首遍圈步层楼趟]|^公[里斤]|^千[米克]|^钟头/;
 const ZH_RUN = /[零〇一二两三四五六七八九十百千万]+/g;
@@ -266,8 +269,9 @@ function normalize(text: string): Normalized {
     const before = text.slice(Math.max(0, m.index - 2), m.index);
     const after = text.slice(m.index + s.length);
     const single = s.length === 1;
-    // 「一点」「有点」：多半是「一些」；单独的「十」「千」「万」也不当数。
-    // 单独的「十」后面跟着量词、钟点才算（十公里、十点、十分钟）；单独的百、千、万不算。
+    // "yidian", "youdian": mostly "yixie"; standalone "shi", "qian", "wan" are also not treated as
+    // numbers. Standalone "shi" counts when followed by a measure word or hour (shigongli, shidian,
+    // shifenzhong); standalone bai, qian, wan do not count.
     if (single && !(s in ZH_DIGIT) && !(s === '十' && ZH_FOLLOW.test(after))) continue;
     if (single && !ZH_FOLLOW.test(after) && !/(?:周|星期|礼拜|[块元圆点])$/.test(before)) continue;
     if (s === '一' && /^点(?![0-9零〇一二三四五六七八九十半])/.test(after)) continue;
@@ -303,17 +307,20 @@ function normalize(text: string): Normalized {
   return { text: out, from, to };
 }
 
-// ---------- 第二步：按种类找 ----------
+// ---------- Step 2: Find by type ----------
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const money = (n: number) => String(Math.round(n * 100) / 100);
 const num = (s: string) => Number(s.replace(',', '.'));
 
-/** 星期几：1 = 周一 … 7 = 周日。 */
+/** Weekday: 1 = Monday ... 7 = Sunday. */
 const weekday = (d: Date) => ((d.getDay() + 6) % 7) + 1;
-/** which：this = 这一周（周一开始）、next = 下一周、last = 上一周、coming = 今天或以后最近的一天、
- *  after = 今天以后最近的一天、before = 今天以前最近的一天。 */
+/**
+ * which: this = this week (starting Monday), next = next week, last = last week, coming = today
+ * or the nearest future day, after = nearest future day after today, before = nearest past day
+ * before today.
+ */
 function dayOfWeek(
   today: Date,
   day: number,
@@ -389,7 +396,7 @@ interface Hit {
   marked?: boolean;
 }
 
-/** 拉丁词的边界（不用 lookbehind）：前面不是字母数字。 */
+/** Latin word boundary (without lookbehind): preceded by a non-letter/non-digit. */
 const B = '(?:^|[^\\p{L}\\p{N}])';
 const E = '(?![\\p{L}\\p{N}])';
 
@@ -404,7 +411,7 @@ function scan(
   const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
   let m: RegExpExecArray | null;
   while ((m = g.exec(n)) !== null) {
-    // 拉丁词边界吃掉的前一个字不算在里面。
+    // The preceding character swallowed by the Latin word boundary is excluded.
     const lead = m[0].length - m[0].replace(/^[^\p{L}\p{N}$€£¥￥]+/u, '').length;
     const hit = make(m);
     if (hit) out.push({ ...hit, start: m.index + lead, end: m.index + m[0].length });
@@ -414,7 +421,7 @@ function scan(
 }
 
 const DATE_FINDERS: Finder[] = [
-  // 中文：今天、明天……
+  // Chinese: today, tomorrow...
   (n, today) =>
     scan(n, /大后天|大前天|今天|今晚|今早|明天|明晚|明早|后天|昨天|昨晚|前天/u, (m) => {
       const map: Record<string, number> = {
@@ -433,7 +440,7 @@ const DATE_FINDERS: Finder[] = [
       };
       return { kind: 'date', values: [localDate(addDays(today, map[m[0]]!))] };
     }),
-  // 下周五、这个星期三、周日、上礼拜一。
+  // Next Friday, this Wednesday, Sunday, last Monday.
   (n, today) =>
     scan(n, /(下下|下个?|这个?|本|上个?)?(?:周|星期|礼拜)([1-7日天])/u, (m) => {
       const day = /[日天]/.test(m[2]!) ? 7 : Number(m[2]);
@@ -449,7 +456,7 @@ const DATE_FINDERS: Finder[] = [
               : 'coming';
       return { kind: 'date', values: [localDate(dayOfWeek(today, day, which))] };
     }),
-  // 2026年3月5日、3月5号、下个月5号、5号。
+  // March 5, 2026, March 5, next month's 5th, the 5th.
   (n, today) =>
     scan(
       n,
@@ -466,7 +473,7 @@ const DATE_FINDERS: Finder[] = [
         return d ? { kind: 'date', values: [localDate(d)] } : null;
       },
     ),
-  // 英文。
+  // English.
   (n, today) =>
     scan(
       n,
@@ -496,7 +503,7 @@ const DATE_FINDERS: Finder[] = [
         p === 'next' ? 'next' : p === 'last' ? 'before' : p === 'this' ? 'this' : 'coming';
       return { kind: 'date', values: [localDate(dayOfWeek(today, day, which))] };
     }),
-  // March 3rd, 3 March, the 3rd of March（可以带年）。
+  // March 3rd, 3 March, the 3rd of March (can include year).
   (n, today) =>
     scan(
       n,
@@ -510,7 +517,7 @@ const DATE_FINDERS: Finder[] = [
         return d ? { kind: 'date', values: [localDate(d)] } : null;
       },
     ),
-  // 法语。
+  // French.
   (n, today) =>
     scan(
       n,
@@ -560,7 +567,7 @@ const DATE_FINDERS: Finder[] = [
     }),
 ];
 
-/** 几点几分；没说上午下午的 1–11 点给两种读法（1–6 点先当下午，7–11 点先当上午）。 */
+/** Hours and minutes; for 1-11 o'clock without AM/PM specified, provide two readings (1-6 defaults to PM first, 7-11 defaults to AM first). */
 function timeValues(h: number, min: number, period: 'am' | 'pm' | 'noon' | null): string[] | null {
   if (min < 0 || min > 59 || h < 0 || h > 24) return null;
   if (h === 24) h = 0;
@@ -590,7 +597,7 @@ const ZH_PERIOD: Record<string, 'am' | 'pm' | 'noon'> = {
 };
 
 const TIME_FINDERS: Finder[] = [
-  // 中文：下午三点半、晚上8点15、十点钟、三点一刻。「三点五」没有早晚、没有分、钟是小数，不是时间。
+  // Chinese: 3:30 PM, 8:15 PM, 10 o'clock, 3:15. "San dian wu" has no day/night or minutes, "dian" is a decimal point, not time.
   (n) =>
     scan(
       n,
@@ -600,7 +607,7 @@ const TIME_FINDERS: Finder[] = [
         const h = Number(m[2]);
         const marked = period !== null || m[3] || m[5] || m[6] || m[7] || m[8];
         if (!marked) {
-          // 「3点」后面没有数字（不是小数）、不是「一点」（一些）才算时间。
+          // Counted as time only if not followed by a digit after "3" (not a decimal) and not "yidian" (some).
           if (m[4] !== undefined) return null;
           if (h < 2 && !/\d/.test(m[2]!)) return null;
         }
@@ -610,14 +617,14 @@ const TIME_FINDERS: Finder[] = [
         return v ? { kind: 'time', values: v } : null;
       },
     ),
-  // 15:30（各种语言）。
+  // 15:30 (various languages).
   (n) =>
     scan(n, /(\d{1,2})\s*[:：]\s*(\d{2})(?:\s*(am|pm|a\.m\.|p\.m\.))?/iu, (m) => {
       const p = m[3]?.toLowerCase().startsWith('p') ? 'pm' : m[3] ? 'am' : null;
       const v = timeValues(Number(m[1]), Number(m[2]), p ?? (Number(m[1]) >= 13 ? 'pm' : null));
       return v ? { kind: 'time', values: v } : null;
     }),
-  // 英文：3pm、at 3、at 3 30、half past three、noon。
+  // English: 3pm, at 3, at 3 30, half past three, noon.
   (n) =>
     scan(
       n,
@@ -668,7 +675,7 @@ const TIME_FINDERS: Finder[] = [
       kind: 'time',
       values: [/^(noon|midday|midi)$/i.test(m[1]!) ? '12:00' : '00:00'],
     })),
-  // 法语：15h30、à 3 heures et demie、8 heures du soir。「2 heures」没有 à、没有早晚是时长。
+  // French: 15h30, à 3 heures et demie, 8 heures du soir. "2 heures" without à and without day/night is a duration.
   (n) =>
     scan(
       n,
@@ -703,7 +710,7 @@ const TIME_FINDERS: Finder[] = [
 ];
 
 const DURATION_FINDERS: Finder[] = [
-  // 中文：一个半小时、2小时30分钟、半小时、45分钟、一刻钟。
+  // Chinese: one and a half hours, 2 hours 30 minutes, half an hour, 45 minutes, a quarter of an hour.
   (n) =>
     scan(
       n,
@@ -719,7 +726,7 @@ const DURATION_FINDERS: Finder[] = [
       kind: 'duration',
       values: [formatDuration(m[1] ? Number(m[1]) : 15)],
     })),
-  // 英文。
+  // English.
   (n) =>
     scan(
       n,
@@ -737,7 +744,7 @@ const DURATION_FINDERS: Finder[] = [
         };
       },
     ),
-  // 法语：2 heures、une heure et demie、une demi-heure、45 minutes（前面有 à 的是时间，上面认过了）。
+  // French: 2 heures, une heure et demie, une demi-heure, 45 minutes (those with à are times, recognized above).
   (n) =>
     scan(
       n,
@@ -779,11 +786,11 @@ const SUB_WORD = 'cents?|centimes?|pence|p';
 const ZH_COUNTER =
   '个|瓶|件|杯|份|本|张|次|斤|公斤|千克|克|公里|千米|米|升|毫升|人|位|盒|包|袋|支|双|条|只|顿|页|章|集|岁|碗|碟|盘|根|台|部|篇|首|遍|圈|步|层|楼|趟|天|周|个月|年|倍|折|%';
 const MONEY_FINDERS: Finder[] = [
-  // 中文：23块5、7块5毛、23.5元、5毛、人民币30。
+  // Chinese: 23.5 yuan (kuai), 7.5 mao, 23.5 yuan, 5 mao, RMB 30.
   (n) =>
     scan(
       n,
-      // 「30块一个」：块后面的数后面跟着量词，是下一样东西的数量，不是几毛。
+      // "30 kuai each": if the number after kuai is followed by a measure word, it is the quantity of the next item, not jiao/mao.
       new RegExp(
         `(\\d+(?:\\.\\d+)?)\\s*(?:块钱|块|元钱|元|圆)(?:\\s*(\\d)(?!\\s*(?:${ZH_COUNTER}))\\s*(?:毛|角)?(?:\\s*(\\d)\\s*分?)?)?|(\\d+)\\s*点\\s*(\\d+)\\s*(?:块钱|块|元)|(\\d)\\s*(?:毛|角)(?:钱)?|(?:人民币|¥|￥|RMB)\\s*(\\d+(?:\\.\\d+)?)`,
         'iu',
@@ -831,14 +838,14 @@ const LATIN_UNIT =
   'km|kms|kilometers?|kilometres?|kilomètres?|miles?|mi|kg|kgs|kilos?|lbs?|g|grams?|grammes?|l|liters?|litres?|ml|pages?|chapters?|chapitres?|times|fois|people|persons?|personnes?|items?|bottles?|bouteilles?|cups?|tasses?|glasses?|verres?|reps?|sets?|laps?|tours?|steps?|pas|days?|jours?|weeks?|semaines?|months?|mois|years?|ans?|%';
 
 const NUMBER_FINDERS: Finder[] = [
-  // 中文小数（没被当成时间的）：三点五、三点五公里（先认，不然「五公里」会被单独拿走）。
+  // Chinese decimals (not recognized as time): san dian wu, san dian wu gongli (recognized first, otherwise "wu gongli" would be taken separately).
   (n) =>
     scan(n, new RegExp(`(\\d+)\\s*点\\s*(\\d+)(?:\\s*(${ZH_COUNTER}))?`, 'u'), (m) => ({
       kind: 'number',
       values: [`${m[1]}.${m[2]}`],
       ...(m[3] ? { unit: m[3].toLowerCase() } : {}),
     })),
-  // 带单位的数（量，不是钱）：3瓶、5公里、12 km、3 shirts 这样的英文名词不认，当没单位的数。
+  // Numbers with units (quantities, not money): 3 bottles, 5 kilometers, 12 km; English nouns like 3 shirts are not recognized and treated as unitless numbers.
   (n) =>
     scan(
       n,
@@ -852,11 +859,11 @@ const NUMBER_FINDERS: Finder[] = [
         unit: (m[2] ?? m[4]!).toLowerCase(),
       }),
     ),
-  // 英文「twelve fifty」：两个数词连着、后一个是两位数，当一个带小数的数（多半是价钱）。
+  // English "twelve fifty": two consecutive numerals where the second is a two-digit number are treated as a decimal number (mostly prices).
   (n) => scan(n, /(\d+(?:[.,]\d+)?)/u, (m) => ({ kind: 'number', values: [String(num(m[1]!))] })),
 ];
 
-/** 「twelve fifty」：原话里是两个数词（不是数字），后一个 10–99，合成 12.50。 */
+/** "twelve fifty": in the original text, two numerals (not digits) with the second being 10-99, combined into 12.50. */
 function wordPrice(hits: Hit[], raw: (h: Hit) => string, n: string): Hit[] {
   const out: Hit[] = [];
   for (let i = 0; i < hits.length; i++) {
@@ -889,8 +896,9 @@ function wordPrice(hits: Hit[], raw: (h: Hit) => string, n: string): Hit[] {
 }
 
 /**
- * 读一句话里的值，按在话里的先后排。先认日期、时间、时长、评分、金额，再认剩下的数；
- * 一段字只算一次（「下午3点」不再当数字 3）。today 是用户的今天（本地日期）。
+ * Read values in a sentence, ordered by their appearance. First recognize dates, times,
+ * durations, ratings, amounts, then remaining numbers; each text segment is counted only once ("3
+ * PM" is no longer treated as the number 3). today is the user's today (local date).
  */
 export function readSpoken(text: string, today: Date): SpokenValue[] {
   const n = normalize(text);
@@ -907,7 +915,7 @@ export function readSpoken(text: string, today: Date): SpokenValue[] {
   for (const finders of groups) {
     for (const find of finders) {
       for (const h of find(n.text, today)) {
-        // 数字的一部分（「123」里的「2」）不算。
+        // Parts of a number (the "2" in "123") do not count.
         if (overlaps(h)) continue;
         const digit = (i: number) => /\d/.test(n.text[i] ?? '');
         if ((digit(h.start) && digit(h.start - 1)) || (digit(h.end - 1) && digit(h.end))) continue;

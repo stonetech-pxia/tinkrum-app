@@ -1,9 +1,9 @@
 import MorphTranslate from '../../modules/morph-translate';
 import type { TranslatePlatform } from './platform';
 
-// TranslatePlatform 的实现：本地 Expo 模块 MorphTranslate（D-170）。没有这个模块（Expo Go）时为 null。
+// Implementation of TranslatePlatform: local Expo module MorphTranslate (D-170). Null when this module is absent (Expo Go).
 
-/** 原生模块的错误码 → 平台错误码（动作实现按它决定怎么告诉用户）。 */
+/** Native module error codes -> platform error codes (action implementations decide how to notify the user based on these). */
 const CODES: Record<string, string> = {
   ERR_TRANSLATE_CANCELLED: 'cancelled',
   ERR_TRANSLATE_UNSUPPORTED: 'unsupported',

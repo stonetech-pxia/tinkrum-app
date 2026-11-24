@@ -10,7 +10,7 @@ import { monthDays } from './month-view';
 import type { Collection, NewComponent } from './schema';
 import { registry } from './test-helpers';
 
-// 记录列表分段（D-347）、月历认日程（D-348）、就地添加带上的值（D-349）。2026-10-30 是周五。
+// Record list grouping (D-347), calendar task recognition (D-348), and default values for inline addition (D-349). 2026-10-30 is Friday.
 const now = new Date(2026, 9, 30, 9);
 const cal = DEFAULT_CALENDAR;
 
@@ -85,7 +85,7 @@ describe('sections in a list', () => {
       ['11月2日 周一', ['Monday']],
       ['不定日期', ['Someday']],
     ]);
-    // 在某一天添加 = 「一次，这一天」；已过期、不定日期没有预设。
+    // Adding on a specific day = "once, this date"; expired and undated items have no preset.
     expect(groups[2]!.preset).toEqual({ repeat: 'once', date: '2026-10-31' });
     expect(groups[0]!.preset).toBeUndefined();
     expect(groups[4]!.preset).toBeUndefined();
@@ -120,7 +120,7 @@ describe('sections in a list', () => {
     expect(listGroups(dated, tasks, { by: 'due' }, { locale: 'en', now, cal })[1]!.preset).toBe(
       '2026-11-03',
     );
-    // 不写 by 只写 unit：按第一个日期字段（due）。
+    // Omitting by and specifying only unit: uses the first date field (due).
     expect(
       listGroups(dated, tasks, { unit: 'month' }, { locale: 'zh', now, cal }).map((g) => g.label),
     ).toEqual(['2026年10月', '2026年11月']);
@@ -157,7 +157,7 @@ describe('a calendar on a schedule field', () => {
     );
     for (const d of mondays) expect(titles(november.get(d)!.records)).toEqual(['Weekly']);
     expect(titles(november.get(dayNumber('2026-11-05')!)!.records)).toEqual(['Nov 5']);
-    // 过去的月份：重复的没有记录可查，不显示。
+    // Past months: recurring items have no inspectable records and are not displayed.
     expect(monthDays(plans, tasks, { date: 'plan' }, '2026-09', now, cal).days.size).toBe(0);
   });
 });

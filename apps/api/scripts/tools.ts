@@ -11,15 +11,17 @@ import {
   verifyOutput,
 } from '../src/publish';
 
-// 发布下载的工具（docs/TOOL_DOWNLOAD_DESIGN.md §13）。在仓库根目录运行：
-//   npm run tools -- build <tools 目录> <输出目录>        检查清单，生成未签名的 catalog.json
-//   npm run tools -- sign <输出目录> --prompt             签名：粘贴私钥（不显示、不写文件）
-//   npm run tools -- sign <输出目录> <私钥文件>           签名：从文件读私钥（开发密钥 tools/dev-signing-key.txt）
-//   npm run tools -- revoke <输出目录> <id@version>       停用一个版本（之后重新签名）
-//   npm run tools -- verify <输出目录> [--dev]            上传前检查（--dev：也信任开发公钥）
-//   npm run tools -- keygen --print                       生成正式密钥，只在终端里显示一次（存进密码管理器）
-//   npm run tools -- keygen <私钥文件>                    生成正式密钥，写进文件（U 盘、加密磁盘映像）
-// 正式公钥填进 packages/core/src/tool-keys.ts。
+// Published downloadable tools (`docs/TOOL_DOWNLOAD_DESIGN.md` §13). Run at repository root: `npm
+// run tools -- build <tools dir> <output dir>` checks manifest and generates unsigned
+// `catalog.json`; `npm run tools -- sign <output dir> --prompt` signs by pasting private key
+// (hidden, unwritten); `npm run tools -- sign <output dir> <private key file>` signs by reading
+// private key from file (development key `tools/dev-signing-key.txt`); `npm run tools -- revoke
+// <output dir> <id@version>` deactivates a version (subsequently re-signed); `npm run tools --
+// verify <output dir> [--dev]` pre-upload check (`--dev`: also trusts dev public key); `npm run
+// tools -- keygen --print` generates official key, displayed only once in terminal (store in
+// password manager); `npm run tools -- keygen <private key file>` generates official key, writes to
+// file (USB drive, encrypted disk image). Enter official public key into
+// `packages/core/src/tool-keys.ts`.
 
 const root = resolve(import.meta.dirname, '../../..');
 const [command, ...args] = process.argv.slice(2);
@@ -29,7 +31,7 @@ const path = (p: string | undefined) => {
   return resolve(root, p);
 };
 
-/** 读一行不回显的输入（粘贴私钥用）；不是终端时（管道）读完整个标准输入。 */
+/** Read a line of input without echo (for pasting private key); reads entire stdin when not a terminal (piped). */
 async function askHidden(question: string): Promise<string> {
   const stdin = process.stdin;
   if (!stdin.isTTY) {

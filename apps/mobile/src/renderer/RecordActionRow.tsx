@@ -16,8 +16,9 @@ import { useAssets } from './Attachments';
 import { Icon } from './Icon';
 import type { Palette } from './theme';
 
-// 已有记录的记录页顶部的一排按钮（D-428，取代 D-423 写死的那排）：有哪些由表上的 recordRow 决定，
-// 每个按钮是一个快捷操作，点了才把这个字段的值或这一条记录交给它（底线 10）。看的是框里现在的值，什么都不写（底线 15）。
+// Top button row on detail page for existing records (D-428, replacing hardcoded row in D-423):
+// determined by recordRow on table, each button is a quick action, passing field values or record
+// upon tap (Invariant 17). Reads current values in form, performs no writes (Invariant 15).
 
 export function RecordActionRow({
   collection,
@@ -26,7 +27,7 @@ export function RecordActionRow({
   palette,
 }: {
   collection: Collection;
-  /** 这一条（带算出来的值）。 */
+  /** The current record (with calculated values). */
   record: DataRecord;
   values: Readonly<Record<string, unknown>>;
   palette: Palette;
@@ -35,7 +36,7 @@ export function RecordActionRow({
   const config = useWorkspace((s) => s.config!);
   const cal = useCalendar();
   const { run, elements } = useHandedRun(palette);
-  /** 框里现在的值：还没保存的修改也算。框里写得不对（金额写了字）时那个字段按框里的原样交。 */
+  /** Current values in form: includes unsaved edits. Fields with invalid inputs (e.g., text in amount) pass their raw form input. */
   const current = (): DataRecord => {
     const prepared = prepareRecordValues(collection, values, record.values, new Date(), cal);
     return {
@@ -43,10 +44,10 @@ export function RecordActionRow({
       values: { ...record.values, ...(prepared.ok ? prepared.values : values) },
     };
   };
-  // 按钮看的值：框里现在的（规范成存的样子，数字是数字；清空了的字段没有值）。
+  // Values inspected by buttons: current form values (normalized to storage format, numbers as numbers; cleared fields have no value).
   const prepared = prepareRecordValues(collection, values, record.values, new Date(), cal);
   const shown = prepared.ok ? prepared.values : values;
-  // 收文件的按钮要知道附件是什么文件（图片、PDF……），读到了才出现（D-442）。
+  // File intake buttons require knowing what the attachment files are (images, PDFs...), appearing only after reading them successfully (D-442).
   const fileIds = [
     ...new Set(
       (collection.recordRow ?? []).flatMap((item) => {

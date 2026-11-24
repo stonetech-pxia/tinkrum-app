@@ -17,9 +17,12 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { deskTool } from '../test-utils/desk-toolbar';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 打开、改外来的 docx / xlsx（D-509）：预览页按读出来的中间格式显示（不再是「这里看不了」）；「编辑」复制一份放上桌，
-// 就是 Word / 表格编辑器（不走转 PDF）；改过以后第一次保存、分享前说一句哪些格式不留；原件不动。
-// 三种状态：没改过就存（存的是原件的副本，不提示）、改过再存、打不开的文件（设了密码）。
+// Opening and editing external docx / xlsx (D-509): Preview page renders using the decoded
+// intermediate format (no longer "cannot view here"); "Edit" copies a file to the desk, acting as a
+// Word / spreadsheet editor (bypassing PDF conversion); before the first save or share after
+// editing, display a notice about which formats are not retained; original file remains untouched.
+// Three states: save unedited (saves a copy of the original without prompting), save after editing,
+// and unopenable files (password-protected).
 
 afterEach(() => {
   useIncoming.getState().clear();
@@ -29,17 +32,17 @@ afterEach(() => {
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const OFFICE_FIXTURES = join(__dirname, '../../../../packages/tool-office/src/fixtures/office');
-/** macOS 的 textutil 从 UTF-8 网页转出来的 docx（£、€、é、中文、粗体、列表）。 */
+/** macOS textutil UTF-8 web-converted docx (£, €, é, Chinese, bold, lists). */
 const LEASE = new Uint8Array(readFileSync(join(OFFICE_FIXTURES, 'lease-textutil.docx')));
-/** Pages 存的、设了密码的 docx。 */
+/** Password-protected docx saved by Pages. */
 const LOCKED = new Uint8Array(readFileSync(join(OFFICE_FIXTURES, 'password-pages.docx')));
-/** Word 存的带表格的 docx（mammoth 的测试文件）。 */
+/** Word-saved docx containing tables (mammoth test file). */
 const TABLES = new Uint8Array(
   readFileSync(
     join(dirname(require.resolve('mammoth/package.json')), 'test/test-data/tables.docx'),
   ),
 );
-/** 记录导出的 xlsx（D-427）：以前也只能用系统预览看。 */
+/** Record export xlsx (D-427): Previously only viewable via system preview. */
 const EXPENSES = writeRowsXlsx('Expenses', [
   [
     { kind: 'text', text: 'Item' },
@@ -67,7 +70,7 @@ async function onlyDesk(files: FakeFiles) {
   return list[0]!;
 }
 
-/** 编辑页（网页）里改字：页面的脚本把整页交回来（同 desk-edit-test）。 */
+/** Editing text in the edit page (web): Page script returns the entire page (same as desk-edit-test). */
 function wordPage() {
   const view = screen.getByTestId('word-editor-page');
   const dom = new JSDOM(view.props.source.html, { runScripts: 'dangerously' });
@@ -83,7 +86,7 @@ function wordPage() {
   };
 }
 
-/** 弹出的提示：记下标题和内容，点 label 那个按钮。 */
+/** Pop-up alert: Record title and content, tap the button with the given label. */
 function answerAlert(label: string) {
   const seen: { title: string; message?: string }[] = [];
   jest.spyOn(Alert, 'alert').mockImplementation((title, message, buttons?: AlertButton[]) => {
@@ -103,7 +106,7 @@ describe('outside Word files (docx)', () => {
     expect(html).toContain('The rent is £1,250 per month');
     expect(html).toContain('Pay the rent');
     expect(html).toContain('中文测试');
-    // 只能看。
+    // Read-only.
     expect(html).not.toContain('contenteditable="true"');
     expect(screen.queryByTestId('desk-preview-generic')).toBeNull();
 
@@ -114,11 +117,11 @@ describe('outside Word files (docx)', () => {
     const desk = await onlyDesk(files);
     const [file] = currentFiles(desk);
     expect(file!.source).toMatchObject({ kind: 'doc', imported: 'original' });
-    // 原件只复制：桌上是一样的字节，原件还在、没变。
+    // Original file is only copied: Desk contains identical bytes, original file remains intact and unchanged.
     expect(files.disk.get(`desk/${desk.id}/${file!.path}`)).toEqual(LEASE);
     expect(files.disk.get(picked.uri)).toEqual(LEASE);
     expect(files.desk.moved).toEqual([]);
-    // 没有转成 PDF。
+    // Not converted to PDF.
     expect(files.documents.converted).toEqual([]);
   });
 
@@ -148,7 +151,7 @@ describe('outside Word files (docx)', () => {
     await page.input();
     await page.state({ focus: false });
 
-    // 第一次点「取消」：什么都不存，下次还问。
+    // First tap on "Cancel": Saves nothing, prompts again next time.
     let alerts = answerAlert('Cancel');
     await fireEvent.press(await deskTool('desk-tool-room-save'));
     await waitFor(() => expect(alerts).toHaveLength(1));
@@ -166,20 +169,20 @@ describe('outside Word files (docx)', () => {
     expect(xml).toContain('Above, edited on the phone');
     expect(xml).toContain('Bottom right, edited');
     expect(xml).toContain('Below');
-    // 外来文件读出来的中间格式不跟着存（下次打开再读一遍）。
+    // Intermediate formats read from external files are not persisted alongside (re-read on next open).
     expect([...files.disk.keys()].filter((k) => k.startsWith(`assets/${asset!.id}/`))).toEqual([
       asset!.path,
     ]);
-    // 原件没动。
+    // Original file untouched.
     expect(files.disk.get(picked.uri)).toEqual(TABLES);
 
-    // 只说一次：接着分享不再问。
+    // Prompt only once: subsequent shares do not prompt again.
     await fireEvent.press(await deskTool('desk-tool-room-share'));
     await waitFor(() => expect(files.shared).toHaveLength(1));
     expect(alerts).toHaveLength(1);
   });
 
-  // 合并 D-507 和 D-509（2026-11-09）：「存到手机」也是把重新生成的文件交出去，同样先说一句。
+  // Combining D-507 and D-509 (2026-11-09): "Save to phone" also exports the regenerated file and similarly shows a notice first.
   it('after editing, Save to phone also says it first; Cancel copies nothing', async () => {
     const { files } = await openPreview('Report.docx', TABLES, DOCX);
     await fireEvent.press(await screen.findByTestId('preview-edit'));
@@ -226,10 +229,10 @@ describe('outside Excel files (xlsx)', () => {
 
     await fireEvent.press(screen.getByTestId('preview-edit'));
     expect(await screen.findByTestId('desk-editor')).toBeTruthy();
-    // 没有表外的文字：识别范围的两个按钮没有用，不显示。
+    // No out-of-table text: The two recognition scope buttons are useless and hidden.
     expect(screen.queryByTestId('table-scope-all')).toBeNull();
     await fireEvent.press(screen.getByTestId('table-cell-1-1'));
-    // 外来的表没有原图：选中的格子下面不说「原图」「这一格是在这里加的」。
+    // External tables lack original images: Below the selected cell, do not display "Original image" or "This cell was added here".
     expect(screen.getByTestId('desk-edit-bar')).not.toHaveTextContent(/原图/);
     await fireEvent.press(screen.getByTestId('table-cell-1-1'));
     await fireEvent.changeText(screen.getByTestId('desk-edit-input'), '5.25');

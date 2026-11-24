@@ -3,37 +3,40 @@ import { SITE_URL } from './site';
 import { t } from './messages';
 import type { Locale } from './schema';
 
-// 交给别的 AI App（D-609、D-611）：给 ChatGPT、Claude 这类 App 的提示词，用户在系统分享面板里自己挑 App、
-// 自己点发送（底线 10）。只有指南、固定规则、用户主动写下的要求，和 App、页面的名字和 ID；不带记录、文件名、文件内容（底线 1、2）。每段是一整句话，三种语言各写各的。
+// Handing over to another AI app (D-609, D-611): prompts for apps like ChatGPT and Claude, where
+// the user selects the app and taps send in the system share sheet (invariant 10). Contains only
+// guides, fixed rules, user-authored requests, and app/page names and IDs; excludes records, file
+// names, and file contents (invariants 1, 2). Each paragraph is a complete sentence, written
+// independently in three languages.
 
 export const AGENT_DOCS_URL = `${SITE_URL}/assets/agent/`;
 
-/** 给别的 AI 自检用的脚本在分享时叫什么（打包在 App 里，D-611）。 */
+/** Name of the self-check script for other AIs during sharing (bundled in the app, D-611). */
 export const CHECKER_FILE_NAME = 'tinkrum-check.js';
 export const HANDOFF_DOC_FILES = ['tinkrum-app-guide.md', 'tinkrum-app-patterns.md'] as const;
 
 export type HandoffScope =
-  /** 从零做一个新 App（我的预设，D-609）。 */
+  /** Build a new app from scratch (my preset, D-609). */
   | { kind: 'new' }
-  /** 改整个工作区（主页和所有 App）。 */
+  /** Modifies the entire workspace (home screen and all apps). */
   | { kind: 'setup' }
-  /** 改一个装好的 App；page：从这个 App 的哪一页进来的（AI 页的上下文）。 */
+  /** Modify an installed app; `page`: entry point page in this app (AI page context). */
   | { kind: 'app'; app: string; page?: { id: string; title: string } };
 
 export interface HandoffOptions {
-  /** App 文件作为附件一起发；false 时 App 文件写在这条消息的最后（没有原生分享时的退路）。 */
+  /** Send app file as an attachment; when false, app file is written at the end of this message (fallback when native share is unavailable). */
   attached: boolean;
-  /** 检查器也作为附件一起发（App 里打包了它的时候）。 */
+  /** Send checker as an attachment as well (when bundled in the app). */
   checker?: boolean;
-  /** 附件里 App 文件的名字。 */
+  /** Name of the app file in attachments. */
   fileName?: string;
-  /** 打包在本机的指南和 patterns 也附上了。 */
+  /** Guides and patterns packaged locally are also attached. */
   docs?: boolean;
-  /** 用户在输入框里主动写下、点分享交给所选 App 的一句话。 */
+  /** A single sentence authored by the user in the input field and shared via share sheet to the selected app. */
   request?: string;
 }
 
-/** 网址带当天日期（?v=YYYYMMDD），让 AI 不用前几天缓存的旧版。 */
+/** URL includes current date (`?v=YYYYMMDD`) so AI does not use cached older versions from previous days. */
 function docsLinks(now: Date) {
   const v = localDateStamp(now);
   return {
@@ -42,7 +45,7 @@ function docsLinks(now: Date) {
   };
 }
 
-/** 提示词存成这个文件一起分享：有的 App（Claude）收到多个文件时会丢掉分享的文字，文件不会丢。 */
+/** The prompt is stored as this file for joint sharing: some apps (Claude) drop shared text when receiving multiple files, but files are preserved. */
 export const HANDOFF_REQUEST_FILE = 'tinkrum-request.md';
 
 export function handoffPrompt(

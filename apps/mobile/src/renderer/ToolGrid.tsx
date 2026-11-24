@@ -19,8 +19,10 @@ import { Card, IconTile } from './ui';
 const COLUMNS = 3;
 
 /**
- * toolGrid 组件（D-181）：一组工具的小图标，每行三个。点一下打开工具；还没添加的工具
- * 图标变淡、角上有「+」，点一下直接添加再打开（和工具目录一样不弹确认框，提示条上可撤销，D-105）。
+ * toolGrid component (D-181): small icons for a group of tools, three per row. Tapping opens a
+ * tool; unadded tool icons appear dimmed with a "+" badge, and tapping them adds and immediately
+ * opens them (same behavior as the tool directory without a confirmation dialog, undoable via
+ * toast banner, D-105).
  */
 export function ToolGrid({
   grid,
@@ -84,7 +86,7 @@ export function ToolGrid({
           {row.map((toolId) => {
             const def = registry.tools.get(toolId)!;
             const installed = config.packages.find((x) => x.id === toolId);
-            // 工具页被改过名字时用页面的名字（和工具卡片一样）。
+            // Uses the page name if the tool page has been renamed (same as tool cards).
             const pageTitle =
               installed && config.containers.pages.find((p) => p.id === installed.page)?.title;
             const name = pageTitle

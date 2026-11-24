@@ -1,4 +1,6 @@
-"""将评测机的软件和硬件信息保存为可复现元数据。"""
+"""Save software and hardware specifications of the evaluation machine as reproducible metadata.
+
+"""
 import json
 import os
 import platform

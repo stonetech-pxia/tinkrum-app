@@ -28,7 +28,7 @@ function textRows(lines: readonly OcrBox[]): OcrBox[][] {
   }
   return rows.map((r) => r.sort((a, b) => a.x - b.x));
 }
-/** 横贯表格的同色条，而不是照片或几个不同颜色的卡片。 */
+/** A uniform color band spanning the table rather than a photo or several cards of different colors. */
 function colorBand(image: RgbaImage, row: readonly OcrBox[], box: Box): boolean {
   const b = bounds(row),
     y = Math.min(image.height - 1, Math.max(0, Math.round(b.y + b.height / 2)));
@@ -70,7 +70,7 @@ function sectionHeader(image: RgbaImage, row: readonly OcrBox[], box: Box): bool
   );
 }
 
-/** 把填写框下面的整行标签从粗网格行中分开；逐行字符守恒，不能把别的字段吞掉。 */
+/** Separate full-row labels below fill-in boxes from coarse grid rows; maintain character conservation per row without swallowing other fields. */
 export function restoreWordFormRows(
   block: DocTable,
   image: RgbaImage,

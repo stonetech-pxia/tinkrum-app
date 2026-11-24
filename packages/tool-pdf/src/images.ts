@@ -26,12 +26,13 @@ import {
 import { type MergeResult, PdfError, assertNumber } from './core';
 import { embedGlyphlessFont, glyphlessText } from './glyphless';
 
-// 图片转 PDF：每张图片一页，按页面选项排版并居中。图片带着识别出的文字时，在上面画一层看不见的字
-// （D-195）：PDF 看起来不变，但能搜索、选中、复制。
+// Image to PDF: one page per image, formatted and centered according to page options. When an image
+// carries recognized text, an invisible text layer is drawn on top (D-195): the PDF looks
+// unchanged, but is searchable, selectable, and copyable.
 
 export type ImageKind = 'jpeg' | 'png';
 
-/** 图片上识别出的一行字：像素坐标，原点在左上角。 */
+/** A line of text recognized on an image: pixel coordinates, origin at top-left. */
 export interface TextLine {
   text: string;
   x: number;
@@ -40,7 +41,7 @@ export interface TextLine {
   height: number;
 }
 
-/** 一张图片的文字：width / height 是识别时图片的像素大小（坐标按它换算，和嵌入时的缩放无关）。 */
+/** Text of an image: width / height are the pixel dimensions of the image during recognition (coordinates are scaled relative to this, independent of scaling during embedding). */
 export interface TextLayer {
   width: number;
   height: number;
@@ -48,33 +49,33 @@ export interface TextLayer {
 }
 
 /**
- * width / height 只作参考：排版以图片本身的像素尺寸为准。
- * PDF 不认 EXIF 方向，调用方应先把照片转正再传入。
+ * width / height are for reference only: layout uses the image's own pixel dimensions. PDFs do
+ * not recognize EXIF orientation; callers should upright photos before passing them in.
  */
 export interface ImageInput {
   bytes: Uint8Array;
   kind: ImageKind;
   width?: number;
   height?: number;
-  /** 识别出的文字；有时画一层看不见的字。 */
+  /** Recognized text; optionally draws an invisible text layer. */
   text?: TextLayer;
 }
 
 export interface ImagePageOptions {
-  /** 'fit'：页面就是图片大小（72 dpi，长边不超过 1700 pt）加边距。 */
+  /** 'fit': page matches image dimensions (72 dpi, long edge not exceeding 1700 pt) plus margins. */
   pageSize: 'a4' | 'letter' | 'fit';
-  /** 'auto'：横图用横向页面。'fit' 时忽略。 */
+  /** 'auto': landscape images use landscape pages. Ignored when 'fit'. */
   orientation: 'auto' | 'portrait' | 'landscape';
-  /** 0–30 毫米。 */
+  /** 0–30 millimeters. */
   marginMm: number;
-  /** contain：完整显示；cover：铺满边距内区域，超出部分裁掉。 */
+  /** contain: display completely; cover: fill the area within margins, cropping any overflow. */
   fit: 'contain' | 'cover';
 }
 
 const PT_PER_MM = 72 / 25.4;
 const FIT_MAX_PT = 1700;
 
-/** JPEG 原样嵌入（不重新编码）；无法解析时报 badImage。 */
+/** Embed JPEG as-is (without re-encoding); reports badImage if it cannot be parsed. */
 export async function embedImage(
   doc: PDFDocument,
   image: { bytes: Uint8Array; kind: ImageKind },
@@ -93,15 +94,17 @@ export function assertImagePageOptions(opts: ImagePageOptions): void {
   assertNumber(opts.marginMm, 0, 30);
 }
 
-/** 文字层用的两种字体：Helvetica 写拉丁字母；别的字（中日韩、俄文等）用无字形字体（D-266）。 */
+/** The two fonts used by the text layer: Helvetica for Latin alphabet; other characters (CJK, Russian, etc.) use the glyph-less font (D-266). */
 export interface TextFonts {
   latin: PDFFont;
   other: PDFRef;
 }
 
 /**
- * 看不见的文字层（D-195）：每行用文字渲染模式「不可见」画在识别框的位置，横向缩放到框的宽度。
- * Helvetica 写得出的行照旧用它；其余的行用无字形字体按 UTF-16 写（D-266，取代 P-028 的「跳过」）。
+ * Invisible text layer (D-195): each line is drawn at the recognition box position using the
+ * invisible text rendering mode, scaled horizontally to fit the box width. Lines renderable by
+ * Helvetica use it as before; remaining lines use the glyph-less font written in UTF-16 (D-266,
+ * replacing the "skip" behavior in P-028).
  */
 function drawTextLayer(
   page: PDFPage,
@@ -135,7 +138,7 @@ function drawTextLayer(
       natural = glyphless.ems * size;
     }
     if (natural <= 0) continue;
-    // 基线比框的底边高一点（下伸部分约占 0.2 个字高）。
+    // The baseline is slightly above the bottom of the box (descenders account for approx. 0.2 character height).
     const x = placement.x + line.x * sx;
     const y = placement.y + placement.height - (line.y + line.height) * sy + size * 0.2;
     page.pushOperators(
@@ -150,7 +153,7 @@ function drawTextLayer(
   }
 }
 
-/** 为一张已嵌入的图片新增一页；带文字时（text 和 font 都给了）加上看不见的文字层。 */
+/** Add a new page for an embedded image; adds an invisible text layer when text and font are provided. */
 export function addImagePage(
   doc: PDFDocument,
   image: PDFImage,
@@ -178,7 +181,7 @@ export function addImagePage(
   const height = ih * scale;
   const placement = { x: (pageW - width) / 2, y: (pageH - height) / 2, width, height };
   if (opts.fit === 'cover') {
-    // 裁剪到边距内的区域，避免图片盖住边距。
+    // Clip to the area within margins to prevent the image from covering the margins.
     page.pushOperators(
       pushGraphicsState(),
       rectangle(margin, margin, boxW, boxH),
@@ -193,7 +196,7 @@ export function addImagePage(
   if (text) drawTextLayer(page, placement, text.layer, text.fonts);
 }
 
-/** 按顺序把图片转成 PDF，每张一页。 */
+/** Convert images to PDF in order, one per page. */
 export async function imagesToPdf(
   images: readonly ImageInput[],
   opts: ImagePageOptions,

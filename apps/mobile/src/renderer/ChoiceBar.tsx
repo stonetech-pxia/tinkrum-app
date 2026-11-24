@@ -5,11 +5,14 @@ import { t } from '../i18n';
 import type { RenderEnv } from './components';
 import { onPage } from './theme';
 
-// 页面上的一排选项（D-573）：一个单选字段的选项排成一排（「全部」在前），点一个，同一页里跟着它的列表、数字和图表
-// 只显示这一项的记录。和时间范围块（PeriodBar）一个样子；选了什么只放在页面的状态里（RenderEnv.pageChoice），
-// 什么都不写（底线 15）。字段里有选项写了颜色（D-568）时，每一项前面一个那个颜色的点（和列表上的点一样）。
+// A row of options on the page (D-573): options of a single-select field are laid out in a row
+// ("All" first), and tapping one filters the list, counts, and charts on the same page to show only
+// records for this item. Same appearance as the time range block (PeriodBar); selections are kept
+// only in page state (RenderEnv.pageChoice) without writing anything (invariant 15). When options
+// have assigned colors in the field (D-568), each item is preceded by a dot of that color (matching
+// list dots).
 
-/** 最多几项还折行排；再多就排成一行横着滑（50 个选项折行会占掉好几屏）。 */
+/** Maximum number of items to wrap to multiple lines; any more are arranged in a single horizontally scrollable row (wrapping 50 options would span multiple screens). */
 const WRAP_UP_TO = 8;
 
 export function ChoiceBar({ block, env }: { block: BlockOf<'choices'>; env: RenderEnv }) {

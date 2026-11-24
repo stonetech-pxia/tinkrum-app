@@ -10,7 +10,7 @@ const line = (x: number, y: number, width: number, text: string) => ({
   height: 20,
   text,
 });
-/** 一栏小表单：每排一个标签，有的排右边还有一个短标签（和另一栏同一高度）。 */
+/** A small single-column form: a label per row, with some rows having an additional short label on the right (at the same height as another column). */
 const form = (x: number) =>
   Array.from({ length: 30 }, (_, i) => [
     line(x, 200 + i * 50, 280, `DADOS DO ADQUIRENTE ${i}`),

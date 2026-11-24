@@ -12,8 +12,9 @@ import { eachRevisionPage } from './revision-pages';
 import type { WorkspaceRepo } from './types';
 
 /**
- * 用户文件用在哪里（D-264）：现在和旧版本里的表、记录（包括回收站里的）、页面。存储空间页面列出来，
- * 全部文件页面删除前用它提醒（D-472）。只读。
+ * Where user files are used (D-264): tables and records (including those in trash), and pages in
+ * current and old versions. Listed on the storage space page and used for warnings prior to
+ * deletion on the all-files page (D-472). Read-only.
  */
 export async function loadAssetUsage(
   repo: WorkspaceRepo,
@@ -31,8 +32,10 @@ export async function loadAssetUsage(
     ...deleted.map((r) => r.collectionId),
   ]);
   const active = (await Promise.all([...ids].map((id) => repo.listRecords(id)))).flat();
-  // 只在旧版本里的表：从历史版本里找回结构（和「设置 → 数据」一样）；旧版本用到的文件一并收集。
-  // 全部历史一页一页读（R02），每个版本只留下需要的，不把几千份配置同时放在内存里。
+  // Tables existing only in older versions: retrieves structure from historical versions (same as
+  // "Settings -> Data"); files used by old versions are collected accordingly. Reads all history
+  // page by page (R02), keeping only what is needed per version without loading thousands of
+  // configurations into memory simultaneously.
   const tables = new Map<string, Collection>();
   const oldAssetIds = new Set<string>();
   await eachRevisionPage(repo, (page) => {

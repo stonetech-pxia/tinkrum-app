@@ -87,7 +87,7 @@ async function pdfsOf(
   );
 }
 
-/** 每页宽度 = 200 + 页码（0 起），用来检查页序。 */
+/** Page width = 200 + page number (starting from 0), used to check page order. */
 const widths = (doc: PDFDocument) => doc.getPages().map((p) => p.getWidth());
 
 describe('PDF tool workflows', () => {
@@ -113,7 +113,7 @@ describe('PDF tool workflows', () => {
     const [{ item, doc }] = await pdfsOf(files, await run());
     expect(item).toMatchObject({ name: 'a', pageCount: 4 });
     expect(widths(doc)[0]).toBe(200);
-    // 横图放在横向 A4 上（842 × 595 pt）。
+    // Landscape image placed on landscape A4 (842 x 595 pt).
     expect(Math.round(doc.getPage(2).getWidth())).toBe(842);
     expect(widths(doc)[3]).toBe(200);
   });
@@ -127,13 +127,13 @@ describe('PDF tool workflows', () => {
     const [first] = await pdfsOf(plain.files, await plain.run());
     expect(first!.item.pageCount).toBe(2);
     const page = first!.doc.getPage(0);
-    // A4：短边 595 pt。
+    // A4: short side 595 pt.
     expect(Math.round(Math.min(page.getWidth(), page.getHeight()))).toBe(595);
-    // 原图是 JPEG：直接嵌入，不重新编码。
+    // Original image is JPEG: embedded directly without re-encoding.
     expect(plain.files.encodes).toEqual([]);
 
     const limited = setup(toolWorkflow('pdf-images'), { pageSize: 'a4', maxMB: 4 });
-    // 6 张约 2 MB 的照片（真实 JPEG 开头 + 补零），合计远超 4 MB。
+    // 6 photos of about 2 MB each (real JPEG header + zero padding), totaling well over 4 MB.
     const big = (name: string) => {
       const jpeg = limited.files.disk.get(limited.files.offerImage('x.jpg', 1, 1).uri)!;
       const bytes = new Uint8Array(2 * 1024 * 1024);
@@ -161,7 +161,7 @@ describe('PDF tool workflows', () => {
   });
 
   it('keeps the PDF as it is when nothing on the page screen changed', async () => {
-    // 合并后的 PDF 直接点「完成」：不再把每一页复制一遍（手机上这一步曾报「文件可能已损坏」）。
+    // Tap "Done" directly after merging the PDF: no longer copies every page again (on mobile, this step used to report "File may be corrupted").
     const { files, run } = setup(toolWorkflow('pdf-arrange'), {}, [
       { index: 0, rotate: 0 },
       { index: 1, rotate: 0 },
@@ -174,7 +174,7 @@ describe('PDF tool workflows', () => {
   });
 
   it('reports what really went wrong when arranging fails after the PDF opened', async () => {
-    // 页面整理界面自己出错，不是文件坏了：照实说，下次能看出原因。
+    // Page arrangement interface encountered an error of its own, not file corruption: report truthfully so the cause can be identified next time.
     const { files, run } = setup(toolWorkflow('pdf-arrange'), {}, async () => {
       throw new TypeError('page screen broke');
     });
@@ -249,9 +249,9 @@ describe('PDF tool workflows', () => {
     );
     const doc = await PDFDocument.create();
     doc.addPage();
-    // 不用对象流保存才有 trailer 字典（默认是交叉引用流，下面的替换会落空）。
+    // Saving without object streams produces a trailer dictionary (default is cross-reference stream, and the replacement below would fail).
     const bytes = await doc.save({ useObjectStreams: false });
-    // 在 trailer 里加一个 /Encrypt 引用，pdf-lib 会把它当作加密文件。
+    // Adding an /Encrypt reference in the trailer makes pdf-lib treat it as an encrypted file.
     const text = new TextDecoder('latin1')
       .decode(bytes)
       .replace('trailer\n<<', 'trailer\n<<\n/Encrypt 1 0 R');

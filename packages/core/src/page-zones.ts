@@ -1,6 +1,6 @@
 import { isKnownComponent, type Component, type KnownComponent, type Page } from './schema';
 
-// 页面的固定区（创始人 2026-11-04 定）：配置里还是一串 page.blocks，只在画的时候按 pin 分开（和右下角的浮动「+」一样）。
+// Fixed zones of a page (established by founder 2026-11-04): config still stores a sequence of page.blocks, split by pin only during rendering (similar to the bottom-right floating "+").
 
 export type BrowseListBlock = Extract<KnownComponent, { look: 'list' | 'cards' | 'checklist' }>;
 
@@ -9,7 +9,7 @@ const isBrowseList = (c: Component): c is BrowseListBlock =>
   (c.look === 'list' || c.look === 'cards' || c.look === 'checklist') &&
   c.show.browse !== undefined;
 
-/** 页面顶层有 show.browse 的列表（隐藏的也算：校验看配置，隐藏只影响显示）。分组里的不算。 */
+/** Top-level lists in the page with show.browse (including hidden ones: validation checks config, while hiding only affects display). Excludes lists inside groups. */
 export const pageBrowseLists = (page: Page): BrowseListBlock[] => page.blocks.filter(isBrowseList);
 
 export const pageDial = (page: Page): Extract<KnownComponent, { look: 'dial' }> | undefined =>
@@ -18,14 +18,14 @@ export const pageDial = (page: Page): Extract<KnownComponent, { look: 'dial' }> 
       !c.hidden && isKnownComponent(c) && c.look === 'dial',
   );
 
-/** 页面上的时间范围块（D-440）：一页最多一个，隐藏的不算。 */
+/** Time range block on the page (D-440): at most one per page, excluding hidden ones. */
 export const pagePeriod = (page: Page): Extract<KnownComponent, { look: 'period' }> | undefined =>
   page.blocks.find(
     (c): c is Extract<KnownComponent, { look: 'period' }> =>
       !c.hidden && isKnownComponent(c) && c.look === 'period',
   );
 
-/** 页面上的一排选项（D-573）：一页最多一个，隐藏的不算。 */
+/** Row of options on the page (D-573): at most one per page, excluding hidden ones. */
 export const pageChoices = (page: Page): Extract<KnownComponent, { look: 'choices' }> | undefined =>
   page.blocks.find(
     (c): c is Extract<KnownComponent, { look: 'choices' }> =>
@@ -33,8 +33,9 @@ export const pageChoices = (page: Page): Extract<KnownComponent, { look: 'choice
   );
 
 /**
- * 状态要放在页面上的那个列表：搜索、排序、筛选要画在固定区（browse.pin），或者分开的浮动按钮要拿它选出的记录。
- * 隐藏的不算。其余的列表状态在自己的块里。
+ * The list whose state should be kept on the page: search, sorting, and filtering are rendered in
+ * the fixed zone (browse.pin), or separate floating buttons use its selected records. Excludes
+ * hidden lists. Other lists maintain state within their own blocks.
  */
 export function pageBrowseHost(page: Page): BrowseListBlock | undefined {
   const visible = pageBrowseLists(page).filter((c) => !c.hidden);
@@ -42,7 +43,7 @@ export function pageBrowseHost(page: Page): BrowseListBlock | undefined {
   return visible.find((c) => c.show.browse?.pin === true) ?? (handing ? visible[0] : undefined);
 }
 
-/** 页面分成上、中、下三段（隐藏的不画）。 */
+/** Page divided into top, middle, and bottom sections (hidden ones are not rendered). */
 export function pageZones(page: Page): {
   top: Component[];
   middle: Component[];

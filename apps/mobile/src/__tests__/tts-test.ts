@@ -7,7 +7,7 @@ import type {
 } from '../../modules/morph-tts';
 import { createSpeaker } from '../runtime/expo-tts';
 
-// 文字转语音的 App 一侧（D-270）：用假的原生模块检查输出地址、进度、取消和错误码。
+// Text-to-speech app side (D-270): use a fake native module to check output address, progress, cancellation, and error codes.
 
 class FakeTTS implements MorphTTSModule {
   calls: { segments: readonly string[]; options: SynthesizeOptions }[] = [];
@@ -21,7 +21,7 @@ class FakeTTS implements MorphTTSModule {
     channels: 1,
   };
   error: { code: string; message: string } | null = null;
-  /** synthesize 等到 release 才返回（测取消）。 */
+  /** Synthesize waits until release before returning (to test cancellation). */
   hold = false;
   private release: (() => void) | null = null;
   private listeners: ((e: TTSProgressEvent) => void)[] = [];

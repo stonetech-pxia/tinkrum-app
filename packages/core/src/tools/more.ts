@@ -9,8 +9,9 @@ import type { ToolDefinition } from '../registry';
 import type { IconName, Locale, QuickAction } from '../schema';
 import type { ActionDefinition } from '../workflow/contract';
 
-// T6 的小工具：压缩包（fflate）、二维码（lean-qr / jsQR）、文字转 PDF、用记录生成 PDF。
-// 实现分别在 packages/tool-archive、packages/tool-qr、core/html.ts 和 App 运行时（expo-print）。
+// T6 sub-tools: archives (fflate), QR codes (lean-qr / jsQR), text-to-PDF, and generating PDFs from
+// records. Implementations reside in packages/tool-archive, packages/tool-qr, core/html.ts, and the
+// app runtime (expo-print) respectively.
 
 const pageSizeField = {
   key: 'pageSize',
@@ -22,7 +23,7 @@ const pageSizeField = {
   ],
 } as const;
 
-/** 一个工具：单功能工作流放在工具页上，每个一个运行卡片。 */
+/** A tool: single-feature workflows placed on the tools page, each with its own run card. */
 function simpleTool(spec: {
   id: string;
   version: string;
@@ -70,7 +71,7 @@ function simpleTool(spec: {
   };
 }
 
-// ---- 压缩包 ----
+// ---- Archives ----
 
 export const ZIP_ACTIONS: readonly ActionDefinition[] = [
   {
@@ -86,7 +87,7 @@ export const ZIP_ACTIONS: readonly ActionDefinition[] = [
     params: z.strictObject(groupParams).refine(groupNeedsSize, { message: 'groupSize is missing' }),
     fields: GROUP_FIELDS,
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [{ match: /^(?:打包|打包成|压缩成)\s*zip$|^(?:zip(?: them)?|make a zip)$/i }],
   },
   {
@@ -158,7 +159,7 @@ export const zipTool = simpleTool({
   ],
 });
 
-// ---- 二维码 ----
+// ---- QR Codes ----
 
 export const QR_ACTIONS: readonly ActionDefinition[] = [
   {
@@ -251,7 +252,7 @@ export const qrTool = simpleTool({
       ],
     },
     {
-      // D-199：给客人连 Wi-Fi 的码。每次问网络名和加密方式，密码总是问、不保存。
+      // id: 'qr-wifi',
       id: 'qr-wifi',
       name: t(locale, 'more_Wi_Fi_QR_code_12af4'),
       steps: [
@@ -275,7 +276,7 @@ export const qrTool = simpleTool({
   ],
 });
 
-// ---- 文字 ----
+// ---- Text ----
 
 export const TEXT_ACTIONS: readonly ActionDefinition[] = [
   {
@@ -325,7 +326,7 @@ export const TEXT_ACTIONS: readonly ActionDefinition[] = [
     params: z.strictObject({}),
     fields: [],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -360,10 +361,10 @@ export const TEXT_ACTIONS: readonly ActionDefinition[] = [
     params: z.strictObject({}),
     fields: [],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [{ match: /^复制(?:文字|译文|结果|下来)?$|^copy(?: the)? (?:text|translation)$/i }],
   },
-  // ---- 文字加工（D-245）：text → text，文字只在本机处理 ----
+  // ---- Text processing (D-245): text -> text, text is processed entirely on-device ----
   {
     id: 'text.tidy',
     label: { en: 'Tidy up text', zh: '整理文字', fr: 'Nettoyer le texte' },
@@ -425,7 +426,7 @@ export const TEXT_ACTIONS: readonly ActionDefinition[] = [
     input: ['text'],
     output: 'same',
     params: z.strictObject({
-      // 空的时候什么都不换（新加的步骤先是空的，编辑页里再填）。
+      // Leaves text unchanged when empty (newly added steps start empty and are filled in the edit page).
       find: z.string().max(200),
       replaceWith: z.string().max(200),
       ignoreCase: z.boolean(),
@@ -566,7 +567,7 @@ export const textTool = simpleTool({
   ],
 });
 
-// ---- 用记录生成 PDF ----
+// ---- Generate PDF from records ----
 
 export const PRINT_ACTIONS: readonly ActionDefinition[] = [
   {
@@ -639,6 +640,6 @@ export const printTool = simpleTool({
   aliases: ['print', 'report', 'records to pdf', '打印', '报表', '记录生成pdf'],
   permissions: ['files.write'],
   actions: PRINT_ACTIONS,
-  // 报表要先有数据表：工作流由用户或 AI 按自己的表创建（in.records → print.records）。
+  // Reports require an existing data table: workflows are created by the user or AI based on their tables (in.records -> print.records).
   workflows: () => [],
 });

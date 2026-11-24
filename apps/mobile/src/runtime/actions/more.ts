@@ -65,8 +65,8 @@ import {
   type RunServices,
 } from './helpers';
 
-// T6 的其他动作：输入文字、读取记录、ZIP、二维码、文字转 PDF、用记录生成 PDF。
-// 文字和记录只在本机处理（D-036、D-042）。
+// Other T6 actions: input text, read records, ZIP, QR code, text to PDF, generate PDF from records.
+// Text and records are processed locally only (D-036, D-042).
 
 type Impl = ActionImpl<RunServices>;
 
@@ -97,7 +97,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
   },
 
   async 'in.wifi'(_input, params, ctx) {
-    // 密码每次运行时问，只在这次运行里（D-199、D-194）。
+    // Password asked on every run, only for this run (D-199, D-194).
     const network = {
       name: String(params.network ?? ''),
       security: params.security as 'WPA' | 'WEP' | 'none',
@@ -122,7 +122,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
     const collection = ctx.services.collections.find((c) => c.id === params.collectionId);
     if (!collection) throw new RunError('notFound', { name: String(params.collectionId) });
     const period = params.period as 'all' | Period;
-    // 查找、汇总、上一条（D-291）带上算出来的值，报表里能印出来。
+    // Find, aggregate, previous record (D-291) include computed values so they can be printed in reports.
     let { records } = await loadComputedRecords(
       (id) => ctx.services.repo.listRecords(id),
       ctx.services.collections,
@@ -133,7 +133,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
     if (period !== 'all') {
       const cal = ctx.services.calendar;
       const [start, end] = periodRange(period, ctx.now(), cal);
-      // 按表里第一个日期字段；没有日期字段就按创建时间（算哪一天按 D-286）。
+      // According to the first date field in the table; if no date field exists, use the creation time (date determination follows D-286).
       const dateField = collection.fields.find((f) => f.type === 'date');
       records = records.filter((r) => {
         const raw = dateField ? r.values[dateField.id] : dayOf(new Date(r.createdAt), cal);
@@ -155,10 +155,10 @@ export const MORE_IMPLS: Record<string, Impl> = {
     }
     const table = ctx.services.collections.find((c) => c.id === input.collectionId);
     if (!table) throw new RunError('notFound', { name: input.name });
-    // 查找、汇总、上一条按它们显示的那种字段印（D-291；值在 in.records 里算好了）。
+    // Find, aggregate, and previous record print using the type of field they display (D-291; values are computed in in.records).
     const collection = expandCollection(ctx.services.collections, table);
     const pageSize = params.pageSize as PageSize;
-    // 引用字段印出被引用记录的标题（D-250）。
+    // Reference fields print the title of the referenced record (D-250).
     const links = await loadLinkResolver(
       (id) => ctx.services.repo.listRecords(id),
       ctx.services.collections,
@@ -184,7 +184,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
         name,
       );
     if (params.attachments !== true) return { type: 'pdf', items: [await report([])] };
-    // D-425：先处理附件，报表上才写得出哪些没放进来。原件只读；中间文件属于这次运行，用完就删。
+    // D-425: Process attachments first so reports can state which ones were not included. Originals are read-only; intermediate files belong to this run and are deleted after use.
     let collected: CollectedAttachments | undefined;
     try {
       collected = await collectAttachments(
@@ -201,7 +201,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
     }
   },
 
-  // D-423：只有用户运行这个快捷操作时才做文件；要离开 App 还要接 out.share，也是用户点的（底线 10）。
+  // D-423: Generate files only when the user runs this quick action; leaving the app also requires chaining out.share, which is also user-triggered (invariant 10).
   async 'records.toVCard'(input, _params, ctx) {
     if (!input || input.type !== 'records') {
       throw new RunError('unexpected', { detail: 'no records' });
@@ -218,7 +218,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
     return { type: 'files', items: [item] };
   },
 
-  // D-428：和 records.toVCard 同样的内容，但是文字：能接生成二维码。
+  // D-428: Same content as records.toVCard, but as text: can be chained to generate a QR code.
   async 'records.toVCardText'(input, _params, ctx) {
     if (!input || input.type !== 'records') {
       throw new RunError('unexpected', { detail: 'no records' });
@@ -230,13 +230,13 @@ export const MORE_IMPLS: Record<string, Impl> = {
     return { type: 'text', text, name: input.name };
   },
 
-  // D-428：把交来的文字打开：系统的拨号、短信、写信、浏览器页面，什么都没有发出去。规则只有 core 的 actionLink。
+  // D-428: Open text passed in: system dialer, SMS, email compose, browser pages; nothing is sent out. The only rule is core's actionLink.
   'out.call': openLinkAction('phone'),
   'out.message': openLinkAction('message'),
   'out.email': openLinkAction('email'),
   'out.website': openLinkAction('url'),
 
-  // D-427：和 vCard 一样只做一个文件，要离开 App 还要接 out.share（底线 10）。列和 CSV 一样。
+  // D-427: Like vCard, creates only a single file, and leaving the app requires chaining out.share (invariant 10). Columns are the same as CSV.
   async 'records.toExcel'(input, params, ctx) {
     if (!input || input.type !== 'records') {
       throw new RunError('unexpected', { detail: 'no records' });
@@ -309,7 +309,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
     return value;
   },
 
-  // 文字加工（D-245）：只在本机处理。结果是空的就说明，不交给下一步一段空文字。
+  // Text processing (D-245): Processed locally only. If the result is empty, it means do not pass empty text to the next step.
   async 'text.tidy'(input, params) {
     const value = textOf(input);
     const text = tidyText(value.text, params.blankLines as BlankLines, params.spaces === true);
@@ -349,7 +349,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
 
   async 'zip.create'(input, params, ctx) {
     const items = fileItems(input);
-    // fflate 在内存里打包：视频和音频也按 P-006 的 50 MB 算，不能用 MEDIA_LIMITS（D-142）。
+    // Pack in memory using fflate: video and audio also count towards the 50 MB limit of P-006 and cannot use MEDIA_LIMITS (D-142).
     for (const item of items) {
       if (item.size > FILE_LIMITS.maxFileBytes) {
         throw new RunError('tooLarge', {
@@ -358,7 +358,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
         });
       }
     }
-    // D-243：分组时每组一个 ZIP，名字是这一组的名字（日期或第一个文件的名字）。
+    // D-243: Group into one ZIP per group, named after the group name (date or the name of the first file).
     const groups = groupItems(
       items,
       params.group as GroupRule | undefined,
@@ -402,7 +402,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
         throw archiveError(e, item);
       }
       for (const [i, entry] of entries.entries()) {
-        // 压缩包里的目录层级去掉，只留文件名（tool-archive 已经去掉了 ../ 之类的路径）。
+        // Remove directory nesting levels in the archive, keeping only file names (tool-archive has already removed paths like ../).
         const fileName = entry.name.split('/').pop()!;
         out.push(
           await writeItem(ctx.services, entry.bytes, {
@@ -428,7 +428,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
       }
       throw new RunError('emptyText');
     }
-    // 每个模块整数个像素，留白 4 个模块，尽量接近要求的大小。
+    // An integer number of pixels per module, leaving a 4-module margin, as close to the requested size as possible.
     const scale = Math.max(1, Math.floor(Number(params.sizePx) / (matrix.size + 8)));
     const png = encodePng(qrToRgba(matrix, { scale }));
     const width = (matrix.size + 8) * scale;
@@ -462,7 +462,7 @@ export const MORE_IMPLS: Record<string, Impl> = {
   },
 };
 
-/** 用系统打印排版把 HTML 变成 PDF。 */
+/** Convert HTML to PDF using system print layout. */
 async function printHtml(
   services: RunServices,
   html: string,

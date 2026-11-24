@@ -1,6 +1,6 @@
-// whisper.cpp 的 JNI 接口（D-151），给 WhisperNative.kt 用。
-// 不从 whisper 的回调里调 JNI（中止回调在 ggml 的工作线程上跑）：进度和取消都是原子变量，Kotlin 轮询。
-// 识别出的文字只返回给 App，不写日志。
+// JNI interface for whisper.cpp (D-151), used by WhisperNative.kt. JNI is not called from whisper
+// callbacks (abortion callbacks run on ggml worker threads): progress and cancellation are atomic
+// variables polled by Kotlin. Recognized text is returned to the app only and is not logged.
 
 #include <jni.h>
 
@@ -24,10 +24,12 @@ struct Session {
 std::once_flag backends_once;
 std::string backend_name = "builtin";
 
-// arm64 上 ggml 的 CPU 后端编成了几种（CMakeLists.txt）：按从新到旧的顺序试，
-// ggml_backend_load 会先问这台手机支不支持（ggml_backend_score），不支持就跳过。
-// 不用带 SVE / SME 的几种（armv9.x，build.gradle 也不打包）：Android 模拟器在苹果芯片上声称支持 SVE2 / SME2，
-// 实际一用就卡死；Mac 上同样的代码直接报非法指令。手机上 128 位的 SVE 也不比 NEON 快。
+// Several ggml CPU backends are compiled for arm64 (CMakeLists.txt): tried in order from newest to
+// oldest; ggml_backend_load first checks whether the device supports it (ggml_backend_score),
+// skipping it if unsupported. Skips backends with SVE / SME (armv9.x, not packaged in build.gradle
+// either): Android simulators on Apple Silicon claim to support SVE2 / SME2 but freeze upon use,
+// and the same code triggers illegal instruction errors on Macs. 128-bit SVE on phones is also no
+// faster than NEON.
 void load_backends() {
 #ifdef MORPH_GGML_DL
   std::call_once(backends_once, [] {
@@ -70,7 +72,7 @@ Java_expo_modules_morphspeech_WhisperNative_backend(JNIEnv *env, jobject) {
   return env->NewStringUTF(backend_name.c_str());
 }
 
-// whisper 能识别的语言代码（zh、en…）。
+// Language codes recognizable by whisper (zh, en, etc.).
 JNIEXPORT jobjectArray JNICALL
 Java_expo_modules_morphspeech_WhisperNative_languages(JNIEnv *env, jobject) {
   const int n = whisper_lang_max_id() + 1;
@@ -81,7 +83,7 @@ Java_expo_modules_morphspeech_WhisperNative_languages(JNIEnv *env, jobject) {
   return out;
 }
 
-// 加载模型；vadPath 是语音检测模型（跳过没人说话的部分，避免 whisper 在静音里「编」出句子）。失败返回 0。
+// Loads the model; vadPath is the voice activity detection model (skipping silent segments to prevent whisper from "hallucinating" sentences in silence). Returns 0 on failure.
 JNIEXPORT jlong JNICALL Java_expo_modules_morphspeech_WhisperNative_init(
     JNIEnv *env, jobject, jstring model_path, jstring vad_path) {
   load_backends();
@@ -117,7 +119,7 @@ JNIEXPORT jint JNICALL Java_expo_modules_morphspeech_WhisperNative_progress(JNIE
   return session(handle)->progress.load();
 }
 
-// 识别一段 16 kHz 单声道的声音。返回段数；取消返回 -1，失败返回 -2。
+// Transcribes a 16 kHz mono audio segment. Returns the number of segments; returns -1 on cancellation, or -2 on failure.
 JNIEXPORT jint JNICALL Java_expo_modules_morphspeech_WhisperNative_transcribe(
     JNIEnv *env, jobject, jlong handle, jfloatArray samples, jint count, jstring language,
     jstring prompt, jint threads) {
@@ -165,7 +167,7 @@ JNIEXPORT jint JNICALL Java_expo_modules_morphspeech_WhisperNative_transcribe(
   return whisper_full_n_segments(s->ctx);
 }
 
-// 段的文字（UTF-8 字节，由 Kotlin 解码：NewStringUTF 要的是改过的 UTF-8，表情符号会出错）。
+// Segment text (UTF-8 bytes, decoded by Kotlin: NewStringUTF expects modified UTF-8, emojis will cause errors).
 JNIEXPORT jbyteArray JNICALL Java_expo_modules_morphspeech_WhisperNative_segmentText(
     JNIEnv *env, jobject, jlong handle, jint i) {
   const char *text = whisper_full_get_segment_text(session(handle)->ctx, i);
@@ -175,7 +177,7 @@ JNIEXPORT jbyteArray JNICALL Java_expo_modules_morphspeech_WhisperNative_segment
   return out;
 }
 
-// 段的开始 / 结束时间（毫秒，相对这一段声音的开头）。
+// Segment start / end time (ms, relative to the beginning of this audio segment).
 JNIEXPORT jlong JNICALL Java_expo_modules_morphspeech_WhisperNative_segmentStart(
     JNIEnv *, jobject, jlong handle, jint i) {
   return whisper_full_get_segment_t0(session(handle)->ctx, i) * 10;

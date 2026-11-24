@@ -131,7 +131,7 @@ describe('imagesToPdf', () => {
       A4,
     );
     const content = await pageContent(result.bytes, 0);
-    // 渲染模式 3（不可见）：两行拉丁字母用 Helvetica，中日韩那两行用看不见的字体（UTF-16 十六进制）。
+    // Rendering mode 3 (invisible): two lines of Latin letters use Helvetica, and the CJK lines use the invisible font (UTF-16 hex).
     expect(content.match(/3 Tr/g)).toHaveLength(4);
     expect(content.match(/\bTj\b/g)).toHaveLength(4);
     expect(content).toMatch(/\d+(\.\d+)? Tz/);
@@ -141,11 +141,11 @@ describe('imagesToPdf', () => {
     );
     expect(decoded).toContain('合计 128 元');
     expect(decoded).toContain('お会計 합계');
-    // 字体是 Type0 + Identity-H，带 ToUnicode（搜索和复制靠它）和嵌入的字体文件。
+    // Fonts are Type0 + Identity-H with ToUnicode (for search and copy) and embedded font files.
     const fonts = await pageFonts(result.bytes, 0);
     const cjk = fonts.find((f) => f.subtype === 'Type0');
     expect(cjk).toMatchObject({ encoding: 'Identity-H', toUnicode: true, embedded: true });
-    // 第二页没有文字。
+    // The second page has no text.
     expect(await pageContent(result.bytes, 1)).not.toMatch(/Tr/);
   });
 

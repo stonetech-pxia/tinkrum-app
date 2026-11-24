@@ -1,20 +1,20 @@
 import { PDFDocument } from 'pdf-lib';
 
-// 所有 PDF 函数共用的类型、错误与加载逻辑。
+// Common types, errors, and loading logic shared by all PDF functions.
 
 export type PdfErrorCode =
   | 'tooFew'
   | 'encrypted'
   | 'unreadable'
-  /** 页码越界、重复或页面规则无法解析。 */
+  /** Page number out of bounds, duplicate, or page rule unparseable. */
   | 'badRange'
-  /** 数值参数越界或格式不对（边距、字号、颜色等）。 */
+  /** Numeric parameter out of bounds or invalid format (margins, font size, color, etc.). */
   | 'badOption'
-  /** 图片字节无法按声明的格式嵌入。 */
+  /** Image bytes cannot be embedded according to the declared format. */
   | 'badImage'
-  /** 标准字体（WinAnsi）无法编码的文字，例如中文。 */
+  /** Text unencodable in standard fonts (WinAnsi), such as Chinese. */
   | 'unsupportedText'
-  /** 表单字段不存在，或值与字段类型不匹配。 */
+  /** Form field does not exist, or value does not match field type. */
   | 'badField';
 
 export class PdfError extends Error {
@@ -37,9 +37,8 @@ export interface MergeResult {
   pageCount: number;
 }
 
-/** 加载 PDF；加密或损坏时抛出 PdfError（带上文件名，若有）。 */
-// 注意：pdf-lib 的错误类是 ES5 编译产物，`instanceof EncryptedPDFError` 永远为 false，
-// 所以改为忽略加密先解析，再看 isEncrypted。
+/** Note: pdf-lib's error classes are ES5 build outputs, so `instanceof EncryptedPDFError` is always false, so switch to ignoring encryption during initial parsing and checking isEncrypted afterwards. */
+// Load PDF; throws PdfError (with filename, if any) if encrypted or corrupted.
 export async function loadPdf(bytes: Uint8Array, name?: string): Promise<PDFDocument> {
   let doc: PDFDocument;
   try {
@@ -51,12 +50,12 @@ export async function loadPdf(bytes: Uint8Array, name?: string): Promise<PDFDocu
   return doc;
 }
 
-/** 数值必须是 [min, max] 内的有限数，否则视为参数错误。 */
+/** Numeric value must be a finite number within [min, max], otherwise treated as a parameter error. */
 export function assertNumber(value: number, min: number, max: number): void {
   if (!Number.isFinite(value) || value < min || value > max) throw new PdfError('badOption');
 }
 
-/** 页码列表不能为空，下标必须是 [0, pageCount) 内的整数，且不重复。 */
+/** Page list cannot be empty, indices must be integers within [0, pageCount), and must not contain duplicates. */
 export function assertPageIndices(indices: readonly number[], pageCount: number): void {
   if (indices.length < 1) throw new PdfError('badRange');
   for (const i of indices) {
@@ -65,7 +64,7 @@ export function assertPageIndices(indices: readonly number[], pageCount: number)
   if (new Set(indices).size !== indices.length) throw new PdfError('badRange');
 }
 
-// WinAnsi（pdf-lib 标准字体的编码）= 可打印 ASCII、Latin-1 补充，外加以下 27 个字符。
+// WinAnsi (pdf-lib standard font encoding) = printable ASCII, Latin-1 supplement, plus the following 27 characters.
 const WIN_ANSI_EXTRA = new Set([
   0x152, 0x153, 0x160, 0x161, 0x178, 0x17d, 0x17e, 0x192, 0x2c6, 0x2dc, 0x2013, 0x2014, 0x2018,
   0x2019, 0x201a, 0x201c, 0x201d, 0x201e, 0x2020, 0x2021, 0x2022, 0x2026, 0x2030, 0x2039, 0x203a,
@@ -73,8 +72,9 @@ const WIN_ANSI_EXTRA = new Set([
 ]);
 
 /**
- * 文字能否用标准字体（Helvetica 等）绘制。不能时（如中文、emoji、换行符），
- * App 应改用 Skia 把文字渲染成 PNG，再用 stampImage。
+ * Whether text can be rendered using standard fonts (such as Helvetica). When it cannot (e.g.,
+ * Chinese, emoji, newlines), the app should instead use Skia to render the text to a PNG and use
+ * stampImage.
  */
 export function canEncodeStandardText(text: string): boolean {
   for (const ch of text) {
@@ -85,7 +85,7 @@ export function canEncodeStandardText(text: string): boolean {
   return true;
 }
 
-/** pdf-lib 在标准字体无法编码文字时抛出的普通 Error。 */
+/** Standard Error thrown by pdf-lib when a standard font cannot encode the text. */
 export function isEncodingError(e: unknown): boolean {
   return e instanceof Error && e.message.includes('cannot encode');
 }

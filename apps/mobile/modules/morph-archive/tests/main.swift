@@ -1,8 +1,9 @@
 import Foundation
 
-// zip 编解码的测试（scripts/test-native-archive.mjs 编译并运行）：
-//   main <工作目录> <python 做的压缩包目录>
-// 写出的包交给 unzip 和 python 核对（脚本做），这里读 python 写的包、读自己写的包、检查恶意的包被拒绝。
+// ZIP codec tests (compiled and run by scripts/test-native-archive.mjs): main <working-dir>
+// <python-archive-dir>. Written archives are verified against unzip and python (via script), reads
+// python-generated archives and self-generated archives, and tests that malicious archives are
+// correctly rejected.
 
 var failures = 0
 func check(_ ok: Bool, _ what: String) {
@@ -31,7 +32,7 @@ func writeArchive(_ url: URL, force: Bool, files: [(String, Data, Bool)]) throws
       read: {
         if given { return Data() }
         given = true
-        // 分块给，试到多块的路径。
+        // Supplied in chunks to exercise multi-chunk code paths.
         return data
       }, shouldCancel: { false }, progress: { _ in })
   }
@@ -78,7 +79,7 @@ for (label, force) in [("plain", false), ("zip64", true)] {
   }
 }
 
-// 很多条目（超过 65535 → Zip64 结尾）。
+// Many entries (exceeding 65535 -> Zip64 end record).
 do {
   let url = work.appendingPathComponent("many.zip")
   try? FileManager.default.removeItem(at: url)
@@ -92,7 +93,7 @@ do {
   check(false, "many: \(error)")
 }
 
-// python 写的包：读得出来；恶意的包拒绝。
+// Python-generated archives: successfully readable; malicious archives rejected.
 let expected: [String: ZipFail?] = [
   "ok-deflate.zip": nil,
   "ok-zip64.zip": nil,
@@ -123,7 +124,7 @@ for (name, want) in expected.sorted(by: { $0.key < $1.key }) {
   }
 }
 
-// 取消：停在中间，抛 cancelled。
+// Cancellation: stop in the middle and throw cancelled.
 do {
   let url = work.appendingPathComponent("cancel.zip")
   var calls = 0
@@ -144,7 +145,7 @@ do {
   check(false, "cancel: \(error)")
 }
 
-// 手动跑一次：超过 4 GB 的单个文件（不进 npm run check，太慢）。参数 big：写 4.2 GB 的零（压缩后很小）再读回来。
+// Run manually: single file exceeding 4 GB (excluded from npm run check due to slowness). Argument big: write 4.2 GB of zeros (very small after compression) and read back.
 if CommandLine.arguments.count > 3, CommandLine.arguments[3] == "big" {
   let url = work.appendingPathComponent("big.zip")
   try? FileManager.default.removeItem(at: url)

@@ -1,4 +1,4 @@
-// fonts 套件：字体、字号、粗体和下划线、标题、对齐。
+// fonts suite: fonts, font size, bold and underline, headings, alignment.
 import { aligned, custom, heading, leaves, table } from '../lib/checks';
 import type { Case } from '../lib/case';
 import {
@@ -14,7 +14,7 @@ import {
   xmlParas,
 } from '../lib/layout-checks';
 
-/** 这处文字所在段的左缩进（twip）；没有这段时 NaN。 */
+/** Left indentation (in twips) of the paragraph containing this text; NaN when the paragraph is absent. */
 const indentOf = (c: Parameters<Parameters<typeof custom>[1]>[0], text: string) => {
   const p = xmlPara(c, text);
   return p ? indentLeft(p) : NaN;

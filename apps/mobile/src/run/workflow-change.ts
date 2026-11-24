@@ -4,8 +4,9 @@ import { Alert } from 'react-native';
 import { t } from '../i18n';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 
-// 工作流页和编辑页的修改：走和 AI 相同的协议（proposeOps → confirm），每次生成一个 source 为 user 的版本，
-// 提示条可撤销（D-082）。用户在界面上点的就是确认，所以不再弹预览。
+// Modifications to workflow and edit pages: follows the same protocol as AI (proposeOps → confirm),
+// generating a version with source set to user each time, with an undoable banner (D-082). User
+// taps in the interface directly confirm, so the preview dialog is skipped.
 
 export function useWorkflowChange() {
   const { locale } = useWorkspaceContext();
@@ -27,7 +28,7 @@ export function useWorkflowChange() {
   };
 }
 
-/** 删除之前确认一次。 */
+/** Confirm before deleting. */
 export function confirmDelete(
   locale: 'en' | 'zh' | 'fr',
   name: string,

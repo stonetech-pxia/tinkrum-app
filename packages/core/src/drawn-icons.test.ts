@@ -11,16 +11,16 @@ import {
   renameDrawnIcons,
 } from './drawn-icons';
 
-// 画出来的图标的路径语法（D-625）：只收 SVG path 的几何命令和普通的数。
+// Drawn icon path syntax (D-625): only accepts SVG path geometry commands and ordinary numbers.
 
 describe('pathDataProblem', () => {
   it('accepts real icon paths, with arcs, relative commands, implicit repeats and compact numbers', () => {
     for (const d of [
-      // 心形（Material Icons）。
+      // Heart shape (Material Icons).
       'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z',
-      // 圆环（两段弧，even-odd 挖空）。
+      // Donut shape (two arcs, even-odd fill).
       'M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20zM12 6a6 6 0 1 1 0 12 6 6 0 1 1 0-12z',
-      // 紧凑的弧标志和连写的小数。
+      // Compact arc flags and chained decimals.
       'M2 2a1 1 0 00 1 1a.5.5 0 01.5.5',
       'm4 4h16v16H4z',
       'M3 12h18M12 3v18',

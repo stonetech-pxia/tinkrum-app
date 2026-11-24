@@ -7,14 +7,15 @@ import type { ToolDefinition } from '../registry';
 import type { Locale, Workflow } from '../schema';
 import type { ActionDefinition, ParamField } from '../workflow/contract';
 
-// 内置 PDF 工具的清单（Tool Manifest）。动作的真实实现在 packages/tool-pdf（pdf-lib）
-// 和 App 运行时中；这里只声明契约，供校验、预览和 mock AI 使用。
+// Manifest of built-in PDF tools (Tool Manifest). Actual action implementations reside in
+// packages/tool-pdf (pdf-lib) and the app runtime; this file only declares contracts for
+// validation, preview, and mock AI use.
 
 export const PDF_TOOL_ID = 'pdf';
 export const PDF_PAGE_ID = 'tool-pdf';
 export const PDF_MERGE_WORKFLOW_ID = 'pdf-merge';
 
-/** 按页码选页的规则：AI 只能选这些符号规则，看不到文件内容（open-tool-research N4）。 */
+/** Page selection rules by page number: AI can only select these symbolic rules and cannot see file contents (open-tool-research N4). */
 export const PAGE_RULES = ['all', 'odd', 'even', 'first', 'last', 'range'] as const;
 
 const ruleFields: ParamField[] = [
@@ -134,7 +135,7 @@ const positionField = (values: readonly string[]): ParamField => ({
 
 export const STAMP_COLORS = ['#000000', '#C92A2A', '#1864AB', '#868E96'] as const;
 
-/** 标注 PDF 的几种起手工具（桌面工具栏上各占一个按钮，进去以后都能换）。擦除、打码会把那一页换成图片。 */
+/** Initial tools for PDF annotation (each occupies a button on the desktop toolbar, switchable once inside). Erasure and redaction replace that page with an image. */
 const ANNOTATE_TOOLS = [
   { value: 'text', label: { en: 'Insert text', zh: '插入文字', fr: 'Insérer du texte' } },
   { value: 'note', label: { en: 'Note', zh: '注释', fr: 'Note' } },
@@ -174,10 +175,10 @@ export const PDF_ACTIONS: readonly ActionDefinition[] = [
       ...GROUP_FIELDS,
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
-        // 只说「合并成一个」是合成一段录音（audio.merge）。
+        // Merely saying "merge into one" refers to audio segment merging (audio.merge).
         match: /^合并\s*(?:pdf)?$|^合并成一个\s*pdf$|^merge(?: into one pdf)?$/i,
         step: () => ({ params: { imagePage: 'a4' } }),
       },
@@ -200,9 +201,9 @@ export const PDF_ACTIONS: readonly ActionDefinition[] = [
         marginMm: z.number().min(0).max(30),
         fit: z.enum(['contain', 'cover']),
         maxMB: z.number().min(0).max(100),
-        /** D-195：能搜索、复制文字（旧配置没有这个参数时当作关）。 */
+        /** D-195: searchable and copyable text (treated as disabled when older configurations lack this parameter). */
         textLayer: z.boolean().optional(),
-        /** D-243：每组一个 PDF。 */
+        /** D-243: one PDF per group. */
         ...groupParams,
       })
       .refine(groupNeedsSize, { message: 'groupSize is missing' }),
@@ -248,7 +249,7 @@ export const PDF_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match: /^(?:合成|转成|生成|做成)\s*(?:一个)?\s*pdf$|^(?:make|create) (?:a |one )?pdf$/i,
@@ -331,7 +332,7 @@ export const PDF_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -556,7 +557,7 @@ export const PDF_ACTIONS: readonly ActionDefinition[] = [
         kind: 'text',
         private: true,
       },
-      // 水印只问文字、颜色、方向（创始人 2026-11-06）：位置、字号、不透明度、页码范围用预设里的，AI 仍能改。
+      // The watermark tool only prompts for text, color, and direction (founder 2026-11-06): position, font size, opacity, and page range use the preset defaults, but the AI can still modify them.
       { ...positionField([...positions, 'center']), ask: false },
       {
         key: 'fontSize',
@@ -678,8 +679,9 @@ export const PDF_ACTIONS: readonly ActionDefinition[] = [
     requires: [],
   },
   {
-    // D-186：iOS 用系统的文档预览排版（Word、Excel、PowerPoint、RTF 都能看），Android 系统不会显示
-    // 办公文档，只能把 Word（.docx）转成网页再排版，复杂排版会走样。
+    // D-186: iOS uses the system document preview layout (Word, Excel, PowerPoint, and RTF are all
+    // viewable). The Android system does not display office documents natively, so Word (.docx
+    // files) must be converted to HTML before rendering; complex layouts may be distorted.
     id: 'pdf.fromDocument',
     ai: 'Word, Excel or PowerPoint to PDF → in.files with accept "documents" then this (on Android only Word works; say so in a note when they mention Excel or PowerPoint).',
     label: { en: 'Document to PDF', zh: '文档转 PDF', fr: 'Document vers PDF' },
@@ -697,7 +699,7 @@ export const PDF_ACTIONS: readonly ActionDefinition[] = [
         key: 'pageSize',
         label: { en: 'Page size', zh: '纸张', fr: 'Format du papier' },
         kind: 'choice',
-        // 工具自己的「Word / Excel / PPT 转 PDF」也不问（D-363）。
+        // The tool's own "Word / Excel / PPT to PDF" action also does not prompt (D-363).
         ask: false,
         options: [
           { value: 'a4', label: { en: 'A4', zh: 'A4', fr: 'A4' } },
@@ -729,7 +731,7 @@ export const PDF_ACTIONS: readonly ActionDefinition[] = [
     fields: [],
     pack: 'pdfview',
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -785,7 +787,7 @@ export const PDF_ACTIONS: readonly ActionDefinition[] = [
     local: 'sign',
     pack: 'pdfview',
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [{ match: /^(?:签名|签字)$|^sign(?: it)?$/i }],
   },
   {
@@ -800,7 +802,7 @@ export const PDF_ACTIONS: readonly ActionDefinition[] = [
     output: 'pdf',
     params: z.strictObject({
       flatten: z.boolean(),
-      /** 没有可填的字段时：stop 报错（默认），skip 原样交给下一步（签回表格时有的 PDF 只需要签名）。 */
+      /** When there are no fillable fields: stop throws an error (default), skip passes the entry as-is to the next step (some PDFs only require a signature when signing back a table). */
       whenNoFields: z.enum(['stop', 'skip']).optional(),
     }),
     fields: [
@@ -838,7 +840,7 @@ export const PDF_ACTIONS: readonly ActionDefinition[] = [
   },
 ];
 
-// ---- PDF 密码（D-194）：iOS 用 PDFKit；Android 先不做（P-025），运行时报不支持 ----
+// ---- PDF passwords (D-194): iOS uses PDFKit; Android is not supported yet (P-025), throwing a runtime unsupported error ----
 
 export const PDF_PASSWORD_ACTIONS: readonly ActionDefinition[] = [
   {
@@ -891,7 +893,7 @@ const pickPdf = (min: number, max: number) => ({
   params: { accept: 'pdf', min, max },
 });
 
-/** 单功能工作流（D-061）。合并 PDF（pdf-merge）保持原来的 ID 和步骤。 */
+/** Single-function workflow (D-061). Merging PDFs (pdf-merge) preserves the original IDs and steps. */
 export function pdfWorkflows(locale: Locale): Workflow[] {
   const wf = (id: string, name: [string, string], steps: Workflow['steps']): Workflow => ({
     id,

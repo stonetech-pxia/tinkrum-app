@@ -6,9 +6,11 @@ import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 
-// 桌面小组件的两份文件（D-321–D-323），在 App 自己的 files/widgets 里：snapshot.json 是 App 算好的画面
-// （格式见 src/widgets/types.ts），queue/ 是小组件上点了、App 还没执行的操作，一次点按一个文件。
-// 哪个小组件显示哪个组件记在 SharedPreferences 里（放到桌面时绑定，只在本机）。
+// Two files for desktop widgets (D-321–D-323), located in the app's own files/widgets directory:
+// snapshot.json is the app-rendered layout (format defined in src/widgets/types.ts), queue/ stores
+// actions tapped on widgets that the app has not yet executed, one file per tap. Which widget
+// displays which component is recorded in SharedPreferences (bound upon desktop placement, local
+// only).
 
 object WidgetStore {
   private const val PREFS = "morph_widgets"
@@ -30,7 +32,7 @@ object WidgetStore {
       null
     }
 
-  /** 记下一次点按：写完再改名，App 读不到写了一半的。 */
+  /** Record a tap: rename only after writing is complete so the app never reads a half-written file. */
   fun enqueue(ctx: Context, entry: JSONObject) {
     val q = queueDir(ctx).apply { mkdirs() }
     val name = "${entry.getLong("at")}-${UUID.randomUUID()}"
@@ -46,8 +48,9 @@ object WidgetStore {
       .sortedBy { it.optDouble("at") }
 
   /**
-   * App 读出点了还没处理的操作，不删（R07）：App 一条一条执行、记下做完了，再用 removeQueue 确认删掉。
-   * id 是文件名（不带 .json）。读不出来的留着，下次再读。
+   * App reads unprocessed tapped actions without deleting them (R07): the app executes them one
+   * by one, records completion, and then uses removeQueue to confirm deletion. id is the filename
+   * (without .json). Unreadable ones are kept and retried next time.
    */
   fun readQueue(ctx: Context): List<Map<String, String>> {
     val files = (queueDir(ctx).listFiles() ?: emptyArray())
@@ -58,7 +61,7 @@ object WidgetStore {
     }
   }
 
-  /** 删掉处理好了的点按。只认队列目录里的文件名：带路径的 id 不删。 */
+  /** Delete processed taps. Only recognizes filenames within the queue directory: paths containing IDs are not deleted. */
   fun removeQueue(ctx: Context, ids: List<String>) {
     val dir = queueDir(ctx)
     for (id in ids) {
@@ -75,7 +78,7 @@ object WidgetStore {
     ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove("w$widgetId").apply()
   }
 
-  /** 这个小组件显示哪个组件：放到桌面时绑定的；从桌面的小组件列表直接加的，显示最近放的那个。 */
+  /** Which component this widget displays: bound upon desktop placement; if added directly from the desktop's widget list, displays the most recently placed one. */
   fun itemFor(ctx: Context, widgetId: Int, snap: JSONObject): String? {
     val bound = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("w$widgetId", null)
     val items = snap.optJSONArray("items") ?: JSONArray()
@@ -84,7 +87,7 @@ object WidgetStore {
   }
 }
 
-/** 这个组件现在该画哪一份；stale：点过的操作算不出来（混着点了几种、点得太多、跨了天）。和 iOS 的 resolveView 一样。 */
+/** Which layout this component should currently render; stale: tapped actions cannot be re-evaluated (mixed taps of various types, too many taps, or spanning across days). Same as iOS resolveView. */
 data class Resolved(val view: JSONObject?, val stale: Boolean)
 
 fun resolveView(snap: JSONObject, item: String, nowMs: Double, queued: List<JSONObject>): Resolved {

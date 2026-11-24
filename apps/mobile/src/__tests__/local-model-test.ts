@@ -6,8 +6,10 @@ import { join } from 'node:path';
 import type { PackStore } from '../packs/store';
 import { MODEL_MIN_MEMORY, deviceFitsLocalModel, openLocalModel } from '../runtime/local-model';
 
-// 本机模型在手机上怎么开、怎么关（D-396）：没装、内存不够就不加载；用完释放，还在生成时先停再释放。
-// 这里的 llama.rn 是假的；真的 llama.rn 只有模拟器和真机上能验证。
+// How on-device model is turned on and off on the phone (D-396): not loaded if uninstalled or
+// memory is insufficient; released after use, and if generation is active, stops first before
+// releasing. The llama.rn mock here is fake; real llama.rn can only be verified on simulators and
+// real devices.
 
 jest.mock('expo-device', () => ({ totalMemory: 8 * 1024 * 1024 * 1024 }));
 jest.mock('../packs/expo-pack-fs', () => ({ expoPackFs: { uri: (p: string) => `file:///${p}` } }));
@@ -60,8 +62,8 @@ const setMemory = (bytes: number | null) => {
   (Device as { totalMemory: number | null }).totalMemory = bytes;
 };
 
-describe('加载模型前先放掉文字识别的内存', () => {
-  it('文字识别的模型先释放，再加载本机模型', async () => {
+describe('Release OCR memory before loading the model', () => {
+  it('Release OCR model first, then load on-device model', async () => {
     mockOcrUnload.mockClear();
     mockInit.mockClear();
     const session = await openLocalModel(store(true))(new AbortController().signal);
@@ -71,22 +73,22 @@ describe('加载模型前先放掉文字识别的内存', () => {
     await session?.release();
   });
 
-  it('释放失败也照样加载', async () => {
+  it('Load anyway even if release fails', async () => {
     mockOcrUnload.mockImplementationOnce(() => Promise.reject(new Error('busy')));
     const session = await openLocalModel(store(true))(new AbortController().signal);
     expect(session).not.toBeNull();
     await session?.release();
   });
 
-  it('没装模型时不动文字识别', async () => {
+  it('Do not touch OCR when model is not installed', async () => {
     mockOcrUnload.mockClear();
     await openLocalModel(store(false))(new AbortController().signal);
     expect(mockOcrUnload).not.toHaveBeenCalled();
   });
 });
 
-describe('识别出的文字不进系统日志（底线 1、2）', () => {
-  it('llama.rn 不打印提示词的 token；Android 从源码编译，补丁才生效', () => {
+describe('Recognized text does not enter system logs (invariants 1, 2)', () => {
+  it('llama.rn does not print prompt tokens; Android compiled from source for patches to take effect', () => {
     const root = join(__dirname, '../../../..');
     const completion = readFileSync(
       join(root, 'node_modules/llama.rn/cpp/rn-completion.cpp'),
@@ -98,7 +100,7 @@ describe('识别出的文字不进系统日志（底线 1、2）', () => {
   });
 });
 
-describe('本机模型（D-396）', () => {
+describe('On-device model (D-396)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     order.length = 0;
@@ -106,19 +108,19 @@ describe('本机模型（D-396）', () => {
     setMemory(8 * 1024 * 1024 * 1024);
   });
 
-  it('没下载：不加载，给 null', async () => {
+  it('Not downloaded: do not load, return null', async () => {
     await expect(openLocalModel(store(false))(new AbortController().signal)).resolves.toBeNull();
     expect(mockInit).not.toHaveBeenCalled();
   });
 
-  it('内存不够：不加载，给 null', async () => {
+  it('Insufficient memory: do not load, return null', async () => {
     setMemory(MODEL_MIN_MEMORY - 1);
     expect(deviceFitsLocalModel()).toBe(false);
     await expect(openLocalModel(store(true))(new AbortController().signal)).resolves.toBeNull();
     expect(mockInit).not.toHaveBeenCalled();
   });
 
-  it('加载扩展包里的文件，只用 CPU，上下文和 core 截断文字的长度一样', async () => {
+  it('Load files from pack, CPU only, context and core text truncation lengths are identical', async () => {
     const session = await openLocalModel(store(true))(new AbortController().signal);
     await session?.release();
     expect(mockInit.mock.calls[0]![0]).toMatchObject({
@@ -142,7 +144,7 @@ describe('本机模型（D-396）', () => {
     setMemory(8 * 1024 * 1024 * 1024);
   });
 
-  it('没在生成时 stopCompletion 什么都不返回（真的 llama.rn 就这样）：照样释放，下一次还能加载', async () => {
+  it('StopCompletion not called while generating returns nothing (true for real llama.rn): released normally, can be loaded next time', async () => {
     context.stopCompletion.mockImplementationOnce(() => undefined as unknown as Promise<void>);
     const open = openLocalModel(store(true));
     const session = (await open(new AbortController().signal))!;
@@ -153,7 +155,7 @@ describe('本机模型（D-396）', () => {
     await next?.release();
   });
 
-  it('释放失败也不挡下一次加载', async () => {
+  it('Release failure does not block next load', async () => {
     context.release.mockImplementationOnce(() => Promise.reject(new Error('busy')));
     const open = openLocalModel(store(true));
     const session = (await open(new AbortController().signal))!;
@@ -163,7 +165,7 @@ describe('本机模型（D-396）', () => {
     await next?.release();
   });
 
-  it('加载期间取消了：加载完马上释放，给 null', async () => {
+  it('Cancelled during load: release immediately after loading completes, returns null', async () => {
     const abort = new AbortController();
     mockInit.mockImplementationOnce(async () => {
       abort.abort();
@@ -173,7 +175,7 @@ describe('本机模型（D-396）', () => {
     expect(context.release).toHaveBeenCalledTimes(1);
   });
 
-  it('取消：通知原生停下，Promise 结束', async () => {
+  it('Cancel: notify native to stop, Promise finishes', async () => {
     const session = (await openLocalModel(store(true))(new AbortController().signal))!;
     const abort = new AbortController();
     const run = session.generate(request, abort.signal);
@@ -183,7 +185,7 @@ describe('本机模型（D-396）', () => {
     await session.release();
   });
 
-  it('释放：还在生成时先停再释放；下一次加载等释放完', async () => {
+  it('Release: stop first if still generating, then release; next load waits for release to finish', async () => {
     const open = openLocalModel(store(true));
     const session = (await open(new AbortController().signal))!;
     void session.generate(request, new AbortController().signal);
@@ -196,8 +198,8 @@ describe('本机模型（D-396）', () => {
     await second?.release();
   });
 
-  describe('任何时候最多一个模型在加载或在内存里', () => {
-    // 假的加载：要等测试放行；数着同时有几个（加载中 + 没释放的）。
+  describe('At most one model loading or in memory at any time', () => {
+    // Fake loading: waits for test release; counts how many are active simultaneously (loading + unreleased).
     let live = 0;
     let peak = 0;
     let loads: (() => void)[] = [];
@@ -216,7 +218,7 @@ describe('本机模型（D-396）', () => {
     const settle = async () => {
       for (let i = 0; i < 20; i++) await Promise.resolve();
     };
-    /** 放行正在加载的，直到 done 结束。 */
+    /** Allow ongoing loads to proceed until done finishes. */
     const finishLoads = async (done: Promise<unknown>) => {
       let over = false;
       void done.finally(() => {
@@ -239,7 +241,7 @@ describe('本机模型（D-396）', () => {
       mockInit.mockImplementation(async () => context);
     });
 
-    it('加载中取消再开：等上一个加载完、释放完才加载下一个', async () => {
+    it('Cancel while loading and restart: wait for previous load to finish and release before loading next', async () => {
       const open = openLocalModel(store(true));
       const a = new AbortController();
       const first = open(a.signal);
@@ -259,7 +261,7 @@ describe('本机模型（D-396）', () => {
       expect(live).toBe(0);
     });
 
-    it('连续开关多次：中间取消的不加载，只留最后一个，同时只有一个', async () => {
+    it('Multiple consecutive toggles: cancelled intermediate ones do not load, keep only the last one, only one at a time', async () => {
       const open = openLocalModel(store(true));
       const runs: Promise<unknown>[] = [];
       for (let i = 0; i < 5; i++) {
@@ -273,13 +275,13 @@ describe('本机模型（D-396）', () => {
       const session = await lastRun;
       expect(session).not.toBeNull();
       expect(peak).toBe(1);
-      // 第一个已经在加载，取消的轮到时不再加载，最后一个加载。
+      // First one is already loading, cancelled one's turn no longer loads, last one loads.
       expect(mockInit).toHaveBeenCalledTimes(2);
       await session?.release();
       expect(live).toBe(0);
     });
 
-    it('关了表单马上开新的：上一个还在生成时也等它释放完', async () => {
+    it('Close form and immediately open new one: wait for previous one to finish releasing even if still generating', async () => {
       const open = openLocalModel(store(true));
       const opening = open(new AbortController().signal);
       await finishLoads(opening);
@@ -292,11 +294,11 @@ describe('本机模型（D-396）', () => {
       await (await next)?.release();
     });
 
-    it('通过引擎走：加载中取消马上给结果，新的一次等上一个释放，同时只有一个', async () => {
+    it('Go through engine: cancel during load immediately returns result, new one waits for previous release, only one at a time', async () => {
       context.completion.mockImplementationOnce(async () => ({ text: 'null' }));
       const engine = modelEngine(openLocalModel(store(true)));
       const input = {
-        // 公司字段规则有候选也问模型（店名有候选就不问了，D-404）。
+        // Company field rules also ask the model even if there are candidates (store name doesn't ask if there are candidates, D-404).
         fields: [{ id: 'merchant', name: 'Company', type: 'text' as const }],
         pages: [
           {
@@ -311,7 +313,7 @@ describe('本机模型（D-396）', () => {
       const first = engine(input, a.signal);
       await settle();
       a.abort();
-      await first; // 取消一定要让 Promise 结束，不等加载。
+      await first; // Cancellation must ensure the Promise finishes, without waiting for loading.
       const second = engine(input, new AbortController().signal);
       await settle();
       expect(mockInit).toHaveBeenCalledTimes(1);
@@ -321,7 +323,7 @@ describe('本机模型（D-396）', () => {
       expect(live).toBe(0);
     });
 
-    it('加载失败也不挡下一个', async () => {
+    it('Load failure does not block next one', async () => {
       mockInit.mockImplementationOnce(() => Promise.reject(new Error('no memory')));
       const open = openLocalModel(store(true));
       await expect(open(new AbortController().signal)).rejects.toThrow('no memory');
@@ -331,7 +333,7 @@ describe('本机模型（D-396）', () => {
       await (await next)?.release();
     });
 
-    it('原生模块加载不了（Expo Go）也不挡下一个', async () => {
+    it('Native module failure to load (Expo Go) does not block next one', async () => {
       const open = openLocalModel(store(true));
       mockNoNative = true;
       await expect(open(new AbortController().signal)).rejects.toThrow('no native module');
@@ -342,7 +344,7 @@ describe('本机模型（D-396）', () => {
       await (await next)?.release();
     });
 
-    it('释放两次只释放一回，不把排队的人放进来', async () => {
+    it('Releasing twice only releases once, does not let queued items in', async () => {
       const open = openLocalModel(store(true));
       const opening = open(new AbortController().signal);
       await finishLoads(opening);

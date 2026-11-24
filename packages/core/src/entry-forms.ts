@@ -14,17 +14,20 @@ import {
   type WorkspaceConfig,
 } from './schema';
 
-// 记录块的添加入口（D-310）：AI 新加了一个记录块（列表、卡片、清单、大圆块、看板、月历），这张表在整个 App 里
-// 却没有任何添加的地方时，新用户只能看到「还没有记录」。这时在它上方补一个「添加」按钮（就地的
-// {do: "create", table, ask: "all"}），打开完整的添加页。
-// 只看这次新加的记录块：用户以后自己移除了这个按钮，别的修改不会再把它加回来。
+// Add entry point for record blocks (D-310): When AI adds a record block (list, card, checklist,
+// large circular block, kanban, calendar) but this table has no add entry point anywhere in the
+// app, new users would only see "No records yet". In this case, prepend an "Add" button above it
+// (an inline {do: "create", table, ask: "all"} opening the full add page). Checked only for newly
+// added record blocks: if the user removes this button later, other modifications will not re-add
+// it.
 
 const isRecordLook = (c: Component): boolean =>
   isKnownComponent(c) && (RECORD_LOOKS as readonly string[]).includes(c.look);
 
 /**
- * 能给这张表添加记录的地方：块上任何一个新建这张表的就地工具（添加表单的提交、按钮、每一行的新建、
- * 就地添加），或者记一笔的快捷操作。
+ * Locations where records can be added to this table: any inline tool on a block creating this
+ * table (add form submission, buttons, row-level creation, inline add), or the quick action to
+ * log an entry.
  */
 function addsTo(config: WorkspaceConfig, table: string): boolean {
   const creates = (c: Component) =>
@@ -40,14 +43,14 @@ function addsTo(config: WorkspaceConfig, table: string): boolean {
   );
 }
 
-/** 给一条记录用的页面上（D-342）：列表只显示连到这条记录的，新记录也要连上它，才会出现在这个列表里。 */
+/** On pages dedicated to a single record (D-342): lists display only entries linked to this record, and new records must also link to it to appear in this list. */
 function linkToRecord(filter: readonly Condition[] | undefined) {
   const links = (filter ?? []).filter((x) => x.op === 'is' && x.value === RECORD_REF);
   if (links.length === 0) return {};
   return { values: Object.fromEntries(links.map((x) => [x.field, RECORD_REF])) };
 }
 
-/** 给 after 里新加的、没有添加入口的记录块补「添加」按钮；返回补了按钮的表。 */
+/** Add missing "Add" buttons for newly added record blocks in after; returns the tables with added buttons. */
 export function addMissingEntryForms(
   before: WorkspaceConfig,
   after: WorkspaceConfig,
@@ -63,13 +66,13 @@ export function addMissingEntryForms(
         .source;
       const table = after.data.tables.find((x) => x.id === tableId);
       if (!table || addsTo(after, table.id)) continue;
-      // 没有能在表单里填的字段（全是算出来的）时不补。
+      // Do not add if the table has no fillable fields in the form (all fields are computed).
       if (!table.fields.some((f) => fieldDefinition(f.type).inForm !== false)) continue;
       const ids = new Set(allComponents(page).map((x) => x.id));
       const stem = `add-${table.id}`.slice(0, 44);
       let id = stem;
       for (let n = 2; ids.has(id); n++) id = `${stem}-${n}`;
-      // 记录块在分组里时放在最外层那个分组的上方（按钮放在页面顶层，和 v33 一样）。
+      // When a record block is grouped, place it above the outermost group (buttons are placed at the page top level, matching v33).
       let top: Component = c;
       for (let p = parentOf(page, top.id); p; p = parentOf(page, top.id)) top = p;
       page.blocks.splice(page.blocks.indexOf(top), 0, {

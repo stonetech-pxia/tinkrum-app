@@ -6,8 +6,9 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, makePdf } from '../test-utils/fake-files';
 
-// D-601：PDF 整份读进内存的动作按 100 MB 收，但走 PDF 预览包（WebView + pdf.js）的动作内存是文件的
-// 20–30 倍，仍然只收 50 MB。这里用 copyToRun 报告的大小，不真的分配几十 MB。
+// D-601: PDF actions that read the entire file into memory are capped at 100 MB, but actions going
+// through the PDF preview pack (WebView + pdf.js) use 20-30 times the file memory and are capped at
+// 50 MB. Here we use the size reported by copyToRun without actually allocating tens of MBs.
 
 const MB = 1024 * 1024;
 const registry = createRegistry(BUILTIN_TOOLS);
@@ -25,7 +26,7 @@ class TextPack implements PackRuntime {
 async function runOn(action: string, params: Record<string, unknown>, mb: number) {
   const files = new FakeFiles();
   const copy = files.copyToRun.bind(files);
-  // 复制之后报告的大小：实际字节很小，只改元数据。
+  // Size reported after copying: actual bytes are very small, only metadata is modified.
   files.copyToRun = async (uri, runId, name) => ({
     ...(await copy(uri, runId, name)),
     size: mb * MB,

@@ -1,7 +1,8 @@
 import type { RunItem } from '@morph/core';
 
-// 转 Excel、转 Word 的结果（D-272、D-328）：带着中间格式、而且中间格式还是为这个文件存的（后面的步骤没有
-// 生成新文件）时，结果页能「放到桌上」改（file-room R2，D-366）。
+// Results of Excel or Word conversion (D-272, D-328): when intermediate formatting is present and
+// preserved specifically for this file (subsequent steps did not generate a new file), the results
+// page can "put it on the desk" to edit (file-room R2, D-366).
 
 export const canEditTable = (item: RunItem) =>
   item.tableDoc !== undefined && item.tableDoc.for === item.uri;

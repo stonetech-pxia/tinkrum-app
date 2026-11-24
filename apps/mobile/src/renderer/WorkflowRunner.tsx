@@ -18,10 +18,11 @@ import { iconColors } from './theme';
 import { Button, Card, IconTile } from './ui';
 
 /**
- * workflowRunner 组件：显示工作流的步骤，点「开始」打开运行页面。
- * 在宫格里（相邻的多个运行卡片，或用户自己的 grid / row 分组）显示成小方块，整块可点（D-108）。
- * look 指定了样子时不看位置：card = 卡片加「运行」按钮，row = 一行、右边 ▶，tile = 小方块（D-230），
- * icon = 只有图标的白底按钮（D-449）。
+ * workflowRunner component: displays workflow steps and opens the runner page upon tapping
+ * "Start". Rendered as a small block in grids (adjacent running cards, or user grid/row
+ * groupings) with the entire block tappable (D-108). Ignores position when look is specified:
+ * card = card with "Run" button, row = single row with ▶ on the right, tile = small block
+ * (D-230), icon = white-background button with icon only (D-449).
  */
 export function WorkflowRunner({
   workflowId,
@@ -31,21 +32,21 @@ export function WorkflowRunner({
 }: {
   workflowId: string;
   look?: 'card' | 'row' | 'tile' | 'icon';
-  /** 图片背景（D-258）。 */
+  /** Image background (D-258). */
   backdrop?: Backdrop | undefined;
   env: RenderEnv;
 }) {
   const router = useRouter();
   const { locale, registry } = env;
   const palette = onPicture(env.palette, backdrop);
-  // 可以指向内设快捷操作的预设 ID；用户改过以后配置里的副本优先（D-259）。
+  // Can point to preset IDs of built-in quick actions; user-modified copies in config take precedence (D-259).
   const found = findWorkflowTarget(quickActionsOf(env.config), workflowId, locale);
   if (!found) return null;
-  // 内设快捷操作的名字跟着界面语言显示（用户改过的不换）。
+  // Built-in quick action names follow the UI language (user-modified names are not replaced).
   const workflow = { ...found, name: builtinText(found.name, locale, registry) };
   const label = (s: { action: string; params: Record<string, unknown> }) =>
     stepLabel(registry.actions.get(s.action), s.params, locale) ?? s.action;
-  // 关键设置（例如「不超过 500 KB」）；每次运行时询问的参数不列出。
+  // Key settings (e.g., "Under 500 KB"); runtime query parameters are excluded.
   const settings = workflow.steps
     .flatMap((s) => {
       const action = registry.actions.get(s.action);
@@ -64,7 +65,7 @@ export function WorkflowRunner({
   const shown = look ?? (env.inCell ? 'tile' : 'card');
   const icon =
     workflow.icon ?? (workflow.package && registry.tools.get(workflow.package)?.icon) ?? 'workflow';
-  // 多步的工作流（预设、自己搭的）列出步骤；单功能的名字已经说明了做什么，只列固定的设置。
+  // Multi-step workflows (presets or custom) list their steps; single-function names already describe their purpose, so only fixed settings are listed.
   const detail =
     workflow.steps.length > 2
       ? workflow.steps
@@ -130,9 +131,9 @@ export function WorkflowRunner({
         onLongPress={env.onLongPress}
         style={styles.tile}>
         <IconTile palette={palette} icon={icon} size={40} {...iconColors(palette, 'tint')} />
-        {/* D-552：名字压在方块底部：同一行的名字底边对齐，一行的名字下面不空出一截。 */}
+        {/* D-552: aligns names at the bottom of blocks: baselines of names in the same row are aligned, preventing empty space below single-line names. */}
         <View style={styles.tileText}>
-          {/* 名字放不下两行时缩一点字号，不截断（法语的名字长，D-487）。 */}
+          {/* Shrinks font size slightly instead of truncating when names cannot fit in two lines (French names are longer, D-487). */}
           <Text
             numberOfLines={2}
             adjustsFontSizeToFit
@@ -140,8 +141,12 @@ export function WorkflowRunner({
             style={[palette.font('title', 15), { color: palette.text }]}>
             {workflow.name}
           </Text>
-          {/* D-487：多步的快捷操作（扫成 PDF、合并文件……）方块上只有图标和名字：步骤链几个方块都差不多又长，不放；
-              单功能的（压缩照片……）名字说不全，照旧放固定的设置。 */}
+          {/*
+           * D-487: multi-step quick actions (scan to PDF, merge files, etc.) display only an icon
+           * and name on their blocks because step chains are long and similar; single-function
+           * actions (compress photos, etc.) retain fixed settings since their names are
+           * incomplete.
+           */}
           {workflow.steps.length <= 2 && settings ? (
             <Text numberOfLines={2} style={[palette.font('body', 12), { color: palette.caption }]}>
               {settings}
@@ -183,7 +188,7 @@ export function WorkflowRunner({
 const styles = StyleSheet.create({
   steps: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 6, rowGap: 2 },
   run: { marginTop: 6 },
-  // 图标加最多两行的名字，内容约 124pt：同一行的方块一样高（D-487）。
+  // Icon with up to two lines of text, occupying approximately 124pt: ensures blocks in the same row have equal height (D-487).
   tile: { flex: 1, minHeight: 132, justifyContent: 'space-between' },
   tileText: { gap: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },

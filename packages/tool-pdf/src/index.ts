@@ -1,5 +1,5 @@
-// PDF 工具的真实处理逻辑。只依赖字节数组，不依赖任何平台 API，
-// 因此同一份代码在手机（Hermes）上运行，也能在 Node 中用真实 PDF 测试。
+// Core processing logic for PDF tools. Depends only on byte arrays and no platform APIs, allowing
+// the same code to run on mobile (Hermes) and be tested with real PDFs in Node.
 
 export {
   type MergeResult,

@@ -4,12 +4,16 @@ import { t } from '../messages';
 import { applyOps, isFunctionOp, type Op } from '../ops';
 import type { WorkspaceConfig } from '../schema';
 
-// 功能和外观分开改（D-191）。功能：数据（表结构、日期设置）、独立工具（快捷操作、提醒）、工具包、手机桌面，
-// 直接生效（可以撤销），做好后可以马上试用；外观：主题、导航栏、页面和页面上的块（记录块、表单、数字也算，
-// 块上的就地一键记录工具也是），先进草稿看效果（D-190）。
-// 一个计划两样都有时功能先生效，剩下的外观直接进草稿（D-419）。由 App 按操作判断，不靠模型自觉。
+// Separate feature and appearance changes (D-191). Feature changes: data (table schema, date
+// settings), standalone tools (quick actions, reminders), packs, and home screen widgets take
+// effect immediately (and are undoable), allowing immediate testing once ready. Appearance changes:
+// themes, navigation bars, pages, and page blocks (including record blocks, forms, numbers, and
+// inline quick action tools on blocks) go into a draft first to preview appearance (D-190). When a
+// plan contains both, feature changes take effect immediately and remaining appearance changes go
+// directly into the draft (D-419). Handled by the app based on operation types, not model
+// discretion.
 
-/** 同一批操作里新建的快捷操作。 */
+/** Quick actions newly created within the same batch of operations. */
 function newQuickActionIds(ops: readonly Op[]): Set<string> {
   return new Set(
     ops.flatMap((op) =>
@@ -20,14 +24,16 @@ function newQuickActionIds(ops: readonly Op[]): Set<string> {
   );
 }
 
-/** 只加、换、去画出来的图标的 setTheme（D-625）：哪边都不算，跟着这一批里的别的修改走。 */
+/** `setTheme` operations that only add, change, or remove drawn icons (D-625): classified under neither category, following other modifications in this batch. */
 const onlyIcons = (op: Op): boolean =>
   op.op === 'setTheme' && Object.keys(op).every((k) => k === 'op' || k === 'app' || k === 'icons');
 
 /**
- * 是不是功能类操作（ops-schema.ts 的 isFunctionOp：数据、独立工具、工具包、手机桌面）。
- * 新快捷操作的运行块（look action）跟着它一起应用：不然做好了却找不到。只改图标库的 setTheme 在有功能操作时
- * 跟着功能（表、快捷操作的图标要用它），没有时是外观。
+ * Check whether an operation is a feature operation (`isFunctionOp` in `ops-schema.ts`: data,
+ * standalone tools, packs, home screen). Execution blocks (look actions) for new quick actions
+ * apply alongside them; otherwise, they would be created without being accessible. `setTheme`
+ * operations modifying only the icon library follow feature operations when present (table and
+ * quick action icons depend on them), or appearance operations otherwise.
  */
 function goesWithFunction(op: Op, added: ReadonlySet<string>, withFunction: boolean): boolean {
   if (isFunctionOp(op)) return true;
@@ -37,7 +43,7 @@ function goesWithFunction(op: Op, added: ReadonlySet<string>, withFunction: bool
   return use !== undefined && 'tool' in use && added.has(use.tool);
 }
 
-/** 把一批操作分成功能和外观两部分，各自保持原来的顺序。 */
+/** Split a batch of operations into feature and appearance parts, preserving their original relative orders. */
 export function splitOps(ops: readonly Op[]): { function: Op[]; look: Op[] } {
   const added = newQuickActionIds(ops);
   const withFunction = ops.some(isFunctionOp);
@@ -51,12 +57,15 @@ export const hasFunctionOps = (ops: readonly Op[]): boolean => splitOps(ops).fun
 
 export type FunctionFirst =
   | { kind: 'look' }
-  /** ops：这一轮直接应用的；deferred：功能生效后进草稿的外观操作（D-419）。 */
+  /** `function`: operations applied immediately in this round; `deferred`: appearance operations deferred to the draft after feature changes apply (D-419). */
   | { kind: 'function'; ops: Op[]; deferred: Op[] };
 
 /**
- * 这一轮做什么（D-191）：没有功能操作就是外观；有功能操作先做功能。功能单独套不上、连同外观才套得上时
- * （例如删字段要把它从表单和列表里拿掉），这些外观操作是功能的善后，一起做。
+ * What to execute in this round (D-191): if there are no feature operations, it is an appearance
+ * change; if there are feature operations, execute them first. When appearance operations cannot
+ * apply independently and require feature operations alongside them (e.g., removing a field
+ * requires removing it from forms and lists), these appearance operations act as cleanup for the
+ * feature operations and run together.
  */
 export function functionFirst(
   before: WorkspaceConfig,
@@ -72,7 +81,9 @@ export function functionFirst(
 }
 
 /**
- * 外观套不上时留给用户的一句话（D-419）：能说明白做什么就说，说不出来就是原话。这句话会再发给模型。
+ * A message shown to the user when appearance changes cannot be applied (D-419): state clearly
+ * what is being done if possible, or fall back to the exact text. This message is sent back to
+ * the model.
  */
 export function deferredLookText(
   config: WorkspaceConfig,
@@ -85,9 +96,12 @@ export function deferredLookText(
 }
 
 /**
- * 在草稿的样子上说的功能修改，要应用到正式版本（D-413）：善后的外观操作针对的页面、块只在草稿里时，
- * 正式版本上跳过，留给草稿套上时再做（rebaseDraft 的 cleanup）。功能操作和跟着新快捷操作的运行块不跳：
- * 它们套不上就是真的要用到草稿里的东西（返回 null）。
+ * Feature modifications discussed in the context of draft previews that need to be applied to the
+ * official version (D-413): when cleanup appearance operations target pages or blocks existing
+ * only in the draft, skip them on the official version and defer them until the draft is applied
+ * (`rebaseDraft` cleanup). Feature operations and execution blocks accompanying new quick actions
+ * are not skipped; if they cannot apply, it indicates they truly require elements from the draft
+ * (returning `null`).
  */
 export function splitDraftOnlyOps(
   head: WorkspaceConfig,
@@ -109,7 +123,7 @@ export function splitDraftOnlyOps(
   return skipped.length > 0 ? { kept, skipped } : null;
 }
 
-/** 这批善后操作里，在这份配置上套得上的部分（按顺序，一条套不上就跳过它）。 */
+/** The subset of deferred cleanup operations that can successfully apply to this configuration (in order, skipping any operation that fails). */
 export function applicableOps(
   config: WorkspaceConfig,
   ops: readonly Op[],

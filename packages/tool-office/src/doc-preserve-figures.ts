@@ -4,7 +4,7 @@ import { type PreparePageState } from './doc-prepare';
 import { type DocLeaf, type DocPage, type DocParagraph, leafBlocks } from './doc-support';
 import { lineShareIn } from './layout';
 
-/** 核对整图之外的内容和样式，连带变化时整页回退。 */
+/** Verify content and styles outside full images, falling back to full-page reversion if cascaded changes occur. */
 export function preservePageFigures(
   state: Pick<PreparePageState, 'previous' | 'figures' | 'lineHeight' | 'available' | 'native'> &
     Pick<ComposedPageState, 'page'>,
@@ -16,8 +16,10 @@ export function preservePageFigures(
     const oldParagraphs = leafBlocks(previous).filter(
       (b): b is DocParagraph => b.kind === 'paragraph' && outside(b),
     );
-    // 图内网格消失会改变整页共用的列线。图外同位置的表仍用原来的完整表示，
-    // 不让纯粹的共享列坐标变化撤销已确认的整图；边界或内容发生变化仍交给下面的回退检查。
+    // Disappearance of intra-image grids changes column lines shared across the page. Tables at the
+    // same position outside images continue using their original complete representation,
+    // preventing pure shared column coordinate changes from revoking confirmed full images;
+    // boundary or content changes are still handled by the fallback checks below.
     const oldTables = new Map(
       leafBlocks(previous)
         .filter((b) => b.kind === 'table' && outside(b))
@@ -92,7 +94,7 @@ export function preservePageFigures(
           ? [b.size, b.bold, b.underline, b.color, b.heading, b.align, b.indent, b.tab]
           : [],
       );
-    // 图外的网格、条码和字体也可能依赖整页统计；有任何连带变化就整页回退，不局部拼补。
+    // Grids, barcodes, and fonts outside images may also depend on page-level statistics; any cascaded change triggers full-page fallback without partial patching.
     if (
       !native &&
       (previous.bodySize !== page.bodySize ||

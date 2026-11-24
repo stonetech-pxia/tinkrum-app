@@ -3,8 +3,10 @@ import type { DocDoc, TableDoc } from '@morph/tool-office';
 import { SOURCE_NAME, writeSavedSource } from '../desk/saved-source-file';
 import { FakeFiles } from '../test-utils/fake-files';
 
-// 存成用户文件时跟着存中间格式（D-367）：有一张图读不到（2026-11-06 三星上「完成」后刚换的图已经搬走），
-// 中间格式也照样存，不然这份 Word 放回桌上就不能改了（D-470）。
+// stores the intermediate format alongside when saving as a user file (D-367): even if an image
+// cannot be read (e.g., the image just changed after tapping "Done" on Samsung on 2026-11-06 has
+// already moved), the intermediate format is still saved, otherwise putting this Word document back
+// on the desk would make it uneditable (D-470).
 
 describe('writeSavedSource', () => {
   it('a missing picture is left out, the rest is still saved', async () => {

@@ -1,4 +1,4 @@
-# 本地 Expo 模块（D-321）：桌面小组件的画面和点按队列，放在 App Group 里。只依赖 Apple 系统框架。
+# Local Expo module (D-321): Home screen widget rendering and tap queue stored in the App Group. Depends only on Apple system frameworks.
 
 Pod::Spec.new do |s|
   s.name           = 'MorphWidgets'

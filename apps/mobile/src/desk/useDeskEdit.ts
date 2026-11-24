@@ -19,34 +19,38 @@ import {
   type DeskSourceDoc,
 } from './store';
 
-// 房间里改表格、文档（file-room §11.2，D-366，创始人 2026-10-30 确认 §10 第 4 题选 A）：
-// 改动先一步步记在内存里（History，最多 100 步），顶部的撤销先退这些；连续的一段编辑在这些时候合上、成为
-// 桌上的一个版本（「编辑了表格」，撤销时整段一起退）：用别的工具、打开「完成」（保存、分享）、离开房间、
-// 切到别的文件、App 进后台。没合上的编辑每改一下写进桌面（editing.json），App 被关掉也不丢。
+// Editing tables or documents in the room (file-room §11.2, D-366, confirmed by founder on
+// 2026-10-30, §10 question 4 chose A): changes are first recorded step by step in memory (History,
+// up to 100 steps), and top-level undo steps revert these first. A continuous editing session is
+// closed and becomes a version on the desk ("Edited table", reverting undoes the whole session
+// together) upon: using another tool, opening "Done" (saving, sharing), leaving the room, switching
+// to another file, or the app going to the background. Unclosed edits are written to the desk
+// (editing.json) on every change so they are not lost if the app is killed.
 
 export interface EditSession {
-  /** 正在改的那份文件（桌上的 ID）。 */
+  /** The file currently being edited (ID on the desk). */
   fileId: string;
   kind: DeskSourceDoc['kind'];
-  /** 这一段编辑开始时的样子：和它一样就是没改。 */
+  /** The state of this editing session at its start: being identical to it means no changes were made. */
   base: TableDoc | DocDoc;
   history: History<TableDoc | DocDoc>;
 }
 
 export interface DeskEdit {
-  /** undefined：还在读；null：这份文件不能改（没有中间格式、读不出来）。 */
+  /** undefined: still loading; null: this file cannot be edited (no intermediate format, cannot be read). */
   session: EditSession | null | undefined;
   apply(next: TableDoc | DocDoc): void;
   undo(): void;
   redo(): void;
-  /** 改过、还没合上（页面上正在改的字也算）。 */
+  /** Modified and not yet closed (includes text currently being edited on the page). */
   dirty: boolean;
   /**
-   * 页面上正在改字（D-464；Word 整页直接改见 D-465）：flush 把改的字放进去。合上前先调它（点「完成」、离开时输入框不一定先失去焦点）；
-   * 不改了传 null。
+   * Text is being edited on the page (D-464; Word whole-page direct editing see D-465): flush
+   * puts the modified text in. Call this before closing (tapping "Done", leaving without input
+   * necessarily losing focus first); pass null if editing has stopped.
    */
   typing(flush: (() => void) | null): void;
-  /** 合上（没改过时什么都不做），返回现在的桌面。 */
+  /** Close session (does nothing if unmodified), returning the current desk. */
   seal(): Promise<Desk | null>;
 }
 
@@ -57,14 +61,14 @@ export function useDeskEdit({
   onSealed,
 }: {
   files: FilePlatform;
-  /** 现在的桌面（ref：合上时要最新的）。 */
+  /** Current desk (ref: must be the latest when closing). */
   desk: { readonly current: Desk | null };
-  /** 正在看的文件。 */
+  /** The file currently being viewed. */
   file: DeskFile | null;
-  /** 合上了：桌面换成新的，正在看的文件换成新的 ID。 */
+  /** Closed: the desk is replaced with the new one, and the currently viewed file is updated to the new ID. */
   onSealed: (desk: Desk, fileId: string) => void;
 }): DeskEdit {
-  // 读好的那一份（按文件 ID）：正在看的文件换了、还没读好时当作「还在读」。
+  // The successfully loaded version (by file ID): when the viewed file changes and has not finished loading yet, treat it as "still loading".
   const [loaded, setLoaded] = useState<{ fileId: string; session: EditSession | null } | null>(
     null,
   );
@@ -73,7 +77,7 @@ export function useDeskEdit({
     ref.current = next;
     setLoaded({ fileId, session: next });
   };
-  // 写「编辑中」文件排队写（后一次覆盖前一次）；合上前先等它写完。
+  // Queue writes to the "editing" file (later writes overwrite earlier ones); wait for writing to finish before closing.
   const writing = useRef<Promise<unknown>>(Promise.resolve());
   const sealing = useRef<Promise<Desk | null> | null>(null);
   const flush = useRef<(() => void) | null>(null);
@@ -84,7 +88,7 @@ export function useDeskEdit({
   const session =
     !file || !editable ? null : loaded?.fileId === file.id ? loaded.session : undefined;
   useEffect(() => {
-    // 刚合上时已经换成了新文件的那一段（不用重新读）。
+    // Already switched to the new file segment right after closing (no need to reload).
     if (!file || !editable || ref.current?.fileId === file.id) return;
     ref.current = null;
     let alive = true;
@@ -110,11 +114,11 @@ export function useDeskEdit({
     return () => {
       alive = false;
     };
-    // 只跟着正在看的文件变。
+    // // eslint-disable-next-line react-hooks/exhaustive-deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files, fileId, editable]);
 
-  /** 改完一步：记下来，写进「编辑中」文件；退回到开始的样子时删掉它。 */
+  /** Follow only the currently viewed file changes. */
   function update(history: History<TableDoc | DocDoc>) {
     const s = ref.current;
     const current = desk.current;
@@ -168,7 +172,7 @@ export function useDeskEdit({
       setTyping(next !== null);
     },
     apply: (next) => ref.current && update(pushHistory(ref.current.history, next)),
-    // 页面上改了还没放进去的字先放进去（D-465）：撤销退的就是刚改的这一段。
+    // After completing a step: record it, write to the "editing" file; delete it when reverting to the initial state.
     undo: () => {
       flushTyping();
       if (ref.current) update(undoHistory(ref.current.history));
@@ -178,9 +182,9 @@ export function useDeskEdit({
       if (ref.current) update(redoHistory(ref.current.history));
     },
     seal() {
-      // 页面上正在改的字先放进去（apply 同步改 ref，下面读得到）。
+      // Put in any text that was edited on the page but not yet submitted (D-465): undo reverts precisely this just-edited segment.
       flushTyping();
-      // 几个地方同时要合上（例如点了工具又离开）：只合一次。
+      // Put in the text currently being edited on the page first (apply synchronously updates the ref so it can be read below).
       sealing.current ??= sealNow().finally(() => {
         sealing.current = null;
       });

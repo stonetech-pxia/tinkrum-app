@@ -4,8 +4,8 @@ import { fireEvent, screen } from '@testing-library/react-native';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 可以收起的分组（D-578）：标题是一个能点的头，点一下收起或展开；fold 的值是一开始的样子。
-// 收起只是看的方式（底线 15），不写任何数据。
+// Collapsible groups (D-578): title is a tappable header, tap to collapse or expand; fold value
+// represents initial state. Folding is viewing method only (invariant 15), writes no data.
 
 const seed = (locale: Locale, registry: Registry) => {
   const result = applyOps(

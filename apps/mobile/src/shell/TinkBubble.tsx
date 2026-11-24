@@ -12,21 +12,26 @@ import {
 
 import type { Palette } from '../renderer/theme';
 
-/** 四个角一样圆；尖角的底边落在直边上（离右边至少 RADIUS）。 */
+/** All four corners are equally rounded; the base of the pointed tail rests on the straight edge (at least RADIUS away from the right side). */
 const RADIUS = 12;
-/** 缩成三个点时的大小：三个点（5，间距 4）加上左右各 11、上下各 7 的内边距。 */
+/** Size when collapsed into three dots: three dots (size 5, spacing 4) plus padding of 11 on left/right and 7 on top/bottom. */
 const DOT = 5;
 const MINI = { w: 3 * DOT + 2 * 4 + 22, h: DOT + 14 };
 const SHRINK_MS = 320;
 const MARGIN = 12;
 
 /**
- * Tink 在右上角说的话（D-526）：气泡浮在页面上，尖角对着 Tink；展开时是内容加右下角「我知道了」，
- * 点它气泡的宽、高、圆角和尖角一起平滑缩成只有三个点的小气泡（文字先淡出，点后淡入），点三个点再展开。
- * 内容太长时气泡有最大高度，内容在里面滚动，「我知道了」始终在下面。
+ * What Tink says in the upper right (D-526): bubble floats on the page, pointing at Tink with its
+ * tail; when expanded, it shows content plus "Got it" in the bottom right. Tapping it smoothly
+ * shrinks the bubble's width, height, corner radius, and tail together into a small bubble with
+ * only three dots (text fades out first, fades in after tapping), and tapping the three dots
+ * expands it again. When content is too long, the bubble has a maximum height, content scrolls
+ * inside, and "Got it" always stays at the bottom.
  *
- * 外面的壳只管位置和动画；展开时的高度自己量一次（内容换了就换 `key` 重新量）。
- * `top` 是气泡顶边（尖角在它上面 10）；`tinkRight` 是 Tink 的中心离右边多远，尖角跟着它对齐。
+ * The outer shell handles position and animation only; measure the expanded height once ourselves
+ * (when content changes, change `key` to re-measure). `top` is the bubble's top edge (the tail is
+ * 10 above it); `tinkRight` is how far Tink's center is from the right edge, and the tail aligns
+ * with it.
  */
 export function TinkBubble({
   palette,
@@ -52,7 +57,7 @@ export function TinkBubble({
   const window = useWindowDimensions();
   const width = Math.min(300, window.width - 2 * MARGIN);
   const maxContent = Math.round(window.height * 0.4);
-  const [progress] = useState(() => new Animated.Value(collapsed ? 1 : 0)); // 0 展开，1 三个点
+  const [progress] = useState(() => new Animated.Value(collapsed ? 1 : 0)); // 0 expanded, 1 three dots
   const [fullHeight, setFullHeight] = useState<number | null>(null);
   useEffect(() => {
     Animated.timing(progress, {
@@ -65,7 +70,7 @@ export function TinkBubble({
 
   const out = [0, 1] as const;
   const onBubble = { color: palette.onPrimary };
-  // 尖角的中心对着 Tink（气泡右边离屏幕 MARGIN）；底边不超出直边。
+  // The center of the tail aligns with Tink (bubble's right edge is MARGIN away from the screen); the base does not exceed the straight edge.
   const tailRight = Math.max(RADIUS, tinkRight - MARGIN - 9);
   const content = (
     <Animated.View
@@ -122,14 +127,14 @@ export function TinkBubble({
                   }),
                 },
             {
-              // 量完高度之前不显示，免得先闪一下。
+              // Not displayed until height measurement is complete, avoiding a flash.
               opacity: fullHeight === null ? 0 : 1,
               backgroundColor: palette.primary,
               borderRadius: progress.interpolate({
                 inputRange: out,
                 outputRange: [RADIUS, MINI.h / 2],
               }),
-              // 高光：主色的光晕，和 Tink 的光圈一起把人的目光带过去。
+              // Highlight: primary color glow, drawing the user's eye along with Tink's halo.
               boxShadow: `0px 0px 18px ${palette.primary}99`,
             },
           ]}>

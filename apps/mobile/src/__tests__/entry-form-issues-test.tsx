@@ -14,8 +14,9 @@ import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// D-572（模拟器检查 QA_BATCH3 P2、P3）：长表单里保存被拒时，保存按钮旁边说有几项要改、标在上面；
-// 改了一个字段，它的错误就不再挂着（不用等下一次保存）。
+// D-572 (simulator check QA_BATCH3 P2, P3): when save is rejected in a long form, next to the save
+// button it states how many items need fixing and marks them above; modifying a field removes its
+// error immediately (without waiting for the next save).
 
 const orders: Collection = {
   id: 'orders',
@@ -132,7 +133,7 @@ describe('a refused save says where the problem is (D-572)', () => {
     expect(screen.getByTestId('editor-item-issue')).toBeTruthy();
     expect(screen.getByTestId('editor-qty-issue')).toHaveTextContent('Must be at least 1.');
 
-    // 改了数量：它的错误马上去掉，句子跟着变成单数；名称的错误还在。
+    // Modified quantity: its error is removed immediately, the sentence changes to singular; item name error remains.
     await fireEvent.changeText(screen.getByTestId('editor-qty'), '3');
     expect(screen.queryByTestId('editor-qty-issue')).toBeNull();
     expect(screen.getByTestId('editor-item-issue')).toBeTruthy();

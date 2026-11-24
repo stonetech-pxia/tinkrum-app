@@ -14,8 +14,9 @@ import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// D-570（创始人 2026-11-16 决定 ①）：记录表单按配置分段，条件显示只看这一条自己的字段、边填边变；字段下面有提示；
-// 数字有范围。藏起来的段里的值不清空（底线 5），保存、删除仍归内核。
+// D-570 (founder 2026-11-16 decision 1): record form segmented by config, conditional display looks
+// only at its own fields and changes as you type; tooltips below fields; numeric ranges. Values in
+// hidden sections are not cleared (invariant 5), and save/delete remain handled by core.
 
 const orders: Collection = {
   id: 'orders',
@@ -126,7 +127,7 @@ describe('the entry form follows the table form (D-570)', () => {
     expect(screen.getByText('Order')).toBeTruthy();
     expect(screen.queryByText('Invoice')).toBeNull();
     expect(screen.queryByTestId('editor-tax-no')).toBeNull();
-    // 没写进任何一段的字段排在后面。
+    // Fields not written into any section are listed at the end.
     expect(screen.getByTestId('editor-section-rest')).toBeTruthy();
     expect(screen.getByTestId('editor-note')).toBeTruthy();
 
@@ -134,13 +135,13 @@ describe('the entry form follows the table form (D-570)', () => {
     expect(screen.getByText('Invoice')).toBeTruthy();
     expect(screen.getByTestId('editor-tax-no-hint')).toHaveTextContent('15 or 18 characters');
 
-    // 显示时必填要填。
+    // Required fields must be filled when displayed.
     await fireEvent.changeText(screen.getByTestId('editor-item'), 'Desk');
     await fireEvent.press(screen.getByTestId('editor-save'));
     expect(await screen.findByTestId('editor-tax-no-issue')).toHaveTextContent('Required');
     expect(await repo.listRecords('orders')).toEqual([]);
 
-    // 藏起来就不按必填查，也不交它里面写了一半的值。
+    // When hidden, required validation is not checked, and partially filled values inside it are not submitted.
     await fireEvent.changeText(screen.getByTestId('editor-tax-no'), 'half');
     await fireEvent(screen.getByTestId('editor-invoice'), 'valueChange', false);
     expect(screen.queryByTestId('editor-tax-no')).toBeNull();
@@ -171,7 +172,7 @@ describe('the entry form follows the table form (D-570)', () => {
   it('a number outside the range is refused with the limit; an old value outside it still shows', async () => {
     const repo = await start({ item: 'Old', qty: 9 });
     await openEntry('r1');
-    // 范围是后加的：存着的 9 照样显示，改别的照样能存。
+    // Range added later: existing stored 9 is displayed as usual, and modifying other fields saves successfully.
     expect(screen.getByTestId('editor-qty').props.value).toBe('9');
     await fireEvent.changeText(screen.getByTestId('editor-item'), 'Old desk');
     await fireEvent.press(screen.getByTestId('editor-save'));

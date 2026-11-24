@@ -2,14 +2,17 @@ import type { Field } from '../schema';
 import { receiptRules } from './doc-context';
 import type { ModelRequest } from './model';
 
-// 分类字段（单选，概念 category）的候选（D-405）：先用代码里的词表（店名区和票面上印的词），拿不准再问本机模型。
-// 词表和提示词是在研究目录 prefill-rules-research/step6-classify 里量过再搬进来的，改了要重新量。
-// 只有选项 ID 是默认分类的 ID（收据模版的六个）时才认得出；用户自己加的选项只靠名字交给模型选。
-// 结果只进候选，用户点了才填（D-394、D-396）。
+// Category field (single-choice, category concept) candidates (D-405): first use the code lexicon
+// (store name area and terms printed on the receipt), and fall back to asking the local model if
+// uncertain. The lexicon and prompts were measured and tuned in research directory
+// prefill-rules-research/step6-classify before being ported over; modifications require
+// re-measurement. Recognized only when option IDs match default category IDs (the six in the
+// receipt template); user-added options rely solely on names for model selection. Results enter
+// candidates only, filled only upon user tap (D-394, D-396).
 
 export type ChoiceField = Extract<Field, { type: 'choice' }>;
 
-/** 默认分类的选项 ID；用户改了选项的名字，ID 不变，还是认得。 */
+/** Default category option IDs; if the user changes the option name, the ID remains the same and is still recognized. */
 export const CATEGORY_IDS = [
   'dining',
   'grocery',
@@ -21,17 +24,17 @@ export const CATEGORY_IDS = [
 type CategoryId = (typeof CATEGORY_IDS)[number];
 const isKnown = (id: string): id is CategoryId => (CATEGORY_IDS as readonly string[]).includes(id);
 
-// 拉丁词的开头要在词边界（不用 lookbehind：Hermes 不一定支持）。
+// Latin word start must be at a word boundary (avoiding lookbehinds, which Hermes may not support).
 const L = (s: string) => `(?:^|[^\\p{L}\\p{N}])(?:${s})`;
 const R = (...parts: string[]) => new RegExp(parts.join('|'), 'iu');
 
 interface Lexicon {
   id: CategoryId;
-  /** 店名区（前 6 排）里出现 3 分，只在别处出现 1 分。 */
+  /** Score 3 if appearing in the store name area (first 6 rows), score 1 if appearing elsewhere. */
   name?: RegExp;
-  /** 票面上印了就是这一类的词，全文出现 3 分。 */
+  /** Words indicating this category is printed on the receipt, score 3 for full-text appearance. */
   strong?: RegExp;
-  /** 全文出现 +1 分。 */
+  /** +1 point for full-text appearance. */
   body?: RegExp;
 }
 
@@ -101,11 +104,11 @@ const LEXICON: readonly Lexicon[] = [
   },
 ];
 
-/** 代码有把握的门槛（测量的：第一名 ≥ 3 分、领先 ≥ 2 分）。 */
+/** Confidence threshold in code (measured: 1st place >= 3 points, lead >= 2 points). */
 const SURE_TOP = 3;
 const SURE_GAP = 2;
 
-/** 词表认出的默认分类 ID；没把握时 null。 */
+/** Default category ID recognized by lexicon; null when uncertain. */
 export function categoryByLexicon(rows: readonly string[]): CategoryId | null {
   const lines = rows.map((r) => r.normalize('NFKC').trim()).filter(Boolean);
   const head = lines.slice(0, 6).join('\n');
@@ -125,18 +128,18 @@ export function categoryByLexicon(rows: readonly string[]): CategoryId | null {
   return first[0];
 }
 
-/** 代码认出的分类，换成这个字段里对应的选项 ID（选项被删了就是 null）。 */
+/** Category recognized by code, mapped to the corresponding option ID in this field (null if the option was deleted). */
 export function categoryByCode(field: ChoiceField, rows: readonly string[]): string | null {
-  // 词表来自收据（D-405），只对收据生效。
+  // Lexicon originates from receipts (D-405), applies only to receipts.
   if (!receiptRules()) return null;
   const id = categoryByLexicon(rows);
   return id !== null && field.options.some((o) => o.id === id) ? id : null;
 }
 
-/** 这个字段能不能问模型：至少两个选项能分清名字。 */
+/** Whether this field can query the model: at least two options to distinguish names. */
 export const canAskCategory = (field: ChoiceField): boolean => categoryChoices(field).length >= 2;
 
-// 提示词里的说明（英文，模型读英文最稳；量的时候中文、法文名字比英文名字差，所以认得的默认分类一律用英文名）。
+// Descriptions in prompt (English; model reads English most reliably; during measurement, Chinese and French names performed worse than English names, so recognized default categories uniformly use English names).
 const DESCRIPTIONS: Record<CategoryId, string> = {
   dining:
     'restaurant, cafe, bar, bakery counter, takeaway or any place that serves prepared food and drinks. Signs: table, guests, service charge, tip, dishes and drinks as items.',
@@ -158,7 +161,7 @@ const cleanName = (label: string) =>
     .replace(/["\\]/g, '')
     .trim();
 
-/** 问模型时每个选项叫什么：认得的默认分类用英文名，其他用用户起的名字；重名的只留第一个。 */
+/** Option labels when querying the model: recognized default categories use English names, others use user-defined names; duplicates keep only the first. */
 function categoryChoices(field: ChoiceField): { id: string; name: string; known: boolean }[] {
   const out: { id: string; name: string; known: boolean }[] = [];
   for (const o of field.options) {
@@ -169,7 +172,7 @@ function categoryChoices(field: ChoiceField): { id: string; name: string; known:
   return out;
 }
 
-/** 问模型时的选项：名字（语法里用）和提示词里的一行（说出来的话也用这一份，D-575）。 */
+/** Options when querying the model: name (used in grammar) and a line in the prompt (spoken text also uses this copy, D-575). */
 export function categoryPromptOptions(
   field: ChoiceField,
 ): { id: string; name: string; line: string }[] {
@@ -184,7 +187,7 @@ const SYSTEM =
   'You read the OCR text of one receipt or document and choose the one category it belongs to. ' +
   'Use only what is written in the text. Output only the category.';
 
-/** 问分类的完整请求：语法把回答限制在这个字段当前的选项名里。手写 ChatML，空的 think 块等于关掉 thinking。 */
+/** Complete request for category query: grammar restricts answers to current option names of this field. Hand-written ChatML; empty think block disables thinking. */
 export function categoryRequest(
   field: ChoiceField,
   rows: readonly string[],
@@ -207,14 +210,14 @@ export function categoryRequest(
   };
 }
 
-/** 模型的回答 → 选项 ID；不是选项名的回答丢掉（语法已经限制了，这里再核对一次）。 */
+/** Model answer -> option ID; answers that are not option names are discarded (grammar already restricts, verified here again). */
 export function categoryAnswers(field: ChoiceField, answer: string): string[] {
   const name = answer.trim();
   const hit = categoryChoices(field).find((c) => c.name === name);
   return hit ? [hit.id] : [];
 }
 
-// 票面写了什么货币（D-429）。¥ 既可能是人民币也可能是日元：看字段的选项里有哪个。
+// Currencies printed on receipts (D-429). ¥ can be either CNY or JPY: determined by which one is in the field options.
 const CURRENCY_MARKS: readonly (readonly [RegExp, readonly string[]])[] = [
   [/(?:C|CA)\$/g, ['cad']],
   [/(?:A|AU)\$/g, ['aud']],
@@ -225,14 +228,14 @@ const CURRENCY_MARKS: readonly (readonly [RegExp, readonly string[]])[] = [
   [/£/g, ['gbp']],
   [/₩/g, ['krw']],
   [/₹/g, ['inr']],
-  // 马币（D-549）：RM 后面紧跟数字，大写（RMB 是人民币）。
+  // Malaysian Ringgit (D-549): RM immediately followed by digits, uppercase (RMB is Chinese Yuan).
   [/\bRM(?=\s?\d)/g, ['myr']],
   [/円/g, ['jpy']],
   [/元|人民币|\bRMB\b/gi, ['cny']],
   [/[¥￥]/g, ['cny', 'jpy']],
 ];
 
-/** 文字里出现最多的货币（必须是这个单选字段的选项）；没有时 null。 */
+/** Currency appearing most frequently in text (must be an option of this choice field); null if none. */
 export function currencyInText(field: ChoiceField, rows: readonly string[]): string | null {
   const ids = new Set(field.options.map((o) => o.id));
   const counts = new Map<string, number>();
@@ -246,7 +249,7 @@ export function currencyInText(field: ChoiceField, rows: readonly string[]): str
     const hits = text.match(mark)?.length ?? 0;
     const id = options.find((o) => ids.has(o));
     if (hits > 0 && id) add(id, hits);
-    // 「CA$」算过了，后面的「$」不再算一次。
+    // "CA$" has been counted, subsequent "$" is not counted again.
     text = text.replace(mark, ' ');
   }
   let best: string | null = null;

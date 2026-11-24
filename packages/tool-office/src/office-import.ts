@@ -4,17 +4,17 @@ import { OfficeImportFailure, type OfficeImportError } from './ooxml';
 import type { TableDoc } from './types';
 import { importXlsx } from './xlsx-import';
 
-// 预览页和放上桌共用的入口（D-509）：按扩展名读外来的 docx / xlsx，读不了时说为什么，不抛错。
+// Shared entry point for the preview page and placing on the desk (D-509): read external docx/xlsx by extension, explain failures without throwing errors.
 
 export type OfficeImport =
   | { ok: true; kind: 'doc'; doc: DocDoc; images: Map<string, ImportedImage> }
   | { ok: true; kind: 'table'; doc: TableDoc; formulas: number }
   | { ok: false; error: OfficeImportError };
 
-/** 能读进来改的扩展名。 */
+/** File extensions that can be read and edited. */
 export const isImportableOffice = (ext: string) => /^(docx|xlsx)$/i.test(ext);
 
-/** 读一份 docx / xlsx；别的扩展名返回 null。 */
+/** Read a docx/xlsx file; return null for other extensions. */
 export function importOffice(data: Uint8Array, ext: string): OfficeImport | null {
   if (!isImportableOffice(ext)) return null;
   try {
@@ -25,7 +25,7 @@ export function importOffice(data: Uint8Array, ext: string): OfficeImport | null
     const { doc, formulas } = importXlsx(data);
     return { ok: true, kind: 'table', doc, formulas };
   } catch (e) {
-    // 文件里有没想到的写法（解析出错）：当作坏了，不让预览页、桌面崩掉。
+    // Unexpected structures in the file (parsing errors): treated as damaged to prevent preview page and workspace crashes.
     return { ok: false, error: e instanceof OfficeImportFailure ? e.code : 'damaged' };
   }
 }

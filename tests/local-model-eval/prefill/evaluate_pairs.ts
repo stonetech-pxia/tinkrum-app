@@ -1,7 +1,10 @@
-// 成对样本（prefill/pairs*/cases.jsonl，由没读过规则代码的人写）：同一版式按顺序来几张，
-// 每张都先预填，再按真值保存；保存一次就学会，所以从第 2 张起看读得对不对（第 1 张只用规则）。
-// 每张都先预填、再按真值「保存」（用户改对了），记忆跟着学。和只用规则（没有记忆）比较。
-// 用法（仓库根目录）：npx tsx tests/local-model-eval/prefill/evaluate_pairs.ts [pairs|pairs2] [--show-wrong]
+// Paired samples (prefill/pairs*/cases.jsonl, written by people who have not read the rule code):
+// several pages of the same layout in order, each first prefilled, then saved according to the
+// ground truth. Learning happens on save, so from the 2nd page onward, check if the reading is
+// correct (the 1st page uses rules only). Each page is prefilled first, then "saved" according to
+// the ground truth (user corrected it), and memory learns from it. Compared against rules only (no
+// memory). Usage (repository root): npx tsx tests/local-model-eval/prefill/evaluate_pairs.ts
+// [pairs|pairs2] [--show-wrong]
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -102,7 +105,7 @@ for (const [layoutId, docs] of layouts) {
         }
       }
     }
-    // 用户检查后保存真值；记忆从保存的值学。
+    // User checks and saves the ground truth; memory learns from the saved values.
     const memory = learnLayout(
       withMemory.layout,
       {

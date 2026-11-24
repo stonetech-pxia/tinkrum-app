@@ -1,14 +1,18 @@
-"""任务 124 ②：新用户没有历史时，把文件对上用户自己的表、快捷操作或按内容的内设快捷操作，或者都不推荐。
+"""Task 124 ②: When a new user has no history, match files against the user's own tables, quick
+actions, content-based preset quick actions, or recommend nothing.
 
-match/profiles.json 是虚构的用户配置（表用 CollectionSchema 的格式，快捷操作只有名字，和真实配置一样）；
-match/presets.json 由 export_presets.ts 从 workflows/presets.ts 导出；match/docs.jsonl 是文件文字和每个用户
-可接受的推荐（空 = 不该推荐）。每对（文件, 用户）是一次判断。快捷操作先按文件类型过滤（代码做）。
+match/profiles.json contains synthetic user configurations (tables use `CollectionSchema`
+format, quick actions have only names, same as real configs); match/presets.json is exported by
+`export_presets.ts` from `workflows/presets.ts`; match/docs.jsonl contains file text and
+acceptable recommendations for each user (empty = should not be recommended). Each (file, user)
+pair is a decision. Quick actions are first filtered by file type (handled in code).
 
-两种打分，阈值都在校准集上定、只在测试集上报：
-  --backend baseline   不用模型：关键词重合（表名、字段名、选项、快捷操作名）+ text-rules 命中对上金额 / 日期 / 电话字段
-  --backend embedding  Qwen3-Embedding GGUF（llama.cpp CPU），比较文件文字和候选说明的余弦相似度
+Two scoring methods, with thresholds determined on the calibration set and reported only on the
+test set:
+  --backend baseline   No model: keyword overlap (table names, field names, options, quick action names) + text-rules matching for amount / date / phone fields
+  --backend embedding  Qwen3-Embedding GGUF (llama.cpp CPU), comparing cosine similarity between file text and candidate descriptions
 
-从 tests/local-model-eval/ 运行：
+Run from tests/local-model-eval/:
   python classification/evaluate_match.py --backend baseline
   MORPH_LLAMA_SERVER_BIN=/abs/llama-server python classification/evaluate_match.py --backend embedding --model q8
 """
@@ -28,7 +32,7 @@ from llama_embed import LlamaEmbedder, rank
 HERE = Path(__file__).resolve().parent
 MATCH = HERE / "match"
 
-# 字段名里表示电话、邮箱的词（通用的写法，不是照着测试样本挑的）。
+# Words in field names denoting phone numbers and email addresses (general patterns, not cherry-picked for test samples).
 CONTACT_WORDS = re.compile(r"phone|tel|mobile|e-?mail|courriel|mail|téléphone|portable|电话|手机|邮箱|联系", re.I)
 STOP = {"the", "and", "for", "with", "your", "from", "les", "des", "une", "pour", "avec", "dans", "sur", "aux",
         "par", "est", "vos", "votre", "this", "that", "are", "you", "not", "all", "one", "new"}
@@ -42,7 +46,9 @@ def load() -> tuple[list[dict], list[dict], list[dict]]:
 
 
 def candidates(profile: dict, presets: list[dict], file: str) -> list[dict]:
-    """这个用户、这种文件能推荐的：全部的表；能接这种文件的快捷操作和内设的。"""
+    """Available recommendations for this user and file type: all tables; quick actions and
+    built-ins that accept this file type.
+    """
     kind = "image" if file == "screenshot" else file
     lang = profile["locale"]
     out = []
@@ -62,7 +68,9 @@ def candidates(profile: dict, presets: list[dict], file: str) -> list[dict]:
 
 
 def tokens(text: str) -> set[str]:
-    """英法文：3 个字母以上的词（小写）；中文：相邻两个汉字。"""
+    """English/French: words with 3 or more letters (lowercase); Chinese: adjacent pairs of Chinese
+    characters.
+    """
     text = text.lower()
     out = {w for w in re.findall(r"[a-zà-ÿœæç]{3,}", text) if w not in STOP}
     for run in re.findall(r"[一-鿿]+", text):

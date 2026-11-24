@@ -16,7 +16,7 @@ import {
 } from './theme';
 import { validateWorkspace } from './validate';
 
-// 图片背景（D-258）：卡片类块的 style.backdrop 和页面的 backdrop（v34：updateContainer 的 changes）。
+// Image background (D-258): card block style.backdrop and page backdrop (v34: updateContainer changes).
 
 function apply(config: WorkspaceConfig, ops: Op[]): WorkspaceConfig {
   const result = applyOps(config, ops, { registry, locale: 'en' });
@@ -49,13 +49,13 @@ describe('backdrop ops', () => {
     expect(tip(on).style).toEqual({ backdrop: { overlay: 'strong' } });
     expect(validateWorkspace(on, registry).ok).toBe(true);
 
-    // 用户在长按编辑里选了图片。
+    // User selected an image in long-press edit.
     const picked = apply(on, [style({ assetId: 'abc123def' })]);
     expect(tip(picked).style).toEqual({ backdrop: { overlay: 'strong', assetId: 'abc123def' } });
-    // AI 之后只调遮罩：图片不变。
+    // Adjust only overlay after AI: image remains unchanged.
     const lighter = apply(picked, [style({ overlay: 'light' })]);
     expect(tip(lighter).style).toEqual({ backdrop: { overlay: 'light', assetId: 'abc123def' } });
-    // 移除图片：图片背景还开着；关掉：整个去掉。
+    // Remove image: image background remains enabled; turn off: removes it entirely.
     expect(tip(apply(lighter, [style({ assetId: null })])).style).toEqual({
       backdrop: { overlay: 'light' },
     });
@@ -121,9 +121,9 @@ describe('backdrop ops', () => {
 describe('overlay contrast', () => {
   it('worst case is the overlay over pure black or pure white', () => {
     expect(overlayContrast('#000000', '#FFFFFF', 1)).toBeCloseTo(21);
-    // 很淡的白遮罩：黑字在图片最暗处只有深灰底。
+    // Very faint white overlay: dark text at the darkest point of the image has only a dark grey background.
     expect(overlayContrast('#000000', '#FFFFFF', 0.3)).toBeLessThan(MIN_TEXT_CONTRAST);
-    // 文字亮度在两头之间：某处图片正好和文字一样亮。
+    // Text luminance between the two extremes: image brightness matches text brightness at a certain point.
     expect(overlayContrast('#777777', '#FFFFFF', 0.3)).toBe(1);
   });
 
@@ -147,7 +147,7 @@ describe('overlay contrast', () => {
             const opacity = overlayOpacity(level, bg, c.text);
             const where = `${id} ${dark ? 'dark' : 'light'} ${bg} ${level}`;
             expect(opacity, where).toBeGreaterThanOrEqual(OVERLAY_OPACITY[level]);
-            // 在纯底色上过了现有的对比度检查（4.5），盖在任何图片上也过；本来就不到的不更差。
+            // Passes existing contrast check (4.5) on solid background, and passes when overlaid on any image; does not worsen items that already fall short.
             const need = Math.min(MIN_TEXT_CONTRAST, contrast(c.text, bg)) - 0.01;
             expect(overlayContrast(c.text, bg, opacity), where).toBeGreaterThanOrEqual(need);
             if (bg === c.surface || bg === c.background)
@@ -168,7 +168,7 @@ describe('overlay contrast', () => {
     expect(l).toBeLessThanOrEqual(m!);
     expect(m).toBeLessThanOrEqual(s!);
     expect(s).toBeLessThanOrEqual(1);
-    // 默认风格里三档真的不一样（图片不会被遮得看不见）。
+    // The three tiers in the default style are genuinely distinct (images won't be obscured beyond recognition).
     expect(new Set([l, m, s]).size).toBe(3);
   });
 });

@@ -17,7 +17,7 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 名片样板（D-423，创始人 2026-11-04 改）在 App 里走一遍：新用户、有数据、边界。
+// Business card sample preset (D-423, modified by the founder 2026-11-04) walk-through in the app: new user, with data, edge cases.
 
 const seed = (locale: Locale, registry: Registry) => {
   const base = createStarterWorkspace(locale, registry);
@@ -88,7 +88,7 @@ describe('new user', () => {
     async (locale, empty, scan, mine, byHand, exportLabel) => {
       await open('contacts', [], locale);
       expect(await screen.findByText(empty)).toBeTruthy();
-      // 没有记录时没有搜索框，也没有导出（一条都没有，交不出去）。
+      // When there are no records, there is no search box and no export option (no entries to export, cannot submit).
       expect(screen.queryByTestId('browse-search')).toBeNull();
       expect(within(screen.getByTestId('page-bottom-zone')).getByText(mine)).toBeTruthy();
       expect(within(screen.getByTestId('dial-main')).getByText(scan)).toBeTruthy();
@@ -107,7 +107,7 @@ describe('new user', () => {
     expect(await screen.findByTestId('editor-save')).toBeTruthy();
     await fireEvent.changeText(screen.getByTestId('editor-name'), '张三');
     await fireEvent.press(screen.getByTestId('editor-save'));
-    // 存好回来，页面换成名片和二维码，两个按钮不见了。
+    // After saving and returning, the page switches to the business card and QR code, and the two buttons disappear.
     await waitFor(() => expect(screen.queryByTestId('editor-save')).toBeNull());
     expect(await screen.findByTestId('single-qr')).toBeTruthy();
     expect(screen.queryByText('手动填写')).toBeNull();
@@ -126,16 +126,16 @@ describe('new user', () => {
   it('adding by hand opens the form, a new tag is typed there, and it is saved on the record only', async () => {
     const { repo } = await open('contacts');
     await fireEvent.press(await screen.findByTestId('dial-toggle'));
-    // 真机上看到的：不认识的图标名会显示成文字（图标名是 plus，不是 add）。
+    // Seen on a real device: unrecognized icon names are displayed as text (the icon name is plus, not add).
     expect(screen.queryByText('add')).toBeNull();
-    // 展开的按钮压在较深的共用遮罩上（和居中问话框同一种），不再自写纯黑。
+    // The expanded button is layered over the darker shared backdrop (same as the centered dialog) rather than using a custom solid black.
     expect(screen.getByTestId('dial-backdrop')).toHaveStyle({
       backgroundColor: makePalette(createDefaultWorkspace('en').theme, false).scrimStrong,
     });
     await fireEvent.press(screen.getByTestId('dial-item-0'));
     expect(screen.queryByTestId('dial-backdrop')).toBeNull();
     await fireEvent.changeText(await screen.findByTestId('editor-name'), 'Ann');
-    // 逗号变成一个标签；后面没按「完成」的也算。
+    // A comma turns into a tag; anything typed afterwards without pressing Done is also included.
     await fireEvent.changeText(screen.getByTestId('editor-tags'), '客户,');
     await fireEvent.changeText(screen.getByTestId('editor-tags'), '北京');
     await fireEvent.press(screen.getByTestId('editor-save'));
@@ -181,7 +181,7 @@ describe('with data', () => {
     await fireEvent.press(screen.getByTestId('browse-filter-tags-vip'));
     expect(screen.getByTestId('record-r0')).toBeTruthy();
     expect(screen.queryByTestId('record-r1')).toBeNull();
-    // 筛选加搜索：两个都要对得上。
+    // Filter plus search: both conditions must match.
     await fireEvent.changeText(screen.getByTestId('browse-search'), 'acme');
     expect(screen.getByTestId('browse-no-match')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('browse-filter-tags-all'));
@@ -239,17 +239,17 @@ describe('edge cases', () => {
     }));
     await open('contacts', many, 'en');
     await waitFor(() => expect(rows()).toBe(30));
-    // 还没到底：不加载。
+    // Not yet at the bottom: do not load.
     await end(100, 3000);
     expect(rows()).toBe(30);
     await end(2400, 3000);
     expect(rows()).toBe(60);
-    // 同一个高度再滚不重复加载。
+    // Scrolling again at the exact same height does not trigger duplicate loading.
     await end(2400, 3000);
     expect(rows()).toBe(60);
     await end(5400, 6000);
     expect(rows()).toBe(90);
-    // 搜索读整张表，也搜没显示的字段；换了搜索回到第一页。
+    // Search reads the entire table, including unshown fields; changing the search query resets to the first page.
     await fireEvent.changeText(screen.getByTestId('browse-search'), '555999');
     expect(rows()).toBe(1);
     await fireEvent.changeText(screen.getByTestId('browse-search'), '');

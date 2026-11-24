@@ -36,21 +36,22 @@ import { SpeechError } from '../speech';
 import { MB, displayName, fileItems, freshName, writeItem, type RunServices } from './helpers';
 import { checkSpace, mediaError } from './video';
 
-// 音频工具的动作实现（D-150–D-155）：码率、声道在 core/audio.ts 里算，编码交给原生模块 morph-media，
-// 语音转文字交给 morph-speech（iOS 系统识别，Android whisper.cpp），文字转语音交给 morph-tts（系统声音，D-270）。
-// 识别出的文字、要朗读的文字只留在本机（D-036）。
+// Audio tool action implementations (D-150–D-155): bitrate and channels are calculated in
+// core/audio.ts, encoding is delegated to the native module morph-media, speech-to-text to
+// morph-speech (iOS system recognition, Android whisper.cpp), and text-to-speech to morph-tts
+// (system voice, D-270). Recognized text and text to be spoken remain on-device only (D-036).
 
 type Impl = ActionImpl<RunServices>;
 type Ctx = Parameters<Impl>[2];
 
-/** 压完还超过目标时最多再压几次。 */
+/** Maximum number of additional compression passes if it still exceeds the target after compressing. */
 const MAX_RETRIES = 2;
-/** 自动识别语言时看前几段（够判断，又不用把整本书交给系统识别）。 */
+/** Number of initial segments to inspect for automatic language detection (sufficient for identification without handing the entire book to the system). */
 const DETECT_SEGMENTS = 8;
-/** 转成 M4A 时，朗读占进度的多少（转格式很快）。 */
+/** Proportion of progress allocated to speech synthesis when converting to M4A (format conversion is very fast). */
 const SPEAK_SHARE = 0.9;
 
-/** 剪一段界面的波形有多少根。 */
+/** Number of buckets in a trimmed waveform interface. */
 const WAVEFORM_BUCKETS = 120;
 
 const audioMime = (ext: string) =>
@@ -101,7 +102,7 @@ const audioItem = (item: RunItem, result: MediaOutput, name = item.name): RunIte
   ...(item.takenAt !== undefined ? { takenAt: item.takenAt } : {}),
 });
 
-/** 一个任务：进度按全部文件合起来的百分比报，只增不减；取消看运行页的「停止」。 */
+/** A job: reports progress as a cumulative percentage across all files, monotonically increasing; cancellation is handled via "Stop" on the run page. */
 function jobFor(ctx: Ctx, index: number, total: number) {
   let shown = 0;
   return {
@@ -120,7 +121,7 @@ function jobFor(ctx: Ctx, index: number, total: number) {
   };
 }
 
-/** 逐个处理音频（或视频的声音）。work 返回新的临时文件，或 null（原样交给下一步）。 */
+/** Process audio files (or video sound tracks) one by one. work returns a new temporary file, or null (passes through to the next step unchanged). */
 async function eachAudio(
   input: RunValue | null,
   ctx: Ctx,
@@ -151,7 +152,7 @@ async function eachAudio(
   return { type: 'audio', items: out };
 }
 
-/** 已经是这种格式（M4A 里是 AAC、WAV 或 MP3）：不用再转。 */
+/** Already in this format (AAC, WAV, or MP3 within M4A): no need to transcode. */
 function alreadyIn(item: RunItem, info: MediaInfo, format: AudioFormat): boolean {
   if (info.hasVideo) return false;
   if (format === 'wav') return item.ext === 'wav';
@@ -159,7 +160,7 @@ function alreadyIn(item: RunItem, info: MediaInfo, format: AudioFormat): boolean
   return item.ext === 'm4a' && /^(aac|mp4a)/i.test(info.audioCodec ?? '');
 }
 
-/** 语音转文字的错误 → 给用户看的错误。 */
+/** Speech-to-text error → user-facing error. */
 function speechError(e: unknown, item: RunItem, ctx: Ctx, language: SpeechLanguage): Error {
   if (e instanceof RunError || e instanceof RunCancelled) return e;
   const { locale } = ctx;
@@ -200,7 +201,7 @@ async function prepareSpeech(ctx: Ctx, language: SpeechLanguage, model: SpeechMo
       action: t(locale, 'speechLangUnsupported', { lang }),
     });
   }
-  // iPhone：系统要先下载这种语言的识别模型，下载前问一句（D-064、D-112）。
+  // iPhone: the system needs to download the recognition model for this language first; prompt the user before downloading (D-064, D-112).
   if (need.kind === 'systemDownload') {
     const ok = await ctx.services.ui.confirm(
       t(locale, 'speechDownloadAsk', { lang }),
@@ -215,7 +216,7 @@ async function prepareSpeech(ctx: Ctx, language: SpeechLanguage, model: SpeechMo
       throw new RunError('packFailed', { detail: t(locale, 'speechDownloadFailed', { lang }) });
     }
   }
-  // Android：模型由执行器在这一步之前按 packFor 确认下载；还没有说明下载失败了。
+  // Android: models are confirmed for download by the executor prior to this step via packFor; if not specified, download failed.
   if (need.kind === 'pack') {
     throw new RunError('packFailed', { detail: t(locale, 'speechDownloadFailed', { lang }) });
   }
@@ -395,7 +396,7 @@ export const AUDIO_IMPLS: Record<string, Impl> = {
         });
       }
       let result = await encode(first.plan);
-      // 编码器会略超码率：超了就按超出的比例降一点再压。
+      // Encoders may slightly overshoot the bitrate: if exceeded, scale down proportionally and re-encode.
       let factor = 1;
       for (let retry = 0; result.size > target && retry < MAX_RETRIES; retry++) {
         factor *= (target / result.size) * 0.95;
@@ -446,7 +447,7 @@ export const AUDIO_IMPLS: Record<string, Impl> = {
 
   async 'audio.trim'(input, _params, ctx) {
     const media = mediaOf(ctx);
-    // 剪切界面要知道时长（分享进来的文件选择器没给）；波形由界面打开后再读。
+    // Trimming interface needs duration (file picker from share does not provide it); waveforms are read after the interface opens.
     const items: RunItem[] = [];
     const infos: MediaInfo[] = [];
     for (const item of fileItems(input)) {
@@ -464,12 +465,12 @@ export const AUDIO_IMPLS: Record<string, Impl> = {
       ctx.throwIfCancelled();
       const range = ranges[i];
       const whole = item.durationMs ?? 0;
-      // 选了整段就不用剪。
+      // No trimming needed if the entire range is selected (startMs <= 0 and whole > 0 and endMs >= whole).
       if (!range || (range.startMs <= 0 && whole > 0 && range.endMs >= whole)) {
         out.push(item);
         continue;
       }
-      // 重新编码成 M4A：哪种格式都能剪，准确到毫秒（不重新编码的剪切只适合 M4A，开头会对不准）。
+      // Re-encode to M4A: any format can be trimmed with millisecond accuracy (uncoded cutting is only suitable for M4A, and the start point may be misaligned otherwise).
       const plan = planAudioConvert(sourceOf(item, infos[i]!), 'm4a');
       checkSpace(ctx, estimateAudioBytes(plan, range.endMs - range.startMs));
       let result: MediaOutput;
@@ -498,8 +499,10 @@ export const AUDIO_IMPLS: Record<string, Impl> = {
     for (const item of items) infos.push(await probeAudio(media, item));
     const sources = items.map((item, i) => sourceOf(item, infos[i]!));
     const durationMs = sources.reduce((sum, s) => sum + s.durationMs, 0);
-    // 有一段是立体声就用立体声；码率按最好的那段（最高 192 kbps）。Android 读 M4A 常常没有码率，
-    // 按大小和时长算（否则两段语音备忘会按 128 kbps 合成，变大好几倍）。
+    // Use stereo if any segment is stereo; bitrate follows the highest-quality segment (up to 192
+    // kbps). Android often fails to report bitrates for M4A, so calculate based on size and
+    // duration (otherwise, two voice memos combined would be synthesized at 128 kbps, inflating
+    // size significantly).
     const plan = planAudioConvert(
       {
         durationMs,
@@ -528,7 +531,7 @@ export const AUDIO_IMPLS: Record<string, Impl> = {
     return { type: 'audio', items: [audioItem(first, result, name)] };
   },
 
-  // 文字转语音（D-270）：系统声音先读成 WAV，要 M4A 时再交给 morph-media 转（和「音频转格式」同样的码率规则）。
+  // Text-to-speech (D-270): system voice is first read as WAV, then passed to morph-media when M4A is requested (using the same bitrate rules as "Audio convert format").
   async 'audio.fromText'(input, params, ctx) {
     if (input?.type !== 'text') throw new RunError('emptyText');
     const text = input.text.trim();
@@ -546,7 +549,7 @@ export const AUDIO_IMPLS: Record<string, Impl> = {
 
     let lang = params.lang as SpeakLanguage | 'auto';
     if (lang === 'auto') {
-      // 先问系统（和翻译同一个语言识别），认不出时按文字的书写系统猜。一次只用一种声音。
+      // Query the system first (uses the same language recognition as translation); fallback to guessing based on the text's writing system if unrecognized. Uses only one voice at a time.
       const sample = segments.slice(0, DETECT_SEGMENTS);
       const detected = await ctx.services.files.translator
         ?.detectLanguages(sample)
@@ -563,7 +566,7 @@ export const AUDIO_IMPLS: Record<string, Impl> = {
 
     const rate = Number(params.rate);
     const format = params.format === 'wav' ? 'wav' : 'm4a';
-    // WAV 中间文件要放得下；转 M4A 时再加上 M4A（小得多）。
+    // WAV intermediate file must have sufficient capacity; include M4A size (much smaller) when converting to M4A.
     const wavBytes = estimateSpeechBytes(text, rate);
     checkSpace(ctx, format === 'm4a' ? wavBytes * 1.1 : wavBytes);
     const share = format === 'm4a' ? SPEAK_SHARE : 1;
@@ -607,7 +610,7 @@ export const AUDIO_IMPLS: Record<string, Impl> = {
       return { type: 'audio', items: [spoken] };
     }
 
-    // M4A：朗读是单声道的人声，码率按「音频转格式」的规则（跟着 WAV 走会到上限，这里按语音给）。
+    // M4A: speech narration is monophonic human voice, bitrate follows "Audio convert format" rules (following WAV would hit the upper limit, so assign speech-appropriate rates here).
     const media = mediaOf(ctx);
     const plan = planAudioConvert(
       {
@@ -661,12 +664,12 @@ export const AUDIO_IMPLS: Record<string, Impl> = {
     }
     if (parts.length === 0) throw new RunError('noSpeech', { name: displayName(items[0]!) });
     ctx.progress(100, 100, 'percent');
-    // 几段录音时每段前面写上文件名。文字只留在本机：复制、存成文件、排成 PDF，绝不发给 AI。
+    // Prepend filename to each segment when there are multiple recordings. Text remains on-device only: copied, saved as a file, or formatted into a PDF, never sent to AI.
     const text =
       items.length === 1
         ? parts[0]!.text
         : parts.map((p) => `【${p.name}】\n${p.text}`).join('\n\n');
-    // 一段录音是用户说的一句话（D-575）：后面接「记一笔」时按它直接填表。几段录音拼起来的不算。
+    // A single voice recording is a sentence spoken by the user (D-575): when followed by "log an expense", it fills the form directly. Combinations of multiple recordings stitched together are not counted.
     return {
       type: 'text',
       text,

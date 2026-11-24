@@ -1,4 +1,4 @@
-// 防倒退测试用到的仓库外资源。默认值是创始人这台 Mac 上的位置；别的机器用环境变量指过去。
+// Resources outside the repository used for regression testing. Default value is the path on the founder's Mac; other machines use an environment variable to point to it.
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -10,15 +10,15 @@ const NOTES = `${homedir()}/Library/Application Support/Claude/side-session-note
 const RUNTIME = `${homedir()}/.cache/codex-runtimes/codex-primary-runtime/dependencies`;
 
 export const ENV = {
-  /** 无头 Chrome：跑 App 里同一个 pdfview 页面（PDF.js 渲染页面、读原始绘图）。 */
+  /** Headless Chrome: runs the same pdfview page in the app (PDF.js renders pages, reads raw drawings). */
   chrome:
     process.env.WORD_REGRESSION_CHROME ??
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  /** playwright 模块所在目录（只用它开 Chrome，不用它的浏览器下载）。 */
+  /** Directory containing the playwright module (used only to launch Chrome, without downloading its browser). */
   playwright: process.env.WORD_REGRESSION_PLAYWRIGHT ?? `${RUNTIME}/node/node_modules`,
-  /** pdfview 包的文件（pdf.js 的 build/、cmaps/ 等），和 App 下载的 pdfview 包相同。 */
+  /** pdfview package files (pdf.js build/, cmaps/, etc.), identical to the pdfview package downloaded by the app. */
   pdfjs: process.env.WORD_REGRESSION_PDFJS ?? `${NOTES}/word-graphics-pages-2026-11-12/pdfjs`,
-  /** 只在 --record（重新识别）时用：PP-OCR、版面模型和 onnxruntime-node。 */
+  /** Used only with --record (re-recognition): PP-OCR, layout model, and onnxruntime-node. */
   models: {
     det: process.env.WORD_REGRESSION_DET ?? `${NOTES}/scan-to-office/dewarp-exp/models/det.onnx`,
     rec: process.env.WORD_REGRESSION_REC ?? `${NOTES}/scan-to-office/dewarp-exp/models/rec.onnx`,
@@ -30,12 +30,13 @@ export const ENV = {
       `${NOTES}/scan-to-office/word-exp/models/layout_S_fp16.onnx`,
   },
   onnxruntime: process.env.WORD_REGRESSION_ORT ?? `${NOTES}/prefill-real-ocr/scripts`,
-  /** 只在 --render 时用：LibreOffice 把 docx 画成 PDF，pdftoppm 画成图。 */
+  /** Used only with --render: LibreOffice renders docx to PDF, pdftoppm renders to images. */
   soffice: process.env.WORD_REGRESSION_SOFFICE ?? `${RUNTIME}/bin/override/soffice`,
   pdftoppm: process.env.WORD_REGRESSION_PDFTOPPM ?? `${RUNTIME}/bin/override/pdftoppm`,
   /**
-   * 无头 LibreOffice 自带的 fontconfig 配置。不指给它时它只认自带的字体，中文全画成空白；
-   * 这份配置里有系统字体目录。
+   * fontconfig configuration bundled with headless LibreOffice. Without it, LibreOffice only
+   * recognizes its built-in fonts, rendering all Chinese text as blank; this configuration
+   * includes the system font directories.
    */
   fontconfig:
     process.env.WORD_REGRESSION_FONTCONFIG ??

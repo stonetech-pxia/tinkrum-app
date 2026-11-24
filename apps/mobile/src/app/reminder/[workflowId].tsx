@@ -10,9 +10,11 @@ import { openRunAfterClosing } from '@/shell/navigation';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
 
 /**
- * 点了提醒、提醒要打开一个快捷操作（D-251）：只把它摆出来，用户自己点「开始」才运行。
- * 不能直接打开运行页面：运行页面一打开就开始运行，而提醒绝不自动运行任何东西。
- * 按钮、快捷入口打开快捷操作（from=entry，D-256）也用这里；指向内设快捷操作、用户改过的，打开副本。
+ * Tapped a reminder, and the reminder opens a quick action (D-251): only present it, let the user
+ * tap "Start" to run. Cannot open the run page directly: opening the run page starts execution
+ * immediately, but reminders never automatically run anything. Buttons and quick entry points
+ * opening quick actions (from=entry, D-256) also use this; pointing to built-in quick actions or
+ * user-modified ones opens a copy.
  */
 export default function ReminderRoute() {
   const { workflowId, from } = useLocalSearchParams<{ workflowId: string; from?: string }>();

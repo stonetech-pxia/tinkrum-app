@@ -34,7 +34,7 @@ import { annotationSvg } from './annotations';
 import type { FlattenPage } from './flatten';
 import type { DrawOp } from './platform';
 
-/** 超过 Metal 纹理上限的离屏画布会让 App 直接崩溃（不是 JS 错误），所以先在 JS 里拦住。 */
+/** Off-screen canvases exceeding Metal texture limits cause immediate app crashes (rather than JS errors), so they are intercepted in JS first. */
 function makeSurface(width: number, height: number) {
   if (width > MAX_SURFACE_SIDE || height > MAX_SURFACE_SIDE || width < 1 || height < 1) {
     throw new Error(`canvas ${width}×${height} is too large`);
@@ -44,15 +44,16 @@ function makeSurface(width: number, height: number) {
   return surface;
 }
 
-// Skia 离屏绘制（Expo Go 自带）。只画我们自己的固定内容，不执行任何配置里的代码。
+// Skia off-screen drawing (built-in to Expo Go). Renders only our own fixed content, executing zero configuration code.
 
-/** 系统字体：iOS 用苹方（含中文），Android 用默认无衬线字体（缺的字——中文、日文、emoji——由系统换字体补上）。 */
+/** System fonts: PingFang on iOS (including Chinese), default sans-serif on Android (missing characters—Chinese, Japanese, emoji—are substituted by the system font fallback). */
 const FONT_FAMILY = Platform.select({ ios: ['PingFang SC'], default: ['sans-serif'] });
 
 /**
- * 标注文字的排版：预览和导出用同一个。用 Skia 的段落排版而不是单字体画字：
- * 段落会按每个字找系统里有这个字的字体（Android 默认字体没有中文，直接画会是方块）。
- * 内边距跟着字号走，字号变了框按比例变。
+ * Layout for label text: shared between preview and export. Uses Skia paragraph layout instead of
+ * single-font drawing: paragraphs query the system for fonts containing each character (Android
+ * default fonts lack Chinese, and drawing directly results in blocks). Padding scales
+ * proportionally with font size.
  */
 export function textLayout(text: string, fontSize: number, color = '#000000') {
   const build = (size: number) => {
@@ -72,7 +73,7 @@ export function textLayout(text: string, fontSize: number, color = '#000000') {
   };
   let size = fontSize;
   let paragraph = build(size);
-  // 很长的一行字会超过画布上限：按比例缩小字号（调用方只用宽高比）。
+  // Very long lines exceeding canvas limits: scales down font size proportionally (callers use aspect ratio only).
   const natural = paragraph.getLongestLine() + size * 0.4;
   if (natural > MAX_SURFACE_SIDE) {
     size = Math.max(8, Math.floor((size * (MAX_SURFACE_SIDE - 16)) / natural));
@@ -109,11 +110,14 @@ export function renderTextPng(
   return { bytes, width, height };
 }
 
-/** 分析图的长边：背景、黑白两端、彩色还是灰度、倾斜角都在这么大的图上算（D-266）。 */
+/** Long side of the analysis image: background, black/white points, color vs. grayscale, and skew angle are computed on an image of this size (D-266). */
 const ENHANCE_ANALYSIS_SIDE = 800;
 
-// 全分辨率的逐像素运算（D-266）：除以纸张背景（每个通道分开，纸变成中性白）→ 按黑白两端拉伸（白点附近软膝，D-275）→
-// 彩色 / 灰度 / 黑白（Sauvola 局部阈值，按最暗的通道判断，均值和标准差来自分析图）。背景和统计图都很小，按格子中心线性插值。
+// Full-resolution per-pixel operations (D-266): divide by paper background (per channel, rendering
+// paper neutral white) -> stretch between black and white points (soft knee near white point,
+// D-275) -> color / grayscale / black-and-white (Sauvola local thresholding based on the darkest
+// channel; mean and standard deviation derived from the analysis image). Background and statistics
+// images are very small and linearly interpolated from grid centers.
 const ENHANCE_SKSL = `
 uniform shader image;
 uniform shader background;
@@ -128,29 +132,31 @@ uniform float knee;
 half4 main(float2 p) {
   float3 c = float3(image.eval(p).rgb);
   float3 b = max(float3(background.eval(p).rgb), float3(0.04));
-  // 软膝（scanTone，D-275）：接近纸色的淡字不被一刀切成白，纸仍然是纯白。黑白模式不用 n。
+  // Soft knee (scanTone, D-275): light text close to the paper color is not bluntly cut off to white, and the paper remains pure white. Not used in black-and-white mode.
   float3 u = min((c / b - lo) / (hi - lo), float3(1.0 + knee));
   float3 kn = u - (u - (1.0 - knee)) * (u - (1.0 - knee)) / (4.0 * knee);
   float3 n = clamp(mix(u, kn, step(float3(1.0 - knee), u)), 0.0, 1.0);
   float y = dot(n, float3(0.299, 0.587, 0.114));
   if (mode < 1.5) {
-    // 中间调压暗一点（γ = SCAN_MIDTONE_GAMMA）：纸还是白、黑还是黑，淡的字更清楚。黑白模式不用（阈值是按没压暗的亮度算的）。
+    // Darken midtones slightly (\u03b3 = SCAN_MIDTONE_GAMMA): paper stays white and black stays black, making faint text clearer. Not used in black-and-white mode (threshold is calculated based on unmodified brightness).
     float3 d = pow(n, float3(gamma));
     float dy = pow(y, gamma);
     if (mode > 0.5) return half4(half3(dy), 1.0);
-    // 接近灰色的像素（纸上的噪点、拍屏幕的摩尔纹）去掉颜色；颜色浓的（红字、印章）保留。
+    // Remove color from pixels close to gray (noise on paper, screen moire patterns); preserve pixels with saturated colors (red text, stamps).
     float chroma = max(n.r, max(n.g, n.b)) - min(n.r, min(n.g, n.b));
     return half4(half3(mix(float3(dy), d, smoothstep(0.08, 0.2, chroma))), 1.0);
   }
-  // 黑白：先取 3×3 的平均（压掉拍屏幕的摩尔纹和纸纹，笔画有 3–4 像素宽，影响不大），
-  // 再按三个通道里最暗的那个判断（红字、蓝字也算深色，和分析图上的 leveledInk 一致）。
+  // Black and white: first take the 3x3 average (suppressing screen moire patterns and paper
+  // texture; strokes are 3-4 pixels wide so impact is small), then evaluate based on the darkest of
+  // the three channels (red and blue text are also treated as dark, consistent with leveledInk in
+  // analysis graphics).
   float3 sum = float3(0.0);
   for (int dx = -1; dx <= 1; dx++) {
     for (int dy = -1; dy <= 1; dy++) sum += float3(image.eval(p + float2(dx, dy)).rgb);
   }
   float3 m3 = clamp((sum / 9.0 / b - lo) / (hi - lo), 0.0, 1.0);
   float ink = min(m3.r, min(m3.g, m3.b));
-  // stats：R 是均值，G 是标准差 × 2，所以 s / 0.5 正好是 G。
+  // stats: R is mean, G is standard deviation \u00d7 2, so s / 0.5 equals G.
   float2 ms = float2(stats.eval(p).rg);
   float t = ms.x * (1.0 + k * (ms.y - 1.0));
   float v = ink < t ? 0.0 : 1.0;
@@ -160,7 +166,7 @@ half4 main(float2 p) {
 
 let enhanceEffect: ReturnType<typeof Skia.RuntimeEffect.Make> | undefined;
 
-/** RGBA 像素做成 Skia 图片（背景格子、统计图）。 */
+/** Creates Skia images from RGBA pixels (background grids, statistical charts). */
 function imageFromRgba(img: RgbaImage) {
   const out = Skia.Image.MakeImage(
     {
@@ -176,7 +182,7 @@ function imageFromRgba(img: RgbaImage) {
   return out;
 }
 
-/** 把一张图读成 RGBA 像素：缩到 width × height（线性插值，缩小时用 mipmap，免得摩尔纹混进分析）。 */
+/** Reads an image into RGBA pixels: downscales to width × height (linear interpolation, using mipmaps when downscaling to prevent moiré patterns from interfering with analysis). */
 function readScaled(image: SkImageLike, width: number, height: number): RgbaImage {
   const surface = makeSurface(width, height);
   const canvas = surface.getCanvas();
@@ -204,9 +210,11 @@ function readRgba(image: SkImageLike, width: number, height: number): Uint8Array
 }
 
 /**
- * 扫描件增强（D-266，取代 D-078 的颜色矩阵）：分析图上算出背景、黑白两端、倾斜角和彩色还是灰度，
- * 再用一个着色器在全分辨率上一次画完（顺带转正倾斜，画布放大到能装下转过的四个角，空出的地方是白色）。
- * 黑白模式最后在全分辨率上去掉孤立的噪点。输出 JPG。
+ * Scanned document enhancement (D-266, replacing the color matrix of D-078): computes background,
+ * black/white endpoints, skew angle, and color/grayscale mode on the analysis image, then draws
+ * in a single pass using a shader at full resolution (along with skew correction, expanding the
+ * canvas to fit the four rotated corners with blank areas filled in white). Black-and-white mode
+ * removes isolated noise pixels at full resolution as a final step. Outputs a JPG.
  */
 export function enhanceJpeg(
   bytes: Uint8Array,
@@ -217,7 +225,7 @@ export function enhanceJpeg(
   height: number;
   output: ScanOutput;
   skew: number;
-  /** 转正前的大小（画布在它外面放大，D-267 换算识别框用）。 */
+  /** Pre-rotation dimensions (canvas is scaled outside of it, used for converting OCR bounding boxes in D-267). */
   base: { width: number; height: number };
 } {
   const image = Skia.Image.MakeImageFromEncoded(Skia.Data.fromBytes(bytes));
@@ -232,7 +240,7 @@ export function enhanceJpeg(
   );
   const plan = planScanEnhance(analysis, look);
 
-  // 转正后的画布不能超过上限：按转过之后的大小算缩放。
+  // Post-rotation canvas must not exceed limits: calculates scaling based on post-rotation dimensions.
   const k = surfaceScale(rotatedSize({ width: iw, height: ih }, plan.skew));
   const width = Math.max(1, Math.floor(iw * k));
   const height = Math.max(1, Math.floor(ih * k));
@@ -275,7 +283,7 @@ export function enhanceJpeg(
   let result = surface.makeImageSnapshot();
 
   if (plan.output === 'bw') {
-    // 转正时边缘插值出的灰也要变成黑白：去噪点前按 128 二值化（despeckle 也按这个判断）。
+    // Gray edges interpolated during rotation must also be binarized: thresholded at 128 prior to denoising (despeckle uses this threshold as well).
     const px = {
       width: canvasSize.width,
       height: canvasSize.height,
@@ -285,7 +293,7 @@ export function enhanceJpeg(
       const v = px.data[i]! < 128 ? 0 : 255;
       px.data[i] = px.data[i + 1] = px.data[i + 2] = v;
     }
-    // 约 200 dpi 时：宽高都不超过 3 像素、9 像素内没有字的黑点当作噪点。
+    // At approximately 200 dpi: black dots where neither width nor height exceeds 3 pixels and no characters exist within a 9-pixel radius are treated as noise.
     const maxSide = Math.max(2, Math.round(Math.max(canvasSize.width, canvasSize.height) / 800));
     despeckle(px, { maxSide, reach: maxSide * 3 });
     result = imageFromRgba(px);
@@ -304,8 +312,9 @@ export function enhanceJpeg(
 type SkImageLike = NonNullable<ReturnType<typeof Skia.Image.MakeImageFromEncoded>>;
 
 /**
- * 离屏合成（D-079）：按顺序执行固定的几种绘制。解码过的图片只缓存最近一张，
- * 拼很多张大图时不会同时占着所有图片的内存。
+ * Off-screen composition (D-079): executes fixed drawing operations in sequence. Caches only the
+ * most recently decoded image, avoiding simultaneous memory occupancy across all images when
+ * stitching many large graphics.
  */
 export async function composeOnSurface(
   canvasSpec: { width: number; height: number; background: string },
@@ -356,7 +365,7 @@ export async function composeOnSurface(
         break;
       }
       case 'blur': {
-        // 先把已经画好的内容拍下来，再在这块区域里画它的模糊版本。
+        // Flushes previously drawn content to a snapshot before drawing its blurred version within that region.
         surface.flush();
         const snapshot = surface.makeImageSnapshot();
         const paint = Skia.Paint();
@@ -407,8 +416,10 @@ export async function composeOnSurface(
 }
 
 /**
- * 文字识别的输入（D-269）：长边先不超过 maxSide，再缩放到找文字行要的大小（32 的倍数，短边至少 736），
- * 一次在 Skia 里缩好（线性插值，缩小时用 mipmap），JS 不用再逐像素插值。
+ * Input for text recognition (D-269): restricts the long side to maxSide first, then scales to
+ * the size required for text line detection (multiple of 32, short side at least 736), scaled
+ * entirely within Skia (linear interpolation, using mipmaps when downscaling) to eliminate
+ * per-pixel interpolation in JS.
  */
 export function ocrPixels(bytes: Uint8Array, maxSide: number): RgbaImage {
   const image = Skia.Image.MakeImageFromEncoded(Skia.Data.fromBytes(bytes));
@@ -421,7 +432,7 @@ export function ocrPixels(bytes: Uint8Array, maxSide: number): RgbaImage {
   return readScaled(image, size.width, size.height);
 }
 
-/** 图片的 RGBA 像素（长边缩到 maxSide 以内）。 */
+/** RGBA pixels of the image (with the long side scaled down to within maxSide). */
 export function pixelsOf(
   bytes: Uint8Array,
   maxSide: number,
@@ -453,15 +464,17 @@ export function pixelsOf(
 }
 
 /**
- * 扫描展平（D-274）用的一张页面：补边缩小给 UVDoc、按网格画小图找文字行、按网格画原大小的结果。
- * 结果只用 drawVertices 在原图上画一次（UVDoc、转正、逐行拉直已经合成在一张网格里）。
+ * A page used for scan flattening (D-274): padding/shrinking for UVDoc, drawing small images on a
+ * grid to find text lines, and drawing full-size results on a grid. The result is drawn once on
+ * the original image using drawVertices (UVDoc, straightening, and line-by-line unslanting are
+ * already composited into a single grid).
  */
 export function openFlattenPage(bytes: Uint8Array): FlattenPage {
   const image = Skia.Image.MakeImageFromEncoded(Skia.Data.fromBytes(bytes));
   if (!image) throw new Error('image could not be decoded');
   const width = image.width();
   const height = image.height();
-  /** 按网格把原图画到 out 大小的画布上。 */
+  /** Draw the original image onto the out-sized canvas according to the mesh. */
   const draw = (mesh: WarpMesh, out: Size, mip: boolean) => {
     const surface = makeSurface(out.width, out.height);
     const canvas = surface.getCanvas();
@@ -487,7 +500,7 @@ export function openFlattenPage(bytes: Uint8Array): FlattenPage {
         mip ? MipmapMode.Linear : MipmapMode.None,
       ),
     );
-    // 没有顶点颜色：Dst 表示只用着色器（原图）的颜色。
+    // No vertex colors: Dst means using only the shader (original image) color.
     canvas.drawVertices(vertices, BlendMode.Dst, paint);
     surface.flush();
     return surface.makeImageSnapshot();
@@ -502,7 +515,7 @@ export function openFlattenPage(bytes: Uint8Array): FlattenPage {
       canvas.drawColor(Skia.Color(`rgb(${gray}, ${gray}, ${gray})`));
       const kx = iw / padded.width;
       const ky = ih / padded.height;
-      // 和模型里的缩放一样用双线性、不用 mipmap。
+      // Use bilinear filtering and no mipmaps, same as the scaling in the model.
       canvas.drawImageRectOptions(
         image,
         Skia.XYWHRect(0, 0, width, height),

@@ -36,7 +36,7 @@ import { findLines } from './lines';
 import { pageSlope } from './text-table';
 import { type OcrBox } from './types';
 
-/** 估计正文和段落的字号、粗体、颜色及下划线。 */
+/** Estimate font size, boldness, color, and underlines for body text and paragraphs. */
 export function measurePageTypography(
   state: Pick<TextTablesState, 'free' | 'repairBaseline'> &
     Pick<TextLinesState, 'synthetic' | 'orig'> &
@@ -66,13 +66,16 @@ export function measurePageTypography(
   } = state;
   let { groups } = state;
 
-  // 字号和笔画：先量出整页的正文字号和笔画粗细，再和它比。
+  // Font size and stroke: first measure the page body font size and stroke weight, then compare against them.
   const strokes = new Map<OcrBox, number>();
   for (const l of free) strokes.set(l, synthetic.has(orig(l)) ? 0 : strokeRatio(image, orig(l)));
   const pageStroke = median([...strokes.values()].filter((v) => v > 0));
-  // 估字号用的行高（同 D-521）：扫描件拉正以后还剩一点斜（0.3–1°），长行的识别框比字高出 宽 × 斜率 一截，
-  // 页脚这样的长行会被量成标题那么大（EU 样本 050），扣掉。按字估的斜率和按线估的都斜才算
-  // （两栏正文的基线错开时，按字估的斜率不准；没有线的页不扣）。
+  // Line height used for estimating font size (same as D-521): after straightening scans, a slight
+  // skew (0.3–1°) remains, causing long-line recognition boxes to be taller than the font height by
+  // width × slope; footers and similar long lines would be measured as heading size (EU sample
+  // 050), so they are deducted. Counted only if skews estimated from characters and lines match
+  // (when two-column body baselines are offset, character-based slope estimation is inaccurate;
+  // borderless pages are not deducted).
   const tilt = Math.min(
     Math.abs(pageSlope(lines, lineHeight)),
     Math.abs(Math.tan(((tableSkew ?? findLines(image).skew) * Math.PI) / 180)),
@@ -80,12 +83,12 @@ export function measurePageTypography(
   const sizeHeight = (l: OcrBox) => Math.max(0.6 * l.height, l.height - tilt * l.width);
   const bodyHeight = median(groups.filter((g) => !g.title).flatMap((g) => g.lines.map(sizeHeight)));
   const bodyH = bodyHeight || lineHeight;
-  // 正文页还是表单页（D-335）：数长行（至少四成页宽）里的字占整页（含表格）的多少。
+  // Body page versus form page (D-335): count the proportion of characters in long lines (at least 40% page width) relative to the entire page (including tables).
   const charsOf = (ls: readonly OcrBox[]) => ls.reduce((n, l) => n + l.text.length, 0);
   const prose =
     charsOf(lines.filter((l) => l.width >= PROSE_LINE * image.width)) >=
     PROSE_SHARE * charsOf(lines);
-  // 只改图的归属，不让移除图内标签改变整页的默认字号。
+  // Modify only image ownership; do not let the removal of intra-image labels alter the default font size of the entire page.
   const bodySize =
     repairBaseline?.bodySize ??
     previous?.bodySize ??
@@ -96,9 +99,9 @@ export function measurePageTypography(
         fontSizeOf(bodyH, fontWidthPx),
       ),
     );
-  // 正文行高按纸宽换算、还没限制范围的字号。
+  // Body line height scaled by paper width, unconstrained raw font size.
   const rawBodySize = (bodyH * A4_WIDTH_PT * BOX_TO_FONT) / fontWidthPx;
-  // 按字宽估字号（D-463）：正文行的估计够一致时才用。
+  // Estimate font size by character width (D-463): used only when body line estimates are sufficiently consistent.
   const bodyWidths = groups
     .filter((g) => !g.title)
     .flatMap((g) => g.lines.map(widthSizeOf))
@@ -110,13 +113,13 @@ export function measurePageTypography(
     bodyWidths[Math.floor(bodyWidths.length * 0.75)]! -
       bodyWidths[Math.floor(bodyWidths.length * 0.25)]! <=
       WIDTH_SPREAD * bodyW;
-  // 整页文字的左右边（判断居中）。
+  // Left and right boundaries of page text (used for determining centering).
   const textLeft = Math.min(...free.map((l) => l.x), ...tables.map((t) => t.box.x));
   const textRight = Math.max(
     ...free.map((l) => l.x + l.width),
     ...tables.map((t) => t.box.x + t.box.width),
   );
-  // 先排好块（区域、表格、图片）的阅读顺序，块里的段落保持从上到下。
+  // Pre-arrange reading order of blocks (regions, tables, images), keeping paragraphs inside blocks top-to-bottom.
   const units: Unit[] = [
     ...tables.map((t) => ({ box: t.box, blocks: [t] as DocLeaf[] })),
     ...images.map((im) => ({ box: im.box, blocks: [im] as DocLeaf[] })),
@@ -134,10 +137,12 @@ export function measurePageTypography(
     let size = Math.min(48, Math.max(6, Math.round(bodySize * (byWidth || byHeight) * 2) / 2));
     const snap = byWidth ? WIDTH_SNAP : BODY_SNAP;
     if (short || Math.abs(size - bodySize) <= snap * bodySize) size = bodySize;
-    // 已知纸张尺寸时，不能让正文的最小字号把大标题按比例再次放大。
+    // When paper dimensions are known, prevent the minimum body font size from scaling up large headings proportionally again.
     if (input.paper && !short && size >= HEADING_RATIO * bodySize) {
-      // 全大写的行没有下伸的字母，框比同字号的行矮，按自己的框高会读小（16.3 磅读成 13 磅）：
-      // 保留按字宽的比例，只去掉正文被最小字号抬高的那一截。
+      // All-caps lines lack descenders and have shorter bounding boxes than same-size lines; using
+      // their own box height makes them read too small (e.g., 16.3 pt read as 13 pt): preserve
+      // character width proportionality, removing only the padding added to body text by the
+      // minimum font size constraint.
       if (/\p{Lu}/u.test(text) && !/\p{Ll}/u.test(text))
         size = Math.min(size, Math.max(6, Math.round(((size * rawBodySize) / bodySize) * 2) / 2));
       else size = Math.min(size, fontSizeOf(h, fontWidthPx));
@@ -145,7 +150,7 @@ export function measurePageTypography(
     const bold =
       pageStroke > 0 && median(paraLines.map((l) => strokes.get(l) ?? 0)) > BOLD_RATIO * pageStroke;
     const color = textColor(image, orig(paraLines[0]!));
-    // 下划线：每一行下面都有（D-463）。
+    // Underline: present beneath every line (D-463).
     const underline = paraLines.every((l) => hasUnderline(image, orig(l)));
     const style: DocStyle = {
       ...(size !== bodySize ? { size } : {}),
@@ -155,7 +160,7 @@ export function measurePageTypography(
     };
     return { h, short, size, style };
   };
-  // 密集页保留原来的分组，避免改动已有的跨页排版；只拼接推断字号、粗体等一致的碎片。
+  // Dense pages retain their original groupings to avoid disrupting existing multi-page layout; only fragments with consistent inferred font sizes, bold styles, etc., are spliced.
   const origin = new Map(groups.flatMap((group) => group.lines.map((l) => [l, group] as const)));
   if (lines.length < DENSE_LINES)
     groups = reconcileTextGroups(groups, free, lineHeight, (a, b) => {

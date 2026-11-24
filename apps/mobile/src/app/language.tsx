@@ -5,7 +5,7 @@ import { LANGUAGE_CHOICES, LANGUAGE_META_KEY, useLanguage } from '@/language';
 import { usePalette } from '@/renderer/theme';
 import { useWorkspaceContext, useAppTheme } from '@/workspace/context';
 
-/** 「设置 → 语言」：跟随系统，或固定一种语言。选了马上生效（外壳按新语言重建）。 */
+/** Settings -> Language: follow system or use fixed language. Takes effect immediately (shell rebuilds with the new language). */
 export default function LanguageRoute() {
   const { repo, locale } = useWorkspaceContext();
   const palette = usePalette(useAppTheme());

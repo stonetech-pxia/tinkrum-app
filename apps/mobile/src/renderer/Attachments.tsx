@@ -29,9 +29,9 @@ import {
 } from './slot-file';
 import type { Palette } from './theme';
 
-// 附件字段（D-187、D-263）：值是一组 Morph 的文件 ID。文件名只在本机显示，不进配置，也不发给 AI。
+// Read a set of user files. Unread ones are undefined, ones not on this device (deleted) are null.
 
-/** 读一组用户文件。还没读到的是 undefined，不在这台设备上的（已删除）是 null。 */
+/** Read a set of user files. Unread ones are undefined, ones not on this device (deleted) are null. */
 export function useAssets(ids: readonly string[]): Map<string, AssetRecord | null> {
   const { repo } = useWorkspaceContext();
   const key = ids.join(',');
@@ -53,11 +53,11 @@ export function useAssets(ids: readonly string[]): Map<string, AssetRecord | nul
   return loaded.key === key ? loaded.assets : new Map();
 }
 
-/** 照片和视频在 App 里全屏左右翻看（和收件页面一样，D-238）；别的文件交给系统预览。 */
+/** Fullscreen left/right browsing of photos and videos within the app (same as inbox page, D-238); other files handed over to system preview. */
 const inViewer = (a: AssetRecord) =>
   a.mimeType.startsWith('image/') || a.mimeType.startsWith('video/');
 
-/** Morph 保存的全部用户文件（文件 ID → 文件），文件有增删时重新读。列表一次读完，不逐条查。 */
+/** All user files saved by Morph (file ID -> file), re-read when files are added or removed. List read all at once, not queried item by item. */
 export function useAssetIndex(): Map<string, AssetRecord> | null {
   const { repo } = useWorkspaceContext();
   const version = useWorkspace((s) => s.assetsVersion);
@@ -72,7 +72,7 @@ export function useAssetIndex(): Map<string, AssetRecord> | null {
   return index;
 }
 
-/** 一条记录附件里的第一张图片（按字段顺序、再按文件顺序）；没有时为 null。 */
+/** First image in a record's attachments (by field order, then file order); null if none. */
 export function firstImage(
   record: DataRecord,
   collection: Collection,
@@ -89,8 +89,8 @@ export function firstImage(
 }
 
 /**
- * 缩略图：expo-image 按显示的大小解码（allowDownscaling，Android 的 Glide 解码时就缩小），
- * 几千万像素的照片也不会整张读进内存。
+ * Thumbnail: expo-image decodes according to display size (allowDownscaling, Android Glide scales
+ * down during decoding), preventing tens-of-megapixels photos from loading entirely into memory.
  */
 export function AttachmentThumb({
   asset,
@@ -123,9 +123,11 @@ export const IMPORT_PROBLEMS: Record<ImportProblem, StringKey> = {
 };
 
 /**
- * 从选好的地方（拍照、相册、「文件」）选，选好的（最多 max 个，由 pick 限制）复制进 App（和文件入口一样，slot-file.ts）。
- * 返回存好的文件 ID；取消时为空。出了问题会提示，已经存好的照样返回。
- * 问从哪里选的是下面的 SourceChoice：不用系统弹窗，因为安卓的系统弹窗最多三个按钮，「取消」会被丢掉。
+ * Select from chosen sources (camera, photo library, "Files"), copy selected ones (up to max,
+ * constrained by pick) into the app (same as file entry point, slot-file.ts). Returns saved file
+ * IDs; empty if cancelled. Prompts if issues occur, still returns successfully saved ones. Source
+ * selection prompt uses SourceChoice below: avoids system dialog because Android system dialog
+ * has at most three buttons, causing "Cancel" to be dropped.
  */
 async function importChosen(
   locale: RenderEnv['locale'],
@@ -137,7 +139,7 @@ async function importChosen(
   try {
     result = await pick(source);
   } catch (e) {
-    // 没有相机、没给权限。
+    // No camera or permission denied.
     Alert.alert(
       title,
       e instanceof RunError
@@ -157,7 +159,7 @@ async function importChosen(
   return result.assetIds;
 }
 
-/** 问从哪里选：拍照、相册、「文件」和「取消」，点空白处也取消。 */
+/** Prompt for source selection: take photo, photo library, "Files", and "cancel", tapping empty space also cancels. */
 function SourceChoice({
   title,
   palette,
@@ -212,15 +214,18 @@ function SourceChoice({
 }
 
 /**
- * 记录页给表单里新建的用户文件（D-395：桌上改好交回来的）：没保存就离开时记录页删掉没用上的，
- * 和收件页面复制来的副本一样（D-392）。只有记录页提供；没有时不能把附件放到桌上。
+ * Record page provider for new user files created in forms (D-395: brought back from desk edits):
+ * record page deletes unused ones upon leaving without saving, same as copies copied from inbox
+ * page (D-392). Provided only by record page; attachments cannot be placed on the desk without
+ * it.
  */
 export const FormFilesContext = createContext<{ hold(ids: readonly string[]): void } | null>(null);
 
 /**
- * 附件字段的输入（D-263）：列出每个文件，可以添加（拍照、相册、「文件」）、调整顺序、去掉。
- * 点一个文件预览（照片、视频全屏翻看，别的用系统预览）。去掉只是不再放在这条记录里，文件本身还在「存储空间」里。
- * 「…」里分享，或放到桌上改（D-395）。
+ * Attachments field input (D-263): lists each file, allows adding (camera, photo library,
+ * "Files"), reordering, and removing. Tapping a file previews it (photos, videos fullscreen
+ * browse, others via system preview). Removal only unlinks it from this record; the file itself
+ * remains in storage. "..." menu allows sharing or placing on the desk for editing (D-395).
  */
 export function AttachmentsInput({
   field,
@@ -248,7 +253,7 @@ export function AttachmentsInput({
   const [choosing, setChoosing] = useState(false);
   const router = useRouter();
   const formFiles = useContext(FormFilesContext);
-  // 桌上改完交回来时用最新的值和 onChange（表单在桌面下面，期间可能重新渲染过）。
+  // Use latest values and onChange when brought back from desk edits (form is below desk, may have re-rendered during the period).
   const latest = useRef({ ids, onChange });
   useEffect(() => {
     latest.current = { ids, onChange };
@@ -264,8 +269,9 @@ export function AttachmentsInput({
     };
   }, []);
 
-  // 点一个文件：照片和视频全屏左右翻看这个字段里所有的照片和视频；别的文件用系统预览
-  // （iOS QuickLook，Android 交给能打开的 App），和文件入口一样。
+  // Tap a file: photos and videos fullscreen left/right browse all photos and videos in this field;
+  // other files use system preview (iOS QuickLook, Android hands over to compatible app), same as
+  // file entry point.
   async function open(asset: AssetRecord) {
     if (inViewer(asset)) {
       const media = ids.flatMap((id) => {
@@ -297,7 +303,7 @@ export function AttachmentsInput({
     }
   }
 
-  // 「…」（D-395）：分享这个文件，或放到桌上改。
+  // "..." (D-395): share this file, or place it on the desk for editing.
   function more(asset: AssetRecord) {
     Alert.alert(asset.name, undefined, [
       { text: t(locale, 'resultShare'), onPress: () => void share(asset) },
@@ -306,7 +312,7 @@ export function AttachmentsInput({
     ]);
   }
 
-  // 分享存着的这个文件：用户文件存在 assets/<id>/<名字>，分享出去就是这个名字。
+  // Share this stored file: user files are stored in assets/<id>/<name>, shared with this exact name.
   async function share(asset: AssetRecord) {
     try {
       await files.shareUris([{ uri: files.fileUri(asset.path), mimeType: asset.mimeType }]);
@@ -318,8 +324,9 @@ export function AttachmentsInput({
     }
   }
 
-  // 放到桌上：复制一份进新桌面（记录里的文件不动；房间里存过的 xlsx / docx 带着中间格式，D-367），
-  // 在桌上点「完成」时问怎么放回来（DeskScreen），交回的文件进表单，还要点保存。
+  // Place on desk: copy into a new desk (files in record untouched; xlsx / docx stored in workspace
+  // retain intermediate format, D-367), prompt how to return when tapping "Done" on desk
+  // (DeskScreen), returned files enter form, and save must still be tapped.
   async function toDesk(asset: AssetRecord) {
     try {
       const now = Date.now();

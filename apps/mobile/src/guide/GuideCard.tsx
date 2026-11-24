@@ -11,8 +11,10 @@ import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { useGuide } from './store';
 
 /**
- * 首页上的引导卡片（D-149、D-231）。第 1、2 步是右上角 Tink 的气泡，见 GuideBubble（D-447）。第 3 步（D-260，第 2 步打开了图片或文件、或点了「以后再说」之后）：
- * 列出五个样板 App，点一个整套进草稿（D-190），看主页面，用户点「应用」才保存；选了或「以后再说」引导结束。
+ * Guide card on the home screen (D-149, D-231). Steps 1 and 2 are Tink's speech bubble in the top
+ * right, see GuideBubble (D-447). Step 3 (D-260, after step 2 opens an image or file, or taps
+ * "Later"): lists five sample apps, tapping one loads the entire set into the draft (D-190), view
+ * the main page, and the user taps "Apply" to save; selection or "Later" ends the guide.
  */
 export function GuideCard({ palette }: { palette: Palette }) {
   const { locale } = useWorkspaceContext();
@@ -50,13 +52,15 @@ export function GuideCard({ palette }: { palette: Palette }) {
     );
   }
 
-  // 第 1、2 步是 Tink 的气泡（GuideBubble，D-447）。
+  // Steps 1 and 2 are Tink's speech bubble (GuideBubble, D-447).
   return null;
 }
 
 /**
- * 选一个样板：整套修改进草稿（D-190），显示它的主页面；放不下时说明原因，草稿不变。
- * 引导第 3 步和「我的预设」（D-544）共用；before 在显示页面之前做（结束引导、回到主页）。
+ * Pick a sample: modifies the entire set into the draft (D-190), displays its main page; explains
+ * the reason when it doesn't fit, and the draft remains unchanged. Shared between guide step 3
+ * and "My Presets" (D-544); before is executed before displaying the page (ending the guide,
+ * returning to home).
  */
 export function usePickSample() {
   const { locale } = useWorkspaceContext();
@@ -86,7 +90,7 @@ export function usePickSample() {
   return { busy, pick };
 }
 
-/** 样板列表：图标、名字、一句话。 */
+/** Sample list: icon, name, brief description. */
 export function SampleRows({
   palette,
   testPrefix,
@@ -122,7 +126,7 @@ export function SampleRows({
 }
 
 const styles = StyleSheet.create({
-  // 左右贴着页面边距（D-454），在用的地方写。
+  // Attached to left and right page margins (D-454), written where used.
   wrap: { paddingTop: 8 },
   link: { alignSelf: 'flex-start', paddingVertical: 2 },
   sample: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },

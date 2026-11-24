@@ -18,8 +18,11 @@ import { useCalendar } from '../../workspace/context';
 import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 
-// 记一笔（D-187、D-397）：快捷操作运行到这一步时，打开和记录页同样的新记录表单。这一步的文件已经在附件里，
-// 表单读它们给候选（D-394），用户还可以再拍照、选照片和文件（D-263）；公式按填的值现算。填的内容直接写进本机的数据表，不进
+// Log an entry (D-187, D-397): when a quick action reaches this step, opens a new record form
+// identical to the record page. Files for this step are already in attachments, and the form reads
+// them for suggestions (D-394), while the user can also take new photos, choose photos, and pick
+// files (D-263); formulas are computed on the fly from entered values. Filled content is written
+// directly to the local data table and does not enter...
 
 export function RecordEntryScreen({
   input,
@@ -30,8 +33,9 @@ export function RecordEntryScreen({
 }: LocalScreenProps<'recordEntry'>) {
   const { collection, prefill, file, overflow, existing, index, total, heard } = input;
   const cal = useCalendar();
-  // 新记录：先套用字段的默认值（日期是今天，按一天从几点开始算，D-286），再放进预先填好的文字。
-  // 放进已有的记录（D-443）：从这条记录现在的值开始，再套上接在后面的文件和文字。
+  // New record: first apply field default values (date is today, based on day start time, D-286),
+  // then populate pre-filled text. Inserting into an existing record (D-443): start from the
+  // record's current values, then apply subsequent files and text.
   const [values, setValues] = useState<Record<string, unknown>>(() => {
     if (existing) return { ...toFormValues(collection, existing), ...prefill };
     const defaults: Record<string, unknown> = {};
@@ -51,7 +55,7 @@ export function RecordEntryScreen({
   const [issues, setIssues] = useState<FieldIssue[]>([]);
   const mayProceed = useSimilarCheck();
   async function done() {
-    // D-570：藏着的段里的字段不交。
+    // D-570: fields in hidden sections are not submitted.
     const input = formInput(collection, values, new Date(), cal);
     const prepared = prepareRecordValues(
       collection,
@@ -64,12 +68,12 @@ export function RecordEntryScreen({
       setIssues(prepared.issues);
       return;
     }
-    // 放进已有的记录：改的是这一条，不会多出一条，所以不问「看起来一样」。
+    // Inserting into an existing record: modifies this specific entry without creating duplicates, so it does not prompt "appears identical".
     if (existing) {
       onDone({ values: input });
       return;
     }
-    // D-426：这张表里有看起来一样的记录时问一句；同一次运行刚存的也算（out.addRecord 存完才开下一张表单）。
+    // D-426: prompt when an identical-looking record exists in this table; records created during the same run also count (out.addRecord saves before opening the next form).
     if (await mayProceed(collection, input)) onDone({ values: input });
   }
 
@@ -115,7 +119,7 @@ export function RecordEntryScreen({
           collection={collection}
           values={values}
           onChange={(next) => {
-            // 改了一个字段，它的错误就去掉（D-572）。
+            // Modifying a field clears its validation error (D-572).
             setIssues((now) => issuesLeft(now, values, next));
             setValues(next);
           }}

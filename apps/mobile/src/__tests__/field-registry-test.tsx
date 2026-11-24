@@ -13,15 +13,16 @@ import { FIELD_EDITORS } from '../renderer/data';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 每种登记的字段在 App 里都能填、能显示（新增字段类型时这里自动覆盖它，见 docs/FIELDS.md）：
-// 一张表放上每种字段的 example，表单里有每个能填的字段，列表按每个字段显示一条记录。
+// Every registered field type can be filled and displayed in the app (automatically covered here
+// when adding new field types, see docs/FIELDS.md): a table places an example of each field, the
+// form contains every fillable field, and the list displays one record per field.
 
 const fields = FIELDS.map((d) => d.example as Field);
 const fillable = FIELDS.filter((d) => d.inForm !== false).map((d) => d.example.id);
 
 const seed = (locale: Locale, registry: Registry) => {
   const components: NewComponent[] = [
-    // 一个表单最多 10 个字段，分成几个表单。
+    // At most 10 fields per form, split across multiple forms.
     ...[0, 10].map((start): NewComponent => ({
       id: start === 0 ? 'form' : `form${start}`,
       look: 'form',
@@ -85,7 +86,7 @@ it.each(['zh', 'en', 'fr'] as const)(
     for (const id of fillable) {
       const form = fillable.indexOf(id) < 10 ? 'form' : 'form10';
       const input = screen.queryByTestId(`form-${form}-${id}`);
-      // 选项和星星是一组按钮，测试 ID 带选项后缀。
+      // Options and stars are a group of buttons; test IDs include option suffixes.
       const parts = screen.queryAllByTestId(new RegExp(`^form-${form}-${id}-`));
       expect({ id, shown: input !== null || parts.length > 0 }).toEqual({ id, shown: true });
     }

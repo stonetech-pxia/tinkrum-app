@@ -37,23 +37,29 @@ import reading from './templates/reading.json';
 import reimbursement from './templates/reimbursement.json';
 import todo from './templates/todo.json';
 
-// 内置的数据页面模版（D-040）：mock AI 用它们理解「新建一个记账页面」这类说法，
-// 评测集也用它们准备初始状态。模版只生成数据表结构和页面，不含任何记录；这四个还没有给用户直接选（D-255），收件页面的预设表见下面（D-392）。
+// Built-in data page templates (D-040): mock AI uses them to understand phrases like "create a new
+// bookkeeping page", and evaluation sets use them to prepare initial states. Templates only
+// generate data table structures and pages, containing no records; these four are not yet directly
+// selectable by users (D-255), see preset tables for inbox page below (D-392).
 //
-// 每个模版是 templates/<名字>.json（D-255，v34 写法）：
-// - ids：数据表和页面的基本 ID；配置里已经有同名的就加 -2、-3……
-// - table、page：addData {table}、addContainer {page} 的内容。ID 写成占位符 $table、$page，
-//   块里引用这张表的地方（source.table、就地工具的 table）也写 $table，生成时一起换成真正的 ID。
-// - 给用户看的文字写成 { en, zh, fr }，按界面语言取一种。
-// - entry：页面的入口。现在只有 nav：放进导航栏（设置之前），导航栏满了就在首页加一个快捷入口。
+// Each template is templates/<name>.json (D-255, v34 format):
+// - ids: base IDs for data tables and pages; if config already has duplicates, append -2, -3...
+// - table, page: content of addData {table}, addContainer {page}. IDs written as placeholders
+// $table, $page, places in blocks referencing this table (source.table, inline tool's table) also
+// written as $table, replaced with actual IDs upon generation.
+// - User-facing text written as { en, zh, fr }, selected by interface language.
+// - entry: page entry point. Currently only nav: put into nav bar (before settings), if full, add
+// quick entry on home screen.
 
 export const DATA_TEMPLATES = ['budget', 'todo', 'reading', 'notes'] as const;
 export type DataTemplate = (typeof DATA_TEMPLATES)[number];
 
 /**
- * 收件页面「存成记录」给用户选的预设表（D-392）：每个都有一个附件字段（attachments），字段之后都能改。
- * 和上面四个分开列：mock AI 和评测只认上面四个，这几个只给用户在收件页面选。blank 是「空白」：
- * 一个标题字段加附件字段，表名先用默认的名字，用户之后自己改。
+ * Preset tables selectable by users for inbox page "Save as record" (D-392): each has an
+ * attachment field (attachments), fields can be modified later. Listed separately from the above
+ * four: mock AI and evaluations recognize only the top four, these are only for users to select
+ * in the inbox page. blank is "blank": one title field plus attachment field, table name uses
+ * default name initially, modified by user later.
  */
 export const FILE_RECORD_PRESETS = [
   'purchase',
@@ -65,8 +71,9 @@ export const FILE_RECORD_PRESETS = [
 ] as const;
 export type FileRecordPreset = (typeof FILE_RECORD_PRESETS)[number];
 /**
- * 用户平时看不到的预设（D-444）：只在导入文件、决定新建表单时参与排序和推荐；mock AI 和评测不认。
- * 字段是原型，名字还没有人审过。
+ * Presets invisible to users normally (D-444): participated in sorting and recommendation only
+ * when importing files and deciding to create new forms; mock AI and evaluations do not recognize
+ * them. Fields are prototypes, names unreviewed.
  */
 export const HIDDEN_RECORD_PRESETS = [
   'bank',
@@ -87,7 +94,7 @@ export const HIDDEN_RECORD_PRESETS = [
   'warranty',
 ] as const;
 export type HiddenRecordPreset = (typeof HIDDEN_RECORD_PRESETS)[number];
-/** 新建表单时能选的全部预设（不含空白）。 */
+/** All presets selectable when creating a new form (excluding blank). */
 export type NewTablePreset = Exclude<FileRecordPreset, 'blank'> | HiddenRecordPreset;
 type Template = DataTemplate | FileRecordPreset | HiddenRecordPreset;
 
@@ -137,7 +144,7 @@ const isLocalized = (v: object) => {
   return keys.length === 3 && keys.join() === 'en,fr,zh';
 };
 
-/** 换掉占位符、按语言取文字。 */
+/** Replace placeholders and retrieve text by language. */
 function fill(value: unknown, locale: Locale, ids: Record<string, string>): unknown {
   if (typeof value === 'string') return ids[value] ?? value;
   if (Array.isArray(value)) return value.map((v) => fill(v, locale, ids));
@@ -155,7 +162,7 @@ function uniqueId(base: string, taken: (id: string) => boolean): string {
   for (let n = 2; ; n++) if (!taken(`${base}-${n}`)) return `${base}-${n}`;
 }
 
-/** 新页面需要一个入口：导航栏有空位就放进导航栏（设置之前），否则在首页加一个快捷入口。 */
+/** New pages need an entry point: put into nav bar if space permits (before settings), otherwise add a quick entry on the home screen. */
 export function entryOps(
   config: WorkspaceConfig,
   pageId: string,
@@ -183,13 +190,13 @@ export function entryOps(
   ];
 }
 
-/** 生成某个模板的修改操作：新建数据表、新建页面，并给页面一个入口。 */
+/** Modification operations to generate a template: create data table, create page, and provide an entry point for the page. */
 export function templateOps(template: Template, config: WorkspaceConfig, locale: Locale): Op[] {
   const op = templateCollectionOp(template, config, locale);
   return [op, ...templatePageOps(template, config, locale, op.table.id)];
 }
 
-/** 只建模板的数据表（功能，D-191）；页面之后单独加（外观，先进草稿）。 */
+/** Create only the template's data table (feature, D-191); add page separately later (look, goes into draft first). */
 export function templateCollectionOp(
   template: Template,
   config: WorkspaceConfig,
@@ -201,7 +208,7 @@ export function templateCollectionOp(
   return { op: 'addData', table: table as AddTable['table'] };
 }
 
-/** 给已有的模板数据表建页面，并给页面一个入口。 */
+/** Create page for existing template data table and add an entry point for the page. */
 export function templatePageOps(
   template: Template,
   config: WorkspaceConfig,
@@ -217,12 +224,12 @@ export function templatePageOps(
   return [{ op: 'addContainer', page }, ...entryOps(config, pageId, page.title, page.icon)];
 }
 
-/** 预设表在这种语言下的名字（收件页面「存成记录」的列表里显示）。 */
+/** Name of the preset table in this language (displayed in inbox page "Save as record" list). */
 export function templateTableName(template: Template, locale: Locale): string {
   return localize((TEMPLATES[template].table as { name: Record<Locale, string> }).name, locale);
 }
 
-/** 由这个模板建出来、现在还在的数据表（ID 是基本 ID 或加了 -2、-3……）；没有时 undefined。 */
+/** Data table created by this template that still exists (ID is base ID or appended with -2, -3...); undefined if none. */
 export function templateTableOf(template: Template, config: WorkspaceConfig): string | undefined {
   const base = TEMPLATES[template].ids.table;
   return config.data.tables.find(
@@ -231,7 +238,7 @@ export function templateTableOf(template: Template, config: WorkspaceConfig): st
   )?.id;
 }
 
-/** 这个模板建好、但还没有页面用到的数据表（先做了功能、页面还没加，D-191）。 */
+/** Data tables created by this template but not yet used by any page (feature done first, page added later, D-191). */
 export function templateCollectionWithoutPage(
   template: DataTemplate,
   config: WorkspaceConfig,
@@ -252,14 +259,16 @@ export function templateCollectionWithoutPage(
 
 export type NewPreset = NewTablePreset | 'blank';
 
-/** 新建表单页上正在改的表（D-444）：还没有写进配置，点「记下」才建。 */
+/** Table being edited on the new form page (D-444): not yet written to config, created only when clicking "Save". */
 export function draftTable(preset: NewPreset, config: WorkspaceConfig, locale: Locale): Collection {
   return templateCollectionOp(preset, config, locale).table as unknown as Collection;
 }
 
 /**
- * 点「记下」时建表的修改：数据表、页面和入口。字段都还在就用预设自己的页面；用户去掉了字段（预设的页面
- * 可能引用它）或者是自己搭的表：用「空白」的页面，列表显示前两个文字字段。
+ * Modifications to create table when clicking "Save": data table, page, and entry point. If
+ * fields still exist, use preset's own page; if user removed fields (preset page might reference
+ * them) or built a table from scratch: use "blank" page, displaying first two text fields in
+ * list.
  */
 export function draftTableOps(
   table: Collection,

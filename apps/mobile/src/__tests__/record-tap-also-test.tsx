@@ -13,9 +13,12 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 import { widgetRowAction } from '../widgets/ops';
 
-// 点一下改这一条的几处（D-566，创始人 2026-11-16 ③）：「发货」把状态改成已发货、发货日期设成今天，同时记一条事件。
-// 几处一起成功或一起不做；之后提示条上有「撤销」（底线 11 的新写法）：放回这一条原来的样子、删掉新建的那条；
-// 这期间这一条被改过就不覆盖，说撤销不了。只改一处的仍然没有撤销。
+// Tap to modify multiple properties of this entry simultaneously (D-566, founder 2026-11-16 ③):
+// "Ship" changes status to shipped, sets shipping date to today, and logs an event simultaneously.
+// All changes succeed together or none do; banner subsequently shows "Undo" (new invariant 11
+// syntax): restores this entry to its original state and deletes the newly created record; if this
+// entry was modified during this time, it will not overwrite and will report that it cannot be
+// undone. Modifying only a single property still has no undo.
 
 const orders: Collection = {
   id: 'orders',
@@ -128,7 +131,7 @@ it('undo puts the entry back exactly and removes the entry the tap created', asy
     expect((await repo.getRecord('o1'))?.values).toEqual({ item: '台灯', status: 'new' }),
   );
   expect(await repo.listRecords('events')).toEqual([]);
-  // 删掉的是工具建的那条，不进「最近删除」（不是用户自己输入的内容，D-303）。
+  // Deleted item is the one created by the tool, does not enter "Recently Deleted" (not user-input content, D-303).
   expect(await repo.listDeletedRecords()).toEqual([]);
 });
 

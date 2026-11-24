@@ -6,7 +6,7 @@ import type {
   ReminderAction,
 } from '../reminders/platform';
 
-/** 测试用的本地通知：记下排了什么、稍后提醒、取消和收起了哪些。 */
+/** Local notifications for testing: records scheduled items, reminders, cancellations, and dismissals. */
 export class FakeNotifications implements NotificationPlatform {
   status: NotificationPermission = 'undetermined';
   answer = true;

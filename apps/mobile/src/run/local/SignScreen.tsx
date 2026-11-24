@@ -16,21 +16,23 @@ import {
   type SignPlacement,
 } from './sign-placement';
 
-// 签名（TOOLS_DESIGN §4 sign）：第一步在签名板上画（可以存起来下次直接用），第二步选页并把签名拖到位置上。
-// 签名存在 documentDirectory/signatures/，不进配置、不进版本，也不发给 AI。
+// Sign (TOOLS_DESIGN §4 sign): step one draws on the signature pad (can be saved for direct reuse
+// next time), step two selects a page and drags the signature into position. Signatures are stored
+// in documentDirectory/signatures/, excluded from configuration and versioning, and never sent to
+// the AI.
 
 const PAD = { width: 320, height: 140 };
 const STROKE = 3.2;
 
-/** 「放置签名」出来以后这么久之内的「完成」当作连点的第二下，不算。 */
+/** Taps on "Done" within this duration after "Place signature" appears are treated as a double-tap and ignored. */
 const DOUBLE_TAP_MS = 600;
 
 type Signature = { bytes: Uint8Array; aspect: number; uri?: string };
 
-/** 一笔：一串点。 */
+/** A single stroke: a sequence of points. */
 type Stroke = { x: number; y: number }[];
 
-/** 笔画 → SVG 路径字符串（Skia 的 Path 组件和离屏绘制都用它）。 */
+/** Strokes → SVG path string (used by Skia's Path component and off-screen rendering). */
 const svgOf = (strokes: Stroke[]) =>
   strokes
     .map((s) =>
@@ -38,7 +40,7 @@ const svgOf = (strokes: Stroke[]) =>
     )
     .join(' ');
 
-/** 签名板：手指画线，结果用 Skia 离屏画成透明 PNG（只取有笔画的区域）。 */
+/** Signature pad: finger draws lines, results rendered off-screen into a transparent PNG via Skia (retaining only regions with strokes). */
 function SignaturePad({
   onChange,
   clearSignal,
@@ -53,7 +55,7 @@ function SignaturePad({
     ) => {
       if (action.type === 'clear') return [];
       const point = { x: action.x, y: action.y };
-      // 一个点也要看得见：起笔时放两个几乎重合的点。
+      // Ensure single points remain visible: place two nearly overlapping points at the start of a stroke.
       if (action.type === 'start')
         return [...state, [point, { x: point.x + 0.1, y: point.y + 0.1 }]];
       const last = state[state.length - 1];
@@ -95,7 +97,7 @@ function SignaturePad({
   );
 }
 
-/** 把笔画画成透明背景的 PNG（3 倍清晰度，裁到笔画的范围）。 */
+/** Render strokes into a transparent background PNG (3x clarity, cropped to stroke bounds). */
 function strokesToPng(strokes: Stroke[]): { bytes: Uint8Array; aspect: number } | null {
   if (strokes.length === 0) return null;
   const all = Skia.Path.MakeFromSVGString(svgOf(strokes));
@@ -133,7 +135,7 @@ export function SignScreen({ input, palette, locale, onDone, onCancel }: LocalSc
   }, [files]);
   const [keep, setKeep] = useState(true);
   const [signature, setSignature] = useState<Signature | null>(null);
-  /** 选好签名的时刻：「放置签名」刚出来时那一下点按不算「完成」（D-512）。 */
+  /** Moment signature was chosen: taps right when "Place signature" appears do not count as "Done" (D-512). */
   const chosenAt = useRef(0);
   const [pageIndex, setPageIndex] = useState(input.pages.length - 1);
   const [box, setBox] = useState({ width: 0, height: 0 });
@@ -141,7 +143,7 @@ export function SignScreen({ input, palette, locale, onDone, onCancel }: LocalSc
   const scale = box.width ? Math.min(box.width / page.width, box.height / page.height) : 0;
   const shown = { width: page.width * scale, height: page.height * scale };
 
-  // 签名在页面上的位置（比例坐标）：点一下页面就放到那一行上，高度照那一行字定（sign-placement.ts）。
+  // Signature position on the page (proportional coordinates): tapping the page places it on that line, with height determined by that line of text (sign-placement.ts).
   const aspect = signature?.aspect ?? 3;
   const [placement, move] = useReducer(
     (state: SignPlacement, action: SignAction) => reducePlacement(state, action, page, aspect),
@@ -155,7 +157,7 @@ export function SignScreen({ input, palette, locale, onDone, onCancel }: LocalSc
   useEffect(() => {
     if (signature) move({ type: 'reset' });
   }, [signature]);
-  // 这一页认出的行（原图点）：只在本机认，只用来定签名多高，不存不发。
+  // Lines recognized on this page (original image points): recognized locally only, used solely to determine signature height, neither stored nor sent.
   const lines = useRef(new Map<number, readonly LineBox[]>());
   useEffect(() => {
     if (!signature || !input.lines || lines.current.has(pageIndex)) return;
@@ -177,7 +179,7 @@ export function SignScreen({ input, palette, locale, onDone, onCancel }: LocalSc
     }),
   );
 
-  // 第一步：选一个存好的签名或现画。
+  // Step 1: choose a saved signature or draw a new one.
   if (!signature) {
     return (
       <LocalFrame
@@ -240,7 +242,7 @@ export function SignScreen({ input, palette, locale, onDone, onCancel }: LocalSc
     );
   }
 
-  // 第二步：选页、拖到位置、调大小。
+  // Step 2: select page, drag into position, adjust size.
   return (
     <LocalFrame
       palette={palette}
@@ -249,7 +251,7 @@ export function SignScreen({ input, palette, locale, onDone, onCancel }: LocalSc
       doneLabel={t(locale, 'localDone')}
       onCancel={onCancel}
       onDone={() => {
-        // 手快连点两下「下一步」，第二下落在同一个位置上的「完成」，放置这一步就被跳过了（2026-11-09 用户复测）。
+        // If the user rapidly double-taps "Next", and the second tap lands on "Done" at the same position, the placement step is skipped (2026-11-09 user re-test).
         if (Date.now() - chosenAt.current < DOUBLE_TAP_MS) return;
         onDone({ png: signature.bytes, pageIndex, ...place });
       }}>

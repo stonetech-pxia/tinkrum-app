@@ -1,7 +1,7 @@
 import type { Palette } from '../renderer/theme';
 import { CloseButton } from './CloseButton';
 
-/** 页面栈的导航栏样式（跟随主题）。 */
+/** Navigation bar style for the page stack (matches theme). */
 export function stackScreenOptions(palette: Palette) {
   return {
     headerStyle: { backgroundColor: palette.background },
@@ -13,7 +13,7 @@ export function stackScreenOptions(palette: Palette) {
   } as const;
 }
 
-/** 弹出页左上角的「关闭」（D-111）。 */
+/** "Close" button in the top left corner of modal pages (D-111). */
 export function closeButtonOption(palette: Palette) {
   return { headerLeft: () => <CloseButton palette={palette} /> };
 }

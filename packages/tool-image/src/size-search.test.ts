@@ -2,7 +2,7 @@ import { type Mock, describe, expect, it, vi } from 'vitest';
 
 import { type EncodeFn, searchForTargetSize, searchSharedQuality } from './size-search';
 
-/** 模型编码器：体积 ∝ 面积 × f(质量)，加上固定的文件头开销。 */
+/** Model encoder: size ∝ area × `f(quality)`, plus fixed file header overhead. */
 function model(base: number, header = 600): Mock<EncodeFn> {
   return vi.fn<EncodeFn>(async (q, s) => Math.round(header + base * s * s * (0.15 + 0.85 * q * q)));
 }
@@ -26,12 +26,12 @@ describe('searchForTargetSize', () => {
     expect(result.met).toBe(true);
     expect(result.scale).toBe(1);
     expect(result.bytes).toBeLessThanOrEqual(target);
-    // 解析解：0.15 + 0.85q² = 0.4994 → q ≈ 0.641
+    // Analytical solution: `0.15 + 0.85q² = 0.4994` → `q ≈ 0.641`.
     expect(result.quality).toBeGreaterThan(0.62);
     expect(result.quality).toBeLessThan(0.642);
     expect(result.encodes).toBeLessThanOrEqual(16);
     expect(encode).toHaveBeenCalledTimes(result.encodes);
-    // App 只保留最后一次输出，所以最后一次调用必须就是结果。
+    // The app only retains the last output, so the final call must correspond to the result.
     expect(lastCall(encode)).toEqual([result.quality, result.scale]);
   });
 
@@ -49,7 +49,7 @@ describe('searchForTargetSize', () => {
   });
 
   it('copes with encoders that do not scale with area', async () => {
-    // 体积只与缩放线性相关：按面积估算会缩得不够，需要再缩一次。
+    // File size is only linearly related to scale: estimating by area alone would under-shrink, requiring an additional shrinkage pass.
     const encode = vi.fn<EncodeFn>(async (q, s) => Math.round(8_000_000 * s * (0.2 + q)));
     const result = await searchForTargetSize({ encode, targetBytes: 300_000 });
     expect(result.met).toBe(true);
@@ -127,7 +127,7 @@ describe('searchSharedQuality', () => {
     expect(result.met).toBe(true);
     expect(result.bytes).toBeLessThanOrEqual(4_000_000);
     expect(result.bytes).toBeGreaterThan(3_500_000);
-    // 返回的 bytes 含容器开销。
+    // Returned bytes include container overhead.
     expect(result.bytes).toBe((await fn(result.quality, result.scale)) + 20_000);
   });
 

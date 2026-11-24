@@ -11,7 +11,7 @@ import { ToolsView } from '@/shell/ToolsView';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
 import { shownConfig } from '@/workspace/store';
 
-/** 从设置或页面上的入口打开的工具页（不在导航栏里时）：单独的页面，返回回到原来的地方。 */
+/** Tool page opened from settings or page entry points (when not in navigation bar): standalone page, going back returns to previous location. */
 export default function ToolsRoute() {
   const { registry, locale } = useWorkspaceContext();
   const config = useWorkspace(shownConfig)!;

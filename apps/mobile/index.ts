@@ -1,6 +1,8 @@
-// 入口：先加载提醒按钮的后台处理（D-318，App 没开着时也要能用），再启动 Expo Router。
-// 根组件外面套一层启动兜底（体检 6.6，D-621）：连续两次没能正常打开时
-// 先显示兜底页，app/ 下的路由（主流程）等用户点「照常打开」才加载。写法照 Expo Router 的自定义入口。
+// Entry point: loads reminder button background processing first (D-318, must work when app is
+// closed), then starts Expo Router. Wraps the root component with a startup fallback (health check
+// 6.6, D-621): shows the fallback page if normal startup fails twice consecutively, loading app/
+// routes (main flow) only when the user taps "Open normally". Follows Expo Router custom entry
+// point conventions.
 import './src/reminders/background';
 import '@expo/metro-runtime';
 import { App } from 'expo-router/build/qualified-entry';
@@ -13,7 +15,7 @@ import { expoAttemptStore } from './src/rescue/expo-attempts';
 import { RescueGate, recordFatalErrors, type StartSession } from './src/rescue/RescueGate';
 
 recordFatalErrors(expoAttemptStore);
-// 兜底页用系统语言：设置里选的语言存在数据库里，兜底页不去读。
+// Fallback page uses system locale: language selected in settings is stored in the database and not read by the fallback page.
 const locale = getDeviceLocale();
 const session: StartSession = {};
 renderRootComponent(() =>

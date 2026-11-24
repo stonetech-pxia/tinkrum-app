@@ -7,16 +7,18 @@ import {
   splitForTranslation,
 } from './tools/translate';
 
-// 文字转语音（D-270）里和平台无关的部分：语言、分段、自动选语言、预计大小。
-// 声音由系统合成（iOS 的 AVSpeechSynthesizer，Android 的 TextToSpeech），在本机生成音频文件，不上传。
-// 这是用户自己运行的步骤；AI 只把它搭进快捷操作，看不到文字（D-036、D-113）。
+// Platform-agnostic part of text-to-speech (D-270): Languages, segmentation, automatic language
+// selection, and estimated size. Speech is synthesized by the system (AVSpeechSynthesizer on iOS,
+// TextToSpeech on Android), generating audio files locally without uploading. This is a step
+// executed directly by the user; the AI only wires it into quick actions and cannot see the text
+// (D-036, D-113).
 
-/** 能选的语言：和翻译同样的 20 种（两边的系统声音都有，但不一定都装了）。 */
+/** Available languages: The same 20 languages as translation (both platforms have system voices for these, though not all may be installed). */
 export const SPEAK_LANGUAGES = TRANSLATE_LANGUAGES;
 export type SpeakLanguage = (typeof SPEAK_LANGUAGES)[number];
 export const SPEAK_LANGUAGE_NAMES = TRANSLATE_LANGUAGE_NAMES;
 
-/** 系统声音用的地区代码（BCP 47）：iOS 的 AVSpeechSynthesisVoice、Android 的 Locale 都认。 */
+/** Region codes (BCP 47) used for system voices: Recognized by iOS AVSpeechSynthesisVoice and Android Locale. */
 export const SPEAK_VOICE_LOCALES: Record<SpeakLanguage, string> = {
   'zh-Hans': 'zh-CN',
   en: 'en-US',
@@ -40,31 +42,33 @@ export const SPEAK_VOICE_LOCALES: Record<SpeakLanguage, string> = {
   hi: 'hi-IN',
 };
 
-/** 语速：1 是系统的正常语速。 */
+/** Speech rate: 1 is the system's normal speed. */
 export const SPEAK_RATE_MIN = 0.5;
 export const SPEAK_RATE_MAX = 2;
 
 /**
- * 一次最多读多少字：中文约 2 小时、英文约 40 分钟的声音。再长的 WAV 中间文件会有几百 MB，
- * 用户也很少需要一个这么长的音频文件。
+ * Maximum character count per read: Roughly 2 hours of Chinese speech or 40 minutes of English
+ * speech. Longer intermediate WAV files would be hundreds of MBs, and users rarely need an audio
+ * file that long.
  */
 export const MAX_SPEAK_CHARS = 30_000;
 
 /**
- * 一段最多多少字：Android 的 TextToSpeech 一次最多 4000 字（getMaxSpeechInputLength），
- * 段小一点进度走得匀、取消也快。
+ * Maximum character count per segment: Android TextToSpeech supports at most 4,000 characters at
+ * once (getMaxSpeechInputLength); smaller segments keep the progress evenly paced and allow
+ * faster cancellation.
  */
 export const SPEAK_SEGMENT_CHARS = 1000;
 
 const CJK_CHAR = /[　-〿぀-ヿ㐀-䶿一-鿿가-힯＀-￯]/;
-/** 一句话在这里结束（切太长的段时优先在这里切）。 */
+/** Sentence boundary marker (preferred breaking point when splitting overly long segments). */
 const SENTENCE = /[^.!?。！？]+[.!?。！？]+["'”’）)]?\s*|[^.!?。！？]+$/g;
-/** 没有句号的长句：退一步在逗号、空格处切。 */
+/** Soft break for long sentences lacking periods: Falls back to breaking at commas and spaces. */
 const SOFT_BREAK = /[,，、;；:：\s]/;
-/** 有字母或数字才读（只有符号的片段跳过）。 */
+/** Only read characters that are letters or numbers (segments containing only symbols are skipped). */
 const READABLE = /[\p{L}\p{N}]/u;
 
-/** 一行的几片接起来：中日韩文字直接接，其他用空格。 */
+/** Joins parts of a line: CJK characters are joined directly, others are separated by spaces. */
 function joinParts(parts: readonly string[]): string {
   return parts.reduce((line, part) => {
     if (!line) return part;
@@ -72,7 +76,7 @@ function joinParts(parts: readonly string[]): string {
   }, '');
 }
 
-/** 太长的一段按句子切，句子还太长时在逗号、空格处切，实在没有就硬切。 */
+/** Splits an excessively long unit by sentences, falls back to commas and spaces if sentences are still too long, and makes a hard split if necessary. */
 function splitLong(unit: string, max: number): string[] {
   if (unit.length <= max) return [unit];
   const out: string[] = [];
@@ -101,8 +105,10 @@ function splitLong(unit: string, max: number): string[] {
 }
 
 /**
- * 把文字切成交给系统朗读的几段，每段不超过 max 字。断开的行先接回去（PDF 和文字识别每一行都断开，
- * 系统读到换行会停顿），段落之间换行；几个短段落合成一段，少调几次系统。只有符号的片段不读。
+ * Splits text into segments for system speech synthesis, ensuring each segment does not exceed
+ * max characters. Broken lines are joined back first (PDF and OCR break every line, causing the
+ * system to pause at line breaks), and paragraphs are separated by newlines; short segments are
+ * combined to reduce system calls. Segments consisting solely of symbols are not read.
  */
 export function splitForSpeech(text: string, max = SPEAK_SEGMENT_CHARS): string[] {
   const units = splitForTranslation(text).flatMap((paragraph, p) =>
@@ -127,11 +133,11 @@ export function splitForSpeech(text: string, max = SPEAK_SEGMENT_CHARS): string[
   return segments;
 }
 
-/** 界面语言对应的朗读语言。 */
+/** Speech language corresponding to the interface locale. */
 export const speakLanguageFor = (locale: Locale): SpeakLanguage =>
   locale === 'zh' ? 'zh-Hans' : locale === 'fr' ? 'fr' : 'en';
 
-/** 按文字本身的书写系统猜语言（系统认不出语言时的退路）；拉丁字母分不出是哪种，返回 null。 */
+/** Guesses the language based on the writing system of the text itself (fallback when the system cannot recognize the language); returns null for Latin scripts since they cannot be distinguished. */
 function scriptLanguage(text: string): SpeakLanguage | null {
   const count = (re: RegExp) => text.match(re)?.length ?? 0;
   const scripts: [SpeakLanguage, number][] = [
@@ -148,9 +154,11 @@ function scriptLanguage(text: string): SpeakLanguage | null {
 }
 
 /**
- * 「自动识别」时用哪种语言：detected 是系统对每一段识别出的语言（拿不到时为 null），按字数取最多的；
- * 系统认不出时按书写系统猜，拉丁字母的文字用界面语言里的拉丁语言（英文 / 法文），都不行返回 null。
- * 一次运行只用一种声音：夹杂的外文按这种语言的声音读。
+ * Language selection for "Auto-detect": detected is the system-recognized language for each
+ * segment (or null if unavailable), selecting the one with the highest character count; falls
+ * back to script-based guessing when the system cannot recognize it, using Latin languages from
+ * the interface locale (English/French) for Latin text, or returning null if all fail. Only one
+ * voice is used per run: mixed foreign text is read using that language's voice.
  */
 export function chooseSpeakLanguage(
   segments: readonly string[],
@@ -176,8 +184,9 @@ export function chooseSpeakLanguage(
 }
 
 /**
- * 系统声音生成的 WAV 中间文件大概多大（字节，检查剩余空间用）：按 24 kHz、16 位单声道，
- * 中日韩文字每秒约 5 个字，其他文字每秒约 14 个字符，偏大估计。
+ * Estimated size (in bytes, used for checking remaining space) of the intermediate WAV file
+ * generated by the system voice: Based on 24 kHz 16-bit mono, assuming ~5 characters per second
+ * for CJK and ~14 characters per second for other scripts, estimated conservatively.
  */
 export function estimateSpeechBytes(text: string, rate = 1): number {
   const cjk = text.match(new RegExp(CJK_CHAR.source, 'g'))?.length ?? 0;

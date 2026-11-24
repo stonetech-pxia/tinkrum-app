@@ -3,19 +3,21 @@ import { create } from 'zustand';
 import type { WorkspaceRepo } from '../storage/types';
 import type { PlacedWidget } from './types';
 
-// 用户「放到桌面」的组件（D-325）：只记在本机的 app_meta 里，不进配置，AI 看不到、也改不了。
-// 组件删掉以后照样记着，小组件上显示「已经移除了」，直到用户在 App 里移除或把小组件从桌面拿掉。
+// User-placed widgets on the home screen (D-325): recorded exclusively in local app_meta, excluded
+// from config, invisible and unmodifiable by AI. Preserved even after component deletion and
+// displayed as "removed" on widgets until removed by the user in the app or cleared from the home
+// screen.
 
 const META_KEY = 'widgets.placed';
-/** 最多记几个（iOS「编辑小组件」的列表不宜太长）。 */
+/** Maximum number of recorded items (to keep iOS "Edit Widgets" list concise). */
 export const MAX_PLACED = 20;
 
 interface PlacedState {
-  /** null：还没读。 */
+  /** null: Not yet read. */
   placed: PlacedWidget[] | null;
   repo: Pick<WorkspaceRepo, 'getMeta' | 'setMeta'> | null;
   load(repo: Pick<WorkspaceRepo, 'getMeta' | 'setMeta'>): Promise<void>;
-  /** 放到桌面：已经放过的挪到最后（成为没选组件的小组件显示的那个）。 */
+  /** Place on home screen: moves previously placed items to the end (serving as the fallback displayed by widgets without a selected component). */
   add(componentId: string, now: number): Promise<void>;
   remove(componentId: string): Promise<void>;
 }

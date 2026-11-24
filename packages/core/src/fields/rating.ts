@@ -11,7 +11,7 @@ const schema = z.strictObject({
 const isStars = (v: unknown): v is number =>
   typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 5;
 
-/** 评分：1 到 5 颗星。 */
+/** Rating: 1 to 5 stars. */
 export const ratingField: FieldDefinitionOf<'rating', typeof schema> = defineField({
   type: 'rating',
   schema,

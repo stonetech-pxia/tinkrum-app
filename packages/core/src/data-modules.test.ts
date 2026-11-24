@@ -15,7 +15,7 @@ import { fromV33, registry, v33Fixture } from './test-helpers';
 
 const createDefaultWorkspace = (locale: 'zh') => fromV33(v33Fixture(`default-${locale}`));
 
-// 数据组件的新能力（D-248 起）：纯逻辑和校验。
+// New capabilities for data components (starting from D-248): pure logic and validation.
 
 const tasks: Collection = {
   id: 'tasks',
@@ -80,7 +80,7 @@ describe('groupedAggregate (D-248)', () => {
   });
 });
 
-// ---- 表和表之间引用（D-250）----
+// ---- References between tables (D-250) ----
 
 const clients: Collection = {
   id: 'clients',
@@ -128,7 +128,7 @@ describe('link fields (D-250)', () => {
       'zh',
     );
     expect(formatRef(orderRec('o1', 'c1'), orders, 'client', 'zh', live)).toBe('王小明');
-    // 被引用的记录删掉了（读不到）：说清楚，而不是显示空白。
+    // Referenced record was deleted (cannot be read): display a clear description instead of a blank space.
     const gone = makeLinkResolver([clients, orders], new Map([['clients', []]]), 'zh');
     expect(formatRef(orderRec('o1', 'c1'), orders, 'client', 'zh', gone)).toBe('已删除的记录');
     expect(formatRef(orderRec('o2'), orders, 'client', 'zh', gone)).toBe('');

@@ -22,8 +22,9 @@ import { FakeFiles, FakeSpeech } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
-// 语音记一笔（D-575）：录音转出来的一句话交给「记一笔」，表单按它直接填有把握的字段（任何一张表），
-// 写「按你说的填的」；存不存还是用户点「保存」。
+// Voice-based quick entry (D-575): speech transcribed into a single sentence is passed to "Log an
+// entry", the form directly pre-fills confident fields based on it (any table), displaying "Filled
+// per your voice"; saving still requires the user to tap "Save".
 
 const registry = createRegistry(BUILTIN_TOOLS);
 type Entry = LocalSteps['recordEntry'];
@@ -47,7 +48,7 @@ const expenses: Collection = {
   ],
 };
 
-/** 音频工具的「转文字」后面接「记一笔」。 */
+/** Audio tool's "Transcribe" followed by "Log an entry". */
 function voiceWorkflow(collectionId: string): Workflow {
   const result = applyOps(
     createDefaultWorkspace('zh'),
@@ -103,8 +104,8 @@ async function runVoice(texts: string[], recordings: number) {
   return { result, opened };
 }
 
-describe('收据样板的「语音添加」（D-576）', () => {
-  it('录一段音、转成文字、打开收据表单，表单拿到这句话', async () => {
+describe('Receipt preset "Voice add" (D-576)', () => {
+  it('Record a short audio, transcribe it to text, open the receipt form, and have the form receive this sentence', async () => {
     const base = createStarterWorkspace('zh', registry);
     const sample = sampleOps('receipts', base, 'zh');
     if (!sample.ok) throw new Error(sample.message);
@@ -153,13 +154,13 @@ describe('收据样板的「语音添加」（D-576）', () => {
     expect(kinds).toEqual(['record', 'recordEntry']);
     expect(speech.calls[0]).toMatchObject({ language: 'zh' });
     expect(opened[0]).toMatchObject({ heard: '昨天在超市买了二十三块五' });
-    // 原话放进备注，不放进第一个文字字段「商家」。
+    // Original utterance goes into notes, not into the first text field "Merchant".
     expect(opened[0]!.prefill).toEqual({ note: '昨天在超市买了二十三块五' });
   });
 });
 
-describe('录音 → 转文字 → 记一笔（D-575）', () => {
-  it('一段录音：表单拿到用户说的话，原话照旧放进长文本字段', async () => {
+describe('Record -> Transcribe -> Log an entry (D-575)', () => {
+  it('An audio recording: form receives what the user said, original utterance goes into the long text field as before', async () => {
     const { result, opened } = await runVoice(['打车花了三十五块'], 1);
     expect(result.status).toBe('succeeded');
     expect(opened).toHaveLength(1);
@@ -169,7 +170,7 @@ describe('录音 → 转文字 → 记一笔（D-575）', () => {
     });
   });
 
-  it('几段录音拼起来的文字不算一句话：不直接填', async () => {
+  it('Text stitched together from multiple audio recordings does not count as a single sentence: do not pre-fill directly', async () => {
     const { opened } = await runVoice(['打车花了三十五块', '午饭二十'], 2);
     expect(opened).toHaveLength(1);
     expect(opened[0]!.heard).toBeUndefined();
@@ -221,15 +222,15 @@ async function openForm(
       </SafeAreaProvider>
     </WorkspaceProvider>,
   );
-  // 候选是异步算的。
+  // Candidates are computed asynchronously.
   await act(async () => {
     await new Promise((r) => setTimeout(r, 0));
   });
   return { onDone };
 }
 
-describe('表单按说的话直接填（D-575）', () => {
-  it('待办：「明天」直接填进截止日期，下面写「按你说的填的」；没说的字段不动', async () => {
+describe('Form pre-fills directly based on what was said (D-575)', () => {
+  it('Tasks: "Tomorrow" fills the due date directly, with "Filled per your voice" displayed below; unmentioned fields remain untouched', async () => {
     await openForm(todo, '明天给妈妈打电话');
     expect(screen.getByTestId('entry-due').props.value).toBe(day(1));
     expect(screen.getByText('按你说的填的')).toBeTruthy();
@@ -237,7 +238,7 @@ describe('表单按说的话直接填（D-575）', () => {
     expect(screen.queryByTestId('entry-title-heard')).toBeNull();
   });
 
-  it('账目：金额直接填（数量和钱分得开），默认的今天被说的「昨天」换掉；用户一改，提示就不写了', async () => {
+  it('Expenses: amount is filled directly (quantity and money are separable), default "today" is replaced by the spoken "yesterday"; once modified by the user, the prompt disappears', async () => {
     await openForm(expenses, '昨天买了3瓶水花了6块');
     expect(screen.getByTestId('entry-amount').props.value).toBe('6');
     expect(screen.getByTestId('entry-date').props.value).toBe(day(-1));
@@ -248,20 +249,20 @@ describe('表单按说的话直接填（D-575）', () => {
     expect(screen.getByTestId('entry-date-heard')).toBeTruthy();
   });
 
-  it('拿不准的（两个金额）不直接填，给候选，点了才填', async () => {
+  it('Uncertain items (two amounts) are not pre-filled directly; they are provided as candidates and filled only upon tapping', async () => {
     await openForm(expenses, '一个30块一个50块');
     expect(screen.getByTestId('entry-amount').props.value ?? '').toBe('');
     expect(screen.getByTestId('entry-amount-suggestion-0')).toBeTruthy();
     expect(screen.queryByText('按你说的填的')).toBeNull();
   });
 
-  it('不是说的话（没有 heard）：什么都不直接填', async () => {
+  it('Non-speech content (no heard text): nothing is pre-filled directly', async () => {
     await openForm(todo, undefined, { title: '明天给妈妈打电话' });
     expect(screen.getByTestId('entry-due').props.value ?? '').toBe('');
     expect(screen.queryByText('按你说的填的')).toBeNull();
   });
 
-  it('存的时候交的是填好的值（保存还是用户点）', async () => {
+  it('Values submitted upon saving are the pre-filled ones (saving is still triggered by the user\'s tap)', async () => {
     const { onDone } = await openForm(expenses, '午饭花了二十三块五');
     expect(onDone).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('local-done'));

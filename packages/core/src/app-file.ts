@@ -17,11 +17,14 @@ import {
 } from './schema';
 import type { AppBarTarget, IconValue, Theme } from './schema-base';
 
-// App 文件（D-485）：一个 App 的全部内容（页面、表、快捷操作、提醒、风格），导入时加到现有的工作区里，
-// 不替换任何东西。和「App 配置」（整份工作区，D-484）不同：这里的 ID 已经带了 App 自己的前缀，不会和别的
-// App 撞；不含记录、用户文件、工具包、桌面菜单、日历这类整个工作区才有的设置。
-// 旧版本的文件靠 schemaVersion 迁移（借整份配置的迁移，底线 12）；导入走 addContainer / addData / addTool 这些
-// 普通操作：先预览，用户确认才生效，改动记录里能撤销（底线 7、18）。
+// App file (D-485): Contains an app's entire content (pages, tables, quick actions, reminders,
+// styles); merged into the existing workspace on import without replacing anything. Unlike "App
+// config" (the entire workspace, D-484), IDs here already have the app's own prefix to avoid
+// collisions; it does not include records, user files, packs, home screen menus, or calendars,
+// which are workspace-wide. Older file versions are migrated via schemaVersion (using full config
+// migration, invariant 12); import uses standard operations like addContainer, addData, and
+// addTool: previewed first, taking effect only upon user confirmation, and undoable in change
+// history (invariants 7, 18).
 
 export const APP_FILE_FORMAT = 'tinkrum-app';
 const FILE_VERSION = 1;
@@ -35,11 +38,11 @@ export interface AppFile {
   pages: Page[];
   tables: Collection[];
   tools: Tool[];
-  /** 内容用到的画出来的图标（D-625）；没用到就不写。 */
+  /** Drawn icons used by the content (D-625); omitted if unused. */
   icons?: Record<string, DrawnIcon>;
 }
 
-/** 写 App 文件。外层带「用到了什么」（D-556），读的版本能说出自己缺什么；它不是 App 的一部分，导入时不读进配置。 */
+/** Write an app file. Outer layer includes usage metadata (D-556), so readers can report missing dependencies; it is not part of the app itself and is not read into config during import. */
 export function appFileText(file: Omit<AppFile, 'format' | 'version' | 'exportedAt'>, now: Date) {
   return JSON.stringify(
     {
@@ -55,9 +58,11 @@ export function appFileText(file: Omit<AppFile, 'format' | 'version' | 'exported
 }
 
 /**
- * 把装好的一个 App 做成 App 文件（D-545，「分享这个 App」）：它的页面、表、快捷操作、提醒，加上名字、图标、
- * 底栏和风格。只有结构：记录本来就不在配置里（底线 14）；指向用户文件的地方（文件位、图片、图片背景）
- * 先清空（底线 3），导入后由用户自己选。没有这个 App 返回 null。
+ * Turn an installed app into an app file (D-545, "Share this app"): Includes its pages, tables,
+ * quick actions, reminders, along with name, icon, tab bar, and style. Structure only: records
+ * are excluded by design (invariant 14); user file references (file slots, images, image
+ * backgrounds) are cleared (invariant 3) and re-selected by the user after import. Returns null
+ * if the app does not exist.
  */
 export function appFileOfApp(
   config: WorkspaceConfig,
@@ -92,7 +97,7 @@ export function appFileOfApp(
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** 内容用到的画出来的图标，从图标库里取（D-625）；一个都没有返回空对象，调用的人不写这个键。 */
+/** Get drawn icons used by the content from the icon library (D-625); returns an empty object if none are used, omitting the key. */
 function iconsUsedBy(
   content: unknown,
   library: WorkspaceConfig['icons'],
@@ -105,7 +110,7 @@ function iconsUsedBy(
 const withIcons = (icons: Record<string, DrawnIcon>) =>
   Object.keys(icons).length > 0 ? { icons } : {};
 
-/** 借整份配置的外壳（只有 App 的这几样），走一遍迁移，再拆开。 */
+/** Reuse the full config shell (restricted to the app's components), run migration, then split it apart. */
 function wrap(file: AppFile): Record<string, unknown> {
   return {
     schemaVersion: file.schemaVersion,
@@ -119,7 +124,9 @@ function wrap(file: AppFile): Record<string, unknown> {
 }
 
 /**
- * 读 App 文件：形状不对返回 null；旧版本迁移到当前版本。只认形状，内容合不合法由导入时的校验管（底线 12、18）。
+ * Read an app file: returns null if the shape is invalid; migrates older versions to the current
+ * version. Shape validation only; content validity is enforced by import-time validation
+ * (invariants 12, 18).
  */
 export function readAppFile(text: string): AppFile | null {
   let data: unknown;
@@ -160,12 +167,14 @@ export function readAppFile(text: string): AppFile | null {
 
 export type AppImport = { ok: true; ops: Op[]; name: string } | { ok: false; error: string };
 
-/** 怎么导入（D-485）：做成一个新 App（主页多一个入口），或者导入主页（换主页风格，页面加进导航栏）。 */
+/** Import mode (D-485): Create as a new app (adding a home screen entry point), or import into home (replacing home style, adding pages to navigation bar). */
 export type ImportMode = 'app' | 'home';
 
 /**
- * 导入一个 App 文件的操作。表的 ID 已经在、并且在主页手里（例如之前删过这个 App，表转给了主页）：
- * 接回来，缺的字段补上，记录不动（底线 5）；页面、快捷操作、提醒、App 的 ID 重名，或表属于别的 App 时拒绝。
+ * Operations for importing an app file. If the table ID already exists and belongs to home (e.g.,
+ * the app was previously deleted and its tables transferred to home): reconnect them, fill in
+ * missing fields, leave records untouched (invariant 5); reject if pages, quick actions,
+ * reminders, or app IDs conflict, or if a table belongs to another app.
  */
 export function appFileOps(
   file: AppFile,
@@ -204,7 +213,7 @@ export function appFileOps(
   file = icons.file;
   const owner = mode === 'app' ? { app: id } : {};
   const ops: Op[] = [];
-  // 画出来的图标先加进图标库（D-625）：后面的表、页面、快捷操作要用。
+  // Add drawn icons to the icon library first (D-625) so subsequent tables, pages, and quick actions can reference them.
   if (Object.keys(icons.add).length > 0) ops.push({ op: 'setTheme', icons: icons.add });
   if (mode === 'app')
     ops.push({
@@ -223,7 +232,7 @@ export function appFileOps(
       ops.push({ op: 'addData', table: { ...table, ...owner } as never });
       continue;
     }
-    // 接回来：属于这个 App，缺的字段补上，已有的不改（更新时照文件改，见 tableUpdateOps）。
+    // Reconnect: belongs to this app, fill in missing fields, keep existing ones unchanged (updated according to file changes, see tableUpdateOps).
     if (mode === 'app')
       ops.push({ op: 'updateData', table: table.id, changes: { app: id } } as never);
     if (options.update) {
@@ -238,7 +247,7 @@ export function appFileOps(
   for (const page of file.pages)
     ops.push({ op: 'addContainer', page: { ...page, ...owner } as never });
   if (mode === 'app') {
-    // 主页上放一个入口（用户随时能删；设置 → 我的 App 照样进得去）。
+    // Place an entry point on the home screen (deletable by the user at any time; still accessible via Settings -> My Apps).
     if (config.containers.pages.some((p) => p.id === HOME_PAGE_ID))
       ops.push({
         op: 'addContainer',
@@ -246,7 +255,7 @@ export function appFileOps(
         block: { id: `go-${id}`.slice(0, 48), look: 'entry', opens: `app:${id}` },
       } as unknown as Op);
   } else {
-    // 导入主页：换成它的风格，它的页面加进主页的导航栏（放得下的）；放不下的由主页上的入口接住。
+    // Import into home: Switch to its style, and add its pages to the home navigation bar (where they fit); overflow items are handled by the entry point on the home screen.
     ops.push({ op: 'setTheme', reset: true });
     ops.push({ op: 'setTheme', ...file.app.theme } as unknown as Op);
     const wanted = file.app.bar.filter((t) => t.startsWith('page:'));
@@ -258,14 +267,16 @@ export function appFileOps(
       ops.push({ op: 'updateContainer', nav: { bar } });
     }
   }
-  // 步数不设上限（D-554）：大小由配置的上限管，用的时候带 fromAppFile 走 prepareOps。
+  // No step limit (D-554): size is bounded by config limits; runs via prepareOps with fromAppFile.
   return { ok: true, ops, name: file.app.name };
 }
 
 /**
- * 文件里的图标怎么进图标库（D-625）：内容用到的 my:<id> 文件里必须有；ID 已经在而且一样的直接用；
- * 不一样的，工作区里别处已经没人用就换成文件里的（更新、恢复同一个 App 时就是这样），还有人用就给文件里的改名
- * （-2、-3…），文件内容里的引用一起改。
+ * How file icons enter the icon library (D-625): Content-referenced my:<id> icons must exist in
+ * the file; if the ID already exists and matches, reuse it; if it differs and is no longer used
+ * elsewhere in the workspace, replace it with the file's icon (used when updating or restoring
+ * the same app); if still in use elsewhere, rename the file's icon (-2, -3, etc.) and update
+ * references in the file content accordingly.
  */
 function importedIcons(
   file: AppFile,
@@ -282,7 +293,7 @@ function importedIcons(
         .join('; '),
     };
   const have = config.icons ?? {};
-  // 文件要接回去的表（同 ID）不算别人在用：它们本来就是这个 App 的。
+  // Tables to be reconnected by the file (matching IDs) are not considered in use by others: they originally belonged to this app.
   const retaken = new Set(file.tables.map((t) => t.id));
   const others = {
     ...config,
@@ -308,7 +319,7 @@ function importedIcons(
   return { ok: true, file: { ...file, ...renameDrawnIcons(content, renames) }, add };
 }
 
-/** 图标 ID 撞了：加 -2、-3…，太长先截短（ID 最多 24 个字符）。 */
+/** Icon ID collision: Append -2, -3, etc., truncating if too long (IDs have a maximum of 24 characters). */
 function freeIconId(base: string, taken: ReadonlySet<string>): string {
   for (let n = 2; ; n++) {
     const suffix = `-${n}`;
@@ -318,19 +329,25 @@ function freeIconId(base: string, taken: ReadonlySet<string>): string {
 }
 
 /**
- * 恢复这个 App 的初始样子（D-485）：把现在的 App 删掉（页面、快捷操作、提醒、入口一起去掉，表和记录转给主页，
- * 底线 5），再用原来的 App 文件装回来：表接回来、缺的字段补上，用户自己建的表留在主页。
- * 在桌面菜单里的还放回去。能在改动记录里撤销。
+ * Restore an app to its initial state (D-485): Delete the current app (removing pages, quick
+ * actions, reminders, and entry points together, transferring tables and records to home,
+ * invariant 5), then reinstall using the original app file: reconnect tables, fill in missing
+ * fields, and keep user-created tables on home. Restores items previously in the desktop menu.
+ * Undoable in change history.
  */
 export function appResetOps(file: AppFile, config: WorkspaceConfig, registry: Registry): AppImport {
   return reinstallOps(file, config, registry, false);
 }
 
 /**
- * 用改过的 App 文件更新装好的同一个 App（D-611，别的 AI 改完交回来的文件）：和恢复初始样子一样先移除再装回，
- * 页面、快捷操作、提醒、名字、风格、底栏都换成文件里的；表按 ID 接回来后照文件改：表名、图标，字段加、改、去、
- * 排序。去掉的字段记录里的值留着，文件里没有的表连同记录归主页（底线 5）；字段类型只能在能互换的类型之间换，
- * 别的由操作拒绝，说「加一个新字段」（和 Tink 改的时候一样）。能在改动记录里撤销。
+ * Update an installed app using a modified app file (D-611, files returned by another AI):
+ * Replaced and re-installed just like factory reset; pages, quick actions, reminders, name,
+ * style, and tab bar are replaced with those in the file; tables are reconnected by ID and
+ * updated per the file: table name, icon, and fields (added, modified, removed, reordered).
+ * Values of removed fields remain in records; tables absent from the file along with their
+ * records revert to home (invariant 5); field types can only be changed between compatible types,
+ * others are rejected by operations with a "Add a new field" message (matching Tink
+ * modifications). Undoable in change history.
  */
 export function appUpdateOps(
   file: AppFile,
@@ -355,7 +372,7 @@ function reinstallOps(
   const plan = appFileOps(file, mid.config, { update });
   if (!plan.ok) return plan;
   const onMenu = (config.nav.phoneHomeScreen ?? []).includes(`app:${id}`);
-  // 更新时主页上的入口放回原来的位置（D-611）：移除 App 时它被去掉，装回时默认加在主页最后。
+  // Restore home screen entry points to their original positions upon update (D-611): Removed during app deletion, and added at the end of home by default when re-installed.
   const home = config.containers.pages.find((p) => p.id === HOME_PAGE_ID);
   const at = update
     ? (home?.blocks.findIndex((b) => (b as { opens?: unknown }).opens === `app:${id}`) ?? -1)
@@ -376,7 +393,7 @@ function reinstallOps(
   return { ok: true, ops, name: file.app.name };
 }
 
-/** 表上能照文件改的属性（和 updateData 允许的一样，app 由导入自己管）。 */
+/** Table properties that can be updated from the file (matching what updateData allows; app management is handled separately by import). */
 const TABLE_KEYS = [
   'name',
   'icon',
@@ -389,9 +406,11 @@ const TABLE_KEYS = [
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * 把装好的表 have 改成文件里的 next（D-611）：只用普通操作，所以每一步都有和 Tink 改的时候一样的检查。
- * 字段按 ID 对：新的加、变了的整个换成文件里的（去掉的属性写 null）、文件里没有的去掉（值留在记录里），
- * 最后按文件的顺序排。
+ * Update an installed collection have to the file version next (D-611): Uses standard operations
+ * only, ensuring every step undergoes the same checks as Tink modifications. Match fields by ID:
+ * add new ones, replace modified ones entirely with file definitions (setting removed properties
+ * to null), remove missing ones (retaining values in records), and finally sort according to the
+ * file order.
  */
 function tableUpdateOps(have: Collection, next: Collection): Op[] {
   const ops: Op[] = [];
@@ -430,8 +449,10 @@ function tableUpdateOps(have: Collection, next: Collection): Op[] {
 }
 
 /**
- * 用文件更新 App 时预览里列的（D-611）：比较更新前后这个 App 自己的东西，只说真正变了的（页面、表、字段、
- * 快捷操作和提醒、名字、风格）。更新是先移除再装回，逐个操作的说法会说「移除 App」，用户看了会误会。
+ * Preview items when updating an app with a file (D-611): Compares the app itself before and
+ * after the update, reporting only genuine changes (pages, tables, fields, quick actions,
+ * reminders, name, style). Since updates involve removal and re-installation, individual
+ * operations would otherwise say "Remove app", confusing the user.
  */
 export function describeAppUpdate(
   before: WorkspaceConfig,
@@ -498,11 +519,13 @@ export function describeAppUpdate(
   return lines.length > 0 ? lines : [t(locale, 'updateNothing')];
 }
 
-// ---- 整份配置 → App 文件（做预设用）----
+// ---- Full config -> App file (for presets) ----
 
 /**
- * 引用 ID 的位置（和数据表、页面、快捷操作的结构对应）：只改这些位置，别的（字段 ID、块 ID、文案）不动。
- * 漏改的位置会让引用指向不存在的东西，校验器会报出来，所以转换后一定要校验。
+ * Locations of ID references (corresponding to the structure of data tables, pages, and quick
+ * actions): only modify these locations, leaving others (field IDs, block IDs, copy) untouched.
+ * Omitted modifications will cause references to point to non-existent items, triggering
+ * validator errors; therefore, validation is mandatory after conversion.
  */
 function rename(
   node: unknown,
@@ -522,22 +545,24 @@ function rename(
   if (key === 'opens') {
     if (node.startsWith('page:')) return `page:${map.pages.get(node.slice(5)) ?? node.slice(5)}`;
     if (node.startsWith('tool:')) return `tool:${map.tools.get(node.slice(5)) ?? node.slice(5)}`;
-    // 记录块的 opens 是给一条记录用的页面（D-342）。
+    // Record block opens refers to a page used for a single record (D-342).
     return map.pages.get(node) ?? node;
   }
   return node;
 }
 
 export interface ConvertMeta {
-  /** App 的 ID，也是所有页面、表、快捷操作 ID 的前缀（≤ 20 个字符）。 */
+  /** App ID, also serving as the prefix for all page, table, and quick action IDs (<= 20 characters). */
   id: string;
   name: string;
   icon?: IconValue;
 }
 
 /**
- * 把一份整份工作区的配置做成一个 App 文件：ID 加前缀并改好引用，主页变成 App 的第一页，底栏只留页面和 Tink。
- * 工具包、桌面菜单、浮动入口、文件桌面、日历是整个工作区的设置，不带。
+ * Convert a full workspace configuration into an app file: Add prefixes to IDs and update
+ * references, make home the app's first page, and restrict the bottom bar to pages and Tink.
+ * Toolboxes, desktop menus, floating entry points, file desks, and calendars are workspace-wide
+ * settings and are excluded.
  */
 export function appFileFromWorkspace(
   config: WorkspaceConfig,

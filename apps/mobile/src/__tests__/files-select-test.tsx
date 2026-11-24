@@ -9,7 +9,7 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, makePdf } from '../test-utils/fake-files';
 import { renderToolsApp, starterAfterGuide } from '../test-utils/render-app';
 
-// D-472：全部文件页面每行右边一个选择框；选了以后下面一排按钮：重命名（一个）、合并（两个以上 PDF）、分享、删除。
+// D-472: All files page has a selection box on the right of each row; after selection, a bottom row of buttons appears: Rename (single), Merge (two or more PDFs), Share, Delete.
 
 async function start() {
   const repo = new MemoryWorkspaceRepo();
@@ -48,7 +48,7 @@ describe('selecting files on the all-files page (D-472)', () => {
     await fireEvent.press(within(page).getByTestId('files-rename-start'));
     const input = within(page).getByTestId('files-rename-input');
     expect(input.props.value).toBe('发票');
-    // 空名字不改。
+    // Empty name remains unchanged.
     await fireEvent.changeText(input, '  ');
     await fireEvent.press(within(page).getByTestId('files-rename-save'));
     await waitFor(() => expect(within(page).queryByTestId('files-rename')).toBeNull());
@@ -57,18 +57,18 @@ describe('selecting files on the all-files page (D-472)', () => {
     await fireEvent.changeText(within(page).getByTestId('files-rename-input'), '三月发票');
     await fireEvent.press(within(page).getByTestId('files-rename-save'));
     await waitFor(async () => expect((await repo.getAsset('a'))!.name).toBe('三月发票.pdf'));
-    // 磁盘上的文件不动（缩略图、中间格式、文字都按路径找）。
+    // Files on disk remain untouched (thumbnails, intermediate formats, and text are found by path).
     expect((await repo.getAsset('a'))!.path).toBe('assets/a/发票.pdf');
     expect(files.disk.has('assets/a/发票.pdf')).toBe(true);
     expect(await within(page).findByTestId('file-三月发票.pdf')).toBeTruthy();
 
-    // 两个时不能重命名。
+    // Cannot rename when two files are selected.
     await check('b');
     await waitFor(() =>
       expect(within(page).getByTestId('files-selected')).toHaveTextContent('已选 2 个'),
     );
     expect(enabled('files-rename-start')).toBe(false);
-    // 「取消选择」：下面那排按钮收起来。
+    // "Cancel Selection": bottom button row collapses.
     await fireEvent.press(within(page).getByTestId('files-clear'));
     await waitFor(() => expect(within(page).queryByTestId('files-bar')).toBeNull());
   });
@@ -79,7 +79,7 @@ describe('selecting files on the all-files page (D-472)', () => {
     await check('a');
     expect(enabled('files-merge')).toBe(true);
     await fireEvent.press(within(page).getByTestId('files-merge'));
-    // 合成以后进新文件的预览页。
+    // Go to new file preview page after merging.
     await screen.findByTestId('preview-bar');
     const assets = await repo.listAssets();
     expect(assets.map((a) => a.name).sort()).toEqual(
@@ -87,7 +87,7 @@ describe('selecting files on the all-files page (D-472)', () => {
     );
     const merged = assets.find((a) => a.name === '合同（合并）.pdf')!;
     const doc = await PDFDocument.load(files.disk.get(merged.path)!);
-    // 先点的「合同」（2 页，宽 200、201）在前面，「发票」（1 页）在后面。
+    // "Lease" tapped first (2 pages, width 200, 201) comes first, "Invoice" (1 page) comes after.
     expect(doc.getPages().map((p) => p.getWidth())).toEqual([200, 201, 200]);
     expect([...files.disk.keys()].some((k) => k.startsWith('runs/'))).toBe(false);
   });
@@ -112,7 +112,7 @@ describe('selecting files on the all-files page (D-472)', () => {
     const [title, message, buttons] = alert.mock.calls[0]!;
     expect(title).toBe('删除 2 个文件？');
     expect(message).toBe('删除后不能恢复。');
-    // 还没确认：一个都没删。
+    // Not confirmed yet: not a single one deleted.
     expect(await repo.listAssets()).toHaveLength(3);
     await act(async () => buttons!.find((b) => b.style === 'destructive')!.onPress!());
     await waitFor(async () => expect((await repo.listAssets()).map((a) => a.id)).toEqual(['b']));

@@ -18,9 +18,9 @@ import { t } from '../../i18n';
 import type { RevisionSource, WorkspaceRepo } from '../../storage/types';
 import type { Applied, DraftOrigin, WorkspaceDeps, WorkspaceState } from './types';
 
-// 各部分共用的东西：依赖、set / get、文案、重新读取 head、等待「渲染成功」确认的提交。
+// Things shared across parts: dependencies, set/get, copy, re-reading head, waiting for "render success" confirmation submission.
 
-/** 等待“渲染成功”确认的提交。 */
+/** Submission waiting for "render success" confirmation. */
 export interface PendingCommit {
   changeRequestId: number;
   revisionId: number;
@@ -37,12 +37,12 @@ export interface Kernel {
   set: StoreApi<WorkspaceState>['setState'];
   get: StoreApi<WorkspaceState>['getState'];
   msg: (key: Parameters<typeof t>[1], vars?: Record<string, string | number>) => string;
-  /** 渲染确认用的状态（每个 store 一份，不进 zustand 状态）。 */
+  /** State used for render confirmation (one per store, does not enter zustand state). */
   render: {
-    /** 最近一次成功渲染的配置；渲染失败时回退到它。 */
+    /** Most recently successfully rendered configuration; falls back to it when rendering fails. */
     lastRendered: WorkspaceConfig | null;
     pending: PendingCommit | null;
-    /** 连续回退次数；回退后仍无法渲染时停止，避免循环。 */
+    /** Consecutive rollback count; stops when rendering still fails after rollback to avoid loops. */
     consecutiveRollbacks: number;
   };
   reload(): Promise<void>;
@@ -53,7 +53,7 @@ export interface Kernel {
 
 export function focusPage(ops: readonly Op[], config: WorkspaceConfig): string {
   for (const op of ops) {
-    // 改一个 app 的风格、底栏（D-485）：看这个 app 的第一页，不回主页。
+    // Modify an app's style, bottom bar (D-485): Look at the app's first page, without returning to home.
     const app =
       op.op === 'setTheme' ? op.app : op.op === 'updateContainer' ? op.app?.id : undefined;
     const first = app === undefined ? null : pageIdOf(firstTarget(appViewOf(config, app)));
@@ -81,7 +81,7 @@ export function createKernel(deps: WorkspaceDeps, set: Kernel['set'], get: Kerne
   const msg = (key: Parameters<typeof t>[1], vars?: Record<string, string | number>) =>
     t(locale, key, vars);
 
-  /** 从数据库重新读取 head（§4：持久化后重新读取再渲染）。 */
+  /** Re-read head from database (§4: re-read and render after persistence). */
   async function reload(): Promise<void> {
     const head = await repo.getHead();
     if (!head) throw new Error('workspace has no head revision');
@@ -91,7 +91,7 @@ export function createKernel(deps: WorkspaceDeps, set: Kernel['set'], get: Kerne
     set({ config: prepared.after, head, status: 'ready', error: null });
   }
 
-  /** 以当前 head 为基础，提交一份已知可用的配置（回退、修复）。 */
+  /** Submit a known-working configuration based on the current head (rollback, fix). */
   async function commitFallback(config: WorkspaceConfig, source: RevisionSource, summary: string) {
     const head = await repo.getHead();
     await repo.commitRevision({ baseId: head?.id ?? null, config, source, summary });

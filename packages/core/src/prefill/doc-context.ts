@@ -1,17 +1,18 @@
-// 这一份文档的上下文：规则在打分前后要知道币种、整份文字、这一排有几个金额、现在是哪一年。
-// suggestValues / planDocument 开头设置，同步用完（里面没有 await），所以放模块变量。
+// Context for the current document: rules need to know currency, full text, number of amounts in
+// the row, and current year before and after scoring. Initialized at the start of suggestValues /
+// planDocument and used synchronously (without await), hence stored in module variables.
 export type DocumentKind = '' | 'card' | 'receipt' | 'other';
 
 export const ctx: {
   currency: string;
   text: string;
-  /** 正在读的这一排里有几个两位小数的数（空格千位分隔的判断用）。 */
+  /** Number of two-decimal numbers in the current row being read (used for space-separated thousand separator detection). */
   rowMany: number;
-  /** 「现在」的年份：两位年的世纪判断用。 */
+  /** "Current" year: used for century resolution on two-digit years. */
   nowYear: number;
-  /** 文字看起来是发票（不是小票）。 */
+  /** The text appears to be an invoice (rather than a receipt). */
   invoice: boolean;
-  /** 用哪组规则（表上的 prefillRules，other = 只有通用规则）；'' = 没经过 planDocument。 */
+  /** Rule set to use (prefillRules on the table, other = general rules only); '' = uninitialized via planDocument. */
   kind: DocumentKind;
 } = {
   kind: '',
@@ -22,7 +23,7 @@ export const ctx: {
   text: '',
 };
 
-/** 一份文档算完后清掉上下文，没经过 planDocument 的调用（附件文字、检查）不会用到上一份文档的币种和文字。 */
+/** Clear document context after processing a document so that un-planned calls (attachment text, checks) do not bleed the currency and text of the previous document. */
 export function resetDocContext(): void {
   ctx.rowMany = 0;
   ctx.nowYear = 0;
@@ -32,12 +33,12 @@ export function resetDocContext(): void {
   ctx.text = '';
 }
 
-/** 收据规则（D-403）只对收据生效；没经过 planDocument 的调用（kind 为 ''）照旧。 */
+/** Receipt rules (D-403) apply only to receipts; un-planned calls (kind set to '') behave as before. */
 export const receiptRules = (): boolean => ctx.kind === '' || ctx.kind === 'receipt';
-/** 名片规则只对名片生效。 */
+/** Business card rules apply only to business cards. */
 export const cardRules = (): boolean => ctx.kind === 'card';
 
-/** planDocument 之后的同步调用（问模型、核对模型的答案）也按这张表的规则走。 */
+/** Synchronous calls following planDocument (querying models, validating model answers) also follow this table's rules. */
 export function withDocKind<T>(kind: DocumentKind, work: () => T): T {
   const before = ctx.kind;
   ctx.kind = kind;

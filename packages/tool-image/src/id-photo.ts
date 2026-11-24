@@ -1,5 +1,6 @@
-// 证件照规格与冲印排版。规格只是默认值，用户可以在界面里修改；
-// 各国要求会变，备注里写明了需要以官方最新要求为准的地方。
+// ID photo specifications and print layout. Specifications are only defaults, users can modify them
+// in the UI; requirements in various countries change, notes specify where to refer to the latest
+// official requirements.
 
 import type { Rect } from './geometry';
 
@@ -16,7 +17,7 @@ export interface IdPhotoSpec {
   heightMm: number;
   widthPx: number;
   heightPx: number;
-  /** 电子版上传的体积上限（KB）。 */
+  /** Volume upper limit (KB) for electronic version upload. */
   maxKB?: number;
   note: LocalizedText;
 }
@@ -27,7 +28,7 @@ export function mmToPx(mm: number, dpi: number): number {
   return Math.round((mm / MM_PER_INCH) * dpi);
 }
 
-/** 常见证件照规格。像素按 300 dpi 换算，官方电子版规格另有规定的以官方为准。 */
+/** Common ID photo specifications. Pixels converted at 300 dpi, official specifications taking precedence where otherwise specified. */
 export const ID_PHOTO_SPECS: readonly IdPhotoSpec[] = [
   {
     id: 'us-passport',
@@ -179,7 +180,7 @@ export interface PrintSheetOptions {
   photo: { widthMm: number; heightMm: number };
   gapMm: number;
   marginMm: number;
-  /** 输出贯穿整张相纸的裁切线，方便用裁纸刀。 */
+  /** Output cutting lines spanning the entire photo paper for easy paper trimmer usage. */
   guides: boolean;
 }
 
@@ -193,7 +194,7 @@ export interface GuideLine {
 export interface PrintSheetLayout {
   width: number;
   height: number;
-  /** 照片在相纸上的位置；rotated 时照片需旋转 90° 放入。 */
+  /** Photo positions on the paper; when rotated, photo needs to be rotated 90 degrees before placement. */
   placements: Rect[];
   rotated: boolean;
   guides: GuideLine[];
@@ -203,7 +204,7 @@ function fitCount(space: number, item: number, gap: number): number {
   return Math.max(0, Math.floor((space + gap) / (item + gap)));
 }
 
-/** 在相纸上排尽可能多的照片；照片横竖两种方向都试，取张数多的，整体居中。 */
+/** Layout as many photos as possible on the paper; try both horizontal and vertical orientations, take the one with more photos, centered overall. */
 export function layoutPrintSheet(options: PrintSheetOptions): PrintSheetLayout {
   const { sheet, dpi, photo, guides } = options;
   const width = Math.round(sheet.widthIn * dpi);
@@ -252,9 +253,9 @@ export function layoutPrintSheet(options: PrintSheetOptions): PrintSheetLayout {
   return { width, height, placements, rotated, guides: lines };
 }
 
-// ---- 自动框脸（D-252）----
+// ---- Auto Face Framing (D-252) ----
 
-/** 头（下巴到头顶）占照片高度的比例：各规格要求的中间值；没写的规格用 DEFAULT_HEAD_RATIO。 */
+/** Ratio of head (chin to top of head) to photo height: median value of requirements for each specification; unspecified specifications use DEFAULT_HEAD_RATIO. */
 export const HEAD_RATIO: Record<string, number> = {
   'us-passport': 0.6, // 25–35 mm / 50.8 mm
   'in-visa': 0.6,
@@ -267,15 +268,19 @@ export const HEAD_RATIO: Record<string, number> = {
 export const DEFAULT_HEAD_RATIO = 0.65;
 
 /**
- * 人脸检测给的框（iOS Vision、ML Kit 都是）大约从眉毛到下巴，不含额头上方和头发：
- * 下巴到头顶约是框高的 1.45 倍。头顶上方留出的空白是上下空白合计的 40%。
+ * Face box provided by face detection (both iOS Vision and ML Kit) spans roughly from eyebrows to
+ * chin, excluding above forehead and hair: chin to top of head is about 1.45 times the box
+ * height. Blank space reserved above the top of the head is 40% of the total vertical blank
+ * space.
  */
 const HEAD_PER_FACE = 1.45;
 const TOP_SHARE = 0.4;
 
 /**
- * 按人脸框算出证件照的裁剪框（原图像素，宽高比 = 规格的宽高比）：头的高度占规格要求的比例，
- * 脸左右居中。照片不够大时整体缩小裁剪框（头会显得大一点），绝不超出原图。
+ * Calculate ID photo crop box from face box (source image pixels, aspect ratio = specification
+ * aspect ratio): head height accounts for specified ratio of requirement, face centered
+ * horizontally. Scale down crop box overall when photo is not large enough (head will appear
+ * slightly larger), never exceeding source image.
  */
 export function faceCrop(
   image: { width: number; height: number },
@@ -287,7 +292,7 @@ export function faceCrop(
   const chin = face.y + face.height;
   let height = head / headRatio;
   let width = height * aspect;
-  // 放不下时缩小，宽和高都不超过原图。
+  // Shrink when it does not fit, ensuring neither width nor height exceeds the original image.
   const shrink = Math.min(1, image.width / width, image.height / height);
   width *= shrink;
   height *= shrink;
@@ -305,7 +310,7 @@ export function faceCrop(
   };
 }
 
-/** 几张脸时用最大的那张（证件照只有一个人；背景里的人脸通常小）。 */
+/** When there are multiple faces, use the largest one (an ID photo has only one person; faces in the background are usually small). */
 export function mainFace(faces: readonly Rect[]): Rect | null {
   return faces.reduce<Rect | null>(
     (best, f) => (!best || f.width * f.height > best.width * best.height ? f : best),

@@ -24,8 +24,8 @@ import { FakeFiles, FakeVision, TINY_JPEG, makePdf } from '../test-utils/fake-fi
 import { renderToolsApp } from '../test-utils/render-app';
 import type { WorkspaceStore } from '../workspace/store';
 
-// 分享到 Tinkrum（TOOLS_DESIGN §11）：原生部分（expo-share-intent）换成假的，只测 JS 侧的收件、选工作流、
-// 类型匹配和大小上限。
+// Share to Tinkrum (TOOLS_DESIGN §11): mock the native part (expo-share-intent) to test only
+// JS-side receiving, workflow selection, type matching, and size limits.
 
 type MockListener = (e: { value: unknown }) => void;
 
@@ -39,7 +39,7 @@ jest.mock('expo-share-intent', () => {
       },
       getShareIntent: jest.fn(),
       clearShareIntent: jest.fn(async () => undefined),
-      /** 模拟原生模块收到一次分享。 */
+      /** Simulate native module receiving a share event. */
       emit: (value: unknown) => listeners.get('onChange')?.({ value }),
     },
   };
@@ -52,7 +52,7 @@ const native = () =>
     }
   ).ShareIntentModule;
 
-/** iOS 分享扩展写的 JSON（plugins/share-extension/ShareViewController.swift）。 */
+/** JSON written by iOS share extension (plugins/share-extension/ShareViewController.swift). */
 const iosPayload = (files: PickedFile[]) =>
   JSON.stringify({
     files: files.map((f) => ({
@@ -97,7 +97,7 @@ describe('normalizeShare', () => {
             width: '4000',
             height: '3000',
           },
-          // expo-share-intent 9.0.0 单个文件时多塞的一项（Kotlin Pair），跳过。
+          // Extra item bundled by expo-share-intent 9.0.0 for single files (Kotlin Pair), skip.
           { first: 'type', second: 'file' },
         ],
         type: 'file',
@@ -177,7 +177,7 @@ describe('running a workflow on shared files', () => {
       ],
     };
     const { files, asked, run } = setup(wf);
-    files.camera = []; // 打开相机会得到「取消」。
+    files.camera = []; // Opening camera returns "Cancel".
     const shared = [
       files.offerShared('a.jpg', TINY_JPEG, 'image/jpeg'),
       files.offerShared('b.JPG', TINY_JPEG, null),
@@ -185,7 +185,7 @@ describe('running a workflow on shared files', () => {
     const { result } = await run(shared);
     expect(result).toMatchObject({ status: 'succeeded' });
     expect(asked).toEqual([]);
-    // 原件留在共享目录（「再来一次」还要用），关闭运行页面时才删。
+    // Originals remain in shared directory (needed for "try again"), deleted only when closing the run page.
     expect(files.sharedFiles()).toHaveLength(2);
   });
 
@@ -221,7 +221,7 @@ describe('running a workflow on shared files', () => {
     expect(first.result.status).toBe('succeeded');
     expect(files.disk.has(video.uri)).toBe(true);
     await first.dispose();
-    // 「再来一次」：原来那份还在。
+    // "Try again": original file is still there.
     expect((await run([video])).result.status).toBe('succeeded');
   });
 
@@ -303,11 +303,11 @@ describe('share journeys (UI)', () => {
 
     expect(await screen.findByTestId('share-screen')).toBeTruthy();
     expect(native().clearShareIntent).toHaveBeenCalledWith('morphShareKey');
-    // 文件一直列在页面上，没有展开收起（D-457）。
+    // Files remain listed on the page without expand/collapse (D-457).
     expect(screen.getByText('报告.pdf')).toBeTruthy();
     expect(screen.queryByTestId('share-files-toggle')).toBeNull();
     expect(screen.queryByTestId('share-desk')).toBeNull();
-    // 「查看全部」在这一页展开：收这些文件的都在，用过但个数不对的说明原因，收不了的不出现。
+    // "View all" expands on this page: all files received are listed, those used with incorrect counts explain why, and un-receivable files do not appear.
     await fireEvent.press(screen.getByTestId('share-see-all'));
     expect(screen.queryByTestId('share-see-all')).toBeNull();
     expect(screen.getByTestId(`share-run-${merge.id}`)).toBeTruthy();
@@ -318,12 +318,12 @@ describe('share journeys (UI)', () => {
     expect(screen.queryByTestId('share-workflow-visa-photo')).toBeNull();
     expect(screen.queryByTestId('run-screen')).toBeNull();
     await fireEvent.press(screen.getByTestId(`share-run-${merge.id}`));
-    // 运行时不摆出步骤列表（D-457）：只有转圈和一句在做什么。
+    // Do not display step lists during runtime (D-457): only a spinner and a sentence describing what is happening.
     expect(await screen.findByTestId('run-compact')).toBeTruthy();
     expect(screen.queryByTestId('run-step-pick')).toBeNull();
-    // 合并 PDF 每次运行时问文件名。
+    // Ask for the file name on every run of merge PDF.
     await fireEvent.press(await screen.findByTestId('prompt-ok', {}, { timeout: 3000 }));
-    // 结果是一个文件：不停在结果页，直接进它的预览页（D-457）；收到的两个文件跟着运行页面释放。
+    // Result is a single file: do not stay on the result page, go directly to its preview page (D-457); the two received files are released along with the run page.
     expect(await screen.findByTestId('preview-bar')).toBeTruthy();
     const result = useIncoming.getState().share!;
     expect(result.source).toBe('result');
@@ -332,13 +332,13 @@ describe('share journeys (UI)', () => {
     expect(files.sharedFiles()).toEqual([]);
     expect(screen.queryByTestId('run-screen')).toBeNull();
 
-    // 关掉预览页：结果的副本删掉，待处理的清空。
+    // Close the preview page: delete the result copy and clear pending items.
     await act(() => router.back());
     expect(useIncoming.getState().share).toBeNull();
     expect(files.disk.has(result.files[0]!.uri)).toBe(false);
   });
 
-  // D-455：分享进来的文件留一份在文档库；收件的临时副本关掉时照样删掉。
+  // D-455: keep a copy of shared files in the document library; delete temporary received copies when closed as usual.
   it('has no save button, keeps the file in the library and clears the shared copies when dismissed', async () => {
     const { files, repo } = await setupApp();
     await share([files.offerShared('IMG_1.jpg', TINY_JPEG, 'image/jpeg')]);
@@ -410,14 +410,14 @@ describe('share journeys (UI)', () => {
     await share([trip]);
     expect(await screen.findByTestId('preview-bar')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('preview-more'));
-    // 证件照、合并 PDF 都不收视频；内设的「视频太大发不出去」直接运行（视频不超过 4 GB，不受 50 MB 限制）。
+    // ID photos and merge PDF do not accept videos; built-in "Video too large to send" runs directly (videos up to 4 GB, not subject to the 50 MB limit).
     expect(screen.queryByTestId('share-too-large')).toBeNull();
     expect(await screen.findByTestId('share-workflow-video-too-big')).toBeTruthy();
     expect(screen.queryByTestId('share-workflow-visa-photo')).toBeNull();
     await fireEvent.press(screen.getByTestId('share-run-video-too-big'));
     await fireEvent.press(await screen.findByTestId('prompt-ok', {}, { timeout: 3000 }));
     expect(await screen.findByTestId('result-item-trip.mp4')).toBeTruthy();
-    // 分享进来的原件原地使用，不复制进运行目录。
+    // Use shared originals in place without copying them into the run directory.
     expect(files.adopted).toEqual([trip.uri]);
     expect(files.runFiles()).toHaveLength(1);
   });
@@ -426,15 +426,15 @@ describe('share journeys (UI)', () => {
     const { files } = await renderToolsApp();
     await share([files.offerShared('IMG_0001.jpg', TINY_JPEG, 'image/jpeg')]);
     expect(await screen.findByTestId('preview-bar')).toBeTruthy();
-    // 一份文件直接是预览页，不是收件页面：没有「我要自己说」，Tink 在右上角。
+    // A single file opens directly as a preview page, not an inbox page: no "I will speak myself", Tink is in the top right.
     expect(screen.queryByTestId('share-ask-ai')).toBeNull();
     expect(screen.getByTestId('page-ai')).toBeTruthy();
     expect(screen.getByTestId('desk-preview-image')).toBeTruthy();
-    // 进来什么都不跑。
+    // Nothing runs upon entry.
     expect(screen.queryByTestId('run-screen')).toBeNull();
     await fireEvent.press(screen.getByTestId('preview-more'));
     await screen.findByTestId('preview-panel-more');
-    // 「更多」按做的事分类（格式转换、智能处理、管理、快捷操作），最常用的几个都在里面。
+    // "More" categorizes actions by function (format conversion, smart processing, management, quick actions), with the most common ones included.
     const ids = screen.getAllByTestId(/^share-workflow-/).map((n) => n.props.testID as string);
     expect(ids).toEqual(
       expect.arrayContaining([
@@ -473,7 +473,7 @@ describe('share journeys (UI)', () => {
     expect(screen.getByTestId('preview-word')).toHaveTextContent('转 Word');
     await fireEvent.press(await screen.findByTestId('desk-system-preview'));
     expect(files.previewed).toEqual([{ uri: pdf.uri, mimeType: 'application/pdf' }]);
-    // 没有能打开它的 App（Android）时说明原因，页面照常能用。
+    // Explain when no app is available to open it (Android), keeping the page usable as usual.
     files.previewFails = true;
     await fireEvent.press(screen.getByTestId('desk-system-preview'));
     expect(await screen.findByTestId('share-preview-error')).toHaveTextContent(/没有能打开/);
@@ -529,7 +529,7 @@ describe('share journeys (UI)', () => {
     await fireEvent.press(await screen.findByTestId('prompt-ok', {}, { timeout: 3000 }));
     expect(await screen.findByTestId('desk-screen', {}, { timeout: 5000 })).toBeTruthy();
     expect(await listDesks(files)).toHaveLength(1);
-    // 返回：回到进来前的页面，这份桌面舍弃，收到的文件还在。
+    // Back: return to the page before entry, discard this desk, keep the received files.
     await act(() => router.back());
     expect(await screen.findByTestId('share-screen')).toBeTruthy();
     await waitFor(async () => expect(await listDesks(files)).toHaveLength(0));
@@ -565,12 +565,12 @@ describe('share journeys (UI)', () => {
     expect(screen.queryByTestId('run-result')).toBeNull();
     expect(useIncoming.getState().share!.source).toBe('result');
     expect(useIncoming.getState().share!.files[0]!.name).toMatch(/\.pdf$/);
-    // 预览页是容器：进来什么都没存、没发。
+    // Preview page is a container: nothing is stored or sent upon entry.
     expect(await app.repo.listAssets()).toEqual([]);
     expect(app.files.shared).toHaveLength(0);
   });
 
-  // 2026-11-09 用户测试：「扫描成 PDF」第一步叫「Choose photos」，停下时却说相机用不了。
+  // 2026-11-09 user test: "Scan to PDF" first step is named "Choose photos", but stopping says the camera is unavailable.
   it('the run page names the first step after where the photos come from', async () => {
     const app = await renderToolsApp(undefined, undefined, { locale: 'en' });
     app.files.cameraAvailable = false;
@@ -586,7 +586,7 @@ describe('share journeys (UI)', () => {
     expect(screen.queryByText('Choose photos')).toBeNull();
   });
 
-  // 2026-11-09 用户测试：相机用不了时只停在第 1 步，没有别的路（D-508）。
+  // 2026-11-09 user test: when the camera is unavailable, this run only stops at step 1 with no other path (D-508).
   it('when the camera is not available, this run can take photos from the library instead', async () => {
     const app = await renderToolsApp(undefined, undefined, { locale: 'en' });
     app.files.cameraAvailable = false;
@@ -600,15 +600,15 @@ describe('share journeys (UI)', () => {
     expect(await screen.findByTestId('run-from-library', {}, { timeout: 5000 })).toHaveTextContent(
       'Choose photos instead',
     );
-    // 「再来一次」照快捷操作原样跑：还是相机，还是停在第 1 步。
+    // "Run again" runs the quick action as originally configured: still the camera, still stopping at step 1.
     await fireEvent.press(screen.getByTestId('run-again'));
     const instead = await screen.findByTestId('run-from-library', {}, { timeout: 5000 });
     app.files.nextPhotos = [app.files.offerImage('page.jpg', 1000, 1400)];
     await fireEvent.press(instead);
-    // 还是一次扫描：做出一个文件就直接进预览页（D-457）。
+    // Still a single scan: generating a file goes directly to the preview page (D-457).
     expect(await screen.findByTestId('preview-bar', {}, { timeout: 5000 })).toBeTruthy();
     expect(useIncoming.getState().share!.files[0]!.name).toMatch(/\.pdf$/);
-    // 只是这一次：快捷操作本身还是用文档相机，配置没写。
+    // This time only: the quick action itself still uses the document camera, not written in config.
     const saved = quickActionsOf(app.store.getState().config!).find((w) => w.id === 'scan-pdf');
     expect(saved!.steps[0]!.params).toMatchObject({ source: 'scanner' });
   });
@@ -620,7 +620,7 @@ describe('share journeys (UI)', () => {
       .getState()
       .proposeOps([{ op: 'addTool', tool: photoPdf('lib-pdf', 'library') }], 'prepare');
     await act(() => app.store.getState().confirm());
-    // 相册这一步没选照片就关了：照常结束，不提议「改从相册选」。
+    // Closed without selecting photos in the photo library step: ends normally without suggesting "Switch to photo library selection".
     app.files.nextPhotos = [];
     await act(() =>
       router.push({ pathname: '/run/[workflowId]', params: { workflowId: 'lib-pdf' } }),
@@ -643,11 +643,11 @@ describe('share journeys (UI)', () => {
     expect(screen.queryByTestId('preview-bar')).toBeNull();
   });
 
-  // 模拟器上发现（2026-11-06）：预览页的「编辑」只复制 xlsx，不带识别出的表格，桌上改不了。
+  // Discovered on simulator (2026-11-06): preview page "Edit" only copies xlsx without recognized tables, unchangeable on the desk.
   it('an Excel result made from a shared photo stays on its result page, where it goes on the desk editable (D-457)', async () => {
     const files = new FakeFiles();
     const vision = new FakeVision(files);
-    // 识别出一行字：没有画线的表格也做成一张表（全部内容）。
+    // Recognized a line of text: tables without drawn lines are also turned into a single table (all contents).
     vision.layers = [
       { width: 100, height: 100, lines: [{ text: '品名', x: 10, y: 10, width: 40, height: 12 }] },
     ];
@@ -668,14 +668,14 @@ describe('share journeys (UI)', () => {
     await share([pdf]);
     await fireEvent.press(await screen.findByTestId('preview-share'));
     expect(await screen.findByTestId('preview-share-send')).toBeTruthy();
-    // 面板标题是「分享」，第一项不能也叫「分享」（出现两行一样的字）。
+    // Panel title is "Share", the first item cannot also be named "Share" (resulting in two identical lines of text).
     expect(within(screen.getByTestId('preview-panel-share')).getAllByText('分享')).toHaveLength(1);
     expect(screen.getByTestId('preview-share-folder')).toBeTruthy();
     expect(screen.getByTestId('preview-share-print')).toBeTruthy();
     expect(screen.queryByTestId('preview-share-photos')).toBeNull();
     await fireEvent.press(screen.getByTestId('preview-share-send'));
     expect(files.shared).toEqual([pdf.uri]);
-    // 点完面板关上，页面还在、文件还在。
+    // Tapping the panel closes it, leaving the page and files intact.
     expect(screen.queryByTestId('preview-share-send')).toBeNull();
     expect(screen.getByTestId('preview-bar')).toBeTruthy();
     await act(() => router.back());
@@ -685,8 +685,8 @@ describe('share journeys (UI)', () => {
     expect(await screen.findByTestId('preview-share-photos')).toBeTruthy();
   });
 
-  // 用户测试（2026-11-09、11-10）和模拟器（2026-11-14）：存到手机后什么提示都没有，
-  // 位置只写 "File Provider Storage"（iOS「我的 iPhone」那一层在文件系统里的名字）。
+  // User testing (2026-11-09, 11-10) and simulator (2026-11-14): no prompt after saving to phone,
+  // location reads only "File Provider Storage" (the file system name for iOS "On My iPhone").
   it('saving to the phone from the preview says which file went where, named as in Files (D-583)', async () => {
     const { files } = await renderToolsApp();
     files.nextFolder = 'File Provider Storage';
@@ -696,14 +696,14 @@ describe('share journeys (UI)', () => {
     expect(await screen.findByText('已把「报告.pdf」存到「我的 iPhone」')).toBeTruthy();
     expect(screen.queryByText(/File Provider Storage/)).toBeNull();
 
-    // 关掉选择器：没存，不说存好了。
+    // Close the picker: nothing saved, no success message.
     files.folderChoice = 'cancel';
     await fireEvent.press(await screen.findByTestId('preview-share'));
     await fireEvent.press(await screen.findByTestId('preview-share-folder'));
     expect(screen.queryByText(/已把/)).toBeNull();
   });
 
-  // 三星真机（2026-11-23）：存到手机失败时预览页写着「保存失败：{detail}」，占位符没替换。
+  // Samsung real device (2026-11-23): save to phone failure shows "Save failed: {detail}" on the preview page with placeholder unreplaced.
   it('a failed save from the preview says why, with the detail filled in', async () => {
     const { files } = await renderToolsApp();
     files.folderChoice = 'saveFailed';
@@ -719,12 +719,12 @@ describe('share journeys (UI)', () => {
     const pdf = files.offerShared('报告.pdf', await makePdf(1));
     await share([pdf]);
     await fireEvent.press(await screen.findByTestId('preview-word'));
-    // 测试环境没有文字识别：失败了就露出完整的运行页面，能看到停在哪一步、能再来一次。
+    // Test environment lacks OCR: failure exposes the full run page, showing the stopped step and allowing a retry.
     expect(await screen.findByTestId('run-error', {}, { timeout: 5000 })).toBeTruthy();
     expect(screen.queryByTestId('run-compact')).toBeNull();
     expect(screen.getByTestId('run-step-pages')).toBeTruthy();
     expect(screen.getByTestId('run-again')).toBeTruthy();
-    // 返回回到预览页，文件还在。
+    // Return to preview page, file remains.
     await act(() => router.back());
     expect(await screen.findByTestId('preview-bar')).toBeTruthy();
     expect(files.sharedFiles()).toHaveLength(1);

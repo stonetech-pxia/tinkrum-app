@@ -23,16 +23,18 @@ import { validateWorkspace } from './validate';
 
 const workspace = (locale: Locale) => fromV33(v33Fixture(`default-${locale}`));
 
-// 字段类型登记表重构的基线（2026-10-27）：每种字段在读取、写入、显示、导出、打印、筛选、排序、统计、
-// 公式、类型转换、修改说明里的输出。重构只换写法，这些输出必须完全不变。
-// 快照一项一行（snapshotLines，2026-10-27 起），内容和原来的展开写法相同。
+// Baseline for field type registry refactoring (2026-10-27): output of each field type in reading,
+// writing, display, export, printing, filtering, sorting, statistics, formulas, type conversion,
+// and change descriptions. Refactoring only changes implementation, these outputs must remain
+// completely identical. One line per snapshot item (snapshotLines, since 2026-10-27), with contents
+// identical to the original expanded format.
 
-// 快照里的时间按本地时区显示，固定时区，换台机器（例如云端的 UTC）也一样。
+// Times in snapshots are displayed in local timezone; fixed timezone so it is consistent across machines (e.g., UTC in the cloud).
 process.env.TZ = 'Europe/Paris';
 
 const LOCALES: Locale[] = ['en', 'zh', 'fr'];
 const NOW = new Date(2026, 9, 27, 10, 30);
-// 公式里的 today 读系统时间：固定成 NOW，不然快照每过一天就对不上。
+// Today in formulas reads system time: fixed to NOW, otherwise snapshots drift every day.
 vi.useFakeTimers({ toFake: ['Date'] });
 vi.setSystemTime(NOW);
 
@@ -244,7 +246,7 @@ describe('field baseline', () => {
     for (const ref of [...FIELDS.map((f) => f.id), 'createdAt']) {
       for (const op of ops) {
         for (const value of values) {
-          // 不在白名单里的时间段校验时就拦下了（matchesCondition 不处理）。
+          // Time periods not in the whitelist are blocked during validation (not handled by matchesCondition).
           if (op === 'inPeriod' && typeof value === 'string' && value !== 'thisMonth') continue;
           const cond = { field: ref, op, ...(value === undefined ? {} : { value }) } as Condition;
           filters[`${ref} ${op} ${String(value)}`] = filterRecords(RECORDS, table, [cond], NOW).map(

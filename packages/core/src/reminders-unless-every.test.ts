@@ -8,8 +8,9 @@ import { planNotifications, reminderCollections, RECORD_OCCURRENCES } from './re
 import type { Collection, Reminder, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// 每天、每周的提醒也可以带 unless（D-563）：「今天还没记就 21:00 提醒我」。通知提前排好，记录一变就重排
-// （useReminders.ts）；什么都不在后台运行（底线 16）。
+// Daily and weekly reminders can also have unless (D-563): "remind me at 21:00 if not logged yet
+// today". Notifications are scheduled in advance and rescheduled on any record change
+// (useReminders.ts); nothing runs in the background (invariant 16).
 
 const logs: Collection = {
   id: 'logs',
@@ -20,7 +21,7 @@ const logs: Collection = {
     { id: 'habit', name: 'Habit', type: 'link', table: 'logs' },
   ],
 };
-// 2026-11-16 是星期一，12:00。
+// 2026-11-16 is Monday, 12:00.
 const now = new Date(2026, 10, 16, 12, 0);
 const ctx = { registry, locale: 'en' as const, now };
 
@@ -112,9 +113,9 @@ describe('unless on a daily or weekly reminder (D-563)', () => {
     const c = config(daily({ table: 'logs', within: 'day' }));
     const days = Array.from({ length: RECORD_OCCURRENCES }, (_, i) => at(16 + i));
     expect(times(c, [])).toEqual(days);
-    // 今天已经记了：今天不提醒，后面的照旧。
+    // Already logged today: no reminder today, subsequent ones as usual.
     expect(times(c, [log('a', new Date(2026, 10, 16, 8))])).toEqual([...days.slice(1), at(23)]);
-    // 昨天记的不算。
+    // Logged yesterday doesn't count.
     expect(times(c, [log('b', new Date(2026, 10, 15, 22))])).toEqual(days);
   });
 
@@ -128,7 +129,7 @@ describe('unless on a daily or weekly reminder (D-563)', () => {
       }),
     );
     const today = at(16);
-    // 只有 kind 是 run 的算；日期看 on（明天的那条让明天不提醒）。
+    // Only those with kind 'run' count; date is checked via on (tomorrow's entry prevents tomorrow's reminder).
     const planned = times(c, [
       log('walk', new Date(2026, 10, 16, 8), { kind: 'walk', on: '2026-11-16' }),
       log('run', new Date(2026, 10, 16, 8), { kind: 'run', on: '2026-11-17' }),
@@ -141,7 +142,7 @@ describe('unless on a daily or weekly reminder (D-563)', () => {
     const c = config(
       reminder({ every: 'week', days: [1, 4], at: '09:00' }, { table: 'logs', within: 'week' }),
     );
-    // 周一 9 点已经过了；本周四有记录就不提醒，下周一、周四照旧。
+    // Monday 9 o'clock has passed; if there is a record this Thursday, do not remind, next Monday and Thursday as usual.
     const planned = times(c, [log('a', new Date(2026, 10, 16, 8))]);
     expect(planned.slice(0, 2)).toEqual([at(23, 9), at(26, 9)]);
     expect(times(c, []).slice(0, 2)).toEqual([at(19, 9), at(23, 9)]);

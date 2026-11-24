@@ -7,8 +7,9 @@ import { Button, Card } from '../renderer/ui';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 
 /**
- * 「接着改」（D-191）：上一次功能修改那句话里剩下的外观请求。点一下打开 AI 修改页，
- * 句子自动打进去发送，进草稿看效果。
+ * "Modify next" (D-191): The remaining appearance requests in the sentence from the previous
+ * feature modification. Tap to open the AI modification page, have the sentence automatically
+ * typed in and sent, and enter the draft to view the effect.
  */
 export function NextCard({ palette, primary }: { palette: Palette; primary?: boolean }) {
   const { locale } = useWorkspaceContext();

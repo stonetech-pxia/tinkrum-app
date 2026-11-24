@@ -10,7 +10,7 @@ function splitAt(text: string, max: number): string[] {
   let rest = Array.from(text);
   while (rest.length > max) {
     let cut = max;
-    // 拉丁语言优先在单词边界换行；长词和中日韩文字按 Unicode 字符切。
+    // Latin languages prefer line breaks at word boundaries; long words and CJK characters are split by Unicode characters.
     for (let i = max; i > max * 0.55; i--)
       if (rest[i] === ' ') {
         cut = i;
@@ -23,12 +23,12 @@ function splitAt(text: string, max: number): string[] {
   if (rest.length) output.push(rest.join('').trim());
   return output;
 }
-/** 一条字幕最长显示多久（毫秒），再长就按文字比例拆开。 */
+/** Maximum display duration for a subtitle cue (milliseconds), longer cues are split proportionally by text length. */
 const MAX_CUE_MS = 6000;
-/** 被前一条完全盖住、只好接在后面的那一条至少显示多久。 */
+/** Minimum display duration for a cue that is completely covered by the previous one and forced to follow it. */
 const MIN_CUE_MS = 700;
 
-/** 真实识别时间戳生成 SRT；过长原生段落按文字比例拆分，段内时间仅是近似。每条最多两行。 */
+/** Generate SRT from actual recognition timestamps; overly long native segments are split proportionally by text length, within-segment times are approximate. Maximum two lines per cue. */
 export function speechToSrt(
   segments: readonly SpeechSegment[],
   language: SpeechLanguage,
@@ -49,7 +49,7 @@ export function speechToSrt(
       language,
     ).trim();
     if (!text) continue;
-    // 按字数（两行放得下）和时长（不超过 MAX_CUE_MS）两头拆。
+    // Split from both ends based on word count (fitting two lines) and duration (not exceeding MAX_CUE_MS).
     const length = Array.from(text).length;
     const pieces = Math.max(
       Math.ceil(length / (lineLength * 2)),
@@ -74,7 +74,7 @@ export function speechToSrt(
     const startMs = Math.max(candidate.startMs, previous?.endMs ?? 0);
     const combined = previous ? tidyTranscript([previous, candidate], language) : candidate.text;
     if (candidate.endMs <= startMs) {
-      // 整段都落在前一条的时间里（识别结果互相重叠）：并进前一条；放不下就接在它后面，不能丢字。
+      // Entire segment falls within the previous cue's time (recognition results overlap): merge into the previous cue; if it doesn't fit, append it immediately after, without losing text.
       if (!previous) continue;
       if (fits(combined)) previous.text = combined;
       else if (startMs < end)

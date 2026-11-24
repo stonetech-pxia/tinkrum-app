@@ -18,11 +18,16 @@ import { useWidgetPlacement } from './placed';
 import { buildWidgetSnapshot } from './snapshot';
 import type { PlacedWidget, QueueEntry, QueuedWidgetOp, WidgetPlatform } from './types';
 
-// 桌面小组件和 App（D-322、D-323）：
-// - 处理小组件上点了的操作：App 启动、回到前台、Android 上 App 开着时小组件点了（onQueue）。先读出来（不删），按点的时间顺序、
-//   以点的时间执行（「今天」是点的那天，记录的创建时间也是点的时间），和 App 里的一键操作排在同一个队列里，
-//   两边不会同时写。执行完弹一个提示条说记下了几次（不带撤销，底线 11）。页面改过、操作换了的不执行，提示条里说。
-// - 画面：正式版本的配置、记录、放到桌面的组件、语言变了就重算（等半秒，连着改只算一次），App 开着跨天时也重算。
+// Desktop widgets and app (D-322, D-323):
+// - Handle operations tapped on the widget: app startup, return to foreground, widget tapped while
+// app is open on Android (onQueue). First read them out (without deleting), execute them in
+// chronological order of tap time ("today" is the tap date, record creation time is also tap time),
+// queue them together with in-app quick actions so both sides never write simultaneously. After
+// execution, show a banner saying how many times it was recorded (without undo, invariant 11).
+// Modified pages and changed operations are not executed, which is explained in the banner.
+// - View: recalculated when official version config, records, desktop widgets, or language changes
+// (wait half a second, consecutive changes calculate only once), and also recalculated when the app
+// is open across days.
 
 type Repo = Pick<WorkspaceRepo, 'listRecords' | 'applyRecordWrites' | 'getMeta' | 'setMeta'>;
 
@@ -50,7 +55,7 @@ function parseQueuedOp(text: string): QueuedWidgetOp | null {
         ...(typeof e.record === 'string' ? { record: e.record } : {}),
       };
   } catch {
-    // 写坏的一条跳过。
+    // Skip corrupted entries.
   }
   return null;
 }
@@ -58,11 +63,11 @@ function parseQueuedOp(text: string): QueuedWidgetOp | null {
 export interface DrainResult {
   done: number;
   skipped: number;
-  /** 出了错、留在队列里下次再做的点按个数（没有时没有这一项）。 */
+  /** Number of taps that failed and remain in the queue for the next attempt (omitted when none). */
   pending?: number;
 }
 
-/** 处理过的点按（队列里的 id）；存在设备上，和记录一起存：做完了但删除没成功，下次读到也不会再做一遍。 */
+/** Processed taps (IDs in queue); stored on device along with records: if execution succeeded but deletion failed, reading it next time will not re-run it. */
 const HANDLED_KEY = 'widgetOpsHandled';
 const HANDLED_KEEP = 300;
 
@@ -77,9 +82,11 @@ async function loadHandled(repo: Repo): Promise<string[]> {
 }
 
 /**
- * 执行读出来的点按（R07）：一条一条按点的时间做，每做完一条就把「这条做过了」和记录写入存进同一个事务；
- * 全部处理完才让 remove 确认删掉队列里这些点按。中途出错（写不进去）就停下：做完的照常确认删除，
- * 没做的留在队列里，下次接着做。返回 null：没有要处理的（队列是空的，或读到的都是做过的）。
+ * Execute read taps (R07): run them one by one by tap time, writing "this was done" and record
+ * writes in the same transaction as each is completed; only allow remove to confirm deletion of
+ * these taps from the queue after all are processed. Stop on mid-way errors (write failure):
+ * completed ones are confirmed deleted as usual, uncompleted ones remain in the queue for the
+ * next run. Returns null: nothing to process (queue is empty, or all read ones are already done).
  */
 export async function runQueuedWidgetOps(
   entries: readonly QueueEntry[],
@@ -101,7 +108,7 @@ export async function runQueuedWidgetOps(
   let pending = 0;
   let stopped = false;
   let marksPending = false;
-  /** 处理好了、可以确认删掉的。 */
+  /** Processed and ready to be confirmed and deleted. */
   const finished: string[] = [];
   const markValue = (extra: string) => JSON.stringify([...handled, extra].slice(-HANDLED_KEEP));
 
@@ -120,9 +127,9 @@ export async function runQueuedWidgetOps(
       continue;
     }
     let outcome: 'done' | 'skipped' | 'stop' = 'stop';
-    // 读到写之间记录被别处改了（表单、提醒按钮）就重新读一次再算，最多三次。
+    // If records are modified elsewhere between read and write (forms, reminder buttons), re-read and recalculate, up to three times.
     for (let attempt = 0; attempt < 3 && outcome === 'stop'; attempt++) {
-      // 时钟被往回调过、点的时间在未来：按现在算。
+      // Clock adjusted backwards, tap time in the future: calculated based on current time.
       const at = new Date(Math.min(op.at, now.getTime()));
       const write = planWidgetOp(config, op, records, at, cal);
       if (!write) {
@@ -193,7 +200,7 @@ export async function runQueuedWidgetOps(
   return { done, skipped, ...(pending > 0 ? { pending } : {}) };
 }
 
-/** 提示条的文字：记下了几次；有没执行的，接着说。 */
+/** Banner text: number of times recorded; if there are unexecuted ones, mention them next. */
 export function drainMessage(result: DrainResult, locale: Locale): string {
   const parts: string[] = [];
   if (result.done > 0) parts.push(t(locale, 'widgetDone', { n: result.done }));
@@ -201,7 +208,7 @@ export function drainMessage(result: DrainResult, locale: Locale): string {
   return parts.join(t(locale, 'separatorList'));
 }
 
-/** 整份画面的 JSON（小组件读的那份）。 */
+/** JSON of the full view (read by widgets). */
 export async function widgetSnapshotJson(
   repo: Repo,
   config: WorkspaceConfig,
@@ -219,21 +226,21 @@ export async function widgetSnapshotJson(
 const msToNextDay = (now: Date) =>
   new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime() + 1000;
 
-/** 放在根布局里。 */
+/** Placed in root layout. */
 export function WidgetBridge({ platform }: { platform: WidgetPlatform | null }) {
   const { repo, locale, registry, store } = useWorkspaceContext();
   const config = useWorkspace((s) => s.config);
   const recordsVersion = useWorkspace((s) => s.recordsVersion);
   const placed = useWidgetPlacement((s) => s.placed);
   const last = useRef<string | null>(null);
-  // App 开着跨天时加一，画面重算（明天那份变成今天，再算后天）。
+  // Incremented when app is open across days, view recalculated (tomorrow's becomes today's, then calculate day after).
   const [day, setDay] = useState(0);
 
   useEffect(() => {
     if (platform) void useWidgetPlacement.getState().load(repo);
   }, [platform, repo]);
 
-  // 取走点按。
+  // Fetch taps.
   useEffect(() => {
     if (!platform) return;
     const drain = () =>
@@ -265,7 +272,7 @@ export function WidgetBridge({ platform }: { platform: WidgetPlatform | null }) 
     return () => clearTimeout(timer);
   }, [platform, day]);
 
-  // 画面：只在内容变了时写（写了系统就重画小组件）。
+  // View: write only when content changes (writing triggers system widget redraw).
   useEffect(() => {
     if (!platform || !config || placed === null) return;
     let alive = true;

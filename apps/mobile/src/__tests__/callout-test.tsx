@@ -4,8 +4,9 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 提示卡（D-580）：文字里的 {count}、{sum:字段} 按符合条件的记录算，卡片里是「做事」和「打开」两个按钮；
-// 数字只在画的时候算，不存（底线 14），也不写任何东西（底线 15）。
+// Callout card (D-580): {count} and {sum:field} in the text are calculated based on records
+// matching the conditions. The card features two buttons, "Action" and "Open". Numbers are computed
+// on rendering only, are not stored (invariant 14), and write nothing (invariant 15).
 
 const pending = [{ field: 'paused', op: 'isNot' as const, value: true }];
 const seed = (locale: Locale, registry: Registry) => {

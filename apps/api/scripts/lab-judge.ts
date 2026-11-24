@@ -8,9 +8,11 @@ import { buildSetup, type EvalSetup } from '@morph/core/src/eval';
 
 import { loadRootEnv } from '../src/config';
 
-// 判定 lab.ts 的记录（side-session-notes/agent-test-plan/PLAN.md §5）：自然语言用例没有 check，由模型按 rubric 判。
-// 同一个用例里一模一样的回复只判一次。
-// 用法：npx tsx scripts/lab-judge.ts --in runs/x.jsonl --out runs/x.judged.jsonl [--model claude-opus-5-5] [--concurrency 12] [--failed-only]
+// Judge records from `lab.ts` (`side-session-notes/agent-test-plan/PLAN.md §5`): natural language
+// test cases lack programmatic assertions and are evaluated by the model according to a rubric.
+// Identical responses within the same test case are judged only once. Usage: `npx tsx
+// scripts/lab-judge.ts --in runs/x.jsonl --out runs/x.judged.jsonl [--model claude-opus-5-5]
+// [--concurrency 12] [--failed-only]`
 
 const { values } = parseArgs({
   options: {
@@ -25,7 +27,7 @@ const { values } = parseArgs({
 loadRootEnv();
 const client = new Anthropic();
 const model = values.model ?? 'claude-haiku-5-5';
-// 预算（创始人 2026-11-03：只用 Haiku，总额 $10），和 lab.ts 共用一本账。
+// Budget (founder on 2026-11-03: use Haiku exclusively, total budget $10), sharing the same ledger as `lab.ts`.
 const LEDGER = process.env.LAB_LEDGER;
 if (!LEDGER) throw new Error('需要 LAB_LEDGER');
 if (model !== 'claude-haiku-5-5') throw new Error('只能用 Haiku');
@@ -145,7 +147,7 @@ async function judge(r: Rec) {
     turns: (r.turns ?? []).map((t) => ({
       said: t.input,
       reply: t.plan,
-      // 拒绝不是校验失败；只有 ops 才有校验结果。
+      // Rejection is not a validation failure; only `ops` types produce validation results.
       validated: (t.plan as { kind?: string } | null)?.kind === 'ops' ? t.ok : null,
       problems: (t.plan as { kind?: string } | null)?.kind === 'ops' ? t.issues : undefined,
       whatChanged: t.lines,

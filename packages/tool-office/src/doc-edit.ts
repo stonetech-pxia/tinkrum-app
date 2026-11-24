@@ -8,21 +8,24 @@ import {
 } from './doc';
 import type { Box, TableBlock, TableDoc } from './types';
 
-// 转 Word 的编辑（D-328）：DocDoc 不可变地改，每次返回新的（撤销、重做用 edit.ts 的 History）。
-// 段落改文字；列表一行一项；表格交给转 Excel 的编辑页（换成只有这一张表的 TableDoc，改完换回来）；
-// 任何块都能删除。并排行（D-331）里的块用 cell、item 指明，和别的块一样改；整行不能直接改，格子都空了就删掉。
+// Word conversion editing (D-328): DocDoc is modified immutably, returning a new instance each time
+// (undo/redo uses edit.ts History). Modify paragraph text; lists have one item per line; tables are
+// delegated to the Excel-conversion editing page (replaced with a TableDoc containing only this
+// table, then swapped back upon completion); any block can be deleted. Blocks inside side-by-side
+// layouts (D-331) are specified using cell and item, edited just like other blocks; entire rows
+// cannot be edited directly, and if all cells are empty, the row is deleted.
 
 export interface DocRef {
   page: number;
   block: number;
-  /** 并排行里的第几格、格子里的第几个块（D-331）；没有时指整个块。 */
+  /** Cell index and item index within a side-by-side layout (D-331); refers to the entire block when omitted. */
   cell?: number;
   item?: number;
 }
 
 const inRow = (at: DocRef) => at.cell !== undefined && at.item !== undefined;
 
-/** 指到的块：页里的块，或者并排行格子里的块。 */
+/** Target block: a block within a page, or a block inside a side-by-side layout cell. */
 export function blockAt(doc: DocDoc, at: DocRef): DocBlock | undefined {
   const block = doc.pages[at.page]?.blocks[at.block];
   if (!inRow(at)) return block;
@@ -63,19 +66,19 @@ function replaceBlock(doc: DocDoc, at: DocRef, next: DocBlock | null): DocDoc {
   };
 }
 
-/** 一个块在编辑框里的文字：段落是它的文字，列表一行一项；表格和图片没有。 */
+/** Text of a block in the editor: paragraphs return their text, lists return one item per line; tables and images have none. */
 export function blockText(block: DocBlock): string | null {
   if (block.kind === 'paragraph') return block.text;
   if (block.kind === 'list') return block.items.join('\n');
   return null;
 }
 
-/** 改一个段落或列表的文字（列表按行分项，空行去掉；改成空的就删掉这个块）。没变时返回原来的 doc。 */
+/** Modify the text of a paragraph or list (lists are split into items by line, empty lines removed; empty text deletes the block). Returns original doc when unchanged. */
 export function setBlockText(doc: DocDoc, at: DocRef, text: string): DocDoc {
   const block = blockAt(doc, at);
   if (!block || blockText(block) === text) return doc;
   if (block.kind === 'paragraph') {
-    // 整段换了字：原来按字分的样式（D-465）对不上了，不要。
+    // Text of the entire paragraph changed: character-based styles (D-465) no longer match and are discarded.
     const { runs: _runs, ...rest } = block;
     return replaceBlock(doc, at, text.trim() ? { ...rest, text } : null);
   }
@@ -90,7 +93,7 @@ export function setBlockText(doc: DocDoc, at: DocRef, text: string): DocDoc {
   return doc;
 }
 
-/** 剪原图时在字的框外面多留的边（原图像素）：签名、印章的笔画常常比认出来的字的框大。 */
+/** Extra margin (in original image pixels) left around text bounding boxes when cropping original images: signature and stamp strokes are often larger than the recognized text bounding box. */
 export function originalBox(box: Box, page: { width: number; height: number }): Box {
   const pad = Math.max(8, Math.round(box.height * 0.25));
   const x = Math.max(0, box.x - pad);
@@ -121,9 +124,11 @@ const sameBox = (a: Box, b: Box) =>
   a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 
 /**
- * 「用原图」（D-467、D-468）要剪的范围：这几块字的框合起来，四周多留一点；碰到这一页已经是图片的块
- * （之前换成原图的、剪好的印章）就把它也包进来，剪成一张：一个签名被认成几行字时，分几次换也只得到一张图
- * （2026-11-06 三星真机：签名被切成了好几份）。
+ * Range to crop for 'Use original image' (D-467, D-468): union of bounding boxes of these text
+ * blocks with extra padding around; if an image block is encountered (previously replaced with
+ * original image, or cropped seal), include it as well to crop into a single image: when a
+ * signature is recognized across multiple text lines, successive replacements yield a single
+ * image (2026-11-06 Samsung physical device: signature split into multiple parts).
  */
 export function originalArea(doc: DocDoc, page: number, boxes: readonly Box[]): Box | null {
   const pg = doc.pages[page];
@@ -144,8 +149,9 @@ export function originalArea(doc: DocDoc, page: number, boxes: readonly Box[]): 
 }
 
 /**
- * 把这一页里框是 boxes 的段落、列表，和碰到 image.box 的图片块，换成一张剪好的原图（放在它们里面第一块的位置）。
- * 一块都没找到时返回原来的 doc。
+ * Replace paragraphs and list blocks whose bounding boxes are boxes on this page, along with any
+ * image blocks overlapping image.box, with a single cropped original image (placed at the
+ * position of the first block among them). Returns original doc if none found.
  */
 export function swapToOriginal(
   doc: DocDoc,
@@ -182,7 +188,7 @@ export function deleteBlock(doc: DocDoc, at: DocRef): DocDoc {
   return replaceBlock(doc, at, null);
 }
 
-/** 表格块换成转 Excel 编辑页能打开的 TableDoc（一页、只有这一张表）。 */
+/** Convert a table block into a TableDoc (single page, containing only this table) openable by the Excel-conversion editing page. */
 export function tableDocOf(doc: DocDoc, at: DocRef, name: string): TableDoc | null {
   const page = doc.pages[at.page];
   const block = blockAt(doc, at);
@@ -204,7 +210,7 @@ export function tableDocOf(doc: DocDoc, at: DocRef, name: string): TableDoc | nu
   };
 }
 
-/** 编辑页改过的 TableDoc 换回表格块；表被删光了就删掉这个块。 */
+/** Convert a TableDoc edited in the editing page back into a table block; delete the block if the table is completely emptied. */
 export function setTableFrom(doc: DocDoc, at: DocRef, edited: TableDoc): DocDoc {
   const block = blockAt(doc, at);
   const page = edited.pages[0];
@@ -231,8 +237,10 @@ export function setTableFrom(doc: DocDoc, at: DocRef, edited: TableDoc): DocDoc 
 }
 
 /**
- * 在文档里直接改一张表（file-room R2，D-366）：表格块换成只有这张表的 TableDoc，交给转 Excel 的编辑函数
- * （改格子、插删行列，edit.ts），再换回来；不再弹出一个只有这张表的编辑页。没变时返回原来的 doc。
+ * Directly edit a table within a document (file-room R2, D-366): replace the table block with a
+ * TableDoc containing only this table, delegate to Excel-conversion editing functions (edit
+ * cells, insert/delete rows/cols, edit.ts), and swap back; avoids popping up a separate
+ * single-table editing page. Returns original doc when unchanged.
  */
 export function editDocTable(doc: DocDoc, at: DocRef, fn: (table: TableDoc) => TableDoc): DocDoc {
   const before = tableDocOf(doc, at, '');
@@ -241,7 +249,7 @@ export function editDocTable(doc: DocDoc, at: DocRef, fn: (table: TableDoc) => T
   return after === before ? doc : setTableFrom(doc, at, after);
 }
 
-/** DocDoc 的 JSON 读回来时检查一下大概的形状（文件是自己写的，只防坏文件）。 */
+/** Validate general structure of DocDoc JSON upon reading (files are self-written, guards against corrupted files only). */
 export function parseDocDoc(json: string): DocDoc | null {
   try {
     const doc = JSON.parse(json) as DocDoc;
@@ -316,8 +324,10 @@ export function parseDocDoc(json: string): DocDoc | null {
       )
     )
       return null;
-    // 旧版本只升版本号，不补纸张：没有 paper 的页（文字转 Word、导入的 docx、旧扫描）照旧按 A4 的原写法，
-    // 重新打开再存出来和当初一样（占位框靠 spaced 分段，补了纸张会丢掉段前距）。
+    // Older versions only increment version number without adding paper properties: pages without
+    // paper (text-to-word, imported docx, legacy scans) retain original A4 formatting rules so they
+    // reopen and save identically as before (placeholder boxes rely on spaced paragraphs; adding
+    // paper would lose space-before).
     return doc.version !== 5 ? { ...doc, version: 5 } : doc;
   } catch {
     return null;

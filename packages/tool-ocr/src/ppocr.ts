@@ -1,23 +1,27 @@
 import { minAreaRect, rectCorners, unclipRect, type Point } from './geometry';
 
-// PP-OCRv6 的文字识别流程（D-269），除了跑模型都在这里：找文字行的输入（缩放到 32 的倍数、BGR、归一化），
-// 概率图 → 文字框（DB 后处理），把每个框拉正裁成 48 像素高的一条，认字结果按 CTC 规则解码。
-// 跑模型由平台提供（iOS、Android 用 ONNX Runtime，Node 测试用 onnxruntime-node），所以这些步骤可以在 Node 里测。
+// PP-OCRv6 text recognition pipeline (D-269), everything except running the model is here: text
+// line input preparation (scaling to multiple of 32, BGR, normalization), probability map -> text
+// boxes (DB post-processing), straightening and cropping each box into a 48-pixel-high strip, and
+// decoding recognition results according to CTC rules. Running the model is provided by the
+// platform (iOS and Android use ONNX Runtime, Node tests use onnxruntime-node), so these steps can
+// be tested in Node.
 
-/** RGBA 像素（每像素 4 字节）。 */
+/** RGBA pixels (4 bytes per pixel). */
 export interface RgbaImage {
   width: number;
   height: number;
   data: Uint8Array;
 }
 
-/** 两个模型：找文字行和认字。 */
+/** Two models: text line detection and character recognition. */
 export interface OcrModels {
-  /** 输入 [1, 3, height, width]，输出每个像素是文字的概率 × 255（width × height 个字节）。 */
+  /** Input [1, 3, height, width], output probability that each pixel is text × 255 (width × height bytes). */
   detect(input: Float32Array, width: number, height: number): Promise<Uint8Array>;
   /**
-   * 输入 [count, 3, 48, width]；输出每一条、每个时间步概率最大的类别（0 是空白）和它的概率，
-   * 按 [count, steps] 排。整张概率表太大，平台只回传最大的那个。
+   * Input [count, 3, 48, width]; output the highest probability category (0 is blank) and its
+   * probability for each sequence and time step, ordered by [count, steps]. The entire
+   * probability table is too large, so the platform only returns the maximum values.
    */
   recognize(
     input: Float32Array,
@@ -28,34 +32,36 @@ export interface OcrModels {
 
 export interface OcrResultLine {
   text: string;
-  /** 平均置信度（0–1）。 */
+  /** Average confidence (0-1). */
   score: number;
-  /** 文字框的四个角（左上、右上、右下、左下），原图像素。 */
+  /** Four corners of the text box (top-left, top-right, bottom-right, bottom-left) in original image pixels. */
   quad: [Point, Point, Point, Point];
-  /** 外接的正矩形，原图像素，原点在左上角。 */
+  /** Bounding axis-aligned rectangle in original image pixels, with origin at top-left. */
   x: number;
   y: number;
   width: number;
   height: number;
   /**
-   * 每个字的大致位置（D-272）：at 是 CTC 时间步的中心占这一行的比例（0 最左，1 最右）。
-   * 转 Excel 时按它切开横跨竖线的行。竖排的行（转过 90° 认的）没有。
+   * Approximate position of each character (D-272): at is the center of the CTC time step as a
+   * proportion of the line width (0 for leftmost, 1 for rightmost). Used to split lines crossing
+   * vertical lines when converting to Excel. Vertical lines (recognized after 90-degree rotation)
+   * do not have this.
    */
   chars?: { text: string; at: number }[];
 }
 
 export interface OcrOptions {
-  /** 找文字行时短边至少这么大（小图放大），默认 736。 */
+  /** Minimum size for the short side when searching for text lines (upscaling small images), default 736. */
   limitSide?: number;
-  /** 是文字的概率门槛，默认 0.3。 */
+  /** Probability threshold for text, default 0.3. */
   threshold?: number;
-  /** 框里平均概率低于它就丢掉，默认 0.6。 */
+  /** Discard boxes whose average inner probability is lower than this, default 0.6. */
   boxThreshold?: number;
-  /** 框往外扩的比例，默认 1.5。 */
+  /** Ratio for expanding boxes outward, default 1.5. */
   unclipRatio?: number;
-  /** 认字的平均置信度低于它就丢掉，默认 0.5。 */
+  /** Discard recognition results whose average confidence is lower than this, default 0.5. */
   textScore?: number;
-  /** 一次送进认字模型的条数，默认 6。 */
+  /** Number of strips sent to the recognition model in one batch, default 6. */
   batch?: number;
 }
 
@@ -66,7 +72,7 @@ const REC_MIN_WIDTH = 320;
 const REC_MAX_WIDTH = 3200;
 const MIN_BOX_SIDE = 3;
 
-/** 双线性取一个通道（边缘外取边缘值）；c 是 RGBA 里的通道号。 */
+/** Bilinear sampling of a single channel (clamping to edge values outside edges); c is the channel number in RGBA. */
 function sample(image: RgbaImage, x: number, y: number, c: number): number {
   const { width, height, data } = image;
   const fx = Math.min(Math.max(x, 0), width - 1);
@@ -83,7 +89,7 @@ function sample(image: RgbaImage, x: number, y: number, c: number): number {
   return top * (1 - ay) + bottom * ay;
 }
 
-/** 找文字行的输入大小：短边不到 limit 时放大，再四舍五入到 32 的倍数。 */
+/** Input size for text line detection: upscale if short side is less than limit, then round to the nearest multiple of 32. */
 export function detectionSize(
   width: number,
   height: number,
@@ -97,8 +103,10 @@ export function detectionSize(
 }
 
 /**
- * 找文字行的输入张量：BGR 通道，减均值除方差。图片已经是要的大小时（平台先用 Skia 缩好）直接换算，
- * 否则双线性缩放（像素中心对齐，和 OpenCV 一样）；手机上的 JS 没有 JIT，逐像素插值很慢，尽量走前一种。
+ * Input tensor for text line detection: BGR channels, subtract mean and divide by variance.
+ * Directly convert if the image is already the requested size (already scaled by platform using
+ * Skia), otherwise bilinear scale (pixel center aligned, same as OpenCV); JS on mobile lacks JIT
+ * and pixel-by-pixel interpolation is very slow, so prefer the former.
  */
 export function detectionInput(image: RgbaImage, limit = 736) {
   const size = detectionSize(image.width, image.height, limit);
@@ -124,7 +132,7 @@ export function detectionInput(image: RgbaImage, limit = 736) {
     for (let x = 0; x < size.width; x++) {
       const srcX = (x + 0.5) * sx - 0.5;
       const o = y * size.width + x;
-      // 通道 0 是 B（RGBA 的 2），1 是 G，2 是 R。
+      // Channel 0 is B (RGBA index 2), 1 is G, 2 is R.
       for (let c = 0; c < 3; c++) {
         tensor[c * plane + o] =
           (sample(image, srcX, srcY, 2 - c) / 255 - DET_MEAN[c]!) / DET_STD[c]!;
@@ -135,8 +143,10 @@ export function detectionInput(image: RgbaImage, limit = 736) {
 }
 
 /**
- * 概率图 → 文字框（DB 后处理）：超过门槛的像素按 8 连通分块，每块平均概率太低的丢掉，
- * 取最小外接矩形，往外扩一点，换算到原图大小，按从上到下、从左到右排。
+ * Probability map -> text boxes (DB post-processing): pixels exceeding the threshold are grouped
+ * into 8-connected components, components with too low average probability are discarded, minimum
+ * bounding rectangle is found, expanded slightly, converted to original image size, and sorted
+ * from top to bottom, left to right.
  */
 export function textBoxes(
   prob: Uint8Array,
@@ -150,13 +160,13 @@ export function textBoxes(
   const unclip = options.unclipRatio ?? 1.5;
   const seen = new Uint8Array(width * height);
   const stack: number[] = [];
-  // 每行最左、最右的像素；用完一块就复原。
+  // Leftmost and rightmost pixels for each row; reset after processing each component.
   const rowMin = new Int32Array(height).fill(width);
   const rowMax = new Int32Array(height).fill(-1);
   const boxes: { quad: [Point, Point, Point, Point]; score: number }[] = [];
   for (let start = 0; start < prob.length; start++) {
     if (seen[start] || prob[start]! <= threshold) continue;
-    // 一块：每行只需要最左、最右的像素（凸包只看它们）。
+    // Component: only leftmost and rightmost pixels are needed per row (convex hull only considers them).
     const firstRow = (start - (start % width)) / width;
     let lastRow = firstRow;
     let sum = 0;
@@ -186,7 +196,7 @@ export function textBoxes(
         }
       }
     }
-    // 按行扫描找到的第一个像素在最上面一行，所以这一块的行号从 firstRow 到 lastRow。
+    // The first pixel found by row scanning is in the topmost row, so the row indices for this component range from firstRow to lastRow.
     const points: Point[] = [];
     for (let y = firstRow; y <= lastRow; y++) {
       if (rowMax[y]! < 0) continue;
@@ -196,8 +206,10 @@ export function textBoxes(
     }
     const rect = minAreaRect(points);
     if (Math.min(rect.w, rect.h) < MIN_BOX_SIDE) continue;
-    // 用这一块自己的像素打分（PaddleOCR 的 score_mode=slow），不用外接矩形：拍屏幕、拍书页时文字行是弯的，
-    // 矩形里一半是空白，平均概率会掉到门槛以下，整行就丢了。
+    // Score using the component's own pixels (PaddleOCR's score_mode=slow) instead of the bounding
+    // rectangle: when photographing screens or book pages, text lines are curved, so half of the
+    // rectangle is blank, dropping the average probability below the threshold and causing the
+    // entire line to be lost.
     const score = sum / count / 255;
     if (score < boxThreshold) continue;
     const grown = unclipRect(rect, unclip);
@@ -208,7 +220,7 @@ export function textBoxes(
     })) as [Point, Point, Point, Point];
     boxes.push({ quad, score });
   }
-  // 从上到下、从左到右；同一行（左上角高度差不到 10 像素）里左边的排前面。
+  // From top to bottom, left to right; within the same line (top-left height difference less than 10 pixels), the one on the left comes first.
   boxes.sort((a, b) => a.quad[0].y - b.quad[0].y || a.quad[0].x - b.quad[0].x);
   for (let i = 0; i < boxes.length - 1; i++) {
     const a = boxes[i]!.quad[0];
@@ -219,7 +231,7 @@ export function textBoxes(
   return boxes;
 }
 
-/** 一个框拉正后的大小；竖长的框（高 ≥ 宽的 1.5 倍）逆时针转 90°。 */
+/** Size of a box after straightening; tall boxes (height >= 1.5 times width) are rotated 90 degrees counter-clockwise. */
 function cropShape(quad: readonly Point[]) {
   const d = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
   const [p0, p1, p2, p3] = quad as [Point, Point, Point, Point];
@@ -230,8 +242,10 @@ function cropShape(quad: readonly Point[]) {
 }
 
 /**
- * 一批框拉正、缩成 48 像素高，排成 [count, 3, 48, width] 的认字输入（BGR，归一化到 -1–1，右边补 0）。
- * used 是每一条实际占的宽度（其余是补的 0），用来把时间步换算成字在这一行里的位置。
+ * Straighten a batch of boxes and scale them to 48 pixels high, arranging them into recognition
+ * input of shape [count, 3, 48, width] (BGR, normalized to -1 to 1, padded with 0 on the right).
+ * used is the actual occupied width of each strip (the rest is padding), used to convert time
+ * steps into character positions within the line.
  */
 export function recognitionInput(image: RgbaImage, quads: readonly (readonly Point[])[]) {
   const shapes = quads.map(cropShape);
@@ -250,17 +264,17 @@ export function recognitionInput(image: RgbaImage, quads: readonly (readonly Poi
       const oy = Math.max(0, ((dy + 0.5) * s.outH) / REC_HEIGHT - 0.5);
       for (let dx = 0; dx < resized; dx++) {
         const ox = Math.max(0, ((dx + 0.5) * s.outW) / resized - 0.5);
-        // 转过 90° 的：输出的 (ox, oy) 对应拉正后的 (w - 1 - oy, ox)。
+        // For 90-degree rotated ones: output (ox, oy) corresponds to straightened (w - 1 - oy, ox).
         const cx = s.turned ? s.w - 1 - oy : ox;
         const cy = s.turned ? ox : oy;
         const u = cx / s.w;
         const v = cy / s.h;
-        // 矩形框的透视变换就是四个角的双线性插值。
+        // Perspective transformation of a rectangular box is bilinear interpolation of the four corners.
         const sx =
           (1 - u) * (1 - v) * p0.x + u * (1 - v) * p1.x + u * v * p2.x + (1 - u) * v * p3.x;
         const sy =
           (1 - u) * (1 - v) * p0.y + u * (1 - v) * p1.y + u * v * p2.y + (1 - u) * v * p3.y;
-        // 双线性取样（内联：手机上的 JS 没有 JIT，函数调用很贵）。
+        // Bilinear sampling (inlined: JS on mobile lacks JIT, function calls are expensive).
         const fx = sx < 0 ? 0 : sx > iw - 1 ? iw - 1 : sx;
         const fy = sy < 0 ? 0 : sy > ih - 1 ? ih - 1 : sy;
         const x0 = fx | 0;
@@ -291,8 +305,11 @@ export function recognitionInput(image: RgbaImage, quads: readonly (readonly Poi
 }
 
 /**
- * CTC 解码：去掉空白（0）和连续重复，类别 i 对应字典第 i - 1 个字；置信度是留下的字的平均概率。
- * at 是每个字在第几个时间步（连续重复的几步取中间），和 text 里的字一一对应（字典外的类别不算）。
+ * CTC decoding: remove blanks (0) and consecutive duplicates, category i corresponds to
+ * dictionary character i - 1; confidence is the average probability of the remaining characters.
+ * at is the time step index for each character (taking the middle of consecutive steps),
+ * corresponding 1-to-1 with characters in text (categories outside the dictionary are not
+ * counted).
  */
 export function ctcDecode(
   index: ArrayLike<number>,
@@ -309,7 +326,7 @@ export function ctcDecode(
   let start = 0;
   for (let t = 0; t <= steps; t++) {
     const k = t < steps ? index[row * steps + t]! : -1;
-    // 上一个字的连续几步结束了。
+    // The consecutive steps of the previous character have ended.
     if (previous > 0 && k !== previous && dictionary[previous - 1] !== undefined) {
       at.push((start + t - 1) / 2);
     }
@@ -325,7 +342,7 @@ export function ctcDecode(
   return { text, score: count > 0 ? sum / count : 0, at };
 }
 
-/** 一页图片的识别：找文字行 → 每行拉正 → 认字（按宽度排序成批，宽度相近的放一批）。 */
+/** Single page image recognition: find text lines -> straighten each line -> recognize characters (batched and sorted by width, placing similar widths in a batch). */
 export async function recognizePage(
   image: RgbaImage,
   models: OcrModels,
@@ -351,7 +368,7 @@ export async function recognizePage(
     const out = await models.recognize(input.tensor, ids.length, input.width);
     for (const [row, i] of ids.entries()) {
       const decoded = ctcDecode(out.index, out.prob, out.steps, row, dictionary);
-      // 时间步 → 这一行里的位置：每步占输入宽度的 1 / steps，有内容的只有前 used 个像素。
+      // Time step -> position in the line: each step occupies 1 / steps of the input width, with only the first used pixels containing content.
       const step = input.width / out.steps;
       const used = input.used[row]!;
       const chars = cropShape(boxes[i]!.quad).turned

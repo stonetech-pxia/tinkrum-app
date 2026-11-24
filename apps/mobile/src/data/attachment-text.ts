@@ -5,23 +5,26 @@ import type { PackRuntime } from '../packs/bridge';
 import type { AssetRecord } from '../storage/types';
 import type { FilePlatform } from '../runtime/platform';
 
-// 新记录表单的候选值（D-394）：读附件里的文字（带位置），只在本机，只给候选值打分用，
-// 不存、不进记录、不发给 AI（D-036）。照片用本机的文字识别（PP-OCRv6，D-269）；PDF 先读文字层，
-// 没有文字层（扫描件）时把前两页画成图再识别。只读前 3 个附件、每个前 2 页。
-// 中间文件放在一次临时运行的目录里（cache/runs/<runId>/），成功、失败、取消都删掉。
-// 用户相册和「文件」里的原件不碰：附件是 Morph 自己的副本，这里也只读不改。
+// New record form candidate values (D-394): reads text from attachments (with coordinates),
+// device-only, used solely for scoring candidate values, not stored, excluded from records, and
+// never sent to AI (D-036). Photos use on-device OCR (PP-OCRv6, D-269); PDFs first check for a text
+// layer, and if missing (scanned documents), render the first two pages as images for recognition.
+// Reads at most 3 attachments, up to 2 pages each. Intermediate files are placed in a temporary run
+// directory (`cache/runs/<runId>/`) and deleted on success, failure, or cancellation. Original
+// files in user photo library and "Files" are untouched: attachments are Morph's own copies,
+// read-only here.
 
-/** 最多读几个附件、每个读几页。 */
+/** Maximum number of attachments to read, and pages per attachment. */
 export const MAX_READ_FILES = 3;
 export const MAX_READ_PAGES = 2;
-/** 送进识别的图片长边（和 PP-OCRv6 的输入一样大，D-269）。 */
+/** Longest side of image sent for recognition (matches PP-OCRv6 input size, D-269). */
 const OCR_SIDE = 2000;
-/** 解二维码前缩到的长边（和「识别二维码」一样）。 */
+/** Longest side scaled down to before decoding QR codes (matches "Scan QR code"). */
 const QR_SIDE = 1600;
 
 export type ReadableKind = 'image' | 'pdf';
 
-/** 这个附件能不能读出文字：照片（不含视频、GIF 动图）和 PDF。 */
+/** Whether text can be read from this attachment: photos (excluding videos and GIFs) and PDFs. */
 export function readableKind(asset: Pick<AssetRecord, 'mimeType' | 'name'>): ReadableKind | null {
   const mime = asset.mimeType.toLowerCase();
   if (mime === 'application/pdf' || /\.pdf$/i.test(asset.name)) return 'pdf';
@@ -32,12 +35,12 @@ export function readableKind(asset: Pick<AssetRecord, 'mimeType' | 'name'>): Rea
 export interface AttachmentTextDeps {
   files: FilePlatform;
   packs: { runtime: PackRuntime; isInstalled(id: string): Promise<boolean> } | null;
-  /** 识别用的语言（BCP 47，第一种是主要的）。 */
+  /** Languages used for recognition (BCP 47, first is primary). */
   languages: readonly string[];
   newRunId: () => string;
 }
 
-/** 这台设备上读这些附件还缺哪些要下载的东西（都要先问用户，D-064）。 */
+/** Missing downloads required on this device to read these attachments (always prompts user first, D-064). */
 export async function missingPacks(
   kinds: readonly ReadableKind[],
   deps: AttachmentTextDeps,
@@ -51,7 +54,7 @@ export async function missingPacks(
   return out;
 }
 
-/** 认这种语言要下载的文字识别模型（PP-OCRv6）；系统自带就能认时为 null。 */
+/** OCR model required to download for recognizing this language (PP-OCRv6); null if supported by system out of the box. */
 function ocrPack(deps: AttachmentTextDeps): string | null {
   const model = deps.files.vision?.ocrModel;
   const code = deps.languages[0]?.split('-')[0];
@@ -67,8 +70,10 @@ async function canRecognize(deps: AttachmentTextDeps): Promise<boolean> {
 }
 
 /**
- * 读出前几张照片里的二维码（D-423，只有名片表的表单调）：和「识别二维码」一样先缩小再解，纯 JS，不用下载。
- * 读不了、没有码都是安静地没有，文字识别照常。内容只给候选用，不存、不发给 AI。
+ * Reads QR codes from the first few photos (D-423, called only by business card table form):
+ * scales down and decodes like "Scan QR code", pure JS, no download needed. Silently ignores
+ * unreadable photos or missing codes; OCR continues normally. Content is used for candidates
+ * only, never stored or sent to AI.
  */
 export async function readAttachmentCodes(
   assets: readonly AssetRecord[],
@@ -84,7 +89,7 @@ export async function readAttachmentCodes(
       const text = decodeQr(downscaleRgba(pixels, QR_SIDE));
       if (text) found.push(text);
     } catch {
-      // 这张读不了：跳过。
+      // Unreadable attachment: skipped.
     }
   }
   if (signal.aborted) throw new ReadCancelled();
@@ -98,8 +103,9 @@ export class ReadCancelled extends Error {
 }
 
 /**
- * 读出前几个附件的文字（每页一组带框的行）。读不了的附件跳过，不报错；还没下载识别模型时照片跳过，
- * PDF 预览没装时 PDF 跳过。signal 取消时在当前这一步结束后马上以 ReadCancelled 结束。
+ * Reads text from the first few attachments (one set of boxed lines per page). Skips unreadable
+ * attachments without throwing; skips photos if OCR model not installed, and PDFs if PDF preview
+ * not installed. Immediately finishes with ReadCancelled when signal aborts current step.
  */
 export async function readAttachmentPages(
   assets: readonly AssetRecord[],
@@ -116,13 +122,13 @@ export async function readAttachmentPages(
   );
 }
 
-/** 一个要读的文件：已经知道种类和地址（附件或收到还没存的文件都行）。 */
+/** A file to be read: type and URI are already known (can be an attachment or a received uncommitted file). */
 export interface ReadItem {
   kind: ReadableKind;
   uri: string;
 }
 
-/** 读这些文件里的文字（附件和收到的文件共用）：只读不改，中间文件读完删掉。 */
+/** Reads text from these files (shared by attachments and received files): read-only, intermediate files deleted after reading. */
 export async function readPagesOf(
   items: readonly ReadItem[],
   deps: AttachmentTextDeps,
@@ -151,7 +157,7 @@ export async function readPagesOf(
       try {
         if (kind === 'image') {
           if (!ocr) continue;
-          // 先转成 JPG（HEIC 等格式识别时不一定能解码），太大的缩小。
+          // Converts to JPG first (formats like HEIC may not be decodable during recognition), scales down if too large.
           const size = await files.imageSize(uri);
           check();
           const k = Math.min(1, OCR_SIDE / Math.max(size.width, size.height));
@@ -183,7 +189,7 @@ export async function readPagesOf(
           pages.push(...withText);
           continue;
         }
-        // 扫描件：没有文字层，把前两页画成图再识别。
+        // Scanned document: no text layer, renders first two pages as images before recognizing.
         if (!ocr) continue;
         const count = Math.min(layer.count, MAX_READ_PAGES);
         const images = await deps.packs!.runtime.call<{ index: number; data: string }[]>(
@@ -206,7 +212,7 @@ export async function readPagesOf(
         }
       } catch (e) {
         if (e instanceof ReadCancelled) throw e;
-        // 这一个读不了：跳过，不影响别的附件。
+        // This one cannot be read: skipped, does not affect other attachments.
       }
     }
     return pages;

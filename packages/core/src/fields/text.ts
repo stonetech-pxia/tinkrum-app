@@ -7,13 +7,13 @@ const schema = z.strictObject({
   ...fieldBase,
   type: z.literal('text'),
   default: boundedText(1, 200).optional(),
-  /** 电话、邮箱、网址（D-422）：仍然是文字，只多了输入键盘，记录页的按钮能打开它（D-428）；保存不查格式。 */
+  /** Phone, email, url (D-422): Still text fields, but with optimized input keyboards, and record page buttons can open them (D-428); format is not validated upon saving. */
   format: z.enum(['phone', 'email', 'url']).optional(),
 });
 
 export type TextFormat = NonNullable<z.infer<typeof schema>['format']>;
 
-/** 一行文字（最多 200 字）。 */
+/** A single line of text (maximum 200 characters). */
 export const textField: FieldDefinitionOf<'text', typeof schema> = defineField({
   type: 'text',
   schema,

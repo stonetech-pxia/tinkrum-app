@@ -4,8 +4,10 @@ import type { Quad } from '@morph/tool-image';
 import type { ImageAnnotation } from './annotations';
 import type { PickedFile } from './platform';
 
-// 本地操作步骤（TOOLS_DESIGN §4）：执行到这里时，运行页面打开对应的界面，用户的操作结果只在本次运行里使用。
-// 每种界面的输入和输出在这里登记；运行页面（app/run/[workflowId].tsx）负责显示。
+// Local operation steps (TOOLS_DESIGN §4): when execution reaches here, the runner page opens the
+// corresponding interface, and user operation results are used only for the current run. Inputs and
+// outputs for each interface are registered here; the runner page (app/run/[workflowId].tsx)
+// handles display.
 
 export interface Rect {
   x: number;
@@ -19,19 +21,20 @@ export interface LocalSteps {
     in: {
       items: RunItem[];
       tool?: ImageAnnotation['kind'] | 'note';
-      /** 是文件的页面（PDF）：新写的字默认是正文大小，不是照片上的标签大小。 */
+      /** Is a document page (PDF): newly written text defaults to body text size rather than photo label size. */
       document?: boolean;
-      /** 第几页上认出的行（原图点），新写的字照最近的一行定字号；只在本机认，不存不发。 */
+      /** Recognized text lines on the specified page (in original image coordinates), new text determines font size based on the nearest line; recognized locally only, never stored or transmitted. */
       lines?: (index: number) => Promise<readonly Rect[]>;
     };
     out: ImageAnnotation[][];
   };
-  /** 逐张框选裁剪区域（原图像素）。aspect 为 null 时自由比例。 */
-  /** initial：每张照片先摆好的框（证件照自动框脸，D-252）；null 或没有时居中。 */
+  /** Crop regions selected per image (original image pixels). Free aspect ratio when aspect is null. */
+  /** initial: pre-positioned crop boxes for each photo (auto face framing for ID photos, D-252); centered if null or absent. */
   crop: { in: { items: RunItem[]; aspect: number | null; initial?: (Rect | null)[] }; out: Rect[] };
   /**
-   * 整理 PDF 页面：选页、删页、排序、旋转。返回保留的页（0 起的原页码），按新顺序，
-   * rotate 是在原来基础上再顺时针转的角度。thumbnails 有 PDF 预览包时才有。
+   * Organize PDF pages: select, delete, reorder, rotate. Returns retained pages (0-based original
+   * page numbers) in new order; rotate is incremental clockwise rotation angle. thumbnails
+   * available only when PDF preview pack is present.
    */
   pages: {
     in: {
@@ -42,19 +45,20 @@ export interface LocalSteps {
     out: { index: number; rotate: 0 | 90 | 180 | 270 }[];
   };
   /**
-   * 签名：选一个存好的签名或现画一个，放到某一页上。pages 是页面预览图（PDF 预览包渲染）。
-   * 返回签名 PNG 和位置（页面比例坐标，左上角为原点）。
+   * Signature: select a saved signature or draw one, place it on a page. pages are page preview
+   * images (rendered by PDF preview pack). Returns signature PNG and position (page-proportional
+   * coordinates, top-left origin).
    */
   sign: {
     in: {
       item: RunItem;
       pages: { uri: string; width: number; height: number }[];
-      /** 第几页上认出的行（原图点），签名的高度照点附近那一行定；只在本机认，不存不发。 */
+      /** Recognized text lines on the specified page (in original image coordinates), signature height determined by the nearby line; recognized locally only, never stored or transmitted. */
       lines?: (index: number) => Promise<readonly Rect[]>;
     };
     out: { png: Uint8Array; pageIndex: number; x: number; y: number; width: number };
   };
-  /** 填表：字段由 pdf-lib 读出，用户在本地填写。返回字段名 → 值。 */
+  /** Fill form: fields are read by pdf-lib and filled by the user locally. Returns field name to value mapping. */
   fillForm: {
     in: {
       item: RunItem;
@@ -70,17 +74,19 @@ export interface LocalSteps {
     out: Record<string, string | boolean>;
   };
   /**
-   * 扫描：逐张确认或拖动纸张的四个角（原图像素坐标）。quad 是扫描包找到的角，找不到时为 null。
-   * 返回每张图最终的四个角。
+   * Scan: confirm or drag the four corners of the paper per image (original image pixel
+   * coordinates). quad is the corners found by the scanning pack, null if not found. Returns the
+   * final four corners for each image.
    */
   corners: { in: { items: { item: RunItem; quad: Quad | null }[] }; out: Quad[] };
-  /** 打码：在每张图上框出要遮住的区域（原图像素）。返回每张图的框，可以没有。 */
+  /** Redact: box out areas to cover on each image (original image pixels). Returns boxes for each image, optional. */
   redact: { in: { items: RunItem[] }; out: Rect[][] };
-  /** 排序、删除：返回保留下来的下标，按新顺序。 */
+  /** Reorder and delete: returns retained indices in the new order. */
   reorder: { in: { items: RunItem[] }; out: number[] };
   /**
-   * 剪一段（视频、音频共用，D-143）：逐个选开始和结束（毫秒）。视频显示画面，音频显示波形。
-   * 返回每个文件选的一段。
+   * Trim segment (shared for video and audio, D-143): select start and end (milliseconds)
+   * individually. Video displays frames, audio displays waveform. Returns the selected segment
+   * for each file.
    */
   frameMedia: {
     in: {
@@ -91,62 +97,68 @@ export interface LocalSteps {
   };
   trimMedia: {
     /**
-     * loadWaveform：读第 i 个文件的波形（0–1 的峰值；视频或读不到时为 null，D-155）。界面先打开、
-     * 波形读好再画：Android 上长录音要解码几十秒以上。
+     * loadWaveform: reads waveform of the i-th file (peak values 0–1; null for video or if
+     * unreadable, D-155). UI opens first, waveform renders after loading: long recordings take
+     * tens of seconds to decode on Android.
      */
     in: {
       items: RunItem[];
       loadWaveform?: (index: number) => Promise<number[] | null>;
       /**
-       * loadThumbnails：取第 i 个视频在这些时间（毫秒）的画面（文件地址）。expo-video 取不到时用：
-       * 三星相机默认拍的 HDR 视频，Android 按精确时间取帧会失败，时间轴没有缩略图。
+       * loadThumbnails: fetches frames (file URIs) of the i-th video at specified timestamps
+       * (milliseconds). Used when expo-video fails: Samsung default HDR video fails precise
+       * timestamp frame extraction on Android, leaving the timeline without thumbnails.
        */
       loadThumbnails?: (index: number, timesMs: number[]) => Promise<string[]>;
     };
     out: { startMs: number; endMs: number }[];
   };
   /**
-   * 录音（D-154）：开始 / 暂停 / 完成，锁屏后继续录。name 是录音的文件名（不含扩展名）。
-   * 返回录好的文件（M4A，在缓存目录里，之后移进本次运行的临时目录）。
+   * Audio recording (D-154): start / pause / complete, continues recording when screen is locked.
+   * name is the recording filename (without extension). Returns the recorded file (M4A, located
+   * in cache directory, subsequently moved to the run's temp directory).
    */
   record: { in: { name: string; autoStart?: boolean }; out: PickedFile };
   /**
-   * 记一笔（D-187、D-397）：和记录页同样的新记录表单（公式不用填）。文件已经存好，
-   * ID 在 prefill 的附件字段里，表单能读它们给候选；prefill 里还有预先填好的文字。
-   * 返回表单的值，或跳过（每个文件一条时）。
+   * Log an entry (D-187, D-397): new record form identical to the record page (formulas omitted).
+   * Files are already stored, IDs are in prefill attachment fields, allowing the form to read
+   * them for candidates; prefill also contains pre-filled text. Returns form values, or skips
+   * (when one entry per file).
    */
   recordEntry: {
     in: {
       collection: Collection;
       prefill: Record<string, unknown>;
-      /** 表里没有附件字段时才有：只显示这一笔对应的文件，不存进记录。 */
+      /** Present only when the table has no attachment field: displays only the file corresponding to this entry without storing it in records. */
       file?: RunItem;
-      /** 文件超过一条记录能放的个数，多的没放进来（D-397）。 */
+      /** Files exceed the capacity of a single record, excess files are not included (D-397). */
       overflow?: boolean;
       /**
-       * 放进已有的记录（D-443）：表单是这条记录的，先是它现在的值，再套上 prefill（接在后面的文件和文字）；
-       * 存的时候改这一条，不新建。
+       * Add to existing record (D-443): the form belongs to this record, starting with its
+       * current values, followed by prefill (appended files and text); updates this record on
+       * save instead of creating a new one.
        */
       existing?: DataRecord;
-      /** 上一步交来的是用户说的一句话（语音转的文字，D-575）：表单按它直接填有把握的字段。 */
+      /** Passed from the previous step as a spoken sentence (speech-to-text, D-575): the form directly populates confident fields based on it. */
       heard?: string;
       index: number;
       total: number;
     };
     out: { values: Record<string, unknown> } | { skip: true };
   };
-  /** 放进已有的记录（D-443）：从这张表现有的记录里选一条（只显示每条的标题）。取消返回 null。 */
+  /** Add to existing record (D-443): select an existing record from this table (displays titles only). Returns null on cancellation. */
   recordPick: {
     in: {
       collection: Collection;
       records: DataRecord[];
-      /** 只是选一条（记录填入模板），不是放进它：确定键写「选择」。 */
+      /** Selects a single entry only (for template population), does not append to it: confirmation button reads "Select". */
       select?: boolean;
     };
     out: { recordId: string };
   };
   /**
-   * 去掉 PDF 密码（D-194）：输这个 PDF 的打开密码。wrong：上一次输的不对。返回密码，或跳过这一个。
+   * Remove PDF password (D-194): enter the open password for this PDF. wrong: previous attempt
+   * was incorrect. Returns the password, or skips this item.
    */
   password: {
     in: { name: string; wrong: boolean; index: number; total: number };
@@ -157,14 +169,15 @@ export interface LocalSteps {
 export type LocalKind = keyof LocalSteps;
 
 export interface LocalUi {
-  /** 简单的二选一，例如「再拍一张？」。message 是标题下面的说明（Android 的标题最多两行）。 */
+  /** Simple binary choice, e.g., "Retake photo?". message is explanatory text below the title (Android titles support up to two lines). */
   confirm(title: string, ok: string, cancel: string, message?: string): Promise<boolean>;
   /**
-   * 运行中问一句（固定的几种问题，文字在 App 里写好，不是 AI 生成的），例如压缩 PDF 不够小时
-   * 「转成图片 / 就用现在的」。返回选了第几个，取消返回 null。
+   * Prompt during execution (fixed questions with pre-written app copy, not AI-generated), e.g.,
+   * when PDF compression is insufficient: "Convert to images / Use current". Returns selected
+   * index, or null on cancellation.
    */
   choose(title: string, message: string, options: readonly string[]): Promise<number | null>;
-  /** 打开本地操作界面；用户取消时返回 null。 */
+  /** Opens local operation interface; returns null if cancelled by the user. */
   open<K extends LocalKind>(
     kind: K,
     input: LocalSteps[K]['in'],

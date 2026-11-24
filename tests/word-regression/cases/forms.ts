@@ -1,4 +1,4 @@
-// forms 套件：标签和值、表单栏位、填写框。
+// forms suite: labels and values, form fields, input boxes.
 import {
   aligned,
   apart,
@@ -46,7 +46,7 @@ export const FORMS: Case[] = [
       sideBySide('Adjustments', 'If you want tax withheld for other income'),
       notInRow('Complete Steps 2–4 ONLY if they apply to you'),
     ],
-    // ca14ef0b 曾让 Step 3 变成 5×3 的表、Step 4 整块丢失；d937db44 的按行守恒修好了。
+    // ca14ef0b once caused Step 3 to turn into a 5x3 table and Step 4 to be completely missing; fixed by line conservation in d937db44.
   },
   {
     id: 'invoice-zh-header-rows',
@@ -269,7 +269,7 @@ export const FORMS: Case[] = [
         return bad.length ? `no field after ${bad.join(', ')}` : null;
       }),
       notInTable('Ulica i numer domu'),
-      // 接了点线的整行宽的行不按左右各空一点算成居中。
+      // Full-width rows connected with dotted lines are not treated as centered by leaving equal margins on left and right.
       aligned('imiona rodziców', 'left'),
       aligned('urodzony', 'left'),
     ],
@@ -338,7 +338,7 @@ export const FORMS: Case[] = [
         const ls = leaves(c.doc).filter((l) => l.leaf.kind === 'paragraph');
         const answers = ls.filter((l) => l.leaf.kind === 'paragraph' && /nein/.test(l.leaf.text));
         if (answers.length !== 6) return `${answers.length} answer paragraphs, want 6`;
-        // 条款可能是段落，也可能是列表项（补回了「■」记号）。
+        // Clauses can be paragraphs or list items (restoring the '■' bullet marker).
         const clauseOf = (re: RegExp) =>
           leaves(c.doc).find(
             (l) =>

@@ -60,7 +60,7 @@ describe('quick-action categories (UI)', () => {
       await store.getState().confirm();
     });
     expect(await screen.findByLabelText('修改这个 App')).toBeTruthy();
-    // 内设的直接列出来、直接运行（D-236）。
+    // Built-in ones are listed directly and run directly (D-236).
     await fireEvent.press(await screen.findByTestId('workflow-run-visa-photo'));
     expect(await screen.findByTestId('run-screen')).toBeTruthy();
   });
@@ -134,7 +134,7 @@ describe('quick-action categories (UI)', () => {
     const rows = within(screen.getByTestId('quick-actions-image')).getAllByTestId(
       /^workflow-(?:send-photos|email-photos|unused|visa-photo)$/,
     );
-    // 没用过的：自己的在内设的前面。
+    // Unused ones: user's own items appear before the built-in ones.
     expect(rows.map((row) => row.props.testID)).toEqual([
       'workflow-send-photos',
       'workflow-email-photos',

@@ -10,9 +10,13 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 表格文件的行导进已有的表（D-574，创始人 2026-11-16 决定 ⑦）：「设置 → 数据」→ 一张表 →「从文件导入记录」。
-// 列在本机按名字对到字段、用户确认；导之前先问（汇总 + 「导入」）；导完提示条能撤销（进「最近删除」）；
-// 每次导入记成一批，「设置 → 数据」里能整批删。原件不动，选择器的副本读完就删（底线 4）。
+// Import rows from a spreadsheet file into an existing table (D-574, founder's decision on
+// 2026-11-16 item 7): "Settings -> Data" -> select a table -> "Import records from file". Columns
+// are mapped locally by name to fields, subject to user confirmation; asks before importing
+// (summary + "Import"); the toast notification after import allows undoing (moves to "Recently
+// Deleted"); each import is logged as a batch, and batches can be deleted as a whole in "Settings
+// -> Data". Originals are untouched, and the copy from the file picker is deleted immediately after
+// reading (Invariant 4).
 
 const seed = (locale: Locale, registry: Registry) => {
   const r = applyOps(
@@ -59,7 +63,7 @@ const encode = (s: string) => new TextEncoder().encode(s);
 
 type XCell = string | { value: number; format: string; text: string };
 
-/** 几张工作表的 xlsx（用 tool-office 的 writeXlsx 写，和真的 Excel 文件一样是数字带格式、文字是共享字符串）。 */
+/** Multi-sheet xlsx (written using tool-office's writeXlsx, with formatted numbers and shared strings just like real Excel files). */
 function workbook(sheets: [string, XCell[][]][]): Uint8Array {
   const pages: TablePage[] = sheets.map(([name, rows]) => {
     const cols = Math.max(...rows.map((r) => r.length));
@@ -98,7 +102,7 @@ function workbook(sheets: [string, XCell[][]][]): Uint8Array {
   return writeXlsx({ version: 3, scope: 'tables', pages });
 }
 
-/** Android 的「文件」给的是 content://，地址里没有扩展名；名字里有。 */
+/** Android's "Files" app provides a content:// URI without an extension, but the file name has one. */
 function offerContent(files: FakeFiles, name: string, bytes: Uint8Array, mimeType: string | null) {
   const uri = `content://com.android.providers.downloads.documents/document/${name.length}`;
   files.disk.set(uri, bytes);
@@ -106,7 +110,7 @@ function offerContent(files: FakeFiles, name: string, bytes: Uint8Array, mimeTyp
   return uri;
 }
 
-/** iOS / 选择器复制到 App 缓存里的那份（picker://）。 */
+/** The copy created in app cache by iOS / file picker (picker://). */
 function offerCopy(files: FakeFiles, name: string, bytes: Uint8Array, mimeType = 'text/csv') {
   const picked = files.offer(name, bytes, mimeType);
   files.nextPick = [picked];
@@ -121,7 +125,7 @@ async function start(
   const app = await renderToolsApp(repo, files, { seed, locale });
   await screen.findByTestId('nav-settings');
   await act(() => router.push('/data'));
-  // 每张表一页（D-614）：导入在表的页面里。
+  // One page per table (D-614): import is located within the table's page.
   await fireEvent.press(await screen.findByTestId('table-orders'));
   await screen.findByTestId('data-table-screen');
   return { ...app, repo, files };
@@ -161,7 +165,7 @@ it('a new user with an empty table: map, review, nothing is written until Import
   await openImport();
   const original = offerContent(files, 'Orders 2026.csv', encode(CSV), null);
   await choose();
-  // 名字相同的列已经对上；Comment 没有对应的字段，跳过。
+  // Columns with matching names are already mapped; Comment has no corresponding field and is skipped.
   for (const [col, id] of [
     [0, 'customer'],
     [1, 'amount'],
@@ -174,7 +178,7 @@ it('a new user with an empty table: map, review, nothing is written until Import
       'accessibilityState',
       expect.objectContaining({ selected: true, checked: true }),
     );
-  // 样例显示读成什么：日期按这一列的顺序（25 大于 12，日在前）。
+  // Sample display parsing result: dates follow the order of this column (25 is greater than 12, so day comes first).
   expect(screen.getAllByTestId('import-sample-2')[0]).toHaveTextContent('25/12/2026 → 2026-12-25');
   expect(screen.getAllByTestId('import-sample-1')[2]).toHaveTextContent('「ten」读不出来');
   await fireEvent.press(screen.getByTestId('import-continue'));
@@ -184,7 +188,7 @@ it('a new user with an empty table: map, review, nothing is written until Import
   expect(summary).toHaveTextContent(/有 2 行不会导入：/);
   expect(summary).toHaveTextContent(/1 行的「Amount」读不出来（第 5 行）/);
   expect(summary).toHaveTextContent(/1 行的「Customer」是空的，但必须填写（第 6 行）/);
-  // 先问：看了对应和汇总都没写。
+  // Ask first: neither mapping nor summary has been written.
   expect(await repo.listRecords('orders')).toEqual([]);
   await fireEvent.press(screen.getByTestId('import-confirm'));
   await flush();
@@ -197,7 +201,7 @@ it('a new user with an empty table: map, review, nothing is written until Import
     { customer: 'Bo', amount: 12, on: '2027-01-03', status: 'open', paid: false },
   ]);
   expect(screen.getByTestId('toast')).toHaveTextContent(/已在「订单」导入 2 条记录/);
-  // 原件（content://）不动。
+  // Original file (content://) remains untouched.
   expect(files.disk.has(original)).toBe(true);
   const [batch] = await repo.listImports('orders');
   expect(batch).toMatchObject({ fileName: 'Orders 2026.csv', count: 2, present: 2 });
@@ -208,7 +212,7 @@ it('a new user with an empty table: map, review, nothing is written until Import
     'Ana',
     'Bo',
   ]);
-  // 撤销以后这一页照实说，不再写着「已导入」。
+  // After undoing, the page accurately reflects the state and no longer displays "Imported".
   await flush();
   expect(screen.getByTestId('import-done')).toHaveTextContent(/已放进「最近删除」/);
   expect(screen.getByTestId('import-done')).not.toHaveTextContent(/已在「订单」导入/);
@@ -227,19 +231,19 @@ it('with data: undo removes exactly the batch; the data screen lists it, deletin
   await openImport();
   const copy = offerCopy(files, 'orders.csv', encode(CSV));
   await choose();
-  // 选择器放在缓存里的副本读完就删。
+  // The file picker's cache copy is deleted after reading.
   expect(files.disk.has(copy)).toBe(false);
   await fireEvent.press(screen.getByTestId('import-continue'));
   await flush();
   await fireEvent.press(screen.getByTestId('import-confirm'));
   await flush();
   expect(await customers(repo)).toEqual(['Ana', 'Bo', 'Old']);
-  // 不撤销，回到「设置 → 数据」：这次导入列在表下面。
+  // Without undoing, return to "Settings -> Data": this import is now listed under the table.
   await act(() => router.back());
   const [batch] = await repo.listImports('orders');
   const row = await screen.findByTestId(`import-batch-${batch!.id}`);
   expect(row).toHaveTextContent(/orders\.csv · 2 条记录/);
-  // 之后改过一条，删除这次导入时也一起删（问的时候说了）。
+  // An entry modified subsequently is also deleted when deleting this import (as stated during the prompt).
   const ana = (await repo.listRecords('orders')).find((r) => r.values.customer === 'Ana')!;
   await repo.updateRecord(ana.id, { ...ana.values, amount: 1 }, Date.now());
   const cancelled = answerNext('取消');
@@ -253,7 +257,7 @@ it('with data: undo removes exactly the batch; the data screen lists it, deletin
   await flush();
   expect(await customers(repo)).toEqual(['Old']);
   await waitFor(() => expect(screen.queryByTestId(`import-batch-${batch!.id}`)).toBeNull());
-  // 「最近删除」里一条条能放回来；放回来的那条又算进这次导入。
+  // Entries in "Recently Deleted" can be restored one by one; a restored entry is counted back into this import batch.
   await act(() => router.push('/data-deleted'));
   await fireEvent.press(await screen.findByTestId(`restore-record-${ana.id}`));
   await flush();
@@ -288,7 +292,7 @@ it('an xlsx with two sheets: pick the second, real Excel dates and numbers; an a
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   );
   await choose();
-  // 第一张表只有一格：选第二张。
+  // The first sheet has only a single cell: select the second sheet.
   await fireEvent.press(screen.getByTestId('import-sheet-1'));
   expect(screen.getAllByTestId('import-sample-2')[1]).toHaveTextContent('03/04/2026 → 2026-04-03');
   await fireEvent.press(screen.getByTestId('import-order-2-mdy'));
@@ -331,14 +335,14 @@ it('edge cases are refused with a sentence and write nothing: not a spreadsheet,
   const repo = new MemoryWorkspaceRepo();
   const { files } = await start(undefined, repo);
   await openImport();
-  // 扩展名是 xlsx，内容是 CSV。
+  // File extension is xlsx, content is CSV.
   let copy = offerCopy(files, 'orders.xlsx', encode(CSV));
   await choose();
   expect(screen.getByTestId('import-error')).toHaveTextContent(
     '这个文件读不成表格。它可能坏了，或者是别的文件。',
   );
   expect(files.disk.has(copy)).toBe(false);
-  // Latin-1 的 CSV。
+  // Latin-1 encoded CSV.
   copy = offerCopy(
     files,
     'clients.csv',
@@ -358,7 +362,7 @@ it('edge cases are refused with a sentence and write nothing: not a spreadsheet,
     '只能导入 .xlsx 和 .csv 文件。请先把文件存成其中一种格式。',
   );
   expect(files.disk.has(copy)).toBe(false);
-  // 2,001 行：不导一部分，整个不导。
+  // 2,001 rows: rather than partial import, the entire import is rejected.
   offerCopy(
     files,
     'big.csv',
@@ -417,7 +421,7 @@ it('French, and one entry, use the singular', async () => {
 it('the kind of file comes from its name, and only when the name has no extension from its MIME type', () => {
   expect(spreadsheetKind('Orders 2026.CSV', null)).toBe('csv');
   expect(spreadsheetKind('orders.xlsx', 'application/octet-stream')).toBe('xlsx');
-  // 名字说是 .xls，MIME 说什么都不算。
+  // Name says .xls, but MIME type is ignored (treated as invalid spreadsheet).
   expect(spreadsheetKind('orders.xls', 'text/csv')).toBeNull();
   expect(spreadsheetKind('orders.numbers', null)).toBeNull();
   expect(spreadsheetKind('document', 'text/comma-separated-values')).toBe('csv');

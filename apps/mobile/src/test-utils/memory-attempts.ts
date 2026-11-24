@@ -1,6 +1,6 @@
 import type { AttemptStore } from '../rescue/attempts';
 
-/** 测试用的启动计数文件；broken 时读写都抛错（模拟磁盘出问题）。 */
+/** Startup counter file for testing; throws errors on both read and write when broken (simulating disk issues). */
 export class MemoryAttemptStore implements AttemptStore {
   text: string | null = null;
   broken = false;

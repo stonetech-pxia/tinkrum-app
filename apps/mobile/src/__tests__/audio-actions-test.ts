@@ -17,8 +17,10 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeMedia, FakeSpeech } from '../test-utils/fake-files';
 
-// 音频工具（D-150–D-156）：录音和选音频、压到指定大小 / 音质、转格式、剪一段、合成一段、取视频的声音、
-// 语音转文字。原生模块 morph-media 换成 FakeMedia（按码率和时长算出大小），morph-speech 换成 FakeSpeech。
+// Audio tools (D-150–D-156): recording and selecting audio, compressing to specified size / audio
+// quality, converting format, trimming a segment, mixing a segment, extracting audio from video,
+// speech-to-text. Replaces native module morph-media with FakeMedia (calculating size based on
+// bitrate and duration), and morph-speech with FakeSpeech.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const MB = 1024 * 1024;
@@ -64,7 +66,7 @@ function setup(
     open: async (kind, input) => {
       opened.push({ kind, input });
       if (kind === 'record') return (opts.recorded ?? null) as never;
-      // 排顺序：保持原来的顺序。
+      // Reordering: maintain the original order.
       if (kind === 'reorder')
         return (input as { items: unknown[] }).items.map((_, i) => i) as never;
       return (opts.trim ?? null) as never;
@@ -82,7 +84,7 @@ function setup(
         now: () => new Date(2026, 9, 23, 9, 5),
         newId: () => `id${++ids}`,
         ui,
-        // 只回答这一步问到的参数。
+        // Answer only the parameters requested in this step.
         askParams: async (request: AskRequest) => ({
           ...request.params,
           ...Object.fromEntries(
@@ -286,7 +288,7 @@ describe('audio tool', () => {
 
   it('joins voice memos at their own bitrate when the file has none (Android M4A)', async () => {
     const { files, media, run } = setup(toolWorkflow('audio-merge'));
-    // 两段 22 秒、各 90 KB 的语音备忘（约 34 kbps），原生模块读不到码率。
+    // Two 22-second, 90 KB voice memos (~34 kbps); native modules cannot read the bitrate.
     const memo = (name: string) =>
       files.offerAudio(name, {
         size: 90 * 1024,

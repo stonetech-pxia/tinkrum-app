@@ -9,15 +9,15 @@ import type { Palette } from '../renderer/theme';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { aboutParams } from './ai-entry';
 
-/** 普通提示（「已记下」）显示多久。到时间就消失，切页面也不会一直留着。 */
+/** How long ordinary prompts ("Logged") are displayed. Disappears when time's up, and switching pages will not keep it lingering. */
 export const TOAST_MS = 4000;
-/** 能点的提示（删除后撤销、接着改）多留一会儿，够读完再点。 */
+/** Tappable prompts (undo after deletion, modify next) stay a bit longer, long enough to finish reading before tapping. */
 export const TOAST_UNDO_MS = 8000;
 
-/** 从备份恢复之后的「撤销」留得更久：一次换掉全部内容，要给人时间看清楚再决定（D-600）。 */
+/** "Undo" after restoring from backup stays longer: replacing all content at once requires giving people time to look closely before deciding (D-600). */
 export const TOAST_RESTORE_MS = 15000;
 
-/** 记录操作的提示条（例如删除后撤销）。和版本提示条分开：记录不属于任何版本。 */
+/** Prompt bar for record operations (such as undo after deletion). Separate from version prompt bars: records do not belong to any version. */
 export function Toast({ palette, bottom }: { palette: Palette; bottom: number }) {
   const { locale } = useWorkspaceContext();
   const toast = useWorkspace((s) => s.toast);
@@ -42,7 +42,7 @@ export function Toast({ palette, bottom }: { palette: Palette; bottom: number })
     : canUndo || canContinue
       ? TOAST_UNDO_MS
       : TOAST_MS;
-  // 换了一条提示重新计时；手指按在按钮上时不消失。
+  // Restart timer when a new prompt is received; does not disappear while the finger is pressing the button.
   useEffect(() => {
     if (!timed) return;
     const timer = setTimeout(dismiss, ms);
@@ -69,7 +69,7 @@ export function Toast({ palette, bottom }: { palette: Palette; bottom: number })
           onPress={() => {
             const tableId = toast.continueTable!;
             dismiss();
-            // 上一句还剩外观没做（接着改）：直接接上；没有就打开 AI 页，这句话默认说这张表。
+            // The previous statement left appearance incomplete (modify next): continue directly; if none, open the AI page, with this sentence defaulting to refer to this table.
             router.push({
               pathname: '/change',
               params: hasNext ? { next: '1' } : aboutParams({ kind: 'table', tableId }),
@@ -91,10 +91,10 @@ export function Toast({ palette, bottom }: { palette: Palette; bottom: number })
             if (toast.restoreRecordId) void actions.restore(toast.restoreRecordId);
             if (toast.restoreRecordIds) void actions.restoreMany(toast.restoreRecordIds);
             if (toast.restorePreset) void restorePreset(toast.restorePreset);
-            // 先开始撤销再关提示：提示一关，恢复之前的数据就删了（backup/service.ts 里 undoing 先于 await 置位）。
+            // Start undo before closing the prompt: once the prompt closes, the pre-restoration data is deleted (undoing is set before await in backup/service.ts).
             if (toast.undoRestore) void getBackup().undoRestore();
             dismiss();
-            // 撤销失败时会换一条提示，所以先关掉这一条。
+            // Undo failure results in a new prompt, so close this one first.
             if (toast.undo) void actions.undo(toast.undo);
             if (toast.undoImport) void actions.undoImport(toast.undoImport);
           }}>
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     paddingRight: 4,
     paddingVertical: 4,
   },
-  // 撤销和关闭至少 44 见方，好点。
+  // Undo and close buttons are at least 44 square points for easy tapping.
   action: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   flex: { flex: 1 },
 });

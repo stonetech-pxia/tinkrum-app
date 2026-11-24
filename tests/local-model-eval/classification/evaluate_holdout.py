@@ -1,11 +1,16 @@
-"""任务 124 ①：独立的虚构样本上校准并测试「无法判断」（Qwen3-Embedding GGUF，llama.cpp CPU）。
+"""Task 124 ①: Calibrate and test "cannot determine" on independent synthetic samples
+(Qwen3-Embedding GGUF, llama.cpp CPU).
 
-holdout/cases.jsonl 按 split 分成校准集和测试集（同一商家 / 版式的在同一边）。空白和乱码先由 App 里的
-textReadability 拒判（ts_features.ts 调用同一份 TS 代码），不交给模型。其余的按维度编码查询，和同语言的
-候选说明比余弦相似度；在校准集上定 min_score / min_margin，只在测试集上报成绩。原始分数写到忽略的
-results/classification/。喂给模型的只有识别文字，不含文件名或答案。
+holdout/cases.jsonl is split into calibration and test sets by `split` (the same merchant /
+layout stays on the same side). Blanks and gibberish are first rejected by the app's
+`textReadability` (ts_features.ts invokes the same TS code) rather than passed to the model. The
+rest encode queries by dimension and compare cosine similarity with candidate descriptions in
+the same language; `min_score` / `min_margin` are determined on the calibration set, and metrics
+are reported only on the test set. Raw scores are written to the ignored
+`results/classification/` directory. Only recognized text is fed to the model, excluding file
+names or answers.
 
-从 tests/local-model-eval/ 运行：
+Run from tests/local-model-eval/:
   MORPH_LLAMA_SERVER_BIN=/abs/llama-server python classification/evaluate_holdout.py --model q8
 """
 from __future__ import annotations
@@ -34,7 +39,9 @@ def load_cases(path: Path) -> list[dict]:
 
 
 def ts_features(path: Path) -> dict[str, dict]:
-    """用 App 的 TS 代码算可读性和规则命中（需要仓库根目录装好 node_modules）。"""
+    """Calculate readability and rule hits using the app's TypeScript code (requires `node_modules`
+    installed in the repository root).
+    """
     npx = shutil.which("npx") or "npx"
     out = subprocess.run([npx, "tsx", str(HERE / "ts_features.ts"), str(path)], cwd=REPO,
                          check=True, capture_output=True, text=True, encoding="utf-8").stdout
@@ -42,7 +49,7 @@ def ts_features(path: Path) -> dict[str, dict]:
 
 
 def query(facet: str, text: str) -> str:
-    # 和 evaluate_embedding_gguf.py 同一条英文任务指令，桌面成绩才可比。
+    # Uses the same English task instruction as `evaluate_embedding_gguf.py` so that desktop scores remain comparable.
     task = f"Given OCR text, retrieve the {facet} category that best describes it"
     return f"Instruct: {task}\nQuery: {text}"
 

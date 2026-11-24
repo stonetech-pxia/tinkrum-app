@@ -4,9 +4,10 @@ import { supportsServerFallback } from './models';
 import type { Complete, Completion } from './planner';
 import { systemPromptFor } from './prompt';
 
-// 直接调用 Claude HTTP API 的传输层，供 App 内“自带 API key”模式使用。
-// 官方 TypeScript SDK 目前不支持 React Native，因此 App 端用 fetch；服务端仍用 SDK。
-// key 只放在请求头里发给 api.anthropic.com，不写入日志、不出现在错误信息中。
+// Transport layer for direct Claude HTTP API calls, used by the in-app "bring-your-own API key"
+// mode. The official TypeScript SDK does not currently support React Native, so the app side uses
+// fetch; the server still uses the SDK. The key is sent only in the request header to
+// api.anthropic.com, and is never logged or exposed in error messages.
 
 export const ANTHROPIC_API_URL = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
@@ -22,7 +23,7 @@ export type AIErrorKind =
   | 'server'
   | 'timeout';
 
-/** 两种自带 key 的传输层（Claude、OpenAI 兼容接口）共用的错误。 */
+/** Error shared by both bring-your-own-key transport layers (Claude and OpenAI-compatible interfaces). */
 export class AIHttpError extends Error {
   constructor(
     readonly kind: AIErrorKind,
@@ -115,7 +116,7 @@ export function createHttpCompleter(options: HttpCompleterOptions): Complete {
     const body = {
       model: options.model,
       max_tokens: 16000,
-      // 系统提示词稳定不变，标记缓存以降低重复请求的成本。
+      // System prompt is stable, tagged with caching to reduce duplicate request costs.
       system: [
         {
           type: 'text',
@@ -157,7 +158,7 @@ export function createHttpCompleter(options: HttpCompleterOptions): Complete {
   };
 }
 
-/** 检查 key 是否可用且能访问该模型。使用 Models API，不消耗 token。 */
+/** Check whether the key is valid and has access to the model. Uses the Models API, consuming no tokens. */
 export async function checkModelAccess(model: string, options: HttpOptions): Promise<void> {
   await request(`/v1/models/${encodeURIComponent(model)}`, { method: 'GET', headers: {} }, options);
 }

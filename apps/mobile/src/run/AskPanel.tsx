@@ -16,7 +16,7 @@ import { t } from '../i18n';
 import type { Palette } from '../renderer/theme';
 import { ParamForm, againKey } from './ParamForm';
 
-// 运行时询问参数（工作流步骤的 ask）。文件名模板显示成渲染好的名字，用户改的是最终的名字。
+// Runtime parameter prompt (workflow step ask). File name template displays as a rendered name, while the user edits the final name.
 
 function suggestedName(template: string, input: RunValue | null, now: Date): string {
   const first = isFileValue(input) ? input.items[0] : undefined;
@@ -51,7 +51,7 @@ export function AskPanel({
   locale: Locale;
   now: Date;
   onAnswer: (values: Record<string, unknown> | null) => void;
-  /** 确定按钮的字（文件房间的工具面板是「应用」，D-360）。 */
+  /** Confirm button text ("Apply" in the file room tool panel, D-360). */
   okLabel?: string;
 }) {
   const [values, setValues] = useState(() => initialAnswers(request, now));
@@ -63,7 +63,7 @@ export function AskPanel({
     for (const key of request.keys) {
       const field = request.action.fields.find((f) => f.key === key);
       let value = values[key];
-      // 密码不在参数结构里，单独交回去（D-194）。要输两遍的，两遍要一样。
+      // Passwords are not in the parameter structure; passed back separately (D-194). When required twice, both entries must match.
       if (field?.kind === 'secret') {
         if (field.confirm && value !== values[againKey(key)]) {
           return setError(t(locale, 'askPasswordMismatch'));
@@ -71,7 +71,7 @@ export function AskPanel({
         secrets[key] = value;
         continue;
       }
-      // 用户输入的是最终文件名，不是模板：去掉花括号，按文件名规则清理。
+      // User inputs the final file name, not a template: strip curly braces, sanitize according to file naming rules.
       if (field?.kind === 'nameTemplate') {
         const literal = String(value ?? '')
           .replace(/[{}]/g, '')
@@ -116,7 +116,7 @@ export function AskPanel({
       <Text style={[palette.font('title', 18), { color: palette.text }]}>
         {onlyName ? t(locale, 'askName') : localize(request.action.label, locale)}
       </Text>
-      {/* 问的参数多（证件照规格有十几个）时比屏幕高：中间滚动，标题和「确定」一直看得到。 */}
+      {/* When parameter prompts are numerous (e.g., ID photo specs have over a dozen), making it taller than the screen: scroll in the middle, keeping the title and "Confirm" always visible. */}
       <ScrollView testID="ask-scroll" style={styles.scroll} keyboardShouldPersistTaps="handled">
         <ParamForm
           action={request.action}

@@ -1,10 +1,12 @@
 import Foundation
 import onnxruntime_objc
 
-// 文字识别模型（PP-OCRv6，D-269）只在这里跑，和 Android 的 OcrRunner.kt 一样：输入、输出都走本次运行的临时文件，
-// 前后处理都在 JS（@morph/tool-ocr）。
-// 找文字行：输入 [1, 3, h, w] 的 float32，输出每个像素的概率 × 255（1 字节）。
-// 认字：输入 [n, 3, 48, w]，输出每一条、每个时间步概率最大的类别（int32）和概率（float32），按 [n, steps] 排。
+// The text recognition model (PP-OCRv6, D-269) runs exclusively here, matching Android's
+// OcrRunner.kt: inputs and outputs use run-local temporary files, with pre- and post-processing
+// handled in JS (@morph/tool-ocr). Finding text lines: input float32 tensor of shape [1, 3, h, w],
+// output probability × 255 per pixel (1 byte). Recognizing text: input tensor of shape [n, 3, 48,
+// w], output highest-probability category (int32) and probability (float32) for each item and time
+// step, arranged as [n, steps].
 final class OcrRunner {
   static let shared = OcrRunner()
 
@@ -71,7 +73,7 @@ final class OcrRunner {
     try Data(bytes).write(to: output)
   }
 
-  /** 返回时间步数。 */
+  /** Returns the number of time steps. */
   func recognize(input: URL, count: Int, width: Int, output: URL) throws -> Int {
     lock.lock()
     defer { lock.unlock() }
@@ -96,7 +98,7 @@ final class OcrRunner {
         bestProb[r] = v
       }
     }
-    // 先 count × steps 个 int32 类别，再 count × steps 个 float32 概率（小端，和 JS 的类型化数组一样）。
+    // First count × steps int32 categories, followed by count × steps float32 probabilities (little-endian, matching JS typed arrays).
     var packed = Data(capacity: count * steps * 8)
     best.withUnsafeBufferPointer { packed.append(Data(buffer: $0)) }
     bestProb.withUnsafeBufferPointer { packed.append(Data(buffer: $0)) }

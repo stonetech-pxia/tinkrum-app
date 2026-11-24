@@ -5,8 +5,9 @@ import { QuickActionSchema, ReminderSchema, TOOL_KINDS, WorkflowStepSchema } fro
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 关系规则 13、14（创始人 2026-10-30 同意，D-370）：结构上已经做不到的，用测试证明它做不到；
-// 结构允许、但检查要拦的，用校验证明拦住了。规则 12 的测试在 record-ops.test.ts。
+// Relation rules 13 and 14 (Founder approved 2026-10-30, D-370): prove structurally that disallowed
+// actions cannot occur; use validation to block permitted structures that violate constraints.
+// Tests for rule 12 are in record-ops.test.ts.
 
 const reminder = {
   id: 'r',
@@ -17,13 +18,13 @@ const reminder = {
   opens: 'page:home',
 } as const;
 
-/** 数据离开 App 的动作（导出、分享、存到「文件」、存到相册、打印）。 */
+/** Actions that export data out of the app (export, share, save to "Files", save to photo library, print). */
 const LEAVES_APP = [
   'out.share',
   'out.saveToFolder',
   'out.saveToPhotos',
   'out.print',
-  // 打电话、发短信、发邮件、打开网站（D-428）。
+  // Making phone calls, sending SMS/emails, opening websites (D-428).
   'out.call',
   'out.message',
   'out.email',
@@ -44,9 +45,9 @@ describe('rule 13: a tool never triggers another tool', () => {
       false,
     );
     expect(RecordToolSchema.safeParse({ do: 'create', table: 't', tool: 'x' }).success).toBe(false);
-    // 块上的就地工具也不能顺带引用一个工具。
+    // Inline tools on blocks cannot implicitly reference a tool either.
     expect(ToolUseSchema.safeParse({ do: 'create', table: 't', tool: 'x' }).success).toBe(false);
-    // 批量新建（D-567）是固定的一种工具：没有步骤、不引用工具；一条一条由引擎做，配置里没有循环。
+    // Batch creation (D-567) is a fixed tool type: no steps, no tool references; executed entry by entry by the engine, with no loops in configuration.
     const bulk = { do: 'createAll', table: 't', from: 's', values: {} };
     expect(RecordToolSchema.safeParse(bulk).success).toBe(true);
     for (const extra of [{ tool: 'x' }, { steps: [] }, { then: { do: 'create', table: 't' } }])
@@ -57,7 +58,7 @@ describe('rule 13: a tool never triggers another tool', () => {
     expect(WorkflowStepSchema.safeParse({ id: 's', action: 'pdf-merge', params: {} }).success).toBe(
       false,
     );
-    // 目录里没有任何动作的参数是「选一个工具」：参数的种类里没有，参数名里也没有。
+    // None of the action parameters in the catalog are "select a tool": neither among parameter types nor parameter names.
     const kinds = new Set<string>();
     for (const action of registry.actions.values())
       for (const field of action.fields) {
@@ -108,11 +109,11 @@ describe('rule 13: a tool never triggers another tool', () => {
       /done acts on this entry/,
     );
     expect(withDone({ do: 'create', table: 'plants', ask: 'all' })).toMatch(/can't ask/);
-    // 批量新建（D-567）也不行：「完成」只改这一条。
+    // Batch creation (D-567) is also disallowed: "Complete" only modifies this single entry.
     expect(
       withDone({ do: 'createAll', table: 'plants', from: 'notes', values: { watered: 'today' } }),
     ).toMatch(/done acts on this entry.*not createAll/);
-    // 点一下改几处（D-566）也不行：通知上没有撤销提示条。
+    // Multi-change on a single tap (D-566) is also disallowed: no undo banner on notifications.
     expect(
       withDone({
         do: 'set',
@@ -122,7 +123,7 @@ describe('rule 13: a tool never triggers another tool', () => {
         also: [{ do: 'set', field: 'name', value: null }],
       }),
     ).not.toBe('');
-    // 关系规则 12：「完成」写的是这一条（when.each.table）。
+    // Relation rule 12: "Complete" modifies this specific entry (when.each.table).
     expect(withDone({ do: 'set', table: 'notes', field: 'watered', value: 'today' })).toMatch(
       /so table must be plants, not notes/,
     );
@@ -139,7 +140,7 @@ describe('rule 14: data leaves the app only when the user taps', () => {
       if (meta.trigger !== 'tap')
         expect({ kind, runs: meta.runs }).toEqual({ kind, runs: 'opens' });
     }
-    // 提醒（时间触发）的结构里没有步骤，所以挂不上分享、导出、存到「文件」。
+    // Time-triggered reminders have no steps in their structure, preventing attachment of share, export, or save-to-"Files" actions.
     for (const action of LEAVES_APP)
       expect(
         ReminderSchema.safeParse({ ...reminder, steps: [{ id: 's', action, params: {} }] }).success,
@@ -150,7 +151,7 @@ describe('rule 14: data leaves the app only when the user taps', () => {
     const config = fromV33(v33Fixture('setup-pdf-zh'));
     config.tools.push({ ...reminder, opens: 'tool:pdf-merge' } as never);
     expect(validateWorkspace(config, registry).ok).toBe(true);
-    // 提醒不能打开工具包或文件（只能是页面、系统入口或 tool:<id>）。
+    // Reminders cannot open tool packages or files (must be pages, system entry points, or tool:<id>).
     for (const opens of ['package:pdf', { file: null }])
       expect(ReminderSchema.safeParse({ ...reminder, opens }).success).toBe(false);
   });

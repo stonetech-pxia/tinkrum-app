@@ -11,9 +11,9 @@ import { cleanTags, tagKey } from './fields';
 import { localeTag } from './localization';
 import type { Collection, Field, Locale, Period } from './schema';
 
-// 列表上的筛选和搜索读什么（创始人 2026-11-04 定）。都是现算：配置里没有标签名（底线 14），什么都不写（底线 15）。
+// Tags used across these records: each unique tag (case-insensitive) counted once, sorted. Tags no longer used by any record disappear.
 
-/** 这些记录用到的标签：同一个标签（不分大小写）只算一次，排好序。没有记录用的标签就没有了。 */
+/** Tags used across these records: each unique tag (case-insensitive) counted once, sorted. Tags no longer used by any record disappear. */
 export function tagsInRecords(
   records: readonly DataRecord[],
   view: Collection,
@@ -46,12 +46,12 @@ function rowValues(
       label: tag,
     }));
   if (field.type !== 'choice') return [];
-  // 单选按选项的顺序，只列有记录用的。
+  // Single-select follows option order, listing only those used by records.
   const used = new Set(records.flatMap((r) => [recordValue(r, view, field.id)].flat()));
   return field.options.filter((o) => used.has(o.id)).map((o) => ({ value: o.id, label: o.label }));
 }
 
-/** 每个筛选字段一排；没有值的字段没有这一排。 */
+/** One row per filter field; fields without values have no row. */
 export function browseFilterRows(
   records: readonly DataRecord[],
   view: Collection,
@@ -65,7 +65,7 @@ export function browseFilterRows(
   });
 }
 
-/** 只留下这个字段是这个值的记录（标签：这条记录有这个标签，不分大小写；多选：选了这一项，D-607）。 */
+/** Retains only records where this field matches this value (tags: record has this tag, case-insensitive; multi-select: item is selected, D-607). */
 export function browseFilter(
   records: readonly DataRecord[],
   view: Collection,
@@ -81,7 +81,7 @@ export function browseFilter(
   });
 }
 
-/** 列表上能切换的时间段（D-437）：本周、本月、本年；再加「全部」（不选）。 */
+/** Time periods switchable on lists (D-437): this week, this month, this year; plus "All" (none selected). */
 export const BROWSE_PERIODS = [
   'thisWeek',
   'thisMonth',
@@ -89,7 +89,7 @@ export const BROWSE_PERIODS = [
 ] as const satisfies readonly Period[];
 export type BrowsePeriod = (typeof BROWSE_PERIODS)[number];
 
-/** 只留下这个日期字段（或创建、修改时间）落在当前这个时间段里的记录；现算，什么都不写。没有日期的不在任何时间段里。 */
+/** Retains only records where this date field (or creation/modification time) falls within the current time period; computed on demand, stored nowhere. Records without dates fall outside all periods. */
 export function browsePeriod(
   records: readonly DataRecord[],
   view: Collection,
@@ -108,8 +108,9 @@ export function browsePeriod(
 }
 
 /**
- * 搜索读的文字：这张表每个字段显示出来的样子，不管列表显示不显示（电话、邮箱、备注、标签、单选的名字），
- * 加上这一行显示的（可能是创建时间）。附件不算：文件名和文件内容都不搜。
+ * Searchable text: rendered display representation of each field in the table regardless of list
+ * visibility (phone, email, notes, tags, single-select name), plus the displayed row value (such
+ * as creation time). Attachments excluded: file names and file contents are not searched.
  */
 export function recordSearchTexts(
   record: DataRecord,

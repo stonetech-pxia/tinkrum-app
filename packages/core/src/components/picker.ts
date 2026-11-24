@@ -5,14 +5,15 @@ import { ToolUseSchema } from '../record-ops-schema';
 import { type LookDefinitionOf, defineLook } from './define';
 
 const shape = {
-  /** icon = 只有图标的白底按钮（D-449）；不写是带文字的按钮。 */
+  /** icon = white-background button with icon only (D-449); omitted means a button with text. */
   show: z.strictObject({ shape: z.enum(['icon']).optional() }).optional(),
   tools: z.array(ToolUseSchema).min(1).max(1),
 };
 
 /**
- * 打开相册 / 打开文件（原 filePick）：内核固定行为，选完进收件页面，绝不自动运行（AI 不提供可执行内容）。
- * $pick.open（D-449）：点了先问从相册还是从「文件」选。
+ * Open photo library / open files (formerly filePick): core fixed behavior, enters inbox after
+ * selection, never runs automatically (AI does not provide executable content). $pick.open
+ * (D-449): prompts whether to select from photo library or "Files" upon tapping.
  */
 export const pickerComponent: LookDefinitionOf<'picker', typeof shape> = defineLook({
   look: 'picker',

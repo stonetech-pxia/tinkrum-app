@@ -35,8 +35,8 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
-// 用户数据（docs/DATA_DESIGN.md）：AI 搭页面，用户记录内容；改界面、撤销、恢复都不碰记录；
-// 发给模型的内容里永远没有记录。
+// User data (docs/DATA_DESIGN.md): AI builds pages, user records store content; modifying the UI,
+// undoing, and restoring never touch records; data sent to the model never contains records.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -90,8 +90,9 @@ async function renderApp({
 }
 
 /**
- * 数据页面分两步（D-191）：数据表是功能，直接做好，打开「数据表做好了」；
- * 页面是外观，点「接着改」自动发送，进草稿，应用。
+ * Data pages are built in two steps (D-191): data tables are features, created directly with an
+ * "expenses table created" notification; pages are UI appearances, and clicking "Continue
+ * editing" automatically sends them to a draft and applies them.
  */
 async function buildDataPage(text: string) {
   await fireEvent.press(screen.getByTestId('nav-ai'));
@@ -118,7 +119,7 @@ describe('user data (UI)', () => {
     const { repo } = await renderApp();
     await buildDataPage('新建一个记账页面');
 
-    // 导航栏已满，新页面的入口是首页上的快捷入口。
+    // Navigation bar is full; the entry point for the new page is the quick entry on the home screen.
     await fireEvent.press(await screen.findByText('记账'));
     expect(await screen.findByTestId('component-recent')).toBeTruthy();
     expect(screen.getByText('还没有记录')).toBeTruthy();
@@ -130,7 +131,7 @@ describe('user data (UI)', () => {
     expect(screen.getByText('¥35.00')).toBeTruthy();
     expect((await repo.listRecords('expenses')).length).toBe(2);
 
-    // 必填项为空时不保存，并提示。
+    // Required fields left blank prevent saving and display a prompt.
     await fireEvent.press(screen.getByTestId('form-add-submit'));
     expect(await screen.findByText('必填')).toBeTruthy();
     expect((await repo.listRecords('expenses')).length).toBe(2);
@@ -153,7 +154,7 @@ describe('user data (UI)', () => {
     await fireEvent.press(await screen.findByTestId(`check-${todo!.id}`));
     expect((await repo.getRecord(todo!.id))!.values.done).toBe(true);
 
-    // 打开记录编辑页修改，然后删除并撤销。
+    // Open the record edit page to modify, then delete and undo.
     await fireEvent.press(screen.getByText('买牛奶'));
     await fireEvent.changeText(await screen.findByTestId('editor-title'), '买燕麦奶');
     await fireEvent.press(screen.getByTestId('editor-save'));
@@ -188,7 +189,7 @@ describe('user data (UI)', () => {
     expect(await screen.findAllByText('¥35.00')).toHaveLength(2);
     const entries = await repo.listRecords('expenses');
 
-    // 撤销一次界面修改：记录不变。
+    // Undo a UI modification: records remain unchanged.
     const theme = await store.getState().proposeOps([{ op: 'setTheme', radius: 4 }], '圆角');
     expect(theme.kind).toBe('preview');
     await store.getState().confirm();
@@ -196,13 +197,13 @@ describe('user data (UI)', () => {
     await store.getState().confirm();
     expect(await repo.listRecords('expenses')).toEqual(entries);
 
-    // 恢复到建表之前的版本：数据表离开界面，记录保留在「设置 → 数据」。
+    // Restore to the version before table creation: the data table leaves the UI, and records remain under "Settings -> Data".
     expect((await store.getState().proposeRestore(1)).kind).toBe('preview');
     await store.getState().confirm();
     expect(store.getState().config!.data.tables).toEqual([]);
     expect(await repo.listRecords('expenses')).toEqual(entries);
 
-    // 记账页已不存在，回到外壳。
+    // The bookkeeping page no longer exists; return to the shell.
     await testRouter.back();
     await fireEvent.press(await screen.findByTestId('nav-settings'));
     await fireEvent.press(await screen.findByTestId('settings-data'));
@@ -212,7 +213,7 @@ describe('user data (UI)', () => {
     await fireEvent.press(screen.getByTestId('export-expenses'));
     expect(files.sharedTexts.get('账目.csv')).toContain('35.00,餐饮,');
 
-    // 再恢复到有这张表的版本：记录原样回来。
+    // Restore to the version containing this table: records return exactly as they were.
     const withTable = (await repo.listRevisions(20)).find(
       (r) => (r.config as WorkspaceConfig).data.tables.length,
     )!;
@@ -265,7 +266,7 @@ describe('Settings → Data: app design and prefill memory', () => {
       amount: { kind: 'amount', label: '实付', offset: 0, position: 0.7, format: 'dot', hits: 1 },
     },
   });
-  // 填写记忆和 App 设计在「数据 → 更多」里（D-614）。
+  // Access memory and app design under "Data -> More" (D-614).
   const openData = async () => {
     await fireEvent.press(await screen.findByTestId('nav-settings'));
     await fireEvent.press(await screen.findByTestId('settings-data'));
@@ -339,7 +340,7 @@ describe('Settings → Data: app design and prefill memory', () => {
     expect(name).toMatch(/^tinkrum-prefill-memory-.*\.json$/);
     expect(JSON.parse(text!).tables.expenses[0].id).toBe('a');
 
-    // 取消：什么都不变。
+    // Cancel: nothing changes.
     answer((b) => b.find((x) => x.style === 'cancel'));
     await fireEvent.press(screen.getByTestId('clear-prefill-memory'));
     expect(parseLayoutStore(await repo.getMeta(LAYOUT_STORE_KEY)).expenses).toHaveLength(1);
@@ -408,7 +409,7 @@ describe('privacy: the model never receives entries', () => {
         };
       },
     });
-    // 同时记录 AIProvider 收到的全部参数（包括配置）。
+    // Simultaneously record all parameters received by AIProvider (including configuration).
     const seen: string[] = [];
     const provider: AIProvider = {
       plan: (input, ctx) => {
@@ -433,7 +434,7 @@ describe('privacy: the model never receives entries', () => {
 
     const request = JSON.stringify(sent);
     expect(sent).toHaveLength(1);
-    // 数据表的结构会发送（字段名），记录的内容和数值不会。
+    // Data table structure is sent (field names), while record contents and values are not.
     expect(request).toContain('账目');
     expect(request).toContain('amount');
     for (const secret of ['SECRET-MARKER-9271', '王小明', '4242.42', '4242']) {

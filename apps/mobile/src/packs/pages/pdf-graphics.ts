@@ -1,13 +1,15 @@
-// 数字 PDF 的整图在本机剪出，跟随 Word 正文重排；页底只允许纯装饰。
-// 字符串随固定的 pdfview 页面打包，不能依赖函数 toString（Metro 会插入运行时辅助函数）。
+// Digital PDF full-page rendering clipped on device, reflowing with Word body text; pure decoration
+// allowed only at page bottom. Strings are bundled with the fixed pdfview page and must not depend
+// on function toString (Metro inserts runtime helper functions).
 export const PDF_GRAPHICS_SCRIPT = String.raw`
 const area = (b) => Math.max(0, b.width) * Math.max(0, b.height);
 const overlap = (a, b) =>
   Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) *
   Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
 const covered = (a, b) => overlap(a, b) / Math.max(1, area(a));
-// PDF.js 记录的路径（0 移动、1 直线、2/3 曲线、4 闭合）是什么形状：矩形、圆角矩形（四条边是横平竖直的直线、
-// 四个角是曲线，例如信息卡片）、椭圆。
+// Shapes of paths recorded by PDF.js (0 move, 1 line, 2/3 curve, 4 close): rectangle, rounded
+// rectangle (four edges are horizontal/vertical straight lines, four corners are curves, e.g.,
+// information cards), ellipse.
 function pathShape(path, bounds) {
   let j = 0,
     curves = 0,
@@ -53,7 +55,7 @@ function pathShape(path, bounds) {
   return {
     ellipse: !bad && curves >= 4 && closed > 0 && longest < Math.min(w, h) * 0.05,
     rectangle: !bad && curves === 0 && lines >= 3 && lines <= 4 && closed > 0,
-    // 圆角只占边的一小段：四条横平竖直的边加起来至少是外框周长的一半（浏览器把每个圆角拆成好几段曲线）。
+    // Rounded corners occupy only a small fraction of the edge: the sum of the four horizontal/vertical edges is at least half of the outer perimeter (the browser splits each rounded corner into multiple curve segments).
     rounded:
       !bad && curves > 0 && closed > 0 && lines >= 2 && lines <= 4 && !slanted &&
       straight >= (w + h) * 2 * 0.5,
@@ -86,9 +88,9 @@ function decorativeOperation(r, full) {
       b.x <= full.width * 0.08 && b.y <= full.height * 0.08 &&
       b.x + b.width >= full.width * 0.92 && b.y + b.height >= full.height * 0.92));
 }
-// 画字的指令：没有 Unicode 的字形（text 是空串）也是字，不能当成绘图画进页底或图外的剪图。
+// Text drawing command: glyphs without Unicode (text is an empty string) are still text and must not be drawn as graphics into the page background or outer clipping paths.
 const isTextOp = (r) => typeof r.text === 'string';
-// 剪图那一遍画哪些指令：图里的字、透明字层画，图外的字不画；阴影蒙版下的绘图不画。
+// Commands drawn in the clipping pass: text inside the figure and the transparent text layer are drawn; text outside the figure is not drawn; drawings under shadow masks are not drawn.
 function cropOperation(r, plan) {
   if (!r) return false;
   if (isTextOp(r)) return plan.keep.has(r.i) || r.mode === 3;
@@ -96,7 +98,7 @@ function cropOperation(r, plan) {
     return false;
   return true;
 }
-// 页底那一遍只画纯装饰：任何字都不画。
+// The page-bottom pass draws pure decorations only: no text of any kind is drawn.
 function backgroundOperation(r, full) {
   if (!r || isTextOp(r)) return false;
   if (r.name === 'constructPath' || r.image || r.name === 'shadingFill')
@@ -104,7 +106,7 @@ function backgroundOperation(r, full) {
   return true;
 }
 function padGraphicBoxes(boxes, lines, width, height) {
-  // 绘图框和版面框都有边界误差；剪图留少量白边，但不能接管相邻正文。
+  // Both drawing boxes and layout boxes have boundary errors; clipping paths leave a small white margin but must not take over adjacent body text.
   return boxes.map((b) => {
     let left = Math.max(0, b.x - width / 128), top = Math.max(0, b.y - height / 128);
     let right = Math.min(width, b.x + b.width + width / 128), bottom = Math.min(height, b.y + b.height + height / 128);
@@ -184,7 +186,7 @@ function planNativeGraphics(records, input) {
   };
   const full = { x: 0, y: 0, width: input.width, height: input.height };
   const owned = [...(input.figures || [])];
-  // 狭长的原生位图若装着正文（如一整行目录），不能当作图的标签吞掉。
+  // If a narrow vertical native bitmap contains body text (such as an entire line of a table of contents), it must not be swallowed as a figure label.
   if (
     records.some(
       (r) =>
@@ -218,7 +220,7 @@ function planNativeGraphics(records, input) {
     const badge =
       letters.length >= 8 &&
       letters.filter((c) => c === c.toUpperCase()).length >= letters.length * 0.9;
-    // 全页扫描图、插着整段正文的图不能成为图像所有权，否则会把可编辑正文吞掉。
+    // Full-page scans or images containing blocks of body text cannot become image ownership targets; otherwise, editable body text would be swallowed.
     if (
       r.image &&
       area(r.box) < area(full) * 0.7 &&
@@ -227,7 +229,7 @@ function planNativeGraphics(records, input) {
       chars < 180
     )
       owned.push(r.box);
-    // 小图章里的两三行短字跟随图章；长句和只有年份的圆圈仍是正文。
+    // Short two- or three-line text inside small seals follows the seal; long sentences and circles containing only years remain body text.
     if (
       r.ellipse &&
       area(r.box) < area(full) * 0.08 &&
@@ -240,7 +242,7 @@ function planNativeGraphics(records, input) {
       nativeArtwork = true;
     }
   }
-  // 页角的小型多色标记（例如三色旗）也独立保留；不把正文、表单色条当成图标。
+  // Small multicolor markers at page corners (e.g., tricolor flags) are also independently preserved; body text and form color bars are not treated as icons.
   const marks = records.filter((r) => r.rectangle && r.fill && r.box &&
     r.box.y < full.height * 0.15 && r.box.x < full.width * 0.18 &&
     r.box.width < full.width * 0.08 && r.box.height < full.height * 0.04 &&
@@ -255,7 +257,7 @@ function planNativeGraphics(records, input) {
     const bottom = Math.max(...group.map((r) => r.box.y + r.box.height));
     owned.push({ x, y, width: right - x, height: bottom - y }); nativeArtwork = true;
   }
-  // 重复的小图卡：相同尺寸的填色矩形，跨两行两列，只有图内少量字母，标题在图外。
+  // Repeated small chart cards: filled rectangles of identical size spanning two rows and two columns, containing only a few letters inside the figure, with the title outside the figure.
   const cards = records.filter(
     (r) =>
       r.rectangle &&
@@ -298,7 +300,7 @@ function planNativeGraphics(records, input) {
       );
     }
   }
-  // 有些标志连字都已转为路径。只接管小块、短行、没有原生正文字层的矢量标志。
+  // Some logos have already had their text converted to paths. Only take over small blocks, short lines, and vector logos without a native body text layer.
   const labels = (input.lines || []).filter((l) => l.chars >= 3 && l.chars <= 32 &&
     !owned.some((b) => covered(l, b) > 0.8) &&
     !texts.some((t) => overlap(l, t.box) / Math.max(1, Math.min(area(l), area(t.box))) > 0.35));
@@ -328,17 +330,21 @@ function planNativeGraphics(records, input) {
     if (texts.some((t) => overlap(t.box, box) > area(t.box) * 0.2)) continue;
     owned.push(box); nativeArtwork = true;
   }
-  // 单色表格的灰底和边框已经由可编辑表格承载，不为它们再叠一张整页底图。
-  // 独立图章/图卡、实质性的原生图像和彩色绘图才需要此路径。
+  // Gray backgrounds and borders of monochrome tables are already handled by editable tables; do
+  // not overlay a full-page base image for them. Only independent seals/chart cards, substantive
+  // native images, and color drawings require this path.
   const chromatic = (c) =>
     /^[0-9A-F]{6}$/i.test(c || '') &&
     Math.max(...[0, 2, 4].map((i) => parseInt(c.slice(i, i + 2), 16))) -
       Math.min(...[0, 2, 4].map((i) => parseInt(c.slice(i, i + 2), 16))) >=
       24;
-  // 模型找到了整幅示意图、原生图像证明其中确实有图时，把零散位图和矢量标签作为一张图。
-  // 很大的表单区、长段正文和没有原生图像佐证的模型误报不接管。
-  // 区域里图外面有一叠左对齐、一行接一行的字（信头的地址、「NOM : / Date de naissance : / Classe :」，
-  // EU 样本 097）：那是框着的正文，不是图里零散的标注，区域不接管，只剪图自己。
+  // When the model finds a complete schematic diagram and native images prove there is indeed an
+  // image, scattered bitmaps and vector labels are treated as a single image. Very large form
+  // areas, long paragraphs of body text, and model false positives without native image
+  // corroboration are not taken over. Outside the figure region, there is a stack of left-aligned,
+  // line-by-line text (letterhead address, "NOM : / Date de naissance : / Classe :", EU sample
+  // 097): that is boxed body text, not scattered annotations inside the figure; the region is not
+  // taken over, and only clipping is applied.
   const textStack = (items) =>
     items.some((a) => {
       const column = items
@@ -380,7 +386,7 @@ function planNativeGraphics(records, input) {
     (r) => r.image && r.box && !r.mask && area(r.box) > area(full) * 0.7,
   );
   if (large.some((r) => !r.safeBackdrop)) return null;
-  // 已证明正文位置在位图中是纯底色：未被原生正文覆盖的少量短字属于这张绘图（例如图中品牌字）。
+  // Body text location proven to be a pure background color in the bitmap: a small amount of short text not covered by native body text belongs to this drawing (e.g., brand text within the image).
   if (large.length) {
     const labels = (input.lines || []).filter(
       (l) =>
@@ -421,8 +427,11 @@ function planNativeGraphics(records, input) {
       ...groups.map((b) => ({ x: b.x - 2, y: b.y - 2, width: b.width + 4, height: b.height + 4 })),
     );
   }
-  // 拼起来的整图下面压着成段的原生正文（斜着的「MUSTER」水印由几百条细位图拼成，EU 样本 071）：
-  // 那是水印、底纹，不是图。接管了就把正文一起画进剪图、切掉跨出图边的字；不接管，字照常可编辑，水印不画。
+  // Piecemeal full images with sections of native body text underneath (slanted "MUSTER" watermark
+  // composed of hundreds of thin bitmaps, EU sample 071): that is a watermark/background pattern,
+  // not a figure. If taken over, body text would be drawn into the clipping path and text crossing
+  // the figure boundary would be cut off; if not taken over, text remains editable and the
+  // watermark is not drawn.
   const merged = mergeGraphicBoxes(owned);
   const watermarks = merged.filter(
     (b) =>
@@ -433,36 +442,39 @@ function planNativeGraphics(records, input) {
   owned.splice(0, owned.length, ...merged.filter((b) => !watermarks.includes(b)));
   const native = (l) =>
     texts.some((t) => overlap(l, t.box) / Math.max(1, Math.min(area(l), area(t.box))) > 0.35);
-  // 水印自己的笔画被识别成的字（「XXxHXXXXI」）：在水印里，又没有原生字和它对得上。
+  // Watermark strokes recognized as text ("XXxHXXXXI"): located inside the watermark and without any matching native text.
   const ink = (l) => watermarks.some((b) => covered(l, b) > 0.8) && !native(l);
   const ocr = (input.lines || []).filter(
     (l) => !owned.some((b) => covered(l, b) > 0.8) && !ink(l),
   );
   const total = ocr.reduce((n, l) => n + l.chars, 0);
   const matched = ocr.reduce((n, l) => n + (native(l) ? l.chars : 0), 0);
-  // 隐藏的 OCR 字层不算数字正文。混合扫描页不能叠一张含正文的扫描图。
+  // Hidden OCR text layers do not count as digital body text. Hybrid scanned pages must not overlay a scanned image containing text.
   if (total && matched / total < 0.85) return null;
   return {
     owned,
     watermarks,
-    // 识别行里哪些是水印的笔画（按传进来的 lines 的序号），转 Word 时不当字。
+    // Identify which strokes in the recognition lines belong to the watermark (by the sequence numbers of incoming lines); do not treat them as text when converting to Word.
     watermarkInk: (input.lines || []).flatMap((l, k) => (ink(l) ? [k] : [])),
-    // 图里的字（连同没有 Unicode 的字形）跟着剪图画。
+    // Text inside figures (along with glyphs lacking Unicode) is drawn along with the clipping path.
     keep: new Set(
       records
         .filter((r) => isTextOp(r) && r.box && r.alpha > 0.01 && r.mode !== 3 && keep(r))
         .map((r) => r.i),
     ),
     shadows: new Set(masks.keys()),
-    // 没画进剪图的字：Word 里按它写颜色；图里和它重叠的识别行也留作正文（不归图）。
+    // Text not drawn into the clipping path: written in its specified color in Word; recognition lines overlapping it in the figure are also preserved as body text (not attributed to the figure).
     colors: texts.filter((t) => !keep(t)).map((t) => ({ box: t.box, color: t.color })),
-    // 圆角的信息卡片也是字下面的底色：不进页底（只画整页装饰），只能随段落、格子的底色保留。
-    // 半透明的底色（20% 的品牌色，EU 样本 048）按它在白纸上看起来的浅色写，不写成不透明的深色。
+    // Rounded information cards are also background colors beneath text: they do not enter the page
+    // bottom (only page-wide decorations are drawn there), and can only be preserved along with
+    // paragraph and cell background colors. Translucent background colors (20% brand color, EU
+    // sample 048) are written as the light color they appear on white paper, not as opaque dark
+    // colors.
     fills: records.filter((r) => r.fill && (r.rectangle || r.rounded) && r.box && r.alpha >= 0.05 && !r.mask)
       .map((r) => ({ box: r.box, color: r.alpha > 0.9 ? r.color : onWhite(r.color, r.alpha) })),
   };
 }
-/** 半透明的颜色（RRGGBB，不透明度 alpha）叠在白纸上的颜色。 */
+/** Color resulting from overlaying a translucent color (RRGGBB, opacity alpha) on white paper. */
 function onWhite(color, alpha) {
   if (!/^[0-9A-F]{6}$/i.test(color)) return color;
   return [0, 2, 4]
@@ -505,7 +517,7 @@ handlers.graphics = async ({ file, index, maxSide, figures, candidates, lines })
         if (name === 'save') stack.push({ ...state });
         else if (name === 'restore') state = stack.pop() || state;
         else if (name === 'beginGroup') {
-          // 透明组整组按开组时的不透明度叠上去（Illustrator 存的 20% 色块：外面 /ca 0.2，组里 /ca 1）。
+          // Transparent groups are overlaid according to the group's opening opacity (20% color blocks saved by Illustrator: outside /ca 0.2, inside /ca 1).
           groups.push({
             state: { ...state },
             mask: args[0]?.smask ? 'mask' + ++maskId : null,
@@ -566,7 +578,7 @@ handlers.graphics = async ({ file, index, maxSide, figures, candidates, lines })
           width: (bb.maxX(r.i) - bb.minX(r.i)) * base.width,
           height: (bb.maxY(r.i) - bb.minY(r.i)) * base.height,
         };
-    // 大位图可能是纸的装饰底图，也可能是扫描正文。只在每一处原生正文下都是平坦底色时允许前者。
+    // Large bitmaps may be decorative paper backgrounds or scanned body text. The former is allowed only if there is a flat background beneath every native body text instance.
     const visible = records.filter((r) => r.text && r.box && r.alpha > 0.01 && r.mode !== 3);
     for (const r of records.filter(
       (r) => r.imageId && r.box && !r.mask && area(r.box) > base.width * base.height * 0.7,
@@ -633,7 +645,7 @@ handlers.graphics = async ({ file, index, maxSide, figures, candidates, lines })
       background: 'rgba(0,0,0,0)',
       operationsFilter: (i) => cropOperation(byIndex.get(i), plan),
     }).promise;
-    // 每张图单独输出。完整绘图层只在此处作剪图中间值，绝不作为文字/表格后面的固定内容层。
+    // Each image is output separately. The complete drawing layer serves solely as a clipping intermediate here and is never used as a fixed content layer behind text/tables.
     plan.owned = completeBarcodes(ctx, canvas.width, canvas.height, plan.owned, scale,
       visible.filter((t) => !plan.keep.has(t.i)));
     plan.owned = padGraphicBoxes(plan.owned, lines, base.width, base.height);

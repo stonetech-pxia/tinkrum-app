@@ -31,14 +31,14 @@ const RESULT_MESSAGES: Record<Exclude<ConnectionResult, { ok: true }>['kind'], S
   network: 'byokUnavailable',
 };
 
-/** provider 一排：Anthropic、几家常见的 OpenAI 兼容接口、自定义。 */
+/** Provider row: Anthropic, several common OpenAI-compatible endpoints, custom. */
 const PROVIDER_CHIPS = [
   { id: 'anthropic', name: 'Anthropic' },
   ...OPENAI_COMPATIBLE_PRESETS,
   { id: 'custom', name: '' },
 ];
 
-/** OpenAI 兼容接口：提到 Claude 的几条换成不点名的说法（D-241）。 */
+/** OpenAI-compatible endpoints: replace mentions of Claude with non-branded phrasing (D-241). */
 const OTHER_RESULT_MESSAGES: typeof RESULT_MESSAGES = {
   ...RESULT_MESSAGES,
   spend_limit: 'byokOtherSpendLimit',
@@ -91,7 +91,7 @@ function Option({
   );
 }
 
-/** 「设置 → AI」：选择 AI 来源；自带 key 时选 provider（D-241）、管理 key、选择模型、测试连接。 */
+/** "Settings -> AI": select AI source; choose provider when using own key (D-241), manage keys, select model, test connection. */
 export function AISettingsScreen() {
   const { locale } = useWorkspaceContext();
   const theme = useAppTheme();
@@ -128,7 +128,7 @@ export function AISettingsScreen() {
     void setMode(m);
   };
 
-  // 「provider」一排：Anthropic 走自己的接口，别的是 OpenAI 兼容接口（填好地址）；「自定义」自己填地址。
+  // "Provider" row: Anthropic uses its own endpoint, others use OpenAI-compatible endpoints (with address filled); "Custom" for user-supplied addresses.
   const [custom, setCustom] = useState(
     provider === 'openai' && !OPENAI_COMPATIBLE_PRESETS.some((p) => p.baseUrl === baseUrl),
   );
@@ -208,7 +208,7 @@ export function AISettingsScreen() {
     );
   }
 
-  // 自带 key 时请求发到哪里：Anthropic 固定，OpenAI 兼容接口是已保存的地址。
+  // Where requests are sent when using own key: fixed for Anthropic, saved address for OpenAI-compatible endpoints.
   const sentTo =
     provider === 'anthropic' ? hostOf(ANTHROPIC_API_URL) : baseUrl ? hostOf(baseUrl) : '';
   const text = [palette.font('body', 15), { color: palette.text }];
@@ -218,7 +218,7 @@ export function AISettingsScreen() {
       style={{ backgroundColor: palette.background }}
       contentContainerStyle={{ padding: palette.pad, gap: palette.gap - 4, paddingBottom: 48 }}
       keyboardShouldPersistTaps="handled"
-      // 地址、模型名和 key 的输入框在下半屏，iOS 弹出键盘时要让开（Android 默认会调整）。
+      // Address, model name, and key input fields are in the lower half of the screen; adjust for keyboard on iOS (Android adjusts automatically).
       automaticallyAdjustKeyboardInsets>
       <SectionLabel palette={palette}>{t(locale, 'aiModeQuestion')}</SectionLabel>
       <Option
@@ -372,7 +372,7 @@ export function AISettingsScreen() {
             ) : null}
           </Card>
 
-          {/* key 只发给已保存的地址，所以 OpenAI 兼容接口先存地址再填 key。 */}
+          {/* Keys are sent only to saved addresses, so OpenAI-compatible endpoints require saving the address before entering the key. */}
           <SectionLabel palette={palette}>{t(locale, 'apiKeyLabel')}</SectionLabel>
           <Card palette={palette}>
             {keyHint ? (
@@ -465,7 +465,7 @@ export function AISettingsScreen() {
         </>
       ) : null}
 
-      {/* 需求回收（D-189）：默认显示按钮，点了才发送；关掉后不再显示。 */}
+      {/* Requirement feedback (D-189): button shown by default, sends only when tapped; hidden after dismissal. */}
       {canSendNeeds ? (
         <Card palette={palette}>
           <View style={styles.row}>

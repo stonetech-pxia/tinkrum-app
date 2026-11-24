@@ -11,7 +11,7 @@ import {
 import { isSequenceAggregate, sequenceText } from '../sequence-text';
 import { defineField, isNumber, readNumber, type FieldDefinitionOf } from './define';
 
-/** 汇总的算法：计数、求和、平均、最小、最大、最近一条的值，以及按日子算的那几种（D-284）。 */
+/** Rollup aggregation algorithms: count, sum, average, min, max, latest value, and date-based variants (D-284). */
 export const ROLLUP_AGGREGATES = [
   'count',
   'sum',
@@ -30,16 +30,18 @@ const schema = z.strictObject({
   via: IdSchema,
   aggregate: z.enum(ROLLUP_AGGREGATES),
   field: IdSchema.optional(),
-  // v33 的 period 迁移成这里末尾的一条 inPeriod，所以最多 6 条（M3）。
+  // v33 period migrated to an inPeriod item at the end here, supporting up to 6 items (M3).
   filter: filterSchema(6).optional(),
   days: DaysSchema.optional(),
 });
 
 /**
- * D-288：汇总。统计另一张表（table）里引用字段 via 指向这条记录的那些记录（可以再按 filter 筛，
- * 时间段也写在 filter 里），不存进记录、不能填。计数和按日子算的值是数字（连续天数显示「3 天」）；求和、平均、
- * 最小、最大和 latest 按 field 的类型显示（related.ts 的 expandCollection），latest 不写 field 时取日期。
- * 按日子算的参数在 days 里（和数字块共用一种写法）。
+ * D-288: Rollup. Computes records in another table (table) pointed to by the reference field via
+ * pointing to this record (optionally filtered by filter, with time periods also specified in
+ * filter), not stored in records, non-fillable. Count and date-based values are numbers
+ * (consecutive days displayed as "3 days"); sum, average, min, max, and latest are displayed
+ * according to field's type (related.ts expandCollection), defaulting to date if field is omitted
+ * for latest. Date-based parameters reside in days (sharing the same syntax as number blocks).
  */
 export const rollupField: FieldDefinitionOf<'rollup', typeof schema> = defineField({
   type: 'rollup',

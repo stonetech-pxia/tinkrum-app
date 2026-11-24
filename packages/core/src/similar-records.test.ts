@@ -4,7 +4,7 @@ import type { DataRecord } from './data';
 import { findSimilarRecords } from './similar-records';
 import type { Collection } from './schema';
 
-// D-426：保存新记录前比哪些值。比的是「应该算同一条」，不是代码怎么写。
+// D-426: Which values to compare before saving a new record. Compares "what should be considered the same entry", not how the code is written.
 
 const record = (id: string, values: Record<string, unknown>, deletedAt?: number) =>
   ({ id, collectionId: 't', values, createdAt: 1, updatedAt: 1, deletedAt }) as DataRecord & {

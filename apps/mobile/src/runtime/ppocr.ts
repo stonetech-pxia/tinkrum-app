@@ -1,15 +1,17 @@
 import { recognizePage, type OcrModels, type OcrResultLine, type RgbaImage } from '@morph/tool-ocr';
 
-// 用 PP-OCRv6 识别一张图（D-269）：前后处理在 @morph/tool-ocr（JS），模型由原生模块跑。
-// 张量和结果走临时文件（几 MB 到几十 MB，不经过 JS 和原生之间的参数转换），识别完不管成功失败都删掉。
+// Recognizes an image using PP-OCRv6 (D-269): preprocessing and post-processing are in
+// @morph/tool-ocr (JS), with the model executed by native modules. Tensors and results pass through
+// temporary files (a few MB to tens of MB, avoiding parameter conversion between JS and native) and
+// are deleted after recognition regardless of success or failure.
 
-/** PP-OCRv6 用得上的语言（BCP 47 的语言部分）：中文（简繁）、日文、英法德西葡意。韩文、俄文、越南文不认。 */
+/** Languages supported by PP-OCRv6 (BCP 47 language subtags): Chinese (Simplified/Traditional), Japanese, English, French, German, Spanish, Portuguese, Italian. Korean, Russian, and Vietnamese are not recognized. */
 export const PPOCR_LANGUAGES = ['zh', 'ja', 'en', 'fr', 'de', 'es', 'pt', 'it'] as const;
 
-/** 扩展包 ID（packages/core 的 PACKS）。 */
+/** Extension pack ID (PACKS in packages/core). */
 export const PPOCR_PACK = 'ppocr';
 
-/** 送去识别的图片长边：在评测里这么大最准（字高约 25–35 像素），再大更慢也不更准。 */
+/** Long side of the image sent for recognition: benchmarks show this size is most accurate (character height approx. 25-35 pixels); larger sizes are slower without improving accuracy. */
 export const PPOCR_INPUT_SIDE = 2000;
 
 export interface PpocrNative {
@@ -19,16 +21,16 @@ export interface PpocrNative {
 }
 
 export interface PpocrIo {
-  /** 扩展包装好了没有。 */
+  /** Whether the extension pack is installed. */
   installed(): Promise<boolean>;
-  /** 扩展包里文件的 file:// 地址。 */
+  /** file:// URI for a file inside a pack. */
   modelUri(file: 'det.onnx' | 'rec.onnx' | 'dictionary.json'): string;
   readText(uri: string): Promise<string>;
-  /** 新建一个临时目录，返回它的 file:// 地址（结尾不带 /）和删除它的方法。 */
+  /** Creates a new temporary directory and returns its file:// URI (without trailing /) and a removal method. */
   tempDir(): { uri: string; remove(): void };
   write(uri: string, bytes: Uint8Array): Promise<void>;
   read(uri: string): Promise<Uint8Array>;
-  /** 图片解码成识别要的大小（ocrPixels）。 */
+  /** Decodes an image to the size required for recognition (ocrPixels). */
   pixels(uri: string, maxSide: number): Promise<RgbaImage>;
 }
 
@@ -42,8 +44,9 @@ export function createPpocr(native: PpocrNative, io: PpocrIo) {
   let dictionary: readonly string[] | null = null;
   return {
     /**
-     * 识别一张图：返回识别时图片的大小和每一行（像素，原点在左上角）。
-     * pixels 是这张图已经按 io.pixels 解码好的像素（转 Excel 找线时解码过，D-272），给了就不再解码。
+     * Recognizes an image: returns the image size at recognition time and each line (pixels,
+     * origin at top-left). pixels are the pre-decoded pixels of this image according to io.pixels
+     * (decoded when finding lines for Excel conversion, D-272), skipping re-decoding if provided.
      */
     async recognize(
       uri: string,
@@ -69,7 +72,7 @@ export function createPpocr(native: PpocrNative, io: PpocrIo) {
             const outFile = `${dir.uri}/rec-${n++}-out.bin`;
             await io.write(inFile, bytesOf(input));
             const steps = await native.ocrRecognize(inFile, count, width, outFile);
-            // 复制一份：读回来的字节不一定从 4 的倍数开始。
+            // Make a copy: the read bytes do not necessarily start at a multiple of 4.
             const bytes = (await io.read(outFile)).slice();
             const cells = count * steps;
             return {

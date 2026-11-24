@@ -18,12 +18,13 @@ import { STARTER_THEME } from './theme';
 import { validateWorkspace } from './validate';
 
 /**
- * 新用户第一次打开时预装的工具（D-104）：需求量最大的图片和 PDF，「视频太大发不出去」的视频（D-146），
- * 加上手机本来就有的扫描、文字识别和二维码。都在本机运行，装上不会下载任何东西。
+ * Preinstalled tools for new users on first launch (D-104): High-demand Image and PDF tools,
+ * Video tool for "videos too large to send" (D-146), along with built-in phone capabilities for
+ * scanning, OCR, and QR codes. All run locally and download nothing upon installation.
  */
 export const STARTER_TOOL_IDS = ['image', 'pdf', 'video', 'scan', 'ocr', 'qr'] as const;
 
-/** 工具箱的分组（D-181）：按用途分，最后一组接住没列出的工具（以后新加的工具也会出现在这里）。 */
+/** Toolbox groups (D-181): Categorized by purpose, with the final group capturing any unlisted tools (future newly added tools will also appear here). */
 const TOOLBOX_GROUPS: { id: string; title: [string, string]; toolIds?: string[] }[] = [
   {
     id: 'media',
@@ -32,15 +33,18 @@ const TOOLBOX_GROUPS: { id: string; title: [string, string]; toolIds?: string[] 
   },
   { id: 'files', title: ['Files and documents', '文件和材料'], toolIds: ['pdf', 'scan', 'zip'] },
   { id: 'text', title: ['Text', '文字'], toolIds: ['ocr', 'translate', 'text'] },
-  // 二维码、报表和以后新加的工具。
+  // QR codes, reports, and future newly added tools.
   { id: 'more', title: ['More tools', '更多工具'] },
 ];
 
 /**
- * 首页的入口（新手引导第 1 步和「跳过引导」用，D-231；D-487 重做）：标题和一句话；
- * 产品的卖点放在最前面——扫成 PDF、Word、Excel，合并文件（四个宫格，都是内设的快捷操作，点了直接运行，不用添加）；
- * 下面一个主色的「打开文件」（先问相册还是文件）；再下面是工具箱入口、最近操作、最近文件。
- * 首页已经有文件入口时不再加；某个快捷操作要的工具没装就不放那一块。
+ * Home screen entry points (used in onboarding step 1 and "Skip guide", D-231; redesigned in
+ * D-487): Title and subtitle; product selling points highlighted at the top—scan to PDF, Word,
+ * Excel, and merge files (four tiles, all built-in quick actions that run immediately on tap
+ * without needing to be added); followed by a primary-colored "Open files" button (prompting
+ * whether to choose from photo library or files); followed by the toolbox entry, recent
+ * operations, and recent files. Omitted if file entry points already exist on the home screen;
+ * tiles are omitted if required tools are uninstalled.
  */
 export function homeFileEntryOps(config: WorkspaceConfig, locale: Locale): Op[] {
   const home = config.containers.pages.find((p) => p.id === HOME_PAGE_ID);
@@ -49,7 +53,7 @@ export function homeFileEntryOps(config: WorkspaceConfig, locale: Locale): Op[] 
   const ids = new Set(allComponents(home).map((c) => c.id));
   const free = (id: string) => (ids.has(id) ? `${id}-2` : id);
   const installed = (id: string) => config.packages.some((p) => p.id === id);
-  // 宫格里的快捷操作（内设的预设 ID）和它要的工具。
+  // Quick actions in the tiles (built-in preset IDs) and their required tools.
   const tiles = [
     { id: 'scan', tool: 'scan-camera', needs: 'scan' },
     { id: 'scan-word', tool: 'scan-doc-word', needs: 'scan' },
@@ -112,7 +116,7 @@ export function homeFileEntryOps(config: WorkspaceConfig, locale: Locale): Op[] 
           },
         ]
       : []),
-    // D-452：最近用过的快捷操作（读运行记录，没有时不显示）和最近的文件（扫描的都在这里，D-450）。
+    // D-452: Recently used quick actions (reading run logs, hidden when empty) and recent files (all scanned files are stored here, D-450).
     {
       op: 'addContainer',
       page: HOME_PAGE_ID,
@@ -137,13 +141,15 @@ export function homeFileEntryOps(config: WorkspaceConfig, locale: Locale): Op[] 
 }
 
 /**
- * 新用户的第一个版本（D-182）：空白首页（D-231，引导第 1 步加上文件入口）、工具箱页面、预装工具，
- * 导航栏只有首页、AI、设置（工具在首页的工具箱里，管理工具和历史在设置里）。
- * createDefaultWorkspace 保持空白：测试、评测和回退都以它为基准。
+ * Initial version for new users (D-182): Blank home screen (D-231, onboarding step 1 adds file
+ * entry), toolbox page, preinstalled tools, with navigation bar limited to Home, AI, and Settings
+ * (tools reside in the home screen toolbox, while tool management and history are under
+ * Settings). createDefaultWorkspace remains blank: used as the baseline for tests, evaluations,
+ * and rollbacks.
  */
 export function createStarterWorkspace(locale: Locale, registry: Registry): WorkspaceConfig {
   const pick = (pair: [string, string]) => pairText(locale, pair);
-  // D-487：新用户的第一个版本用精修过的 Clay（STARTER_THEME）；createDefaultWorkspace 仍是基准。
+  // D-487: New users' first version uses the refined Clay (STARTER_THEME); createDefaultWorkspace remains the baseline.
   const base = { ...createDefaultWorkspace(locale), theme: structuredClone(STARTER_THEME) };
   const toolIds = STARTER_TOOL_IDS.filter((id) => registry.tools.has(id));
 
@@ -180,10 +186,10 @@ export function createStarterWorkspace(locale: Locale, registry: Registry): Work
   };
 
   const ops: Op[] = [
-    // 先放工具箱：添加工具包时它已经显示这些工具包，首页就不会多出入口（D-181）。
+    // Place toolbox first: when adding tool packs, it already displays these tool packs, so the home screen won't have extra entry points (D-181).
     { op: 'addContainer', page: toolbox },
     ...toolIds.map((id) => ({ op: 'setPackage' as const, package: id, do: 'add' as const })),
-    // 首页从空白开始（D-231）：新手引导第 1 步让用户自己加上「打开相册」「打开文件」。
+    // Start home screen from blank (D-231): onboarding step 1 has the user add "Open album" and "Open files" themselves.
     { op: 'removeContainer', page: HOME_PAGE_ID, block: 'welcome' },
     { op: 'removeContainer', page: HOME_PAGE_ID, block: 'catalog' },
     { op: 'removeContainer', page: HOME_PAGE_ID, block: 'recent-files' },
@@ -198,8 +204,9 @@ export function createStarterWorkspace(locale: Locale, registry: Registry): Work
 type Page = WorkspaceConfig['containers']['pages'][number];
 
 /**
- * 「文件」页：扫描、转换、打开过的文件按类型摆成书架（门户的 Clay 预设用，D-487）。
- * 按语言生成，内置文字（builtin-text）也认它，所以导入后的预设跟着界面语言显示（D-582）。
+ * "Files" page: scanned, converted, and opened files are arranged as a bookshelf by type (used by
+ * the portal's Clay preset, D-487). Generated per language, and builtin-text also recognizes it,
+ * so imported presets follow the interface language (D-582).
  */
 export function filesByTypePage(locale: Locale): Page {
   const shelf = (id: string, title: string, kind: string) => ({

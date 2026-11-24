@@ -12,7 +12,7 @@ export interface DropTarget {
   line: ItemBox;
 }
 
-/** 按组件实际矩形找落点：宫格按左右半格，纵排按上下半格；隐藏项不占落点。 */
+/** Find drop targets based on the component's actual rectangle: grids use left/right halves, vertical lists use top/bottom halves; hidden items occupy no drop target. */
 export function findDropTarget(
   page: Page,
   id: string,
@@ -25,7 +25,7 @@ export function findDropTarget(
     if (!allowed.some((s) => s.parentId === slot.parentId && s.index === slot.index)) return;
     const dx = Math.max(box.x - point.x, 0, point.x - box.x - box.width);
     const dy = Math.max(box.y - point.y, 0, point.y - box.y - box.height);
-    // 重叠的分组和子项中优先选子项。
+    // Prefer child items over overlapping groups and child items.
     const distance = dx * dx + dy * dy - depth * 0.01;
     if (!best || distance < best.distance) best = { target: { slot, line }, distance };
   };
@@ -45,7 +45,7 @@ export function findDropTarget(
       consider(slot, line, box, parentId ? 1 : 0);
       if (c.look === 'group') {
         if (!c.children.some((child) => !child.hidden)) {
-          // 空分组内仍可放入；上下边缘保留移到分组前后的落点。
+          // Items can still be dropped into empty groups; preserve drop targets before and after the group at the top and bottom edges.
           const inset = Math.min(12, box.height / 4);
           const inner = { ...box, y: box.y + inset, height: box.height - inset * 2 };
           consider(

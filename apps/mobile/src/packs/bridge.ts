@@ -1,22 +1,23 @@
 import { packById } from '@morph/core';
 
-// App 和扩展包页面（WebView）之间的通道（D-074）。
-// 页面只能拿到两种文件：已安装扩展包清单里列出的文件，和本次调用明确传入的文件。
-// 消息格式固定；App 只发送动作名、我们自己的参数和文件内容，从不注入代码。
+// Communication channel between App and pack pages (WebView) (D-074). Pages can only access two
+// types of files: files listed in the installed pack manifest and files explicitly passed in the
+// current call. Message format is fixed; the App sends only action names, our own parameters, and
+// file contents, never injecting code.
 
 export type PackPageId = 'pdfview' | 'scan' | 'ocr';
 
-/** 读文件的能力（App 中由 expo-file-system 实现）。 */
+/** File reading capability (implemented via expo-file-system in the App). */
 export interface BridgeFiles {
-  /** 已安装扩展包里的文件，读成文字或 base64。 */
+  /** Read files inside installed packs as text or base64. */
   packFile(pack: string, path: string, as: 'text' | 'base64'): Promise<string>;
   isInstalled(pack: string): Promise<boolean>;
-  /** 本次运行的临时文件，读成 base64。 */
+  /** Read temporary files of the current run as base64. */
   runFile(uri: string): Promise<string>;
 }
 
 export interface PackRuntime {
-  /** 调用扩展包页面里的一个处理函数；files 是本次允许页面读取的文件（名字 → 地址）。 */
+  /** Invoke a handler function inside a pack page; files are those permitted for the page to read in this call (name → URI). */
   call<T>(
     page: PackPageId,
     method: string,
@@ -47,7 +48,7 @@ export class PackBridge implements PackRuntime {
 
   constructor(private readonly files: BridgeFiles) {}
 
-  // ---- 给宿主组件用 ----
+  // ---- For host components ----
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -57,13 +58,15 @@ export class PackBridge implements PackRuntime {
     if (webview) this.webviews.set(page, webview);
     else {
       this.webviews.delete(page);
-      // 重新渲染时 React 会先用 null、再用同一个 WebView 调一次：页面还在用就不算掉线，
-      // 否则之后的调用都在等一个不会再来的 ready。页面从使用中拿掉（close）之后才算真的卸下。
+      // During re-rendering, React first uses null, then invokes with the same WebView: if the page
+      // is still in use, it's not considered disconnected, otherwise subsequent calls wait for a
+      // ready state that never arrives. Considered truly unmounted only after the page is removed
+      // from use (close).
       if (!this.active.includes(page)) this.readyPages.delete(page);
     }
   }
 
-  /** 页面发来的消息。 */
+  /** Messages sent from the page. */
   async onMessage(page: PackPageId, data: string): Promise<void> {
     let m: {
       t?: string;
@@ -80,7 +83,7 @@ export class PackBridge implements PackRuntime {
       return;
     }
     if (m.t === 'log') {
-      // 页面里的错误只写进开发日志（内容是我们自己的页面代码报的错，不含文件内容）。
+      // Errors within pages are written only to dev logs (content consists of errors thrown by our own page code, excluding file contents).
       if (__DEV__) console.warn(`[pack:${page}]`, (m as { message?: string }).message);
       return;
     }
@@ -130,8 +133,9 @@ export class PackBridge implements PackRuntime {
   }
 
   /**
-   * 页面的网页进程被系统结束了（iOS 内存紧张时会这样）：正在等的调用马上失败，不再等到超时；
-   * 页面卸下，下次调用重新挂上。
+   * Page web process terminated by the system (occurs during iOS low memory pressure): pending
+   * calls fail immediately without waiting for timeout; page is unmounted and remounted on next
+   * call.
    */
   processGone(page: PackPageId) {
     this.readyPages.delete(page);
@@ -143,7 +147,7 @@ export class PackBridge implements PackRuntime {
     this.close(page);
   }
 
-  /** 关掉页面释放内存（例如离开运行页面后）。 */
+  /** Close page to release memory (e.g., after leaving the run page). */
   close(page: PackPageId) {
     this.active = this.active.filter((p) => p !== page);
     this.emit();
@@ -168,7 +172,7 @@ export class PackBridge implements PackRuntime {
     try {
       let data: string;
       if ('pack' in ref) {
-        // 只允许清单里列出的文件，而且扩展包必须已安装（校验过哈希）。
+        // Only manifest-listed files are permitted, and the pack must be installed (hash verified).
         const pack = packById(ref.pack);
         if (!pack || !pack.files.some((f) => f.path === ref.path)) throw new Error('not allowed');
         if (!(await this.files.isInstalled(ref.pack))) throw new Error('pack not installed');

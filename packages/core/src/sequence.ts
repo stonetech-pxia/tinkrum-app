@@ -4,13 +4,14 @@ import { round } from './field-values';
 import { dayNumber } from './formula';
 import { type Collection, type Days, type SequenceAggregate, type StreakUnit } from './schema';
 
-// 按顺序的聚合（D-284）：看记录落在哪些日子上，而不是把数值加起来。纯逻辑，接口是
-// 「一组记录 + 日期字段 + 参数 → 值」：统计、图表现在用，以后汇总字段（P3）也照样用。
-// 日子都换成天数（dayNumber）来比较，按「一天从几点开始、一周从周几开始」（D-286）归类。
+// Sequential aggregates (D-284): check which days records fall on rather than summing values. Pure
+// logic, interface is "set of records + date field + parameters -> value": currently used by
+// statistics and charts, and will be used by summary fields (P3) in the future. Days are converted
+// to dayNumber for comparison, categorized by "start hour of day, start day of week" (D-286).
 
 export { isSequenceAggregate, sequenceText } from './sequence-text';
 
-/** 连续的规则：每个单位（天 / 周 / 月）至少 perUnit 条才算做到；skip 那个选项的记录算「跳过」。 */
+/** Streak rule: requirement of at least perUnit entries per unit (day/week/month) to count as achieved; records with the skip option count as "skipped". */
 export interface StreakRule {
   unit: StreakUnit;
   perUnit: number;
@@ -18,8 +19,9 @@ export interface StreakRule {
 }
 
 /**
- * 按日子算用哪个日期（Days.date，图表按时间分组时是 group.by，月历是 group.by）：写了就用它；不写是表里第一个
- * 日期字段，没有就第一个日期时间字段（D-279），再没有就创建时间。
+ * Date to use for calculations (Days.date, group.by for charts grouped by time, group.by for
+ * calendars): use if specified; otherwise, use the first date field in the table, falling back to
+ * the first datetime field (D-279), and finally creation time.
  */
 export function dateFieldOf(collection: Collection, date: string | undefined): string {
   return (
@@ -31,13 +33,13 @@ export function dateFieldOf(collection: Collection, date: string | undefined): s
 }
 
 export interface SequenceContext {
-  /** 按哪个日期：日期字段、日期时间字段（D-279），或 createdAt / updatedAt（按一天开始的钟点归到哪一天）。 */
+  /** Date to use: date field, datetime field (D-279), or createdAt / updatedAt (classified into a day based on the start hour of the day). */
   dateField: string;
   now: Date;
   cal?: Calendar;
 }
 
-/** 每条记录的日子（天数）；没有日期的不算。 */
+/** Day numbers for each record; records without dates are excluded. */
 function recordDays(records: readonly DataRecord[], collection: Collection, ctx: SequenceContext) {
   const cal = ctx.cal ?? DEFAULT_CALENDAR;
   return records.flatMap((r) => {
@@ -47,7 +49,7 @@ function recordDays(records: readonly DataRecord[], collection: Collection, ctx:
   });
 }
 
-/** 一天落在哪个单位里（单位的编号，相邻单位差 1）。 */
+/** Which unit a day falls into (unit ID, adjacent units differ by 1). */
 function unitOf(day: number, unit: StreakUnit, cal: Calendar): number {
   if (unit === 'day') return day;
   if (unit === 'week') return Math.floor(weekStartOf(day, cal) / 7);
@@ -56,8 +58,10 @@ function unitOf(day: number, unit: StreakUnit, cal: Calendar): number {
 }
 
 /**
- * 当前连续和最佳连续（照 Streaks 的规则）：一个单位里做到的条数够了 +1；只有「跳过」的单位
- * 不断也不加；当前这个单位（今天 / 本周 / 本月）还没做到不算断，过了才断。今天以后的记录不算。
+ * Current and best streaks (according to Streaks rules): achieving enough entries in a unit
+ * increments +1; units with only "skipped" entries neither break nor increment; current unit
+ * (today/this week/this month) does not break until it has passed without fulfillment. Records
+ * after today are ignored.
  */
 export function streakOf(
   records: readonly DataRecord[],
@@ -75,7 +79,7 @@ export function streakOf(
     const unit = unitOf(day, rule.unit, cal);
     const isSkip =
       skipField !== undefined &&
-      // 多选（D-607）：选了「跳过」这一项就算。
+      // Multi-select (D-607): selecting the "skip" item counts as skipped.
       [readValue(skipField, record.values[skipField.id])].flat().includes(rule.skip!.option);
     if (isSkip) skipped.add(unit);
     else done.set(unit, (done.get(unit) ?? 0) + 1);
@@ -95,7 +99,7 @@ export function streakOf(
   return { current: run, best };
 }
 
-/** 距最近一条（今天以前，含今天）几天；没有记录时为 null。 */
+/** Days since the most recent entry (before or on today); null if no records. */
 export function daysSince(
   records: readonly DataRecord[],
   collection: Collection,
@@ -106,14 +110,14 @@ export function daysSince(
   return past.length === 0 ? null : today - Math.max(...past.map((d) => d.day));
 }
 
-/** 有记录的不同日子，从早到晚。 */
+/** Distinct days with records, sorted from earliest to latest. */
 const distinctDayList = (
   records: readonly DataRecord[],
   collection: Collection,
   ctx: SequenceContext,
 ) => [...new Set(recordDays(records, collection, ctx).map((d) => d.day))].sort((a, b) => a - b);
 
-/** 相邻两个有记录的日子平均隔几天（一位小数）；不到两天有记录时为 null。 */
+/** Average interval in days between adjacent recorded days (one decimal place); null if fewer than two recorded days. */
 export function avgInterval(
   records: readonly DataRecord[],
   collection: Collection,
@@ -123,7 +127,7 @@ export function avgInterval(
   return days.length < 2 ? null : round((days.at(-1)! - days[0]!) / (days.length - 1), 1);
 }
 
-/** 有记录的天数。 */
+/** Number of days with records. */
 export const distinctDays = (
   records: readonly DataRecord[],
   collection: Collection,
@@ -131,8 +135,9 @@ export const distinctDays = (
 ): number => distinctDayList(records, collection, ctx).length;
 
 /**
- * 数字块、汇总字段显示的值：streak 是当前连续，另给 best；其余只有 value。日期按 days.date（dateFieldOf），
- * days.unit、perUnit、skip 只给 streak。
+ * Value displayed by number blocks and summary fields: streak is the current streak, with best
+ * provided separately; others have only value. Dates follow days.date (dateFieldOf); days.unit,
+ * perUnit, and skip apply only to streak.
  */
 export function sequenceValue(
   records: readonly DataRecord[],
@@ -145,7 +150,7 @@ export function sequenceValue(
   const ctx: SequenceContext = { dateField: dateFieldOf(collection, days?.date), now, cal };
   switch (aggregate) {
     case 'streak': {
-      // skip 要选项和字段都写了才算（同 v33）。
+      // skip requires both field and option to be specified (same as v33).
       const skip = days?.skip?.field && days.skip.option ? days.skip : undefined;
       const rule = { unit: days?.unit ?? 'day', perUnit: days?.perUnit ?? 1, skip };
       const { current, best } = streakOf(records, collection, rule, ctx);

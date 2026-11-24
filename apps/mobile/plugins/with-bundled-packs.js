@@ -1,19 +1,22 @@
-// 随 App 打包的扩展包（D-510）：prebuild 时按 packages/core/src/packs.ts 的清单下载 BUNDLED_PACKS 里的文件，
-// 逐个校验大小和 SHA-256（缓存在 node_modules/.cache/morph-bundled-packs，下次 prebuild 不再下载），
-// 放进 App 的 packs/<id>/<version>/：iOS 是 .app 里的文件夹（Xcode 里的 folder reference），
-// Android 是 app/src/main/assets/packs。App 第一次用到时复制到 documentDirectory/packs（src/packs/store.ts）。
-// 放在我们自己服务器上的扩展包（展平、版面，D-274）要 EXPO_PUBLIC_MORPH_PACKS_URL；没配置时跳过（App 也不提示下载它们）。
-// 下载失败或大小、哈希不对时 prebuild 失败，不会打出少了扩展包的 App。
+// Extension packs bundled with the app (D-510): during prebuild, downloads files in BUNDLED_PACKS
+// according to packages/core/src/packs.ts manifest, verifies size and SHA-256 for each (cached in
+// node_modules/.cache/morph-bundled-packs to avoid re-downloading on subsequent prebuilds), and
+// places them into packs/<id>/<version>/ within the app: a folder reference inside the .app bundle
+// on Xcode for iOS, and app/src/main/assets/packs on Android. Copied to documentDirectory/packs
+// (src/packs/store.ts) the first time the app uses them. Extension packs hosted on our own server
+// (layouts, flat packs, D-274) require EXPO_PUBLIC_MORPH_PACKS_URL; skipped when unconfigured (the
+// app does not prompt to download them). Prebuild fails if a download fails or if the size or hash
+// is incorrect, preventing the generation of an app missing extension packs.
 const { Buffer } = require('node:buffer');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { withDangerousMod, withXcodeProject } = require('expo/config-plugins');
 
-/** 仓库根目录（projectRoot 是 apps/mobile）。 */
+/** Repository root directory (projectRoot is apps/mobile). */
 const repoOf = (projectRoot) => path.resolve(projectRoot, '../..');
 
-/** 清单是 TypeScript：Node 22.18 起能直接读（去掉类型）。只在 prebuild 时读。 */
+/** Manifest is written in TypeScript: directly readable by Node 22.18+ (stripping types). Read only during prebuild. */
 function manifest(repo) {
   try {
     return require(path.join(repo, 'packages/core/src/packs.ts'));
@@ -26,7 +29,7 @@ function manifest(repo) {
 
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 
-/** 一个文件：缓存里有而且哈希对就用缓存，否则下载、校验后放进缓存。返回缓存里的路径。 */
+/** A single file: uses cache if present and hash matches; otherwise downloads, validates, and stores it in cache. Returns the cached path. */
 async function fetchFile(repo, pack, file, url) {
   const cached = path.join(
     repo,
@@ -47,7 +50,7 @@ async function fetchFile(repo, pack, file, url) {
   return cached;
 }
 
-/** 把这个平台要带的扩展包放进 dest（先清空，旧版本不留）。 */
+/** Place the extension packs required for this platform into dest (clears first so old versions are not left behind). */
 async function bundlePacks(repo, platform, dest) {
   const { BUNDLED_PACKS, packById, packFileUrl } = manifest(repo);
   const base = process.env.EXPO_PUBLIC_MORPH_PACKS_URL;
@@ -88,7 +91,7 @@ const withIosPacks = (config) =>
       },
     ]),
     (next) => {
-      // 整个文件夹作为 folder reference 进 App 的资源（.app/packs/...），文件夹里的结构原样保留。
+      // Add the entire folder as a folder reference into app resources (.app/packs/...), preserving internal folder structure as-is.
       const project = next.modResults;
       const name = next.modRequest.projectName;
       const group = project.findPBXGroupKey({ name }) ?? project.findPBXGroupKey({ path: name });
@@ -98,7 +101,7 @@ const withIosPacks = (config) =>
         { lastKnownFileType: 'folder', target: project.getFirstTarget().uuid },
         group,
       );
-      // 已经加过（不带 --clean 的 prebuild）时返回 false。文件夹没有编码，去掉 xcode 库写成「undefined」的空字段。
+      // Returns false if already added (prebuild without --clean). Folders have no encoding; removes empty fields written as "undefined" by the Xcode library.
       const ref = file && project.pbxFileReferenceSection()[file.fileRef];
       for (const key of Object.keys(ref ?? {})) if (ref[key] === undefined) delete ref[key];
       return next;

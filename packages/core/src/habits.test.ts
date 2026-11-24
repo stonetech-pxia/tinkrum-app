@@ -54,7 +54,7 @@ describe('habits (D-127)', () => {
     record = recordHabit(record, key);
     expect(shouldSuggest(record)).toBe(true);
 
-    // 换了一个值就重新数。
+    // Re-count when a value changes.
     const other = recordHabit(record, habitKey([{ stepId: 'compress', values: { maxKB: 500 } }]));
     expect(other.count).toBe(1);
 

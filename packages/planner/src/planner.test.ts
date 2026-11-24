@@ -66,7 +66,7 @@ describe('system prompt', () => {
     for (const type of FieldSchema.options) expect(prompt).toContain(type.shape.type.value);
     expect(prompt).toContain('"userData"');
     expect(prompt).toContain('"errand"');
-    // 翻译文件做成快捷操作，翻译一句话仍是办事（D-171）。
+    // File translation made into a quick action; translating a single sentence remains an operation (D-171).
     expect(prompt).toContain('translate.text');
     expect(prompt).toContain('Translating files is a job on files');
     expect(prompt).toContain('mailto');
@@ -387,8 +387,9 @@ describe('checks the tool and repairs once more (AGENT_PLAN §3.6)', () => {
   const plan = (complete: Complete, input: string, c: PlanContext = ctx) =>
     createClaudePlanner({ complete, registry, now }).plan(input, c);
 
-  // 任务引用项目。prepareOps 会给有列表的表补添加按钮，但补不到只被引用的「项目」表，所以它记不进去：
-  // 这次新增的 blocker（add-missing，S2-04 里真实发生过）。
+  // Task referencing projects. prepareOps adds add buttons to tables with lists, but cannot add
+  // them to the referenced-only "Projects" table, so it cannot be recorded: a newly introduced
+  // blocker (add-missing, which actually occurred in S2-04).
   const projects = {
     op: 'addData',
     table: { id: 'projects', name: '项目', fields: [{ id: 'name', name: '名字', type: 'text' }] },
@@ -529,7 +530,7 @@ describe('checks the tool and repairs once more (AGENT_PLAN §3.6)', () => {
     const zh = scripted([json(same), json(same)]);
     const result = (await plan(zh, '做一个把 PDF 压到 2MB 的快捷操作')) as { notes: string[] };
     expect(zh).toHaveBeenCalledTimes(2);
-    // notes 最多 4 条，App 的 PlanSchema 不能因此拒绝。
+    // notes has at most 4 items; the app's PlanSchema must not reject it for this reason.
     expect(PlanSchema.safeParse(result).success).toBe(true);
     expect(result.notes).toEqual(['a', 'b', 'c', expect.stringContaining('快捷操作')]);
     const fr = scripted([json(same), json(same)]);
@@ -579,7 +580,7 @@ describe('checks the tool and repairs once more (AGENT_PLAN §3.6)', () => {
     expect(calls.map((m) => m.length)).toEqual([1, 3, 3]);
     expect(calls[1]![1]!.content).toEqual([{ type: 'text', text: 'not json' }]);
     expect(calls[2]![1]!.content).toEqual([{ type: 'text', text: JSON.stringify(noAdd) }]);
-    // 第 3 次是最新的回复和最新的修正，第一条还是原来的用户消息。
+    // The 3rd attempt is the newest response and newest correction, while the first item remains the original user message.
     expect(calls[2]![0]).toEqual(calls[0]![0]);
     expect(calls[2]![2]!.content).not.toEqual(calls[1]![2]!.content);
   });
@@ -798,7 +799,7 @@ describe('opened from a page (D-406)', () => {
   });
 });
 
-describe('工具清单和搭建计划（D-414、D-415）', () => {
+describe('Tool inventory and building plan (D-414, D-415)', () => {
   const plan2 = {
     kind: 'build',
     summary: '一个 App',
@@ -812,7 +813,7 @@ describe('工具清单和搭建计划（D-414、D-415）', () => {
     session: { open: [], recent: [], step: { index: 1, total: 2, remaining: 1 } },
   };
 
-  it('每个请求都带 <session>：目标、没做完的项、最近的话；没有就不写', () => {
+  it('Every request includes <session>: goal, unfinished items, recent messages; omitted if empty', () => {
     const msg = buildUserMessage(config, '换颜色', 'zh', undefined, undefined, registry, {
       goal: '记账 App',
       open: [
@@ -827,7 +828,7 @@ describe('工具清单和搭建计划（D-414、D-415）', () => {
     expect(buildUserMessage(config, '换颜色', 'zh')).not.toContain('<session>');
   });
 
-  it('session 超长时丢最旧的，总长不超过上限', () => {
+  it('When session is too long, drop the oldest ones so total length does not exceed the limit', () => {
     const recent = Array.from({ length: 5 }, (_, i) => ({
       input: `旧句子${i}`,
       done: true,
@@ -851,21 +852,21 @@ describe('工具清单和搭建计划（D-414、D-415）', () => {
     expect(block).not.toContain('项0字');
   });
 
-  it('规则 53 在提示词末尾，Output 里有 build', () => {
+  it('Rule 53 is at the end of the prompt, Output contains build', () => {
     const prompt = buildSystemPrompt(registry);
     expect(prompt).toContain('53. Big jobs start with a plan');
     expect(prompt).toContain('{ kind: "build"; summary: string');
     expect(prompt.indexOf('52. The file desk')).toBeLessThan(prompt.indexOf('53. Big jobs'));
   });
 
-  it('合法的计划直接返回，不跑校验和工具检查，一次调用', async () => {
+  it('Valid plans are returned directly without running validation and tool checks, in a single call', async () => {
     const complete = vi.fn<Complete>().mockResolvedValue(json(plan2));
     const planner = createClaudePlanner({ complete, registry, now });
     expect(await planner.plan('做一个 App', ctx)).toMatchObject({ kind: 'build' });
     expect(complete).toHaveBeenCalledTimes(1);
   });
 
-  it('步数不对、种类不对、request 是空的：走格式修复', async () => {
+  it('Incorrect step count, incorrect type, or empty request: run format repair', async () => {
     const complete = vi
       .fn<Complete>()
       .mockResolvedValueOnce(json({ ...plan2, steps: plan2.steps.slice(0, 1) }))
@@ -876,7 +877,7 @@ describe('工具清单和搭建计划（D-414、D-415）', () => {
     expect(complete.mock.calls[1]![0]).toHaveLength(3);
   });
 
-  it('做计划的一步时又回计划：发回去要操作', async () => {
+  it('When planning a step results in returning to planning: send back to execute', async () => {
     const complete = vi
       .fn<Complete>()
       .mockResolvedValueOnce(json(plan2))
@@ -886,7 +887,7 @@ describe('工具清单和搭建计划（D-414、D-415）', () => {
     expect(JSON.stringify(complete.mock.calls[1]![0][2])).toContain('not another build plan');
   });
 
-  it('做计划的一步时只建了表和添加按钮（列表在后面的步骤）：不发回去补', async () => {
+  it('When planning a step only creates tables and add buttons (with lists in subsequent steps): do not send back to supplement', async () => {
     const ops = {
       kind: 'ops',
       ops: [
@@ -910,7 +911,7 @@ describe('工具清单和搭建计划（D-414、D-415）', () => {
     const planner = createClaudePlanner({ complete, registry, now });
     await planner.plan('建表', stepCtx);
     expect(complete).toHaveBeenCalledTimes(1);
-    // 最后一步还缺就要补一次。
+    // If something is still missing in the final step, supplement it once.
     complete.mockClear();
     await planner.plan('建表', {
       ...ctx,
@@ -920,7 +921,7 @@ describe('工具清单和搭建计划（D-414、D-415）', () => {
   });
 });
 
-// D-448：AI 页发送后 Tink 旁边的短文字跟着规划走到哪一步；只报阶段，不带句子和配置内容。
+// D-448: Short text next to Tink on the AI page tracking the planner's progress after sending; reports only the phase, without sentence or config content.
 describe('plan progress', () => {
   it('reports the prompt route, then checking', async () => {
     const steps: string[] = [];
@@ -944,7 +945,7 @@ describe('plan progress', () => {
   });
 });
 
-describe('在 app 里的 Tink（D-485）', () => {
+describe('Tink inside the app (D-485)', () => {
   const built = applyOps(
     createDefaultWorkspace('en'),
     [
@@ -968,7 +969,7 @@ describe('在 app 里的 Tink（D-485）', () => {
     const message = String(complete.mock.calls[0]![0]![0]!.content);
     expect(message).toContain('inside app "fit"');
     expect(message).toContain('fit-home');
-    // 别的 app 和主页的页面看不到，只剩占着的 ID。
+    // Pages of other apps and the home page are not visible, leaving only the placeholder IDs.
     expect(message).not.toContain('Menu');
     expect(message).not.toContain('"title":"Home"');
     expect(message).toContain('cook-home');

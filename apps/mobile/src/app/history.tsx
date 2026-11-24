@@ -10,8 +10,9 @@ import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/cont
 import { shownConfig } from '@/workspace/store';
 
 /**
- * 「设置 → 改动记录」：和设置里其他页面一样是单独的页面，返回回到设置。
- * 回到以前的版本后也回到设置：撤销的提示条在外壳上。
+ * 'Settings -> Change History': a standalone page like other settings pages, returning goes back
+ * to settings. Returning to previous versions also returns to settings: the undo banner is on the
+ * shell.
  */
 export default function HistoryRoute() {
   const { registry, locale } = useWorkspaceContext();

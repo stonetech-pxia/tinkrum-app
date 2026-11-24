@@ -5,8 +5,10 @@ import type { Op } from './ops';
 import { allComponents, type WorkspaceConfig } from './schema';
 import { apply, registry, workspace } from './test-helpers';
 
-// 新页面的入口：AI 新加了一个页面却没有任何地方能打开它时，应用后用户找不到这一页
-// （创始人 2026-10-31：让 AI 做 Todoist 的页面时经常忘了加入口）。在首页最后补一个入口，并在草稿说明里写出来。
+// New page entry point: when the AI adds a new page without any entry point to open it, the user
+// cannot find the page after applying (founder 2026-10-31: often forgot to add entry points when
+// asking AI to make a Todoist page). Appends an entry point at the end of the home screen and
+// describes it in the draft message.
 
 const ctx = { registry, locale: 'zh' as const, now: new Date(2026, 9, 31) };
 const newPage: Op = {
@@ -63,7 +65,7 @@ describe('a new page nothing opens', () => {
   });
 
   it('only looks at pages added in this change', () => {
-    // 用户自己移除了入口：以后别的修改不再把它加回来。
+    // User removed the entry point themselves: subsequent modifications will not add it back.
     const withPage = prepare(workspace('zh'), [newPage]).after;
     const home = withPage.containers.pages.find((p) => p.id === 'home')!;
     const id = homeEntries(withPage)[0]!.id;

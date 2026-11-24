@@ -32,8 +32,9 @@ import { HabitCard } from './HabitCard';
 import { canEditTable, canEditWord } from './office-items';
 import { ResultView } from './ResultView';
 
-// 运行页面（TOOLS_DESIGN §3）：每一步的进度、取消、运行时询问、本地操作界面、结果预览。
-// 打开即开始运行；关闭时取消并删除本次的临时文件。
+// Run page (TOOLS_DESIGN §3): progress of each step, cancellation, runtime prompts, local operation
+// interface, result preview. Starts running immediately upon opening; cancels and deletes temporary
+// files for this run upon closing.
 
 export interface LocalScreenProps<K extends LocalKind> {
   input: LocalSteps[K]['in'];
@@ -43,7 +44,7 @@ export interface LocalScreenProps<K extends LocalKind> {
   onCancel: () => void;
 }
 
-/** 运行页面弹出动画的时长（iOS 模态约 350 毫秒）。 */
+/** Duration of the run page pop-up animation (iOS modal is approx. 350 ms). */
 const START_DELAY_MS = 450;
 
 export function RunScreen({
@@ -57,15 +58,15 @@ export function RunScreen({
 }: {
   workflow: Workflow;
   onEdit?: () => void;
-  /** 「让 AI 改这个」：带着这个快捷操作打开 AI 修改（D-126）。 */
+  /** "Ask AI to modify this": open AI modification with this quick action (D-126). */
   onAskAI?: () => void;
-  /** 分享进来的文件（D-115）：第一步用它们，不打开选择器。关闭运行页面时删掉。 */
+  /** Files shared in (D-115): use them for the first step without opening the picker. Deleted when closing the run page. */
   incoming?: IncomingShare;
-  /** 预览页打开的（D-457）：关闭时不删收到的文件，返回就回到预览页，文件还在。 */
+  /** Opened from the preview page (D-457): do not delete received files upon closing, returning goes back to the preview page and the files remain. */
   keepIncoming?: boolean;
-  /** 预览页「转 Word」（D-457）：做好后直接放到桌上进编辑，返回就舍弃这份 Word。 */
+  /** "Convert to Word" from the preview page (D-457): place directly on the desk for editing after creation, returning discards this Word document. */
   thenDesk?: boolean;
-  /** 容器交的值（D-428）：记录页的这一条、这个字段的值、列表选出的记录。 */
+  /** Value passed by the container (D-428): this entry on the records page, the value of this field, records selected from a list. */
   handed?: RunValue | HandedFiles;
 }) {
   const { repo, files, registry, locale } = useWorkspaceContext();
@@ -78,7 +79,7 @@ export function RunScreen({
   const bumpRecords = useWorkspace((s) => s.bumpRecords);
   const palette = usePalette(theme);
   const router = useRouter();
-  // 打开即开始运行，所以初始状态就是第 1 步。
+  // Starts running immediately upon opening, so the initial state is step 1.
   const [current, setCurrent] = useState<{
     index: number;
     done?: number;
@@ -96,14 +97,14 @@ export function RunScreen({
   const alive = useRef(true);
   const transferring = useRef(false);
   const [transferBusy, setTransferBusy] = useState(false);
-  // 转进预览页失败了：照常停在结果页。
+  // Failed to transition into the preview page: remain on the results page as usual.
   const [noPreview, setNoPreview] = useState(false);
   const signal = useRef({ cancelled: false });
   const run = useRef<Run | null>(null);
-  // 这次运行里「每次运行时问」的回答，结果页据此提议做成快捷操作（D-127）。
+  // Answers to "ask at runtime" during this run, the results page proposes turning them into a quick action based on this (D-127).
   const answers = useRef<AskedAnswer[]>([]);
   const [runCount, setRunCount] = useState(0);
-  // 相机用不了时这一次改从相册选（D-508）：只换这一次运行的来源，快捷操作本身不改。
+  // Fallback to picking from the photo library this time when the camera is unavailable (D-508): only changes the source for this single run, does not modify the quick action itself.
   const [fromLibrary, setFromLibrary] = useState(false);
   const shown = fromLibrary ? fromPhotoLibrary(workflow) : workflow;
   const label = (action: string, index: number) =>
@@ -112,8 +113,10 @@ export function RunScreen({
       : (stepLabel(registry.actions.get(action), shown.steps[index]?.params, locale) ?? action);
 
   /**
-   * 当前这一步的进度文字（D-276）：按百分比报的写百分比；处理多个文件、进度按文件数报时写「第 n/N 张」
-   * （正在处理的那一张，所以第一张还没做完时就显示第 1 张）；别的计数写「done/total」。
+   * Progress text for the current step (D-276): report percentages as percentages; when
+   * processing multiple files and progress is reported by file count, write "nth/N" (the one
+   * currently being processed, so show 1st even before the first one finishes); for other counts,
+   * write "done/total".
    */
   function progressText(c: NonNullable<typeof current>): string {
     if (c.unit === 'percent' && c.total) {
@@ -126,7 +129,7 @@ export function RunScreen({
     return c.total ? `  ${t(locale, 'runProgress', { done: c.done ?? 0, total: c.total })}` : '';
   }
 
-  /** 「再来一次」：清掉上一次的结果再运行。library：这一次照片改从相册选（D-508）。 */
+  /** "Run again": clear the previous results and run again. library: fallback to selecting photos from the photo library this time (D-508). */
   async function restart(library = false) {
     signal.current = { cancelled: false };
     setFromLibrary(library);
@@ -160,7 +163,7 @@ export function RunScreen({
       askParams: async (request) => {
         const answer = await host.askParams(request);
         if (answer) {
-          // 密码不留下来（D-194）。
+          // Passwords are not retained (D-194).
           const secret = (k: string) =>
             request.action.fields.find((f) => f.key === k)?.kind === 'secret';
           const values = Object.fromEntries(
@@ -178,7 +181,7 @@ export function RunScreen({
                 ...(e.items !== undefined ? { items: e.items, images: e.images === true } : {}),
               }
             : {
-                // 同一步里保留这一步要处理几个文件（「第 n/N 张」要用）。
+                // Retain how many files need to be processed in this step if it matches the previous step (needed for "nth/N").
                 ...(prev?.index === e.index && prev.items !== undefined
                   ? { items: prev.items, images: prev.images }
                   : {}),
@@ -198,7 +201,7 @@ export function RunScreen({
     setOutcome(started.result);
     setRunCount((n) => n + 1);
     if (started.result.status === 'succeeded' && started.result.saved.length > 0) bumpAssets();
-    // 第一次扫描完、或处理完分享进来的文件：一次问完文件处理包（D-456）。
+    // After the initial scan completes, or after processing shared-in files: prompt for the file processing pack all at once (D-456).
     if (
       started.result.status === 'succeeded' &&
       (incoming || workflow.steps.some((s) => s.action.startsWith('scan.')))
@@ -214,12 +217,12 @@ export function RunScreen({
         () => undefined,
       );
     }
-    // 记一笔（D-187）直接写数据库：页面上的列表和统计要重新读（停在中途也可能已经记了几笔）。
+    // Log an expense (D-187) writes directly to the database: lists and statistics on the page must be re-read (might have already logged some expenses even if stopped midway).
     if (workflow.steps.some((s) => s.action === 'out.addRecord')) bumpRecords();
   }
 
   useEffect(() => {
-    // 等运行页面弹出的动画结束再开始：动画进行中系统不会弹出照片 / 文件选择器（会一直停在第 1 步）。
+    // Wait for the run page pop-up animation to finish before starting: the system will not pop up photo/file pickers while the animation is playing (it would otherwise stay stuck on step 1).
     alive.current = true;
     const timer = setTimeout(() => void execute(), START_DELAY_MS);
     return () => {
@@ -228,17 +231,17 @@ export function RunScreen({
       signal.current.cancelled = true;
       void run.current?.dispose();
       if (incoming && !keepIncoming) void releaseShare(files, incoming.id);
-      // 扫描包和文字识别包的页面占几十 MB 内存，离开运行页面就关掉（下次用时再加载）。
+      // The scanning pack and OCR pack pages consume tens of MB of memory, close them upon leaving the run page (reload when next used).
       packs?.bridge.close('scan');
       packs?.bridge.close('ocr');
     };
-    // 只在打开时运行一次。
+    // Run only once upon opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const running = current !== null;
   const failedAt = outcome?.status === 'failed' ? outcome.stepIndex : null;
-  // 停在拍照或扫描这一步、原因是相机用不了或没给相机权限：提议这一次改从相册选（D-508）。
+  // Stopped at the photo or scan step because the camera is unavailable or permission was not granted: propose switching to pick from the photo library this time (D-508).
   const failedStep = failedAt !== null ? workflow.steps[failedAt] : undefined;
   const offerLibrary =
     outcome?.status === 'failed' &&
@@ -248,34 +251,41 @@ export function RunScreen({
     (outcome.error.code === 'cameraUnavailable' ||
       (outcome.error.code === 'permissionDenied' && outcome.error.detail?.what === 'camera'));
   const value = outcome?.status === 'succeeded' ? outcome.value : null;
-  // 结果只有一个文件：不停在结果页，直接进它的预览页（D-457）。限两种：拍照扫描做出来的，和在收到的文件上
-  // 运行的（从预览页、收件页面来的）。自己会发出去、存起来、记下来的快捷操作（有 out. 步骤）、容器交值的运行和
-  // 「转 Word」进桌面的照旧；工具页里自己选文件的运行也照旧，它们的结果页管保存和文件夹。
+  // Only one result file: do not stop on the results page, go directly to its preview page (D-457).
+  // Limited to two cases: created by photo scanning, and run on received files (from preview or
+  // inbox pages). Quick actions that output, save, or log themselves (having out. steps),
+  // container-valued runs, and "Convert to Word" going to the desktop behave as before; runs where
+  // files are manually selected in the tools page also behave as before, with their results pages
+  // managing saving and folders.
   const first = workflow.steps[0];
   const scans = first?.action === 'in.photos' && first.params.source === 'scanner';
   const forwarding =
     !noPreview &&
     (scans || incoming !== undefined) &&
-    // 接在上一个结果后面运行的，结果页上有「合成一个快捷操作」（ChainCard），照旧停在结果页。
+    // Running subsequent to a previous result, with a ChainCard ("Combine into a quick action") on the results page; continue to stay on the results page.
     !incoming?.result &&
     !thenDesk &&
     !handed &&
     isFileValue(value) &&
     value.items.length === 1 &&
-    // 能在桌上改的 Excel、Word（带识别出的表格、文档）照旧停在结果页：预览页的「编辑」只复制文件，改不了。
+    // Excel and Word files editable on the desktop (containing recognized tables or documents) continue to stay on the results page: "Edit" on the preview page only copies the file and cannot modify it.
     !canEditTable(value.items[0]!) &&
     !canEditWord(value.items[0]!) &&
     !workflow.steps.some((st) => st.action.startsWith('out.'));
 
-  // 转 Word 进桌面、扫描、在收到的文件上运行的：运行时不摆出「快捷操作」的步骤列表，只说一句在做什么，做完
-  // 直接进桌面或预览页（D-457）。失败、取消、结果有好几个文件时才露出完整的运行页面。
+  // Converted to Word on desktop, scanned, or run on received files: do not display the quick
+  // action step list at runtime, only state what is being done, and go directly to the desktop or
+  // preview page upon completion (D-457). Reveal the full run page only on failure, cancellation,
+  // or when there are multiple result files.
   const couldForward =
     !noPreview &&
     !handed &&
     !workflow.steps.some((st) => st.action.startsWith('out.')) &&
     (thenDesk || ((scans || incoming !== undefined) && !incoming?.result));
-  // 做完是「记一笔」的快捷操作（语音记一笔、扫收据，D-588）：和上面一样不摆步骤列表，只说一句在做什么；
-  // 记好了或者用户取消了，直接回到来的地方，不停在结果页。失败时照旧露出完整的运行页面。
+  // Quick action whose completion is "Log an expense" (voice logging, receipt scanning, D-588):
+  // like above, do not display the step list, only state what is being done; once logged or
+  // cancelled by the user, return directly to the originating place without stopping on the results
+  // page. Reveal the full run page as usual upon failure.
   const recordRun =
     !noPreview &&
     !handed &&
@@ -286,18 +296,18 @@ export function RunScreen({
       (outcome === null || (outcome.status === 'succeeded' && (thenDesk || forwarding)))) ||
     (recordRun && (outcome === null || outcome.status === 'succeeded'));
 
-  // 扫描器里点了取消：直接回到来的地方，不留一个「已取消」的运行页面。
+  // Cancelled inside the scanner: return directly to the originating place without leaving a "cancelled" run page.
   const scanCancelled =
     outcome?.status === 'cancelled' && (scans || recordRun) && incoming === undefined;
   useEffect(() => {
     if (scanCancelled) router.back();
-    // router 每次渲染不变，只在变成「扫描取消了」时做一次。
+    // Router remains constant across renders, execute only when switching to "scan cancelled".
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanCancelled]);
   const recorded = recordRun && outcome?.status === 'succeeded';
   useEffect(() => {
     if (recorded && router.canGoBack()) router.back();
-    // 只在「记好了」变成真时做一次。
+    // Execute only once when "logged successfully" becomes true.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorded]);
 
@@ -331,7 +341,7 @@ export function RunScreen({
       }
       useIncoming.getState().receive(picked, [], 'result', { runId, workflow });
       try {
-        // 从预览页进来的：这一页关掉，下面那个预览页换成结果；别的情况换成预览页。
+        // Entered from the preview page: close this page, replace the preview page below with the results; otherwise replace with the preview page.
         if (auto && keepIncoming) router.back();
         else router.replace('/share');
       } catch (error) {
@@ -351,7 +361,7 @@ export function RunScreen({
     if (!forwarding) return;
     const timer = setTimeout(() => void continueProcessing(true), 0);
     return () => clearTimeout(timer);
-    // 只在「要转进预览页」变成真时做一次。
+    // Execute only once when "ready to transition into preview page" becomes true.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forwarding]);
 
@@ -360,10 +370,10 @@ export function RunScreen({
   return (
     <ScrollView
       testID="run-screen"
-      // 问话面板（Modal）也在这棵树里：不加这个，键盘开着时点「确定」只会收起键盘。
+      // The prompt panel (Modal) is also in this tree: without this, tapping "Confirm" while the keyboard is open would only dismiss the keyboard.
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ padding: palette.pad, gap: palette.gap, paddingBottom: 80 }}>
-      {/* 运行结束才有 AI 入口（D-406）：运行中离开这一页会打断它。 */}
+      {/* AI entry point is available only after the run finishes (D-406): leaving this page during a run will interrupt it. */}
       <Stack.Screen
         options={{
           ...(compact ? { title: '' } : {}),
@@ -374,7 +384,7 @@ export function RunScreen({
       {compact ? (
         <View
           testID="run-compact"
-          // 扫描器在前面的那一步（选照片）这一页不露出来：用户只关心扫描器，不想先看到一个转圈的页面。
+          // The scanner's preceding step (selecting photos) is hidden on this page: users only care about the scanner and do not want to see a loading spinner page first.
           style={[
             styles.compact,
             (scans || recordRun) && !incoming && current?.index === 0 && { opacity: 0 },
@@ -446,7 +456,7 @@ export function RunScreen({
                     {state === 'current' && current ? progressText(current) : ''}
                   </Text>
                   {state === 'current' && !outcome ? (
-                    // 正在处理（D-276）：问参数、等用户确认时也在这一步，转圈只说明还没做完。
+                    // Processing (D-276): querying parameters or waiting for user confirmation also happens at this step, the spinner only indicates that it is not yet finished.
                     <ActivityIndicator
                       testID={`run-busy-${s.id}`}
                       size="small"
@@ -458,7 +468,7 @@ export function RunScreen({
             })}
           </Card>
 
-          {/* 长步骤（视频、音频）运行时说一句能不能切走（D-160、D-148）。 */}
+          {/* Prompt whether the user can navigate away during long steps (video, audio) (D-160, D-148). */}
           {current && isBackgroundAction(workflow.steps[current.index]?.action ?? '') ? (
             <Text
               testID="run-background-hint"
@@ -512,7 +522,7 @@ export function RunScreen({
               ) : null}
             </Card>
           ) : null}
-          {/* 翻译的结果下面说明一句（D-172）：本机翻译适合看懂意思，正式文件找专业翻译。 */}
+          {/* Add an explanatory note below translation results (D-172): on-device translation is suitable for understanding gist, use professional translation for official documents. */}
           {value && workflow.steps.some((st) => st.action === 'translate.text') ? (
             <Text
               testID="translate-note"
@@ -520,7 +530,7 @@ export function RunScreen({
               {t(locale, 'translateNote')}
             </Text>
           ) : null}
-          {/* 语音转文字的结果上面说明一句（D-150）：本机自动识别，可能有错字，请核对。 */}
+          {/* Add an explanatory note above speech-to-text results (D-150): automatically recognized on-device, may contain typos, please verify. */}
           {value &&
           workflow.steps.some(
             (st) => st.action === 'audio.transcribe' || st.action === 'video.subtitles',
@@ -540,7 +550,7 @@ export function RunScreen({
           ) : null}
           {value && !forwarding ? (
             <ResultView
-              // 编辑后换成了新文件：「已保存」之类的状态从头算。
+              // Switched to a new file after editing: states like "Saved" are calculated from scratch.
               key={isFileValue(value) ? value.items.map((i) => i.uri).join('|') : 'value'}
               value={value}
               inputSize={outcome?.status === 'succeeded' ? outcome.inputSize : 0}
@@ -549,7 +559,7 @@ export function RunScreen({
               actions={{
                 save: saveResult,
                 continueProcessing,
-                // 放到桌上改（D-366）：复制一份进新桌面，结果页上的这一份不动。
+                // Place on desktop to edit (D-366): copy into a new desktop, leaving the one on the results page untouched.
                 putOnDesk: async (item) => {
                   const desk = await placeResultsOnDesk(files, [item], Date.now());
                   router.push({ pathname: '/desk/[deskId]', params: { deskId: desk.id } });
@@ -599,7 +609,7 @@ export function RunScreen({
             />
           ) : null}
 
-          {/* 结果页：「完成」关闭页面；「再来一次」次要；改设置是一个小链接（D-111）。 */}
+          {/* Results page: "Done" closes the page; "Run again" is secondary; modifying settings is a small link (D-111). */}
           {!running && !forwarding ? (
             <>
               <View style={styles.row}>
@@ -668,7 +678,7 @@ const styles = StyleSheet.create({
   editLink: { paddingVertical: 4 },
 });
 
-/** 这一次运行改从相册选照片（D-508）：拍照、扫描的那一步来源换成相册，别的不变；不写配置。 */
+/** Change photo source to photo library for this run (D-508): change the source of the photo-taking or scanning step to the photo library, leave others unchanged; do not write to config. */
 function fromPhotoLibrary(workflow: Workflow): Workflow {
   return {
     ...workflow,

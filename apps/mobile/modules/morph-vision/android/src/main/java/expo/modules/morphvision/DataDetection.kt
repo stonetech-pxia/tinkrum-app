@@ -18,11 +18,14 @@ class NeedsDownloadException(language: String) :
   CodedException("ERR_VISION_NEEDS_DOWNLOAD", "The entity model for $language has to be downloaded first", null)
 
 /**
- * 「记一笔」预填用的系统识别，只做规则的补充（D-244）：ML Kit 实体识别（日期和金额）。
- * 每种语言的模型第一次用时从 Google 下载（App 里不打包），下载前 App 先问用户（downloadDataModel）；
- * 没下载、又不许下载（allowDownload = false，JS 一律这样调）或者没网时，以 ERR_VISION_NEEDS_DOWNLOAD 结束，
- * JS 只用规则。位置是 UTF-16，和 JS 字符串一样；
- * 日期按本机时区写成 YYYY-MM-DD，只要精确到日的；金额不给值，JS 按原文统一。文字不写日志。
+ * System recognition used for pre-filling "log an expense", supplementing rules only (D-244): ML
+ * Kit entity extraction (dates and amounts). Models for each language are downloaded from Google
+ * on first use (not bundled in the app); the app prompts the user before downloading
+ * (downloadDataModel). If models are not downloaded, downloading is disallowed (allowDownload =
+ * false, always called this way from JS), or there is no network, it terminates with
+ * ERR_VISION_NEEDS_DOWNLOAD, and JS falls back to rules. Positions are in UTF-16, matching JS
+ * strings; dates are formatted as YYYY-MM-DD in the local timezone, precision to the day; amounts
+ * are unassigned, leaving JS to parse the raw text consistently. Text is not logged.
  */
 object DataDetection {
   private const val TIMEOUT_S = 30L
@@ -46,7 +49,7 @@ object DataDetection {
     else -> null
   }
 
-  /** ready：模型在本机；download：要先下载；unsupported：这种语言不支持。 */
+  /** ready: model is on-device; download: download required first; unsupported: language is not supported. */
   fun status(code: String): String {
     val language = modelLanguage(code) ?: return "unsupported"
     val model = EntityExtractionRemoteModel.Builder(language).build()
@@ -54,7 +57,7 @@ object DataDetection {
     return if (downloaded) "ready" else "download"
   }
 
-  /** 下载这种语言的模型（App 先问过用户才调用）。没网或者失败时以 ERR_VISION_NEEDS_DOWNLOAD 结束。 */
+  /** Downloads the model for this language (called after the app prompts the user). Terminates with ERR_VISION_NEEDS_DOWNLOAD on network failure or error. */
   fun download(code: String) {
     val language = modelLanguage(code) ?: return
     val extractor = EntityExtraction.getClient(EntityExtractorOptions.Builder(language).build())

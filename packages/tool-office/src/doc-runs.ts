@@ -1,12 +1,14 @@
 import type { DocBlock, DocDoc, DocLeaf, DocList, DocParagraph, DocRun } from './doc';
 
-// 编辑页整页直接改（D-465，创始人 2026-11-06：「可以自由在文档里面移动光标……还可以变换字体大小，加粗，
-// 下划线，斜体」）：编辑页把每一块改完的样子交回来（EditedPage），这里合回 DocDoc。块用 ref 对回原来的块，
-// 原来的位置、版面信息都留着；回车分出来的新段落照着它前面那一段。删掉的块就没了。
+// Direct editing page modification (D-465, founder 2026-11-06: 'freely move cursors within
+// documents... change font size, bold, underline, italic'): editing page returns modified block
+// states (EditedPage), which are merged back into DocDoc here. Blocks map back to original blocks
+// via ref, preserving original positions and layout info; new paragraphs created by carriage
+// returns follow their preceding paragraph. Deleted blocks are removed.
 
 const zeroBox = { x: 0, y: 0, width: 0, height: 0 };
 
-/** 编辑页交回来的一截字：每一项都写明（不是相对整段的）。 */
+/** Text run returned from the editing page: specifies attributes for each item (not relative to the entire paragraph). */
 export interface EditedRun {
   text: string;
   size: number;
@@ -18,7 +20,7 @@ export interface EditedRun {
 export type EditedLeaf =
   | {
       kind: 'paragraph';
-      /** 原来是哪一块（「页-块」或「页-块-格-第几个」）；回车新分出来的段落带着前一段的 ref。 */
+      /** Original block reference ('page-block' or 'page-block-cell-index'); new paragraphs created by carriage returns inherit the preceding paragraph's ref. */
       ref?: string;
       runs: EditedRun[];
       align?: 'left' | 'center' | 'right';
@@ -33,7 +35,7 @@ export interface EditedPage {
   blocks: EditedBlock[];
 }
 
-/** 一段字的几截按 sep 切开（换行、制表符），每份各自带着样式。 */
+/** Split text run segments by separator (newlines, tabs), with each portion retaining its styling. */
 export function splitRuns(runs: readonly DocRun[], sep: string): DocRun[][] {
   const out: DocRun[][] = [[]];
   for (const run of runs) {
@@ -46,8 +48,10 @@ export function splitRuns(runs: readonly DocRun[], sep: string): DocRun[][] {
 }
 
 /**
- * 整段（标题、粗体、字号）的样子：编辑页交回来的每一截和它一样的项不写。size 是编辑页上画成的字号（磅，
- * 按整点画，和文档里的字号差一点）；docSize 是文档里的字号：变大变小的那几截按差多少加在 docSize 上。
+ * Appearance of the full block (title, bold, font size): sections returned by the edit page that
+ * match are omitted. `size` is the font size rendered on the edit page (points, rounded to
+ * integer, slightly differing from document font size); `docSize` is the document font size:
+ * scaled runs apply the difference relative to `docSize`.
  */
 export interface Base {
   size: number;
@@ -57,7 +61,7 @@ export interface Base {
   underline: boolean;
 }
 
-/** 字号差不到这么多磅就当一样大（编辑页按点算，换回磅有误差）。 */
+/** Font size differences within this many points are treated as equal (edit page uses points, conversion back to points has minor variance). */
 const SIZE_SNAP = 0.3;
 
 function ownRuns(runs: readonly EditedRun[], base: Base): DocRun[] | undefined {
@@ -94,8 +98,9 @@ function parseRef(ref: string | undefined) {
 }
 
 /**
- * 编辑页改完的样子合回文档。baseOf 给出每一块在编辑页里画成的样子（字号、粗体），交回来和它一样的不写。
- * 没变时返回原来的 doc（不多记一步撤销）。
+ * Merge edited appearance back into the document. `baseOf` provides the rendered appearance of
+ * each block on the edit page (font size, bold); matching sections returned are omitted. Returns
+ * the original doc if unchanged (avoiding an extra undo step).
  */
 export function mergeEdited(
   doc: DocDoc,
@@ -113,7 +118,7 @@ export function mergeEdited(
   const pages = doc.pages.map((page, p) => {
     const blocks = edited[p]?.blocks;
     if (!blocks) return page;
-    // 最近的一块：回车分出来的、没有 ref 的段落照着它。
+    // Most recent block: paragraphs split by newline without a ref follow this block.
     let previous: DocLeaf | undefined;
     const leaf = (e: EditedLeaf): DocLeaf | null => {
       const orig = leafAt(e.ref) ?? previous;
@@ -191,7 +196,7 @@ export function mergeEdited(
   return sameValue(next, doc) ? doc : next;
 }
 
-/** 两个值一样（JSON 那样的值，键的顺序不算）。 */
+/** Checks if two values are equal (JSON-like values, ignoring key order). */
 export function sameValue(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== 'object' || typeof b !== 'object' || !a || !b) return false;

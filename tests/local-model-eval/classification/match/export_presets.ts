@@ -1,11 +1,12 @@
-// 从仓库的内设快捷操作导出「按内容推荐」评测用的候选（名字、说明、能接的文件类型）。
-// 用法（仓库根目录）：npx tsx tests/local-model-eval/classification/match/export_presets.ts
+// Export candidates for "content-based recommendation" evaluations (name, description, supported
+// file types) from repository preset quick actions. Usage (repository root): npx tsx
+// tests/local-model-eval/classification/match/export_presets.ts
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { WORKFLOW_PRESETS } from '../../../../packages/core/src/workflows/presets';
 
-// 只取跟文件内容有关的内设快捷操作；按文件类型和个数排的（D-237 已经有）不在这里比。
+// Only include preset quick actions related to file contents; presets sorted by file type and count (already covered in D-237) are not compared here.
 const CONTENT_PRESETS = ['receipt-archive', 'expense-report', 'sign-return', 'redact-screenshots'];
 
 const accepts = (first: { action: string; params: Record<string, unknown> }) =>

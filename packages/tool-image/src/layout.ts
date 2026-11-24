@@ -1,27 +1,27 @@
-// 拼接、宫格、水印的排版计算。App 用 Skia 按这些矩形绘制，这里只算位置。
+// Layout calculations for stitching, grids, and watermarks. The app renders using Skia based on these rectangles, while this only computes positions.
 
 import type { Rect, Size } from './geometry';
 
-// ---- 长图拼接 ----
+// ---- Long image stitching ----
 
 export interface StitchOptions {
   direction: 'vertical' | 'horizontal';
   gapPx: number;
-  /** 单张输出的最长边（GPU 纹理上限）。 */
+  /** Maximum side length for single-output (GPU texture limit). */
   maxSide?: number;
-  /** 竖拼的统一宽度；默认取最窄图片的宽度（不放大）。 */
+  /** Uniform width for vertical stitching; defaults to the width of the narrowest image (no upscaling). */
   outputWidth?: number;
-  /** 横拼的统一高度；默认取最矮图片的高度。 */
+  /** Uniform height for horizontal stitching; defaults to the height of the shortest image. */
   outputHeight?: number;
 }
 
 export interface StitchPlacement extends Rect {
-  /** 输入图片序号。 */
+  /** Input image index. */
   index: number;
-  /** 竖拼时图片被切开：源图上的起始行和行数。 */
+  /** Image split during vertical stitching: starting row and row count on the source image. */
   srcY?: number;
   srcHeight?: number;
-  /** 横拼时图片被切开：源图上的起始列和列数。 */
+  /** Image split during horizontal stitching: starting column and column count on the source image. */
   srcX?: number;
   srcWidth?: number;
 }
@@ -33,8 +33,10 @@ export interface StitchSegment {
 }
 
 /**
- * 统一宽度（竖拼）或高度（横拼）后依次排列；总长超过 maxSide 时拆成多张输出。
- * 单张图片本身超过 maxSide 时跨段切开，用 src 子区域描述每一段取源图的哪部分。
+ * Arrange in sequence after unifying width (vertical stitching) or height (horizontal stitching);
+ * split into multiple outputs when the total length exceeds maxSide. When a single image exceeds
+ * maxSide, split it across segments, using src sub-regions to describe which part of the source
+ * image each segment takes.
  */
 export function layoutStitch(
   sizes: readonly Size[],
@@ -70,7 +72,7 @@ export function layoutStitch(
       const start = placements.length > 0 ? length + gapPx : 0;
       const rest = total - done;
       if (rest > maxSide - start && placements.length > 0) {
-        close(); // 放不下就换新的一段，尽量不切开图片
+        close(); // Switch to a new segment if it does not fit, avoiding splitting images whenever possible
         continue;
       }
       const piece = Math.min(rest, maxSide - start);
@@ -98,18 +100,18 @@ export function layoutStitch(
   return { segments };
 }
 
-// ---- 宫格拼图 ----
+// ---- Grid collage ----
 
 export interface GridOptions {
   columns: number;
-  /** 单元格宽/高。 */
+  /** Cell width/height ratio. */
   cellAspect: number;
   gapPx: number;
   paddingPx: number;
   outputWidth: number;
 }
 
-/** 按列数排宫格，单元格大小一致，取整剩下的像素平分到左右两侧。 */
+/** Arrange grid by column count with uniform cell sizes, distributing the remaining rounded pixels evenly to both sides. */
 export function layoutGrid(
   count: number,
   options: GridOptions,
@@ -136,28 +138,28 @@ export function layoutGrid(
   return { width: outputWidth, height, cells };
 }
 
-// ---- 水印 ----
+// ---- Watermark ----
 
 export type WatermarkPosition = 'bottomRight' | 'bottomLeft' | 'topRight' | 'topLeft' | 'center';
 
 export interface WatermarkOptions {
   mode: 'corner' | 'tile';
   corner: WatermarkPosition;
-  /** 水印宽度占图片短边的比例。 */
+  /** Watermark width as a proportion of the image's short side. */
   relativeSize: number;
-  /** 水印（文字渲染成的图或 logo）的宽/高。 */
+  /** Width/height ratio of the watermark (rendered text image or logo). */
   markAspect: number;
-  /** 绕各自中心旋转的角度；默认角落 0°、平铺 -30°。 */
+  /** Rotation angle around respective centers; defaults to 0° for corners and -30° for tiling. */
   angleDeg?: number;
 }
 
 export interface WatermarkLayout {
-  /** 未旋转时水印的位置，App 绕矩形中心旋转 angleDeg 后绘制，超出部分裁掉。 */
+  /** Watermark position when unrotated; the app draws after rotating around the rectangle center by angleDeg, cropping any overflow. */
   rects: Rect[];
   angleDeg: number;
 }
 
-/** 角落模式放一个水印；平铺模式错位铺满整张图（含旋转后会露出的角落）。 */
+/** Place a single watermark in corner mode; tile across the entire image with staggered offsets in tiled mode (including corners that become exposed after rotation). */
 export function layoutWatermark(size: Size, options: WatermarkOptions): WatermarkLayout {
   const { width, height } = size;
   const { mode, corner, relativeSize, markAspect } = options;
@@ -165,7 +167,7 @@ export function layoutWatermark(size: Size, options: WatermarkOptions): Watermar
   const angleDeg = options.angleDeg ?? (mode === 'tile' ? -30 : 0);
   const short = Math.min(width, height);
   const margin = Math.round(short * 0.03);
-  // 水印不超过图片减去边距的范围。
+  // Watermark must not exceed the image bounds minus margins.
   let markW = Math.min(
     relativeSize * short,
     width - 2 * margin,
@@ -195,7 +197,7 @@ export function layoutWatermark(size: Size, options: WatermarkOptions): Watermar
     return { rects: [{ x, y, width: markW, height: markH }], angleDeg };
   }
 
-  // 用旋转后的外接框算步长，保证相邻水印不重叠；奇数行错开半格。
+  // Use the rotated bounding box to calculate step size, ensuring adjacent watermarks do not overlap; odd rows are staggered by half a cell.
   const rad = (angleDeg * Math.PI) / 180;
   const cos = Math.abs(Math.cos(rad));
   const sin = Math.abs(Math.sin(rad));
@@ -211,7 +213,7 @@ export function layoutWatermark(size: Size, options: WatermarkOptions): Watermar
     for (let i = -cols - 1; i <= cols; i++) {
       const cx = width / 2 + i * stepX + (Math.abs(j) % 2 === 1 ? stepX / 2 : 0);
       const cy = height / 2 + j * stepY;
-      // 只保留旋转外接框与图片相交的水印。
+      // Keep only watermarks whose rotated bounding box intersects the image.
       if (cx + boxW / 2 < 0 || cx - boxW / 2 > width) continue;
       if (cy + boxH / 2 < 0 || cy - boxH / 2 > height) continue;
       rects.push({

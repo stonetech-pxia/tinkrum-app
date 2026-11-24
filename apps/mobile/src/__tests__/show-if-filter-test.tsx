@@ -4,7 +4,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 块只在有符合条件的记录时显示（D-579）：待确认的订阅不在了，提示就不画；只读，不写任何东西（底线 15）。
+// Blocks are displayed only when matching records exist (D-579): unconfirmed subscriptions are gone, so prompts are not rendered; read-only, writes nothing (invariant 15).
 
 const seed = (locale: Locale, registry: Registry) => {
   const result = applyOps(

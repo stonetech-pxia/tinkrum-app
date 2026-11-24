@@ -27,16 +27,18 @@ import { FakeFiles, FakeVision, TINY_JPEG } from '../test-utils/fake-files';
 import { MemoryPackFs, sha256 } from '../test-utils/memory-packs';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 新记录表单的候选值（D-394）：附件里的照片、PDF 在本机读出文字，每个空字段下面最多 3 个候选，
-// 点了才填，从不自动填。三种状态：新用户（没装文字识别 → 提示；装了 → 候选）、有数据（上次点的
-// 标签下次排第一）、边界（没有文字、照片和 PDF 混着、超过 3 个附件、编辑已有记录、没读完就离开）。
+// New record form suggestions (D-394): text is read locally from photos and PDFs in attachments,
+// with up to 3 suggestions per empty field, filled only on tap and never automatically. Three
+// states: new user (OCR not installed -> prompt; installed -> suggestions), has data (last tapped
+// tag ranks first next time), edge cases (no text, mixed photos and PDFs, more than 3 attachments,
+// editing an existing record, leaving before read completes).
 
 afterEach(() => {
   useIncoming.getState().clear();
   useGuide.setState({ stage: null, repo: null, introOpen: false });
 });
 
-/** 一排一排的识别结果（每排一段，字高 20，排距 40）。 */
+/** Recognition results row by row (each row a segment, font height 20, row spacing 40). */
 function layer(rows: string[]): RecognizedLayer {
   return {
     width: 600,
@@ -53,11 +55,11 @@ function layer(rows: string[]): RecognizedLayer {
 
 const RECEIPT = ['Maple Corner', 'Date 2026-10-20', 'Subtotal 165.03', 'Tax 13.20', 'Total 178.23'];
 
-/** 假的 PDF 预览页面：lines 给文字层，render 给页面图片。 */
+/** Fake PDF preview page: lines provide the text layer, render provides the page image. */
 class FakePdfPages {
   calls: string[] = [];
   textPages: TextPage[] = [];
-  /** 下一次文字层读出来以前一直等着（模拟没读完就离开）。 */
+  /** Wait until the next text layer is read (simulating leaving before reading completes). */
   hold: Promise<void> | null = null;
   async call<T>(_page: string, method: string): Promise<T> {
     this.calls.push(method);
@@ -69,7 +71,7 @@ class FakePdfPages {
   }
 }
 
-/** 扩展包环境：内存里的 PackStore（installed 里的算装好了）和假的 PDF 页面。 */
+/** Pack environment: in-memory PackStore (installed ones are considered installed) and fake PDF pages. */
 async function fakePacks(installed: string[]) {
   const fs = new MemoryPackFs();
   const store = new PackStore(fs, sha256);
@@ -87,7 +89,7 @@ async function fakePacks(installed: string[]) {
   return { packs: { store, bridge } as Packs, fs, pdf, install };
 }
 
-/** 新建表单页的候选另有测试（new-table-test）；这里用已经建好的购物凭证表。 */
+/** New form page suggestions have separate tests (new-table-test); use the pre-created shopping receipt table here. */
 function withPurchases(locale: Locale, registry: Registry): WorkspaceConfig {
   const blank = createStarterWorkspace(locale, registry);
   const r = applyOps(blank, templateOps('purchase', blank, locale), { registry, locale });
@@ -116,7 +118,7 @@ async function render(
   return { ...app, vision, ...p };
 }
 
-/** 收件页面收到这些文件（真实的扩展名和类型，选择器给的是 picker:// 的地址），存成「购物凭证」。 */
+/** Inbox page receives these files (real extensions and types, selector provides picker:// addresses), saved as "Shopping Receipts". */
 async function shareInto(
   files: FakeFiles,
   items: { name: string; mime: string }[],
@@ -155,15 +157,15 @@ async function save() {
   expect(await screen.findByTestId('share-screen')).toBeTruthy();
 }
 
-describe('新记录表单的候选值', () => {
-  it('新用户、没装文字识别：只显示一行提示，不识别、不下载；点了先问，同意以后才识别', async () => {
+describe('Suggestions for new record forms', () => {
+  it('New user, OCR not installed: display a single prompt line only, no recognition or download; prompt on tap, recognize only after consent', async () => {
     const { files, vision, fs, install } = await render([]);
     await shareInto(files, [{ name: 'IMG_0001.HEIC', mime: 'image/heic' }]);
     expect(await screen.findByTestId('suggestions-notice')).toHaveTextContent(/需要先下载一次/);
     expect(recognized(vision)).toHaveLength(0);
     expect(chipTexts('amount')).toEqual([]);
 
-    // 点了先弹确认框；取消就什么都不做。
+    // Tapping shows confirmation dialog first; cancelling does nothing.
     await fireEvent.press(screen.getByTestId('suggestions-download'));
     expect(await screen.findByTestId('pack-gate')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('pack-cancel'));
@@ -171,38 +173,38 @@ describe('新记录表单的候选值', () => {
     expect(fs.downloads).toEqual([]);
     expect(recognized(vision)).toHaveLength(0);
 
-    // 同意下载（下载本身由 PackStore 负责，这里当作已经下好），然后在后台识别，出现候选。
+    // Consent to download (download itself handled by PackStore, treated as already downloaded here), then recognize in the background, making suggestions appear.
     vision.layers.push(layer(RECEIPT));
     await fireEvent.press(screen.getByTestId('suggestions-download'));
     await install('ppocr');
     await fireEvent.press(await screen.findByTestId('pack-download'));
     await waitFor(() => expect(chipTexts('amount').length).toBeGreaterThan(0));
     expect(screen.queryByTestId('suggestions-notice')).toBeNull();
-    // HEIC 先转成 JPG 再识别；中间文件已经删掉。
+    // Convert HEIC to JPG before recognition; intermediate files are already deleted.
     expect(recognized(vision)[0]!.uri).toMatch(/^runs\/prefill-.+\/page-1\.jpg$/);
     expect(runsLeft(files)).toEqual([]);
   });
 
-  it('装了文字识别：自动识别，空字段下面有候选，没有自动填；点了才填，候选留在原地、点中的那个标出来', async () => {
+  it('OCR installed: automatic recognition, suggestions appear below empty fields without auto-filling; populate only on tap, suggestions stay in place and tapped item is marked', async () => {
     const { files, vision, repo } = await render();
     vision.layers.push(layer(RECEIPT));
     await shareInto(files, [{ name: 'receipt.jpg', mime: 'image/jpeg' }]);
     await waitFor(() => expect(chipTexts('amount').length).toBeGreaterThan(0));
     expect(screen.queryByTestId('suggestions-notice')).toBeNull();
-    // 实付排第一，不是小计；日期、商家也有。
+    // Actual amount ranks first, not subtotal; date and merchant are also present.
     expect(chipTexts('amount')[0]).toMatch(/178\.23/);
     expect(chipTexts('date')[0]).toMatch(/「日期」/);
-    // 日期写出月份（日月分不清时两个候选才分得开），不是 2026-10-12 这种只有数字的写法。
+    // Date writes out the month (two candidates are needed when month/day are ambiguous), unlike numeric-only formats like 2026-10-12.
     expect(chipTexts('date')[0]).toMatch(/\d{4}年\d{1,2}月\d{1,2}日/);
     expect(chipTexts('merchant')[0]).toBe('把 Maple Corner 填进「商家」');
-    // 一个都没有自动填。
+    // None of them are auto-filled.
     for (const id of ['merchant', 'date', 'amount'])
       expect(screen.getByTestId(`editor-${id}`).props.value ?? '').toBe('');
 
     const before = chipTexts('amount');
     await fireEvent.press(screen.getByTestId('editor-amount-suggestion-0'));
     expect(screen.getByTestId('editor-amount').props.value).toBe('178.23');
-    // 候选不消失（下面的字段不会往上跳，iOS 模拟器 2026-10-31），点中的那个标成已选。
+    // Suggestions do not disappear (fields below do not jump up, iOS simulator 2026-10-31), and the tapped one is marked as selected.
     expect(chipTexts('amount')).toEqual(before);
     const selected = (id: string) =>
       screen
@@ -214,27 +216,27 @@ describe('新记录表单的候选值', () => {
           ),
         );
     expect(selected('amount')).toEqual(before.map((_, i) => i === 0));
-    // 手动输入的字段：候选还在，一个都不标；不学。
+    // Manually entered fields: suggestions remain, none are marked; learning does not occur.
     await fireEvent.changeText(screen.getByTestId('editor-merchant'), '枫叶小店');
     expect(chipTexts('merchant').length).toBeGreaterThan(0);
     expect(selected('merchant').some(Boolean)).toBe(false);
     await save();
     const [record] = await repo.listRecords('purchases');
     expect(record!.values).toMatchObject({ amount: 178.23, merchant: '枫叶小店' });
-    // 只记下点过的那个字段：标签和位置，不记值。
+    // Record only the tapped field: label and position, without values.
     const picks = JSON.parse((await repo.getMeta(PICK_STORE_KEY))!);
     expect(Object.keys(picks.purchases)).toEqual(['amount']);
     expect(JSON.stringify(picks)).not.toContain('178');
-    // 点过的标签学到这个字段下面（D-445）。
+    // Tapped tags are learned under this field (D-445).
     expect(picks.purchases.amount.labels[0].label).toBe('total');
   });
 
-  it('收据模版的分类（D-405）：票面上看得出来就在分类下面给候选，没有自动选；点了才选中，看不出来就没有', async () => {
+  it('Receipt template classification (D-405): provide suggestions below classification if discernible on the ticket, no auto-selection; select only on tap, none if indiscernible', async () => {
     const { files, vision, repo } = await render();
     vision.layers.push(layer(['大众药房', 'Date 2026-10-20', '感冒灵 12.00', 'Total 12.00']));
     await shareInto(files, [{ name: 'receipt.jpg', mime: 'image/jpeg' }]);
     await waitFor(() => expect(chipTexts('category')).toEqual(['把 药妆 填进「分类」']));
-    // 没有自动选：六个选项都没选中。
+    // No auto-selection: none of the six options are selected.
     const optionOn = (id: string) =>
       (screen.getByTestId(`editor-category-${id}`).props as { style?: unknown }).style;
     const before = optionOn('pharmacy');
@@ -246,11 +248,11 @@ describe('新记录表单的候选值', () => {
     await save();
     const [record] = await repo.listRecords('purchases');
     expect(record!.values.category).toBe('pharmacy');
-    // 分类的候选不是文字里的某个位置：不记点选。
+    // Category suggestions are not specific positions within text: tap selections are not recorded.
     expect(await repo.getMeta(PICK_STORE_KEY)).toBeNull();
   });
 
-  it('收据模版的分类：票面上看不出是哪一类就不给候选，不报错（没装本机模型）', async () => {
+  it('Receipt template classification: no suggestions and no errors (local model not installed) if ticket category is indiscernible', async () => {
     const { files, vision } = await render();
     vision.layers.push(layer(RECEIPT));
     await shareInto(files, [{ name: 'receipt.jpg', mime: 'image/jpeg' }]);
@@ -259,7 +261,7 @@ describe('新记录表单的候选值', () => {
     expect(screen.getByTestId('editor-category-dining')).toBeTruthy();
   });
 
-  it('有数据：上次点的标签，下次同样的单据排第一', async () => {
+  it('Has data: previously tapped tag ranks first for similar receipts next time', async () => {
     const { files, vision } = await render();
     const shipped = ['Order date 2026-09-03', 'Ship date 2026-09-08', 'Total 5.00'];
     vision.layers.push(layer(shipped));
@@ -277,7 +279,7 @@ describe('新记录表单的候选值', () => {
     expect(chipTexts('date')[0]).toMatch(learned === 'ship' ? /10月6日|10-06/ : /10月1日|10-01/);
   });
 
-  it('法语：提示跟着语言走', async () => {
+  it('French: prompts follow the language', async () => {
     const fr = await render([], 'fr');
     await shareInto(fr.files, [{ name: 'recu.jpg', mime: 'image/jpeg' }]);
     expect(await screen.findByTestId('suggestions-notice')).toHaveTextContent(
@@ -285,7 +287,7 @@ describe('新记录表单的候选值', () => {
     );
   });
 
-  it('英语：候选的无障碍说明跟着语言走', async () => {
+  it('English: suggestion accessibility descriptions follow the language', async () => {
     const en = await render(['ppocr'], 'en');
     en.vision.layers.push(layer(RECEIPT));
     await shareInto(en.files, [{ name: 'receipt.jpg', mime: 'image/jpeg' }]);
@@ -293,7 +295,7 @@ describe('新记录表单的候选值', () => {
     expect(chipTexts('amount')[0]).toMatch(/^Fill “Amount” with .*178\.23/);
   });
 
-  it('边界：读不出文字时没有候选，也不报错', async () => {
+  it('Edge case: no suggestions and no errors when text cannot be read', async () => {
     const { files, vision } = await render();
     vision.layers.push({ width: 100, height: 100, lines: [] });
     await shareInto(files, [{ name: 'blank.png', mime: 'image/png' }]);
@@ -303,7 +305,7 @@ describe('新记录表单的候选值', () => {
     expect(screen.getByTestId('editor-save')).toBeTruthy();
   });
 
-  it('边界：照片和 PDF 混着时都读（PDF 用文字层，扫描的 PDF 画成图再识别），超过 3 个只读前 3 个', async () => {
+  it('Edge case: read both when photos and PDFs are mixed (PDFs use text layer, scanned PDFs rendered to images then recognized), read only the first 3 if exceeding 3', async () => {
     const { files, vision, pdf } = await render();
     pdf.textPages = [layer(['Facture', 'Montant TTC 42,50 €'])];
     vision.layers.push(layer(['Date 2026-10-20']), layer(['x']), layer(['y']));
@@ -317,25 +319,25 @@ describe('新记录表单的候选值', () => {
     await waitFor(() => expect(chipTexts('amount').length).toBeGreaterThan(0));
     expect(chipTexts('amount')[0]).toMatch(/42\.50/);
     expect(chipTexts('date')[0]).toMatch(/10月20日|2026/);
-    // 前 3 个：两张照片识别，PDF 读文字层（有文字，不画图）。
+    // First 3: two photos recognized, PDF text layer read (has text, no drawing).
     expect(recognized(vision)).toHaveLength(2);
     expect(pdf.calls).toEqual(['lines']);
     expect(runsLeft(files)).toEqual([]);
   });
 
-  it('边界：扫描的 PDF 没有文字层，画成图再识别', async () => {
+  it('Edge case: scanned PDFs without text layers are rendered to images and then recognized', async () => {
     const { files, vision, pdf } = await render();
     pdf.textPages = [{ width: 600, height: 800, lines: [] }];
     vision.layers.push(layer(['合计 ¥88.00']));
     await shareInto(files, [{ name: 'scan.pdf', mime: 'application/pdf' }]);
     await waitFor(() => expect(chipTexts('amount').length).toBeGreaterThan(0));
-    // 预览页先把 PDF 画出来看（D-457），然后才是识别。
+    // Preview page first draws the PDF to view (D-457), followed by recognition.
     expect(pdf.calls).toEqual(['preview', 'lines', 'render']);
     expect(recognized(vision)[0]!.uri).toMatch(/^runs\/prefill-.+\/pdf-1-1\.jpg$/);
     expect(runsLeft(files)).toEqual([]);
   });
 
-  it('编辑已有的记录不给候选', async () => {
+  it('Editing existing records does not provide suggestions', async () => {
     const { files, vision, repo } = await render();
     vision.layers.push(layer(RECEIPT));
     await shareInto(files, [{ name: 'receipt.jpg', mime: 'image/jpeg' }]);
@@ -350,7 +352,7 @@ describe('新记录表单的候选值', () => {
     expect(recognized(vision)).toHaveLength(before);
   });
 
-  it('没读完就离开：读取结束（不悬着），中间文件删掉，不再显示', async () => {
+  it('Leaving before read completes: reading terminates (not left hanging), intermediate files deleted, no longer displayed', async () => {
     const { files, pdf } = await render();
     let release!: () => void;
     pdf.hold = new Promise((r) => (release = r));
@@ -366,8 +368,8 @@ describe('新记录表单的候选值', () => {
   });
 });
 
-// 扫描按钮（D-397）：快捷操作把文件交给表单，读取是表单自己的事，步骤里没有识别。
-describe('快捷操作「记一笔」的表单（D-397）', () => {
+// Quick action "Log an expense" form (D-397): scan button (D-397): quick action hands files to the form, reading is handled by the form itself, and steps do not include recognition.
+describe('Quick action "Log an expense" form (D-397)', () => {
   const receipts = (extra: Partial<Collection> = {}): Collection => ({
     id: 'receipts',
     name: '小票',
@@ -394,7 +396,7 @@ describe('快捷操作「记一笔」的表单（D-397）', () => {
   };
   const entryChips = () => screen.queryAllByTestId(/^entry-amount-suggestion-\d$/);
 
-  it('文件进了表单就自动识别、给候选，点了才填', async () => {
+  it('Files entering the form are automatically recognized, provide suggestions, and fill only on tap', async () => {
     const { files, vision } = await render(undefined, 'zh', seed(receipts()));
     vision.layers.push(layer(RECEIPT));
     files.nextPhotos = [files.offerImage('receipt.jpg', 600, 240)];
@@ -407,7 +409,7 @@ describe('快捷操作「记一笔」的表单（D-397）', () => {
     expect(recognized(vision)).toHaveLength(1);
   });
 
-  it('没装文字识别：和别的表单一样只显示一行提示，不下载', async () => {
+  it('OCR not installed: displays a single prompt line like other forms, without downloading', async () => {
     const { files, vision } = await render([], 'zh', seed(receipts()));
     files.nextPhotos = [files.offerImage('receipt.jpg', 600, 240)];
     await act(() => router.push('/run/scan-receipt'));
@@ -415,7 +417,7 @@ describe('快捷操作「记一笔」的表单（D-397）', () => {
     expect(recognized(vision)).toHaveLength(0);
   });
 
-  it('表关掉了「自动读取附件」：不识别、没有候选，也没有下载提示', async () => {
+  it('Table turns off "automatic attachment reading": no recognition, no suggestions, and no download prompt', async () => {
     const { files, vision } = await render(
       undefined,
       'zh',
@@ -431,7 +433,7 @@ describe('快捷操作「记一笔」的表单（D-397）', () => {
     expect(screen.queryByTestId('suggestions-notice')).toBeNull();
   });
 
-  it('设置 → 数据：有附件字段的表才有开关，默认打开，关了就不读', async () => {
+  it('Settings -> Data: Only tables with attachment fields have this switch; on by default, turns off reading when disabled', async () => {
     const plain: Collection = {
       id: 'plain',
       name: '备忘',
@@ -443,7 +445,7 @@ describe('快捷操作「记一笔」的表单（D-397）', () => {
       return config;
     };
     const { files, vision } = await render(undefined, 'zh', both);
-    // 每张表一页（D-614）：没有文件字段的表没有这个开关。
+    // One page per table (D-614): tables without file fields lack this switch.
     await act(() =>
       router.push({ pathname: '/data-table/[tableId]', params: { tableId: 'plain' } }),
     );
@@ -466,7 +468,7 @@ describe('快捷操作「记一笔」的表单（D-397）', () => {
     expect(recognized(vision)).toHaveLength(0);
   });
 
-  it('设置 → 数据：选「附件是」写到表上（D-421），有附件字段的表才有，默认是其他', async () => {
+  it('Settings -> Data: Select "attachment is" written to the table (D-421), only available for tables with attachment fields, defaults to other', async () => {
     const plain: Collection = {
       id: 'plain',
       name: '备忘',
@@ -497,8 +499,8 @@ describe('快捷操作「记一笔」的表单（D-397）', () => {
   });
 });
 
-// 名片表的表单还找二维码（D-423）：vCard、MeCard 的值排第一，网址只给网站；别的不管，文字照常读；点了才填。
-describe('名片表的二维码', () => {
+// Business card table forms also look up QR codes (D-423): vCard and MeCard values rank first, URLs provide websites only; other things ignored, text read normally; filled only on tap.
+describe('Business card table QR code', () => {
   const cards: Collection = {
     id: 'people',
     name: '联系人',
@@ -518,7 +520,7 @@ describe('名片表的二维码', () => {
   const qr = (text: string) => qrToRgba(qrMatrix(text), { scale: 4 });
   const VCARD = 'BEGIN:VCARD\nFN:Maria Garcia\nTEL:+33 6 12 34 56 78\nEND:VCARD';
 
-  /** 表单收到一张照片，照片的像素是 pixels（不给时是白图）。 */
+  /** Form receives a photo with pixel data pixels (white image if omitted). */
   async function scan(
     pixels: ReturnType<typeof qr> | null,
     rows: string[] = [],
@@ -533,7 +535,7 @@ describe('名片表的二维码', () => {
     return { ...app, read };
   }
 
-  it('只有二维码、文字一个都没读出来：也有候选，没有自动填；点了才填', async () => {
+  it('Only QR code present, no text recognized: still shows suggestions, no auto-fill; fills only upon tapping', async () => {
     const { repo } = await scan(qr(VCARD));
     await waitFor(() => expect(chipTexts('name').length).toBeGreaterThan(0));
     expect(chipTexts('name')[0]).toContain('Maria Garcia');
@@ -545,18 +547,18 @@ describe('名片表的二维码', () => {
     const [record] = await repo.listRecords('people');
     expect(record!.values.name).toBe('Maria Garcia');
     expect(record!.values.tel).toBeUndefined();
-    // 二维码的值不记位置（没有版面可记）。
+    // QR code values do not record positions (no layout to record).
     expect(await repo.getMeta(PICK_STORE_KEY)).toBeNull();
   });
 
-  it('二维码的值排在文字读出的值前面', async () => {
+  it('QR code value precedes text-recognized values', async () => {
     await scan(qr(VCARD), ['Tel +33 1 11 11 11 11']);
     await waitFor(() => expect(chipTexts('tel').length).toBeGreaterThan(1));
     expect(chipTexts('tel')[0]).toContain('+33 6 12 34 56 78');
     expect(chipTexts('tel')[1]).toContain('+33 1 11 11 11 11');
   });
 
-  it('网址只给网站', async () => {
+  it('URL provides website only', async () => {
     await scan(qr('https://example.com/me'));
     await waitFor(() => expect(chipTexts('site').length).toBeGreaterThan(0));
     expect(chipTexts('site')[0]).toContain('https://example.com/me');
@@ -564,14 +566,14 @@ describe('名片表的二维码', () => {
     expect(chipTexts('tel')).toEqual([]);
   });
 
-  it('别的二维码不管，名片照常按文字读', async () => {
+  it('Ignore other QR codes, business cards read normally as text', async () => {
     await scan(qr('WIFI:T:WPA;S:cafe;P:12345678;;'), ['Tel +33 1 11 11 11 11']);
     await waitFor(() => expect(chipTexts('tel').length).toBeGreaterThan(0));
     expect(chipTexts('tel')[0]).toContain('+33 1 11 11 11 11');
     expect(chipTexts('name').join()).not.toContain('cafe');
   });
 
-  it('解不出来（读像素失败、没有码）都不说话，文字照常', async () => {
+  it('Unresolvable cases (pixel reading failure, no code) say nothing, text proceeds as normal', async () => {
     const app = await render(['ppocr', 'pdfview'], 'zh', seed(cards));
     app.vision.layers.push(layer(['Tel +33 1 11 11 11 11']));
     jest.spyOn(app.files, 'imagePixels').mockRejectedValue(new Error('broken'));
@@ -580,14 +582,14 @@ describe('名片表的二维码', () => {
     expect(chipTexts('tel')[0]).toContain('+33 1 11 11 11 11');
   });
 
-  it('文字识别没装时二维码也能用，不下载', async () => {
+  it('QR code works even when text recognition is not installed, no download', async () => {
     const { fs } = await scan(qr(VCARD), [], cards, []);
     await waitFor(() => expect(chipTexts('name').length).toBeGreaterThan(0));
     expect(chipTexts('name')[0]).toContain('Maria Garcia');
     expect(fs.downloads).toEqual([]);
   });
 
-  it('照片和 PDF 混着：只读照片的二维码', async () => {
+  it('Photos and PDFs mixed: read QR code only from photos', async () => {
     const app = await render(['ppocr', 'pdfview'], 'zh', seed(cards));
     app.vision.layers.push(layer([]));
     const read = jest.spyOn(app.files, 'imagePixels').mockResolvedValue(qr(VCARD));
@@ -603,7 +605,7 @@ describe('名片表的二维码', () => {
     expect(read).toHaveBeenCalledTimes(1);
   });
 
-  it('不是名片表：不找二维码', async () => {
+  it('Not a business card table: do not search for QR codes', async () => {
     const { prefillRules: _unused, ...plain } = cards;
     const { read, vision } = await scan(qr(VCARD), ['Tel +33 1 11 11 11 11'], plain as Collection);
     await waitFor(() => expect(recognized(vision).length).toBeGreaterThan(0));
@@ -613,7 +615,7 @@ describe('名片表的二维码', () => {
   });
 });
 
-/** 一份照片在预览页点「存记录」，不选，只看面板里的表。 */
+/** Tap "Save record" for a photo on the preview page without selecting, viewing only the tables in the panel. */
 async function openChooserFor(files: FakeFiles) {
   const picked = [files.offer('receipt.jpg', TINY_JPEG, 'image/jpeg')];
   await act(async () => useIncoming.getState().receive(picked, [], 'picker'));
@@ -622,19 +624,19 @@ async function openChooserFor(files: FakeFiles) {
   return screen.findByTestId('share-record-table-purchases');
 }
 
-describe('存记录面板：像收据的照片，推荐带收据规则的表（D-477）', () => {
+describe('Save record panel: for receipt-like photos, recommend tables with receipt rules (D-477)', () => {
   const TAG = '看起来是收据，推荐放这里';
 
-  it('收据照片：「购物凭证」表上写推荐', async () => {
+  it('Receipt photo: recommend writing to the "Shopping Voucher" table', async () => {
     const { files, vision } = await render();
     vision.layers.push(layer(RECEIPT));
     const row = await openChooserFor(files);
     await waitFor(() => expect(within(row).getByText(TAG)).toBeTruthy());
-    // 读的是收到的照片本身，不改它（底线 4）；读完不留中间文件。
+    // Reads the received photo itself without modifying it (invariant 4); intermediate files are not left behind after reading.
     expect(files.disk.size).toBeGreaterThan(0);
   });
 
-  it('不像收据（没有合计和金额）：不写推荐，面板照旧', async () => {
+  it('Unlike a receipt (no total and amount): no recommendation written, panel remains as usual', async () => {
     const { files, vision } = await render();
     vision.layers.push(layer(['Vaccination record', 'Dose 1: 3 March 2025']));
     const row = await openChooserFor(files);
@@ -642,7 +644,7 @@ describe('存记录面板：像收据的照片，推荐带收据规则的表（D
     expect(within(row).queryByText(TAG)).toBeNull();
   });
 
-  it('没装文字识别：不读、不推荐、不报错', async () => {
+  it('Text recognition not installed: do not read, do not recommend, no errors', async () => {
     const { files, vision } = await render([]);
     vision.layers.push(layer(RECEIPT));
     const row = await openChooserFor(files);

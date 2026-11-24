@@ -28,8 +28,10 @@ import { FieldSchema, type Collection, type Field, type NewComponent } from './s
 import { registry } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// D-607：单选字段可以选多个（multiple: true）。存的值是选项 ID 的列表（按选项顺序）；筛选 is 是「含有其中一个」，
-// isNot 是「一个都不含」；分段、分组、看板、页面上的一排选项里一条记录算进它选的每一项。
+// D-607: single-choice fields can allow multiple selections (multiple: true). Stored values are a
+// list of option IDs (in option order); filter is "contains any of" for is, and "contains none of"
+// for isNot; splitting, grouping, Kanban, and option rows on pages count a record toward every
+// option it selects.
 
 const now = new Date(2026, 10, 20, 9);
 const cal = DEFAULT_CALENDAR;
@@ -82,7 +84,7 @@ const list = [
   meal('Curry', { days: ['thu'] }),
   meal('Salad', { days: ['mon', 'tue', 'thu', 'sat'] }),
   meal('Toast', {}),
-  // 改成多选以前存的一个选项 ID。
+  // Single option ID stored prior to switching to multi-choice.
   meal('Pasta', { days: 'sat' }),
 ];
 
@@ -252,7 +254,7 @@ describe('filters (D-607)', () => {
       { unit: 'day', perUnit: 1, skip: { field: 'days', option: 'sat' } },
       { dateField: 'date', now, cal },
     );
-    // 19 号那条带「跳过」：不断，也不算一天。
+    // The 19th has "skipped": streak is unbroken, but not counted as a day.
     expect(streak.current).toBe(2);
   });
 });
@@ -470,7 +472,7 @@ describe('record tools on a multiple field (D-607)', () => {
       list,
       { now, cal },
     );
-    // Salad 已经有周二以外的：整个换成 [tue]；没有一条已经正好是 [tue]。
+    // Salad already has days other than Tuesday: replace entirely with [tue]; no existing entry is already exactly [tue].
     expect(changes.map((c) => [c.id, c.after.days])).toEqual([
       ['Soup', ['tue']],
       ['Curry', ['tue']],
@@ -525,14 +527,14 @@ describe('turning multiple on and off (D-607)', () => {
 
   it('after an undo back to one option, a stored list still shows and is kept on save', () => {
     const one = single.fields[1]!;
-    // 只显示，不当作选了哪一项（筛选、分段、表单都当没选）。
+    // Display only, not treated as selecting a specific item (filters, groupings, and forms treat it as unselected).
     expect(readValue(one, ['mon', 'thu'])).toBeUndefined();
     expect(formatValue(one, ['mon', 'thu'], 'en')).toBe('Monday, Thursday');
-    // 改别的字段：存着的列表原样留着。
+    // Modifying other fields: stored list remains unchanged.
     expect(
       prepareRecordValues(single, { name: 'Soup 2' }, { name: 'Soup', days: ['mon', 'thu'] }, now),
     ).toEqual({ ok: true, values: { name: 'Soup 2', days: ['mon', 'thu'] } });
-    // 用户自己选了一项：换成这一项。
+    // User explicitly selected an item: replace with this item.
     expect(
       prepareRecordValues(single, { days: 'tue' }, { name: 'Soup', days: ['mon', 'thu'] }, now),
     ).toEqual({ ok: true, values: { name: 'Soup', days: 'tue' } });

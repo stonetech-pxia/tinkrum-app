@@ -44,9 +44,9 @@ describe('scan quads', () => {
 
   it('rejects crossed or collapsed corners', () => {
     expect(isConvexQuad(paper)).toBe(true);
-    // 右上和右下拖反了：边交叉。
+    // Top-right and bottom-right swapped: edges intersect.
     expect(isConvexQuad({ ...paper, tr: paper.br, br: paper.tr })).toBe(false);
-    // 三个角挤在一起：面积太小。
+    // Three corners clustered together: area is too small.
     const tiny: Quad = {
       tl: { x: 0, y: 0 },
       tr: { x: 1, y: 0 },

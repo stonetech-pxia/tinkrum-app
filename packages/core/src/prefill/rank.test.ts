@@ -16,10 +16,11 @@ import {
   serializePickStore,
 } from './store';
 
-// 新记录表单的候选值（D-394）：照测量的失败例写的几张单据（按排的识别结果），断言该排第一的排第一、
-// 不该出现的不出现。
+// Candidate values for the new record form (D-394): measured test cases of several documents
+// (recognition results by row), asserting that what should be first ranks first, and what should
+// not appear does not appear.
 
-/** 一排一排的文字：每排可以有几段（[文字, x]），字高 20，排距 40，页宽 600。 */
+/** Text arranged in rows: each row can have multiple segments ([text, x]), font height 20, row spacing 40, page width 600. */
 function page(rows: (string | [string, number][])[], height = rows.length * 40 + 40): TextPage {
   const lines: TextBox[] = [];
   rows.forEach((row, i) => {
@@ -98,7 +99,7 @@ describe('suggestValues', () => {
     expect(values(r, 'date')[0]).toBe('2026-09-01');
   });
 
-  it('bill 到期日 picks 到期日, not 开票日期 (Chinese bill)', () => {
+  it('bill due date picks due date, not invoice date (Chinese bill)', () => {
     const doc = page(['开票日期：2026年9月1日', '到期日：2026年10月15日', '应付金额：¥256.00']);
     const fields = [date('due', '到期日'), money('amount', '金额')];
     const r = suggestValues({ rules: 'receipt', fields, pages: [doc], locale: 'zh', now: NOW });
@@ -141,7 +142,7 @@ describe('suggestValues', () => {
       locale: 'en',
       now: NOW,
     });
-    // 用户点了排第二的那个。
+    // The user tapped the second-ranked one.
     const second = before.date![1]!;
     const picks: Record<string, FieldPick> = { date: second.pick! };
     const next = page(['Order date 2026-10-01', 'Ship date 2026-10-06', 'Total 7.00']);
@@ -204,8 +205,11 @@ describe('suggestValues', () => {
   });
 
   it('drops dates far from the other dates on the document (OCR read 2026 as 2012)', () => {
-    // 现在的 10 年窗口（2016-10 到 2027-10）里的日期直接合理，不看单据上别的日期（D-403：真日期不被一个假日期挤出窗口）；
-    // 窗口外的才拿单据上别的日期比：2012 年离 2026 年太远，不合理，分数比窗口内的少 1 分（「合理」占 1 分）。
+    // Dates within the current 10-year window (2016-10 to 2027-10) are directly considered
+    // reasonable, ignoring other dates on the document (D-403: real dates are not squeezed out of
+    // the window by a fake date); only those outside the window are compared with other dates on
+    // the document: 2012 is too far from 2026, unreasonable, and scores 1 point lower than those
+    // within the window ("reasonable" is worth 1 point).
     const withAnchor = (year: string) =>
       page(['Paid 21 March 2026', `Date 21/03/${year} 09:13`, 'Total 5.00']);
     const score = (doc: TextPage, value: string) =>
@@ -223,7 +227,7 @@ describe('suggestValues', () => {
 });
 
 describe('suggestValues: iOS simulator findings (2026-10-31)', () => {
-  it('a free-text field with no concept (备注) gets nothing from unlabeled rows; 事由 only from its own label', () => {
+  it('a free-text field with no concept (remarks) gets nothing from unlabeled rows; purpose only from its own label', () => {
     const doc = page([
       '青禾餐馆',
       '样例单据 · 仅供测试',
@@ -249,7 +253,7 @@ describe('suggestValues: iOS simulator findings (2026-10-31)', () => {
     expect(values(r, 'purpose')).toEqual(['餐饮']);
   });
 
-  it('values only under exclusion labels (优惠, 找零) are not offered; 感谢惠顾 is not a shop name', () => {
+  it('values only under exclusion labels (discount, change) are not offered; "Thank you for your patronage" is not a shop name', () => {
     const doc = page([
       '青禾餐馆',
       [
@@ -309,7 +313,7 @@ describe('suggestValues: iOS simulator findings (2026-10-31)', () => {
         now: NOW,
         ...(picks ? { picks } : {}),
       });
-      // D-403：地址行不再被直接排除（带地址词的行在真店名里也占 8.6%），但店名始终排第一。
+      // D-403: Address lines are no longer directly excluded (lines with address words account for 8.6% of real store names), but the store name always ranks first.
       expect(values(r, 'merchant')[0]).toBe('LIGHTROOM GALLERY SDN BHD');
     }
   });
@@ -341,7 +345,7 @@ describe('conceptOf for the D-392 presets', () => {
       }
     });
   }
-  it('the contract 名称 is a title, not a person', () => {
+  it('the contract name is a title, not a person', () => {
     expect(conceptOf({ id: 'name', name: '名称' })).toBe('title');
   });
 });
@@ -364,7 +368,7 @@ describe('pick store', () => {
     expect(parsePickStore('{bad')).toEqual({});
     const file = layoutStoreFile({}, NOW, store);
     expect(readPickStoreFile(file)).toEqual(store);
-    // 第 1 版的文件没有点过的候选。
+    // Version 1 files have no tapped candidates.
     const v1 = JSON.stringify({ format: 'morph-prefill-memory', version: 1, tables: {} });
     expect(readPickStoreFile(v1)).toEqual({});
     expect(readPickStoreFile('hello')).toBeNull();

@@ -6,7 +6,7 @@ import { modelEngine, ruleEngine, suggestionForField, type PrefillEngine } from 
 import type { ModelSession } from './model';
 import type { TextPage } from './rows';
 
-// 表上的 prefillRules 决定用哪组规则：有就是它加通用规则，没有就只有通用规则（D-421）。
+// The prefillRules on the table determine which rule set to use: if present, it uses that plus the general rules; if absent, only the general rules (D-421).
 
 const NOW = new Date('2026-11-04T00:00:00Z');
 
@@ -134,7 +134,7 @@ describe('a multi-line address', () => {
 
 describe('receipt rules', () => {
   const DATE = f('date', 'Date', 'date');
-  // 「22-Oct-2026」的月份名写法是收据规则（D-403）；通用规则不认。
+  // The month name format in "22-Oct-2026" is a receipt rule (D-403); general rules do not recognize it.
   const MONTH_NAME = page([...RECEIPT.lines.map((l) => l.text), 'Issued 22-Oct-2026']);
 
   it('read a month-name date on a receipt table', async () => {
@@ -186,7 +186,7 @@ describe('the on-device model on a card', () => {
     release: () => Promise.resolve(),
   });
 
-  // 对照：同名的普通文字字段是问的，所以「没问」不是因为模型没打开（D-422）。
+  // Control: plain text fields with the same name are asked about, so "not asked" is not because the model is disabled (D-422).
   it('is not asked for fields with format, whatever their name; a plain field of that name is asked', async () => {
     const empty = page(['Nothing to read here']);
     const asked: string[] = [];

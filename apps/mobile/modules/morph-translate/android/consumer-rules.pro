@@ -1,4 +1,6 @@
-# ML Kit 各个库都带一份改了名的内部类，靠组件注册在运行时连起来。release 包开了 R8，
-# 会把这些类合并、改写，结果在手机上空指针（例如语言识别读到另一个库的类）。整个 ML Kit 不让 R8 动。
+# Each ML Kit library contains its own copy of renamed internal classes, which are wired together at
+# runtime via component registration. With R8 enabled in the release build, these classes would be
+# merged and obfuscated, resulting in NullPointerExceptions on device (e.g., language recognition
+# reading a class from another library). Prevent R8 from modifying the entire ML Kit.
 -keep class com.google.mlkit.** { *; }
 -keep class com.google.android.gms.internal.mlkit_** { *; }

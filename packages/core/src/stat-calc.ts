@@ -15,7 +15,7 @@ import type { TableRead } from './source';
 
 export type TotalSource = Pick<NumberSource, 'table' | 'aggregate' | 'field' | 'filter' | 'days'>;
 
-/** 只读：主合计和其他合计共用筛选、时间范围和聚合。 */
+/** Read-only: primary totals and other totals share filters, time ranges, and aggregates. */
 export function numberTotal(
   source: TotalSource,
   read: TableRead,
@@ -56,7 +56,7 @@ export function latestNumber(
   return typeof value === 'number' ? value : null;
 }
 
-/** 页面和桌面小组件用同一份计算；页面选项仅放在主合计的 filter，其他合计不跟。 */
+/** Pages and desktop widgets use identical calculations; page options apply solely to the primary total's filter, while other totals do not follow. */
 export function calculatedNumber(
   source: NumberSource,
   own: TableRead,
@@ -83,12 +83,12 @@ export function calculatedNumber(
     const read = other(total.table);
     totals.set(total.id, read ? numberTotal(total, read, now, cal, range).value : null);
   }
-  // 空的操作数不被 if 的未执行分支悄悄忽略。
+  // Empty operands are not silently ignored by unexecuted branches of if statements.
   if ([...totals.values()].some((v) => v === null)) return { value: null };
   return { value: evaluateFormula(parsed.node, (id) => totals.get(id) ?? undefined) ?? null };
 }
 
-/** 放在组件定义之外，避免 conditions → schema → components 的循环引用。 */
+/** Placed outside component definitions to avoid circular dependencies among conditions → schema → components. */
 export function statCalcProblems(
   block: ComponentOf<'number'>,
   collection: Collection,
@@ -153,7 +153,7 @@ export function statCalcProblems(
   return problems;
 }
 
-/** 没有专门的显示选项时，由调用方按主字段的格式显示。 */
+/** When no dedicated display option exists, formatted by the caller according to the primary field's format. */
 export function calculatedText(
   value: number | null,
   calc: NumberSource['calc'],
@@ -161,7 +161,7 @@ export function calculatedText(
 ): string | undefined {
   if (!calc?.as) return undefined;
   if (value === null) return '—';
-  // 浮点误差（0.29 * 100 = 28.999999999999996）不能显示成 29.0000；显示最多四位，这里先取到六位。
+  // Floating-point inaccuracies (0.29 * 100 = 28.999999999999996) must not be displayed as 29.0000; displays up to four decimal places, rounding to six places first.
   const shown = (n: number) => Math.round(n * 1e6) / 1e6;
   return calc.as === 'percent'
     ? t(locale, 'statPercent', { value: formatNumber(shown(value * 100), undefined, locale) })

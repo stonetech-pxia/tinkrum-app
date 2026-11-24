@@ -14,7 +14,7 @@ import {
   readNoisyJpeg,
 } from './test-helpers';
 
-/** 一页文字 + 一张大 JPEG + 一张 Flate 图 + 一张带透明的 PNG（会有 SMask）+ 一张小图。 */
+/** A page of text + one large JPEG + one Flate image + one PNG with transparency (has SMask) + one small image. */
 async function photoPdf(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595, 842]);
@@ -31,7 +31,7 @@ async function photoPdf(): Promise<Uint8Array> {
   return doc.save();
 }
 
-/** PDF 里所有图片对象的滤镜、宽高。 */
+/** Filters, widths, and heights of all image objects in the PDF. */
 async function imagesIn(bytes: Uint8Array) {
   const doc = await PDFDocument.load(bytes);
   const out: { filter: string; width: number; height: number; colorSpace: string }[] = [];
@@ -58,7 +58,7 @@ describe('openForCompression', () => {
         [120, 120],
       ]),
     );
-    // 120×120 的 SMask（透明度）和 60×40 的小图都不算。
+    // The 120×120 SMask (transparency) and 60×40 small image are not counted.
     expect(c.pictures).toHaveLength(3);
     expect(c.otherBytes).toBeGreaterThan(0);
     expect(c.otherBytes + c.pictures.reduce((s, p) => s + p.storedBytes, 0)).toBe(c.originalBytes);
@@ -76,7 +76,7 @@ describe('openForCompression', () => {
     const view = new DataView(png.bytes.buffer, png.bytes.byteOffset);
     expect(view.getUint32(16)).toBe(200);
     expect(view.getUint32(20)).toBe(150);
-    // 像素和原图一样：解开 IDAT，每行 1 个滤镜字节 + 600 个字节。
+    // Pixels same as original: unpack IDAT, 1 filter byte + 600 bytes per row.
     const idatLength = view.getUint32(33);
     const rows = inflateSync(png.bytes.subarray(41, 41 + idatLength));
     expect(rows.length).toBe(150 * 601);
@@ -92,7 +92,7 @@ describe('openForCompression', () => {
     const out = await c.build(replacements);
     expect(out.length).toBeLessThan(original.length / 2);
     const images = await imagesIn(out);
-    // 换过的三张都是 60×40 的 DCT RGB；SMask 还在（原样的 Flate 灰度图）。
+    // The three replaced images are all 60×40 DCT RGB; SMask remains (original Flate grayscale image).
     expect(images.filter((i) => i.filter === '/DCTDecode' && i.width === 60)).toHaveLength(4);
     expect(images.some((i) => i.filter === '/FlateDecode' && i.colorSpace === '/DeviceGray')).toBe(
       true,

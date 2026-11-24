@@ -31,10 +31,12 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-// 文字识别和扫描的 Android 实现（D-087）：全部在本机处理。
-// 文字识别主要用 PP-OCRv6（D-269，OcrRunner 跑模型，前后处理在 JS）；ML Kit 只留韩文识别器（PP-OCRv6 不认韩文）。
-// 和 iOS 的 JS 接口相同；ML Kit 没有「给一张照片找四个角」的接口，所以 canFindPaper 是 false，
-// 相册照片的找边退回扫描包。识别出的文字只返回给 App，不写日志。
+// Android implementation of text recognition and document scanning (D-087): fully processed
+// on-device. Text recognition primarily uses PP-OCRv6 (D-269, running models via OcrRunner, with
+// pre- and post-processing in JS); ML Kit retains only the Korean recognizer (since PP-OCRv6 does
+// not recognize Korean). JavaScript interface matches iOS; ML Kit lacks an interface to find four
+// corners in a photo, so canFindPaper is false, and border detection for photo gallery images falls
+// back to the scanning pack. Recognized text is returned exclusively to the app and never logged.
 
 class VisionFailedException(detail: String?) : CodedException("Vision failed: $detail")
 
@@ -75,10 +77,10 @@ class MorphVisionModule : Module() {
       BackgroundRemoval.remove(context, Uri.parse(uri), background, File(Uri.parse(output).path!!))
     }
 
-    // 证件照（D-252）：ML Kit 人脸检测（模型打包进 App）；换底色用上面的主体分割（Google Play 服务的模型）。
+    // ID photo (D-252): ML Kit face detection (model bundled into the app); for changing the background color, use the subject segmentation above (Google Play services model).
     AsyncFunction("detectFaces") { uri: String -> FaceFinder.detect(context, Uri.parse(uri)) }
 
-    // 照片里是什么（没有文字的照片做推荐用）：ML Kit 图像标注，见 ImageClassifier。后台线程跑，取消时轮询结束。
+    // What is in the photo (used for recommendations on photos without text): ML Kit image labeling, see ImageClassifier. Runs on a background thread; polls until finished when cancelled.
     AsyncFunction("classifyImage") { taskId: String, uri: String, options: ClassifyOptions, promise: Promise ->
       thread(name = "morph-classify") {
         try {
@@ -95,7 +97,7 @@ class MorphVisionModule : Module() {
 
     Function("cancelClassify") { taskId: String -> ImageClassifier.cancel(taskId) }
 
-    // 「记一笔」预填用的系统识别（ML Kit 实体识别），只做规则的补充，见 DataDetection。
+    // System recognition for "Log an expense" prefill (ML Kit entity recognition), acting only as a rule supplement; see DataDetection.
     AsyncFunction("detectData") { text: String, language: String, allowDownload: Boolean, promise: Promise ->
       thread(name = "morph-detect-data") {
         try {
@@ -110,7 +112,7 @@ class MorphVisionModule : Module() {
 
     AsyncFunction("dataDetectionStatus") { language: String -> DataDetection.status(language) }
 
-    // 用户同意以后才下载（JS 先问）。
+    // Download only after user consent (JS prompts first).
     AsyncFunction("downloadDataModel") { language: String, promise: Promise ->
       thread(name = "morph-data-model") {
         try {
@@ -130,15 +132,15 @@ class MorphVisionModule : Module() {
 
     Function("canFindPaper") { false }
 
-    // PDF 的文字层（D-455）：Android 15 起系统能读，更早的系统返回 null。
+    // PDF text layer (D-455): readable by the system starting from Android 15; earlier systems return null.
     AsyncFunction("pdfText") { uri: String -> PdfThumbnail.text(File(Uri.parse(uri).path!!)) }
 
-    // PDF 第一页的缩略图（D-451）。
+    // PDF first-page thumbnail (D-451).
     AsyncFunction("pdfThumbnail") { uri: String, output: String, maxSide: Int ->
       PdfThumbnail.render(File(Uri.parse(uri).path!!), File(Uri.parse(output).path!!), maxSide)
     }
 
-    // 文档扫描在 Google Play 服务里，没有 Google Play 服务的手机用不了。
+    // Document scanning is part of Google Play Services; phones without Google Play Services cannot use it.
     Function("isDocumentCameraSupported") {
       GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context) ==
         ConnectionResult.SUCCESS
@@ -150,7 +152,7 @@ class MorphVisionModule : Module() {
 
     Function("supportsLanguage") { code: String -> recognizerFor(code) != null }
 
-    // PP-OCRv6 的两个模型（D-269）：路径是扩展包里的文件；输入、输出都是本次运行的临时文件。
+    // The two PP-OCRv6 models (D-269): paths are files within the pack; inputs and outputs are temporary files for the current run.
     AsyncFunction("ocrLoad") { det: String, rec: String ->
       OcrRunner.load(fileOf(det).path, fileOf(rec).path)
     }
@@ -162,7 +164,7 @@ class MorphVisionModule : Module() {
     }
     AsyncFunction("ocrUnload") { OcrRunner.unload() }
 
-    // 扫描展平的 UVDoc 网格模型（D-274）：一个 float32 输入、一个 float32 输出，都走临时文件，返回输出的形状。
+    // Scan-flattened UVDoc grid model (D-274): one float32 input and one float32 output, both via temporary files, returning the output shape.
     AsyncFunction("modelRun") { model: String, input: String, shape: List<Int>, output: String ->
       ModelRunner.run(
         fileOf(model).path,
@@ -177,7 +179,7 @@ class MorphVisionModule : Module() {
       listOf("ko")
     }
 
-    // languages 是 BCP 47，第一种是用户选的语言，决定用哪个识别器（中日韩识别器也认拉丁字母）。
+    // languages is BCP 47; the first is the user's chosen language, determining which recognizer to use (CJK recognizers also recognize Latin letters).
     AsyncFunction("recognizeText") { uri: String, languages: List<String> ->
       val first = languages.firstOrNull() ?: ""
       val recognizer = recognizerFor(first) ?: throw UnsupportedLanguageException(first)
@@ -187,7 +189,7 @@ class MorphVisionModule : Module() {
         val lines = result.textBlocks.flatMap { block ->
           block.lines.mapNotNull { line -> line.boundingBox?.let { TextLine(line.text, it) } }
         }
-        // 每行的位置（D-195）：像素，原点在左上角；框是按拍摄方向摆正后的坐标，宽高也按摆正后的给。
+        // Line positions (D-195): pixels, origin at top-left; bounding boxes are coordinates adjusted after straightening according to shooting orientation, and width/height are also given accordingly.
         val turned = image.rotationDegrees == 90 || image.rotationDegrees == 270
         val items = lines.map {
           mapOf(
@@ -213,8 +215,9 @@ class MorphVisionModule : Module() {
       }
     }
 
-    // 系统文档扫描（ML Kit）：实时找边、自动拍、多页、可以从相册导入，拍完已经拉正。
-    // 每页存成 JPG（长边不超过 maxSide）放在 directory 里；用户取消时返回 null。
+    // System document scanning (ML Kit): real-time edge detection, auto-capture, multi-page, can
+    // import from photo library, straightened upon capture. Each page is saved as a JPG (long side
+    // not exceeding maxSide) in directory; returns null if cancelled by the user.
     AsyncFunction("scanDocuments") { directory: String, maxSide: Int, quality: Double, promise: Promise ->
       val activity = appContext.currentActivity
       if (activity == null || pendingScan != null) {
@@ -243,7 +246,7 @@ class MorphVisionModule : Module() {
         pending.promise.resolve(null)
         return@OnActivityResult
       }
-      // 解码和编码放到后台，不卡界面。
+      // Decoding and encoding are moved to the background to avoid blocking the UI.
       thread {
         try {
           pending.promise.resolve(savePages(result, pending))
@@ -257,7 +260,7 @@ class MorphVisionModule : Module() {
   private fun recognizerFor(code: String): TextRecognizer? {
     val lang = code.substringBefore('-')
     return when {
-      // 其他语言由 JS 用 PP-OCRv6 识别（D-269），不走 ML Kit。
+      // Other languages are recognized by JS using PP-OCRv6 (D-269), bypassing ML Kit.
       lang == "ko" -> TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
       else -> null
     }
@@ -282,7 +285,7 @@ class MorphVisionModule : Module() {
     }
   }
 
-  /** 先按 2 的幂缩小解码（省内存），再精确缩到长边 maxSide。 */
+  /** Decode by first scaling down by powers of 2 (saving memory), then precisely scaling to maxSide on the long side. */
   private fun decodeScaled(uri: Uri, maxSide: Int): Bitmap {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it, null, bounds) }
@@ -306,8 +309,10 @@ class MorphVisionModule : Module() {
 private class TextLine(val text: String, val box: Rect)
 
 /**
- * 和 iOS 一样排版：同一高度的几段（收据上的品名和价格）放在一行，用空格隔开；
- * 行距明显变大时空一行。ML Kit 的坐标原点在左上角，y 越大越靠下。
+ * Layout matches iOS: segments at the same height (such as item name and price on a receipt) are
+ * placed on the same line and separated by spaces; leaves a blank line when line spacing
+ * increases significantly. ML Kit's coordinate origin is at the top-left, where larger y means
+ * further down.
  */
 private fun layout(lines: List<TextLine>): String {
   val sorted = lines.sortedBy { it.box.exactCenterY() }
@@ -338,5 +343,5 @@ private fun layout(lines: List<TextLine>): String {
   return out.joinToString("\n")
 }
 
-/** file:// 地址或路径 → 文件。 */
+/** file:// URI or path -> File. */
 private fun fileOf(uri: String): File = File(Uri.parse(uri).path ?: uri)

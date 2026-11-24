@@ -14,18 +14,21 @@ import { shortDate, weekdayName } from './schedule';
 import { isMultipleChoice, type Collection, type Grouping, type Locale } from './schema';
 import { dateFieldOf } from './sequence';
 
-// 记录列表分段（D-347）：按单选、引用分（每个选项 / 被引用的每条一段，顺序同 D-336 的分组），或者按日子分
-// （日期、日期时间、系统字段按天 / 周 / 月；日程按下一次，过期的合成一段放最前，没有下一次的放最后）。
-// 纯逻辑：每段的标题、记录和「在这一段添加」时预设的值（A10，D-349）；App 只画标题、折叠和行。
+// Record list grouping (D-347): group by single-choice or link (each option / each referenced entry
+// forms a group, ordered as in D-336), or group by date (date, datetime, system fields by day /
+// week / month; schedules by next occurrence, with expired ones combined into a leading group and
+// undated ones at the end). Pure logic: section title, records, and preset values for "add in this
+// section" (A10, D-349); the app only renders titles, collapsing, and rows.
 
 export interface ListGroup {
-  /** 稳定的键：折叠状态按它记。 */
+  /** Stable key: used to record collapse state. */
   key: string;
   label: string;
   records: DataRecord[];
   /**
-   * 在这一段新建时这个字段预设成什么（表单输入）：单选项 ID、引用的记录 ID、日期（按天分时）、日程的「一次」。
-   * 「未选」「已过期」、按周按月分的段没有。
+   * Preset values for form inputs when creating a new entry in this section: option ID,
+   * referenced record ID, date (when grouped by day), or schedule "once". Unselected, expired,
+   * and weekly/monthly grouped sections have none.
    */
   preset?: unknown;
 }
@@ -78,9 +81,11 @@ function monthLabel(day: number, locale: Locale): string {
 }
 
 /**
- * 已经筛选、排好序的记录按 group 分段（每段里保持原来的顺序）。group.by 不写时按第一个日期字段（dateFieldOf）。
- * 按日子分时段的先后跟着排序走：按日期从早到晚排就是今天、明天……；日程的「已过期」总在最前，「不定日期」总在最后。
- * group.showEmpty：单选、引用时没有记录的段也列出（版块）。
+ * Group filtered and sorted records by group (preserving original order within each group). When
+ * group.by is omitted, groups by the first date field (dateFieldOf). When grouping by date,
+ * section order follows sorting: early-to-late date sorting puts today, tomorrow... first;
+ * schedule "expired" is always first, and "undated" is always last. group.showEmpty: also lists
+ * empty sections for single-choice and link types (sections panel).
  */
 export function listGroups(
   records: readonly DataRecord[],
@@ -90,7 +95,7 @@ export function listGroups(
     locale: Locale;
     now: Date;
     cal: Calendar;
-    /** 引用字段：被引用的那张表和它的记录（D-336）。 */
+    /** Link field: the referenced table and its records (D-336). */
     linked?: LinkedGroups | undefined;
   },
 ): ListGroup[] {
@@ -104,13 +109,13 @@ export function listGroups(
         key: g.optionId ?? 'none',
         label: g.label,
         records: g.records,
-        // 多选（D-607）：在这一段添加时选上这一项。
+        // Multi-choice (D-607): select this item when adding in this section.
         ...(g.optionId === null
           ? {}
           : { preset: isMultipleChoice(field) ? [g.optionId] : g.optionId }),
       }));
   }
-  // 文字（D-424，列表上临时按公司分）：每个不同的值一段，按字母排，没填的放最后。
+  // Text (D-424, temporary grouping by company on list): Each distinct value forms a section, sorted alphabetically; uncategorized items are placed at the end.
   if (field?.type === 'text') return textGroups(records, groupBy, locale);
   const today = todayNumber(now, cal);
   const unit = group.unit ?? 'day';
@@ -156,7 +161,7 @@ export function listGroups(
             ? monthLabel(start, locale)
             : dayLabel(start, today, locale);
       const date = dateOfDayNumber(start);
-      // 按天分时可以在这一天添加：日期字段填这一天，日程是「一次，这一天」。
+      // When grouping by day, items can be added on that day: date field is set to this day, and schedule is set to "once, on this day".
       const preset =
         unit !== 'day'
           ? undefined
@@ -174,8 +179,10 @@ export function listGroups(
 }
 
 /**
- * 在一个列表里新建时从它的筛选能带上的值（A10，D-349）：单选 is 某个选项、引用 is 某条（给一条记录用的页面上
- * 已经换成这条，D-342）、勾选框 is true / false。只认「等于」，别的条件（时间段、包含……）带不上。
+ * Values carried over from a list's filters when creating a new entry within it (A10, D-349):
+ * radio is equals option, relation is equals record (the page used for a specific record has
+ * already been switched to this record, D-342), checkbox is true / false. Only "equals" is
+ * recognized; other conditions (date range, contains...) are not carried over.
  */
 export function filterPresets(
   collection: Collection,
@@ -198,8 +205,10 @@ export function filterPresets(
 const searchForm = (text: string) => text.normalize('NFKC').toLowerCase();
 
 /**
- * 列表上的搜索（D-424）：每个词都要出现在这一条显示的文字里（不分大小写，全角半角一样，中文按字匹配）。
- * 传进来的是还没截到 limit 的记录，所以 limit 之外的也找得到。
+ * Search on list (D-424): Every word must appear in the displayed text of the entry
+ * (case-insensitive, full-width and half-width characters treated equally, Chinese matched by
+ * character). The incoming records have not been sliced to the limit yet, so entries beyond the
+ * limit can also be found.
  */
 export function searchRecords<R>(
   records: readonly R[],
@@ -215,8 +224,9 @@ export function searchRecords<R>(
 }
 
 /**
- * 用户临时换的排序放在最前，配置里的排序（D-560，可以是几个）跟在后面排一样的；同一个字段不重复。
- * 用户没换时就是配置里的。
+ * Sort keys temporarily changed by the user are placed first, followed by the config-defined
+ * sorts (D-560, can be multiple) in the same order; duplicate fields are omitted. When the user
+ * hasn't changed it, uses the config default.
  */
 export function browseSortKeys<S extends { field: string; direction: 'asc' | 'desc' }>(
   picked: S | undefined,
@@ -230,7 +240,7 @@ export function browseSortKeys<S extends { field: string; direction: 'asc' | 'de
   return after.length === 0 ? picked : [picked, ...after];
 }
 
-/** 用户点了「按这个字段排」（D-424）：日期、数字新的大的在前，别的从 A 到 Z。 */
+/** When the user taps "Sort by this field" (D-424): dates and numbers largest first, others from A to Z. */
 export function browseSort(
   field: string,
   tables: readonly Collection[],

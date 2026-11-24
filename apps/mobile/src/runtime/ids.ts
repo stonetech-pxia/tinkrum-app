@@ -1,4 +1,4 @@
-/** 新的用户文件 / 记录 / 预设的 ID（时间 + 随机）。单独一个文件：存储、渲染器都要它，不该为此依赖执行器（R11）。 */
+/** ID for new user files / records / presets (timestamp + random). In a separate file: both storage and renderer need it and should not depend on the executor for this (R11). */
 export function newAssetId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 }

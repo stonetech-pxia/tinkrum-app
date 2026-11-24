@@ -14,7 +14,7 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 附件字段放多个文件（D-263）：记录里是一组文件 ID；旧数据里的单个 ID 当成一组。
+// Attachment field holds multiple files (D-263): stored as a list of file IDs in the record; single IDs in old data are treated as a list.
 
 const receipts: Collection = {
   id: 'expenses',
@@ -66,7 +66,7 @@ async function openEditor(repo: MemoryWorkspaceRepo, files = new FakeFiles()) {
 
 afterEach(() => jest.restoreAllMocks());
 
-/** 这次新复制进来的文件名（withRecord 先放了 a1、a2）。 */
+/** File names newly copied this time (withRcord puts a1 and a2 first). */
 const added = async (repo: MemoryWorkspaceRepo) =>
   (await repo.listAssets()).map((a) => a.name).filter((n) => n !== '发票.jpg' && n !== '小票.pdf');
 
@@ -82,7 +82,7 @@ describe('attachment fields in the record editor', () => {
     await fireEvent.press(screen.getByTestId('editor-receipt-remove-0'));
     await fireEvent.press(screen.getByTestId('editor-save'));
     expect((await repo.getRecord('r1'))!.values.receipt).toEqual(['a1']);
-    // 文件本身还在（用户文件不随记录删除）。
+    // The file itself is still present (user files are not deleted when records are deleted).
     expect(await repo.getAsset('a2')).not.toBeNull();
   });
 
@@ -135,7 +135,7 @@ describe('adding attachments (D-263)', () => {
     await fireEvent.press(await screen.findByTestId('attachment-source-files'));
     expect(await screen.findByText('报价.docx')).toBeTruthy();
 
-    // 最后一个挪到最前面。
+    // Move the last one to the very front.
     await fireEvent.press(screen.getByTestId('editor-receipt-up-3'));
     await fireEvent.press(screen.getByTestId('editor-receipt-up-2'));
     await fireEvent.press(screen.getByTestId('editor-receipt-up-1'));
@@ -150,10 +150,10 @@ describe('adding attachments (D-263)', () => {
       byName('IMG_1.HEIC').id,
       byName('合同.pdf').id,
     ]);
-    // 照片原样保存（不重新编码），扩展名和类型照旧。
+    // Save photos as-is (no re-encoding), preserving extension and type.
     expect(byName('IMG_1.HEIC')).toMatchObject({ mimeType: 'image/heic', source: 'picked' });
     expect(files.disk.get(byName('合同.pdf').path)).toEqual(pdf);
-    // 选择器放在缓存里的副本都删了。
+    // All copies placed in the cache by the selector are deleted.
     expect([...files.disk.keys()].filter((k) => k.startsWith('picker://'))).toEqual([]);
     expect(files.encodes).toEqual([]);
   });
@@ -206,10 +206,10 @@ describe('adding attachments (D-263)', () => {
     await fireEvent.press(await screen.findByTestId('editor-receipt-add'));
     for (const id of ['camera', 'photos', 'files', 'cancel'])
       expect(screen.getByTestId(`attachment-source-${id}`)).toBeTruthy();
-    // 取消：关掉、什么也没加、没弹别的。
+    // Cancel: closes, adds nothing, and pops up nothing else.
     await fireEvent.press(screen.getByTestId('attachment-source-cancel'));
     expect(screen.queryByTestId('attachment-source')).toBeNull();
-    // 点空白处也一样。
+    // Tapping blank space works the same way.
     await fireEvent.press(screen.getByTestId('editor-receipt-add'));
     await fireEvent.press(screen.getByTestId('attachment-source-backdrop'));
     expect(screen.queryByTestId('attachment-source')).toBeNull();
@@ -239,7 +239,7 @@ describe('adding attachments (D-263)', () => {
     await fireEvent.press(await screen.findByTestId('attachment-source-files'));
     expect(await screen.findByText('最多 20 个文件')).toBeTruthy();
     expect(screen.queryByTestId('editor-receipt-add')).toBeNull();
-    // 只复制了还放得下的那一个。
+    // Only copied the one that still fits.
     expect(await added(repo)).toEqual(['a.pdf']);
   });
 });
@@ -284,7 +284,7 @@ describe('the quick-add form on a page takes attachments (D-263)', () => {
     await fireEvent.press(await screen.findByTestId('attachment-source-photos'));
     expect(await screen.findByText('IMG_9.jpg')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('form-add-submit'));
-    // 记下以后表单清空。
+    // Clear the form after recording.
     await waitFor(() => expect(screen.queryByText('IMG_9.jpg')).toBeNull());
     const [asset] = await repo.listAssets();
     expect((await repo.listRecords('expenses'))[0]!.values).toEqual({
@@ -341,7 +341,7 @@ describe('thumbnails and previews (D-263)', () => {
     expect(thumb.props.source).toEqual([{ uri: files.fileUri('assets/a1/发票.jpg') }]);
     expect(thumb.props.allowDownscaling).toBe(true);
     expect(thumb.props.style).toMatchObject({ width: 44, height: 44 });
-    // 旧格式的单个 ID 也显示；没有附件、只有 PDF、文件已经删掉的不显示。
+    // Single IDs in old format are also displayed; no attachments, PDF-only, or deleted files are not displayed.
     expect(screen.getByTestId('record-thumb-old')).toBeTruthy();
     expect(screen.queryByTestId('record-thumb-none')).toBeNull();
     expect(screen.queryByTestId('record-thumb-gone')).toBeNull();
@@ -380,7 +380,7 @@ describe('thumbnails and previews (D-263)', () => {
     expect(screen.queryByTestId('editor-receipt-thumb-1')).toBeNull();
 
     await fireEvent.press(screen.getByTestId('editor-receipt-file-2'));
-    // 只翻看照片和视频：两张照片，从第二张开始。
+    // Browsing photos and videos only: two photos, starting from the second one.
     expect(await screen.findByTestId('share-viewer')).toBeTruthy();
     expect(screen.getByTestId('share-viewer-count')).toHaveTextContent('2 / 2');
     await fireEvent.press(screen.getByTestId('share-viewer-close'));

@@ -78,7 +78,7 @@ describe('backdropStops', () => {
 
 describe('contrastProblems', () => {
   it('checks text on the aurora, under glass cards and on chrome cards', () => {
-    // 深色模式下浅色文字压在亮黄色的极光上看不清。
+    // Light-colored text on bright yellow aurora backgrounds has poor contrast in dark mode.
     const aurora = {
       ...DEFAULT_THEME,
       mode: 'dark' as const,
@@ -87,7 +87,7 @@ describe('contrastProblems', () => {
     };
     expect(contrastProblems(aurora).join('\n')).toMatch(/backdrop color 1/);
     expect(contrastProblems({ ...aurora, backdrop: 'plain' })).toEqual([]);
-    // 中灰正文在白背景和黑卡片上都够清楚，但毛玻璃把两者混成灰色就不行了。
+    // Medium gray body text is clear enough on both white backgrounds and black cards, but frosted glass blurring them into gray fails the contrast check.
     const grey = {
       ...DEFAULT_THEME,
       primaryColor: '#FFFFFF',
@@ -98,7 +98,7 @@ describe('contrastProblems', () => {
     expect(contrastProblems({ ...grey, cardStyle: 'glass' }).join('\n')).toMatch(
       /glass card over backdrop color/,
     );
-    // 金属卡片的暗部要看得清正文。
+    // Body text must remain legible against the dark areas of metallic cards.
     const chrome = {
       ...DEFAULT_THEME,
       cardStyle: 'chrome' as const,
@@ -120,7 +120,7 @@ describe('contrastProblems', () => {
     expect(contrastProblems({ ...theme, mode: 'light' })).toEqual([]);
   });
 
-  // D-409：深色页面配浅色卡片。text 只管页面，surfaceText 管卡片。
+  // D-409: Dark pages paired with light cards. text applies only to the page, while surfaceText applies to cards.
   const forest = {
     ...DEFAULT_THEME,
     colors: {
@@ -133,7 +133,7 @@ describe('contrastProblems', () => {
 
   it('accepts a dark page with light cards when the cards have their own text color', () => {
     expect(contrastProblems(forest)).toEqual([]);
-    // 没有 surfaceText 时同样的配色过不了。
+    // Fails validation when surfaceText is missing under the same color scheme.
     const { surfaceText: _, ...one } = forest.colors;
     expect(contrastProblems({ ...forest, colors: one }).join('\n')).toMatch(/on surface/);
   });
@@ -203,7 +203,7 @@ describe('surfaceText (D-409)', () => {
     expect(card.text).toBe('#2A2420');
     expect(contrast(card.muted, card.surface)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(card.caption, card.surface)).toBeGreaterThanOrEqual(3);
-    // 卡片里凹下去的底色（tone muted、月历当天）上也看得清。
+    // Legible even against sunken background tones in cards (tone muted, calendar current day).
     expect(contrast(card.text, card.background)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(card.primaryText, card.surface)).toBeGreaterThanOrEqual(3);
     expect(contrast(card.onSecondaryTint, card.secondaryTint)).toBeGreaterThanOrEqual(4.5);
@@ -216,9 +216,9 @@ describe('surfaceText (D-409)', () => {
     expect(contrast(page.muted, page.background)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(page.caption, page.background)).toBeGreaterThanOrEqual(3);
     expect(contrast(page.primaryText, page.background)).toBeGreaterThanOrEqual(3);
-    // 还没换成卡片配色的系统页面（导航栏、弹窗）：text 压在它们的底色上也要清楚。
+    // System pages not yet updated to card color schemes (navigation bars, dialogs): text must remain legible against their background colors.
     expect(contrast(page.text, page.surface)).toBeGreaterThanOrEqual(4.5);
-    // 删除、移除的红字压在这层底色上也要清楚。
+    // Red text for delete/remove actions must also be legible against this background layer.
     expect(contrast(page.danger, page.surface)).toBeGreaterThanOrEqual(3);
     expect(page.danger).not.toBe(CLAY.light.danger);
   });
@@ -244,14 +244,14 @@ describe('surfaceText (D-409)', () => {
 });
 
 describe('overlay and accent colours', () => {
-  // 实色底上的字是粗体或控件文字，按 3:1；白字够 3:1 就保留白字（创始人 2026-11-22 选定）。
+  // Text on solid backgrounds uses bold or control text sizing, evaluated at a 3:1 ratio; white text is retained if it meets 3:1 (selected by the founder 2026-11-22).
   it.each(['#FFFFFF', '#FDE047', '#C8623A', '#777777', '#B03A2E', '#1C1815', '#F0794F'])(
     'keeps text readable on an arbitrary solid accent %s',
     (accent) => {
       expect(contrast(onAccent(accent), accent)).toBeGreaterThanOrEqual(3);
     },
   );
-  // 按钮、提示条、选中的 Pill、步骤圆点用同一条规则：同一个底色上不会一处白字一处黑字。
+  // Buttons, prompt bars, selected pills, and step dots share the same rule: consistent white or black text coloring across the same background.
   it.each([
     '#C8623A',
     '#007AFF',

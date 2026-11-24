@@ -10,7 +10,7 @@ import { prepareTextLines } from './doc-text-lines';
 import { buildTextTables } from './doc-text-tables';
 import { measurePageTypography } from './doc-typography';
 
-/** 按原有顺序串联各阶段；重建回调保留原来的整页回退路径。 */
+/** Concatenate stages in original order; rebuild callbacks preserve the original full-page fallback path. */
 export function buildPage(
   input: DocPageInput,
   options: DocBuildOptions,

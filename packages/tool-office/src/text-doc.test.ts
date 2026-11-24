@@ -33,9 +33,9 @@ describe('textToDocDoc', () => {
     expect(xml).toContain('签证材料 &lt;清单&gt; &amp; &quot;备注&quot;');
     expect(xml).toContain('<w:br/><w:t xml:space="preserve">第二行</w:t>');
     expect(xml).toContain('第二段');
-    // 每个 run 都写字体，东亚字体也在（苹果的预览不读默认样式）。
+    // Every run specifies the font, including East Asian fonts (Apple Preview does not read default styles).
     expect(xml).toContain('w:eastAsia=');
-    // 两个段落。
+    // Two paragraphs.
     expect(xml.match(/<w:p>|<w:p /g)).toHaveLength(2);
   });
 });

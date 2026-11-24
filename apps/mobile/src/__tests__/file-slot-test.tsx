@@ -24,8 +24,10 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore, type WorkspaceStore } from '../workspace/store';
 
-// 文件入口（D-257）：AI 只放空位；用户点空位从相册或「文件」选，文件复制一份存成用户文件，
-// 配置里只有文件 ID；点一下用系统预览打开；长按编辑里换文件、移除文件。文件名不进配置、不发给 AI。
+// File triggers (D-257): AI only populates empty slots; user taps empty slot to select from photo
+// library or "Files", a copy of the file is saved as a user file, config holds only the file ID;
+// single tap opens with system preview; long-press edit replaces or removes the file. File names do
+// not enter config and are not sent to AI.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -96,7 +98,7 @@ const slotBlock = (store: WorkspaceStore) =>
     opens: { file: string | null };
   };
 
-/** 系统弹窗：依次点名字为 labels 的按钮（每个弹窗一个）。 */
+/** System popups: tap buttons named labels sequentially (one per popup). */
 function pressInAlerts(...labels: string[]) {
   const spy = jest.spyOn(Alert, 'alert');
   for (const label of labels)
@@ -106,7 +108,7 @@ function pressInAlerts(...labels: string[]) {
   return spy;
 }
 
-/** 入口卡片上显示的文字（首页的「最近文件」也会列出这份副本）。 */
+/** Text displayed on trigger card ("Recent Files" on home screen also lists this copy). */
 async function slotShows(text: string) {
   await waitFor(() =>
     expect(within(screen.getByTestId('file-slot-lease')).getByText(text)).toBeTruthy(),
@@ -119,7 +121,7 @@ describe('file slot', () => {
   it('empty slot: the user picks a file from Files, Tinkrum keeps a copy and opens it', async () => {
     const { repo, store, files } = await renderApp();
     await commit(store, [SLOT], '加文件入口');
-    // 新用户：空位显示提示。
+    // New user: empty slot displays hint.
     await slotShows('点按选择一个文件');
 
     files.nextPick = [files.offer('合同 2026.pdf', pdf, 'application/pdf')];
@@ -134,16 +136,16 @@ describe('file slot', () => {
       source: 'picked',
       size: pdf.length,
     });
-    // 副本在 App 的用户文件里；选择器放在缓存里的那份删掉了。
+    // Copy resides in app's user files; selector cache copy is deleted.
     expect(files.disk.get(asset!.path)).toEqual(pdf);
     expect(files.disk.has('picker://合同 2026.pdf')).toBe(false);
-    // 配置里只有文件 ID，没有文件名；这次修改是用户的手动修改。
+    // Config contains only file ID, no file name; this modification is a manual user edit.
     expect(slotBlock(store).show).toEqual({ title: '租房合同' });
     expect(slotBlock(store).opens).toEqual({ file: asset!.id });
     expect(JSON.stringify(store.getState().config)).not.toContain('合同 2026');
     expect(store.getState().head).toMatchObject({ source: 'user', summary: '设置文件' });
 
-    // 点一下用系统预览打开副本。
+    // Single tap opens copy with system preview.
     await fireEvent.press(screen.getByTestId('file-slot-lease'));
     expect(files.previewed).toEqual([
       { uri: files.fileUri(asset!.path), mimeType: 'application/pdf' },
@@ -158,7 +160,7 @@ describe('file slot', () => {
     await fireEvent.press(await screen.findByTestId('file-slot-lease'));
     await slotShows('IMG_0042.HEIC');
     const [asset] = await repo.listAssets();
-    // 不像图片组件那样重新编码：原样保存。
+    // Unlike image components, not re-encoded: saved as-is.
     expect(asset).toMatchObject({ name: 'IMG_0042.HEIC', mimeType: 'image/heic' });
     expect(slotBlock(store).opens.file).toBe(asset!.id);
   });
@@ -168,26 +170,26 @@ describe('file slot', () => {
     await commit(store, [SLOT], '加文件入口');
     const headId = store.getState().head!.id;
 
-    // 选择器里取消。
+    // Cancel in selector.
     files.nextPick = null;
     pressInAlerts('从「文件」选');
     await fireEvent.press(await screen.findByTestId('file-slot-lease'));
 
-    // 弹窗里取消。
+    // Cancel in popup.
     pressInAlerts('取消');
     await fireEvent.press(screen.getByTestId('file-slot-lease'));
 
-    // 超过 4 GB（视频的上限，D-142）。
+    // Exceeds 4 GB (video limit, D-142).
     const huge = files.offer('big.mov', pdf, 'video/quicktime');
     files.nextPick = [{ ...huge, size: MEDIA_LIMITS.maxFileBytes + 1 }];
     const tooLarge = pressInAlerts('从「文件」选');
     await fireEvent.press(screen.getByTestId('file-slot-lease'));
     await slotShows('点按选择一个文件');
     expect(tooLarge).toHaveBeenLastCalledWith('租房合同', '这个文件超过 4 GB。');
-    // 没复制，选择器的缓存副本也删了。
+    // Not copied, selector cache copy also deleted.
     expect(files.disk.has('picker://big.mov')).toBe(false);
 
-    // 剩余空间不够。
+    // Insufficient remaining space.
     files.freeBytes = 1024;
     files.nextPick = [files.offer('a.pdf', pdf)];
     const noSpace = pressInAlerts('从「文件」选');
@@ -211,7 +213,7 @@ describe('file slot', () => {
     await slotShows('v1.pdf');
     const first = slotBlock(store).opens.file;
 
-    // 长按 → 编辑 → 更换文件。
+    // Long press -> Edit -> Replace file.
     await fireEvent(screen.getByTestId('file-slot-lease'), 'longPress');
     await fireEvent.press(await screen.findByTestId('single-edit-lease'));
     files.nextPick = [files.offer('v2.pdf', pdf)];
@@ -223,7 +225,7 @@ describe('file slot', () => {
     const second = slotBlock(store).opens.file;
     expect(second).not.toBe(first);
 
-    // 移除文件：回到空位；两个副本都还在（和图片组件一样，用户文件不随版本删除）。
+    // Remove file: returns to empty slot; both copies remain (like image component, user files are not deleted with versions).
     await fireEvent(screen.getByTestId('file-slot-lease'), 'longPress');
     await fireEvent.press(await screen.findByTestId('single-edit-lease'));
     await fireEvent.press(screen.getByTestId('edit-file-remove'));
@@ -232,11 +234,11 @@ describe('file slot', () => {
     expect(slotBlock(store).opens.file).toBeNull();
     expect((await repo.listAssets()).map((a) => a.id).sort()).toEqual([first, second].sort());
 
-    // 撤销：文件回来。
+    // Undo: file returns.
     await fireEvent.press(await screen.findByText('撤销'));
     await slotShows('v2.pdf');
 
-    // 删掉组件、再恢复那个版本：副本还在，入口照样能打开。
+    // Delete component, then restore that version: copy still exists, trigger opens normally.
     const withFile = store.getState().head!.id;
     await commit(store, [{ op: 'removeContainer', page: 'home', block: 'lease' }], '删');
     expect(await repo.listAssets()).toHaveLength(2);
@@ -287,7 +289,7 @@ describe('file slot', () => {
 
     expect((await store.getState().propose('圆角小一点')).kind).toBe('preview');
     const all = JSON.stringify(sent);
-    // v34 里文件入口是 opens 为 { file } 的 entry：模型看得到入口，文件 ID 换成占位符（底线 3），看不到文件名。
+    // In v34, file trigger is an entry with opens as { file }: model sees trigger, file ID is replaced with placeholder (invariant 3), file name is hidden.
     expect(all).toContain('租房合同');
     expect(all).toContain('opens');
     expect(all).toContain(REDACTED_FILE);

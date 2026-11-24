@@ -2,10 +2,13 @@ import type { FilePlatform, PickedFile } from '../runtime/platform';
 import { copyUserFiles, type ImportProblem } from '../storage/copy-files';
 import type { WorkspaceRepo } from '../storage/types';
 
-// 文件入口（D-257）和附件字段（D-263）：用户选的文件复制一份存成用户文件（assets/<id>/<文件名>），原件不动
-// （AGENTS.md「文件的归属」）。选择在这里，复制进 App 在 storage/copy-files.ts（R11）。
+// Where to select from: camera (attachments only), photos (as-is, no re-encoding), and "files".
+// File entry points (D-257) and attachment fields (D-263): user-selected files are copied and
+// stored as user files (assets/<id>/<filename>), leaving originals untouched (AGENTS.md "File
+// ownership"). Selection happens here, and copying into the app happens in storage/copy-files.ts
+// (R11).
 
-/** 从哪里选：相机（只给附件用）、相册（原样，不重新编码）、「文件」。 */
+/** Where to select from: camera (attachments only), photos (as-is, no re-encoding), and "files". */
 export type SlotSource = 'camera' | 'photos' | 'files';
 
 export type { ImportProblem };
@@ -13,7 +16,7 @@ export type { ImportProblem };
 export type SlotImport =
   { kind: 'saved'; assetId: string } | { kind: 'cancelled' } | { kind: ImportProblem };
 
-/** 一次选了几个文件：存好的按选的顺序；中间出了问题就停在那里，problem 说明原因。 */
+/** Number of files selected at once: stored files maintain the selected order; stops immediately if an error occurs mid-way, with problem indicating the reason. */
 export type FilesImport =
   { kind: 'cancelled' } | { kind: 'done'; assetIds: string[]; problem?: ImportProblem };
 
@@ -29,7 +32,7 @@ async function pick(
   return source === 'photos' ? files.pickMedia(max) : files.pickDocuments(['*/*'], max > 1);
 }
 
-/** 选最多 max 个文件，逐个复制进 App。 */
+/** Select at most max files and copy them into the app one by one. */
 export async function importUserFiles(
   source: SlotSource,
   max: number,
@@ -41,12 +44,12 @@ export async function importUserFiles(
   try {
     return { kind: 'done', ...(await copyUserFiles(picked, files, repo)) };
   } finally {
-    // 选择器复制进缓存的那份（视频可能很大）用完就删；相册原件、content:// 不在缓存里，不会动。
+    // Delete the copy placed into cache by the selector (videos can be very large) after use; photo library originals and content:// URIs are outside the cache and remain untouched.
     await files.removePickedCopies(picked.map((p) => p.uri)).catch(() => undefined);
   }
 }
 
-/** 文件入口：选一个文件复制进 App。 */
+/** File entry point: select a file and copy it into the app. */
 export async function importSlotFile(
   source: Exclude<SlotSource, 'camera'>,
   files: FilePlatform,

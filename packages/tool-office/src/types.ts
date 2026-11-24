@@ -1,6 +1,6 @@
-// 扫描件转 Excel（D-272）的数据：TableDoc 是编辑页改的东西，xlsx 每次从它重新生成。
+// Data for scanned-to-Excel conversion (D-272): TableDoc is modified on the edit page, and xlsx is regenerated from it each time.
 
-/** 像素坐标，原点在左上角。 */
+/** Pixel coordinates, with origin at the top-left corner. */
 export interface Box {
   x: number;
   y: number;
@@ -8,31 +8,35 @@ export interface Box {
   height: number;
 }
 
-/** RGBA 像素（每像素 4 字节）。 */
+/** RGBA pixels (4 bytes per pixel). */
 export interface RgbaImage {
   width: number;
   height: number;
   data: Uint8Array;
 }
 
-/** 识别出的一行（和找线那张图同一个坐标系）。 */
+/** Recognized line of text (same coordinate system as the line-detection image). */
 export interface OcrBox extends Box {
   text: string;
-  /** 识别的平均置信度（0–1，PP-OCRv6 有；系统识别没有）。 */
+  /** Average recognition confidence (0–1, present in PP-OCRv6; absent in system OCR). */
   score?: number;
   /**
-   * 每个字的大致位置（PP-OCRv6 的 CTC 时间步，D-272）：at 是字的中心在这一行里从左到右的比例（0–1）。
-   * 没有时（系统识别）横跨竖线的行不能按字切开，整行按中心放进一格。
+   * Approximate position of each character (PP-OCRv6 CTC timestamps, D-272): at is the ratio
+   * (0–1) of the character's center from left to right within the line. When absent (system OCR),
+   * lines crossing vertical lines cannot be split by character, and the entire line is placed
+   * into a cell based on its center.
    */
   chars?: readonly { text: string; at: number }[];
 }
 
-/** 水平对齐：按原图里文字在格子里的位置判断（D-272）；没有时靠左。 */
+/** Horizontal alignment: determined by the position of text within the cell in the original image (D-272); defaults to left when absent. */
 export type CellAlign = 'left' | 'center' | 'right';
 
 /**
- * 一个格子；合并单元格只有左上角那一个，rowSpan / colSpan 大于 1。网格里每个位置都正好属于一个格子。
- * col 和 colSpan 按这一页共用的列算（从这张表的第一列 TableBlock.col 起），所以一格可能横跨几条只有别的表才有的列线。
+ * A single cell; merged cells have only one top-left cell, with rowSpan / colSpan greater than 1.
+ * Every position in the grid belongs to exactly one cell. col and colSpan are calculated based on
+ * shared columns for this page (starting from the table's first column TableBlock.col), so a cell
+ * may span multiple column lines unique to other tables.
  */
 export interface TableCell {
   row: number;
@@ -41,57 +45,62 @@ export interface TableCell {
   colSpan: number;
   text: string;
   align?: CellAlign;
-  /** 原图里这一格的位置（截图核对用）；编辑页插入的行列没有。 */
+  /** Position of this cell in the original image (for screenshot verification); absent for rows/columns inserted on the edit page. */
   box?: Box;
   /**
-   * 这一格写成什么（记录导出，D-427）：text 永远是文字，number 是真的数字或日期（format 是 Excel 的数字格式）。
-   * 没有时（扫描件）按文字猜：纯数字写成数字。
+   * Cell export format (record export, D-427): text is always text, number is a true number or
+   * date (format is Excel number format). When absent (scans), guessed as text: pure numbers are
+   * written as numbers.
    */
   write?: { kind: 'text' } | { kind: 'number'; value: number; format: string };
-  /** 字号（磅，D-521）：按这一格字的行高估的；没有时用这一页的 bodySize（再没有是 11）。 */
+  /** Font size (points, D-521): estimated from the line height of characters in this cell; falls back to the page's bodySize when absent (defaulting to 11). */
   size?: number;
-  /** 粗体（D-521）：笔画比整页的字粗得多；没有时不加粗。 */
+  /** Bold (D-521): strokes are significantly thicker than the page's text; not bold when absent. */
   bold?: boolean;
 }
 
 export interface TableBlock {
   kind: 'table';
   rows: number;
-  /** 这张表从这一页共用的第几列开始（从 0 起）。 */
+  /** Starting shared column index for this table on the page (0-indexed). */
   col: number;
-  /** 占几列共用的列。 */
+  /** Number of shared columns occupied. */
   cols: number;
-  /** 按行、列排好。 */
+  /** Arranged by rows and columns. */
   cells: TableCell[];
   box: Box;
-  /** 并排的一带（D-522），同 TextBlock.band。 */
+  /** Side-by-side band (D-522), same as TextBlock.band. */
   band?: number;
-  /** 写 xlsx 时格子不画边框（外来的 xlsx 读进来的表，D-509：原来的边框读不出来，也不给每一格加上）。 */
+  /** Cells have no borders when writing xlsx (tables imported from external xlsx files, D-509: original borders cannot be read, nor are borders added to individual cells). */
   borderless?: boolean;
 }
 
 /**
- * 表格外的一段文字（识别范围是「全部内容」时写进 xlsx，每段一行）。
- * 没有 col 时从第一列合并到最后一列；左右两栏的页（D-522）每一栏有自己的列范围，两栏的段落排在同一批行上。
+ * A paragraph of text outside tables (written to xlsx when recognition scope is "all content",
+ * one line per paragraph). When col is absent, spans from the first column to the last column;
+ * two-column pages (D-522) have their own column ranges per column, with two-column paragraphs
+ * laid out on the same batch of rows.
  */
 export interface TextBlock {
   kind: 'text';
   text: string;
   align?: CellAlign;
-  /** 从这一页共用的第几列开始、占几列（和 TableBlock.col / cols 一样）；两个都没有时横跨整页。 */
+  /** Starting shared column index and column span on this page (same as TableBlock.col / cols); spans the entire page when both are absent. */
   col?: number;
   cols?: number;
-  /** 并排的一带（D-522）：同一个编号的块从同一行起，各排各的列（左栏、右栏、旁边的图片）。 */
+  /** Side-by-side band (D-522): blocks with the same ID start on the same row, each laying out its own columns (left column, right column, adjacent image). */
   band?: number;
-  /** 字号（磅）和粗体（D-521），同 TableCell。 */
+  /** Font size (points) and bold (D-521), same as TableCell. */
   size?: number;
   bold?: boolean;
   box: Box;
 }
 
 /**
- * 从原图剪下来的图片（D-520）：写 xlsx 时放在 col 列起、占 cols 列的位置，高度按图的长宽比。
- * src 是剪好的 JPG（本次运行的文件，放到桌上后是桌面里的文件）；剪不出来时没有，编辑页只显示位置。
+ * Image cropped from the original image (D-520): placed starting at column col spanning cols
+ * columns when writing xlsx, with height proportional to the image aspect ratio. src is the
+ * cropped JPG (current runtime file, becomes a workspace file after being placed on the desk);
+ * absent if cropping fails, edit page displays position only.
  */
 export interface ImageBlock {
   kind: 'image';
@@ -105,32 +114,34 @@ export interface ImageBlock {
 export type Block = TableBlock | TextBlock | ImageBlock;
 
 export interface TablePage {
-  /** 工作表名（写 xlsx 时再清理）。 */
+  /** Worksheet name (cleaned up when writing xlsx). */
   name: string;
-  /** 用来截原图的那张图（找线那张）的 uri。 */
+  /** URI of the image used to crop the original image (the line-detection image). */
   source: string;
-  /** 找线时那张图的大小：box 都在这个坐标系里，截图时按原图的实际大小换算。 */
+  /** Size of that image during line detection: boxes are in this coordinate system, converted to actual original image sizes during screenshots. */
   width: number;
   height: number;
-  /** 这一页文字的典型行高（像素）：段落之间空隙超过 1.5 倍行高时空一行。 */
+  /** Typical text line height on this page (pixels): leaves a blank line when the gap between paragraphs exceeds 1.5 times the line height. */
   lineHeight: number;
   /**
-   * 整页共用的列宽（原图像素）：各张表的竖线（没有竖线的按文字空隙分的列）对齐成一套列线（D-272），
-   * 表外的文字从第一列合并到最后一列。没有表时是平分页宽的 4 列。
+   * Shared column widths across the page (original image pixels): vertical lines of all tables
+   * (or text gap-based columns when no vertical lines exist) are aligned into a set of column
+   * lines (D-272), with non-table text spanning from the first column to the last column.
+   * Defaults to 4 columns evenly splitting page width when there are no tables.
    */
   colWidths: number[];
-  /** 这一页正文的字号（磅，D-521）：格子和文字没有自己的字号时用它；没有时是 11（老文件）。 */
+  /** Body text font size on this page (points, D-521): used when cells and text lack their own font size; defaults to 11 when absent (legacy files). */
   bodySize?: number;
-  /** 按阅读顺序（从上到下）。 */
+  /** Ordered by reading sequence (top to bottom). */
   blocks: Block[];
 }
 
 export type TableScope = 'all' | 'tables';
 
 export interface TableDoc {
-  /** 3：加了图片块、文字的列范围、字号（D-520–D-522）；2 的文件读进来时升成 3（parseTableDoc），一个字段都不丢。 */
+  /** 3: Added image blocks, text column ranges, font sizes (D-520–D-522); version 2 files are upgraded to 3 upon reading (parseTableDoc) without losing any fields. */
   version: 3;
-  /** 识别范围：只决定写 xlsx 时要不要写表外的文字，所以切换不会丢掉改过的内容。 */
+  /** Recognition scope: determines only whether non-table text is written to xlsx, so toggling it does not lose edited content. */
   scope: TableScope;
   pages: TablePage[];
 }

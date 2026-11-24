@@ -40,8 +40,9 @@ import { resolveOcrLanguage } from './ocr-language';
 import type { LocalUi } from './local';
 import type { FilePlatform, PickedFile } from './platform';
 
-// App 侧的执行入口：把 core 的执行器（workflow/engine.ts）接上本地存储、平台能力和运行页面。
-// 这里是唯一能执行动作的地方；配置里只有动作 ID 和参数，没有任何代码。
+// App-side execution entry point: connects the core executor (workflow/engine.ts) to local storage,
+// platform capabilities, and runtime pages. This is the sole place where actions are executed;
+// configuration contains only action IDs and parameters, with zero code.
 
 export type { FilePlatform, PickedFile } from './platform';
 
@@ -55,33 +56,35 @@ export interface RunContext {
   now: () => Date;
   newId: () => string;
   ui: LocalUi;
-  /** 当前配置里的数据表（读取记录用）。 */
+  /** Data tables in the current configuration (for reading records). */
   collections?: RunServices['collections'];
   calendar?: Calendar;
   packs?: RunServices['packs'];
   askParams?: (request: AskRequest) => Promise<Record<string, unknown> | null>;
   ensurePack?: (packId: string, options?: { optional?: boolean }) => Promise<boolean>;
-  /** 一次问完这次运行要的扩展包（D-299）：返回没下载的可选扩展包，null 表示取消。 */
+  /** Queries all extension packs required for this run upfront (D-299): returns optional packs that are not yet downloaded, or null if cancelled. */
   ensurePacks?: (needs: readonly PackNeed[]) => Promise<string[] | null>;
   signal?: { cancelled: boolean };
   onEvent?: (event: RunEvent) => void;
-  /** 分享进来的文件（D-115）：交给第一步，第一步不再打开选择器，也不问参数。 */
+  /** Files shared into the app (D-115): passed directly to the first step, bypassing the file picker and prompt for parameters. */
   incoming?: readonly PickedFile[] | null;
   /**
-   * 容器交的值（D-428）：记录页的这一条、这个字段的值、列表选出的记录。点了按钮才有。
-   * 附件（D-442）交过来的只有文件 ID，副本在这里（startRun）复制进这次运行的临时目录。
+   * Values passed from a container (D-428): the current record page entry, field value, or
+   * records selected in a list. Present only when triggered via a button. Attachments (D-442)
+   * pass only file IDs, with copies duplicated into the temporary directory for this run via
+   * startRun.
    */
   handed?: RunValue | HandedFiles | null;
 }
 
 export interface Run {
   result: RunResult;
-  /** 本次运行的临时文件 ID；结果页关闭时调用 dispose 删除。 */
+  /** Temporary file ID for the current run; deleted via dispose when the results page is closed. */
   runId: string;
   dispose(): Promise<void>;
 }
 
-/** 会跑很久的动作（视频、音频）：含这些步骤的运行切到别的 App 也继续（D-160）。 */
+/** Long-running actions (video, audio): runs containing these steps continue even if switched to another app (D-160). */
 const BACKGROUND_ACTIONS: ReadonlySet<string> = new Set([
   'video.speed',
   'video.crop',
@@ -106,12 +109,15 @@ const BACKGROUND_ACTIONS: ReadonlySet<string> = new Set([
 
 export const isBackgroundAction = (actionId: string) => BACKGROUND_ACTIONS.has(actionId);
 
-/** 进度通知最多多久改一次（毫秒）。 */
+/** Maximum frequency of progress notifications (in milliseconds). */
 const NOTIFY_MS = 1000;
 
 /**
- * 含长步骤的运行：从开始（用户刚点了，App 在前台；Android 12 起在后台不能开始）到结束一直保活，
- * 长步骤后面的命名、保存也在后台跑完。第一次时问一次通知权限（D-161），结束时不在前台就发完成通知（D-162）。
+ * Runs containing long steps: kept alive from start (when the user taps and the app is in the
+ * foreground; starting in background is prohibited on Android 12+) until completion, allowing
+ * subsequent naming and saving steps to finish in the background. Prompts for notification
+ * permissions on first use (D-161), and sends a completion notification if not in the foreground
+ * upon finishing (D-162).
  */
 async function keepAlive(ctx: RunContext) {
   const background = ctx.files.background;
@@ -159,12 +165,13 @@ async function keepAlive(ctx: RunContext) {
   };
 }
 
-/** 保存的文件授权给谁：工具自带的工作流给工具，用户自己的工作流给它自己。 */
+/** Grantee for saved files: tool-bundled workflows grant files to the tool, while user workflows grant them to the user. */
 export const granteeOf = (workflow: Workflow) => workflow.package ?? `workflow:${workflow.id}`;
 
 /**
- * 这一步在这台设备上不需要扩展包（D-085–D-087）：系统能识别这种语言；系统能找边，
- * 或者输入全是文档相机拉正过的页面（scan.detect 直接放行）。
+ * Whether this step does not require an extension pack on this device (D-085-D-087): the system
+ * recognizes the language; the system can detect edges, or the input consists entirely of
+ * document-camera straightened pages (scan.detect passes through directly).
  */
 export function packNotNeeded(
   files: FilePlatform,
@@ -174,7 +181,7 @@ export function packNotNeeded(
   locale: Locale = 'en',
 ): boolean {
   const { vision } = files;
-  // 语音转文字（D-150、D-151）：iOS 用系统识别，不用下载内容；没有原生模块时动作自己报错，不白下载。
+  // Speech-to-text (D-150, D-151): iOS uses system recognition without downloading content; reports an error directly if native modules are missing rather than downloading unnecessarily.
   if (actionId === 'audio.transcribe' || actionId === 'video.subtitles')
     return files.speech?.engine !== 'whisper';
   if (actionId === 'ocr.recognize') {
@@ -189,8 +196,10 @@ export function packNotNeeded(
 }
 
 /**
- * 这一步在这台设备上要的文字识别模型（D-269）：识别 PP-OCRv6 认的语言时要它；可搜索 PDF 的文字层、
- * 按识别出的文字取名不下载也能做（没有文字层、用原来的名字），所以是可选的。
+ * OCR model required on this device for this step (D-269): required when recognizing languages
+ * supported by PP-OCRv6; text layers for searchable PDFs and naming by recognized text can work
+ * without downloading (falling back to original names if no text layer exists), making it
+ * optional.
  */
 export function devicePack(
   files: FilePlatform,
@@ -198,7 +207,7 @@ export function devicePack(
   params: Record<string, unknown>,
   locale: Locale = 'en',
 ): DevicePack | DevicePack[] | undefined {
-  // 扫描的展平模型（D-274）：在扫描包之外另外问，不下载也照常扫描。
+  // Flattening model for scanning (D-274): queried separately from the scanning pack, enabling scanning to function normally without downloading.
   const flatten = files.vision?.flattenModel;
   if (actionId === 'scan.detect') {
     return flatten && params.flatten !== false
@@ -206,8 +215,9 @@ export function devicePack(
       : undefined;
   }
   const model = files.vision?.ocrModel;
-  // 转 Word（D-328）、转 Excel（D-272）要每行的位置，只用本机的识别（PP-OCRv6 或系统的），不用文字识别包；
-  // 另外可选版面分析模型（不下载也照样转：Word 不分标题和图片，Excel 不放图片，D-520）。
+  // Word (D-328) and Excel (D-272) conversions require line positions, using native recognition
+  // (PP-OCRv6 or system) without OCR packs; layout analysis model is optional (conversion works
+  // without downloading: Word omits headers/titles and images, Excel omits images, D-520).
   if (actionId === 'ocr.toWord' || actionId === 'ocr.toExcel') {
     const lang = resolveOcrLanguage(params.lang, locale);
     const code = VISION_LANGUAGES[lang]?.[0];
@@ -223,7 +233,7 @@ export function devicePack(
     const lang = resolveOcrLanguage(params.lang, locale);
     const code = VISION_LANGUAGES[lang]?.[0];
     if (model && code && model.languages.includes(code.split('-')[0]!)) return { pack: model.pack };
-    // 自动（D-278）选到系统也认不了的语言（Android 的俄文、越南文）：要那种语言的识别包。
+    // Auto-selection (D-278) resolves to a language unrecognized by the system (such as Russian or Vietnamese on Android): requires the OCR pack for that language.
     if (params.lang === 'auto' && !(code && files.vision?.supportsLanguage(code))) {
       return { pack: ocrPackId(lang) };
     }
@@ -243,7 +253,7 @@ export function devicePack(
   return undefined;
 }
 
-/** 这台设备上真正需要下载的扩展包（工作流页的提示用；预设的扫描都从文档相机开始）。 */
+/** Extension packs truly required for download on this device (used for workflow page prompts; preset scans start from the document camera). */
 export function packsNeeded(packIds: readonly string[], files: FilePlatform): string[] {
   const { vision } = files;
   const speechNeeded = (id: string) =>
@@ -261,7 +271,7 @@ export function packsNeeded(packIds: readonly string[], files: FilePlatform): st
       return true;
     })
     .concat(
-      // PP-OCRv6 认的语言不要语言包，但要文字识别模型（D-269）。
+      // Languages recognized by PP-OCRv6 do not need language packs, but do require the OCR model (D-269).
       vision.ocrModel &&
         packIds.some((id) => {
           const code = VISION_LANGUAGES[id.slice(4).replace('-', '_') as OcrLanguage]?.[0];
@@ -276,7 +286,7 @@ export function packsNeeded(packIds: readonly string[], files: FilePlatform): st
     );
 }
 
-/** 第一步用分享进来的文件时，它的「每次运行时问」（来源、个数）没有意义，不问。 */
+/** When the first step uses shared-in files, its "ask on each run" configuration (source, count) is meaningless and is therefore skipped. */
 function askUnlessShared(
   ctx: RunContext,
   ask: NonNullable<RunContext['askParams']>,
@@ -286,8 +296,9 @@ function askUnlessShared(
 }
 
 /**
- * 这台设备根本做不了的步骤（iOS 17 以下、没有 Google Play 服务时的去背景）：开始前就说，
- * 不要等用户选完照片、跑到那一步才告诉他。
+ * Steps entirely unsupported on this device (iOS below 17, or background removal without Google
+ * Play Services): reported upfront rather than waiting until the user selects photos and reaches
+ * that step.
  */
 function unsupportedStep(ctx: RunContext): RunResult | null {
   const index = ctx.workflow.steps.findIndex((s) => s.action === 'image.removeBackground');
@@ -300,9 +311,12 @@ function unsupportedStep(ctx: RunContext): RunResult | null {
 }
 
 /**
- * 把容器交来的附件（用户文件）复制进这次运行的临时目录（D-442）：处理的是副本，用户文件原样不动（底线 4）。
- * 视频和音频可能有几个 GB，不复制（D-142）：用户文件不在缓存目录里，adoptIntoRun 原地使用、不会移走。
- * 已经不在这台设备上的文件跳过；复制到一半出错或取消，由调用的人删掉整个运行目录。
+ * Copies attachments (user files) passed from containers into the temporary directory for this
+ * run (D-442): operates on copies while leaving user files untouched (invariant 4). Video and
+ * audio files potentially gigabytes in size are not copied (D-142): user files are outside the
+ * cache directory, and adoptIntoRun uses them in place without moving. Files no longer present on
+ * this device are skipped; if copying fails halfway or is cancelled, the caller deletes the
+ * entire run directory.
  */
 export async function copyHandedFiles(
   ctx: Pick<RunContext, 'repo' | 'files' | 'signal'>,
@@ -316,7 +330,7 @@ export async function copyHandedFiles(
     const asset = await ctx.repo.getAsset(id);
     if (asset) assets.push(asset);
   }
-  // 复制之前就查大小，太大的不白复制。
+  // Checks sizes before copying to avoid unnecessary duplication of oversized files.
   checkSizes(assets.map((a) => ({ name: a.name, size: a.size, mimeType: a.mimeType })));
   const items: RunItem[] = [];
   for (const asset of assets) {
@@ -349,7 +363,7 @@ export async function startRun(ctx: RunContext): Promise<Run> {
     try {
       handed = await copyHandedFiles(ctx, runId, ctx.handed);
     } catch (e) {
-      // 复制到一半出错或取消：运行目录里已经复制的副本一起删（成功和失败都要删）。
+      // If copying fails or is cancelled midway, deletes any already copied copies in the run directory (required for both success and failure).
       await ctx.files.removeRun(runId);
       const dispose = async () => undefined;
       if (e instanceof RunCancelled) return { result: { status: 'cancelled' }, runId, dispose };
@@ -413,7 +427,7 @@ export async function startRun(ctx: RunContext): Promise<Run> {
     },
   );
   const dispose = () => ctx.files.removeRun(runId);
-  // 没有结果可看时立即清理临时文件。
+  // Cleans up temporary files immediately when there is no result to display.
   if (result.status !== 'succeeded') await dispose();
   return { result, runId, dispose };
 }

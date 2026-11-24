@@ -5,11 +5,12 @@ import type { Occurrence } from './rows';
 import * as D from './rules-data';
 import { isExcludedLabel, labelScore, norm } from './similarity';
 
-// 票据预填规则的逻辑（词表在 rules-data.ts，D-403）。这些规则只改候选的打分和排序，不写数据，不联网；
-// 不用后行断言，也不用 Hermes 没有的 Intl（PluralRules、ListFormat、RelativeTimeFormat）。
+// Logic for bill prefill rules (vocabulary in rules-data.ts, D-403). These rules only adjust
+// candidate scoring and sorting; they do not write data or make network requests. No lookbehind,
+// and no Intl features unsupported by Hermes (PluralRules, ListFormat, RelativeTimeFormat).
 
-// ======== 发票还是小票 ========
-// 发票上才常见的词（bill to、due date、facture…）出现两个以上就当发票：发票的店名在「开票方」后面，不在最上面几排。
+// ======== Invoice or receipt ========
+// Treat as an invoice if more than two terms common only on invoices (bill to, due date, facture...) appear: on an invoice, the merchant name follows the 'issuer' rather than appearing in the top few rows.
 let invFor = '';
 let invVal = false;
 export function isInvoiceText(text: string): boolean {
@@ -20,7 +21,7 @@ export function isInvoiceText(text: string): boolean {
   return invVal;
 }
 
-// ======== 日月顺序 ========
+// ======== Day-month order ========
 let evidenceFor = '';
 let evidence: { DMY: Set<string>; MDY: Set<string> } = { DMY: new Set(), MDY: new Set() };
 function docEvidence() {
@@ -36,8 +37,9 @@ function docEvidence() {
   return evidence;
 }
 /**
- * 年在后、两个数都 ≤ 12 的日期谁排前；null = 保持原来（按界面语言）。
- * 先看这份文字自己的证据（别处有「25/12/2024」就知道日在前），再看币种、货币符号、增值税字样这些线索。
+ * When year is last and both numbers are <= 12, determine which comes first; null = keep original
+ * (based on UI locale). First check the document's own evidence (e.g. '25/12/2024' indicates
+ * day-first), then look at clues like currency, currency symbols, and VAT terms.
  */
 export function orderPref(sep: string, _locale: string): 'DMY' | 'MDY' | null {
   if (!receiptRules()) return null;
@@ -57,14 +59,14 @@ export function orderPref(sep: string, _locale: string): 'DMY' | 'MDY' | null {
   return null;
 }
 
-// ======== 词表调整：合计、税额、店名 ========
+// ======== Vocabulary adjustment: total, tax amount, merchant name ========
 export function adjustTerms(
   concept: ConceptId | null,
   keywords: readonly string[],
   exclude: readonly string[],
 ): { kw: readonly string[]; ex: readonly string[] } {
   if (!receiptRules()) return { kw: keywords, ex: exclude };
-  // 发票上收票方（bill to、client…）不是店名。
+  // On invoices, the bill-to party ('bill to', 'client'...) is not the merchant.
   if (concept === 'merchant' && ctx.invoice)
     return {
       kw: keywords,
@@ -82,7 +84,7 @@ export function adjustTerms(
   return { kw, ex };
 }
 
-// ---- 西方语言的合计、税额词：整词（整句）匹配，不用字符相似度（相似度会让 mwst、imposta 这类词误中英文标签）----
+// ---- Western language total and tax words: whole-word (whole-phrase) matching without character similarity (similarity would cause words like 'mwst' or 'imposta' to falsely match English/Chinese labels) ----
 const wordsOf = (s: string): string =>
   ' ' +
   s
@@ -120,7 +122,7 @@ export function labelScoreX(
 ): number {
   if (!receiptRules()) return labelScore(label, kw, ex);
   if (!label) return 0;
-  // 开始、结束、期间、送达这类日期的标签不当开票日的标签（整词，标签分归零，值还在候选里）。
+  // Labels for dates such as start, end, period, and delivery are not valid issue date labels (whole word, label score zeroed, value remains in candidates).
   if (concept === 'issueDate' && wHit(label, X03)) return 0;
   if (concept === 'amount') {
     if (wHit(label, W_AMT_EX)) return 0;
@@ -130,7 +132,7 @@ export function labelScoreX(
     if (wHit(label, W_TAX_KW)) return Math.max(0.9, labelScore(label, kw, ex));
   }
   if (concept === 'amount') {
-    // 「含税合计」不是税前合计。
+    // 'Total including tax' is not pre-tax total.
     if (D.TOTAL_WORD.test(label) && D.TAX_INCLUDED.test(label)) return 1;
     const n = norm(label);
     if (EXACT.has(n)) return 0;
@@ -163,12 +165,12 @@ export function isExcludedX(
   return isExcludedLabel(label, ex);
 }
 
-// ======== 数字切分：标签后面的整数、一位小数，和「A + B = C」一排三个数 ========
+// ======== Number segmentation: integers and one-decimal numbers following labels, and three numbers in a row 'A + B = C' ========
 interface Tok {
   start: number;
   end: number;
   raw: string;
-  /** 数字本身（不含货币符号、空格）。 */
+  /** The number itself (excluding currency symbols and spaces). */
   num: string;
 }
 const TOKEN = /[$€£¥￥*]?\s?\d[\d.,]*/g;
@@ -210,8 +212,9 @@ function mk(
 }
 
 /**
- * 标签后面紧跟的整数、一位小数（「Total 20」「合计 1234」）。要求标签分 > 0.6，
- * 并且标签不是编号（no、id、card、#）、数字不超过 7 位，免得把单号、电话当金额。
+ * Integers and one-decimal numbers immediately following labels (e.g., 'Total 20', 'Total 1234').
+ * Requires label score > 0.6, label is not an identifier (no, id, card, #), and number is at most
+ * 7 digits, to avoid treating transaction numbers or phone numbers as amounts.
  */
 export function extraWholeNumbers(
   pages: PageLike[],
@@ -228,7 +231,7 @@ export function extraWholeNumbers(
         const label = cleanLab(r.text.slice(i === 0 ? 0 : toks[i - 1]!.end, t.start));
         if (!label || isEx(label) || score(label) <= 0.6) return;
         if (BAD_AFTER.test(r.text.slice(t.end))) return;
-        // 编号：标签以 no / id / card / # 结尾，或数字太长。
+        // Identifier: label ends with no / id / card / #, or number is too long.
         if (
           /(?:\b(?:no|number|id|card|reg|tel|phone|tin)\.?|[#№])$/i.test(label) ||
           t.num.replace(/\D/g, '').length > 7
@@ -261,7 +264,7 @@ function ratesOf(text: string): number[] {
 }
 const closeTo = (x: number, y: number) => Math.abs(x - y) <= 0.011 + 0.004 * Math.abs(x);
 
-/** 一排「标签 + 三个数」，其中 A + B = C：C 当合计候选，B 当税额候选（有税率时要对得上）。 */
+/** A row of 'label + three numbers' where A + B = C: treat C as a total candidate and B as a tax amount candidate (must match when tax rate is present). */
 export function extraSumRow(
   concept: ConceptId | null,
   pages: PageLike[],
@@ -307,7 +310,7 @@ export function extraSumRow(
   return out;
 }
 
-/** 文档里所有金额（税率核对、加法核对用）。 */
+/** All amounts in the document (used for tax rate verification and addition verification). */
 export const amountSet = (occ: Occurrence[]) =>
   [...new Set(occ.filter((o) => o.kind === 'money').map((o) => Number(o.value)))].filter(
     (x) => x > 0,
@@ -320,7 +323,7 @@ interface C {
   base: number;
 }
 
-/** 税率核对：税额候选 ≈ 某个金额 × 票上写的税率（含税价按 p/(100+p)），加 2 分。 */
+/** Tax rate verification: tax amount candidate ≈ some amount × tax rate stated on bill (price with tax computed as p/(100+p)), add 2 points. */
 export function taxRateCheck(
   cands: C[],
   rowText: (o: Occurrence) => string,
@@ -345,10 +348,10 @@ export function taxRateCheck(
   }
 }
 
-/** 金额不多（不超过 12 个）才用「税额 + 某数 = 全文最大金额」给门槛加分，金额一多巧合太多。 */
+/** Use addition checking ('tax amount + number = maximum amount in full text') to boost the threshold only when there are few amounts (no more than 12); too many amounts lead to excessive coincidences. */
 const TAX_ADD_MAX_AMOUNTS = 12;
 
-/** 税额候选的加法关系：加得上别的金额的加 1 分，本身等于一个更小的候选加某个金额的（更像合计）减 1 分。 */
+/** Addition relationships for tax amount candidates: add 1 point if it can sum with other amounts, and subtract 1 point if it equals a smaller candidate plus some amount (making it more likely a total). */
 export function taxAddCheck(cands: C[], amounts: number[]): void {
   const near = (a: number, b: number) => Math.abs(a - b) <= 0.011;
   const good = new Map<C, boolean>();
@@ -373,7 +376,7 @@ export function taxAddCheck(cands: C[], amounts: number[]): void {
     const t = Number(c.value);
     if (good.get(c)) {
       c.score += 1;
-      // 加法关系成立（且金额不多、和是全文最大）的税额候选，门槛也按加了这一分的算。
+      // For tax amount candidates where the addition relationship holds (and amount count is small and sum is document maximum), calculate the threshold taking this added point into account.
       if (goodBase.get(c)) c.base += 1;
     }
     const smaller = cands.filter((o) => o !== c && Number(o.value) < t);
@@ -382,7 +385,7 @@ export function taxAddCheck(cands: C[], amounts: number[]): void {
   }
 }
 
-/** 同分的金额候选重排：能由别的两个候选相加得到的排前面，再按大的、靠下的。cands 已按分排好；返回新次序。 */
+/** Reorder tied amount candidates: those derivable from the sum of two other candidates come first, followed by larger and lower ones. cands are already sorted by score; returns new order. */
 export function reorderTiedAmounts<T extends C>(cands: T[]): T[] {
   const out: T[] = [];
   let i = 0;
@@ -417,10 +420,10 @@ export function reorderTiedAmounts<T extends C>(cands: T[]): T[] {
   return out;
 }
 
-// ======== 空格千位分隔的数（3 620,84）的加法核对（全文）========
+// ======== Addition verification for space-thousand-separated numbers (3 620,84) in full text ========
 let addsFor = '';
 let addsVals: number[] = [];
-/** x = a + b 或 x + a = b，a、b 是全文里别的金额（空格千位也算）。 */
+/** x = a + b or x + a = b, where a and b are other amounts in the full text (including space-separated thousands). */
 export function docAdds(x: number): boolean {
   if (addsFor !== ctx.text) {
     addsFor = ctx.text;
@@ -444,7 +447,7 @@ export function docAdds(x: number): boolean {
   return false;
 }
 
-// ======== 发票上开票方的标签：整词短标签，按权重给分（不用字符相似度）========
+// ======== Seller labels on invoices: whole-word short labels, scored by weight (without character similarity) ========
 const SELLER_LABELS = D.SELLER_KEYWORDS.map(wordsOf);
 export function sellerLabelScore(label: string): number {
   const w = wordsOf(label);

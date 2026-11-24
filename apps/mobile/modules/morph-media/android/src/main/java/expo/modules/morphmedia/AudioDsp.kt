@@ -1,6 +1,6 @@
 package expo.modules.morphmedia
 
-/** 共享的 LUFS/峰值分析器（libebur128，MIT）。每个任务单独持有状态。 */
+/** Shared LUFS/peak analyzer (libebur128, MIT). Each task maintains its own state. */
 object AudioDsp {
   init { System.loadLibrary("morphdsp") }
   @JvmStatic external fun nativeCreate(rate: Int, channels: Int): Long

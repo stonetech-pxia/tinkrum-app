@@ -1,16 +1,17 @@
 import { allComponents, childrenOf, type Component, type WorkspaceConfig } from './schema';
 
-// 底线 3（创始人 2026-10-31，对话）：配置里指向用户文件的地方只能由用户自己选。v34 只有四处
-// （D-377）：文件位的 opens.file、图片块的 show.asset、卡片的 style.backdrop.assetId、页面的
-// backdrop.assetId。发给 AI 时文件 ID 换成占位符；AI 的修改不能让任何一处多指向一个文件。
+// Invariant 3 (Founder 2026-10-31, conversation): Config references to user files can only be
+// chosen by the user themselves. In v34 there are only four places (D-377): file slot opens.file,
+// image block show.asset, card style.backdrop.assetId, and page backdrop.assetId. When sent to the
+// AI, file IDs are replaced with placeholders; AI modifications cannot add any new file references.
 
-/** 发给 AI 的配置里，用户文件的 ID 换成这个。 */
+/** Placeholder used to replace user file IDs in configurations sent to the AI. */
 export const REDACTED_FILE = '<user file>';
 
 const FILE_KEYS = new Set(['assetId', 'asset', 'file']);
 
 interface FileRef {
-  /** 哪一处：块 ID（不分页面，移动块不算新引用）或页面，加上块里的路径。 */
+  /** Location identifier: block ID (page-agnostic, moving a block does not count as a new reference) or page ID, combined with the path within the block. */
   place: string;
   id: string;
   holder: Record<string, unknown>;
@@ -34,7 +35,7 @@ function refsIn(value: unknown, place: string, path: string, into: FileRef[]): v
   }
 }
 
-/** 配置里每一处文件引用（分组的子块单独算，不算在分组上）。 */
+/** Every file reference in the config (nested sub-blocks are counted separately, not aggregated at the group level). */
 function fileRefs(config: WorkspaceConfig): FileRef[] {
   const out: FileRef[] = [];
   for (const page of config.containers.pages) {
@@ -47,7 +48,7 @@ function fileRefs(config: WorkspaceConfig): FileRef[] {
   return out;
 }
 
-/** 发给 AI 前：文件 ID 换成占位符（AI 只知道这里放了一个用户的文件）。 */
+/** Before sending to AI: Replace file IDs with placeholders (the AI only knows that a user file is placed here). */
 export function redactFileRefs(config: WorkspaceConfig): WorkspaceConfig {
   if (fileRefs(config).length === 0) return config;
   const copy = JSON.parse(JSON.stringify(config)) as WorkspaceConfig;
@@ -55,12 +56,13 @@ export function redactFileRefs(config: WorkspaceConfig): WorkspaceConfig {
   return copy;
 }
 
-/** 配置里指向用户文件的地方有几处。 */
+/** Number of places in the config pointing to user files. */
 export const countFileRefs = (config: WorkspaceConfig): number => fileRefs(config).length;
 
 /**
- * 去掉每一处文件引用（预设，D-410）：文件位和图片留着、变成空的，图片背景留着、没有图片。
- * 换设备或文件被删了也不会指向不存在的文件（底线 18）。
+ * Remove every file reference (presets, D-410): Keep file slots and images as empty placeholders,
+ * and keep image backgrounds without images. Changing devices or deleting files will not result
+ * in pointing to non-existent files (Invariant 18).
  */
 export function clearFileRefs(config: WorkspaceConfig): WorkspaceConfig {
   const copy = JSON.parse(JSON.stringify(config)) as WorkspaceConfig;
@@ -72,10 +74,13 @@ export function clearFileRefs(config: WorkspaceConfig): WorkspaceConfig {
 }
 
 /**
- * 整套设置交回来后（D-637）：发出去时每一处文件引用都清掉了（底线 3），换回来的配置里
- * 这些位置是空的。同一处（同一个块的同一个位置、同一个页面背景）在当前配置里原来有用户自己选的文件、
- * 而交回来的配置里是空的，就把那个文件放回去：不新增任何文件引用（newFileRefs 为空），
- * AI 既不能选文件，也不能换成另一个文件；原来没有的、已经有别的值的、原来指向不止一个文件的，都不动。
+ * After the full setup is returned from another AI app (D-637): every file reference was cleared
+ * upon export (invariant 3), so those positions are empty in the returned configuration. If a
+ * specific location (the same position in the same block, or the same page background) had a
+ * user-selected file in the current configuration but is empty in the returned configuration,
+ * that file is restored: no new file references are added (newFileRefs is empty), meaning the AI
+ * can neither select a file nor substitute a different one; locations previously empty, already
+ * containing other values, or previously pointing to multiple files are left untouched.
  */
 export function keepChosenFiles(before: WorkspaceConfig, after: WorkspaceConfig): WorkspaceConfig {
   const old = new Map<string, FileRef>();
@@ -100,7 +105,7 @@ export function keepChosenFiles(before: WorkspaceConfig, after: WorkspaceConfig)
     if (!m) continue;
     const root = roots.get(m[1]!);
     if (!root) continue;
-    // 块：路径从块本身起，children 不在其中（分组的子块单独算）。
+    // Block: path starts from the block itself, excluding children (grouped child blocks are counted separately).
     let node: unknown = m[1]!.startsWith('block:')
       ? (root as { original: unknown }).original
       : root;
@@ -117,8 +122,9 @@ export function keepChosenFiles(before: WorkspaceConfig, after: WorkspaceConfig)
 }
 
 /**
- * AI 把占位符原样写回来时（例如整块重写 opens），换回修改前同一处的文件 ID。同一处原来没有文件、
- * 或有不止一个，就留着占位符（后面的检查会拒绝）。
+ * When the AI writes placeholders back verbatim (e.g. rewriting an entire block opens), restore
+ * the file ID from the same location prior to the modification. If that location originally had
+ * no file or more than one, retain the placeholder (subsequent checks will reject it).
  */
 export function restoreFileRefs(before: WorkspaceConfig, after: WorkspaceConfig): WorkspaceConfig {
   if (!fileRefs(after).some((r) => r.id === REDACTED_FILE)) return after;
@@ -133,8 +139,9 @@ export function restoreFileRefs(before: WorkspaceConfig, after: WorkspaceConfig)
 }
 
 /**
- * 修改后比修改前多出来的文件引用（哪一处）。清空、移除、移动、改别的属性都不算；
- * 新加的、换成另一个文件的、复制出来的都算。
+ * File references added after modification compared to before (by location). Clearing, removing,
+ * moving, or changing other attributes do not count; newly added, swapped, or duplicated files
+ * are counted.
  */
 export function newFileRefs(before: WorkspaceConfig, after: WorkspaceConfig): string[] {
   const count = new Map<string, number>();

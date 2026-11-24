@@ -14,15 +14,16 @@ import {
 
 import { formatWhen } from '../i18n';
 
-// 启动兜底页（体检 6.6）：系统层，写死在代码里（底线 8），不读配置、不用渲染器和主题——它们可能正是坏的那块。
-// 颜色取默认风格，字体用系统字体。
+// Rescue screen (Diagnostics 6.6): System layer, hardcoded in code (Invariant 8), does not read
+// config, uses no renderer or theme—since those might be the broken part. Colors use default style,
+// fonts use system fonts.
 
 export interface RescueActions {
-  /** 导出整份备份并打开分享面板。 */
+  /** Export a complete backup and open the share sheet. */
   exportBackup(): Promise<void>;
-  /** 回到上一个版本；返回现在用的是哪个时候的版本。 */
+  /** Revert to the previous version; returns the timestamp/version of the current state being used. */
   stepBack(): Promise<number>;
-  /** 把错误信息交给系统分享面板，由用户自己决定发不发。 */
+  /** Hand error information over to the system share sheet, letting the user decide whether to send it. */
   shareError(text: string): Promise<void>;
   openSite(): Promise<void>;
 }

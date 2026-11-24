@@ -18,7 +18,7 @@ const line = (text: string, x: number, y: number, width: number, height = 28): O
 describe('list markers OCR did not read (EU sample 026, 027)', () => {
   it('puts back round bullets and dashes found left of the lines', () => {
     const rects: Rect[] = [
-      // 两行圆点（8×8 的实心点，在字的半腰），两行短横。
+      // Two rows of dots (8x8 solid dots positioned at the midpoint of characters), two rows of short dashes.
       { x: 120, y: 110, width: 8, height: 8 },
       ...glyphs(150, 104, 400, 18),
       { x: 120, y: 170, width: 8, height: 8 },
@@ -46,7 +46,7 @@ describe('list markers OCR did not read (EU sample 026, 027)', () => {
   });
 
   it('puts back square bullets that sit inside the start of the line boxes (EU sample 041)', () => {
-    // 识别框从方块记号开始，字里却没有它：第一个字在框里往右一段。
+    // Recognition bounding box starts with a square marker, but text does not contain it: the first character is offset to the right within the box.
     const rects: Rect[] = [
       { x: 122, y: 108, width: 10, height: 10 },
       ...glyphs(150, 104, 400, 18),
@@ -66,10 +66,10 @@ describe('list markers OCR did not read (EU sample 026, 027)', () => {
 
   it('leaves a single stray mark and a line with a word on its left alone', () => {
     const rects: Rect[] = [
-      // 只有一行左边有一个点（扫描件上的脏点）。
+      // Only a single row with a dot on the left (smudge on the scan).
       { x: 120, y: 110, width: 8, height: 8 },
       ...glyphs(150, 104, 400, 18),
-      // 左边是别的字（同一排前面的词）。
+      // The left side contains other text (preceding words in the same row).
       ...glyphs(60, 164, 80, 18),
       ...glyphs(150, 164, 300, 18),
     ];

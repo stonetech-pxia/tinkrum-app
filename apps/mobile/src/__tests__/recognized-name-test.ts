@@ -6,7 +6,7 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeVision } from '../test-utils/fake-files';
 
-// 用识别出的文字命名（D-244）：文字只在本机用来取名，不出现在结果里。
+// Naming using recognized text (D-244): text is used locally only for naming and does not appear in results.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const steps = (template: string): Workflow['steps'] => [
@@ -52,9 +52,9 @@ describe('naming with recognized text', () => {
       files.offerImage('IMG_2.jpg', 800, 1200),
     ];
     const result = await run(files, '发票-{ocr:invoiceNo}-{ocr:date}');
-    // 第二张没有日期：去掉多出来的连接符。
+    // Second item has no date: remove trailing separator.
     expect(names(result)).toEqual(['发票-04418765-2026-10-21', '发票-INV-7']);
-    // 识别用界面语言加英文。
+    // Recognition uses interface language plus English.
     expect(vision.calls.filter((c) => c.method === 'recognizeText').map((c) => c.args)).toEqual([
       ['zh-Hans', 'en-US'],
       ['zh-Hans', 'en-US'],
@@ -72,7 +72,7 @@ describe('naming with recognized text', () => {
     const files = new FakeFiles();
     const photo = files.offerImage('ticket.png', 400, 400, 'image/png');
     const qr = qrToRgba(qrMatrix('Order 12345, call +33 1 23 45 67 89'), { scale: 4 });
-    // 选中的照片会先复制进本次运行，地址变了：按任意地址都给这张二维码。
+    // Selected photos are first copied into the current run, changing their path: any path requested returns this QR code image.
     files.imagePixels = async () => qr;
     files.nextPhotos = [photo];
     expect(names(await run(files, 'ticket-{qr:phone}', 'en'))).toEqual(['ticket-+33123456789']);

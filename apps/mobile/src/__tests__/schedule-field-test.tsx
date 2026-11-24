@@ -11,7 +11,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 日程字段的填写（D-296）和列表里的「规则 · 下一次」、今天该做的筛选（D-292–D-295）。
+// Schedule field input (D-296), list "Rule · Next", and today's due filtering (D-292–D-295).
 
 const plants: Collection = {
   id: 'plants',
@@ -96,7 +96,7 @@ it('a new entry starts with the default rule, and the steps change it', async ()
     name: '龟背竹',
     plan: { repeat: 'interval', every: 8, perDay: 2 },
   });
-  // 没浇过 → 今天该浇。
+  // Never watered -> needs watering today.
   expect(await screen.findByText('龟背竹')).toBeTruthy();
   expect(screen.getByText('每 8 天，一天 2 次 · 今天')).toBeTruthy();
 });
@@ -105,7 +105,7 @@ it('picks weekdays and days of the month; at least one stays selected', async ()
   const repo = new MemoryWorkspaceRepo();
   await renderToolsApp(repo, undefined, { seed, locale: 'en' });
   await fireEvent.press(await screen.findByTestId('form-add-plan-weekdays'));
-  // 今天那天已经选上；再点它不会变成一天都没有。
+  // Today's date is already selected; tapping it again will not make it unselected for all days.
   const summary = () => screen.getByTestId('form-add-plan-summary').props.children as string;
   const before = summary();
   for (const day of [1, 2, 3, 4, 5, 6, 7])

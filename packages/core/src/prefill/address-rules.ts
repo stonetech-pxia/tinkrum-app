@@ -2,16 +2,17 @@ import type { CardDoc, Unit } from './card-rules';
 import { hasCompany, hasJob } from './card-rules';
 import type { ValueSuggestion } from './rank';
 
-// 名片地址候选（规则 A-01…A-08）。
-// 不用后行断言；全部同步；不写数据，不联网。多行地址用 \n 连接。
-//   A-01 多行拼接（街道行 + 邮编城市行 + 国家/楼层行）
-//   A-02 邮编和城市格式（法西德意 5 位、奥瑞 4 位、英美加澳葡荷巴西…）
-//   A-03 多语言街道词 + 门牌号前后写法（含缩写）
-//   A-04 标签词（address/adresse/dirección/indirizzo/anschrift/morada/地址…），去掉标签；单独一行的标签取下一行
-//   A-05 排除陷阱（公司名/口号里的街道词、服务区域、电话、邮箱、网址行）
-//   A-06 中文/日韩地址（省市区路街号楼室，数字可以是汉字，繁体）
-//   A-07 丢掉通用打分给的杂项候选（地址栏里的职位、域名等）
-//   A-08 地址行尾巴上的电话/网址切掉
+// Business card address candidates (rules A-01–A-08). No negative lookbehinds; fully synchronous;
+// does not write data or use network. Multi-line addresses connected with \\n. A-01 Multi-line
+// joining (street line + postal/city line + country/floor line) A-02 Postal code and city format
+// (France/Spain/Germany/Italy/Austria/Switzerland/UK/US/Canada/Australia/Portugal/Netherlands/Brazil...)
+// A-03 Multilingual street terms + house number position (including abbreviations) A-04 Label terms
+// (address/adresse/dirección/indirizzo/anschrift/morada/address...), strip labels; single-line
+// labels take the next line A-05 Exclude traps (street terms in company names/slogans, service
+// areas, phone, email, website lines) A-06 Chinese/Japanese/Korean addresses
+// (province/city/district/road/street/number/building/room, numbers can be Chinese characters,
+// traditional Chinese) A-07 Drop miscellaneous candidates from general scoring (job titles, domain
+// names, etc. in address field) A-08 Cut off phone numbers/websites at the end of address lines
 
 const fold = (s: string) => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const squash = (s: string) => fold(s).replace(/[^\p{L}\p{N}]/gu, '');
@@ -19,22 +20,22 @@ const CJK = /[㐀-鿿]/;
 const KANA = /[぀-ヿ]/;
 const HANGUL = /[가-힯]/;
 
-// ---------- 标签 ----------
+// ---------- Labels ----------
 const LAB_PREFIX =
   '(?:(?:postal|mailing|business|office|studio|street|home|visiting|registered|billing|company|head\\s*office)\\s+)?';
-// 完整的词：后面的分隔符可有可无
+// Full word: separators after it are optional
 const LABEL_FULL = new RegExp(
   `^${LAB_PREFIX}(?:address|adresse|adres|direcci[oó]n|direccion|domicilio|indirizzo|anschrift|besuchsadresse|postanschrift|morada|endere[cç]o|moradia)(?:\\s+(?:postale|comercial|fiscal|legale|professionnelle))?\\s*[:：.\\-–—|]*\\s*`,
   'i',
 );
-// 短写法：必须有 : 或 . 才算标签（Add: 、Addr. 、A:）
+// Short form: must have : or . to be considered a label (Add: , Addr. , A:)
 const LABEL_SHORT = /^(?:addr|add|adr|dir|ind)\s*[:：.]\s*|^A\s*[:：]\s*/i;
 const LABEL_CJK =
   /^[一-鿿]{0,4}(?:地\s*址|住\s*址|通訊處|通讯处|廠址|厂址|所在地|住所)\s*[:：]?\s*/;
 const LABEL_KO = /^주소\s*[:：]?\s*/;
 const LABEL_JA = /^〒?\s*(?:住所|所在地)\s*[:：]?\s*/;
 
-/** 去掉开头的符号和标签；返回值和是否有标签（labelOnly = 标签单独占一行）。 */
+/** Strip leading symbols and labels; returns text and whether it has a label (labelOnly = label occupies a line by itself). */
 function stripLabel(t0: string): { text: string; labeled: boolean; labelOnly: boolean } {
   let t = t0
     .trim()
@@ -44,14 +45,14 @@ function stripLabel(t0: string): { text: string; labeled: boolean; labelOnly: bo
     const m = t.match(re);
     if (m && m[0].length > 0) {
       const rest = t.slice(m[0].length).trim();
-      // 短写法 A: 后面必须还有内容（或本来就是单独的）
+      // Short form A: must still have content afterwards (or be standalone)
       return { text: rest, labeled: true, labelOnly: rest.length === 0 };
     }
   }
   return { text: t, labeled: false, labelOnly: false };
 }
 
-// ---------- 不是地址的行 ----------
+// ---------- Non-address lines ----------
 const CONTACT_LABEL =
   /^(?:tel|tél|tlf|telf|telefon|telefono|teléfono|telefone|phone|ph|mob|mobile|móvil|movil|portable|cell|cel|celular|handy|fax|whatsapp|email|e-mail|mail|courriel|correo|web|www|site|url|电话|電話|手机|手機|傳真|传真|邮箱|郵箱|電郵|网址|網址|携帯|メール|이메일)\b\s*[.:：]?/i;
 const CONTACT_CJK =
@@ -71,8 +72,8 @@ function phoneLike(t: string): boolean {
   return digits >= 7 && digits > 0.6 * body;
 }
 
-// ---------- 街道词 ----------
-// 街名词在名前（法西意葡）：长写法随便出现；短写法必须带 . 或 /
+// ---------- Street terms ----------
+// Street nouns before the name (French/Spanish/Italian/Portuguese): long forms appear freely; short forms must have . or /
 const PRE_LONG = new Set(
   'rue avenue boulevard impasse chemin quai allee cours passage voie route calle avenida avda avd paseo carrer camino cmno carretera ctra ronda travesia glorieta urbanizacion poligono carrera diagonal transversal rua travessa alameda estrada rodovia praceta beco via viale piazza piazzale vicolo strada lungomare lungotevere contrada localita plaza praca largo place square bd bvd blvd bld rte lungarno corso rambla vial'.split(
     ' ',
@@ -86,7 +87,7 @@ const PRE_SHORT = new Set(
     ' ',
   ),
 );
-// 英语：街名在前、词在后
+// English: street name first, term last
 const EN_STRONG = new Set(
   'street avenue ave road rd boulevard blvd lane ln highway hwy parkway pkwy terrace crescent cres'.split(
     ' ',
@@ -97,12 +98,12 @@ const EN_WEAK = new Set(
     ' ',
   ),
 );
-// 德荷：复合词词尾
+// German/Dutch: compound word suffix
 const COMPOUND =
   /^[a-zß-]{2,}(?:strasse|straße|str|platz|weg|allee|gasse|ring|damm|ufer|chaussee|steig|pfad|markt|straat|laan|gracht|plein|singel|kade|dijk|steeg|baan|hof)$/;
 const DE_WORD = new Set('strasse straße str platz weg allee gasse'.split(' '));
 const NL_WORD = new Set('singel laan plein gracht kade dijk steeg straat weg'.split(' '));
-const DE_WORD_NUM = new Set(['ring', 'damm', 'ufer']); // 单独的词：只有后面有门牌号才算（Kärntner Ring 5）
+const DE_WORD_NUM = new Set(['ring', 'damm', 'ufer']); // Standalone words: only count if followed by a house number (Kärntner Ring 5)
 const CONNECT = new Set(
   'de del della delle di da do dos das du des la le el los las y e et and of the van von der den ten ter d l saint sainte san santa sao são st'.split(
     ' ',
@@ -110,7 +111,7 @@ const CONNECT = new Set(
 );
 const DE_PARTICLE =
   /^(?:Am|An der|An den|Auf dem|Auf der|Im|In der|Zum|Zur|Unter den|Hinter dem|Beim)\s+\p{Lu}[\p{L}'’.-]*/u;
-// 路名词后面直接跟的数字是路线号（Route 66），不是门牌号
+// Route numbers directly following route nouns (Route 66), not house numbers
 const ROUTE_WORD = new Set('route rte ruta highway hwy autobahn rodovia'.split(' '));
 const POBOX =
   /(?:^|[^a-z])(?:p\.?\s?o\.?\s*box|postfach|apartado(?:\s+(?:de\s+correos|postal))?|casilla(?:\s+de\s+correo)?|caixa\s+postal|case\s+postale|casella\s+postale|postbus|b\.?p\.?|c\.?s\.?|cedex)\s*n?[º°o]?\.?\s*\d+/i;
@@ -134,7 +135,7 @@ const key = (tok: string) =>
 const isCap = (tok: string) => /^[A-ZÀ-ÖØ-Þ0-9]/.test(tok);
 const isOrdinal = (tok: string) => /^\d+(?:st|nd|rd|th|e|er|ème|eme|ª|º|°)$/i.test(tok);
 
-/** HN 和街名词之间的词都像名字（大写、数字、连接词），不像口号里的小写词。 */
+/** Words between HN and street nouns look like names (capitalized, digits, conjunctions), unlike lowercase words in slogans. */
 function nameTokensOk(tok: string[], from: number, to: number): boolean {
   for (let j = from; j < to; j++) {
     const w = tok[j]!;
@@ -150,7 +151,7 @@ function nameTokensOk(tok: string[], from: number, to: number): boolean {
   }
   return true;
 }
-/** 门牌号：返回位置，没有为 -1。tok 为 token 数组，from..to 范围内找。 */
+/** House number: returns position, -1 if none. tok is token array, searched within from..to range. */
 function findHN(tok: string[], from: number, to: number): number {
   for (let j = Math.max(0, from); j <= Math.min(tok.length - 1, to); j++) {
     const k = key(tok[j]!);
@@ -160,28 +161,28 @@ function findHN(tok: string[], from: number, to: number): number {
     const m = tok[j]!.match(HN);
     if (!m) continue;
     const digits = m[1]!.replace(/\D/g, '');
-    if (/^\d{5,}$/.test(m[1]!) && !/^(?:n|no|nr|#)/i.test(tok[j]!)) continue; // 5 位数当邮编，除非有 No./#
+    if (/^\d{5,}$/.test(m[1]!) && !/^(?:n|no|nr|#)/i.test(tok[j]!)) continue; // 5-digit numbers treated as postal codes unless accompanied by No./#
     if (digits.length > 5) continue;
-    // 路线号
+    // Route number
     if (j > 0 && ROUTE_WORD.has(key(tok[j - 1]!))) continue;
     return j;
   }
   return -1;
 }
 
-// ---------- 邮编城市 ----------
+// ---------- Postal code and city ----------
 const P_STRONG: RegExp[] = [
-  /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/, // 英国
-  /\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b/, // 加拿大
-  /\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/, // 美国 州 + 邮编
-  /\b\d{4}-\d{3}\b/, // 葡萄牙
-  /\b\d{5}-\d{3}\b/, // 巴西
-  /\b[1-9]\d{3}\s?[A-Z]{2}\b/, // 荷兰
-  /\b(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\s+\d{4}\b/, // 澳洲
-  /\b(?:CH|AT|A|BE|B|LU|L|DK|NO|SE|FI|DE|D|FR|F|ES|E|IT|I|PL|MA|TN|DZ|NL|PT|P)\s?[-–]\s?\d{4,5}\b/, // CH-8001 之类
+  /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/, // UK
+  /\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b/, // Canada
+  /\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/, // US state + postal code
+  /\b\d{4}-\d{3}\b/, // Portugal
+  /\b\d{5}-\d{3}\b/, // Brazil
+  /\b[1-9]\d{3}\s?[A-Z]{2}\b/, // Netherlands
+  /\b(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\s+\d{4}\b/, // Australia
+  /\b(?:CH|AT|A|BE|B|LU|L|DK|NO|SE|FI|DE|D|FR|F|ES|E|IT|I|PL|MA|TN|DZ|NL|PT|P)\s?[-–]\s?\d{4,5}\b/, // CH-8001 and similar
   /\b(?:c\.?\s?p\.?|cep|plz|zip|npa|cap|code\s+postal)\s*:?\s*\d{4,6}\b/i,
-  /\b[A-Z]\d{4}[A-Z]{3}\b/, // 阿根廷 C1425ABC
-  /\b\d{2}-\d{3}\b/, // 波兰
+  /\b[A-Z]\d{4}[A-Z]{3}\b/, // Argentina C1425ABC
+  /\b\d{2}-\d{3}\b/, // Poland
 ];
 const P5 = /(?:^|[^\d])(\d{5})(?!\d)/;
 const P4 = /(?:^|[^\d])([1-9]\d{3})(?!\d)/;
@@ -191,7 +192,7 @@ const NOT_POSTAL =
 function hasStrongPostal(t: string): boolean {
   return P_STRONG.some((re) => re.test(t));
 }
-/** 一行像「邮编 + 城市」：strong 的格式，或者 5 位数 + 城市词；ctx4 = 前面有街道行时 4 位数也算。 */
+/** Line looks like "postal code + city": strong format, or 5 digits + city term; ctx4 = 4 digits also counts if preceded by a street line. */
 function postalCity(t: string, ctx4: boolean): boolean {
   if (
     t.length > 70 ||
@@ -224,7 +225,7 @@ function postalCity(t: string, ctx4: boolean): boolean {
   }
   return false;
 }
-/** 邮编在行里（不管有没有城市）。 */
+/** Postal code is within the line (regardless of whether city is present). */
 function postalIn(t: string): boolean {
   return hasStrongPostal(t) || (P5.test(t) && !NOT_POSTAL.test(t.replace(/\d{5}.*/, '')));
 }
@@ -268,12 +269,12 @@ function unitLine(t: string): boolean {
   );
 }
 
-// ---------- 街道行判断 ----------
+// ---------- Street line determination ----------
 interface Street {
   ok: boolean;
-  /** 有街道词但没有门牌号和邮编（下一行是邮编城市时才算地址）。 */
+  /** Has street term but no house number or postal code (counts as an address only if the next line is postal code/city). */
   weak?: boolean;
-  /** 证据强度：门牌号 + 街道词 = 3；街道词 + 邮编 = 2.8；PO box = 2.5 */
+  /** Evidence strength: house number + street term = 3; street term + postal code = 2.8; PO box = 2.5 */
   s: number;
 }
 const NO: Street = { ok: false, s: 0 };
@@ -287,12 +288,12 @@ function streetLine(t: string): Street {
   let weakSeen = false;
   if (POBOX.test(t)) return { ok: true, s: 2.5 };
   const hn0 = findHN(tok, 0, 1);
-  // 德语前置词：Am Markt 5
+  // German prepositions: Am Markt 5
   if (DE_PARTICLE.test(t) && findHN(tok, 1, 5) >= 0) return { ok: true, s: 3 };
   for (let i = 0; i < tok.length; i++) {
     const k = key(tok[i]!);
     const raw = tok[i]!;
-    // 英语：街名词在后
+    // English: street noun last
     if (i >= 1 && (EN_STRONG.has(k) || EN_WEAK.has(k) || k === 'st' || k === 'dr')) {
       if (
         (k === 'st' || k === 'dr') &&
@@ -302,7 +303,7 @@ function streetLine(t: string): Street {
         !/^\d/.test(tok[i + 1]!) &&
         !unitLine(tok.slice(i + 1).join(' '))
       )
-        continue; // St. Gallen（逗号分开的不算）
+        continue; // St. Gallen (separated by commas does not count)
       if (k === 'dr' && i < 2) continue;
       if (i > 6) continue;
       if (hn0 >= 0 && hn0 < i && nameTokensOk(tok, hn0 + 1, i)) return { ok: true, s: 3 };
@@ -322,9 +323,9 @@ function streetLine(t: string): Street {
       }
       continue;
     }
-    // 名前型：Rue/Calle/Via/Rua…，在第 0–3 个 token
+    // Prefix type: Rue/Calle/Via/Rua..., within tokens 0–3
     const shortOk = PRE_SHORT.has(k) && /[./]/.test(raw);
-    // 1 route de Genève：门牌号紧挨在街名词前面（前面可以有别的字，Bureaux de la Colline, 1 route de Genève）
+    // 1 route de Genève: house number immediately precedes the street noun (can have other words before it, Bureaux de la Colline, 1 route de Genève)
     if (
       i >= 2 &&
       i <= 9 &&
@@ -344,28 +345,28 @@ function streetLine(t: string): Street {
           )
         )
       ) {
-        // 街名词不在行首也不跟在门牌号后面：要有门牌号或邮编
+        // Street noun is neither at line start nor follows house number: must have house number or postal code
         if (findHN(tok, i + 1, i + 6) < 0 && !postal) continue;
       }
       if (i >= 1 && !nameTokensOk(tok, 0, i)) continue; // Dal 1990 in Via Roma
       if (ROUTE_WORD.has(k) && hn0 < 0 && !postal) {
-        // Route 66 Diner：路线号后面没有别的门牌号
+        // Route 66 Diner: route number not followed by another house number
         if (findHN(tok, i + 2, i + 6) < 0) continue;
       }
       const after = findHN(tok, i + 1, i + 7);
       if (hn0 >= 0 && hn0 < i) return { ok: true, s: 3 };
       if (after >= 0 && AMBIG_PRE.has(k) && !postal) {
-        // Cours de cuisine - 8 places：常用名词做街名词时，门牌号后面只能是逗号、单位或结束
+        // Cours de cuisine - 8 places: when common nouns are used as street nouns, only commas, units, or end can follow the house number
         const at = t.indexOf(tok[after]!, t.indexOf(raw));
         const tail = t.slice(at + tok[after]!.length).trim();
         if (tail && !/^[,;–—-]|^(?:bis|ter)\b|^[A-Za-z]{1,3}\b/i.test(tail)) continue;
       }
       if (after >= 0 && after < tok.length - 4 && !postal && findHN(tok, after + 1, tok.length) < 0)
-        continue; // 门牌号后面还有一长串：口号、店名
+        continue; // Long string following house number: slogans, store names
       if (after >= 0 && /^(?:18|19|20)\d\d$/.test(tok[after]!) && after > i + 2 && !postal)
         continue; // Calle Real Bodegas 1895
       if (after >= 0) {
-        // Calle 8 Tapas Bar：街名词后面紧跟 1–2 位数字、没有 No./# 标记，后面还有没用逗号隔开的大写词，是店名不是地址
+        // Calle 8 Tapas Bar: street noun immediately followed by 1–2 digits without No./# marker, followed by capitalized words not separated by commas, is a store name not an address
         if (after === i + 1 && /^\d{1,2}$/.test(tok[after]!) && !postal) {
           const at = t.indexOf(tok[after]!, t.indexOf(raw));
           const tail = t.slice(at + tok[after]!.length).trim();
@@ -383,10 +384,10 @@ function streetLine(t: string): Street {
       if (i === 0 && !AMBIG_PRE.has(k)) weakSeen = true;
       continue;
     }
-    // 德语单独的 Ring / Damm / Ufer
+    // German standalone Ring / Damm / Ufer
     if (i >= 1 && DE_WORD_NUM.has(k) && isCap(raw) && findHN(tok, i + 1, i + 2) === i + 1)
       return { ok: true, s: 3 };
-    // 荷语单独的街名词：Singel 250 、Laan van Meerdervoort 100（必须有门牌号）
+    // Dutch standalone street nouns: Singel 250, Laan van Meerdervoort 100 (must have house number)
     if (
       i <= 1 &&
       NL_WORD.has(k) &&
@@ -395,9 +396,9 @@ function streetLine(t: string): Street {
       findHN(tok, i + 1, i + 4) >= 0
     )
       return { ok: true, s: 2.8 };
-    // 德荷复合词
+    // German-Dutch compound words
     if (i <= 4 && (COMPOUND.test(k.replace(/\.$/, '')) || DE_WORD.has(k))) {
-      if (DE_WORD.has(k) && i === 0) continue; // 「Straße」单独开头不是街名
+      if (DE_WORD.has(k) && i === 0) continue; // "Straße" alone at the beginning is not a street name
       const after = findHN(tok, i + 1, i + 3);
       if (after >= 0 && (after === i + 1 || (after === i + 2 && HN_MARK.test(tok[i + 1]!))))
         return { ok: true, s: 3 };
@@ -409,7 +410,7 @@ function streetLine(t: string): Street {
   return weakSeen ? { ok: false, s: 0, weak: true } : NO;
 }
 
-// ---------- 中日韩 ----------
+// ---------- Chinese, Japanese, and Korean ----------
 const ADM = /[省市縣县區区鄉乡鎮镇村里郡]/g;
 const ROAD = /[路街道段巷弄]|大道|大街|胡同|開發區|开发区|園區|园区/;
 const NUMM = /[號号樓楼室座棟栋層层]/;
@@ -421,7 +422,7 @@ const BLDG_CJK =
 const CO_END_CJK =
   /(?:有限公司|股份有限公司|公司|集團|集团|事務所|事务所|工作室|株式会社|有限会社|診所|诊所|醫院|医院|銀行|银行|商行)$/;
 function cjkAddress(t: string): number {
-  // 返回分数，0 = 不是
+  // Returns score, 0 = no
   if (t.length < 5 || t.length > 70) return 0;
   const adm = (t.match(ADM) ?? []).length;
   const cls = (adm > 0 ? 1 : 0) + (ROAD.test(t) ? 1 : 0) + (NUMM.test(t) ? 1 : 0);
@@ -442,30 +443,30 @@ function cjkAddress(t: string): number {
 const jobLikeCjk = (t: string) => hasJob(t) && !ROAD.test(t);
 function cjkJaKo(t: string): number {
   if (KANA.test(t) || /[一-鿿]/.test(t)) {
-    // 日语：〒、都道府県市区町村 + 丁目番地号/通り + 数字
+    // Japanese: 〒, prefectures/cities/wards/towns/villages + chome-ban-go/street + numbers
     const adm = /[都道府県市区町村郡]/.test(t);
     const road = /丁目|番地|番|号|通り|町/.test(t);
     if ((t.includes('〒') || adm) && (road || /\d/.test(t)) && /\d/.test(t)) return 2.5;
     return 0;
   }
   if (HANGUL.test(t)) {
-    // 韩语：시/구/동/로/길 + 数字
+    // Korean: si/gu/dong/ro/gil + numbers
     if (/[가-힣]+(?:로|길|대로|동|구|시)\s*\d+/.test(t)) return 2.5;
   }
   return 0;
 }
 
-// ---------- 行的整体判断 ----------
+// ---------- Overall line evaluation ----------
 interface Line {
   u: Unit;
-  text: string; // 去标签、去尾巴后
+  text: string; // After removing labels and trailing parts
   labeled: boolean;
   labelOnly: boolean;
   street: Street;
   cjk: number;
   postal: boolean;
   postalCity: boolean;
-  bad: boolean; // 联系方式行
+  bad: boolean; // Contact info line
 }
 
 const CUT_TAIL =
@@ -474,7 +475,7 @@ const CUT_TAIL =
 function prepLine(u: Unit): Line {
   const lab = stripLabel(u.text);
   let text = lab.text;
-  // 「Visit us: 15 Rose Lane…」：短前缀 + 冒号，后面是认得出的街道行
+  // "Visit us: 15 Rose Lane..." : Short prefix + colon, followed by recognizable street line
   if (!lab.labeled) {
     const pm = text.match(/^([^\d:：]{2,18})[:：]\s*(.{6,})$/);
     if (
@@ -484,7 +485,7 @@ function prepLine(u: Unit): Line {
     )
       text = pm[2]!.trim();
   }
-  // 地址行尾巴上的电话/网址
+  // Phone/URL at the end of an address line
   if (text.length > 8) {
     const m = text.match(CUT_TAIL);
     if (m && m.index !== undefined && m.index >= 6) text = text.slice(0, m.index).trim();
@@ -497,7 +498,7 @@ function prepLine(u: Unit): Line {
   if (phoneLike(text)) bad = true;
   const sloganHit = SLOGAN.test(text) && !postalIn(text) && !/,/.test(text);
   let street = bad || sloganHit ? NO : streetLine(text);
-  // 公司名/店名里带街道词：没有逗号、邮编的不算（Park Avenue Design Studio、3 Avenue Hotel）
+  // Company/store names containing street words: exclude those without commas and postal codes (Park Avenue Design Studio, 3 Avenue Hotel)
   if (
     street.ok &&
     !postalIn(text) &&
@@ -520,7 +521,7 @@ function prepLine(u: Unit): Line {
   };
 }
 
-/** 行 b 紧挨着 a 下面（竖直间隔不大，左/中/右对齐之一）。 */
+/** Line b is immediately below a (small vertical gap, and aligned left, center, or right). */
 function below(a: Unit, b: Unit): boolean {
   if (a.page !== b.page) return false;
   const hh = Math.max(a.h, b.h);
@@ -542,7 +543,7 @@ export function addressCandidates(doc: CardDoc): ValueSuggestion[] {
   const lines = units.map(prepLine);
   const out: { v: string; s: number; relY: number; row: number; used: number[] }[] = [];
 
-  // 单行或多行：以 i 为起点
+  // Single line or multi-line: starting from i
   for (let i = 0; i < lines.length; i++) {
     const L = lines[i]!;
     if (L.bad && !L.labeled) continue;
@@ -552,7 +553,7 @@ export function addressCandidates(doc: CardDoc): ValueSuggestion[] {
     let parts: string[] = [];
     const used: number[] = [i];
     if (L.labelOnly) {
-      // 标签单独一行：值取下一行（紧挨着）
+      // Label on a separate line: value taken from the next line (immediately following)
       const nx = lines[i + 1];
       if (
         !nx ||
@@ -563,7 +564,7 @@ export function addressCandidates(doc: CardDoc): ValueSuggestion[] {
       )
         continue;
       if (CJK.test(nx.text) && nx.cjk === 0 && !nx.postalCity) {
-        // 中文标签后面的值就算格式不全也认
+        // Recognize values following Chinese labels even if formatting is incomplete
       }
       head = nx;
       headIdx = i + 1;
@@ -583,7 +584,7 @@ export function addressCandidates(doc: CardDoc): ValueSuggestion[] {
       below(L.u, lines[i + 1]!.u) &&
       postalCity(lines[i + 1]!.text, true)
     ) {
-      // 只有街道词没有门牌号，但下一行是邮编城市（The Old Mill, Mill Lane / London…）
+      // Only street words without house number, but next line is postal code and city (The Old Mill, Mill Lane / London...)
       score = 2.4;
       parts = [L.text];
     } else if (L.street.ok) {
@@ -593,26 +594,26 @@ export function addressCandidates(doc: CardDoc): ValueSuggestion[] {
       score = L.cjk + (L.labeled ? 1 : 0);
       parts = [L.text];
     } else if (L.labeled && L.text.length >= 3 && /\p{L}|\d/u.test(L.text)) {
-      // 有标签、值的格式不认识（Address: Gorriti 5062, Palermo）：认
+      // Has label, unrecognized value format (Address: Gorriti 5062, Palermo): recognized
       score = 3.5;
       parts = [L.text];
     } else continue;
 
-    // 单行的邮编城市已经在街道行里：不再重复
+    // Single-line postal code and city already in the street line: do not duplicate
     if (!L.labelOnly && L.street.ok && postalIn(L.text)) score += 0.3;
 
-    // 多行拼接：往下取邮编城市、国家、楼层
+    // Multi-line joining: fetch postal code, city, country, and floor downwards
     let last = headIdx;
     let sawPostal = postalIn(head.text);
     let sawCountry = false;
     for (let k = last + 1; k < lines.length && parts.length < 4; k++) {
       const N = lines[k]!;
       if (N.bad || !below(lines[last]!.u, N.u)) break;
-      if (N.labeled && !N.labelOnly) break; // 另一个有标签的行
+      if (N.labeled && !N.labelOnly) break; // Another labeled line
       const cjkHere = head.cjk > 0 || CJK.test(head.text);
       let take = false;
       if (cjkHere) {
-        // 中文：楼层、室、座
+        // Chinese: floor, room, building (zuo)
         const nt = N.text.replace(/\s+/g, '');
         take =
           (FLOOR_CJK.test(nt) ||
@@ -649,7 +650,7 @@ export function addressCandidates(doc: CardDoc): ValueSuggestion[] {
       used.push(k);
       last = k;
     }
-    // 街道行上面紧挨着的楼层/楼栋行（Building B / Immeuble X）
+    // Floor/building line immediately above the street line (Building B / Immeuble X)
     if (L.street.ok && i > 0 && !L.labelOnly) {
       const P = lines[i - 1]!;
       if (
@@ -660,7 +661,7 @@ export function addressCandidates(doc: CardDoc): ValueSuggestion[] {
         P.text.length <= 32 &&
         (BUILDING_LINE.test(fold(P.text)) || /\d|\b[A-Z]\b/.test(P.text))
       ) {
-        // 只在上面这行确实像楼栋、楼层时才并（Suite 5 / Building 4）
+        // Merge only when the line above genuinely resembles a building or floor (Suite 5 / Building 4)
         parts = [P.text, ...parts];
         used.unshift(i - 1);
         score += 0;
@@ -674,7 +675,7 @@ export function addressCandidates(doc: CardDoc): ValueSuggestion[] {
       row: head.u.row,
       used,
     });
-    // 只给整段第一个；街道行单独的版本补在后面
+    // Give only to the first of the block; the street-only version is appended later
     if (parts.length > 1)
       out.push({
         v: head.text,
@@ -685,7 +686,7 @@ export function addressCandidates(doc: CardDoc): ValueSuggestion[] {
       });
   }
 
-  // 排序、去重（包含关系：短的被长的包含就不再单独给，除非它是被拼出来的第二候选）
+  // Sorting and deduplication (inclusion relationship: if short is included in long, do not keep separately unless it is the second candidate produced by merging)
   out.sort((a, b) => b.s - a.s || a.row - b.row);
   const res: typeof out = [];
   for (const o of out) {
@@ -702,7 +703,7 @@ export function addressCandidates(doc: CardDoc): ValueSuggestion[] {
   }));
 }
 
-// 城市单独一行（London / Milano (MI)）：只在后面紧跟邮编行时才并进地址
+// City on a single line (London / Milano (MI)): merge into address only when immediately followed by a postal code line
 function bridgeCity(t: string): boolean {
   const s = t.trim();
   if (s.length < 3 || s.length > 28 || /\d/.test(s) || EMAIL.test(s) || URLISH.test(s))

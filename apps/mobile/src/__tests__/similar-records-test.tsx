@@ -14,8 +14,9 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 保存新记录前问一句（D-426）：记录页、「记一笔」、页面上的添加表单都走同一个检查。
-// 三种状态：新用户（没有记录）、有数据（一样的、不一样的）、边界（回收站里的、没有标题、编辑已有的记录、同一次运行刚存的）。
+// Ask before saving a new record (D-426): record page, "Log an expense", and add forms on pages all
+// use the same check. Three states: new user (no records), existing data (identical, different),
+// edge cases (in trash, no title, editing existing record, saved in current run).
 
 const receipts: Collection = {
   id: 'claims',
@@ -89,7 +90,7 @@ async function setup(records: { id: string; values: Record<string, unknown> }[] 
   return repo;
 }
 
-/** 存好后页面退回去；等它退完，下一个测试才从头开始。 */
+/** Page goes back after saving; wait for it to finish before the next test starts from scratch. */
 const leftForm = () => waitFor(() => expect(screen.queryByTestId('editor-save')).toBeNull());
 
 const open = (params: Record<string, string>) =>
@@ -108,7 +109,7 @@ const lunch = { id: 'r1', values: { amount: 30, date: '2026-11-03', merchant: '�
 
 afterEach(async () => {
   jest.restoreAllMocks();
-  // 提示条和退回去的动画还在计时器上：跑完，下一个测试才是干净的。
+  // Banner and return animations are still running on timers: wait for them to finish so the next test starts clean.
   const flush = () =>
     act(async () => {
       jest.runOnlyPendingTimers();
@@ -117,7 +118,7 @@ afterEach(async () => {
   await flush();
   cleanup();
   await flush();
-  // 卸载以后路由还有收尾的异步工作：换回真的计时器等它做完（renderRouter 下次会再换成假的）。
+  // Router has asynchronous cleanup work after unmount: switch back to real timers and wait for completion (renderRouter will switch back to fake timers next time).
   jest.useRealTimers();
   await new Promise((resolve) => setTimeout(resolve, 20));
 });

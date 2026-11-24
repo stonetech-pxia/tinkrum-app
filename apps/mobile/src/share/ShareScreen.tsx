@@ -37,8 +37,9 @@ import { shareRecommendations } from './recommendations';
 import type { SucceededRuns } from '../storage/types';
 
 /**
- * 收件页面（TOOLS_DESIGN §11，D-117）：「收到 N 个文件」，列出能接这些文件的工作流，点一个才运行
- * （不会自动运行）。文件名和大小只在本机显示，不发给 AI。由内核提供，AI 不能修改。
+ * Inbox (TOOLS_DESIGN §11, D-117): "Received N files", lists workflows that can accept these
+ * files, and runs only when tapped (does not run automatically). File names and sizes are
+ * displayed locally only and are not sent to the AI. Provided by core; AI cannot modify it.
  */
 const ICONS: Partial<Record<MediaKind, IconName>> = {
   image: 'photo',
@@ -52,19 +53,19 @@ export function ShareScreen() {
   const palette = usePalette(useAppTheme(config));
   const share = useIncoming((s) => s.share);
   const router = useRouter();
-  // 分享或打开文件后，一次问完文件处理包（D-456）；问过就不再问。
+  // After sharing or opening files, prompt for the file processing bundle once (D-456); once asked, do not ask again.
   const bundle = useFileBundleOffer(palette, locale);
   const fromOutside = !!share && share.files.length > 0 && share.source !== 'result';
   useEffect(() => {
     if (fromOutside) bundle.offer();
-    // 每批文件只看一次。
+    // View each batch of files only once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [share?.id]);
 
-  // 读到使用次数之前不排推荐：否则先按「都没用过」排一遍，读到后卡片跳位置，快点时会点错。
+  // Do not sort recommendations until usage counts are read: otherwise, sorting first by "none used" causes cards to jump positions when counts load, leading to misclicks when tapping quickly.
   const [usage, setUsage] = useState<SucceededRuns | null>(null);
   const [showAll, setShowAll] = useState(false);
-  // 「存成记录」的表列表展开了（D-392）。
+  // The table list for "Save as record" is expanded (D-392).
   const [choosing, setChoosing] = useState(false);
   const record = useSaveAsRecord(share?.files ?? [], () => setChoosing(false));
   const placing = record.placing;
@@ -76,23 +77,24 @@ export function ShareScreen() {
         if (alive) setUsage(counts);
       })
       .catch(() => {
-        /* 统计暂时不可用时仍可手动选择快捷操作。 */
+        /* Quick actions can still be selected manually when statistics are temporarily unavailable. */
         if (alive) setUsage(new Map());
       });
     return () => {
       alive = false;
     };
   }, [repo, share?.id]);
-  // 交给运行页面或 AI 时为 true：离开页面时不删文件（运行页面关闭时再删）。
+  // True when handed over to the execution page or AI: do not delete files when leaving the page (deleted when the execution page closes).
   const handed = useRef(false);
-  // 从 AI 取消返回后，收件页重新负责关闭时的清理。
+  // After returning from AI cancellation, the inbox resumes responsibility for cleanup on close.
   useFocusEffect(
     useCallback(() => {
       handed.current = false;
     }, []),
   );
-  // 打开 AI 之前已有的快捷操作：回来后新做的那个标「刚做好」、排在最前面（D-129）。
-  // AI 的修改在草稿里应用（D-190），应用后重新打开这个页面，带着新做的那个（made）。
+  // Quick actions existing before opening the AI: upon return, the newly created one is marked
+  // "Just created" and sorted first (D-129). AI modifications are applied in the draft (D-190);
+  // after applying, reopen this page carrying the newly created one (made).
   const { made } = useLocalSearchParams<{ made?: string }>();
   const [knownIds, setKnownIds] = useState<Set<string> | null>(() =>
     made
@@ -104,14 +106,14 @@ export function ShareScreen() {
       : null,
   );
   const scroll = useRef<ScrollViewInstance>(null);
-  // AI 做好回到这里时，新的排在最前：滚到顶上让用户看到（否则还停在「让 AI 搭一个」那里）。
+  // When returning here after AI completion, the new ones are sorted first: scroll to the top so the user sees them (otherwise it stays stuck at "Let AI build one").
   const newest = knownIds
     ? quickActionsOf(config).find((w) => !w.package && !knownIds.has(w.id))?.id
     : undefined;
   useEffect(() => {
     if (newest) scroll.current?.scrollTo({ y: 0, animated: true });
   }, [newest]);
-  // 视频和音频的时长（只在本机显示）；没有原生模块时不显示。
+  // Video and audio durations (displayed locally only); hidden when native modules are unavailable.
   const [durations, setDurations] = useState<Record<string, number>>({});
   useEffect(() => {
     const media = files.media;
@@ -125,7 +127,7 @@ export function ShareScreen() {
           const info = await media.probe(f.uri);
           if (alive) setDurations((d) => ({ ...d, [f.uri]: info.durationMs }));
         } catch {
-          // 打不开的文件运行时会报错，这里只是不显示时长。
+          // Files that fail to open will throw at runtime; here we simply omit the duration.
         }
       }
     })();
@@ -171,7 +173,7 @@ export function ShareScreen() {
     size: f.size,
   }));
   const sizeProblem = sharedSizeProblem(infos);
-  // 点一个文件进它的预览页（D-457，取代 D-238 的全屏看图和系统预览）；只在本机显示。
+  // Tap a file to enter its preview page (D-457, replacing the full-screen image viewer and system preview of D-238); displayed locally only.
   const open = (i: number) =>
     router.push({
       pathname: '/file-preview',
@@ -185,15 +187,16 @@ export function ShareScreen() {
     locale,
     newest,
   );
-  // 「查看全部 N 个」就在这一页展开这 N 个（跳到分类页会漏掉也收这些文件、但属于别的分类的快捷操作）。
+  // "View all N" expands those N on this page (jumping to the category page would miss quick actions that also accept these files but belong to other categories).
   const candidates = usage === null ? [] : showAll ? all : recommended;
 
   function isNew(wf: Workflow) {
     return knownIds !== null && !wf.package && !knownIds.has(wf.id);
   }
 
-  // 一个快捷操作一行（D-237）：名字（法语长名字可以折成两行）和一行说明，右边「运行」；
-  // 5 个加「我要自己说」不用上滑就能看全。
+  // One quick action per row (D-237): name (long French names can wrap to two lines) and a
+  // description line, with "Run" on the right; 5 items plus "I want to describe it myself" fit
+  // without scrolling.
   const workflowRow = ({ wf, fit }: (typeof candidates)[number], i: number) => (
     <View
       key={wf.id}
@@ -249,10 +252,10 @@ export function ShareScreen() {
     });
   }
 
-  /** 让 AI 搭一个：AI 只知道文件的类型和个数（D-124）。做好后回到这里，新的排在最前面。 */
+  /** Let AI build one: AI only knows the file types and count (D-124). Returns here upon completion, with new ones sorted first. */
   function askAI() {
     setKnownIds(new Set(quickActionsOf(config).map((w) => w.id)));
-    // AI 的修改先进草稿、这个页面会关掉（D-190）：分享的文件留着，应用后回到这里还能用。
+    // AI modifications go into the draft first, and this page will close (D-190): shared files are kept, and can still be used here after returning upon application.
     handed.current = true;
     router.push({ pathname: '/change', params: { shared: String(share!.id) } });
   }
@@ -268,7 +271,7 @@ export function ShareScreen() {
           headerRight: () => <AIEntryButton palette={palette} locale={locale} onPress={askAI} />,
         }}
       />
-      {/* 文件一直列在这里（没有展开收起），点一个进它的预览页（D-457）；列表最高一屏的一半，多了在里面滚动。 */}
+      {/* Files are listed here continuously (without expand/collapse), tap one to enter its preview page (D-457); list height is at most half a screen, with excess scrolling internally. */}
       <Card palette={palette}>
         <Text testID="share-files-summary" style={caption}>
           {`${t(locale, infos.every((f) => f.mimeType.startsWith('image/')) ? 'sharePhotoSummary' : 'shareSummary', { n: share.files.length })}${
@@ -338,7 +341,7 @@ export function ShareScreen() {
       ) : (
         <>
           <Card palette={palette} style={styles.list}>
-            {/* 存成记录（D-392）：放在文件下面、快捷操作推荐上面；点了才展开表的列表，不自动做什么。 */}
+            {/* Save as record (D-392): placed below files and above quick action recommendations; expands the table list only when tapped, does not perform actions automatically. */}
             <View testID="share-record" style={styles.row}>
               <View style={styles.flex}>
                 <Text
@@ -387,7 +390,7 @@ export function ShareScreen() {
               onPress={() => setShowAll(true)}
             />
           ) : null}
-          {/* 「我要自己说」放在快捷操作下面（D-237，原来在上面，D-233）。 */}
+          {/* "I want to describe it myself" is placed below quick actions (D-237; previously above, in D-233). */}
           <Button
             palette={palette}
             testID="share-ask-ai"

@@ -1,12 +1,12 @@
 import { RunCancelled, RunError } from '@morph/core';
 import { PdfError } from '@morph/tool-pdf';
 
-// tool-pdf 的错误翻成运行错误。单独一个文件：文档库的合并 PDF（存储）也要用，不该为此依赖整个 PDF 动作模块（R11）。
+// Translates tool-pdf errors into run errors. In a separate file: workspace PDF merging (storage) also needs it and should not depend on the entire PDF action module for this (R11).
 
-/** tool-pdf 的错误 → 运行错误（带出错的文件名）。 */
+/** tool-pdf error -> run error (with the erroneous filename). */
 export function pdfError(e: unknown, name = ''): never {
   if (e instanceof RunError || e instanceof RunCancelled) throw e;
-  // pdf-lib 读坏文件时会抛各种普通错误：对用户来说都是「无法读取」。
+  // pdf-lib throws various generic errors when reading corrupted files: all presented to the user as "unreadable".
   if (!(e instanceof PdfError)) throw new RunError('unreadable', { name });
   const file = e.fileName ?? name;
   switch (e.code) {

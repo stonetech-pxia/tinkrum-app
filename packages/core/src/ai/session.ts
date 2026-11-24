@@ -13,10 +13,13 @@ import {
   type WorkKind,
 } from './types';
 
-// 工具清单（AGENT_PLAN §3.5、D-414）：本机一个「会话」，随 App 重启保留，取代只有草稿聊天框才有的历史。
-// 内容只有用户说的话、计划里的一句话和配置结构，没有记录（底线 1、2、14）；存在 app_meta，不在配置里，AI 改不了（底线 8）。
-// 「做了」由代码判定：这轮操作应用成功，且工具检查对相关的表或工具没有 blocker。模型自己说了不算。
-// 这里全是纯函数：App 的 store 和实验台 lab.ts 用同一份。
+// Tool list (AGENT_PLAN §3.5, D-414): a local "session", preserved across app restarts, replacing
+// history that was previously confined to the draft chat box. Contents include only user
+// utterances, a single sentence from the plan, and config structure, with no records (invariants 1,
+// 2, 14); stored in app_meta, not in config, so the AI cannot modify it (invariant 8). "Done" is
+// determined by code: this round of operations applied successfully, and tool checks have no
+// blockers for related tables or tools. The model's own word does not count. Everything here
+// consists of pure functions: the app's store and the lab test bench use the same copy.
 
 export type SessionItemStatus = 'todo' | 'done' | 'skipped' | 'failed';
 
@@ -26,9 +29,9 @@ export interface SessionItem {
   text: string;
   status: SessionItemStatus;
   reason?: string;
-  /** 这一项碰到的工具（table:<id>、quickAction:<id>…）：只有结构，后面用来重新判断做好了没有。 */
+  /** Tools encountered by this item (table:<id>, quickAction:<id>, etc.): structure only, used later to re-evaluate whether it is done. */
   targets?: string[];
-  /** 还在草稿里时是哪一步（changeRequestId）；生效后换成版本号 rev。撤销、退一步时据此改状态。 */
+  /** Which step it was when still in the draft (changeRequestId); replaced with version number rev after taking effect. Used to adjust status on undo or step back. */
   cr?: number;
   rev?: number;
 }
@@ -41,16 +44,16 @@ export interface SessionSaid extends PlanEarlier {
 export interface WorkSession {
   goal?: string;
   items: SessionItem[];
-  /** 最近说过的话，最早的在前，包括不在草稿里说的（放宽 D-207）。 */
+  /** Most recent utterances, oldest first, including those said outside the draft (relaxed D-207). */
   said: SessionSaid[];
-  /** 会话开始时配置已有的问题（code|target）：starter 或旧问题不怪用户，「把这些补上」不算它们（D-418）。 */
+  /** Pre-existing issues in the config when the session started (code|target): starters or old issues are not the user's fault, "patch these up" does not count them (D-418). */
   startIssues?: string[];
 }
 
 export const SESSION_MAX_ITEMS = 12;
-/** 带给 AI 的最近几句。 */
+/** Number of recent utterances to pass to the AI. */
 export const SESSION_RECENT = 5;
-/** <session> 块的总长上限，超了丢最旧的（prompt.ts 的 describeSession）。 */
+/** Maximum total length of the <session> block; oldest ones are dropped if exceeded (describeSession in prompt.ts). */
 export const SESSION_CHAR_LIMIT = 1500;
 const TEXT_MAX = 300;
 const REPLY_MAX = 160;
@@ -85,7 +88,7 @@ const SessionSchema = z.object({
 
 export const emptySession = (): WorkSession => ({ items: [], said: [] });
 
-/** 存着的会话；旧版 App 没有、坏了都当空的（底线 12）。 */
+/** Stored session; missing or corrupted storage in older apps is treated as empty (invariant 12). */
 export function parseSession(stored: string | null): WorkSession {
   if (!stored) return emptySession();
   try {
@@ -99,11 +102,11 @@ export function parseSession(stored: string | null): WorkSession {
 export const sessionIsEmpty = (s: WorkSession): boolean =>
   !s.goal && s.items.length === 0 && s.said.length === 0;
 
-/** 还差的：没做的和没做好的。 */
+/** Remaining work: unfinished and not-yet-completed items. */
 export const openItems = (s: WorkSession): SessionItem[] =>
   s.items.filter((i) => i.status === 'todo' || i.status === 'failed');
 
-/** 超过上限时先丢最旧的已结束的项，还不够再丢最旧的。 */
+/** When exceeding the limit, drop completed items first; if still not enough, drop the oldest ones. */
 function trimItems(items: SessionItem[]): SessionItem[] {
   const kept = [...items];
   while (kept.length > SESSION_MAX_ITEMS) {
@@ -118,7 +121,7 @@ function newItemId(items: readonly SessionItem[]): string {
   return `i${Math.max(0, ...used) + 1}`;
 }
 
-/** 发给模型的样子。current：正在做的这一句，不用再列一遍。 */
+/** What is sent to the model. current: the utterance currently being processed, no need to list again. */
 export function planSession(
   s: WorkSession,
   options: { current?: string; step?: PlanSession['step'] } = {},
@@ -143,7 +146,7 @@ export function planSession(
   };
 }
 
-/** 从操作看这一句是哪一种工具：文件进记录、文件、记录，其余是外观。 */
+/** Determine what kind of work this utterance is from operations: files go to records, files, records, everything else is appearance. */
 export function workKindOfOps(ops: readonly Op[]): WorkKind {
   const quickActions = ops.flatMap((op) =>
     (op.op === 'addTool' || op.op === 'updateTool') &&
@@ -160,13 +163,13 @@ export function workKindOfOps(ops: readonly Op[]): WorkKind {
   return 'look';
 }
 
-// ---- 代码判定「做好了」 ----
+// ---- Code determines "is done" ----
 
 function same(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-/** 这次改动碰到的工具和页面。 */
+/** Tools and pages encountered in this change. */
 function changedTargets(before: WorkspaceConfig, after: WorkspaceConfig): string[] {
   const diff = <T extends { id: string }>(prefix: string, was: readonly T[], now: readonly T[]) => {
     const old = new Map(was.map((x) => [x.id, x]));
@@ -180,7 +183,7 @@ function changedTargets(before: WorkspaceConfig, after: WorkspaceConfig): string
   ];
 }
 
-/** 一个问题属不属于这些工具：块归页面，字段归表。 */
+/** Whether an issue belongs to these tools: blocks belong to pages, fields belong to tables. */
 function concerns(issue: ToolIssue, targets: ReadonlySet<string>): boolean {
   if (targets.has(issue.target)) return true;
   const [prefix, rest = ''] = issue.target.split(/:(.*)/s);
@@ -195,8 +198,10 @@ export interface ToolVerdict {
 }
 
 /**
- * 这轮改完，相关的工具能不能用：比改之前多出来的 blocker，加上碰到的工具上的 blocker。
- * later：后面还有一步（next、计划的下一步）会做页面，新表暂时没有入口是预期的。
+ * After this round of changes, whether related tools can be used: blockers that are new compared
+ * to before changes, plus blockers on encountered tools. later: a subsequent step (next, next
+ * step of plan) will create the page, so a new table temporarily without an entry point is
+ * expected.
  */
 export function toolVerdict(
   before: WorkspaceConfig,
@@ -218,7 +223,7 @@ export function toolVerdict(
       return !(options.later && FIXED_BY_A_LATER_STEP.has(i.code));
     return false;
   });
-  // 问题出在没碰到的表上时（页面加了按钮，表没变）也要记下，后面才判断得出补好了没有。
+  // Must be recorded even when an issue occurs on an untouched table (page added a button, table unchanged) so it can be determined later whether it was patched.
   return { targets: [...new Set([...targets, ...found.map((i) => i.target)])], blockers: found };
 }
 
@@ -233,7 +238,7 @@ function nameOf(target: string, config: WorkspaceConfig): string {
   return config.containers.pages.find((x) => x.id === id)?.title ?? id;
 }
 
-/** 给用户看的原因（工具检查的 message 是给模型的英文）。 */
+/** Reason shown to the user (tool check messages are English for the model). */
 export function issueReason(issue: ToolIssue, config: WorkspaceConfig, locale: Locale): string {
   const name = nameOf(issue.target, config);
   if (issue.code.startsWith('add-')) return t(locale, 'sessionWhyAdd', { name });
@@ -244,15 +249,16 @@ export function issueReason(issue: ToolIssue, config: WorkspaceConfig, locale: L
   return t(locale, 'sessionWhyOther', { name });
 }
 
-// ---- 把这些补上（D-418）----
+// ---- Patch these up (D-418) ----
 
 const blockerKey = (i: ToolIssue) => `${i.code}|${i.target}`;
 const blockersOf = (config: WorkspaceConfig, registry: Registry) =>
   checkTools(config, registry).issues.filter((i) => i.severity === 'blocker');
 
 /**
- * 记下这个会话的起点。还没开始的会话（空的）每次都重新记；旧版 App 存的会话没有起点，从现在算。
- * 没变就返回原来的对象，不用写存储。
+ * Record the start point of this session. Unstarted sessions (empty) are re-recorded every time;
+ * sessions stored by older apps without a start point calculate from now. Returns the original
+ * object if unchanged, avoiding writes to storage.
  */
 export function markSessionStart(
   s: WorkSession,
@@ -265,8 +271,10 @@ export function markSessionStart(
 }
 
 /**
- * 这个会话新增的问题：起点没有的 blocker，按 code + target 的个数比。会话里没做过什么（没有条目，或者都撤销了）时没有。
- * later：下一句（next）会做页面，新表暂时没有入口是预期的。
+ * New issues introduced in this session: blockers not present at the start, compared by count of
+ * code + target. None when nothing was done in the session (no entries, or all undone). later:
+ * the next utterance (next) will create the page, so a new table temporarily without an entry
+ * point is expected.
  */
 export function sessionProblems(
   s: WorkSession,
@@ -287,37 +295,37 @@ export function sessionProblems(
   });
 }
 
-/** 一次请求最多带几条，剩下的用户再点一次。 */
+/** Maximum number of items per request, the rest are handled by the user clicking again. */
 const FIX_REQUEST_MAX = 10;
 export const FIX_REQUEST_PREFIX = 'Fix these so the app can be used:';
 
-/** 发给模型的句子（英文，只有配置结构）。用户看到的是自己语言的「把这些补上」。 */
+/** Sentence sent to the model (English, config structure only). Users see "patch these up" in their own language. */
 export function fixRequest(issues: readonly ToolIssue[]): string {
   const lines = issues.slice(0, FIX_REQUEST_MAX).map((i) => `- ${i.message}`);
   return [FIX_REQUEST_PREFIX, ...lines].join('\n');
 }
 
-// ---- 改会话 ----
+// ---- Modify session ----
 
 export interface SessionTurn {
   input: string;
-  /** 模型的一句回复或改了什么；只存配置结构和说明。 */
+  /** A single model reply or what was changed; stores only config structure and descriptions. */
   reply: string;
   done: boolean;
-  /** 这一句做了什么种类；没做时不新加项（拒绝的原因已经告诉用户）。 */
+  /** What kind of work this utterance performed; no new item added when nothing was done (reason for refusal already told to the user). */
   kind?: WorkKind;
   verdict?: ToolVerdict;
-  /** 这一句做的是计划的哪一项。 */
+  /** Which item of the plan this utterance performed. */
   itemId?: string;
-  /** 没做好时给用户看的原因。 */
+  /** Reason shown to the user when not successfully completed. */
   reason?: string;
-  /** 模型留的下一句（next）：进清单。 */
+  /** Next utterance left by the model (next): enter the list. */
   next?: string | null;
   cr?: number;
   rev?: number;
 }
 
-/** 记下一句：更新对应的项（没有就新加一项，没做的不加），记进最近说过的话。 */
+/** Record an utterance: update the corresponding item (add a new one if none exists, do not add if nothing was done), and record it in recent utterances. */
 export function recordTurn(s: WorkSession, turn: SessionTurn): WorkSession {
   const failed = (turn.verdict?.blockers.length ?? 0) > 0 || !turn.done;
   const status: SessionItemStatus = failed ? 'failed' : 'done';
@@ -374,7 +382,7 @@ export function recordTurn(s: WorkSession, turn: SessionTurn): WorkSession {
   };
 }
 
-/** 用户点了「开始」：目标和没做的步骤进清单。 */
+/** User clicked "Start": target and unfinished steps enter the list. */
 export function startBuildItems(
   s: WorkSession,
   summary: string,
@@ -415,8 +423,10 @@ export function setItemStatus(
 }
 
 /**
- * 重新判断清单：没做好的现在没问题了就算做好（用户又说了一句补上了）。
- * all：做好的也重新看（搭建结束的整体检查，中间放过的「页面在下一步」这时要算了）。
+ * Re-evaluate the list: items that were not well done are now considered done if they have no
+ * issues (user said another utterance and patched it). all: re-evaluate completed items as well
+ * (overall check at the end of building, intermediate skipped "page in next step" must be counted
+ * now).
  */
 export function recheckItems(
   s: WorkSession,
@@ -445,7 +455,7 @@ export function recheckItems(
   };
 }
 
-/** 草稿应用了：这些步的话和项生效，记下版本号。 */
+/** Draft applied: utterances and items for these steps take effect, version number recorded. */
 export function commitDrafted(s: WorkSession, crs: readonly number[], rev: number): WorkSession {
   const set = new Set(crs);
   const move = <T extends { cr?: number; rev?: number }>(x: T): T => {
@@ -456,7 +466,7 @@ export function commitDrafted(s: WorkSession, crs: readonly number[], rev: numbe
   return { ...s, items: s.items.map(move), said: s.said.map(move) };
 }
 
-/** 草稿里的这些步没了（退一步、删除草稿、套不上）：那几句不算说过，项不再算做了。 */
+/** These steps in the draft are removed (step back, discard draft, failed to apply): those utterances no longer count as said, and items no longer count as done. */
 export function dropDrafted(s: WorkSession, crs: readonly number[]): WorkSession {
   const set = new Set(crs);
   const gone = (x: { cr?: number }) => x.cr !== undefined && set.has(x.cr);
@@ -471,7 +481,7 @@ export function dropDrafted(s: WorkSession, crs: readonly number[]): WorkSession
   };
 }
 
-/** 撤销、恢复旧版本、换预设之后：这些版本里做的不在配置里了。 */
+/** After undo, restore old version, or change preset: work done in these versions is no longer in the config. */
 export function markUndone(s: WorkSession, undone: (rev: number) => boolean): WorkSession {
   const hit = (x: { rev?: number }) => x.rev !== undefined && undone(x.rev);
   return {

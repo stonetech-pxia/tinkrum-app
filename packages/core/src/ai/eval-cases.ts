@@ -41,7 +41,7 @@ import {
   type RejectReason,
 } from './types';
 
-/** 结构相同即可（校验后对象的键顺序可能变）。 */
+/** Identical structure is sufficient (keyed order of validated objects may vary). */
 function sameValue(a: unknown, b: unknown): boolean {
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return a === b;
   const ka = Object.keys(a);
@@ -52,19 +52,20 @@ function sameValue(a: unknown, b: unknown): boolean {
   );
 }
 
-// AI 评测集（§7F、§14）：mock AI 与真实模型用同一组用例衡量。
-// ID 与 docs/MOCK_AI_PHRASES.md 对应；P* 是只有真实模型才需要理解的改写说法。
+// AI evaluation suite (§7F, §14): mock AI and real models are measured using the same set of test
+// cases. IDs correspond to `docs/MOCK_AI_PHRASES.md`; `P*` are paraphrased phrasings that only real
+// models need to understand.
 
-/** starter：新用户的第一个版本（精简首页 + 工具箱，D-181、D-182）。 */
-/** visaHomeScreen：visa 再把签证照片放到手机桌面（D-271）。 */
-/** habits：一张打卡表（习惯、完成 / 跳过、日期）和显示它的页面（D-284）。 */
-/** oneTap：喝水、工时（开始 / 结束）、行李清单、账单四张表，每张一个列表页面（一键记录操作，D-300）。 */
-/** views：心情、上下班（开始和结束的日期时间）、喝水三张表，每张一个列表页面（D-305–D-308）。 */
-/** boards：习惯 ← 打卡、任务（状态是单选）两组表，习惯和任务各一个列表页面（大圆块和看板，D-311–D-314）。 */
-/** scheduled：植物（日程 + 上次浇水）、习惯（日程）← 打卡三张表，植物和习惯各一个列表页面（按记录排的提醒，D-316–D-318）。 */
-/** linked：互相引用的表（习惯 ← 打卡、工作 ← 工时、客户 ← 订单）和一张加油表，每张一个页面（D-287–D-289）。 */
-/** envelopes：零基预算的分类 ← 分配、分类 ← 流水（支出 / 收入）三张表，分类和流水各一个列表页面（D-336–D-338）。 */
-/** todos：项目 ← 任务（日程默认「一次」，lastDone 是完成记录的汇总）← 完成记录三张表，任务和项目各一个列表页面（D-340–D-344）。 */
+/** starter: first version for new users (streamlined home screen + toolbox, D-181, D-182). */
+/** visaHomeScreen: visa places visa photo on the home screen (D-271). */
+/** oneTap: four tables for water, work hours (start/end), packing list, bills, each with a list page (one-tap logging operation, D-300). */
+/** views: three tables for mood, commute (start and end date/time), water, each with a list page (D-305–D-308). */
+/** boards: two table groups (habit ← check-in, task with single-choice status), each with a list page for habits and tasks (large circle blocks and Kanban board, D-311–D-314). */
+/** scheduled: three tables for plants (schedule + last watered), habits (schedule) ← check-in, each with a list page for plants and habits (reminders sorted by record, D-316–D-318). */
+/** linked: cross-referenced tables (habit ← check-in, work ← work hours, customer ← order) and a refueling table, each with a page (D-287–D-289). */
+/** envelopes: zero-based budgeting with three tables: category ← allocation, category ← transaction (expense/income), each with category and transaction list pages (D-336–D-338). */
+/** todos: project ← task (default schedule "once", `lastDone` is summary of completion records) ← completion record, with task and project list pages (D-340–D-344). */
+/** EvalSetup definition. */
 export type EvalSetup =
   | 'default'
   | 'pdf'
@@ -88,7 +89,7 @@ export type EvalExpectation =
   | {
       kind: 'ops';
       check: (after: WorkspaceConfig) => string | null;
-      /** 检查计划本身（notes、homeEntry）。 */
+      /** Check the plan itself (`notes`, `homeEntry`). */
       plan?: (plan: OpsPlan) => string | null;
     }
   | { kind: 'restorePrevious' }
@@ -100,23 +101,28 @@ export interface EvalCase {
   locale: Locale;
   setup: EvalSetup;
   expect: EvalExpectation;
-  /** mock AI 是否应当通过（改写说法只要求真实模型通过）。 */
+  /** Whether mock AI should pass (paraphrased phrasings only require real models to pass). */
   mock: boolean;
-  /** 从哪里打开的 AI（D-124）：一个快捷操作，或分享进来的文件。 */
+  /** Where the AI was opened from (D-124): a quick action or a shared file. */
   about?: PlanAbout;
   /**
-   * 先做功能、再接着做外观（D-191）：第一句要有功能，计划里要有 next；照着 next 再问一次，
-   * check 检查两步之后的样子（用户点了「接着改」）。第一句就把外观也做了（混合计划，D-419）不用 next，
-   * check 检查功能和外观都应用之后的样子。
+   * Perform feature first, then appearance (D-191): first sentence must have features, plan must
+   * include `next`; query again following `next`, and `check` inspects the state after two steps
+   * (user tapped "Continue modifying"). Doing appearance in the first sentence (mixed plan,
+   * D-419) does not use `next`; `check` inspects state after both features and appearance are
+   * applied.
    */
   next?: boolean;
   /**
-   * 草稿聊天框里之前说过的话（D-207）：有 ops 的是做了的一步（先套在 setup 上，回复是它的说明），
-   * 有 notDone 的是没做的一句和原因。
+   * Previous statements in draft chat box (D-207): items with `ops` represent completed steps
+   * (applied to setup, response is its explanation), and items with `notDone` represent
+   * unperformed statements with reasons.
    */
   earlier?: EvalEarlier[];
   /**
-   * 一句话多个工具（规则 53、D-415）：回搭建计划也算对。计划要合法（judgeBuild），ops 的断言不变。
+   * Multiple tools in a single sentence (rule 53, D-415): returning a build plan is also
+   * considered correct. Plan must be valid (`judgeBuild`), and assertions for `ops` remain
+   * unchanged.
    */
   allowBuild?: true;
 }
@@ -163,7 +169,7 @@ export function buildSetup(setup: EvalSetup, locale: Locale, registry: Registry)
   return result.config;
 }
 
-/** 打卡表和它的页面（三种语言的名字）。 */
+/** Check-in table and its page (names in three languages). */
 function habitOps(locale: Locale): Op[] {
   const names: Record<Locale, Record<'table' | 'habit' | 'run' | 'read' | 'status', string>> = {
     zh: { table: '打卡', habit: '习惯', run: '跑步', read: '读书', status: '状态' },
@@ -225,7 +231,7 @@ function habitOps(locale: Locale): Op[] {
   ];
 }
 
-/** 心情、上下班、喝水三张表，每张一个列表页面（名字按语言，ID 都一样）。 */
+/** Three tables: mood, commute, and water; each with a list page (localized names, identical IDs). */
 function viewOps(locale: Locale): Op[] {
   const n = {
     zh: [
@@ -348,7 +354,7 @@ function viewOps(locale: Locale): Op[] {
   ]);
 }
 
-/** 习惯 ← 打卡、任务两组表；习惯和任务各一个普通列表页面（名字按语言，ID 都一样）。 */
+/** Two table groups: habits ← check-ins, and tasks; one standard list page each for habits and tasks (localized names, identical IDs). */
 function boardOps(locale: Locale): Op[] {
   const n = {
     zh: [
@@ -462,7 +468,7 @@ function boardOps(locale: Locale): Op[] {
   ];
 }
 
-/** 有日程字段的植物和习惯表、习惯的打卡表，植物和习惯各一个列表页面（名字按语言，ID 都一样）。 */
+/** Plant and habit tables with schedule fields, plus habit check-in table; one list page each for plants and habits (localized names, identical IDs). */
 function scheduledOps(locale: Locale): Op[] {
   const n = {
     zh: ['植物', '名字', '浇水日程', '上次浇水', '习惯', '日程', '打卡', '日期'],
@@ -543,7 +549,7 @@ function scheduledOps(locale: Locale): Op[] {
   ];
 }
 
-/** 零基预算的三张表：分类 ← 分配、分类 ← 流水（名字按语言，ID 都一样），分类和流水各一个列表页面。 */
+/** Three zero-based budgeting tables: category ← allocation, category ← transactions (localized names, identical IDs), with one list page each for categories and transactions. */
 function envelopeOps(locale: Locale): Op[] {
   const n = {
     zh: ['分类', '名称', '每月目标', '分配', '金额', '日期', '流水', '类型', '支出', '收入'],
@@ -645,7 +651,7 @@ function envelopeOps(locale: Locale): Op[] {
   ];
 }
 
-/** 待办的三张表：项目 ← 任务 ← 完成记录（名字按语言，ID 都一样），任务和项目各一个列表页面。 */
+/** Three todo tables: project ← task ← completion record (localized names, identical IDs), with one list page each for tasks and projects. */
 function todoOps(locale: Locale): Op[] {
   const [projects, name, tasks, title, plan, last, priority, done, date] = {
     zh: ['项目', '名称', '任务', '标题', '日程', '最后完成', '优先级', '完成记录', '日期'],
@@ -731,7 +737,7 @@ function todoOps(locale: Locale): Op[] {
       ],
     },
   });
-  // 任务的 lastDone 指向汇总字段，汇总要等完成记录表在：先建不带 lastDone 的，再补上。
+  // Task's lastDone points to a rollup field; rollups require the completion record table to exist first: create without lastDone, then add it back.
   const [projectTable, taskTable, completionTable] = tables as [Collection, Collection, Collection];
   const taskWithout = {
     ...taskTable,
@@ -750,7 +756,7 @@ function todoOps(locale: Locale): Op[] {
   ];
 }
 
-/** 互相引用的几张表，每张一个列表页面（名字按语言，ID 都一样）。 */
+/** Several mutually referencing tables, each with a list page (localized names, identical IDs). */
 function linkedOps(locale: Locale): Op[] {
   const names = {
     zh: [
@@ -910,7 +916,7 @@ function linkedOps(locale: Locale): Op[] {
   ]);
 }
 
-/** 一键记录操作的四张表和它们的列表页面（三种语言的名字）。 */
+/** Four tables for one-tap logging actions and their list pages (names in three languages). */
 function oneTapOps(locale: Locale): Op[] {
   const n = {
     zh: [
@@ -1016,37 +1022,37 @@ function oneTapOps(locale: Locale): Op[] {
 
 const home = (c: WorkspaceConfig) => c.containers.pages.find((p) => p.id === 'home')!;
 const homeIds = (c: WorkspaceConfig) => home(c).blocks.map((x) => x.id);
-/** 运行卡片（look action，原 workflowRunner）运行的快捷操作 ID；别的块是 null。 */
+/** ID of the quick action run by a runner card (look action, formerly workflowRunner); null for other blocks. */
 const runsTool = (x: Component): string | null => {
   if (!isKnownComponent(x) || x.look !== 'action') return null;
   const use = x.tools[0];
   return use && 'tool' in use ? use.tool : null;
 };
-/** 文件位（look entry，opens {file}，原 fileSlot）。 */
+/** File slot (look entry, opens {file}, formerly fileSlot). */
 const isFileSlot = (x: Component): x is ComponentOf<'entry'> =>
   x.look === 'entry' && entryKind(x) === 'file';
-/** 文件位选好的文件（原 fileSlot 的 assetId）；还没选是 null。 */
+/** The file selected in the file slot (formerly fileSlot's assetId); null if not yet selected. */
 const fileOf = (x: ComponentOf<'entry'>) => (isFileTarget(x.opens) ? x.opens.file : null);
-/** 记录块（look list / cards / checklist / tiles / board / calendar，原 recordList）。 */
+/** Record block (look list / cards / checklist / tiles / board / calendar, formerly recordList). */
 type RecordBlock = ComponentOf<RecordLook>;
 const isRecordBlock = (x: Component): x is RecordBlock =>
   isKnownComponent(x) && (RECORD_LOOKS as readonly string[]).includes(x.look);
-/** 所有页面里读这张表的记录块。 */
+/** Record blocks reading this table across all pages. */
 const recordBlocksOf = (c: WorkspaceConfig, table: string): RecordBlock[] =>
   c.containers.pages
     .flatMap((p) => allComponents(p))
     .filter((x): x is RecordBlock => isRecordBlock(x) && x.source.table === table);
-/** 所有页面里这张表的数字块（原 stat）。 */
+/** Number blocks for this table across all pages (formerly stat). */
 const numbersOf = (c: WorkspaceConfig, table: string) =>
   c.containers.pages
     .flatMap((p) => allComponents(p))
     .filter((x): x is ComponentOf<'number'> => x.look === 'number' && x.source.table === table);
-/** 所有页面里这张表的图表。 */
+/** Charts for this table across all pages. */
 const chartsOf = (c: WorkspaceConfig, table: string) =>
   c.containers.pages
     .flatMap((p) => allComponents(p))
     .filter((x): x is ComponentOf<'chart'> => x.look === 'chart' && x.source.table === table);
-/** 所有页面里往这张表添加记录的表单块（原 recordForm 的 inline / sheet）。 */
+/** Form blocks adding records to this table across all pages (formerly recordForm's inline / sheet). */
 const formsOf = (c: WorkspaceConfig, table: string) =>
   c.containers.pages
     .flatMap((p) => allComponents(p))
@@ -1054,20 +1060,20 @@ const formsOf = (c: WorkspaceConfig, table: string) =>
       (x): x is ComponentOf<'form'> =>
         x.look === 'form' && x.tools.some((t) => 'do' in t && t.table === table),
     );
-/** 记录块每一条上的工具（原 rowActions：一般是 button，大圆块上是 tap）。 */
+/** Tools on each row of a record block (formerly rowActions: usually buttons, or tap on large tile blocks). */
 const rowToolsOf = (x: RecordBlock): ToolUse[] =>
   (x.tools ?? []).filter((t) => t.as === 'button' || t.as === 'tap');
-/** 就地新建记录的工具里的预设值（"$here" 不算）。 */
+/** Preset values in tools that create records in place (excluding "$here"). */
 const valuesOf = (t: ToolUse): Record<string, unknown> =>
   'do' in t && t.do === 'create' && typeof t.values === 'object' ? t.values : {};
-/** 列表的分段（原 recordList.groupBy / groupUnit）；看板的分栏、月历的日子不算。 */
+/** List grouping (formerly recordList.groupBy / groupUnit); excludes board columns and calendar days. */
 const groupByOf = (x: RecordBlock) =>
   x.look === 'board' || x.look === 'calendar' ? undefined : x.source.group;
-/** 表里的一个字段。 */
+/** A field within a table. */
 
 const fieldOf = (c: WorkspaceConfig, table: string, field: string | undefined) =>
   c.data.tables.find((t) => t.id === table)?.fields.find((f) => f.id === field);
-/** 「打开相册 / 打开文件」块（look picker，原 filePick）选的是 media 还是 files；别的块是 null。 */
+/** "Open Photo Library / Open Files" block (look picker, formerly filePick); media or files, or null for other blocks. */
 
 const pickSource = (x: Component): 'media' | 'files' | null => {
   if (!isKnownComponent(x) || x.look !== 'picker') return null;
@@ -1075,13 +1081,13 @@ const pickSource = (x: Component): 'media' | 'files' | null => {
   const tool = use && 'tool' in use ? use.tool : null;
   return tool === '$pick.media' ? 'media' : tool === '$pick.files' ? 'files' : null;
 };
-/** 工具包的入口（look entry，opens package:<id>，原 toolCard）。 */
+/** Tool package entry point (look entry, opens package:<id>, formerly toolCard). */
 
 const isToolCard = (x: Component) => x.look === 'entry' && entryKind(x) === 'package';
 const mergeSteps = (c: WorkspaceConfig) =>
   quickActionsOf(c).find((w) => w.id === 'pdf-merge')?.steps ?? [];
 
-/** 每个检查返回 null 表示通过，否则返回失败原因。 */
+/** Each check returns null on success, or the failure reason otherwise. */
 const all =
   (...checks: ((c: WorkspaceConfig) => string | null)[]) =>
   (c: WorkspaceConfig) =>
@@ -1091,7 +1097,7 @@ const pdfFirst = (c: WorkspaceConfig) =>
   homeIds(c)[1] === 'card-pdf'
     ? null
     : `PDF card should be right after the header, got ${homeIds(c).join(',')}`;
-/** PDF 工具页上「合并 PDF」的卡片排在标题后面的第一个。 */
+/** The "Merge PDF" card on the PDF tool page is placed first after the title. */
 const mergeRunnerFirst = (c: WorkspaceConfig) => {
   const page = c.containers.pages.find((p) => p.id === 'tool-pdf');
   const first = page?.blocks.find((x) => x.look !== 'header');
@@ -1107,7 +1113,7 @@ const color = (hex: string) => (c: WorkspaceConfig) =>
   c.theme.primaryColor.toLowerCase() === hex.toLowerCase()
     ? null
     : `color should be ${hex}, got ${c.theme.primaryColor}`;
-/** 文件名包含日期即可（“按日期命名”既可理解为只用日期，也可保留“合并”之类的前缀）。 */
+/** File name containing the date is sufficient ("Date-named" can mean date-only or retaining prefixes like "merged"). */
 const renameStep = (c: WorkspaceConfig) => mergeSteps(c).find((s) => s.action === 'file.rename');
 const savesWithDate = (c: WorkspaceConfig) => {
   const template = String(renameStep(c)?.params.template);
@@ -1121,7 +1127,7 @@ const singlePdfTool = (c: WorkspaceConfig) =>
   new Set(quickActionsOf(c).map((w) => w.id)).size === quickActionsOf(c).length
     ? null
     : 'must keep exactly one PDF tool and one merge workflow';
-/** 用户看得到的步骤只剩选文件和合并：命名、保存可以保留，但不再询问。 */
+/** Only file selection and merging are visible to the user: naming and saving can be retained but are no longer prompted. */
 const simplifiedMerge = (c: WorkspaceConfig) => {
   const steps = mergeSteps(c);
   const visible = steps.filter((s) => s.action !== 'file.rename' && s.action !== 'file.save');
@@ -1132,14 +1138,14 @@ const simplifiedMerge = (c: WorkspaceConfig) => {
   if (!steps.some((s) => s.action === 'file.save')) return 'file.save must stay';
   return steps.some((s) => s.ask?.length) ? 'no step should ask the user any more' : null;
 };
-/** 首页第 index 个组件是一个还没选照片的图片位（AI 不能替用户选照片）。 */
+/** The index-th component on the home screen is an image slot where no photo has been selected yet (AI cannot select photos for the user). */
 const imageSlot = (c: WorkspaceConfig, index: number): string | null => {
   const img = home(c).blocks[index];
   if (img?.look !== 'image')
     return `expected an image at position ${index}, got ${String(img?.look)}`;
   return img.show.asset ? 'the AI must not pick a photo' : null;
 };
-/** 有这个标题的页面，且能从导航栏、浮动按钮或首页的按钮 / 快捷入口打开。 */
+/** A page with this title that is reachable from the navigation bar, floating button, or home screen buttons / quick shortcuts. */
 const reachablePage = (title: string) => (c: WorkspaceConfig) => {
   const page = c.containers.pages.find((p) => p.title === title);
   if (!page) return `expected a page titled ${title}`;
@@ -1157,7 +1163,7 @@ const darkBackground = (c: WorkspaceConfig) => {
     ? null
     : `background should be dark, got ${colors.background}`;
 };
-/** 有一张含某类型字段的数据表，并且有一个能打开的页面用上了它（统计求和或可勾选清单）。 */
+/** A data table containing a specific field type, used by an accessible page (sum aggregation or checkable list). */
 const dataPage =
   (fieldType: string, usage: 'sum' | 'checklist') =>
   (c: WorkspaceConfig): string | null => {
@@ -1179,7 +1185,7 @@ const savesAs = (template: string) => (c: WorkspaceConfig) =>
     : `the file.rename template should be ${template}, got ${String(renameStep(c)?.params.template)}`;
 
 const BASE_EVAL_CASES: readonly EvalCase[] = [
-  // 旅程 A
+  // Journey A
   {
     id: 'A1',
     input: '把首页改成文件工作台，把 PDF 放到最上面，导航栏只保留首页、工具、设置。',
@@ -1228,7 +1234,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     mock: true,
     expect: { kind: 'ops', check: navHomeToolsSettings },
   },
-  // 单项修改
+  // Single-item modification
   {
     id: 'B1',
     input: '主题换成绿色',
@@ -1273,7 +1279,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
           : `recent files should come before PDF, got ${homeIds(c).join(',')}`,
     },
   },
-  // 样式
+  // Style
   {
     id: 'B5',
     input: '字体大一点',
@@ -1401,7 +1407,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
       },
     },
   },
-  // 导航与页面
+  // Navigation and pages
   {
     id: 'B13-tink',
     input: '把 Tink 入口删掉',
@@ -1438,7 +1444,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     mock: true,
     expect: { kind: 'ops', check: reachablePage('记账') },
   },
-  // 数据页面（只改结构，从不碰记录）
+  // Data pages (structure changes only, never touching records)
   {
     id: 'F1',
     input: '新建一个记账页面',
@@ -1478,7 +1484,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     mock: true,
     expect: { kind: 'reject', reason: 'userData' },
   },
-  // 图片、emoji 图标、富文本
+  // Images, emoji icons, rich text
   {
     id: 'G1',
     input: '在首页顶部加一张横幅',
@@ -1501,7 +1507,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
           : 'budget page icon should be 💰',
     },
   },
-  // 旅程 C
+  // Journey C
   {
     id: 'C1',
     input: '把 PDF 工具首页简化成上传和合并两个步骤，完成后自动按照‘合并-日期’命名',
@@ -1521,7 +1527,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     mock: true,
     expect: { kind: 'ops', check: all(savesWithDate, singlePdfTool) },
   },
-  // 旅程 D
+  // Journey D
   {
     id: 'D1',
     input: '恢复上一次修改前的界面',
@@ -1546,7 +1552,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     mock: true,
     expect: { kind: 'restorePrevious' },
   },
-  // 必须拒绝
+  // Must reject
   {
     id: 'X1',
     input: '帮我订一张机票',
@@ -1563,7 +1569,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     mock: true,
     expect: { kind: 'reject', reason: 'protected' },
   },
-  // 保存的预设是系统层（D-410）：AI 不能替用户存、也不能替他换回来，告诉他到设置里。
+  // Saved presets are part of the system layer (D-410): AI cannot save them for the user or switch them back; direct the user to Settings.
   {
     id: 'PRESET1',
     input: '把现在这个 App 存成预设',
@@ -1597,14 +1603,14 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     mock: true,
     expect: { kind: 'reject', reason: 'deleteFiles' },
   },
-  // 改写说法：只要求真实模型理解
+  // Rewriting phrasing: only requires real model understanding
   {
     id: 'P1',
     input: '能不能把合并 PDF 的入口挪到最前面？',
     locale: 'zh',
     setup: 'pdfBelowFiles',
     mock: false,
-    // T3 之后 PDF 工具页上也有「合并 PDF」的卡片：挪首页的 PDF 卡片，或者把工具页上的合并卡片挪到最前，都算理解对了。
+    // T3 and later also have the "Merge PDF" card on the PDF tool page: moving the home PDF card, or moving the tool page merge card to the front, both count as correct understanding.
     expect: {
       kind: 'ops',
       check: (c) => (pdfFirst(c) === null || mergeRunnerFirst(c) ? null : pdfFirst(c)),
@@ -1652,7 +1658,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     locale: 'zh',
     setup: 'default',
     mock: false,
-    // 可读性由校验器保证；这里只检查最终显示的背景确实是深色。
+    // Readability is guaranteed by the validator; this only checks that the final displayed background is indeed dark.
     expect: { kind: 'ops', check: darkBackground },
   },
   {
@@ -1739,7 +1745,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     locale: 'zh',
     setup: 'budget',
     mock: false,
-    // 移出界面或删除页面都可以；无论哪种，校验通过即可（记录始终保留在数据库里）。
+    // Removing from the interface or deleting the page are both acceptable; either way, passing validation is sufficient (records remain in the database).
     expect: {
       kind: 'ops',
       check: (c) =>
@@ -1816,7 +1822,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
     locale: 'zh',
     setup: 'default',
     mock: false,
-    // 多项修改一项都不能漏。只说「横幅」时模型可能理解为文字横幅（提示框），所以这里明确说「横幅图片」。
+    // Not a single multi-item modification can be missed. When only "banner" is mentioned, the model might interpret it as a text banner (prompt box), so explicitly specify "banner image" here.
     expect: {
       kind: 'ops',
       check: (c) => {
@@ -1840,13 +1846,13 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-// ---- 工作流（T7）----
+// ---- Workflows (T7) ----
 
-/** 用户自己的工作流（不属于工具）。 */
+/** User's own workflows (not belonging to tools). */
 const userWorkflows = (c: WorkspaceConfig) => quickActionsOf(c).filter((w) => !w.package);
 const visa = (c: WorkspaceConfig) =>
   quickActionsOf(c).find((w) => w.id === 'visa-photo' || w.preset === 'visa-photo');
-/** 有一个用户工作流按顺序包含这些动作（中间可以有别的步骤），参数满足 check。 */
+/** A user workflow sequentially contains these actions (with potential intermediate steps), and parameters satisfy check. */
 const hasWorkflow =
   (
     actions: readonly string[],
@@ -1869,7 +1875,7 @@ const param =
     const got = steps.find((s) => s.action === action)?.params[key];
     return got === value ? null : `${action}.${key} should be ${String(value)}, got ${String(got)}`;
   };
-/** 有一个用户快捷操作翻译成 to；first 给了时第一步必须是其中之一。 */
+/** A user quick action translates to `to`; when `first` is provided, the first step must be one of them. */
 const translatesTo =
   (to: string, first?: readonly string[]) =>
   (c: WorkspaceConfig): string | null => {
@@ -1891,8 +1897,9 @@ const translatesTo =
   };
 
 /**
- * W10「扫描文档，压到 300KB，存到文件」：扫描的图片压到 300KB 再存，
- * 或者扫描 →（找边拉正）→ 做成不超过 0.3 MB 的 PDF，最后一步存文件。创始人 2026-10-27（本地会话）确认两种都算对。
+ * W10 "Scan document, compress to 300KB, save to files": compress scanned image to 300KB then
+ * save, or scan → (detect edges and straighten) → create PDF under 0.3 MB, with save file as the
+ * final step. Confirmed by founder on 2026-10-27 (local session) that both are correct.
  */
 const scanDocTo300KB = (c: WorkspaceConfig): string | null => {
   const compressed = hasWorkflow(
@@ -2060,7 +2067,7 @@ const WORKFLOW_EVAL_CASES: readonly EvalCase[] = [
     locale: 'zh',
     setup: 'default',
     mock: true,
-    // 两种理解都算对（D-083 补充）：把扫描的图片压到 300KB，或者先拉正再做成不超过 0.3 MB 的 PDF（scanDocTo300KB）。
+    // Both interpretations are correct (supplementing D-083): compress scanned images to 300KB, or straighten first and create a PDF under 0.3 MB (scanDocTo300KB).
     expect: { kind: 'ops', check: scanDocTo300KB },
   },
   {
@@ -2198,10 +2205,11 @@ const WORKFLOW_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-// 「目标式」说法（D-110）：用户只说「我有什么、想要什么」，AI 自己搭工作流。只要求真实模型通过。
-// 同时检查：不顺手放到首页（D-109）、做不到的部分写进 notes、按用途补步骤但不加多余的。
+// "Goal-based" phrasing (D-110): user states "what I have and what I want", and AI builds the
+// workflow. Only required to pass for real models. Also checks: do not place on home screen
+// casually (D-109), write unachievable parts into notes, add steps by purpose without extras.
 
-/** 没有任何页面上的运行卡片（用户没说要放首页）。 */
+/** No runner cards on any page (user did not ask to place them on the home screen). */
 const noRunner = (c: WorkspaceConfig) => {
   const runners = c.containers.pages.flatMap((p) =>
     allComponents(p).filter((x) => x.look === 'action'),
@@ -2281,7 +2289,7 @@ const GOAL_EVAL_CASES: readonly EvalCase[] = [
     mock: false,
     expect: {
       kind: 'ops',
-      // 没有定时运行：要在 notes 里说「每月需要你自己点一次」；发给会计按日期命名。
+      // No scheduled runs: must state in notes "monthly manual tap required"; name by date when sending to accountant.
       check: all(hasWorkflow(['in.photos', 'pdf.fromImages'], datedName), noRunner),
       plan: hasNotes,
     },
@@ -2294,7 +2302,7 @@ const GOAL_EVAL_CASES: readonly EvalCase[] = [
     mock: false,
     expect: {
       kind: 'ops',
-      // 多张大照片可能超过邮件附件上限：要压缩或缩小。
+      // Multiple large photos may exceed email attachment limits: must compress or downscale.
       check: all(
         hasWorkflow(['in.photos', 'out.share'], someAction(['image.compress', 'image.resize'])),
         noRunner,
@@ -2309,7 +2317,7 @@ const GOAL_EVAL_CASES: readonly EvalCase[] = [
     mock: false,
     expect: {
       kind: 'ops',
-      // 拉正就够了，不用再让用户手动裁剪。
+      // Straightening is enough, no need for manual user cropping.
       check: all(
         hasWorkflow(['in.photos', 'pdf.fromImages']),
         withoutAction('image.crop'),
@@ -2341,7 +2349,7 @@ const GOAL_EVAL_CASES: readonly EvalCase[] = [
       plan: hasNotes,
     },
   },
-  // 新手引导的三句（D-149）：内置规则也要认得；真实模型拿到同样的句子也要搭出能用的快捷操作。
+  // Three onboarding sentences (D-149): built-in rules must also recognize them; real models given the same sentences must build working quick actions.
   {
     id: 'GW8',
     input: '我有一堆旅行照片，想发给朋友',
@@ -2350,7 +2358,7 @@ const GOAL_EVAL_CASES: readonly EvalCase[] = [
     mock: false,
     expect: {
       kind: 'ops',
-      // 发给别人：要缩小或压缩。去掉定位是引导里的惊喜点，由内置规则保证（goals.test.ts），真实模型不强求。
+      // Sending to others: must downscale or compress. Removing location is a delightful onboarding touch guaranteed by built-in rules (goals.test.ts); real models are not strictly required.
       check: all(
         hasWorkflow(['in.photos', 'out.share'], someAction(['image.compress', 'image.resize'])),
         noRunner,
@@ -2418,7 +2426,7 @@ const GOAL_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-// 新说法（D-112）：「快捷操作 / quick action」「添加 / 移除工具」「改动记录」，旧说法仍然能用（W*、P7）。
+// New terminology (D-112): "quick action", "add / remove tool", "change history"; old terms still work (W*, P7).
 
 const toolIds = (c: WorkspaceConfig) => c.packages.map((t) => t.id);
 const onHome = (c: WorkspaceConfig) =>
@@ -2504,12 +2512,13 @@ const WORDING_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-// AI 只改 App（D-113、D-124）：办事类请求拒绝并给出能做的快捷操作；文件上的事照样做成快捷操作；
-// 从一个快捷操作打开时「这个」指它；从收件页面打开时，新快捷操作的第一步收得下分享的文件。
+// AI only modifies the app (D-113, D-124): reject errand requests and provide executable quick
+// actions; handle file tasks as quick actions; "this" refers to the quick action when opened from
+// one; when opened from the inbox, the new quick action's first step must accept shared files.
 
 const visaStep = (c: WorkspaceConfig, action: string) =>
   visa(c)?.steps.find((s) => s.action === action);
-/** visa 场景里用户自己的快捷操作只有签证照片：改它，不新建。 */
+/** In the visa scenario, the user's only relevant quick action is visa photos: modify it, do not create a new one. */
 const onlyVisa = (c: WorkspaceConfig) =>
   userWorkflows(c).length === 1 ? null : `made a new quick action instead of changing this one`;
 const homeEntryOff = (plan: OpsPlan) =>
@@ -2533,7 +2542,7 @@ const ABOUT_EVAL_CASES: readonly EvalCase[] = [
     expect: { kind: 'reject', reason: 'errand' },
   },
   {
-    // D-171：翻译文件是文件上的事，做一个翻译快捷操作（以前按办事拒绝）。
+    // D-171: Translating files is a file-related task, create a translation quick action (previously rejected as an errand).
     id: 'ER2',
     input: '把这份合同翻译成英文',
     locale: 'zh',
@@ -2650,7 +2659,7 @@ const ABOUT_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 视频和压缩 PDF（D-140–D-147）。V* 是 mock 句式（MOCK_AI_PHRASES W12–W14），PV* 和 SH3 只要求真实模型。 */
+/** Video and PDF compression (D-140–D-147). V* are mock phrases (MOCK_AI_PHRASES W12–W14), while PV* and SH3 are required for real models only. */
 const firstVideo = (steps: { action: string; params: Record<string, unknown> }[]) => {
   const first = steps[0];
   if (first?.action === 'in.videos') return null;
@@ -2834,7 +2843,7 @@ const VIDEO_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-// ---- 翻译（D-170–D-176）：翻译文件做成快捷操作；直接要译文仍按办事拒绝 ----
+// ---- Translation (D-170–D-176): File translation as quick action; direct requests for translations still rejected as errands ----
 
 const TRANSLATE_EVAL_CASES: readonly EvalCase[] = [
   {
@@ -2943,8 +2952,8 @@ const TRANSLATE_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-// ---- 音频（D-150–D-157）：录音转文字、压小、剪一段、合成、取视频的声音做成快捷操作；总结录音内容按办事拒绝 ----
-// AU* 是 mock 句式（MOCK_AI_PHRASES AU），PAU* 和 SH4 只要求真实模型。
+// ---- Audio (D-150–D-157): Speech-to-text, compression, trimming, synthesis, extracting audio from video as quick actions; summarizing audio content rejected as errands ----
+// AU* are mock phrases (MOCK_AI_PHRASES AU), while PAU* and SH4 are required for real models only.
 
 const firstAudio = (steps: { action: string; params: Record<string, unknown> }[]) => {
   const first = steps[0];
@@ -3120,8 +3129,8 @@ const AUDIO_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-// ---- 文字转语音（D-270）：PDF、纸质材料读成音频文件，做成快捷操作；要 AI 读一句话给用户听按办事拒绝 ----
-// TTS* 是 mock 句式（MOCK_AI_PHRASES TTS），PTTS* 只要求真实模型。
+// ---- Text-to-Speech (D-270): Read PDFs and paper materials into audio files as quick actions; asking AI to read a single sentence to the user rejected as errands ----
+// TTS* are mock phrases (MOCK_AI_PHRASES TTS), while PTTS* is required for real models only.
 
 const SPEAK_EVAL_CASES: readonly EvalCase[] = [
   {
@@ -3176,7 +3185,7 @@ const SPEAK_EVAL_CASES: readonly EvalCase[] = [
       check: hasWorkflow(['in.text', 'audio.fromText', 'audio.convert', 'out.share']),
     },
   },
-  // ---- 扫描件转 Excel（D-272）----
+  // ---- Scanned documents to Excel (D-272) ----
   {
     id: 'XLS1',
     input: '新建一个快捷操作：扫描文档，转 Excel，分享',
@@ -3215,7 +3224,7 @@ const SPEAK_EVAL_CASES: readonly EvalCase[] = [
     mock: false,
     expect: { kind: 'ops', check: hasWorkflow(['in.photos', 'ocr.toExcel']) },
   },
-  // ---- 扫描件转 Word（D-328）----
+  // ---- Scanned documents to Word (D-328) ----
   {
     id: 'DOC1',
     input: '新建一个快捷操作：扫描文档，转 Word，分享',
@@ -3302,7 +3311,7 @@ const SPEAK_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-// 工具箱是用户自己的页面，AI 能改（D-181）。
+// Toolbox is a user-owned page that AI can modify (D-181).
 
 type ToolGrid = ComponentOf<'packages'>;
 const toolbox = (c: WorkspaceConfig) => c.containers.pages.find((p) => p.id === 'toolbox');
@@ -3403,7 +3412,7 @@ const toolInFront = (toolId: string) => (c: WorkspaceConfig) => {
     : `the ${toolId} tool should be first in the bottom bar, got ${c.nav.bar.join(',')}`;
 };
 
-// 功能和外观分开改（D-191）：一句话两样都有时先做功能，外观留作下一句。
+// Modify features and appearance separately (D-191): when a single sentence includes both, do functionality first and leave appearance for the next sentence.
 const SPLIT_EVAL_CASES: readonly EvalCase[] = [
   {
     id: 'FL1',
@@ -3454,8 +3463,8 @@ const SPLIT_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-// ---- 格式转换的缺口（D-183–D-186）：MP3、动图 GIF、从「文件」选视频、Word / Excel / PPT 转 PDF ----
-// FG* 是 mock 句式（MOCK_AI_PHRASES FG），PFG* 只要求真实模型。
+// Format conversion gaps (D-183–D-186): MP3, animated GIF, selecting video from "Files", Word / Excel / PPT to PDF ----
+// FG* are mock phrases (MOCK_AI_PHRASES FG), while PFG* is required for real models only.
 
 const firstDocuments = (steps: { action: string; params: Record<string, unknown> }[]) => {
   const first = steps[0];
@@ -3589,7 +3598,7 @@ const FORMAT_EVAL_CASES: readonly EvalCase[] = [
     expect: { kind: 'ops', check: hasWorkflow(['pdf.fromDocument'], firstDocuments) },
   },
   {
-    // D-195：扫出来的 PDF 要能搜索、复制文字。
+    // D-195: Scanned PDFs must be searchable and allow text copying.
     id: 'PSP1',
     input: 'Scan receipts into a PDF where I can search and copy the text later',
     locale: 'en',
@@ -3604,7 +3613,7 @@ const FORMAT_EVAL_CASES: readonly EvalCase[] = [
     },
   },
   {
-    // D-194：带密码的 PDF 先去密码，再合并。
+    // D-194: For a password-protected PDF, remove the password first, then merge.
     id: 'PPW1',
     input: '银行发的对账单 PDF 有密码，想去掉密码再和别的材料合成一份',
     locale: 'zh',
@@ -3613,7 +3622,7 @@ const FORMAT_EVAL_CASES: readonly EvalCase[] = [
     expect: { kind: 'ops', check: hasWorkflow(['pdf.unlock', 'pdf.merge']) },
   },
   {
-    // D-194：加密码放在最后（之后只有命名、保存、分享）。
+    // D-194: Add password protection at the end (only naming, saving, and sharing follow).
     id: 'PPW2',
     input: 'Before I send a contract I want to put a password on the PDF',
     locale: 'en',
@@ -3631,7 +3640,7 @@ const FORMAT_EVAL_CASES: readonly EvalCase[] = [
     },
   },
   {
-    // D-197：一份报销单越攒越多。
+    // D-197: Accumulate multiple items into a single expense claim.
     id: 'PFA1',
     input: '出差时每拍一张收据，就接到上次那份报销单 PDF 后面，最后只交一份',
     locale: 'zh',
@@ -3640,7 +3649,7 @@ const FORMAT_EVAL_CASES: readonly EvalCase[] = [
     expect: { kind: 'ops', check: hasWorkflow(['file.addExisting', 'pdf.merge']) },
   },
   {
-    // D-199：Wi-Fi 二维码。自己搭（in.wifi → qr.generate）或添加二维码工具（带「Wi-Fi 二维码」）都算。
+    // D-199: Wi-Fi QR code. Either building it yourself (`in.wifi` -> `qr.generate`) or adding the QR code tool (with `"Wi-Fi QR code"`) counts.
     id: 'PWF1',
     input: '想做一个二维码，让来家里的客人扫一下就能连上 Wi-Fi',
     locale: 'zh',
@@ -3661,10 +3670,10 @@ const FORMAT_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-// ---- 记一笔、附件和公式字段（D-187、D-188）：快捷操作写记录；直接替用户记一笔仍按 userData 拒绝 ----
-// RE* 是 mock 句式（MOCK_AI_PHRASES RE），PRE* 只要求真实模型。
+// Log an expense, attachments, and formula fields (D-187, D-188): quick actions write records; directly logging an expense for the user is still rejected under `userData`.
+// `RE*` is the mock phrase syntax (`MOCK_AI_PHRASES RE`), while `PRE*` only requires the real model.
 
-/** 有一个快捷操作记到 expenses，而且这张表有附件字段（收文件时）。 */
+/** There is a quick action that logs to `expenses`, and this table has an attachment field (when receiving files). */
 const logsTo =
   (needsFile: boolean) =>
   (c: WorkspaceConfig): string | null => {
@@ -3679,7 +3688,8 @@ const logsTo =
   };
 
 /**
- * D-263：给表加附件字段（用户在表单里自己拍照、选文件），不另外搭「记一笔」快捷操作。
+ * D-263: Add an attachment field to the table (for users to take photos or select files directly
+ * in the form), without setting up a separate "Log an expense" quick action.
  */
 const attachesTo =
   (collectionId: string) =>
@@ -3692,7 +3702,7 @@ const attachesTo =
     return null;
   };
 
-/** D-397：扫描按钮只拿文件、交给表单；识别是表单自己的事，步骤里没有 ocr。 */
+/** D-397: The scan button only retrieves files and passes them to the form; recognition is handled by the form itself, with no OCR step. */
 const scansInto =
   (each: boolean) =>
   (c: WorkspaceConfig): string | null => {
@@ -3797,7 +3807,7 @@ const RECORD_EVAL_CASES: readonly EvalCase[] = [
     input: '新建一个快捷操作：拍照，记到不存在的表',
     locale: 'zh',
     setup: 'budget',
-    // 点名的表不存在、用途清楚就建（D-407，创始人 2026-11-03 定）。内置规则不猜，照旧拒绝，只有真实模型跑。
+    // If the named table does not exist and its purpose is clear, create it (D-407, decided by the founder on 2026-11-03). Built-in rules do not guess and reject as before; only the real model runs it.
     mock: false,
     expect: {
       kind: 'ops',
@@ -3813,7 +3823,7 @@ const RECORD_EVAL_CASES: readonly EvalCase[] = [
     locale: 'zh',
     setup: 'budget',
     mock: false,
-    // D-263 起表单里就能拍照，只给账目加附件字段也算对；搭了「记一笔」快捷操作也对。
+    // Starting from D-263, users can take photos directly in the form; either adding an attachment field to the expense table alone or setting up a "Log an expense" quick action is considered correct.
     expect: {
       kind: 'ops',
       check: (c) => (logsTo(true)(c) === null ? null : attachesTo('expenses')(c)),
@@ -3907,7 +3917,7 @@ const RECORD_EVAL_CASES: readonly EvalCase[] = [
 const BLUE = '#1C7ED6';
 const toBlue: Op[] = [{ op: 'setTheme', primaryColor: BLUE }];
 
-/** 草稿聊天框里接着说（D-207）：只有带上之前说过的话才知道「再…一点」「那就…」指什么。 */
+/** Continuing the conversation in the draft chat (D-207): only by including previously spoken statements can we understand what "a bit more..." or "then..." refers to. */
 const DRAFT_CHAT_EVAL_CASES: readonly EvalCase[] = [
   {
     id: 'DR1',
@@ -4526,7 +4536,7 @@ const QUICK_ACTION_ENTRY_CASES: EvalCase[] = [
             allComponents(p).some(
               (x) =>
                 ((x.look === 'entry' || x.look === 'button') && x.opens === 'quickActions') ||
-                // 把分类入口直接放在首页也算（D-230）。
+                // Placing the category entry point directly on the Home Screen also counts (D-230).
                 (x.look === 'library' && !x.source.kind),
             ),
         )
@@ -4549,7 +4559,7 @@ const QUICK_ACTION_ENTRY_CASES: EvalCase[] = [
             allComponents(p).some(
               (x) =>
                 ((x.look === 'entry' || x.look === 'button') && x.opens === 'quickActions') ||
-                // 把分类入口直接放在首页也算（D-230）。
+                // Placing the category entry point directly on the Home Screen also counts (D-230).
                 (x.look === 'library' && !x.source.kind),
             ),
         )
@@ -4558,13 +4568,13 @@ const QUICK_ACTION_ENTRY_CASES: EvalCase[] = [
     },
   },
 ];
-// ---- 外观选项（D-230）----
+// -- Look options (D-230) --
 const homeEntries = (c: WorkspaceConfig) =>
   allComponents(home(c)).filter(
-    // 入口（原 shortcut、toolCard、catalogLink）；文件位（原 fileSlot）不算。
+    // Entry points (formerly `shortcut`, `toolCard`, `catalogLink`); file slots (formerly `fileSlot`) do not count.
     (x): x is ComponentOf<'entry'> => x.look === 'entry' && entryKind(x) !== 'file',
   );
-/** 首页所有入口卡片都是这个样子（至少有一个）。 */
+/** All entry cards on the Home Screen look like this (at least one). */
 const entriesLook = (look: 'row' | 'tile') => (c: WorkspaceConfig) => {
   const entries = homeEntries(c);
   return entries.length > 0 && entries.every((x) => x.show?.shape === look)
@@ -4576,7 +4586,7 @@ const quickActionListOn = (kind: string) => (c: WorkspaceConfig) =>
     ? null
     : `missing a ${kind} quickActionList on home`;
 
-/** 工时、睡眠这类表（D-279、D-280）：两个时间或日期时间字段，一个用 hours() / minutes() 算时长的公式。 */
+/** Tables for work hours or sleep (D-279, D-280): two time or datetime fields, and a formula calculating duration using `hours()` / `minutes()`. */
 function workHoursProblem(c: WorkspaceConfig, needsBreak = true): string | null {
   const table = c.data.tables.find(
     (x) => x.fields.filter((f) => f.type === 'time' || f.type === 'datetime').length >= 2,
@@ -4686,7 +4696,7 @@ const LOOK_CASES: EvalCase[] = [
     mock: false,
     expect: { kind: 'ops', check: quickActionListOn('video') },
   },
-  // 卡片的边框和阴影用参数写（D-624）：没有现成样式时写 card；回到某个样式时 card 要去掉。
+  // Card borders and shadows are written using parameters (D-624): write `card` when no preset style exists; when reverting to a default style, `card` must be removed.
   {
     id: 'LK6',
     input: '卡片加一圈主色的粗边框，不要阴影',
@@ -4735,7 +4745,7 @@ const LOOK_CASES: EvalCase[] = [
           : `expected outline without card, got ${c.theme.cardStyle} ${JSON.stringify(c.theme.card)}`,
     },
   },
-  // 画出来的图标（D-625）：列表里没有的图标画成路径放进 icons，用 my:<id>；去掉时不能留下悬空的引用。
+  // Drawn icons (D-625): icons missing from the list are drawn as paths and placed into `icons`, referenced as `my:<id>`; when removed, no dangling references can be left behind.
   {
     id: 'IC1',
     input: '给宠物表画一个猫爪图标',
@@ -4778,7 +4788,7 @@ const LOOK_CASES: EvalCase[] = [
     expect: {
       kind: 'ops',
       check: (c) => {
-        // 「首页的图标」可以是页面自己的图标，也可以是首页上一个块的图标（标题块等）：两种都算用上了。
+        // The "Home Screen icon" can be the page's own icon or an icon from a block on the Home Screen (such as a title block): both count as being used.
         const home = c.containers.pages.find((p) => p.id === 'home');
         const used = [
           home?.icon,
@@ -4822,8 +4832,8 @@ const LOOK_CASES: EvalCase[] = [
     },
   },
 ];
-// 新手引导第 1 步（D-231）：空白首页上加两个文件入口。中英文走内置规则，法语交给模型。
-/** 引导第 1 步（D-449）：首页加上「扫描」（运行内设的扫描成 PDF）和「打开文件」（先问相册还是文件）。 */
+// Newbie onboarding step 1 (D-231): add two file entry points to the blank Home Screen. English and Chinese go through built-in rules, while French is handled by the model.
+/** Onboarding step 1 (D-449): add "Scan" (runs the built-in scan-to-PDF flow) and "Open file" (prompts whether to pick from photo library or files) to the Home Screen. */
 const twoFilePicks = (c: WorkspaceConfig) => {
   const blocks = allComponents(home(c)).filter(isKnownComponent);
   const open = blocks.some(
@@ -4874,7 +4884,7 @@ const FRENCH_CASES: readonly EvalCase[] = [
           : 'missing photo compression/share workflow',
     },
   },
-  // 法语引导的第 1 步句子：内置规则不认法语，交给真模型（guide/store.ts）。
+  // French onboarding step 1 sentence: built-in rules do not recognize French, so it is delegated to the real model (`guide/store.ts`).
   {
     id: 'FR4',
     locale: 'fr',
@@ -5056,7 +5066,7 @@ const EXPERIENCE_CASES: readonly EvalCase[] = [
     },
   },
 ];
-// ---- 条件、分组和文字加工（D-242 起）：只给真实模型跑 ----
+// -- Conditions, grouping, and text processing (starting D-242): run only for the real model --
 const MODULE_EVAL_CASES: readonly EvalCase[] = [
   {
     id: 'FX1',
@@ -5422,7 +5432,7 @@ const MODULE_EVAL_CASES: readonly EvalCase[] = [
     },
   },
   {
-    // 创始人 2026-10-31 的原话（D-391）：选的是「每加一条，两分钟后提醒」。
+    // Founder's original statement from October 31, 2026 (D-391): selected "Remind two minutes after each addition".
     id: 'RM5',
     input: '给账单的记录增加两分钟的提醒功能',
     locale: 'zh',
@@ -5481,7 +5491,7 @@ const MODULE_EVAL_CASES: readonly EvalCase[] = [
     locale: 'zh',
     setup: 'visa',
     mock: false,
-    // 不能自动运行（P-043）：只能做一个打开它的提醒，并在说明里讲清楚。
+    // Cannot run automatically (P-043): can only create a reminder to open it, explaining this clearly in the description.
     expect: {
       kind: 'ops',
       check: (c) =>
@@ -5533,9 +5543,9 @@ const MODULE_EVAL_CASES: readonly EvalCase[] = [
   },
 ];
 
-// ---- 手机桌面（D-271）：「放到桌面 / 主屏幕 / home screen / écran d'accueil」是手机桌面，「首页」仍是首页（D-109）----
+// -- Phone Home Screen (D-271): "Place on desktop / main screen / home screen / écran d'accueil" refers to the phone's Home Screen, whereas "Home Screen" still refers to the app's home page (D-109) --
 
-/** 放在手机桌面上的快捷操作（nav.phoneHomeScreen，原 workflow.homeScreen）。 */
+/** Quick actions placed on the phone Home Screen (`nav.phoneHomeScreen`, formerly `workflow.homeScreen`). */
 const onPhoneHomeScreen = (c: WorkspaceConfig, id: string) =>
   c.nav.phoneHomeScreen?.includes(id) ?? false;
 const onHomeScreen = (c: WorkspaceConfig) =>
@@ -5548,7 +5558,7 @@ const visaOnHomeScreen = (c: WorkspaceConfig) =>
           .map((w) => w.id)
           .join(',') || 'none'
       }`;
-/** 只放到桌面，没有顺手在首页加卡片。 */
+/** Placed only on the phone Home Screen, without additionally adding a card on the app's home page. */
 const noNewHomeRunner = (c: WorkspaceConfig) =>
   allComponents(home(c)).some((x) => runsTool(x) === visa(c)?.id)
     ? 'the home screen request also put a card on the home page'
@@ -5562,7 +5572,7 @@ const visaOnHomePageOnly = (c: WorkspaceConfig) =>
           .join(',')}`
       : null;
 
-/** 打卡表上的统计（D-284）。 */
+/** Statistics on check-in tables (D-284). */
 const habitStat =
   (want: (source: NumberSource) => boolean, what: string) => (c: WorkspaceConfig) =>
     c.containers.pages.some((p) =>
@@ -5676,7 +5686,7 @@ const SEQUENCE_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 日程（D-292–D-296）：有一个日程字段；want 检查它和用到它的列表。 */
+/** Schedules (D-292–D-296): has a schedule field; `want` checks it and lists using it. */
 function scheduleProblem(
   c: WorkspaceConfig,
   want: {
@@ -5910,9 +5920,9 @@ const BOARD_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 按记录排的提醒（when.each，原 scheduleField）在哪张表的哪个字段上；别的提醒是 null。 */
+/** Record-based reminders (`when.each`, formerly `scheduleField`): specifies which table and field the reminder belongs to; other reminders are `null`. */
 const eachOf = (r: Reminder) => ('each' in r.when ? r.when.each : null);
-/** 按记录排的提醒（D-316）：表 collectionId 的日程字段 plan、time 对上；extra 再查别的。 */
+/** Record-based reminders (D-316): the table's collection ID matches the schedule fields `plan` and `time`; check extras for anything else. */
 const recordReminder =
   (collectionId: string, time: string, extra?: (r: Reminder) => string | null) =>
   (c: WorkspaceConfig): string | null => {
@@ -5994,7 +6004,7 @@ const RECORD_REMINDER_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 零基预算（D-336–D-338）：统计相减、按引用分组、新建并打开表单。 */
+/** Zero-based budgeting (D-336–D-338): subtracting statistics, grouping by reference, creating and opening forms. */
 const ENVELOPE_CASES: readonly EvalCase[] = [
   {
     id: 'ZB1',
@@ -6085,9 +6095,12 @@ const ENVELOPE_CASES: readonly EvalCase[] = [
 ];
 
 /**
- * 改已有的图表（创始人 2026-11-05 要的：Tink 按用户的话灵活改图表）。先有一张每月柱状图（earlier），
- * 再说要怎么改：种类、最近几个、按周、只看一类、只看今年、笔数、标题、再加一张。Tink 看不到记录内容（底线 2），
- * 所以这里没有「按数据里最大的那一类」这类要读值的说法。
+ * Editing existing charts (requested by the founder on 2026-11-05: Tink flexibly modifies charts
+ * based on user input). Start with an existing monthly bar chart (`earlier`), then specify
+ * modifications: type, last N periods, by week, filter by category, current year only, count of
+ * entries, title, or add another chart. Since Tink cannot see record contents (invariant 2),
+ * there are no instructions here like "group by the category with the highest data value" that
+ * require reading values.
  */
 function chartEditCases(): EvalCase[] {
   const first: EvalEarlier = {
@@ -6216,7 +6229,7 @@ function chartEditCases(): EvalCase[] {
   ];
 }
 
-/** 待办（D-340–D-344）：今天、收件箱、给一条记录用的页面、本机认日期、提前完成。 */
+/** Todos (D-340–D-344): today, inbox, page for a single record, local date recognition, completing ahead of schedule. */
 const TODO_CASES: readonly EvalCase[] = [
   {
     id: 'TD1',
@@ -6328,7 +6341,7 @@ const TODO_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 待办第二批（D-346–D-349）：分段、月历认日程、就地添加、按记录自己的钟点提醒。 */
+/** Todo batch 2 (D-346–D-349): sections, calendar recognizing schedules, inline addition, record-specific time reminders. */
 const TODO_VIEW_CASES: readonly EvalCase[] = [
   {
     id: 'TD6',
@@ -6414,7 +6427,7 @@ const TODO_VIEW_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 待办第三批（D-351、D-352）：项目自己的版块看板、浮动添加。 */
+/** Todo batch 3 (D-351, D-352): project-specific section boards, floating add button. */
 const TODO_BOARD_CASES: readonly EvalCase[] = [
   {
     id: 'TD11',
@@ -6470,7 +6483,7 @@ const TODO_BOARD_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 用 AI 真搭 Todoist 样板时搭错的地方（D-354）和建议的下一步（D-355）。 */
+/** Mistakes made when using AI to build the Todoist sample app (D-354) and suggested next steps (D-355). */
 const TODO_ACCEPT_CASES: readonly EvalCase[] = [
   {
     id: 'TD13',
@@ -6478,7 +6491,7 @@ const TODO_ACCEPT_CASES: readonly EvalCase[] = [
     locale: 'zh',
     setup: 'starter',
     mock: false,
-    // 「完成」按钮不能做过一次就消失（校验会拦，见 record-ops）；这里只要能点完成。
+    // The "Complete" button must not disappear after a single use (validation catches this, see `record-ops`); here, it's sufficient that it can be clicked.
     expect: {
       kind: 'ops',
       check: (c) => {
@@ -6613,7 +6626,7 @@ const HOME_SCREEN_CASES: readonly EvalCase[] = [
     expect: { kind: 'ops', check: all(visaOnHomeScreen, noNewHomeRunner) },
   },
   {
-    // 内置规则不认法语（P-037），只要求真实模型。
+    // Built-in rules do not recognize French (P-037), requiring the real model.
     id: 'HS1-fr',
     input: 'Mets la photo de visa sur l’écran d’accueil',
     locale: 'fr',
@@ -6646,7 +6659,7 @@ const HOME_SCREEN_CASES: readonly EvalCase[] = [
     expect: { kind: 'ops', check: visaOnHomePageOnly },
   },
   {
-    // 还没添加的预设：先添加，再放到桌面。
+    // Presets not yet added: add first, then place on the phone Home Screen.
     id: 'HS3',
     input: '把签证照片放到手机主屏幕',
     locale: 'zh',
@@ -6699,7 +6712,7 @@ const HOME_SCREEN_CASES: readonly EvalCase[] = [
     expect: { kind: 'ops', check: visaOnHomeScreen },
   },
   {
-    // 新做的快捷操作放到桌面：新建和放到桌面一起做（都是功能）。
+    // Placing a newly created quick action on the phone Home Screen: create and place on the desktop simultaneously (both are feature changes).
     id: 'PHS3-fr',
     input:
       'Crée une action rapide pour choisir des photos, les compresser à 500 Ko et les partager, et mets-la sur l’écran d’accueil du téléphone',
@@ -6718,7 +6731,7 @@ const HOME_SCREEN_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 一张表上某种计算字段（查找、汇总、上一条）满足 want。 */
+/** A specific computed field type on a table (lookup, rollup, previous) satisfies `want`. */
 const relatedField =
   (collectionId: string, want: (f: Field, c: Collection) => boolean, what: string) =>
   (config: WorkspaceConfig) => {
@@ -6726,7 +6739,7 @@ const relatedField =
     return c && c.fields.some((f) => want(f, c)) ? null : `expected on ${collectionId}: ${what}`;
   };
 
-/** 这个字段显示在这张表的某个记录列表里。 */
+/** This field is displayed in a record list of this table. */
 const listed = (collectionId: string, type: Field['type']) => (config: WorkspaceConfig) => {
   const ids = new Set(
     config.data.tables
@@ -6870,7 +6883,7 @@ const RELATED_CASES: readonly EvalCase[] = [
           f.type === 'rollup' &&
           f.table === 'checkins' &&
           f.aggregate === 'count' &&
-          // v33 的 period 在 v34 是 filter 里的一条 inPeriod。
+          // v33's `period` corresponds to an `inPeriod` filter item in v34.
           (f.filter ?? []).some((x) => x.op === 'inPeriod' && x.value === 'thisWeek'),
         'a count rollup of this week',
       ),
@@ -6880,7 +6893,7 @@ const RELATED_CASES: readonly EvalCase[] = [
 
 type AnyAction = { do?: string; [key: string]: unknown };
 
-/** 页面上所有按钮的一键记录工具（原 action）和记录列表每一条上的工具（原 rowActions，D-300）。 */
+/** One-tap record tools for all page buttons (formerly `action`) and tools on each item in a record list (formerly `rowActions`, D-300). */
 function recordActions(c: WorkspaceConfig): {
   buttons: AnyAction[];
   rows: (AnyAction & { list: string })[];
@@ -7014,7 +7027,7 @@ const RECORD_ACTION_CASES: readonly EvalCase[] = [
     },
   },
   {
-    // 文字是用户的内容（D-042）：不能预设一条备注，只能打开表单。
+    // Text is user content (D-042): cannot preset a note, can only open the form.
     id: 'RA7',
     input: '首页加一个按钮，点一下记一条账单，名称写「房租」',
     locale: 'zh',
@@ -7034,12 +7047,12 @@ const RECORD_ACTION_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 从页面右上角的入口打开 AI（D-406）：「这个页面」默认指这一页；说了别的页面就改别的。 */
+/** Open AI from the entry point in the top-right corner of the page (D-406): "this page" defaults to the current page; specifying another page changes it. */
 const blocksOn = (c: WorkspaceConfig, pageId: string) =>
   allComponents(c.containers.pages.find((p) => p.id === pageId)!);
 const titleOf = (c: WorkspaceConfig, pageId: string) =>
   c.containers.pages.find((p) => p.id === pageId)?.title;
-/** 新块加在 budget 页上，不在首页（这个 setup 的首页上没有这种块）。 */
+/** New block added to the `budget` page, not the home page (the home page of this setup has no such blocks). */
 const addedToBudget =
   (look: string) =>
   (c: WorkspaceConfig): string | null => {
@@ -7099,7 +7112,7 @@ const PAGE_ENTRY_CASES: EvalCase[] = [
     },
   },
   {
-    // 用户说了别的页面：按用户说的改（创始人 2026-11-03 在对话里选的）。
+    // User specified a different page: modify according to user instructions (selected by the founder in conversation on 2026-11-03).
     id: 'PE5',
     input: '把首页改名叫「主页」',
     locale: 'zh',
@@ -7220,7 +7233,7 @@ const PAGE_ENTRY_CASES: EvalCase[] = [
     expect: { kind: 'ops', check: toolbarOnTop },
   },
   {
-    // 不是从桌面打开的也能改（D-358）。
+    // Can also be modified when not opened from the home screen (D-358).
     id: 'PD4',
     input: 'Put the toolbar on top when I edit a PDF on the file desk',
     locale: 'en',
@@ -7229,7 +7242,7 @@ const PAGE_ENTRY_CASES: EvalCase[] = [
     expect: { kind: 'ops', check: toolbarOnTop },
   },
   {
-    // AI 永远不碰文件（底线 3）、不替用户办事（底线 6）。
+    // AI never touches files (invariant 3) or acts on behalf of the user (invariant 6).
     id: 'PD5',
     input: '总结一下这个文件',
     locale: 'zh',
@@ -7240,8 +7253,11 @@ const PAGE_ENTRY_CASES: EvalCase[] = [
   },
 ];
 
-// 全面测试（2026-11-03）发现的提示词缺陷（D-407）：一处做不到不整单拒绝，模糊的外观要做，
-// 撤销只有一步，点名的东西不存在就建，固定值要写进参数，私人内容不进配置，不重复建表。页面上的文字可以写（D-408）。
+// Prompt flaws discovered during comprehensive testing (2026-11-03) (D-407): do not reject an
+// entire request for a single unachievable part, implement vague look changes, limit undo to a
+// single step, create named items if they do not exist, write fixed values into parameters, exclude
+// private content from configuration, and avoid duplicate table creation. Text on pages may be
+// written (D-408).
 const quickActionSteps = (c: WorkspaceConfig) => quickActionsOf(c).flatMap((w) => w.steps);
 const saysWhatWasNotDone = (plan: OpsPlan) =>
   plan.notes?.length ? null : 'should say in notes what was not done';
@@ -7468,7 +7484,7 @@ const FIX_CASES: EvalCase[] = [
           : 'not translated to English',
     },
   },
-  // D-423：列表上的搜索和能换的排序、分组；导出成 vCard；只显示一条记录的块。
+  // D-423: List search, switchable sorting, grouping, vCard export, and single-record view blocks.
   {
     id: 'CARD1',
     input: '给记账列表加一个搜索框，还能按分类分组',
@@ -7525,7 +7541,7 @@ const FIX_CASES: EvalCase[] = [
       ),
     },
   },
-  // D-428：容器把值交给工具（规则 54）：记录页的按钮、列表上方的按钮。
+  // D-428: Containers pass values to tools (Rule 54): buttons on record pages, buttons above lists.
   {
     id: 'CURRENCY1',
     input: 'let me pick the currency for each expense',
@@ -7554,7 +7570,7 @@ const FIX_CASES: EvalCase[] = [
       check: (c) => {
         const tagged = c.data.tables.some((t) => t.fields.some((f) => f.type === 'tags'));
         if (!tagged) return 'no tags field';
-        // 标签名不能进配置（底线 14）：筛选只能在 browse.filter 上。
+        // Tag names cannot enter configuration (invariant 14): filtering can only use `browse.filter`.
         return JSON.stringify(c.containers).includes('"filter":["') ? null : 'no browse.filter';
       },
     },
@@ -7637,7 +7653,7 @@ const FIX_CASES: EvalCase[] = [
   },
 ];
 
-/** 内核补缺（2026-11-14）：先有一张合同表（名称、结束日期），用例在它上面改。 */
+/** Kernel patch (2026-11-14): start with a contracts table (name, end date), with test cases modifying it. */
 const contractsEarlier: EvalEarlier = {
   input: 'Make a table of my contracts with a name and an end date, and a page that lists them',
   ops: [
@@ -7674,7 +7690,7 @@ const filteredOn = (c: WorkspaceConfig, table: string, ok: (f: Condition) => boo
     (x.source.filter ?? []).some(ok),
   );
 
-/** 订单表，状态有 5 个选项（「是其中一个」用 isNot 写不出来）。 */
+/** Orders table, with status having 5 options (cannot express "is one of" using `isNot`). */
 const ordersEarlier: EvalEarlier = {
   input: 'Make a table of my orders with a status, and a page that lists them',
   ops: [
@@ -7831,7 +7847,7 @@ const TABLE_LOOK_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 植物表，有照片（附件）字段。 */
+/** Plants table, with a photo (attachment) field. */
 const plantsEarlier: EvalEarlier = {
   input: 'Make a table of my plants with a name and photos, and a page that lists them',
   ops: [
@@ -7933,7 +7949,7 @@ const MARK_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 合同表：开始日期和期限（月）。 */
+/** Contracts table: start date and duration (in months). */
 const termsEarlier: EvalEarlier = {
   input: 'Make a table of my contracts with a name, a start date and a term in months',
   ops: [
@@ -7993,7 +8009,7 @@ const DATE_OFFSET_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 合同表上已经有算出来的到期日（D-542）。 */
+/** Contracts table already has a computed expiration date (D-542). */
 const endsEarlier: EvalEarlier = {
   input: 'Add an end date that is the start date plus the term',
   ops: [
@@ -8012,7 +8028,7 @@ const endsEarlier: EvalEarlier = {
   ],
 };
 
-// 算出来的日期能放进月历、当到期前提醒的日期（D-550）。
+// Computed dates can be placed into calendars and used as pre-expiration reminder dates (D-550).
 const DATE_OFFSET_USE_CASES: readonly EvalCase[] = [
   {
     id: 'KG13',
@@ -8055,7 +8071,7 @@ const DATE_OFFSET_USE_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 植物有自己的页面（page.of），上面列出它的浇水记录（D-342）。 */
+/** Plants have their own page (`page.of`), listing their watering records (D-342). */
 const plantPageEarlier: EvalEarlier = {
   input: 'Log waterings for each plant, and open a plant to see its waterings',
   ops: [
@@ -8093,7 +8109,7 @@ const plantPageEarlier: EvalEarlier = {
     { op: 'updateContainer', page: 'plants-page', block: 'all', changes: { opens: 'plant' } },
   ],
 };
-/** 给一条植物用的页面上显示打开的那一条（D-558）。 */
+/** Display the opened record on a page dedicated to a single plant (D-558). */
 const showsOpenedPlant = (c: WorkspaceConfig) =>
   c.containers.pages
     .filter((p) => p.of === 'plants')
@@ -8108,7 +8124,7 @@ const showsOpenedPlant = (c: WorkspaceConfig) =>
     ? null
     : 'expected a single block on the plant page with source.record "$record" showing photos';
 
-// 记录页上显示这一条自己的字段（D-558）。
+// Display the record's own fields on the record page (D-558).
 const OPENED_RECORD_CASES: readonly EvalCase[] = [
   {
     id: 'KG15',
@@ -8130,7 +8146,7 @@ const OPENED_RECORD_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 账单表：名字、金额、到期日，一页列出来。 */
+/** Bills table: name, amount, due date, listed on a page. */
 const billsEarlier: EvalEarlier = {
   input:
     'Make a table of my bills with a name, an amount and a due date, and a page that lists them',
@@ -8165,7 +8181,7 @@ const billsEarlier: EvalEarlier = {
   ],
 };
 
-// 日历上前后的时间段（D-559）。
+// Adjacent time periods on the calendar (D-559).
 const NEIGHBOUR_PERIOD_CASES: readonly EvalCase[] = [
   {
     id: 'KG17',
@@ -8206,7 +8222,7 @@ const NEIGHBOUR_PERIOD_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 任务表：优先级（高、中、低）和到期日，一页列出来。 */
+/** Tasks table: priority (high, medium, low) and due date, listed on a page. */
 const prioritiesEarlier: EvalEarlier = {
   input:
     'Make a table of my tasks with a priority (high, medium, low) and a due date, and a page that lists them',
@@ -8249,7 +8265,7 @@ const prioritiesEarlier: EvalEarlier = {
     },
   ],
 };
-/** 任务列表先按优先级（高在前）再按到期日（早的在前）排（D-560）。 */
+/** Task list sorted first by priority (high first) and then by due date (earlier first) (D-560). */
 const byPriorityThenDue = (c: WorkspaceConfig) =>
   recordBlocksOf(c, 'tasks').some((x) => {
     const keys = sortList(x.source.sort);
@@ -8264,7 +8280,7 @@ const byPriorityThenDue = (c: WorkspaceConfig) =>
     ? null
     : 'expected a tasks list sorted by [priority asc, due asc]';
 
-// 按几个字段依次排（D-560）。
+// Sorting sequentially by multiple fields (D-560).
 const SORT_MANY_CASES: readonly EvalCase[] = [
   {
     id: 'KG19',
@@ -8286,7 +8302,7 @@ const SORT_MANY_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 记账页上已经有一个时间范围（本月、本星期）和跟着它的柱状图（D-440）。 */
+/** The bookkeeping page already has a time range (this month, this week) followed by its corresponding bar chart (D-440). */
 const budgetRangeEarlier: EvalEarlier = {
   input: '记账页面加一个时间范围，可以选本月和本星期，柱状图跟着变',
   ops: [
@@ -8313,7 +8329,7 @@ const budgetRangeEarlier: EvalEarlier = {
     } as Op,
   ],
 };
-/** 记账页上读 expenses 的记录块（月历除外）都跟着时间范围（D-561）。 */
+/** Record blocks reading `expenses` on the bookkeeping page (except calendars) all follow the time range (D-561). */
 const expenseListsFollow = (c: WorkspaceConfig) => {
   const lists = recordBlocksOf(c, 'expenses').filter((x) => x.look !== 'calendar');
   return lists.length > 0 && lists.every((x) => x.source.period === 'page')
@@ -8321,7 +8337,7 @@ const expenseListsFollow = (c: WorkspaceConfig) => {
     : `expected the expenses lists to have source.period "page", got ${JSON.stringify(lists.map((x) => x.source.period))}`;
 };
 
-// 页面上的时间范围也管记录列表（D-561）。
+// Time ranges on pages also apply to record lists (D-561).
 const LIST_PERIOD_CASES: readonly EvalCase[] = [
   {
     id: 'KG21',
@@ -8355,7 +8371,7 @@ const LIST_PERIOD_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 预约表：做什么、什么时候（日期时间），一页列出来。 */
+/** Appointments table: task description, time (datetime), listed on a page. */
 const appointmentsEarlier: EvalEarlier = {
   input:
     'Make a table of my appointments with what it is and when (date and time), and a page that lists them',
@@ -8400,7 +8416,7 @@ const minutesBefore = (minutes: number) => (c: WorkspaceConfig) =>
     ? null
     : `expected a reminder ${minutes} minutes before appointments.when, got ${JSON.stringify(remindersOf(c).map((r) => r.when))}`;
 
-// 日期时间前几分钟提醒（D-562）。
+// Remind a specified number of minutes before a datetime (D-562).
 const MINUTES_BEFORE_CASES: readonly EvalCase[] = [
   {
     id: 'KG23',
@@ -8422,7 +8438,7 @@ const MINUTES_BEFORE_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 每天 / 每周的提醒，那天（那周）expenses 里已经有记录就不响（D-563）。 */
+/** Daily or weekly reminders do not sound if expenses already have an entry for that day (or week) (D-563). */
 const quietWhenLogged = (every: 'day' | 'week', within: 'day' | 'week') => (c: WorkspaceConfig) =>
   remindersOf(c).some(
     (r) =>
@@ -8435,7 +8451,7 @@ const quietWhenLogged = (every: 'day' | 'week', within: 'day' | 'week') => (c: W
     ? null
     : `expected an every ${every} reminder with unless {table: expenses, within: ${within}}, got ${JSON.stringify(remindersOf(c))}`;
 
-/** 每月几号的提醒（D-577），可以带 unless。 */
+/** Monthly reminders on a specific date (D-577), optionally with an `unless` clause. */
 const monthlyReminder =
   (day: number, at: string, quiet: boolean) =>
   (c: WorkspaceConfig): string | null => {
@@ -8452,7 +8468,7 @@ const monthlyReminder =
       : `expected an every month reminder on day ${day} at ${at}${quiet ? ' with unless {table: expenses, within: month}' : ''}, got ${JSON.stringify(remindersOf(c))}`;
   };
 
-// 提示卡（D-580）：文字里数条数和合计，卡片里一个打开页面的按钮。
+// Callout card (D-580): shows count and total sum in text, with a button to open a page.
 const CALLOUT_CASES: readonly EvalCase[] = [
   {
     id: 'KG42',
@@ -8477,7 +8493,7 @@ const CALLOUT_CASES: readonly EvalCase[] = [
   },
 ];
 
-// 每月几号的提醒（D-577）。
+// Monthly reminders on a specific date (D-577).
 const MONTHLY_REMINDER_CASES: readonly EvalCase[] = [
   {
     id: 'KG40',
@@ -8497,7 +8513,7 @@ const MONTHLY_REMINDER_CASES: readonly EvalCase[] = [
   },
 ];
 
-// 每天、每周的提醒，已经做了就不响（D-563）。
+// Daily and weekly reminders that do not sound if the task has already been done (D-563).
 const UNLESS_REPEATING_CASES: readonly EvalCase[] = [
   {
     id: 'KG25',
@@ -8517,7 +8533,7 @@ const UNLESS_REPEATING_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 商品表（价格）和订单表（引用商品、价格），一页列出商品（D-565）。 */
+/** Product table (prices) and order table (referencing products and prices), listing products on a single page (D-565). */
 const productsEarlier: EvalEarlier = {
   input:
     'Make a table of products with a name and a price, a table of orders linked to a product with a price, and a page that lists the products',
@@ -8564,7 +8580,7 @@ const productsEarlier: EvalEarlier = {
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 
-// 一键记录工具写从今天、从这一条起算的日期，抄这一条的值（D-565）。
+// Quick action writing dates starting from today or this entry, copying values from this entry (D-565).
 const RELATIVE_VALUE_CASES: readonly EvalCase[] = [
   {
     id: 'KG27',
@@ -8612,7 +8628,7 @@ const RELATIVE_VALUE_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 发货：订单有状态和发货日期（D-566）。 */
+/** Shipping: orders have status and shipping date (D-566). */
 const shippingEarlier: EvalEarlier = {
   input:
     'Make a table of orders with an item, a status and a ship date, and a page that lists them',
@@ -8655,7 +8671,7 @@ const shippingEarlier: EvalEarlier = {
   ],
 };
 
-/** 习惯（上次完成）和打卡（引用习惯）（D-566）。 */
+/** Habit (last completed) and check-in (referencing habit) (D-566). */
 const habitLogEarlier: EvalEarlier = {
   input: '建一个习惯表（名字、上次完成）和打卡表（习惯、日期），再做一页列出习惯',
   ops: [
@@ -8699,7 +8715,7 @@ const habitLogEarlier: EvalEarlier = {
   ],
 };
 
-// 打卡格（D-610）：习惯 × 最近几天，点空格打卡、点打过的取消。
+// Check-in grid (D-610): habits × recent days, tap empty cell to check in, tap checked cell to cancel.
 const weekGrid =
   (removes: boolean) =>
   (c: WorkspaceConfig): string | null => {
@@ -8740,7 +8756,7 @@ const GRID_CASES: readonly EvalCase[] = [
   },
 ];
 
-// 勾选新建（D-616）：菜谱页上用料列表下面的「添加」勾几样食材，每样建一条。
+// Checkbox creation (D-616): clicking "Add" under the ingredients list on the recipe page checks off multiple ingredients, creating an entry for each.
 const recipeEarlier: EvalEarlier = {
   input:
     'Make recipes, ingredients and recipe items (a recipe, an ingredient and an amount), and a page for one recipe that lists its items',
@@ -8854,7 +8870,7 @@ const PICK_CASES: readonly EvalCase[] = [
   },
 ];
 
-// 清单的勾带 also（D-617）、数字块的 latest（D-618）、公式里空着的数算 0（D-619）。
+// List check-off with `also` (D-617), number block `latest` (D-618), and blank numbers in formulas counting as 0 (D-619).
 const taskListEarlier: EvalEarlier = {
   input:
     'Make a to-do list: tasks with a title, a done check box and a completed date, ticked off on a checklist',
@@ -9210,13 +9226,13 @@ const CHECK_LATEST_EMPTY_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 一个工具点一下要做的几处（工具本身加 also）。 */
+/** A tool triggering multiple actions at once (adding `also` to the tool itself). */
 const writesOf = (a: AnyAction): AnyAction[] => [
   a,
   ...((Array.isArray(a.also) ? a.also : []) as AnyAction[]),
 ];
 
-// 点一下改这一条的几处（D-566）。
+// Modify multiple fields of an entry with a single tap (D-566).
 const TAP_ALSO_CASES: readonly EvalCase[] = [
   {
     id: 'KG29',
@@ -9269,7 +9285,7 @@ const TAP_ALSO_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 客户（老客户、常用金额）和订单（引用客户、金额、日期），一页列出客户（D-567）。 */
+/** Customers (VIP status, common amounts) and orders (referencing customer, amount, date), listing customers on a single page (D-567). */
 const customersEarlier: EvalEarlier = {
   input:
     'Make a table of customers with a name, a regular checkbox and a usual amount, a table of orders linked to a customer with an amount and a date, and a page that lists the customers',
@@ -9316,7 +9332,7 @@ const customersEarlier: EvalEarlier = {
   ],
 };
 
-/** 一个按钮批量新建订单：每个老客户一条，引用这个客户（D-567）。 */
+/** Batch create orders with a single button: one entry per regular customer, referencing that customer (D-567). */
 const createsMonthlyOrders = (copiesAmount: boolean) =>
   actionCheck(
     'buttons',
@@ -9330,7 +9346,7 @@ const createsMonthlyOrders = (copiesAmount: boolean) =>
     `a createAll button from regular customers into orders with customer "$row"${copiesAmount ? ' and amount {copy: "usual"}' : ''}`,
   );
 
-// 批量新建（D-567）。
+// Batch creation (D-567).
 const CREATE_ALL_CASES: readonly EvalCase[] = [
   {
     id: 'KG31',
@@ -9358,7 +9374,7 @@ const statusOptions = (c: WorkspaceConfig) => {
   return f?.type === 'choice' ? f.options : [];
 };
 
-// 选项的颜色（D-568）。
+// Option colors (D-568).
 const OPTION_COLOR_CASES: readonly EvalCase[] = [
   {
     id: 'KG33',
@@ -9381,7 +9397,7 @@ const OPTION_COLOR_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 订阅表：价格和计费周期（选项还没有数）。 */
+/** Subscription table: price and billing cycle (options do not have numeric values yet). */
 const subsEarlier: EvalEarlier = {
   input: 'Make a table of my subscriptions with a name, a price and a billing cycle',
   ops: [
@@ -9407,7 +9423,7 @@ const subsEarlier: EvalEarlier = {
     },
   ],
 };
-/** 账单表：金额和「已付」勾选框。 */
+/** Bill table: amount and "paid" checkbox. */
 const paidBillsEarlier: EvalEarlier = {
   input: '做一个账单表：名称、金额、已付',
   ops: [
@@ -9425,7 +9441,7 @@ const paidBillsEarlier: EvalEarlier = {
     },
   ],
 };
-/** 按一条假想的记录算表里的公式字段，看有没有一个给出 want。 */
+/** Evaluate formula fields in the table against a hypothetical record to see if any formula yields the expected value (`want`). */
 const formulaGives = (
   c: WorkspaceConfig,
   table: string,
@@ -9440,7 +9456,7 @@ const formulaGives = (
   );
 };
 
-// 公式读勾选框和单选（D-569）。
+// Formulas reading checkboxes and single-select fields (D-569).
 const FORMULA_CHOICE_CASES: readonly EvalCase[] = [
   {
     id: 'KG34',
@@ -9477,7 +9493,7 @@ const FORMULA_CHOICE_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 订单表：有「要发票」和发票的几项。 */
+/** Order table: includes "needs invoice" and invoice detail fields. */
 const invoiceOrdersEarlier: EvalEarlier = {
   input: 'Make a table of my orders: item, quantity, needs invoice, tax number, company name',
   ops: [
@@ -9499,7 +9515,7 @@ const invoiceOrdersEarlier: EvalEarlier = {
 };
 const ordersTable = (c: WorkspaceConfig) => c.data.tables.find((t) => t.id === 'orders');
 
-// 记录表单的分段、条件、提示和范围（D-570）。
+// Entry form sections, conditions, hints, and scopes (D-570).
 const ENTRY_FORM_CASES: readonly EvalCase[] = [
   {
     id: 'KG36',
@@ -9548,7 +9564,7 @@ const ENTRY_FORM_CASES: readonly EvalCase[] = [
   },
 ];
 
-/** 销售页：订单表（状态：待发货、已发货、完成），页上有列表、合计和按月的柱状图。 */
+/** Sales page: order table (status: pending, shipped, completed) with a list, totals, and monthly bar chart on the page. */
 const salesEarlier: EvalEarlier = {
   input:
     'Make an orders table (item, amount, date, status: To ship / Shipped / Done) and a Sales page with the list, the total and a monthly chart',
@@ -9609,7 +9625,7 @@ const salesEarlier: EvalEarlier = {
     } as Op,
   ],
 };
-/** 销售页上已经有一个时间范围（本月、今年），三个块都跟着它（D-440、D-561）。 */
+/** Sales page already has a time range (this month, this year), with all three blocks following it (D-440, D-561). */
 const salesRangeEarlier: EvalEarlier = {
   input: '销售页加一个时间范围，本月和今年，列表、合计和图表都跟着变',
   ops: [
@@ -9629,7 +9645,7 @@ const salesRangeEarlier: EvalEarlier = {
     ),
   ],
 };
-/** 销售页上有一排按状态切换的选项，列表、合计和图表都跟着它（D-573）。 */
+/** Sales page has a row of status filter options that the list, totals, and chart all follow (D-573). */
 const salesFollowChoices = (c: WorkspaceConfig, period: boolean) => {
   const page = c.containers.pages.find((p) => p.id === 'sales');
   if (!page) return 'expected the sales page';
@@ -9652,7 +9668,7 @@ const salesFollowChoices = (c: WorkspaceConfig, period: boolean) => {
   return null;
 };
 
-// 页面上的一排选项，页上的块跟着它（D-573）。
+// A row of filter options on a page, with the page blocks following them (D-573).
 const PAGE_CHOICE_CASES: readonly EvalCase[] = [
   {
     id: 'KG38',
@@ -9674,7 +9690,7 @@ const PAGE_CHOICE_CASES: readonly EvalCase[] = [
   },
 ];
 
-// 单选可以选多个（D-607，规则 68）：固定的几项、一条可以选几个用 multiple；用户自己的词用标签。
+// Single-select fields supporting multiple selections (D-607, rule 68): use `multiple` for fixed items where multiple can be selected; use tags for user-defined terms.
 const multipleChoiceFields = (c: WorkspaceConfig) =>
   c.data.tables.flatMap((t) =>
     t.fields.flatMap((f) => (f.type === 'choice' && f.multiple ? [{ table: t, field: f }] : [])),
@@ -9711,7 +9727,7 @@ const MULTI_CHOICE_CASES: readonly EvalCase[] = [
                   [x.value].flat().includes(monday.id),
               ),
           );
-        // 页面那一半可以留到下一轮（规则 26）：读这张表的块有的话，要有一个只列周一的。
+        // The page half can be deferred to the next round (rule 26): if there are blocks reading this table, one of them must list Mondays only.
         const reads = c.containers.pages
           .flatMap((p) => allComponents(p))
           .some((b) => 'source' in b && (b.source as { table?: string }).table === days.table.id);
@@ -9993,9 +10009,11 @@ export const EVAL_CASES: readonly EvalCase[] = [
 export type EvalOutcome = { pass: true } | { pass: false; reason: string };
 
 /**
- * 按 App 的做法跑一个用例（D-191）：计划把功能和外观混在一起时功能先应用，外观接着进草稿（D-419），
- * check 看用户确认草稿后的样子；要求接着改的用例照着 next 再问一次，在第一步的结果上套用第二个计划。
- * mock 的测试和真实模型的评测脚本共用。
+ * Run a test case following app logic (D-191): when planning mixes function and appearance
+ * changes, apply function changes first, then send appearance changes to the draft (D-419), and
+ * check the state after the user confirms the draft; for test cases requiring follow-up edits,
+ * prompt again using `next`, applying the second plan on top of the first step's result. Shared
+ * between mock tests and real model eval scripts.
  */
 export async function runEvalCase(
   c: EvalCase,
@@ -10029,7 +10047,7 @@ export async function runEvalCase(
   const plans = [plan];
   if (plan.kind !== 'ops') return { outcome: judgeEval(c, plan, null), plans };
   const first = functionFirst(config, plan.ops, ctx);
-  // AI 的计划和 App 里一样检查（底线 3：不能多出指向用户文件的引用）。
+  // AI plan checked identically to app-side logic (invariant 3: no extra references pointing to user files).
   const aiCtx = { ...ctx, fromAI: true };
   let prepared: PreparedChange = prepareOps(config, plan.ops, aiCtx);
   const mixed = first.kind === 'function' && first.deferred.length > 0;
@@ -10037,7 +10055,7 @@ export async function runEvalCase(
     const fn = prepareOps(config, first.ops, aiCtx);
     prepared = fn.ok ? prepareOps(fn.after, first.deferred, aiCtx) : fn;
   }
-  // 混合计划外观已经做了：只有模型还留了 next 才接着问。
+  // Appearance changes of mixed plan already applied: prompt for follow-up only if the model left a `next` step.
   if (c.next && prepared.ok && !(mixed && !plan.next)) {
     if (first.kind !== 'function')
       return { outcome: fail('the first turn should do the function part'), plans };
@@ -10052,13 +10070,15 @@ export async function runEvalCase(
       return { outcome: fail(`next “${plan.next}” should only change the look`), plans };
     prepared = prepareOps(prepared.after, second.ops, aiCtx);
   }
-  // 计划本身的检查（例如建议的下一步，D-355）看最后一轮。
+  // Check the plan itself (e.g. suggested next steps, D-355) on the final round.
   return { outcome: judgeEval(c, plans.at(-1)!, prepared), plans };
 }
 
 /**
- * 搭建计划应该怎样（规则 53）：过 PlanSchema（2–8 步，步骤 ID 不重复，每步都有要做的话），
- * 有做数据或工具的步骤，外观排在它们后面。allowBuild 的用例都是要新建东西的，只有外观的计划不算。
+ * Build plan requirements (rule 53): pass `PlanSchema` (2–8 steps, unique step IDs, every step
+ * has an action description), contain data or tool steps, with appearance steps placed after
+ * them. All `allowBuild` test cases require creating new items; appearance-only plans do not
+ * count.
  */
 function judgeBuild(plan: Extract<Plan, { kind: 'build' }>): string | null {
   const parsed = PlanSchema.safeParse(plan);
@@ -10071,7 +10091,7 @@ function judgeBuild(plan: Extract<Plan, { kind: 'build' }>): string | null {
   return null;
 }
 
-/** 判定一个计划是否符合用例预期。afterOrIssues 来自 prepareOps。 */
+/** Determine whether a plan matches test case expectations. `afterOrIssues` comes from `prepareOps`. */
 export function judgeEval(
   c: EvalCase,
   plan: Plan,
@@ -10106,8 +10126,9 @@ export function judgeEval(
 }
 
 /**
- * 页面上的时间范围（创始人 2026-11-05 要的）：Tink 加一个时间范围块、改它的选项、加自定义、让图表跟着它、删掉。
- * 选项越少越好：用户说「本月和本星期」就只有这两个。
+ * Time range on pages (requested by founder 2026-11-05): Tink adds a time range block, changes
+ * its options, adds custom ranges, makes charts follow it, and deletes it. Fewer options are
+ * better: if the user says "this month and this week", keep only those two.
  */
 function periodCases(): EvalCase[] {
   const chartBlock = {

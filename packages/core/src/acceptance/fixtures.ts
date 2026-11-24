@@ -3,10 +3,11 @@ import { createDefaultWorkspace } from '../defaults';
 import type { Locale, WorkspaceConfig } from '../schema';
 import { registry } from '../test-helpers';
 
-// 验收测试用的配置：手写，走 prepareOps（和 AI 的修改过同一个校验器），证明这些配置 App 真的接受。
-// 不从 index.ts 导出。
+// Config for acceptance tests: hand-written, runs through prepareOps (shares the same validator as
+// AI modifications), proving these configs are genuinely accepted by the app. Not exported from
+// index.ts.
 
-/** 手写的数据，类型由校验器把关。 */
+/** Hand-written data, types guarded by the validator. */
 export type Json = any;
 
 export const text = (id: string, extra: object = {}) => ({ id, name: id, type: 'text', ...extra });
@@ -108,7 +109,7 @@ export const scanInto = (id: string, table: string, source = 'scanner') =>
   ]);
 export const runAction = (id: string, tool: string) => ({ id, look: 'action', tools: [{ tool }] });
 
-/** 操作走校验器，返回配置；过不了校验直接失败。 */
+/** Operations run through the validator, returning config; fails immediately if validation fails. */
 export function buildConfig(ops: readonly object[], locale: Locale = 'en'): WorkspaceConfig {
   const base = createDefaultWorkspace(locale);
   const prepared = prepareOps(base, ops as never, { registry, locale, now: new Date(0) });
@@ -116,7 +117,7 @@ export function buildConfig(ops: readonly object[], locale: Locale = 'en'): Work
   return prepared.after;
 }
 
-/** 配置的副本，改完再打分（反例不用过校验）。 */
+/** A copy of the config, scored after changes (counterexamples do not need to pass validation). */
 export function changed(config: WorkspaceConfig, change: (c: Json) => void): WorkspaceConfig {
   const copy = JSON.parse(JSON.stringify(config)) as WorkspaceConfig;
   change(copy);
@@ -126,7 +127,7 @@ export function changed(config: WorkspaceConfig, change: (c: Json) => void): Wor
 const walk = (blocks: Json[]): Json[] =>
   blocks.flatMap((b) => [b, ...walk((b.children as Json[] | undefined) ?? [])]);
 
-/** 按 ID 找块。 */
+/** Find block by ID. */
 export function blockIn(config: Json, id: string): Json {
   for (const page of config.containers.pages) {
     const hit = walk(page.blocks).find((b) => b.id === id);
@@ -135,7 +136,7 @@ export function blockIn(config: Json, id: string): Json {
   throw new Error(`no block ${id}`);
 }
 
-/** 按 ID 删块。 */
+/** Delete block by ID. */
 export function dropBlock(config: Json, id: string): void {
   blockIn(config, id);
   for (const page of config.containers.pages)

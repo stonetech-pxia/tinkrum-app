@@ -5,12 +5,14 @@ import { cleanTags, fieldDefinition } from './fields';
 import type { Collection, Field } from './schema';
 import { decodeUtf8 } from './tool-download';
 
-// 表格文件的行导进一张已有的表（D-574，创始人 2026-11-16 决定 ⑦）：系统层，只在本机。
-// 读文件（CSV 在这里，xlsx 在 tool-office）→ 按列名对到字段（只比规范化后的名字是否相同）→ 用户确认对应 →
-// 每格先宽容地读成字段能收的样子，再交给字段自己严格的 write（prepareRecordValues）→ 确认后一个事务写进去。
-// 列名、格子的内容都不发给 AI、不进配置（底线 1、2、14）。
+// Importing rows from a spreadsheet file into an existing table (D-574, founder's decision on
+// 2026-11-16 item 7): System layer, local-only. Read file (CSV here, xlsx in tool-office) -> map
+// columns to fields by normalized name only -> user confirms mapping -> leniently parse each cell
+// into what the field can accept, then run field's strict write (`prepareRecordValues`) -> write
+// into a transaction after confirmation. Neither column names nor cell contents are sent to the AI
+// or stored in config (Invariants 1, 2, 14).
 
-/** 表格文件里的一格：看到的字；Excel 存的是数字时带着数字，日期格式的数字标上 date（序号按 1900 年制）。 */
+/** A cell in a spreadsheet file: visible text; when Excel stores numbers, it includes the number, and date-formatted numbers are marked as date (serial numbers based on the 1900 date system). */
 export interface SheetCell {
   text: string;
   number?: number;
@@ -24,33 +26,36 @@ export interface SheetRows {
 
 export const IMPORT_LIMITS = {
   /**
-   * 一次最多导入这么多行（不算表头和全空的行）。一次导入是一个事务、一批撤销，这么多行在手机内存里读、对、
-   * 写都不慢；再多的分几次导（每张表还有 RECORD_LIMITS.perCollection）。
+   * Maximum number of rows imported at once (excluding header and completely empty rows). A
+   * single import is one transaction and one undo batch; reading, matching, and writing this many
+   * rows in mobile memory is fast. Larger amounts can be imported in batches (each table also has
+   * `RECORD_LIMITS.perCollection`).
    */
   maxRows: 2000,
-  /** xlsx 最多读这么多个有内容的格子（2,000 行 × 50 列）。 */
+  /** Maximum number of content-bearing cells read from xlsx (2,000 rows x 50 columns). */
   maxCells: 100_000,
-  /** 汇总里每种原因列出前几个行号。 */
+  /** List the first few row numbers for each cause in the summary. */
   rowNumbersShown: 5,
 } as const;
 
 export type SpreadsheetError =
-  /** 不是 xlsx / csv（例如老的 .xls、.numbers）。 */
+  /** Not xlsx or csv (e.g., old .xls, .numbers). */
   | 'unsupported'
-  /** 扩展名是表格，内容不是（改了扩展名的别的文件、坏了）。 */
+  /** Extension is a spreadsheet, but content is not (e.g., renamed other files, corrupted files). */
   | 'notSpreadsheet'
-  /** 文字文件但不是 UTF-8、也没有 UTF-16 的 BOM。 */
+  /** Text file but not UTF-8 and missing UTF-16 BOM. */
   | 'encoding'
   | 'tooLarge'
   | 'empty';
 
-// ---- 读文字 ----
+// ---- Read Text ----
 
 const ZIP = [0x50, 0x4b, 0x03, 0x04];
 
 /**
- * 表格文字文件的字节 → 字符串：UTF-8（有没有 BOM 都行）、带 BOM 的 UTF-16（LE / BE）。别的编码（GBK、Latin-1……）
- * 不猜，返回 encoding；其实是 zip、或者开头有 NUL 字节的是别的文件，返回 notSpreadsheet。
+ * Spreadsheet text file bytes -> string: UTF-8 (with or without BOM), UTF-16 with BOM (LE / BE).
+ * Other encodings (GBK, Latin-1, etc.) are not guessed and return encoding; files that are
+ * actually zip archives or start with a NUL byte return notSpreadsheet.
  */
 export function decodeSheetText(
   bytes: Uint8Array,
@@ -78,8 +83,9 @@ function decodeUtf16(bytes: Uint8Array, little: boolean): string {
 }
 
 /**
- * CSV：分隔符是逗号、分号或制表符（第一行里引号外出现最多的那个，一样多时用逗号）；双引号括起来的格子里可以有
- * 分隔符、换行和写成两个的双引号。行尾的 \r\n、\n、\r 都行。
+ * CSV: Separators are comma, semicolon, or tab (the one appearing most often outside quotes in
+ * the first line; defaults to comma on ties); cells enclosed in double quotes may contain
+ * separators, newlines, and escaped double quotes. Line endings can be \\r\\n, \\n, or \\r.
  */
 export function parseCsv(text: string): SheetCell[][] {
   const delimiter = csvDelimiter(text);
@@ -140,9 +146,9 @@ function csvDelimiter(text: string): string {
   return best;
 }
 
-// ---- 列和字段 ----
+// ---- Columns and Fields ----
 
-/** 能导进去的字段：用户填的（算出来的、文件、日程、引用都不行，D-574）。 */
+/** Fields eligible for import: user-filled fields (calculated, file, schedule, and relation fields are excluded, D-574). */
 export function importTargets(collection: Collection): Field[] {
   return collection.fields.filter(
     (f) =>
@@ -153,7 +159,7 @@ export function importTargets(collection: Collection): Field[] {
   );
 }
 
-/** 比名字用：全角变半角、去掉两头的空白、中间的空白算一个、不分大小写。 */
+/** Used for name comparison: full-width to half-width, strip leading/trailing whitespace, collapse middle whitespace to a single space, case-insensitive. */
 export function normalizeName(s: string): string {
   return halfWidth(s).trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -170,7 +176,8 @@ function halfWidth(s: string): string {
 }
 
 /**
- * 表头 → 每列对到的字段 ID（null 是跳过）：只看规范化后的名字是否相同，不猜近似的；同一个字段只给第一列。
+ * Header -> field ID mapped for each column (null means skip): checks normalized name equality
+ * only, does not guess approximate matches; assigns each field to the first column only.
  */
 export function proposeMapping(
   header: readonly string[],
@@ -187,7 +194,7 @@ export function proposeMapping(
   });
 }
 
-// ---- 日期 ----
+// ---- Date ----
 
 export type DateOrder = 'dmy' | 'mdy';
 
@@ -196,13 +203,15 @@ const ISO_DATE = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[ T]+(.+))?$/;
 const CJK_DATE = /^(\d{4})年(\d{1,2})月(\d{1,2})日(?:\s*(.+))?$/;
 
 /**
- * 这一列的日期是日在前还是月在前：有一个前一段大于 12 的就是日在前，有一个后一段大于 12 的就是月在前；
- * 都看不出（或者两种都有）时 decided 为 false，order 默认日在前，用户在对应页上能换。
+ * Determines whether dates in this column are day-first or month-first: if any preceding segment
+ * is greater than 12, it is day-first; if any succeeding segment is greater than 12, it is
+ * month-first; if inconclusive (or both), decided is false and order defaults to day-first, which
+ * the user can change on the mapping page.
  */
 export function dateOrderOf(cells: readonly (SheetCell | undefined)[]): {
   order: DateOrder;
   decided: boolean;
-  /** 有没有两种读法都说得通的日期（这时对应页上让用户选）。 */
+  /** Whether both interpretations of a date are plausible (in which case the user is prompted to choose on the mapping page). */
   ambiguous: boolean;
 } {
   let dmy = false;
@@ -224,7 +233,7 @@ export function dateOrderOf(cells: readonly (SheetCell | undefined)[]): {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** Excel 的序号（1900 年制）→ 本地日期和时间；1900-03-01 之前（序号有一天的错）不认。 */
+/** Excel serial number (1900 date system) -> local date and time; values before 1900-03-01 (due to the 1-day Excel leap year bug) are rejected. */
 function serialParts(serial: number): { date: string; time: string } | null {
   if (!Number.isFinite(serial) || serial < 61 || serial > 2958465) return null;
   let minutes = Math.round(serial * 1440);
@@ -237,7 +246,7 @@ function serialParts(serial: number): { date: string; time: string } | null {
   };
 }
 
-/** 日期文字 → YYYY-MM-DD 和后面的时间文字；认不出时 null。年份只认四位数（两位数的年份不猜世纪）。 */
+/** Date text -> YYYY-MM-DD and trailing time text; returns null if unrecognized. Years must be 4 digits (two-digit years are not guessed). */
 function textDate(text: string, order: DateOrder): { date: string; rest?: string } | null {
   const s = halfWidth(text).trim();
   let y: number, mo: number, d: number, rest: string | undefined;
@@ -255,11 +264,14 @@ function textDate(text: string, order: DateOrder): { date: string; rest?: string
   return isValidDate(date) ? { date, ...(rest !== undefined ? { rest } : {}) } : null;
 }
 
-// ---- 数字 ----
+// ---- Numbers ----
 
 /**
- * 表格里的数字文字：可以有货币符号或货币代码、千位分隔（逗号、点、空格、撇号）、负号。只有一种分隔符时：
- * 逗号后面正好三位一组的算千位，否则算小数点；点后面有两组以上三位的算千位，否则算小数点。
+ * Number text in spreadsheets: may include currency symbols or currency codes, thousand
+ * separators (comma, dot, space, apostrophe), and negative signs. When only one separator type
+ * exists: commas followed by groups of exactly three digits are thousand separators, otherwise
+ * decimals; dots preceded by two or more groups of three digits are thousand separators,
+ * otherwise decimals.
  */
 export function readNumberText(text: string): number | undefined {
   let s = halfWidth(text)
@@ -281,7 +293,7 @@ export function readNumberText(text: string): number | undefined {
   const lastDot = s.lastIndexOf('.');
   let normal: string;
   if (lastComma >= 0 && lastDot >= 0) {
-    // 两种都有：后出现的是小数点，前面的是千位分隔，要三位一组。
+    // Both exist: the later one is the decimal separator, and the preceding ones are thousand separators which must be grouped in threes.
     const at = Math.max(lastComma, lastDot);
     const group = lastComma > lastDot ? '.' : ',';
     const int = s.slice(0, at);
@@ -299,15 +311,16 @@ export function readNumberText(text: string): number | undefined {
   return Number.isFinite(n) ? (negative ? -n : n) : undefined;
 }
 
-/** 一格里几个标签、几个选项之间的分隔：逗号、顿号、分号（中英文）。 */
+/** Separators between multiple tags or options in a cell: commas, ideographic commas, semicolons (English and Chinese). */
 const TAG_SEPARATORS = /[,，、;；]/;
 
 const TRUE_WORDS = new Set(['yes', 'y', 'true', '1', '✓', '✔', '√', '是', '对', 'oui', 'vrai']);
 const FALSE_WORDS = new Set(['no', 'n', 'false', '0', '否', '不是', '错', 'non', 'faux']);
 
 /**
- * 一格 → 字段能收的值（交给字段自己的 write 再严格检查一遍）；空格子是 undefined（不写，用默认值），
- * 认不出的是 invalid。
+ * Cell -> value acceptable to the field (subject to strict validation by the field's own write
+ * method); empty cells are undefined (omitted, uses default value), unrecognized values are
+ * invalid.
  */
 export function readCellFor(
   field: Field,
@@ -331,7 +344,7 @@ export function readCellFor(
       return n === undefined ? bad : { value: n };
     }
     case 'duration':
-      // Excel 的时长是带时间格式的天数。
+      // Excel durations are days with time formatting.
       if (num !== undefined) return { value: cell.date ? Math.round(num * 1440) : num };
       return { value: text };
     case 'checkbox': {
@@ -348,7 +361,7 @@ export function readCellFor(
       const option = optionOf(text);
       if (option) return { value: field.multiple ? [option.id] : option.id };
       if (!field.multiple) return bad;
-      // 多选（D-607）：几个选项名用逗号、顿号或分号隔开（和标签一样，也是导出时的写法）；一个认不出这一格就不导。
+      // Multi-select (D-607): option names separated by commas, ideographic commas, or semicolons (same as tags, also export format); if any option is unrecognized, the entire cell is skipped.
       const parts = text
         .split(TAG_SEPARATORS)
         .map((p) => p.trim())
@@ -373,7 +386,7 @@ export function readCellFor(
     }
     case 'time': {
       if (num !== undefined) {
-        // 只有时间的格子（小于一天）。
+        // Time-only cells (less than one day).
         if (!cell.date || num < 0 || num >= 1) return bad;
         const minutes = Math.round(num * 1440) % 1440;
         return { value: `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}` };
@@ -385,41 +398,41 @@ export function readCellFor(
   }
 }
 
-// ---- 一次导入 ----
+// ---- Single Import ----
 
 export interface ImportSettings {
-  /** 第一行是表头（默认）。 */
+  /** First row is the header (default). */
   header: boolean;
-  /** 每列对到的字段 ID，null 是跳过。 */
+  /** Field ID mapped to each column, null means skip. */
   mapping: readonly (string | null)[];
-  /** 每列的日期顺序（只有对到日期字段的列用得到）。 */
+  /** Date order for each column (applicable only to columns mapped to date fields). */
   orders: readonly DateOrder[];
 }
 
 export interface SkippedGroup {
   code: FieldIssue['code'];
   fieldId: string;
-  /** 一共几行。 */
+  /** Total row count. */
   count: number;
-  /** 前几个行号（文件里的行号，从 1 起，表头那行也算）。 */
+  /** First few row numbers (file row numbers starting from 1, including the header row). */
   rows: number[];
-  /** 超出范围时的 min / max。 */
+  /** Min / max limits when out of range. */
   limit?: number;
 }
 
 export interface ImportPlan {
-  /** 能导进去的：每条记录的值（已经过字段的 write）和它在文件里的行号。 */
+  /** Importable entries: field values for each record (already processed by field write) and its file row number. */
   entries: { row: number; values: Record<string, unknown> }[];
-  /** 导不进去的，按原因（哪个字段、什么问题）分组，按出现的先后。 */
+  /** Unimported items, grouped by reason (which field, what issue) in order of appearance. */
   skipped: SkippedGroup[];
-  /** 不算全空的行，一共几行数据。 */
+  /** Total data rows excluding completely empty rows. */
   rows: number;
 }
 
 const blankRow = (row: readonly SheetCell[]) =>
   row.every((c) => c.text.trim() === '' && c.number === undefined);
 
-/** 数据行（去掉表头）和它们在文件里的行号，全空的行不算。 */
+/** Data rows (excluding header) and their file row numbers, ignoring completely empty rows. */
 export function dataRows(
   rows: readonly SheetCell[][],
   header: boolean,
@@ -432,13 +445,13 @@ export function dataRows(
   return out;
 }
 
-/** 表头（没有表头时是空的名字）；列数按最宽的一行。 */
+/** Headers (empty string if no header); column count based on the widest row. */
 export function sheetColumns(rows: readonly SheetCell[][], header: boolean): string[] {
   const width = rows.reduce((w, r) => Math.max(w, r.length), 0);
   return Array.from({ length: width }, (_, i) => (header ? (rows[0]?.[i]?.text.trim() ?? '') : ''));
 }
 
-/** 按对应把每一行变成一条记录的值；一格写不进去，这一行就不导，记下原因。 */
+/** Transform each row into record values according to the mapping; if any cell fails to write, skip the row and record the reason. */
 export function planImport(
   collection: Collection,
   rows: readonly SheetCell[][],
@@ -484,8 +497,9 @@ export function planImport(
 }
 
 /**
- * 能不能导：数据行超过 IMPORT_LIMITS.maxRows、或者导进去以后这张表超过 RECORD_LIMITS.perCollection 时不导，
- * 也不导一部分（用户看到原因，分开导或先删一些）。
+ * Import feasibility: reject import if data rows exceed IMPORT_LIMITS.maxRows, or if importing
+ * causes the table to exceed RECORD_LIMITS.perCollection; does not perform partial imports (the
+ * user sees the reason and can import separately or delete items first).
  */
 export function importLimitProblem(
   rows: number,

@@ -4,8 +4,9 @@ import type { FilePlatform } from '../runtime/platform';
 import { newAssetId } from '../runtime/ids';
 import type { WorkspaceRepo } from '../storage/types';
 
-// 用户在页面上选的照片（图片组件 D-046、图片背景 D-258）：从相册选一张，重新编码、缩小后存成用户文件，
-// 配置里只记录文件 ID。照片不随版本删除（和其他用户文件一样）。
+// Photos selected by the user on the page (image component D-046, image background D-258): select
+// one from the photo library, re-encode and resize it, and save it as a user file; only the file ID
+// is recorded in the config. Photos are not deleted with version changes (like other user files).
 
 export type PickedPicture =
   { kind: 'saved'; assetId: string } | { kind: 'cancelled' } | { kind: 'tooLarge' };
@@ -35,7 +36,7 @@ export async function pickPicture(
       createdAt: Date.now(),
     });
   } catch (e) {
-    // 副本复制进来了、登记不上：删掉这个新副本，别留下看不见的文件（R10）。
+    // If a copy was successfully copied in but failed to register: delete this new copy so that no orphaned files are left behind (R10).
     await files.removeAssetFile(stored.path).catch(() => undefined);
     throw e;
   }

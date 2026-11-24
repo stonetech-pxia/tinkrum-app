@@ -12,12 +12,18 @@ import java.util.zip.DataFormatException
 import java.util.zip.Deflater
 import java.util.zip.Inflater
 
-// zip 的读写（D-600），不依赖 Android 和 Expo，可以单独编译测试。和 iOS 的 ios/ZipCodec.swift 是同一套规则：
-// - 写：边读边写，不把文件读进内存；单个文件和整个压缩包超过 4 GB 时用 Zip64。已经压缩过的文件（照片、视频、PDF 等）
-//   只存不压，数据库和文本才压。每个文件写完后回头补本地头里的校验和与大小，所以不用数据描述符。
-//   不用 java.util.zip.ZipOutputStream / ZipFile：它们对 Zip64 的支持随 Android 版本不同，这里只用 Deflater、Inflater、CRC32。
-// - 读：先读中央目录并逐条检查（名字、符号链接、加密、压缩方式、大小），全部通过才解压；解压时边解边数字节，
-//   超过声明的大小就停（防压缩炸弹），最后核对校验和。名字不安全、有符号链接的包整个拒绝。
+// ZIP read/write (D-600), independent of Android and Expo, can be compiled and tested separately.
+// Follows the same rules as iOS's ios/ZipCodec.swift:
+// - Write: read-as-you-write, without reading files into memory; use Zip64 when a single file or
+// the entire archive exceeds 4 GB. Already compressed files (photos, videos, PDFs, etc.) are stored
+// without recompression; only databases and text are compressed. Backpatch the local header's
+// checksum and size after writing each file, so data descriptors are not needed. Avoid
+// java.util.zip.ZipOutputStream / ZipFile, as their Zip64 support varies across Android versions;
+// use only Deflater, Inflater, and CRC32 here.
+// - Read: read the central directory first and check each entry (name, symbolic links, encryption,
+// compression method, size) one by one, unpacking only if all pass; count bytes as you decompress,
+// stopping if it exceeds the declared size (zip bomb protection), and finally verify the checksum.
+// Completely reject archives with unsafe names or symbolic links.
 
 sealed class ZipFail(message: String) : Exception(message) {
   object Cancelled : ZipFail("cancelled")
@@ -33,11 +39,11 @@ const val ZIP_CHUNK = 1 shl 20
 const val ZIP_MAX_ENTRIES = 2_000_000L
 const val ZIP_MAX_CENTRAL = 1L shl 29
 const val ZIP_MAX_NAME = 4096
-/** 比这小的单个文件不用 Zip64（留出余量，压缩后略大也不会超过 4 GB）。 */
+/** Single files smaller than this do not need Zip64 (leaves margin so that slightly larger compressed output still stays under 4 GB). */
 const val ZIP_BIG_FILE = 0xF000_0000L
 private const val U32 = 0xFFFF_FFFFL
 
-/** 已经是压缩格式的文件：只存不压。 */
+/** Files that are already in a compressed format: store only, do not compress. */
 val ZIP_STORED_EXTENSIONS = setOf(
   "jpg", "jpeg", "png", "heic", "heif", "webp", "gif", "avif", "jp2",
   "mp4", "mov", "m4v", "m4a", "mp3", "aac", "opus", "ogg", "flac", "webm", "mkv",
@@ -50,13 +56,13 @@ fun zipShouldStore(name: String): Boolean {
   return ZIP_STORED_EXTENSIONS.contains(name.substring(dot + 1).lowercase())
 }
 
-/** 名字能不能用：只允许相对路径、没有 .. 和 .、没有空段、没有反斜杠、没有盘符。 */
+/** Whether a name is valid: allows only relative paths, no .. or ., no empty segments, no backslashes, no drive letters. */
 fun zipSafeName(raw: String): Boolean {
   if (raw.isEmpty() || raw.toByteArray(Charsets.UTF_8).size > ZIP_MAX_NAME) return false
   if (raw.contains('\u0000') || raw.contains('\\') || raw.startsWith("/")) return false
   if (raw.length >= 2 && raw[1] == ':' && raw[0].isLetter()) return false
   val parts = raw.split('/').toMutableList()
-  if (parts.last().isEmpty()) parts.removeAt(parts.size - 1) // 目录条目的结尾斜杠
+  if (parts.last().isEmpty()) parts.removeAt(parts.size - 1) // Trailing slash for directory entries
   if (parts.isEmpty()) return false
   return parts.none { it.isEmpty() || it == "." || it == ".." }
 }
@@ -91,7 +97,7 @@ private fun dosDateTime(millis: Long): Pair<Int, Int> {
   return Pair(time, date)
 }
 
-// MARK: - 写
+// MARK: - Write
 
 private class Central(
   val name: String,
@@ -109,11 +115,11 @@ class ZipWriter(path: String, private val forceZip64: Boolean = false) {
   private val file = RandomAccessFile(path, "rw").also { it.setLength(0) }
   private val buffer = ByteArray(ZIP_CHUNK)
   private var buffered = 0
-  /** 已经写出的字节数（含缓冲里的）。 */
+  /** Number of bytes already written (including buffered ones). */
   var offset = 0L
     private set
   private val central = ArrayList<Central>()
-  /** 已写进压缩包的原始字节数（给进度用）。 */
+  /** Original raw bytes written into the archive (for progress reporting). */
   var inputBytes = 0L
     private set
 
@@ -141,7 +147,7 @@ class ZipWriter(path: String, private val forceZip64: Boolean = false) {
     offset += len
   }
 
-  /** 写一个文件进去。read 每次把下一块读进 buf，返回字节数（-1 表示结束）。 */
+  /** Write a file into the archive. read reads the next chunk into buf each time, returning the byte count (-1 indicates end). */
   fun add(
     name: String, declared: Long, modified: Long, store: Boolean,
     read: (ByteArray) -> Int, shouldCancel: () -> Boolean, progress: (Long) -> Unit,
@@ -203,7 +209,7 @@ class ZipWriter(path: String, private val forceZip64: Boolean = false) {
       deflater?.end()
     }
 
-    // 补本地头里的校验和和大小。
+    // Backpatch the checksum and size in the local header.
     if (size >= U32 && !local64) throw ZipFail.Io("file grew while writing")
     flush()
     val end = offset
@@ -229,14 +235,14 @@ class ZipWriter(path: String, private val forceZip64: Boolean = false) {
     add(name, bytes.size.toLong(), modified, false, { buf ->
       if (given) -1 else {
         given = true
-        // 小文字块（manifest）一次给完。
+        // Small text blocks (manifest) supplied all at once.
         System.arraycopy(bytes, 0, buf, 0, minOf(bytes.size, buf.size))
         bytes.size
       }
     }, shouldCancel) { }
   }
 
-  /** 写中央目录和结尾，关掉文件。 */
+  /** Write the central directory and end record, then close the file. */
   fun finish() {
     val cdStart = offset
     for (e in central) {
@@ -292,9 +298,9 @@ class ZipWriter(path: String, private val forceZip64: Boolean = false) {
   }
 }
 
-// MARK: - 读
+// MARK: - Read
 
-/** 压缩包的来源：要能随机读（本机文件，或能 seek 的 content:// 文件描述符）。 */
+/** Archive source: must support random reading (local file, or seekable content:// file descriptor). */
 class ZipSource(private val channel: FileChannel, private val onClose: () -> Unit = {}) {
   val length: Long = channel.size()
 
@@ -333,7 +339,7 @@ class ZipReader(private val source: ZipSource) {
 
   fun close() = source.close()
 
-  /** 读中央目录并检查每一条。有一条不合格整个压缩包就拒绝。 */
+  /** Read the central directory and validate every entry. Reject the entire archive if any entry fails validation. */
   fun load() {
     val length = source.length
     if (length < 22) throw ZipFail.NotZip
@@ -388,7 +394,7 @@ class ZipReader(private val source: ZipSource) {
       val end = pos + 46 + nameLength + extraLength + commentLength
       if (end > cd.size) throw ZipFail.Damaged("central entry")
       val nameData = cd.copyOfRange(pos + 46, pos + 46 + nameLength)
-      // 带 Zip64 附加字段的：只有写成 0xFFFFFFFF 的那几项在里面，顺序固定。
+      // Entries with Zip64 extra fields: only the fields written as 0xFFFFFFFF are contained within, in a fixed order.
       var extra = pos + 46 + nameLength
       val extraEnd = extra + extraLength
       while (extra + 4 <= extraEnd) {
@@ -413,7 +419,7 @@ class ZipReader(private val source: ZipSource) {
       pos = end
       if (flags and 0x1 != 0 || flags and 0x40 != 0) throw ZipFail.Unsupported("encrypted")
       if (method != 0 && method != 8) throw ZipFail.Unsupported("method $method")
-      // 符号链接和别的特殊文件：整个压缩包拒绝。
+      // Symbolic links and other special files: reject the entire archive.
       if (madeBy shr 8 == 3) {
         val type = ((external shr 16) and 0xF000L).toInt()
         if (type != 0 && type != 0x8000 && type != 0x4000) throw ZipFail.Unsafe("special file")
@@ -435,7 +441,7 @@ class ZipReader(private val source: ZipSource) {
     entries = list
   }
 
-  /** 把一条解到 dest（父目录按需创建）。边解边数字节，超过声明的大小就停；最后核对校验和。 */
+  /** Extract an entry to dest (parent directories created as needed). Count bytes during extraction, stopping if it exceeds the declared size; finally verify the checksum. */
   fun extract(entry: ZipEntry, dest: java.io.File, shouldCancel: () -> Boolean, progress: (Long) -> Unit) {
     val local = source.readAt(entry.offset, 30)
     if (Le.u32(local, 0) != 0x0403_4b50L) throw ZipFail.Damaged("local header")
@@ -478,7 +484,7 @@ class ZipReader(private val source: ZipSource) {
               if (got > 0) emit(scratch, got)
               if (got == 0 && (inflater.needsInput() || inflater.needsDictionary())) break
             }
-            // raw deflate 的最后一块有时要多给一个字节才结束。
+            // The last chunk of raw deflate sometimes requires an extra byte to finish.
             if (!inflater.finished() && consumed == entry.compressed) {
               inflater.setInput(ByteArray(1), 0, 1)
               while (!inflater.finished()) {

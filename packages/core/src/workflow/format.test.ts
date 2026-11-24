@@ -7,7 +7,7 @@ const now = new Date(2026, 10, 9, 12);
 const action = (id: string) => registry.actions.get(id)!;
 
 describe('describeParams', () => {
-  // 2026-11-09 用户测试：首页卡片写成「If it cannot get that small Ask me」，像半句话。
+  // 2026-11-09 user testing: Home screen card was written as "If it cannot get that small Ask me", sounding like half a sentence.
   it('a choice reads as "label: option" in every language', () => {
     const params = { maxMB: 2, whenTooBig: 'ask' };
     expect(describeParams(action('pdf.compress'), params, 'en', now, ['whenTooBig'])).toBe(
@@ -29,7 +29,7 @@ describe('describeParams', () => {
 });
 
 describe('stepLabel', () => {
-  // 2026-11-09 用户测试：「扫描成 PDF」第一步叫「Choose photos」，打开的却是相机。
+  // 2026-11-09 user testing: The first step of "Scan to PDF" was called "Choose photos", but it opened the camera instead.
   it('choosing photos is named after where they come from', () => {
     const photos = action('in.photos');
     expect(stepLabel(photos, { source: 'library', min: 1, max: 20 }, 'en')).toBe('Choose photos');

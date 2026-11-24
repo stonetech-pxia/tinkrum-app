@@ -1,12 +1,12 @@
 import * as D from './rules-data';
 
-// 店名规则的逻辑（词表在 rules-data.ts，D-403）：标题行、弱标签、清理前缀、公司后缀、「Powered by」、Seller/Client 表头。不用后行断言。
+// Merchant rule logic (vocabulary in rules-data.ts, D-403): header line, weak label, clean prefix, company suffix, 'Powered by', Seller/Client headers. No lookbehind.
 
 const ESC = /[.*+?^${}()|[\]\\]/g;
 const esc = (s: string) => s.replace(ESC, '\\$&');
 const lc = (s: string) => s.normalize('NFKC').toLowerCase();
 
-// ---- 标题行（「收据」「Tax invoice」这类单据名，不是店名）----
+// ---- Header line (document names like 'receipt' or 'Tax invoice', not merchant names) ----
 const LATIN = [...D.TITLE_WORDS_LATIN].sort((a, b) => b.length - a.length).map((w) => esc(lc(w)));
 const TITLE_RE = new RegExp(`(^|[^\\p{L}\\p{N}])(?:${LATIN.join('|')})(?![\\p{L}\\p{N}])`, 'gu');
 export function isTitleRow(text: string): boolean {
@@ -18,11 +18,11 @@ export function isTitleRow(text: string): boolean {
   return had && left < 3;
 }
 
-// ---- 「Store」「Branch」开头的弱标签（不是「店名：」）----
+// ---- Weak labels starting with 'Store' or 'Branch' (not 'Merchant:') ----
 export const weakStore = (label: string) =>
   /^(store|branch|outlet|shop)\b/i.test(label.trim()) && !/^store\s*name\b/i.test(label.trim());
 
-// ---- 清理店名：去掉「Welcome to」「Sold by:」这类前缀和首尾符号 ----
+// ---- Clean merchant name: remove prefixes like 'Welcome to' or 'Sold by:' and leading/trailing symbols ----
 export function cleanMerchant(v: string): string {
   let s = v.trim();
   const low = () => s.toLowerCase();
@@ -41,7 +41,7 @@ export function cleanMerchant(v: string): string {
   return s;
 }
 
-// ---- 带公司后缀（LLC、GmbH、株式会社…）的行 ----
+// ---- Lines with company suffixes (LLC, GmbH, Inc., etc.) ----
 const SUF_LATIN = new RegExp(
   `(^|[^\\p{L}\\p{N}])(?:${[...D.COMPANY_SUFFIX_LATIN]
     .sort((a, b) => b.length - a.length)
@@ -52,10 +52,10 @@ const SUF_LATIN = new RegExp(
 export const companyRow = (text: string) =>
   SUF_LATIN.test(text) || D.COMPANY_SUFFIX_CJK.some((w) => text.includes(w));
 
-// ---- 「Powered by」不是店名 ----
+// ---- 'Powered by' is not a merchant name ----
 export const POWERED = /^[\s\W]*(powered?\s+by|brought\s+to\s+you\s+by)/i;
 
-// ---- 发票表头「Seller: Client:」下面一排的第一格是卖方 ----
+// ---- The first cell in the row below invoice headers ('Seller:', 'Client:') is the seller ----
 interface PageRows {
   rows: { text: string; relY: number; cells?: string[] }[];
 }

@@ -19,12 +19,15 @@ import { packsNeeded, startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeVision, TINY_JPEG, paperGray } from '../test-utils/fake-files';
 
-// 扫描和文字识别有两条路径（D-084）：
-// - 没有系统识别（Android、Expo Go）：扫描包 / 文字识别包页面换成假的（找边返回四个角，矫正返回真实的小 JPEG，识别返回文字）；
-// - iOS 的 Vision：换成 FakeVision，不需要扩展包；
-// - Android 的 ML Kit：FakeVision 不能找边、不认俄文，这两种情况退回扩展包。
+// Scanning and OCR have two paths (D-084):
+// - Without system recognition (Android, Expo Go): scan/OCR package pages are replaced with fake
+// ones (find edges returns four corners, rectification returns a real small JPEG, recognition
+// returns text);
+// - iOS Vision: replaced with FakeVision, no extension pack needed;
+// - Android ML Kit: FakeVision cannot find edges and does not recognize Russian; falls back to
+// extension packs in these cases.
 
-// 手机的语言列表（文字层按它选识别语言，D-266）；默认没有，由界面语言决定。
+// Phone language list (text layer selects recognition language based on it, D-266); none by default, determined by the UI language.
 jest.mock('expo-localization', () => ({ getLocales: jest.fn(() => []) }));
 
 const registry = createRegistry(BUILTIN_TOOLS);
@@ -42,7 +45,7 @@ function toolWorkflow(toolId: string, id: string, locale: 'zh' | 'en' = 'zh'): W
   return quickActionsOf(result.config).find((w) => w.id === id)!;
 }
 
-/** 用户在「调整设置」里指定了识别语言（D-278：内设的快捷操作默认自动、不问）。 */
+/** User specified recognition language in Adjust Settings (D-278: built-in quick actions are automatic by default, without asking). */
 function withLang(wf: Workflow, lang: string): Workflow {
   return {
     ...wf,
@@ -61,9 +64,9 @@ class FakePacks implements PackRuntime {
   constructor(private readonly files: FakeFiles) {}
   calls: { page: PackPageId; method: string; args: Record<string, unknown>; files: string[] }[] =
     [];
-  /** 每次找边的候选（按顺序）：一个四边形是深色桌面上的一张纸，null 是没找到。 */
+  /** Edge detection candidates per step (in order): a quadrilateral represents a piece of paper on a dark desk, null means not found. */
   detected: (Quad | Quad[] | null)[] = [];
-  /** 找边页面给的小灰度图；不设时按候选画（见 paperGray）。 */
+  /** Small grayscale image provided by the edge detection page; when not set, drawn based on candidates (see paperGray). */
   gray: ((size: { width: number; height: number }) => Uint8Array) | null = null;
   texts: string[] = [];
   async call<T>(
@@ -115,7 +118,7 @@ function setup(
   const packs = new FakePacks(files);
   const opened: { kind: LocalKind; input: unknown }[] = [];
   const asked: string[] = [];
-  /** 用户不肯下载的扩展包。 */
+  /** Extension packs that the user refused to download. */
   const declined = new Set<string>();
   const ui: LocalUi = {
     confirm: async () => false,
@@ -157,15 +160,15 @@ describe('scanner', () => {
     ];
     const result = await run();
     expect(asked).toEqual(['scan']);
-    // HEIC 先在 App 里重新编码成 JPG，页面只拿到这一个临时文件。
+    // HEIC is re-encoded to JPG in the app first, and the page receives only this temporary file.
     const detects = packs.calls.filter((c) => c.method === 'detect');
     expect(detects).toHaveLength(2);
     expect(detects[0]!.files[0]).toMatch(/IMG_1\.jpg$/);
-    // 找到的角交给本地界面确认；第二张没找到，给 null，界面会用默认框。
+    // Found corners passed to the local UI for confirmation; if the second one is not found, passes null and the UI uses the default bounding box.
     const input = opened[0]!.input as { items: { quad: Quad | null }[] };
     expect(opened[0]!.kind).toBe('corners');
     expect(input.items.map((i) => i.quad)).toEqual([paper, null]);
-    // 按用户确认的角矫正，长边 2400。
+    // Rectify according to the corners confirmed by the user, long side 2400.
     const warp = packs.calls.find((c) => c.method === 'warp')!;
     expect(warp.args).toMatchObject({ quad: paper, height: 2400 });
     expect(files.enhanced).toEqual(['auto', 'auto']);
@@ -181,7 +184,7 @@ describe('scanner', () => {
     });
     packs.detected = [
       { tl: { x: 0, y: 0 }, tr: { x: 50, y: 0 }, br: { x: 50, y: 50 }, bl: { x: 0, y: 50 } },
-      // 页面给的四个点顺序不定，App 自己排（D-326）；有一个点凹进去时排不成凸四边形。
+      // The order of the four points given by the page is variable, sorted by the app itself (D-326); cannot form a convex quadrilateral when one point is concave.
       { ...paper, bl: { x: 1500, y: 1500 } },
     ];
     files.nextPhotos = [
@@ -194,7 +197,7 @@ describe('scanner', () => {
   });
 
   it('starts from the whole photo, not the table, when the page fills the photo (D-326)', async () => {
-    // 2026-10-29 真机：物业账单占满画面，找边只找到中间那张大表格的外框。
+    // October 29, 2026 real device: property bill fills the screen, edge detection only finds the outer border of the large table in the middle.
     const { files, packs, run, opened } = setup(toolWorkflow('scan', 'scan-straighten'), {
       corners: [paper],
     });
@@ -205,7 +208,7 @@ describe('scanner', () => {
       bl: { x: 250, y: 3450 },
     };
     packs.detected = [frame];
-    // 整张都是纸，表格框只是几条线。
+    // Entire page is paper, table border consists of just a few lines.
     packs.gray = ({ width, height }) => {
       const data = new Uint8Array(width * height).fill(205);
       for (let y = 140; y < 345; y++) for (const x of [25, 26, 274, 275]) data[y * width + x] = 40;
@@ -233,7 +236,7 @@ describe('scanner', () => {
       br: { x: 2200, y: 2500 },
       bl: { x: 800, y: 2500 },
     };
-    // 第一个候选是纸（假页面按它画灰度图），表格框在后面。
+    // First candidate is paper (fake page draws grayscale based on it), table border is behind.
     packs.detected = [[paper, box]];
     files.nextPhotos = [files.offerImage('a.jpg', 3000, 4000)];
     expect((await run()).status).toBe('succeeded');
@@ -245,7 +248,7 @@ describe('scanner', () => {
     const { files, run } = setup(toolWorkflow('scan', 'scan-straighten'));
     files.nextPhotos = [files.offerImage('big.jpg', 8000, 6000)];
     expect((await run()).status).toBe('cancelled');
-    // 4800 万像素 → 长边 4096。
+    // 48 megapixels -> long side 4096.
     expect(files.encodes[0]).toMatchObject({ width: 4096, height: 3072, format: 'jpeg' });
   });
 
@@ -308,7 +311,7 @@ describe('scanner and text recognition with the system Vision (iOS)', () => {
     const result = await run();
     expect(asked).toEqual([]);
     expect(packs.calls).toEqual([]);
-    // 送进识别的是重新编码的 JPG；中文后面补上英文。
+    // Re-encoded JPG is sent for recognition; English is appended after Chinese.
     expect(vision.calls).toEqual([
       {
         method: 'recognizeText',
@@ -316,7 +319,7 @@ describe('scanner and text recognition with the system Vision (iOS)', () => {
         args: ['zh-Hans', 'en-US'],
       },
     ]);
-    // 行内中文之间的空格照样整理掉。
+    // Spaces between inline Chinese characters are still cleaned up.
     expect(result).toMatchObject({
       status: 'succeeded',
       value: { type: 'text', text: '租约续签通知\n月租3200元', name: 'IMG_1' },
@@ -352,7 +355,7 @@ describe('scanner and text recognition with the system Vision (iOS)', () => {
   });
 
   it('takes the page, not the table frame, when Vision segmentation touches the photo edges (D-327)', async () => {
-    // 以前 iOS 原生的偏好：文档分割有两个以上的角贴边、矩形检测的框在照片里面时用矩形，纸占满画面时正好选中表格框。
+    // Previous iOS native preference: document segmentation used when more than two corners snap to edges or the rectangle detection box is inside the photo, and table border is precisely selected when paper fills the screen.
     const { files, vision, run, opened } = setup(
       toolWorkflow('scan', 'scan-straighten'),
       { corners: [paper] },
@@ -371,9 +374,9 @@ describe('scanner and text recognition with the system Vision (iOS)', () => {
       br: { x: 2750, y: 3450 },
       bl: { x: 250, y: 3450 },
     };
-    // 原生给的顺序：文档分割的在前，矩形检测的在后。
+    // Order given by native: document segmentation first, rectangle detection second.
     vision.found = [[page, frame]];
-    // 整张都是纸，表格框只是几条线。
+    // Entire page is paper, table border consists of just a few lines.
     vision.gray = ({ width, height }) => {
       const data = new Uint8Array(width * height).fill(205);
       for (let y = 140; y < 345; y++) for (const x of [25, 26, 274, 275]) data[y * width + x] = 40;
@@ -401,7 +404,7 @@ describe('scanner and text recognition with the system Vision (iOS)', () => {
       straightened: true,
     }));
     const result = await run();
-    // 扫描成 PDF 带文字层（D-455）：拉正、增强后每页识别一次文字。
+    // Scan to PDF with text layer (D-455): recognize text once per page after dewarping and enhancing.
     expect(vision.calls.map((c) => c.method).filter((m) => m !== 'recognizeLines')).toEqual([
       'scanDocuments',
     ]);
@@ -425,11 +428,11 @@ describe('scanner and text recognition with the system Vision (iOS)', () => {
     const enhance = files.enhanceImage.bind(files);
     files.enhanceImage = async (uri, ...rest) => (enhancedFrom.push(uri), enhance(uri, ...rest));
     const result = await run();
-    // 展平模型是另外问的扩展包；文档相机的页面不要扫描包。
+    // The dewarping model is a separate requested pack; do not scan it on document camera pages.
     expect(asked).toEqual(['dewarp']);
     const flattened = vision.calls.filter((c) => c.method === 'flatten');
     expect(flattened).toHaveLength(2);
-    // 增强的是展平后的页面，不是相机给的页面（识别文字用增强前的图，也就是展平后的，D-267）。
+    // Enhanced pages are the dewarping-processed pages, not the raw camera pages (use pre-enhancement images for text recognition, i.e., dewarped images, D-267).
     expect(enhancedFrom).toHaveLength(2);
     for (const [i, uri] of enhancedFrom.entries()) {
       expect(uri).not.toBe(flattened[i]!.uri);
@@ -454,7 +457,7 @@ describe('scanner and text recognition with the system Vision (iOS)', () => {
     }));
     const result = await run();
     expect(asked).toEqual(['dewarp']);
-    // 第一页就知道模型没装，后面的页不再试。
+    // If the model is missing on the first page, do not retry on subsequent pages.
     expect(vision.calls.filter((c) => c.method === 'flatten')).toHaveLength(1);
     expect(result).toMatchObject({ status: 'succeeded', value: { items: [{ pageCount: 2 }] } });
   });
@@ -515,7 +518,7 @@ describe('scanner and text recognition with the system Vision (iOS)', () => {
       ...files.offerImage(`scan-${n}.jpg`, 1700, 2400),
       straightened: true,
     }));
-    // 第二页按中文认失败、再按西欧语言认也失败：那一页不加文字层，PDF 照样生成。
+    // If text recognition fails for both Chinese and Western European languages on a page, do not add a text layer to that page, but still generate the PDF.
     vision.layers = [
       { width: 100, height: 100, lines: [line] },
       new Error('vision failed'),
@@ -525,7 +528,7 @@ describe('scanner and text recognition with the system Vision (iOS)', () => {
     const result = await run();
     const zh = ['zh-Hans', 'en-US'];
     const latin = ['en-US', 'fr-FR', 'de-DE', 'es-ES', 'it-IT', 'pt-BR'];
-    // 界面是中文：先按中文认（中文识别器也认英文）。
+    // Interface is Chinese: recognize Chinese first (the Chinese recognizer also recognizes English).
     expect(vision.calls.filter((c) => c.method === 'recognizeLines').map((c) => c.args)).toEqual([
       zh,
       zh,
@@ -538,7 +541,7 @@ describe('scanner and text recognition with the system Vision (iOS)', () => {
         : [];
     const doc = await PDFDocument.load(files.disk.get(pdf!.uri)!);
     expect(doc.getPageCount()).toBe(3);
-    // 页面内容是压缩过的：解开所有流再找（图片的 JPEG 流跳过）。
+    // Page content is compressed: unpack all streams before searching (skip JPEG streams of images).
     const decoded = (obj: unknown) => {
       if (!(obj instanceof PDFRawStream)) return '';
       try {
@@ -551,11 +554,11 @@ describe('scanner and text recognition with the system Vision (iOS)', () => {
       .enumerateIndirectObjects()
       .map(([, obj]) => decoded(obj))
       .join('\n');
-    // 第一页一行、第三页两行（中文那行用无字形字体按 UTF-16 写，D-266）。
+    // One line on the first page, two lines on the third page (Chinese line written using a glyphless font with UTF-16, D-266).
     expect(text.match(/3 Tr/g)).toHaveLength(3);
     expect(text).toContain('<53D17968> Tj');
 
-    // 没有系统识别（Expo Go）：不加文字层，PDF 照常。
+    // No system recognition (Expo Go): do not add text layer, PDF proceeds as usual.
     const library: Workflow = {
       ...wf,
       steps: [
@@ -721,7 +724,7 @@ describe('Android (ML Kit): no edge finding, no Russian', () => {
       'ocr-rus',
       'pdfview',
     ]);
-    // 没有 Google Play 服务：没有文档扫描，扫描包也要下载。
+    // No Google Play Services: no document scanning, and the scanning pack must also be downloaded.
     vision.documentCamera = false;
     expect(packsNeeded(['scan'], files)).toEqual(['scan']);
   });
@@ -736,7 +739,7 @@ describe('text layer languages (D-266)', () => {
     expect(textLayerLanguages('fr', ['zh-HK'])).toEqual(['zh-Hant', 'en-US']);
     expect(textLayerLanguages('en', ['en-GB', 'ja-JP'])).toEqual(['ja-JP', 'en-US']);
     expect(textLayerLanguages('fr', ['ko-KR'])).toEqual(['ko-KR', 'en-US']);
-    // 手机语言排在界面语言前面：手机设成繁体时，中文界面也按繁体认。
+    // Phone language takes precedence over interface language: when the phone is set to Traditional Chinese, the Chinese interface also recognizes Traditional.
     expect(textLayerLanguages('zh', ['zh-Hant-TW'])).toEqual(['zh-Hant', 'en-US']);
   });
 
@@ -747,7 +750,7 @@ describe('text layer languages (D-266)', () => {
 });
 
 describe('recognition reads the page before enhancing (D-267)', () => {
-  /** 文档相机拍两页；返回送进增强的图（增强前）和增强出来的图，运行时填上。 */
+  /** Document camera captures two pages; returns the pre-enhanced images and enhanced images, populated at runtime. */
   const scanned = (files: FakeFiles, vision: FakeVision) => {
     vision.scanned = [1, 2].map((n) => ({
       ...files.offerImage(`scan-${n}.jpg`, 1700, 2400),
@@ -790,7 +793,7 @@ describe('recognition reads the page before enhancing (D-267)', () => {
     vision.texts = ['第一页', '第二页'];
     const result = await run();
     expect(files.enhanced).toEqual(['bw', 'bw']);
-    // 送去识别前重新编码的是增强前的页面，不是黑白图。
+    // Re-encoding before sending for recognition uses pre-enhanced pages, not black-and-white images.
     expect(pages.after).toHaveLength(2);
     expect(files.encodedFrom).toEqual(pages.before);
     expect(result).toMatchObject({ value: { type: 'text', text: '第一页\n\n第二页' } });
@@ -806,7 +809,7 @@ describe('recognition reads the page before enhancing (D-267)', () => {
     const { files, vision, run } = setup(wf, {}, {}, true);
     const pages = scanned(files, vision);
     const enhance = files.enhanceImage.bind(files);
-    // 增强完就把原来的页面删掉。
+    // Delete the original page once enhancement is complete.
     files.enhanceImage = async (uri, ...rest) => {
       const out = await enhance(uri, ...rest);
       files.disk.delete(uri);
@@ -815,7 +818,7 @@ describe('recognition reads the page before enhancing (D-267)', () => {
     };
     vision.texts = ['第一页', '第二页'];
     expect(await run()).toMatchObject({ value: { type: 'text', text: '第一页\n\n第二页' } });
-    // 增强前的图读不了（没编码成功），每页改用增强后的图。
+    // If pre-enhanced images cannot be read (encoding failed), use the enhanced images for each page instead.
     expect(files.encodedFrom).toEqual(pages.after);
     expect(vision.calls.filter((c) => c.method === 'recognizeText')).toHaveLength(2);
   });
@@ -824,7 +827,7 @@ describe('recognition reads the page before enhancing (D-267)', () => {
     const wf: Workflow = { kind: 'quickAction', id: 'pdf', name: 'pdf', steps: [pick, bw, pdf] };
     const { files, vision, run } = setup(wf, {}, {}, true);
     const pages = scanned(files, vision);
-    // 第一页转正了 2°（画布变大），第二页没转。
+    // First page de-skewed by 2 degrees (canvas expanded), second page not skewed.
     files.enhanceSkews = [2, 0];
     const line = { text: 'Invoice 42', x: 100, y: 200, width: 300, height: 40 };
     vision.layers = [
@@ -953,7 +956,7 @@ describe('recognized Chinese is tidied (D-268)', () => {
         }
       })
       .join('\n');
-    // 「差别：内部」的 UTF-16：5DEE 522B FF1A 5185 90E8。
+    // UTF-16 for "Difference: internal": 5DEE 522B FF1A 5185 90E8.
     expect(text).toContain('<5DEE522BFF1A518590E8> Tj');
   });
 });
@@ -995,7 +998,7 @@ describe('PP-OCRv6 replaces ML Kit and Vision for the languages it reads (D-269)
     vision.texts = ['文字'];
     expect(await run()).toMatchObject({ status: 'succeeded', value: { text: '文字' } });
     expect(asked).toEqual(['ppocr']);
-    // 界面是中文：按简体中文整理（第一种是中文，附英文）。
+    // Interface is Chinese: organize as Simplified Chinese (first is Chinese, with English attached).
     expect(vision.calls.find((c) => c.method === 'recognizeText')!.args).toEqual([
       'zh-Hans',
       'en-US',
@@ -1084,8 +1087,10 @@ describe('PP-OCRv6 replaces ML Kit and Vision for the languages it reads (D-269)
 
 describe('one download prompt for scan to Excel (D-299)', () => {
   it('lists edge finding, flattening and text recognition together before scanning a shared photo', async () => {
-    // 2026-10-29 真机（Android、新用户）：找边、展平、认字分三个框问；认字模型要在找边之前装好，
-    // 第一次扫描时展平后的逐行精修（D-274）才能用。
+    // 2026-10-29 real device (Android, new user): edge detection, dewarping, and text recognition
+    // are queried across three boxes; the text recognition model must be installed before edge
+    // detection so that line-by-line fine-tuning after dewarping during the first scan (D-274) can
+    // work.
     const files = new FakeFiles();
     const vision = new FakeVision(files);
     files.vision = vision;

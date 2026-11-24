@@ -6,8 +6,10 @@ import { ReminderSchema, type Collection, type WorkspaceConfig } from './schema'
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 点一下改这一条的两三处（D-566，创始人 2026-11-16 决定 ③）：最多 3 处，都限在这一条（或者新建一条连回这一条），
-// 是一个固定的平的列表（没有条件、循环、嵌套，不启动别的工具，底线 9）；全部成功或者全部不做；之后出撤销提示条（底线 11）。
+// Modify two or three places on this record with a single tap (D-566, founder decision 2026-11-16
+// ③): at most 3 places, all restricted to this record (or creating a new record linked back to this
+// record), forming a fixed flat list (no conditions, loops, nesting, or triggering other tools;
+// invariant 9); all succeed or none do; followed by an undo banner (invariant 11).
 
 const orders: Collection = {
   id: 'orders',
@@ -70,7 +72,7 @@ describe('one tap, up to three changes to this entry (D-566)', () => {
   it('a Ship button sets the status and the ship date', () => {
     expect(ToolUseSchema.safeParse(ship).success).toBe(true);
     expect(problems([list([ship])])).toBe('');
-    // 三处：设值、勾选、加减，再加一条连回这一条的新记录（最多一条新建）。
+    // Three places: set value, check, increment/decrement, plus one new record linked back to this record (at most one new record).
     expect(
       problems([
         list([
@@ -104,7 +106,7 @@ describe('one tap, up to three changes to this entry (D-566)', () => {
       { ...ship, also: [{ ...ship.also[0], also: [{ do: 'toggle', field: 'paid' }] }] },
       { ...ship, also: [{ tool: 'pdf-merge' }] },
       { ...ship, also: [{ do: 'set', field: 'paid', value: true, when: [] }] },
-      // setAll 和批量新建本身不能带。
+      // setAll and batch creation themselves cannot include this.
       { do: 'setAll', table: 'orders', field: 'paid', value: true, also: [ship.also[0]] },
     ];
     for (const use of bad)

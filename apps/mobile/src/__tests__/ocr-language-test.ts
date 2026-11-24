@@ -1,6 +1,6 @@
 import { autoOcrLanguage } from '../runtime/ocr-language';
 
-// 识别语言「自动」（D-278）：按手机语言列表的第一种选，没有时按界面语言。
+// Automatic text recognition language (D-278): Selects the first language from the phone's language list, falling back to the interface language if unavailable.
 
 describe('automatic text recognition language', () => {
   it('follows the first phone language', () => {

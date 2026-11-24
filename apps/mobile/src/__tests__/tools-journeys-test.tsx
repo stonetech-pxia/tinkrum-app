@@ -3,7 +3,7 @@ import { screen } from 'expo-router/testing-library';
 
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 内置工具的界面旅程：安装 → 打开工具页 → 运行单功能工作流 → 结果页操作。
+// Built-in tool interface journeys: install -> open tool page -> run single-function workflow -> result page actions.
 
 describe('tool journeys (UI)', () => {
   afterEach(() => jest.restoreAllMocks());
@@ -18,8 +18,9 @@ describe('tool journeys (UI)', () => {
 
   it('compresses photos from the image tool page and saves them only when asked', async () => {
     const { files, repo } = await installImageTool();
-    // 工具页的功能排成宫格，整块可点，没有单独的「开始」按钮（D-108）。
-    // 方块上显示固定的设置；每次运行时问的大小不列出。
+    // Tool page features are arranged in a grid; the entire block is tappable, with no separate
+    // "Start" button (D-108). Fixed settings are displayed on the tile; runtime prompts are not
+    // listed.
     expect(await screen.findByText('压缩图片')).toBeTruthy();
     expect(screen.getByText('格式：JPG')).toBeTruthy();
     expect(screen.queryAllByText('开始')).toEqual([]);
@@ -28,11 +29,11 @@ describe('tool journeys (UI)', () => {
       files.offerImage('IMG_1.HEIC', 4032, 3024, 'image/heic', new Uint8Array(2_000_000)),
     ];
     await fireEvent.press(screen.getByTestId('run-image-compress'));
-    // 运行时询问目标大小：点「240 KB」再确定。
+    // Runtime prompt for target size: tap "240 KB" and confirm.
     await fireEvent.press(await screen.findByTestId('ask-preset-kb-240'));
     await fireEvent.press(screen.getByTestId('prompt-ok'));
     expect(await screen.findByTestId('result-item-IMG_1.jpg')).toBeTruthy();
-    // 变小了：显示原来和现在的大小。
+    // Shrunken: displays original and current sizes.
     expect(screen.getByTestId('result-smaller')).toHaveTextContent(/^原来 .+，现在 .+$/);
     expect(await repo.listAssets()).toEqual([]);
 
@@ -44,7 +45,7 @@ describe('tool journeys (UI)', () => {
     await fireEvent.press(screen.getByTestId('result-photos'));
     expect(files.savedToPhotos).toHaveLength(1);
 
-    // 「完成」关闭运行页，回到工具页（D-111）。
+    // "Done" closes the run page and returns to the tool page (D-111).
     expect(screen.getByTestId('run-done')).toHaveTextContent('完成');
     await fireEvent.press(screen.getByTestId('run-done'));
     expect(screen.queryByTestId('run-done')).toBeNull();
@@ -63,11 +64,11 @@ describe('tool journeys (UI)', () => {
     await fireEvent.press(screen.getByTestId('prompt-ok'));
     expect(await screen.findByTestId('result-item-c.jpg')).toBeTruthy();
 
-    // 一次分享面板带上三个文件（D-119）。
+    // Include three files in a single share sheet (D-119).
     await fireEvent.press(screen.getByTestId('result-share'));
     expect(files.shareSheets.map((sheet) => sheet.length)).toEqual([3]);
 
-    // 关掉文件夹选择器：不算存好，也不报错。
+    // Dismiss folder picker: neither saved nor errored.
     files.folderChoice = 'cancel';
     await fireEvent.press(screen.getByTestId('result-folder'));
     expect(screen.getByText('存到手机')).toBeTruthy();
@@ -83,14 +84,14 @@ describe('tool journeys (UI)', () => {
     expect([...files.folders.get('MorphOut')!.keys()]).toEqual(['a.jpg', 'b.jpg', 'c.jpg']);
     expect(files.folderPicks).toBe(3);
 
-    // 换文件夹：再弹一次选择器，以后记住新的。
+    // Change folder: prompt picker again, and remember the new one henceforth.
     files.nextFolder = 'Receipts';
     await fireEvent.press(screen.getByTestId('result-folderChange'));
     expect(await screen.findByText('已存到「Receipts」')).toBeTruthy();
     expect(files.folderPicks).toBe(4);
     expect(files.remembered).toBe('Receipts');
 
-    // iOS「我的 iPhone」那一层在文件系统里叫 File Provider Storage，按「文件」App 里的名字显示（D-583）。
+    // iOS "On My iPhone" layer is named File Provider Storage in the file system; displayed according to the "Files" app name (D-583).
     files.nextFolder = 'File Provider Storage';
     await fireEvent.press(screen.getByTestId('result-folderChange'));
     expect(await screen.findByText('已存到「我的 iPhone」')).toBeTruthy();
@@ -107,7 +108,7 @@ describe('tool journeys (UI)', () => {
     expect(screen.getByText('换文件夹')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('result-folder'));
     expect(await screen.findByText('已存到「MorphOut」')).toBeTruthy();
-    // 直接存进去，没有弹选择器。
+    // Saved directly without prompting the picker.
     expect(files.folderPicks).toBe(0);
   });
 
@@ -131,7 +132,7 @@ describe('tool journeys (UI)', () => {
     await fireEvent.changeText(await screen.findByTestId('ask-network'), 'Home');
     const password = screen.getByTestId('ask-password');
     expect(password.props.secureTextEntry).toBe(true);
-    // 没填密码：运行时报错，不会生成没用的码。
+    // Password left blank: runtime error, no useless code generated.
     await fireEvent.press(screen.getByTestId('prompt-ok'));
     expect(await screen.findByText('没有填密码。')).toBeTruthy();
 

@@ -10,17 +10,19 @@ import {
 import { cleanRegions, lineShareIn, type LayoutRegion } from './layout';
 import type { Box, OcrBox, RgbaImage } from './types';
 
-// 转 Excel 时表外的东西怎么排（D-520–D-522）：图片区域、左右两栏的文字、字号和粗体。
-// 版面分析、分栏都用转 Word 的那一套（D-328、D-331），只是排到工作表的列上而不是 docx 的并排行里。
-// 都在拉正后的坐标里算，build.ts 再按整页共用的列定每一块占哪几列。
+// How non-table elements are arranged when converting to Excel (D-520-D-522): image regions,
+// two-column text, font size, and bold text. Layout analysis and column splitting use the Word
+// conversion pipeline (D-328, D-331), but map to worksheet columns instead of side-by-side
+// paragraphs in docx. Calculations are performed in straightened coordinates, and build.ts
+// determines column spans based on shared page columns.
 
-/** 正文字号的范围（磅）：和转 Word 一样，照片里的纸不一定是 A4，按 A4 换算会偏大。 */
+/** Body font size range (pt): similar to Word conversion, paper in photos is not necessarily A4, and scaling based on A4 can be too large. */
 const BODY_MIN = 6;
 const BODY_MAX = 12;
-/** 标题等字号和正文差不到这么多（比例）就当正文；字母数字少于 SHORT_TEXT 个的行高不准，也当正文。 */
+/** Treat as body text if the font size difference from the body is below this threshold (ratio); line heights with fewer than SHORT_TEXT alphanumeric characters are unreliable and also treated as body text. */
 const BODY_SNAP = 0.25;
 const SHORT_TEXT = 6;
-/** 一张表的字号和正文差不到这么多（磅）就当正文，免得半磅的估计误差让同一页的表字号不一样。 */
+/** Treat as body text if the table font size difference from the body is below this threshold (pt), avoiding half-point estimation errors causing inconsistent table font sizes on the same page. */
 const TABLE_SNAP = 0.5;
 const TEXT_MAX = 48;
 
@@ -40,13 +42,13 @@ const unionBox = (boxes: readonly Box[]): Box => {
   };
 };
 
-/** 单独一块字的左边离整页内容的左边至少这么多比例的页宽，才算靠右栏。 */
+/** A text block is considered a right-column block only if its left edge is at least this fraction of the page width away from the left edge of the full-page content. */
 const RIGHT_COLUMN = 0.25;
 
-/** 上下两排字的行高相差这么多倍以上，不是同一块（大标题和下面一行小字挨得很近）。 */
+/** Line height difference ratio between consecutive rows exceeding this threshold indicates they belong to different blocks (e.g., a large heading is placed very close to the small subtitle below it). */
 const SIZE_BREAK = 1.3;
 
-/** 一块里的行按竖直方向的重叠分成一排一排，行高和上一排差得多的地方分开。 */
+/** Split lines within a block into rows based on vertical overlap, separating them where line heights differ significantly from the previous row. */
 function splitBySize(lines: OcrBox[]): OcrBox[][] {
   const sorted = [...lines].sort((a, b) => a.y + a.height / 2 - (b.y + b.height / 2));
   const rows: OcrBox[][] = [];
@@ -71,20 +73,23 @@ function splitBySize(lines: OcrBox[]): OcrBox[][] {
   return parts;
 }
 
-/** 整页的正文字号（磅）：按整页文字的典型行高。 */
+/** Page body font size (pt): based on typical line height of page text. */
 export const bodySizeOf = (lineHeight: number, pageWidth: number) =>
   Math.min(BODY_MAX, Math.max(BODY_MIN, fontSizeOf(lineHeight, pageWidth)));
 
-/** 一张表的字号（磅）：按表里文字的行高，和正文差不多就是正文。 */
+/** Table font size (pt): based on line height of text within the table; similar to body text means it is body text. */
 export function tableSizeOf(lineHeight: number, pageWidth: number, bodySize: number): number {
   const size = bodySizeOf(lineHeight, pageWidth);
   return Math.abs(size - bodySize) <= TABLE_SNAP ? bodySize : size;
 }
 
 /**
- * 版面分析的区域整理（原图坐标）：图片区域外面留一点边（和转 Word 一样剪下来时不贴着字），
- * 其余的（标题、正文、页码）用来把字分块（两栏的页，栏和栏之间的空隙窄时靠区域分开）。
- * 区域的整理（里面字太多的、占了半页的不当图片；模型的表格不用）也是转 Word 的 cleanRegions。
+ * Layout region arrangement (original image coordinates): leave a small margin outside image
+ * regions (not hugging text when cropped, same as Word conversion), and use the rest (title,
+ * body, page numbers) to segment text into blocks (for two-column pages, narrow gaps between
+ * columns are separated by regions). Region cleanup (discarding image regions with too many
+ * characters or occupying half a page; ignoring model-generated tables) also reuses Word's
+ * cleanRegions.
  */
 export function layoutRegions(
   regions: readonly LayoutRegion[],
@@ -94,7 +99,7 @@ export function layoutRegions(
 ): { figures: Box[]; text: LayoutRegion[] } {
   const size = { width: image.width, height: image.height };
   const pad = IMAGE_PAD * lineHeight;
-  // D-530 的弱证据恢复先限定在 Word；新增框会重分工作表列线，不能顺带改变 Excel 的列宽和分页。
+  // D-530 weak evidence recovery is restricted to Word for now; adding new boxes would re-split worksheet column lines and could unintentionally alter Excel column widths and pagination.
   const cleaned = cleanRegions(
     regions.filter((r) => !r.wordOnly),
     lines,
@@ -118,50 +123,56 @@ export function layoutRegions(
   };
 }
 
-/** 一块要排的东西：文字或图片；range 是它占的左右范围（拉正后的像素），没有时横跨整页。 */
+/** An element to be arranged: text or image; 'range' is its horizontal span (straightened pixels), or spanning the full page if absent. */
 export type Draft = (
   | { kind: 'text'; text: string; lines: OcrBox[]; size?: number; bold?: boolean }
   | { kind: 'image' }
-  /** 已经找好的表（第几张）：只用来排并排的带，表自己的列已经有了。 */
+  /** Already identified table (index): used only for arranging side-by-side bands; table columns are already established. */
   | { kind: 'table'; index: number }
 ) & { box: Box; band?: number; range?: [number, number] };
 
 export interface RestPlan {
-  /** 从上到下；一组是并排的一带（几块各占一栏）或单独的一块。 */
+  /** From top to bottom; a group is either a side-by-side band (multiple blocks each occupying a column) or a single block. */
   groups: { y: number; drafts: Draft[] }[];
 }
 
 export interface RestInput {
-  /** 表外的行（拉正后的坐标）。 */
+  /** Lines outside tables (straightened coordinates). */
   lines: readonly OcrBox[];
-  /** 图片区域（拉正后的坐标）。 */
+  /** Image regions (straightened coordinates). */
   figures: readonly Box[];
-  /** 版面分析的文字区域（标题、正文）：同一个区域里的字才连成块；没有区域或字不在任何区域里的按位置聚块。 */
+  /** Text regions from layout analysis (title, body): text within the same region forms a connected block; missing regions or text outside any region are clustered by position. */
   regions: readonly LayoutRegion[];
-  /** 找好的几张表的位置（拉正后的坐标）：和文字、图片一起排并排的带（表在左栏、字在右栏）。 */
+  /** Positions of identified tables (straightened coordinates): arranged in side-by-side bands with text and images (e.g., table on the left, text on the right). */
   tables: readonly Box[];
   lineHeight: number;
-  /** 估字号用的行高：照片拍歪时长行的框比字高，要扣掉倾斜多出来的一截；baseHeight 是整页文字的典型值。 */
+  /** Line height used for estimating font size: when photos are skewed, bounding boxes of long lines are taller than the text, so extra skew height must be subtracted; baseHeight is the typical value for page text. */
   sizeHeight: (line: OcrBox) => number;
   baseHeight: number;
   bodySize: number;
-  /** 同一段的几行接成文字。 */
+  /** Join lines of the same paragraph into text. */
   join: (lines: readonly OcrBox[]) => string;
-  /** 一行字的笔画粗细和行高的比；整页的典型值。 */
+  /** Ratio of stroke thickness to line height for a line of text; page typical value. */
   strokeOf: (line: OcrBox) => number;
   pageStroke: number;
 }
 
 /**
- * 表外的字按位置聚成块（转 Word 的 clusterLines：上下挨着、左右有重叠的连在一起，一排里隔得远的左右分开），
- * 加上图片，用转 Word 的并排规则（arrangeUnits，D-331）排：上下范围重叠、左右分开的块是并排的一带，
- * 每一栏有自己的左右范围，一栏里的块接在一起。每块字估字号（按行高和正文的比）和粗体（笔画比整页粗得多）。
+ * Cluster non-table text into blocks by position (Word's clusterLines: vertically adjacent and
+ * horizontally overlapping text are connected, with widely separated items in a row split
+ * horizontally), combine with images, and arrange using Word's side-by-side rules (arrangeUnits,
+ * D-331): blocks with overlapping vertical ranges and separate horizontal ranges form a
+ * side-by-side band, each column has its own horizontal range, and blocks within a column are
+ * concatenated. Estimate font size for each text block (based on line height-to-body ratio) and
+ * bold style (stroke width significantly thicker than page average).
  */
 export function planRest(input: RestInput): RestPlan {
   const { lineHeight, bodySize, pageStroke } = input;
   const drafts: Draft[] = [];
-  // 字分块：区域里的字（标题整块一个）各自聚块，不在任何区域里的按位置聚块（和转 Word 一样，D-328）。
-  // 和表格重叠一大半的区域（表格的标题行、表格里认成正文的）不要。
+  // Text segmentation into blocks: text within regions (each title forms a block) clustered
+  // individually, and unassigned text clustered by position (same as Word, D-328). Discard regions
+  // that substantially overlap with tables (table header rows, or table content misidentified as
+  // body text).
   const overTable = (r: LayoutRegion) =>
     input.tables.some((box) => {
       const ix = Math.min(box.x + box.width, r.box.x + r.box.width) - Math.max(box.x, r.box.x);
@@ -172,8 +183,10 @@ export function planRest(input: RestInput): RestPlan {
     input.regions.filter((r) => !overTable(r)),
     lineHeight,
   );
-  // 每行归包住它（至少一半在里面）的最小的区域：模型常给出几个互相套着的正文区域（一个盖住两三段的大区域，
-  // 加上每段自己的小区域），按包住的比例选会让一段的最后一行落进大区域，一段被切成两块。
+  // Assign each line to the smallest region enclosing it (at least half inside): models often
+  // output nested body regions (a large region covering 2-3 paragraphs plus small regions for each
+  // paragraph); selecting by containment proportion causes the last line of a paragraph to fall
+  // into the large region, splitting the paragraph into two blocks.
   const owner = input.lines.map((line) => {
     let best = -1;
     for (const [i, r] of regions.entries()) {
@@ -214,7 +227,7 @@ export function planRest(input: RestInput): RestPlan {
   }
   for (const box of input.figures) drafts.push({ kind: 'image', box });
   for (const [index, box] of input.tables.entries()) drafts.push({ kind: 'table', index, box });
-  // 排成并排的带：每一块用一个占位的图片块带着它的下标，排好以后换回来。
+  // Arrange into side-by-side bands: each block is represented by a placeholder image block carrying its index, which is swapped back after layout.
   const units = drafts.map((d, i) => ({
     box: d.box,
     blocks: [{ kind: 'image', box: d.box, src: String(i) }] as DocLeaf[],
@@ -223,7 +236,7 @@ export function planRest(input: RestInput): RestPlan {
   const own = (d: Draft): [number, number] => [d.box.x, d.box.x + d.box.width];
   const groups: RestPlan['groups'] = [];
   let band = 0;
-  // 整页内容的左右边（靠右栏的字、表在左边的字用）。
+  // Left and right margins of full-page content (used for right-column text and tables positioned on the left).
   const pageLeft = Math.min(...drafts.map((d) => d.box.x));
   const pageRight = Math.max(...drafts.map((d) => d.box.x + d.box.width));
   const pageWidth = pageRight - pageLeft;
@@ -231,8 +244,10 @@ export function planRest(input: RestInput): RestPlan {
     if (block.kind !== 'row') {
       const d = drafts[indexOf(block)]!;
       if (d.kind === 'image') d.range = own(d);
-      // 单独一块、不在并排的带里、靠右栏的字（一栏的开头落在另一栏的段落上方）：从它的左边起排到整页的右边，
-      // 不横跨整页（居中的标题左右空白差不多，不算）。
+      // For a single block not in a side-by-side band and positioned in the right column (the start
+      // of one column falls above a paragraph in the other column): extend from its left edge to
+      // the right edge of the page, without spanning the full page (centered titles have similar
+      // left/right whitespace and are excluded).
       else if (
         d.kind === 'text' &&
         d.box.x - pageLeft >= RIGHT_COLUMN * pageWidth &&
@@ -250,7 +265,7 @@ export function planRest(input: RestInput): RestPlan {
       for (const i of at) {
         const d = drafts[i]!;
         d.band = id;
-        // 文字占这一栏的整个宽度（到下一栏的左边为止）；图片只占它自己的位置。
+        // Text occupies the full width of the column (up to the left edge of the next column); images occupy only their own position.
         if (d.kind === 'image') d.range = own(d);
         else if (d.kind === 'text') d.range = [left, left + cell.width];
         group.push(d);

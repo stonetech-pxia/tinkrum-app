@@ -13,9 +13,10 @@ import { attachmentIds, localDate } from './field-values';
 import { DEFAULT_CALENDAR, type Calendar } from './calendar';
 import { fieldDefinition, type Collection, type Field, type Locale } from './schema';
 
-// 文字转 PDF、用记录生成 PDF 的固定 HTML 模板（expo-print 渲染，系统字体，中日韩都能显示）。
-// 用户的文字和记录值一律先转义再在本机填进去；AI 只能选模板、标题和字段名（D-042）。
-// 模板里没有脚本、没有外部资源。
+// Fixed HTML template for converting text to PDF and generating PDFs from records (rendered via
+// expo-print, system fonts, supports CJK). User text and record values are always escaped first
+// before being filled in locally; the AI can only select templates, titles, and field names
+// (D-042). The template contains no scripts and no external resources.
 
 export function escapeHtml(text: string, { apostrophes = true } = {}): string {
   const escaped = text
@@ -28,7 +29,7 @@ export function escapeHtml(text: string, { apostrophes = true } = {}): string {
 
 export type PageSize = 'a4' | 'letter';
 
-/** 纸张大小（PDF 点，1/72 英寸）。 */
+/** Paper sizes (in PDF points, 1/72 inch). */
 export const PAGE_POINTS: Record<PageSize, { width: number; height: number }> = {
   a4: { width: 595, height: 842 },
   letter: { width: 612, height: 792 },
@@ -48,7 +49,7 @@ ${css}
 </style></head><body>${body}</body></html>`;
 }
 
-/** 一段文字 → 一页页的 PDF（保留换行，长行自动折行）。 */
+/** A piece of text -> multi-page PDF (preserves newlines, long lines automatically wrap). */
 export function textToHtml(
   text: string,
   opts: { fontSize: number; pageSize: PageSize; title?: string },
@@ -73,18 +74,18 @@ export type RecordTemplate = (typeof RECORD_TEMPLATES)[number];
 export interface RecordsHtmlOptions {
   template: RecordTemplate;
   title: string;
-  /** 要显示的字段（字段 ID 或 createdAt）；空 = 全部字段。不存在的字段忽略。 */
+  /** Fields to display (field IDs or createdAt); empty = all fields. Non-existent fields are ignored. */
   fields: readonly string[];
   pageSize: PageSize;
   locale: Locale;
   now: Date;
-  /** 引用字段显示被引用记录的标题（D-250）。 */
+  /** Reference fields display the title of the referenced record (D-250). */
   links?: LinkResolver;
-  /** 印在标题下面的说明（D-425：哪些附件没放进来）。用户看的文字，先转义再填。 */
+  /** Notes printed below the title (D-425: which attachments were not included). Text shown to the user is escaped before filling. */
   notes?: readonly string[];
 }
 
-/** 记录 → HTML。receipt 在表格下面合计第一个金额（没有就数字）字段。 */
+/** Records -> HTML. For receipts, sums up the first numeric (or number) field below the table. */
 export function recordsToHtml(
   collection: Collection,
   records: readonly DataRecord[],
@@ -100,7 +101,7 @@ export function recordsToHtml(
       : ref === 'updatedAt'
         ? t(locale, 'html_Updated_74f0c')
         : fieldOf(collection, ref)!.name;
-  // 靠右对齐的数字列（字段定义的 print.numeric：数字、金额）。
+  // Right-aligned numeric columns (field definition print.numeric: numbers, amounts).
   const numeric = (ref: string) => {
     const f = fieldOf(collection, ref);
     return f !== undefined && fieldDefinition(f.type).print?.numeric === true;
@@ -136,7 +137,7 @@ export function recordsToHtml(
       .join('\n');
     let total = '';
     if (opts.template === 'receipt') {
-      // 合计哪个字段：字段定义 print.total 的 rank 小的类型优先（先金额、再数字），同类型取第一个。
+      // Which field to sum: field definition print.total with smaller rank takes priority (amounts first, then numbers), taking the first for the same type.
       const candidates = collection.fields.filter(
         (f) => refs.includes(f.id) && fieldDefinition(f.type).print?.total,
       );
@@ -148,7 +149,7 @@ export function recordsToHtml(
         const shown =
           perCurrencyText(records, collection, 'sum', field.id, locale) ??
           fieldDefinition(field.type).print!.total!.format(field, sum, locale);
-        // 冒号按语言：中文全角，法语前面带窄不换行空格，英文半角。
+        // Colons according to locale: Chinese full-width, French preceded by a narrow non-breaking space, English half-width.
         const colon = locale === 'zh' ? '：' : locale === 'fr' ? '\u202f: ' : ': ';
         total = `<div class="total">${t(locale, 'html_Total_08322')} · ${escapeHtml(field.name)}${colon}<strong>${escapeHtml(shown)}</strong></div>`;
       }
@@ -174,23 +175,23 @@ tr { page-break-inside: avoid; }
   );
 }
 
-// ---- 报表带附件（D-425）----
+// ---- Reports with attachments (D-425) ----
 
-/** 报表要放的一个附件：属于哪条记录，图注写什么。 */
+/** An attachment to include in the report: which record it belongs to, and what caption to write. */
 export interface ReportAttachment {
-  /** 用户文件的 ID：只在本机用，不进 HTML、不发给 AI。 */
+  /** User file ID: used only on-device, not included in HTML, and not sent to the AI. */
   assetId: string;
   title: string;
-  /** 这条记录在报表里印出来的值，读的人对得上是哪一行。 */
+  /** The printed value of this record in the report, allowing the reader to match it to the correct row. */
   detail: string;
-  /** 这条记录的第几个（从 1 起）、一共几个。 */
+  /** Sequence number of this record (1-based) and total count. */
   index: number;
   total: number;
 }
 
 const CAPTION_CHARS = 120;
 
-/** 记录顺序、每条记录内按字段和附件的顺序，列出文件字段里的附件。 */
+/** List attachments in file fields, ordered by record order, and within each record by field and attachment order. */
 export function reportAttachments(
   collection: Collection,
   records: readonly DataRecord[],
@@ -228,15 +229,15 @@ export function reportAttachments(
   });
 }
 
-/** 一页附件：图注 + 照片（JPEG 的 base64）。没有照片时是后面接 PDF 页面的那一页图注。 */
+/** An attachment page: caption + photo (JPEG base64). When there are no photos, it serves as the caption page preceding the PDF pages. */
 export interface ReportAttachmentPage {
   attachment: ReportAttachment;
   jpegBase64?: string;
-  /** 后面接的 PDF 有几页。 */
+  /** Number of subsequent PDF pages. */
   pdfPages?: number;
 }
 
-/** 附件页的 HTML：每张照片一页，图注在上面。 */
+/** HTML for attachment pages: one photo per page, with the caption above. */
 export function reportAttachmentsToHtml(
   pages: readonly ReportAttachmentPage[],
   opts: { pageSize: PageSize; locale: Locale },
@@ -258,7 +259,7 @@ export function reportAttachmentsToHtml(
       return `<section class="att"><h2>${escapeHtml(cut(a.title))}</h2><div class="meta">${escapeHtml(meta)}</div>${pdf}${image}</section>`;
     })
     .join('\n');
-  // 上下边距 40pt，图注最多占大约 90pt：照片不会被挤到下一页。
+  // Top and bottom margins of 40pt, caption takes at most approx. 90pt: photos will not be pushed to the next page.
   return page(
     body,
     `.att { page-break-after: always; break-after: page; }
@@ -271,7 +272,7 @@ img { display: block; margin: 0 auto; max-width: 100%; max-height: ${height - 80
   );
 }
 
-/** 没放进来的附件 → 印在报表上的话。多于 8 条记录时只列前 8 条。 */
+/** Unincluded attachments -> text to print on the report. When there are more than 8 records, only the first 8 are listed. */
 export function reportAttachmentNotes(
   left: { overLimit: readonly string[]; unreadable: readonly string[] },
   locale: Locale,

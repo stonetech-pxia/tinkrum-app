@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
 
-# 检查本次推送的完整范围；只复用同一提交和环境通过的检查。
+# Check the full scope of the current push; reuse only checks that passed for the exact same commit and environment.
 cd "$(git rev-parse --show-toplevel)"
 exec node scripts/check.mjs --push

@@ -14,8 +14,10 @@ import { TINY_JPEG } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 import type { WorkspaceStore } from '../workspace/store';
 
-// AI 只改 App（D-113）：做好后由用户自己点「现在就用一次」、从快捷操作打开 AI 改它、办事类请求给出
-// 能做的快捷操作、从使用习惯里提议、收件页面现场搭一个、现成的按场景分组（D-124–D-130）。
+// AI only changes the app (D-113): once completed, the user can choose to "use once right now",
+// open the AI via quick actions to modify it, receive executable quick actions for operational
+// requests, get suggestions based on usage habits, dynamically assemble one on the inbox page, or
+// use pre-built ones grouped by scenario (D-124–D-130).
 
 async function askAi(text: string) {
   await fireEvent.press(screen.getByTestId('nav-ai'));
@@ -38,36 +40,37 @@ describe('AI changes the app, the user runs it (UI)', () => {
   it('a new quick action opens “ready”; the user taps “use it now” to run it (D-125)', async () => {
     const { store, files } = await renderToolsApp();
     await askAi('添加签证照片快捷操作');
-    // 快捷操作是功能，直接做好（D-191），打开「做好了」。
+    // Quick actions are features; they are created directly (D-191), opening the "created" view.
     expect(await screen.findByTestId('ready-screen')).toHaveTextContent(/快捷操作做好了/);
     expect(screen.getByTestId('ready-name')).toHaveTextContent('签证 / 证件照');
-    // AI 没有自己运行。
+    // AI did not execute itself.
     expect(screen.queryByTestId('run-screen')).toBeNull();
 
     files.nextPhotos = [files.offerImage('me.jpg', 1200, 1600)];
     await fireEvent.press(screen.getByTestId('ready-run'));
-    // 先关掉「做好了」，关完才打开运行页：两个模态同时动画时 iOS 不弹照片选择器，运行停在第 1 步
-    // （2026-11-06 模拟器上「现在就用一次」卡在「选照片」）。
+    // Close the "created" view first before opening the execution page: on iOS, animating two
+    // modals simultaneously prevents the photo picker from appearing, leaving execution stuck at
+    // step 1 (stuck at "Select photo" on simulator on 2026-11-06).
     expect(screen.queryByTestId('ready-screen')).toBeNull();
     expect(screen.queryByTestId('run-screen')).toBeNull();
     expect(await screen.findByTestId('run-screen')).toBeTruthy();
     expect(quickActionsOf(store.getState().config!).map((w) => w.id)).toContain('visa-photo');
   });
 
-  it('“ask AI to change it” opens AI about that quick action; 这个 means it (D-126)', async () => {
+  it('"ask AI to change it" opens AI about that quick action; this means it (D-126)', async () => {
     const { store } = await renderToolsApp();
     await addVisa(store);
     await act(() => router.push({ pathname: '/change', params: { workflow: 'visa-photo' } }));
     expect(await screen.findByTestId('change-about')).toHaveTextContent(
       /要改的快捷操作：「签证 \/ 证件照」/,
     );
-    // 不列预设的句子（D-233）；风格选择器也不显示。
+    // Do not list preset sentences (D-233); style selector is also hidden.
     expect(screen.queryByText('把这个的大小改成 200KB')).toBeNull();
     expect(screen.queryByTestId('change-pick-style')).toBeNull();
 
     await fireEvent.changeText(screen.getByTestId('change-input'), '把这个的大小改成 200KB');
     await fireEvent.press(screen.getByTestId('change-submit'));
-    // 改快捷操作直接生效（D-191），打开它的「做好了」页面，现在就能再用一次。
+    // Modifying quick actions takes effect immediately (D-191), opening its "created" page so it can be used again right away.
     expect(await screen.findByTestId('ready-name')).toHaveTextContent('签证 / 证件照');
     const visa = quickActionsOf(store.getState().config!).find((w) => w.id === 'visa-photo')!;
     expect(visa.steps.find((s) => s.action === 'image.idPhoto')!.params.maxKB).toBe(200);
@@ -161,13 +164,13 @@ describe('AI changes the app, the user runs it (UI)', () => {
     const photo = files.offer('IMG_1.jpg', TINY_JPEG, 'image/jpeg');
     await act(async () => useIncoming.getState().receive([photo]));
     await act(() => router.push('/share'));
-    // 一份文件进预览页（D-457）：快捷操作在底下的面板里，Tink 在右上角。
+    // A file enters the preview page (D-457): quick actions are in the bottom panel, and Tink is in the top right.
     await fireEvent.press(await screen.findByTestId('preview-more'));
-    // 内设的里，第一步收一张照片的才列出来（签证照片收 1 张；签回表格收 PDF，不列）。
+    // Among built-in presets, only those where the first step receives a single photo are listed (visa photos receive 1 file; sign-back forms receive PDFs and are excluded).
     expect(screen.getByTestId('share-workflow-visa-photo')).toBeTruthy();
     expect(screen.queryByTestId('share-workflow-sign-return')).toBeNull();
 
-    // 让 AI 搭一个：AI 页说明是给分享进来的文件，只知道类型和个数。
+    // Let AI assemble one: AI page instructions state it is for shared files, and it only knows the file types and counts.
     await fireEvent.press(screen.getByTestId('page-ai'));
     expect(await screen.findByTestId('change-about')).toHaveTextContent(/给分享进来的 1 张照片/);
     await fireEvent.changeText(
@@ -175,8 +178,9 @@ describe('AI changes the app, the user runs it (UI)', () => {
       '新建一个快捷操作：选照片，压到 500KB，分享',
     );
     await fireEvent.press(screen.getByTestId('change-submit'));
-    // 直接做好（D-191），回到收件页面，新做的排在最前面、标「刚做好」，不会自己运行。
-    // 给分享的文件做的不放首页，在收件页面运行。
+    // Created directly (D-191), returns to the inbox page, with newly created items sorted to the
+    // very top and labeled "Just created"; does not execute on its own. Created items for shared
+    // files are not placed on the home screen; they run on the inbox page.
     const made = await waitFor(() =>
       quickActionsOf(store.getState().config!).find((w) => !w.package && !w.preset)!,
     );

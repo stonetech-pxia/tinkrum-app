@@ -27,18 +27,16 @@ import type { FilePlatform } from '../runtime/platform';
 import { deskFileUri } from './store';
 import { WordPreview } from './WordPreview';
 
-// 房间的大预览（file-room DESIGN §4、§11.3，D-360）：图片能双指放大；PDF 一页一页左右翻（用「PDF 预览」
-// 扩展包把页面画成图，不加原生依赖）；转 Excel / 转 Word 的结果不在这里画，房间直接用编辑器（DeskEditor，D-366）；
-// 视频直接播放；外来的 docx / xlsx 在预览页上按读出来的中间格式显示（D-509，取代 §8「第一版不读外来的办公文档」），
-// 别的文件（.doc、.pptx 等）用系统预览看。全部只在本机显示，不发给 AI。
+// External docx / xlsx on the preview page (D-509): intermediate formats while loading or loaded,
+// or reasons for failure. Memory-only, writes nothing.
 
-/** 预览页上外来的 docx / xlsx（D-509）：还在读、读好的中间格式，或者读不了的原因。只在内存里，什么都不写。 */
+/** External docx / xlsx on the preview page (D-509): intermediate formats while loading or loaded, or reasons for failure. Memory-only, writes nothing. */
 export type OfficePreview = 'loading' | OfficeImport;
 
-/** PDF 一页画多大（最长边，像素）：全屏看得清，又不会太占内存。 */
+/** PDF page render size (longest side, pixels): clear on full screen without consuming excessive memory. */
 const PDF_SIDE = 1600;
 const PDF_QUALITY = 0.8;
-/** 当前页前后各留几页画好的（翻页时不用等），更远的放掉。 */
+/** Number of pre-rendered pages kept before and after the current page (avoiding wait times on page turns), dropping more distant ones. */
 const PDF_KEEP = 2;
 
 export function DeskPreview({
@@ -52,11 +50,11 @@ export function DeskPreview({
   wordDoc,
   office,
 }: {
-  /** 存过的 Word 的中间格式（D-470）：有时按编辑页的版面显示。 */
+  /** Cached intermediate format for Word documents (D-470): sometimes displayed according to the editing page layout. */
   wordDoc?: DocDoc | null;
-  /** 外来的 docx / xlsx 读出来的样子（D-509）。 */
+  /** Rendered output of external docx / xlsx files (D-509). */
   office?: OfficePreview | null;
-  /** 桌上的文件；预览页（收到的一份文件，不在桌上）改给 `uri`。 */
+  /** Files on the desk; preview page edits (received file, not on the desk) apply to `uri`. */
   desk?: Desk;
   uri?: string;
   file: DeskFile;
@@ -67,7 +65,7 @@ export function DeskPreview({
 }) {
   const window = useWindowDimensions();
   const [measured, setSize] = useState<{ width: number; height: number } | null>(null);
-  // 量出预览区的大小之前先按屏幕估（第一帧不留白）。
+  // Estimate size from screen dimensions before the preview area size is measured (prevents blank first frame).
   const size = measured ?? { width: window.width, height: Math.round(window.height * 0.5) };
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -145,7 +143,7 @@ export function DeskPreview({
   );
 }
 
-/** 只有名字、大小和「用系统预览看」（音频、.doc / .pptx 这些、读不了的 docx / xlsx、认不出的文件）。 */
+/** Displays only name, size, and "View with system preview" (audio, .doc / .pptx, unreadable docx / xlsx, unrecognized files). */
 function Generic({
   file,
   palette,
@@ -182,7 +180,7 @@ function Generic({
   );
 }
 
-/** 外来的 xlsx（D-509）：和桌上的表格编辑器一样的表格视图，只能看；几张工作表时下面有页签。 */
+/** External xlsx (D-509): spreadsheet view identical to the desk table editor, view-only; tabs at the bottom when there are multiple worksheets. */
 function TablePreview({ doc, palette }: { doc: TableDoc; palette: Palette }) {
   const [index, setIndex] = useState(0);
   const page = doc.pages[Math.min(index, doc.pages.length - 1)];
@@ -226,7 +224,7 @@ function TablePreview({ doc, palette }: { doc: TableDoc; palette: Palette }) {
   );
 }
 
-/** PDF 左右翻页：用到哪页画哪页（PDF 预览扩展包），没装时先问要不要下载。 */
+/** PDF horizontal page turning: renders pages on demand using the PDF preview pack, prompting for download if not installed. */
 function PdfPages({
   uri,
   width,
@@ -243,7 +241,7 @@ function PdfPages({
   onSystemPreview: () => void;
 }) {
   const packs = usePacks();
-  // 没有扩展包功能（测试里没有 PackHost）时当作没装。
+  // Treat as uninstalled when pack features are unavailable (no PackHost in tests).
   const [installed, setInstalled] = useState<boolean | null>(packs ? null : false);
   const [asking, setAsking] = useState(false);
   const [count, setCount] = useState<number | null>(null);
@@ -258,7 +256,7 @@ function PdfPages({
     const check = () =>
       void packs.store.isInstalled('pdfview').then((ok) => alive && setInstalled(ok));
     check();
-    // 别处（例如文件处理包的框，D-456）装好了也要跟着变。
+    // Subscribes to updates so changes reflect elsewhere (e.g., file processing pack dialog, D-456).
     const stop = packs.store.subscribe(check);
     return () => {
       alive = false;
@@ -266,7 +264,7 @@ function PdfPages({
     };
   }, [packs]);
 
-  // 画当前页和前后几页；更远的放掉（几十页的 PDF 不全留在内存里）。
+  // Renders the current page and adjacent pages, dropping distant ones (prevents keeping multi-page PDFs entirely in memory).
   useEffect(() => {
     if (!installed || !packs) return;
     let alive = true;
@@ -383,7 +381,7 @@ function PdfPages({
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
-  // 页签一行普通高度（横向 ScrollView 默认 flexGrow: 1，同 DeskEditor）。
+  // Tab row standard height (horizontal ScrollView defaults to flexGrow: 1, same as DeskEditor).
   tabs: { flexGrow: 0, flexShrink: 0 },
   tabRow: { flexDirection: 'row', gap: 8, padding: 8, alignItems: 'center' },
   tab: {
@@ -394,7 +392,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   note: { textAlign: 'center' },
-  // D-488：深色半透明的小药丸，压在页面上也看得清（不跟着主题变，纸是白的）。
+  // D-488: Dark translucent small pill, legible even when overlaid on pages (independent of theme, paper is white).
   counter: {
     position: 'absolute',
     bottom: 12,

@@ -15,11 +15,13 @@ import { builtInWorkflows, sharePresetOrder } from '../workflows/presets';
 import type { DeskTool, DeskToolsConfig } from './layout';
 import { deskKindOf, type DeskFile, type DeskKind } from './model';
 
-// 房间的工具栏（file-room DESIGN §4、§5，D-359）：没有配置时按桌上文件的种类从动作注册表生成，不写死。
-// 用一个工具 = 一个两步的工作流（输入 + 这个工具），桌上的文件当作分享进来的文件交给第一步（D-115），
-// 执行照用现有的执行器；快捷操作按钮也一样，把整个快捷操作作用到桌上的文件。
+// Room toolbar (file-room DESIGN §4, §5, D-359): when unconfigured, generated from the action
+// registry based on the file types on the desk rather than being hardcoded. Using a tool = a
+// two-step workflow (input + this tool), files on the desk are passed to the first step as if
+// shared in (D-115), and execution reuses existing executors; quick action buttons work similarly,
+// applying the entire quick action to the files on the desk.
 
-/** 默认工具栏的组：编辑（要用户亲手操作的）、处理（类型不变）、转换（类型变了，或者只出文字）、快捷操作。 */
+/** Default toolbar groups: edit (requires user manual operation), process (type unchanged), convert (type changed, or text output only), quick actions. */
 export type DeskGroupId = 'annotate' | 'pages' | 'edit' | 'adjust' | 'convert' | 'quick';
 
 export interface DeskDefaultGroup {
@@ -27,7 +29,7 @@ export interface DeskDefaultGroup {
   items: DeskTool[];
 }
 
-/** 种类 → 动作的输入类型。办公文档、别的文件是 files。 */
+/** File type -> action input type. Office documents and other files use `files`. */
 const VALUE_TYPE: Record<DeskKind, FileValueType> = {
   image: 'images',
   pdf: 'pdf',
@@ -38,12 +40,14 @@ const VALUE_TYPE: Record<DeskKind, FileValueType> = {
   other: 'files',
 };
 
-/** 默认工具栏里最多几个快捷操作。 */
+/** Maximum number of quick actions in the default toolbar. */
 const MAX_QUICK = 8;
 
 /**
- * 这个动作能不能当桌上的一个工具：选输入、输出（分享、保存、打印、记一笔）和整理文件（命名、筛选、排序、
- * 加上已有文件）是房间自己的事（「完成」、桌上的名字），不放进工具栏。
+ * Whether an action can act as a tool on the desk: selecting inputs, outputs (share, saving,
+ * printing, logging an expense), and file organization (naming, filtering, sorting, adding
+ * existing files) are room-specific functions ("Done", desk names) and are not placed in the
+ * toolbar.
  */
 function isDeskAction(action: ActionDefinition): boolean {
   if (isSourceAction(action)) return false;
@@ -51,8 +55,10 @@ function isDeskAction(action: ActionDefinition): boolean {
 }
 
 /**
- * 这种文件能用这个动作吗：动作的输入里明确写了这种类型（images、pdf、video、audio）。
- * 办公文档只接受「收文件、但不收图片和 PDF」的动作（文档转 PDF）：收任何文件的（合并、打包）对它们没有意义。
+ * Whether this file type can use this action: the action's input explicitly specifies this type
+ * (images, pdf, video, audio). Office documents only accept actions that "accept files but not
+ * images and PDFs" (document-to-PDF); actions accepting any file (merge, bundle) are meaningless
+ * for them.
  */
 function fitsKind(action: ActionDefinition, kind: DeskKind): boolean {
   const type = VALUE_TYPE[kind];
@@ -66,14 +72,15 @@ function fitsKind(action: ActionDefinition, kind: DeskKind): boolean {
 }
 
 /**
- * 配置的工具栏上能不能放这个动作：点了能跑（比 fitsKind 宽：fitsKind 只决定默认工具栏列哪些，
- * 用户要的「打包这份文档」类型接得上就能放，底线 19）。
+ * Whether this action can be placed on the configured toolbar: can run when tapped (broader than
+ * `fitsKind`; `fitsKind` only determines default toolbar listings, whereas user-requested actions
+ * like "bundle this document" can be placed if types are compatible, invariant 19).
  */
 export function deskActionFits(action: ActionDefinition, kind: DeskKind): boolean {
   return isDeskAction(action) && actionAccepts(action, VALUE_TYPE[kind]);
 }
 
-/** PDF 的工具栏按用途分：标注（在页面上画、写、签）、页面（整理、拆分）；其余按下面的「处理、转换」。 */
+/** PDF toolbar grouped by purpose: annotate (draw, write, sign on the page), pages (organize, split); others follow processing and conversion below. */
 const PDF_GROUP: Readonly<Record<string, DeskGroupId>> = {
   'pdf.annotate': 'annotate',
   'pdf.sign': 'annotate',
@@ -86,7 +93,7 @@ const PDF_GROUP: Readonly<Record<string, DeskGroupId>> = {
   'pdf.pageNumbers': 'pages',
 };
 
-/** PDF 桌面不放的工具：压缩（预览页的「更多」里有「PDF 太大传不上去」）。 */
+/** Tools excluded from the PDF desk: compression (available under "More" on the preview page if the PDF is too large to upload). */
 const PDF_LEFT_OUT: ReadonlySet<string> = new Set(['pdf.compress']);
 
 function groupOf(action: ActionDefinition, kind: DeskKind): DeskGroupId {
@@ -98,8 +105,9 @@ function groupOf(action: ActionDefinition, kind: DeskKind): DeskGroupId {
 }
 
 /**
- * 默认工具栏：注册表里这种文件能用的工具，按「编辑、处理、转换」分组（注册表的顺序），
- * 最后是接得上这种文件的快捷操作（自己的在前，内设的按这类文件最常用的排，D-237）。空的组不出现。
+ * Default toolbar: usable tools for this file type from the registry, grouped by "edit, process,
+ * convert" (in registry order), followed by compatible quick actions (custom ones first,
+ * built-ins sorted by most common for this file type, D-237). Empty groups are omitted.
  */
 export function defaultDeskTools(
   kind: DeskKind,
@@ -119,7 +127,7 @@ export function defaultDeskTools(
     if (!isDeskAction(action) || !fitsKind(action, kind)) continue;
     if (kind === 'pdf' && PDF_LEFT_OUT.has(action.id)) continue;
     const group = groupOf(action, kind);
-    // 标注 PDF 的每种起手工具各占一个按钮（插入文字、注释、画笔……）。
+    // Each starting tool for annotating a PDF gets its own button (insert text, annotation, brush...).
     if (kind === 'pdf' && action.id === 'pdf.annotate' && action.presets) {
       for (const preset of action.presets)
         groups[group].push({ action: action.id, preset: preset.id });
@@ -129,8 +137,9 @@ export function defaultDeskTools(
   }
   const sample = SAMPLE_FILE[kind];
   if (sample) {
-    // PDF 桌面只放用户自己的快捷操作：内设的（压缩、转 Word、翻译、转音频……）要么已经是上面的工具，
-    // 要么和编辑 PDF 本身无关，在预览页的「更多」里仍然有。
+    // PDF desk only includes user's own quick actions: built-in ones (compress, convert to Word,
+    // translate, convert to audio...) are either already tools above or unrelated to PDF editing
+    // itself, and remain available under "More" on the preview page.
     const builtIns = kind === 'pdf' ? [] : builtInWorkflows(workflows, locale);
     const order = sharePresetOrder([sample]);
     const rank = (wf: Workflow) => {
@@ -148,7 +157,7 @@ export function defaultDeskTools(
     .map((id) => ({ id, items: groups[id] }));
 }
 
-/** 判断快捷操作接不接得上这种文件时用的样本（只看类型）。 */
+/** Sample used when determining whether a quick action is compatible with this file type (checks type only). */
 const SAMPLE_FILE: Record<DeskKind, SharedFileInfo | null> = {
   image: { name: 'a.jpg', mimeType: 'image/jpeg', size: 1 },
   pdf: { name: 'a.pdf', mimeType: 'application/pdf', size: 1 },
@@ -167,11 +176,11 @@ const SAMPLE_FILE: Record<DeskKind, SharedFileInfo | null> = {
   other: null,
 };
 
-/** 桌上的几份文件当作分享进来的文件时的样子（快捷操作接不接得上按它判断）。 */
+/** Representation of files on the desk when treated as shared-in files (used to check quick action compatibility). */
 export const deskShareInfos = (files: readonly DeskFile[]): SharedFileInfo[] =>
   files.map((f) => ({ name: `${f.name}.${f.ext}`, mimeType: f.mimeType, size: f.size }));
 
-/** 收桌上这几份文件的输入步骤：按种类选，个数正好是这几份。 */
+/** Input step for these files on the desk: selected by type, with the exact count of these files. */
 export function deskInputStep(files: readonly DeskFile[]): WorkflowStep {
   const kinds = new Set(files.map(deskKindOf));
   const n = Math.max(1, files.length);
@@ -206,8 +215,9 @@ export function deskInputStep(files: readonly DeskFile[]): WorkflowStep {
 }
 
 /**
- * 用一个工具时跑的工作流：输入 + 这个工具。params 是用户在参数面板里定的（不写时用工具的默认参数）。
- * 接不上这些文件（类型不对、参数不对）时返回 null，工具栏上这一项变灰。
+ * Workflow run when using a single tool: input + this tool. `params` are defined by the user in
+ * the parameter panel (uses tool defaults if omitted). Returns null if incompatible with these
+ * files (wrong type, invalid params), causing the toolbar item to appear dimmed.
  */
 export function deskToolWorkflow(
   actionId: string,
@@ -226,7 +236,7 @@ export function deskToolWorkflow(
       { id: 'desk-step', action: actionId, params: params ?? initialParams(action) },
     ],
   };
-  // 默认参数可能还不完整（例如文字戳要写字）：先只检查类型接不接得上，参数在面板里填好再检查。
+  // Default parameters may still be incomplete (e.g., text stamp requires text): initially check only type compatibility, and validate parameters after they are filled in the panel.
   const problems = workflowProblems(workflow, registry).filter(
     (p) => params !== undefined || p.code !== 'params' || p.stepId !== 'desk-step',
   );
@@ -234,10 +244,13 @@ export function deskToolWorkflow(
 }
 
 /**
- * 房间里单用一个工具时，先弹出参数面板问哪些参数（D-363）。规则只有一条：
- * 参数写了 `ask: false`（默认值就是对的，例如识别语言「自动」，D-278）的不问；密码不在面板里（执行器跑的时候问）；
- * 剩下的都问。一个都不用问、而且默认参数能用时返回 []：直接跑，不弹面板。
- * 默认参数不能用（例如文字戳要写字）时，就算都写了 ask: false 也问全部，免得跑一个必然失败的工具。
+ * When using a single tool in the room, pop up the parameter panel to ask for specific parameters
+ * (D-363). Rule: parameters with `ask: false` (default value is correct, e.g., recognition
+ * language "auto", D-278) are not asked; passwords are not in the panel (asked when executor
+ * runs); the rest are asked. Returns [] if none need to be asked and default parameters are
+ * usable: runs directly without popping up the panel. If default parameters are unusable (e.g.,
+ * text stamp needs text), asks for all even if marked `ask: false`, to avoid running a
+ * guaranteed-to-fail tool.
  */
 export function deskToolAsks(action: ActionDefinition): string[] {
   const shown = action.fields.filter((f) => f.kind !== 'secret');
@@ -246,16 +259,16 @@ export function deskToolAsks(action: ActionDefinition): string[] {
   return action.params.safeParse(initialParams(action)).success ? [] : shown.map((f) => f.key);
 }
 
-/** 快捷操作能不能作用到桌上这几份文件（看它的第一步，和收件页面一样）。 */
+/** Whether a quick action can apply to these files on the desk (checks its first step, same as the inbox page). */
 export const deskWorkflowFits = (workflow: Workflow, files: readonly DeskFile[]) =>
   files.length > 0 && shareFit(workflow, deskShareInfos(files)).ok;
 
-/** 配置里写的组 → 和默认的一样的写法（标题是配置里的文字）。 */
+/** Groups written in config -> same format as defaults (title is text from config). */
 export type DeskGroup = { title?: string; id?: DeskGroupId; items: DeskTool[] };
 
 /**
- * 这种文件的工具栏：配置里写了就用配置的（DeskLayout.tools），否则用默认的。
- * 配置里指向已经没有的动作、快捷操作的项不显示。
+ * Toolbar for this file type: uses config if specified (`DeskLayout.tools`), otherwise defaults.
+ * Items pointing to non-existent actions or quick actions in the config are hidden.
  */
 export function deskToolbar(
   kind: DeskKind,

@@ -12,8 +12,8 @@ import { toolEntries } from '../desk/DeskToolbar';
 import { runsHere } from '../runtime/device-support';
 import { shareRecommendations } from '../share/recommendations';
 
-// PDF 密码（加密码、去掉密码）只有 iOS 做了（P-025）。Android 上没有原生模块（测试里也没有），
-// 入口不显示：创始人 2026-10-31「识别安卓，不要显示这个功能」。
+// PDF passwords (add/remove password) implemented only on iOS (P-025). No native module on Android
+// (nor in tests), entry not shown: founder 2026-10-31 "Identify Android, do not show this feature".
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const config = createDefaultWorkspace('zh');
@@ -30,13 +30,13 @@ const protect: Workflow = {
   ],
 };
 
-describe('没有 PDF 密码模块的手机', () => {
-  it('用到密码的快捷操作不能在这里运行', () => {
+describe('Phones without PDF password module', () => {
+  it('Quick actions using passwords cannot run here', () => {
     expect(runsHere(protect)).toBe(false);
     expect(runsHere({ ...protect, steps: protect.steps.slice(0, 1) })).toBe(true);
   });
 
-  it('PDF 桌面的工具栏没有加密码、去掉密码', () => {
+  it('PDF desk toolbar lacks add/remove password', () => {
     const file = {
       id: 'f',
       name: 'a',
@@ -59,7 +59,7 @@ describe('没有 PDF 密码模块的手机', () => {
     expect(items.filter((i) => i === 'pdf-protect' || i === 'pdf-unlock')).toEqual([]);
   });
 
-  it('收件页不推荐，「查看全部」里也没有', () => {
+  it('Inbox does not recommend, nor is it present in "View all"', () => {
     const result = shareRecommendations(
       [...quickActionsOf(config), protect],
       [pdf],

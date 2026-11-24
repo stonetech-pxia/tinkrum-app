@@ -1,5 +1,6 @@
-# 本地 Expo 模块（D-186）：用系统的文档预览（WKWebView）和打印排版，在本机把 Word、Excel、PowerPoint 转成 PDF。
-# 只依赖 Apple 系统框架，没有第三方代码。
+# Local Expo module (D-186): uses system document preview (WKWebView) and print formatting to
+# convert Word, Excel, PowerPoint into PDF locally on the device. Depends only on Apple system
+# frameworks with no third-party code.
 
 Pod::Spec.new do |s|
   s.name           = 'MorphDocs'

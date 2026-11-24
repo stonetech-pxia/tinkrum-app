@@ -1,6 +1,6 @@
 import { MEDIA_MIME_BY_EXT, OFFICE_MIME_BY_EXT } from '@morph/core';
 
-// 文件名 / 扩展名 / MIME 之间的换算（纯函数）。单独一个文件：存储也要用，不该为此依赖动作的公共工具（R11）。
+// Conversion between filenames, extensions, and MIME types (pure function). In a separate file: storage needs it too and should not depend on action common utilities for this (R11).
 
 const MIME_BY_EXT: Record<string, string> = {
   pdf: 'application/pdf',
@@ -20,7 +20,7 @@ const MIME_BY_EXT: Record<string, string> = {
 export const extOf = (name: string) => /\.([^./]+)$/.exec(name)?.[1]?.toLowerCase() ?? '';
 export const baseName = (name: string) => name.replace(/\.[^./]+$/, '');
 export const mimeOfExt = (ext: string) => MIME_BY_EXT[ext] ?? 'application/octet-stream';
-/** MIME 对应的扩展名（名字里没有扩展名时用）；认不出时是空的。 */
+/** Extension corresponding to MIME type (used when filename lacks an extension); empty if unrecognized. */
 export const extOfMime = (mime: string | null | undefined) =>
   Object.keys(MIME_BY_EXT).find((ext) => MIME_BY_EXT[ext] === mime?.toLowerCase()) ?? '';
 

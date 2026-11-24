@@ -8,7 +8,7 @@ import { bindRecord } from './record-pages';
 import type { BlockOf, Collection, WorkspaceConfig } from './schema';
 import { registry } from './test-helpers';
 
-// 给一条记录用的页面（D-342）：项目页列出这个项目的任务，任务页列出它的子任务。
+// Page for a single record (D-342): project pages list tasks for the project, and task pages list subtasks.
 
 const projects: Collection = {
   id: 'projects',
@@ -97,7 +97,7 @@ describe('a page for one entry', () => {
       problems([
         projectPage([list('l', 'tasks', { filter: [{ field, op: 'is', value: '$record' }] })], of),
       ]).join();
-    // 父任务指向任务表，不是项目。
+    // Parent task points to the tasks table, not projects.
     expect(filter('parent')).toMatch(
       /only works with is \/ isNot on a link field that points at projects/,
     );
@@ -242,7 +242,7 @@ describe('binding the entry when the page opens', () => {
   });
 });
 
-// D-352：底部弹出的添加框（浮动的「+」）一页一个，不能放进分组。
+// D-352: bottom-popped add box (floating "+") is one per page and cannot be placed inside groups.
 describe('a floating add', () => {
   const sheet = (id: string, extra: Record<string, unknown> = {}) => ({
     id,
@@ -298,7 +298,7 @@ describe('the opened entry in a single block (D-558)', () => {
         addHome(list('all', 'projects', { opens: 'project' })),
       ]),
     ).toEqual([]);
-    // 分组里的也一样。
+    // Same for items inside groups.
     expect(
       problems([
         projectPage([

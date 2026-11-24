@@ -21,8 +21,9 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
-// D-254：更新的 App 存下的配置里有这个版本不认识的组件。页面照常打开，那个位置显示「需要更新 App」，
-// 长按只能移动和删除，保存时原样写回。
+// D-254: Stored configuration from a newer app contains a component unrecognized by this version.
+// The page opens as usual, that position displays "App update required", long-press only allows
+// moving and deleting, and it is written back as-is upon saving.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -45,7 +46,7 @@ const memorySecrets = (): SecretStore => {
 async function renderWithNewerConfig(locale: Locale) {
   const repo = new MemoryWorkspaceRepo();
   const config = createDefaultWorkspace(locale);
-  // 存下来的 JSON 来自更新的 App：组件类型这个版本不认识。
+  // The saved JSON comes from a newer app: component type is not recognized by this version.
   const stored = {
     ...config,
     containers: {

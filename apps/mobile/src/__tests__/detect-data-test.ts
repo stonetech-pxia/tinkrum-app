@@ -2,7 +2,7 @@ import { prefillRecord, type Field } from '@morph/core';
 
 import { detectDataWith, prepareDataDetection } from '../runtime/detect-data';
 
-// 系统识别只做规则的补充：出问题时返回空，预填照样用规则。
+// System recognition only acts as rule supplementation: return empty on issues, prefill still uses rules.
 
 const TEXT = 'Corner Deli\nPaid on 3 March\nTotal 8.40';
 const FIELDS = [
@@ -52,7 +52,7 @@ describe('detectDataWith', () => {
       { kind: 'date', start: 20, end: 27, value: '2026-03-03' },
       { kind: 'amount', start: 34, end: 38 },
     ]);
-    // 规则没找到的日期由系统补上。
+    // Dates not found by rules are supplemented by the system.
     const result = prefillRecord({ text: TEXT, locale: 'en', fields: FIELDS, system: found });
     expect(result.values.day).toEqual({ value: '2026-03-03', source: 'system' });
   });
@@ -102,7 +102,7 @@ describe('prepareDataDetection', () => {
     expect(await prepareDataDetection(v, 'zh', ask, m)).toBe(false);
     expect(ask).toHaveBeenCalledTimes(1);
     expect(v.downloads).toEqual([]);
-    // 别的语言照样会问。
+    // Other languages will still prompt.
     await prepareDataDetection(v, 'en', ask, m);
     expect(ask).toHaveBeenCalledTimes(2);
   });

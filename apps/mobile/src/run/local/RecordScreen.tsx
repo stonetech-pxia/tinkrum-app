@@ -17,11 +17,12 @@ import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 import { formatTime } from './TrimScreen';
 
-// 录音（D-154）：大按钮开始 / 暂停 / 继续，计时和音量条；锁屏后继续录（app.json 里 expo-audio 的
-// 后台录音：iOS 后台音频，Android 前台服务和「正在录音」通知）。录成 M4A（AAC 单声道 64 kbps，
-// 一小时约 28 MB），录完交给下一步；录音只在本机。
+// Voice recording (D-154): large button for start / pause / resume, timer and level meter;
+// continues recording after lock screen (expo-audio background recording in app.json: iOS
+// background audio, Android foreground service and "Recording" notification). Recorded as M4A (AAC
+// mono 64 kbps, ~28 MB per hour), handed to the next step upon completion; recording stays local.
 
-/** 说话录音：单声道 64 kbps 足够清楚，也方便后面转文字。 */
+/** Voice recording: mono 64 kbps is clear enough and convenient for subsequent speech-to-text. */
 export const VOICE_RECORDING: RecordingOptions = {
   extension: '.m4a',
   sampleRate: 44100,
@@ -39,7 +40,7 @@ export const VOICE_RECORDING: RecordingOptions = {
   web: { mimeType: 'audio/webm', bitsPerSecond: 64000 },
 };
 
-/** 音量（分贝，-160–0）→ 0–1：-50 dB 以下算安静。 */
+/** Audio level (dB, -160 to 0) to 0–1: below -50 dB is considered silent. */
 export const levelOf = (db: number | undefined) =>
   db === undefined ? 0 : Math.max(0, Math.min(1, (db + 50) / 50));
 
@@ -57,7 +58,7 @@ export function RecordScreen({
   const [phase, setPhase] = useState<Phase>('idle');
   const [denied, setDenied] = useState(false);
   const [failed, setFailed] = useState(false);
-  // 打开就开始录、点一下停止并继续（in.audio 的 autoStart，D-587）。
+  // Start recording immediately upon opening, tap once to stop and continue (in.audio autoStart, D-587).
   const quick = input.autoStart === true;
   const starting = useRef(false);
 
@@ -87,8 +88,10 @@ export function RecordScreen({
       try {
         await recorder.prepareToRecordAsync();
       } catch {
-        // 刚录完一段马上再录时，expo-audio 的后台录音服务正在关闭，有时 5 秒内连不上（三星 SM-S948B 实测
-        // 连录 8 段有 3 段），过一会儿再试就好。
+        // Right after finishing a recording and starting another, expo-audio's background recording
+        // service is shutting down, occasionally failing to connect within 5 seconds (Samsung
+        // SM-S948B test: 3 out of 8 consecutive recordings failed), so waiting briefly before
+        // retrying resolves it.
         await new Promise((resolve) => setTimeout(resolve, 1000));
         await recorder.prepareToRecordAsync();
       }
@@ -96,20 +99,20 @@ export function RecordScreen({
       setFailed(false);
       setPhase('recording');
     } catch {
-      // 没有麦克风（模拟器、被别的 App 占着）：说一句，可以再试。
+      // No microphone (simulator, occupied by another app): report it so the user can retry.
       setFailed(true);
     }
   }
 
   useEffect(() => {
     if (quick) void start();
-    // 只在打开时开始一次。
+    // Start only once upon opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function toggle() {
     if (phase === 'idle') return void start();
-    // 打开就录的：录着时这个按钮是「停止并继续」，直接交给下一步。
+    // For auto-start recordings: while recording, this button acts as "Stop and continue", directly handing over to the next step.
     if (quick && phase === 'recording') return void finish();
     if (phase === 'recording') {
       recorder.pause();
@@ -220,7 +223,7 @@ export function RecordScreen({
   );
 }
 
-/** 音量条：20 格，亮几格看现在多大声。 */
+/** Level meter: 20 bars, lit up based on current volume level. */
 function Meter({ level, palette }: { level: number; palette: Palette }) {
   const lit = Math.round(level * 20);
   return (

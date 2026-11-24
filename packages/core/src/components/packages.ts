@@ -6,14 +6,14 @@ import { duplicates, type LookDefinitionOf, defineLook } from './define';
 
 const shape = {
   show: z.strictObject({ title: boundedText(1, 60).optional() }).optional(),
-  /** 读工具包目录；点没添加的先添加（内核工具），再打开。不写 ids = 同一页其他宫格没列出的。 */
+  /** Read tool pack catalog; tap unadded items to add them first (core tools), then open. If ids are omitted = other unlisted grid items on the same page. */
   source: z.strictObject({
     catalog: z.literal('packages'),
     ids: z.array(IdSchema).min(1).max(30).optional(),
   }),
 };
 
-/** 工具宫格（原 toolGrid，D-181）。 */
+/** Tool grid (formerly toolGrid, D-181). */
 export const packagesComponent: LookDefinitionOf<'packages', typeof shape> = defineLook({
   look: 'packages',
   shape,

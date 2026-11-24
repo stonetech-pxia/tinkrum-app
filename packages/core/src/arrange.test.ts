@@ -6,7 +6,7 @@ import { childrenOf, type KnownComponent, type Page, type WorkspaceConfig } from
 import { apply, registry, workspace } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-/** 首页：标题、分组（a、b）、添加工具、最近文件。 */
+/** Home screen: title, groups (a, b), add tool, recent files. */
 function arranged(): WorkspaceConfig {
   return apply(workspace(), [
     {
@@ -196,9 +196,9 @@ describe('coalesceOps', () => {
         changes: { style: { backdrop } },
       }) as Op;
     for (const ops of [
-      // 选了图片再调遮罩：图片要留着。
+      // Selected an image and then adjusted the overlay: the image must be kept.
       [style({ assetId: 'abc123def' }), style({ overlay: 'strong' })],
-      // 关掉以后再打开：不能把关掉之前的图片带回来。
+      // Turned off and opened again: must not bring back the image from before it was turned off.
       [style({ assetId: 'abc123def' }), style(null), style({ overlay: 'light' })],
       [style({ overlay: 'light' }), style({ assetId: null }), style({ overlay: 'medium' })],
     ]) {
@@ -209,7 +209,7 @@ describe('coalesceOps', () => {
 });
 
 describe('two levels of groups (Q3)', () => {
-  /** 首页：标题、外层分组 grid（a、内层分组 inner（x）、b）、添加工具、最近文件。 */
+  /** Home screen: title, outer group grid (a, inner group inner (x), b), add tool, recent files. */
   function nested(): WorkspaceConfig {
     return apply(arranged(), [
       {
@@ -258,9 +258,9 @@ describe('two levels of groups (Q3)', () => {
     const slots = dropSlots(home(c), 'loose');
     expect(slots.filter((s) => s.parentId === 'grid')).toHaveLength(4);
     expect(slots.some((s) => s.parentId === 'inner')).toBe(false);
-    // 放着分组的分组只能在页面顶层。
+    // Groups containing other groups can only reside at the top level of the page.
     expect(dropSlots(page, 'grid').every((s) => s.parentId === undefined)).toBe(true);
-    // 普通块两层都能放。
+    // Regular blocks can be placed at both levels.
     expect(dropSlots(page, 'catalog').filter((s) => s.parentId === 'inner')).toHaveLength(2);
     run(c, dropOp(home(c), 'loose', { parentId: 'grid', index: 0 }));
   });

@@ -24,7 +24,7 @@ import {
 } from './schema';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 
-// 按记录排的提醒（D-316–D-319）。
+// Reminders sorted by record (D-316–D-319).
 
 const habits: Collection = {
   id: 'habits',
@@ -55,7 +55,7 @@ const perHabit: Reminder = {
 const each = (table: string, field: string, at = '20:00') => ({
   when: { each: { table, field }, at },
 });
-// 2026-10-22 是周四，中午。
+// 2026-10-22 is Thursday, noon.
 const now = new Date(2026, 9, 22, 12);
 const today = dayNumber('2026-10-22')!;
 const ctx = { registry, locale: 'zh' as const, now };
@@ -99,19 +99,19 @@ describe('scheduleOccurrences', () => {
       today + 1,
       today + 2,
     ]);
-    // 每 3 天，上次在 5 天前：已经过期，今天提醒，之后每 3 天。
+    // Every 3 days, last 5 days ago: already overdue, remind today, then every 3 days.
     expect(scheduleOccurrences({ repeat: 'interval', every: 3 }, [today - 5], today, 3)).toEqual([
       today,
       today + 3,
       today + 6,
     ]);
-    // 每周一、三、五（今天周四）：周五、下周一、下周三。
+    // Every Monday, Wednesday, and Friday (today is Thursday): Friday, next Monday, next Wednesday.
     expect(scheduleOccurrences({ repeat: 'weekdays', days: [1, 3, 5] }, [], today, 3)).toEqual([
       today + 1,
       today + 4,
       today + 6,
     ]);
-    // 每周 2 次，这周已经做了 2 天：下周一起。
+    // Twice a week, already done for 2 days this week: starting next Monday.
     const monday = today - 3;
     expect(
       scheduleOccurrences(
@@ -145,7 +145,7 @@ describe('reminder settings per entry (D-316)', () => {
     const bad = (r: Partial<Reminder> | Record<string, unknown>) =>
       prepare([{ op: 'addTool', tool: { ...perHabit, ...r } as Reminder }]).ok;
     expect(bad({})).toBe(true);
-    expect(bad(each('habits', 'last'))).toBe(false); // 不是日程字段
+    expect(bad(each('habits', 'last'))).toBe(false); // Not a schedule field
     expect(bad(each('missing', 'plan'))).toBe(false);
     expect(bad({ unless: { table: 'missing', within: 'day' } })).toBe(false);
     expect(bad({ unless: { table: 'checkins', within: 'day', link: 'day' } })).toBe(false);
@@ -159,19 +159,19 @@ describe('reminder settings per entry (D-316)', () => {
         },
       }),
     ).toBe(false);
-    // 「完成」不能写文字，increment 要数字字段。
+    // "Done" cannot write text; increment requires a numeric field.
     expect(bad({ done: { do: 'set', table: 'habits', field: 'name', value: 'x' } })).toBe(false);
     expect(bad({ done: { do: 'increment', table: 'habits', field: 'last', by: 1 } })).toBe(false);
     expect(bad({ done: { do: 'set', table: 'habits', field: 'last', value: 'today' } })).toBe(true);
-    // 「完成」不能运行快捷操作，也不能打开表单（关系规则 13）。
+    // "Done" cannot run quick actions or open forms (relation rule 13).
     expect(bad({ done: { tool: 'pdf-merge' } })).toBe(false);
     expect(bad({ done: { do: 'create', table: 'checkins', ask: 'all' } })).toBe(false);
-    // 关系规则 12：在别的表新建要连回这一条。
+    // Relation rule 12: creating in another table must link back to this entry.
     expect(bad({ done: { do: 'create', table: 'checkins', values: { day: 'today' } } })).toBe(
       false,
     );
     expect(bad({ snoozeMinutes: 2 })).toBe(false);
-    // unless、done、snoozeMinutes 只用在 when.each 上。
+    // unless, done, and snoozeMinutes are only used on when.each.
     expect(bad({ when: { every: 'day', at: '09:00' }, snoozeMinutes: 10 })).toBe(false);
   });
 
@@ -257,7 +257,7 @@ describe('planNotifications per entry (D-316, D-319)', () => {
     expect(water[0]!.trigger).toEqual({ kind: 'date', at: atLocal('2026-10-27', '20:00') });
     expect(water[1]!.trigger).toEqual({ kind: 'date', at: atLocal('2026-11-03', '20:00') });
     expect(planned.some((n) => n.recordId === 'none')).toBe(false);
-    // 最近的在前。
+    // Most recent first.
     const times = planned.map((n) => (n.trigger as { at: number }).at);
     expect(times).toEqual([...times].sort((a, b) => a - b));
   });
@@ -275,7 +275,7 @@ describe('planNotifications per entry (D-316, D-319)', () => {
     const planned = planNotifications(c, records, now, 'zh');
     const pill = planned.filter((n) => n.recordId === 'pill');
     expect(pill[0]!.trigger).toEqual({ kind: 'date', at: atLocal('2026-10-22', '13:30') });
-    // 一次：只排那一次。
+    // One-off: schedule only that single time.
     expect(planned.filter((n) => n.recordId === 'call').map((n) => n.trigger)).toEqual([
       { kind: 'date', at: atLocal('2026-10-24', '08:15') },
     ]);
@@ -319,7 +319,7 @@ describe('planNotifications per entry (D-316, D-319)', () => {
     );
     const planned = planNotifications(c, new Map([['habits', many]]), now, 'zh');
     expect(planned).toHaveLength(MAX_RECORD_NOTIFICATIONS);
-    // 20 条 × 7 天里只留最近的：今天和明天的 40 条。
+    // Keep only the most recent ones within 20 items × 7 days: 40 items for today and tomorrow.
     const last = Math.max(...planned.map((n) => (n.trigger as { at: number }).at));
     expect(last).toBe(atLocal('2026-10-23', '20:00'));
   });
@@ -345,7 +345,7 @@ describe('planNotifications per entry (D-316, D-319)', () => {
     const planned = planNotifications(withOthers, new Map([['habits', many]]), now, 'zh', {
       reserved: 4,
     });
-    // 20 条每周提醒 + 4 条稍后提醒占掉 24 个位置，按记录的只剩 40 个。
+    // 20 weekly reminders + 4 snooze reminders take 24 slots, leaving 40 based on records.
     expect(planned.filter((n) => n.trigger.kind === 'weekly')).toHaveLength(20);
     expect(planned).toHaveLength(MAX_PENDING_NOTIFICATIONS - 4);
     const fewer = planNotifications(withOthers, new Map([['habits', many]]), now, 'zh', {
@@ -376,7 +376,7 @@ describe('unless (D-317)', () => {
     const planned = planNotifications(linked, records, now, 'zh');
     const days = (id: string) =>
       planned.filter((n) => n.recordId === id).map((n) => n.id.split('-').pop());
-    // 跑步今天打过卡了：今天不提醒，明天照常；读书今天照常。
+    // Already checked in for running today: no reminder today, tomorrow as usual; reading as usual today.
     expect(days('run')[0]).toBe(String(today + 1));
     expect(days('read')[0]).toBe(String(today));
   });
@@ -393,7 +393,7 @@ describe('unless (D-317)', () => {
     ]);
     const r = remindersOf(weekly)[0]!;
     const records = new Map([['checkins', [checkin('c1', 'run', new Date(2026, 9, 20, 8))]]]);
-    // 周二打过卡：这周（到周日 10-25）都不提醒，下周一照常。
+    // Checked in on Tuesday: no reminders for this week (until Sunday 10-25), next Monday as usual.
     expect(reminderSkipped(r, run, today, weekly, records, now)).toBe(true);
     expect(reminderSkipped(r, run, today + 3, weekly, records, now)).toBe(true);
     expect(reminderSkipped(r, run, today + 4, weekly, records, now)).toBe(false);
@@ -424,7 +424,7 @@ describe('unless (D-317)', () => {
     expect(reminderSkipped(r, run, today + 1, anyCheckin, map(dated('2026-10-22')), now)).toBe(
       false,
     );
-    // 没有日期的不符合筛选。
+    // No date does not match the filter.
     expect(reminderSkipped(r, run, today, anyCheckin, map(dated()), now)).toBe(false);
   });
 

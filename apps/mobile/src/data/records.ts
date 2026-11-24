@@ -23,19 +23,23 @@ import type { StoredRecord, WorkspaceRepo } from '../storage/types';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '../workspace/context';
 import type { RecordToast, WorkspaceState } from '../workspace/store/types';
 
-// 用户记录的读写。只由用户在页面上的操作触发，直接写数据库，不经过 AI、不生成版本
-// （docs/DATA_DESIGN.md）。AI 拿到的只有 WorkspaceConfig，而记录从不进入配置。
+// Read and write operations for user records. Triggered exclusively by user actions on pages,
+// writing directly to the database without passing through AI or generating versions
+// (`docs/DATA_DESIGN.md`). The AI only receives `WorkspaceConfig`, while records never enter the
+// configuration.
 
 /**
- * 一张表现在的版本（D-555）：「不知道写了哪张表」的次数加上这张表自己写过的次数。只有这张表（或者所有表）
- * 写过以后才变。
+ * Current version of a table (D-555): the count of "unknown table write" events plus the table's
+ * own write count. Changes only after this specific table (or any table) is modified.
  */
 export const tableVersion = (s: WorkspaceState, collectionId: string) =>
   `${s.recordsAll}.${s.tableVersions[collectionId] ?? 0}`;
 
 /**
- * 读这几张表的组件用：它们的版本连成一串，只有其中一张写过以后才变（别的表写了，组件不重来）。
- * 返回表 ID → 版本。ids 要稳定（useMemo），顺序和内容一样时结果一样。
+ * Used by components reading these tables: joins their versions into a string, changing only
+ * after any of the tables is written (if other tables change, components do not re-render).
+ * Returns table ID -> version map. `ids` must be stable (`useMemo`), producing identical results
+ * when order and content match.
  */
 function useTableVersions(ids: readonly string[]): ReadonlyMap<string, string> {
   const key = useWorkspace((s) => ids.map((id) => tableVersion(s, id)).join(','));
@@ -46,10 +50,13 @@ function useTableVersions(ids: readonly string[]): ReadonlyMap<string, string> {
 }
 
 /**
- * 读一张表的记录。同一个版本（tableVersion）里、同时在读的几个组件共用一次读取，读完就不留（R13）：
- * 一次写入之后所有显示这张表的组件一起重新读，不再每个组件各读一遍整张表。
- * 只共用「还在读」的那一次：版本不同不共用（写入之后的读一定在写入之后开始），读完的不缓存（别处的写入照样读得到）。
- * 每个组件拿到自己的数组（记录对象共用，只读）。
+ * Reading table records. Multiple components reading simultaneously within the same version
+ * (`tableVersion`) share a single read operation, discarding results afterward (R13): after a
+ * write, all components displaying this table re-read together rather than each component
+ * re-reading the entire table individually. Sharing applies only to ongoing reads: different
+ * versions are not shared (reads after a write always start post-write), and completed reads are
+ * not cached (subsequent writes elsewhere remain visible). Each component receives its own array
+ * (record objects are shared, read-only).
  */
 const tableReads = new WeakMap<WorkspaceRepo, Map<string, Promise<DataRecord[]>>>();
 
@@ -74,7 +81,7 @@ export function readTable(
   return read.then((rows) => rows.slice());
 }
 
-/** 按各表的版本读（共用还在读的那一次）；不在 versions 里的表直接读，不共用。 */
+/** Reads according to table versions (sharing ongoing reads); tables absent from `versions` are read directly without sharing. */
 const readAt =
   (repo: WorkspaceRepo, versions: ReadonlyMap<string, string>) =>
   (id: string): Promise<DataRecord[]> => {
@@ -83,9 +90,12 @@ const readAt =
   };
 
 /**
- * 一张表算好的记录（查找、汇总、上一条，D-291），同一页上读这张表的几个块共用一次计算（D-555）。
- * 和 readTable 一样只共用「还在算」的那一次：要读的每张表的版本都一样、用的是同一份配置（草稿预览时是另一份）
- * 和同一个日历设置才共用；算完就不留。每个块拿到自己的数组（记录对象共用，只读）。
+ * Computed records for a table (lookups, rollups, previous entry, D-291). Multiple blocks reading
+ * this table on the same page share a single computation (D-555). Like `readTable`, sharing
+ * applies only to ongoing computations: shared only when all target tables have identical
+ * versions, use the same configuration (a different one during draft preview), and share calendar
+ * settings; discarded after computation finishes. Each block receives its own array (record
+ * objects are shared, read-only).
  */
 interface Computation {
   collections: readonly Collection[];
@@ -127,7 +137,7 @@ function computeTable(
   return entry.result.then((r) => ({ view: r.view, records: r.records.slice() }));
 }
 
-/** 某张表未删除的全部记录；这张表增删改后自动刷新。null 表示还在读取。 */
+/** All undeleted records of a table; automatically refreshed after records are added, deleted, or modified. Null indicates loading is in progress. */
 export function useRecords(collectionId: string): DataRecord[] | null {
   const { repo } = useWorkspaceContext();
   const version = useWorkspace((s) => tableVersion(s, collectionId));
@@ -142,7 +152,7 @@ export function useRecords(collectionId: string): DataRecord[] | null {
   return records;
 }
 
-/** 算一张表要读的表（自己，和查找、汇总、上一条、公式要读的表，relatedCollectionIds）。 */
+/** Tables required for computing a table (itself, plus tables required by lookups, rollups, previous entry, and formulas: `relatedCollectionIds`). */
 const NO_TABLES: readonly string[] = [];
 function useRelatedIds(collections: readonly Collection[], collection: Collection | undefined) {
   return useMemo(
@@ -152,9 +162,12 @@ function useRelatedIds(collections: readonly Collection[], collection: Collectio
 }
 
 /**
- * 一张表的记录，连同查找、汇总、上一条算出来的值（D-291，只在本机算，related.ts），和显示用的表（这几种
- * 字段换成它们显示的那种字段）。会读它要用到的别的表的记录；这些表增删改后、表的定义变了重新算（D-555：
- * 别的表写了不重算）。collections、cal 用页面正在显示的那份配置（草稿预览时是草稿）。写记录仍然用原来的表。
+ * A table's records along with computed values for lookups, rollups, and previous entries (D-291,
+ * calculated locally via `related.ts`), plus display tables (replacing those field types with
+ * their display equivalents). Reads records of dependent tables; recalculates when those tables
+ * are modified or table definitions change (D-555: writes to unrelated tables do not trigger
+ * recalculation). `collections` and `cal` use the page's active configuration (the draft during
+ * draft preview). Record writing still uses the original tables.
  */
 export function useComputedRecords(
   collections: readonly Collection[],
@@ -179,14 +192,17 @@ export function useComputedRecords(
     () => collection && expandCollection(collections, collection),
     [collections, collection],
   );
-  // 表换了以后，旧的那份不再用。
+  // After switching tables, the old instance is no longer used.
   return { view, records: loaded && loaded.view === view ? loaded.records : null };
 }
 
 /**
- * 月历（D-305）的记录：按月份或周的日范围读取（多读一天，见 monthQueryRange / dayQueryRange），跨日记录按重叠读取。表里有查找、汇总、上一条时，
- * 要别的记录才能算，就读整张表再算（和 useComputedRecords 一样）；dateField 不是存着的日期、日期时间或系统字段时
- * 也读整张表。落在哪天、筛选由调用方按 recordDay 再精确地分。
+ * Records for the calendar (D-305): read according to the day range of a month or week (reads an
+ * extra day, see monthQueryRange / dayQueryRange), with cross-day records read based on overlap.
+ * When the table involves lookups, aggregates, or previous-record references requiring other
+ * records to compute, reads the entire table and then computes (same as useComputedRecords); also
+ * reads the entire table when dateField is not a stored date, datetime, or system field. The
+ * caller precisely partitions records into calendar days and filters using recordDay.
  */
 export function useMonthRecords(
   collections: readonly Collection[],
@@ -216,7 +232,7 @@ export function useMonthRecords(
       collection.fields.some(
         (f) => f.id === dateField && (f.type === 'date' || f.type === 'datetime'),
       );
-    // 查找、汇总、上一条要别的记录（上一条可能在上个月）；公式只看自己这条，可以只读这个月。
+    // Lookups, rollups, and previous entries require other records (the previous entry might be in the previous month); formulas only depend on the current entry, allowing month-only reads.
     const whole =
       !stored ||
       collection.fields.some(
@@ -251,8 +267,10 @@ export function useMonthRecords(
 }
 
 /**
- * 引用字段（D-250）显示被引用记录的标题：读出这张表引用的那些表的记录（没删的），那些表增删改后刷新（D-555）。
- * 被引用的记录删掉了就查不到，显示「已删除的记录」；恢复后又能查到。
+ * Reference fields (D-250) displaying referenced record titles: reads records of tables
+ * referenced by this table (undeleted ones), refreshing when those tables change (D-555). Deleted
+ * referenced records cannot be found and display "Deleted record"; they become queryable again
+ * upon restoration.
  */
 export function useLinkResolver(collection: Collection | undefined): LinkResolver | undefined {
   const { repo, locale } = useWorkspaceContext();
@@ -263,7 +281,7 @@ export function useLinkResolver(collection: Collection | undefined): LinkResolve
   );
   const versions = useTableVersions(linked);
   const targets = linked.join(',');
-  // 记下是为哪几张表读的：表换了以后旧的不再用。
+  // Tracks the tables for which readers were initialized: after switching tables, old readers are discarded.
   const [loaded, setLoaded] = useState<{ targets: string; resolver: LinkResolver } | null>(null);
   useEffect(() => {
     if (!targets || !collections) return;
@@ -278,15 +296,15 @@ export function useLinkResolver(collection: Collection | undefined): LinkResolve
   return loaded && loaded.targets === targets ? loaded.resolver : undefined;
 }
 
-/** 新建一条记录的结果。 */
+/** Result of creating a new record entry. */
 export type AddResult =
   { ok: true; id: string } | { ok: false; issues: FieldIssue[] } | { ok: false; full: true };
 
 export type SaveResult =
   | AddResult
-  /** 打开之后这条记录被别处改过（R05）：没有保存；latest 是现在存的那条。 */
+  /** The record was modified elsewhere after being opened (R05): not saved; `latest` is the currently stored version. */
   | { ok: false; conflict: StoredRecord }
-  /** 这条记录已经不在了（删了）：没有保存。 */
+  /** The record no longer exists (has been deleted): not saved. */
   | { ok: false; gone: true };
 
 export function useRecordActions() {
@@ -303,7 +321,7 @@ export function useRecordActions() {
     const now = new Date();
     const prepared = prepareRecordValues(collection, input, record.values, now, cal);
     if (!prepared.ok) return { ok: false, issues: prepared.issues };
-    // 记录必须还是 record 那份（表单打开时的）才写：别的入口（通知按钮、桌面小组件）这期间改过就不覆盖（R05）。
+    // Writes only if the record still matches the initial version (when the form was opened): prevents overwriting if modified elsewhere during this time by other entry points (notification buttons, widgets) (R05).
     const written = await repo.updateRecordIfUnchanged(
       record.id,
       record.values,
@@ -343,8 +361,10 @@ export function useRecordActions() {
     update,
 
     /**
-     * 改一条记录里的几项（列表上勾一下）：按现在存的那条改，只动 input 里的项，别处刚改的项保持最新。
-     * 读到写之间又被改了就再读一次（最多三次）。
+     * Modifies specific fields of a record (e.g., checking an item in a list): updates based on
+     * the currently stored version, modifying only items in `input`, while keeping concurrently
+     * modified fields up to date. Re-reads if modified between read and write (up to three
+     * times).
      */
     async patch(
       collection: Collection,
@@ -361,21 +381,22 @@ export function useRecordActions() {
       return result;
     },
 
-    /** 软删除，提示条上可以撤销。 */
+    /** Soft delete, allowing undo from the toast message. */
     async remove(record: DataRecord): Promise<void> {
       await repo.deleteRecord(record.id, Date.now());
       bump([record.collectionId]);
       showToast({ message: t(locale, 'recordDeleted'), restoreRecordId: record.id });
     },
 
-    // 恢复只知道记录 ID：所有表一起重来（D-555）。
+    // Restoration requires only the record ID: reloads all tables together (D-555).
     async restore(id: string): Promise<void> {
       await repo.restoreRecord(id);
       bump();
     },
 
     /**
-     * 撤销点一下改的几处、批量新建的那些（D-566、D-567）：一个事务，要求每条还是做完时的样子；改过就不覆盖，说一声。
+     * Undoes multi-field edits or batch creations (D-566, D-567): single transaction, requiring
+     * each entry to still match its post-completion state; aborts and notifies if modified.
      */
     async undo(undo: NonNullable<RecordToast['undo']>): Promise<void> {
       let outcome: 'applied' | 'conflict';
@@ -389,7 +410,9 @@ export function useRecordActions() {
     },
 
     /**
-     * 撤销一次导入（D-574）：这一批还在的记录软删除，进「最近删除」30 天（导入的是用户自己的内容，不像批量新建那样真删）。
+     * Undoes an import batch (D-574): soft deletes still-existing records from this batch into
+     * "Recently deleted" for 30 days (imported items are user content, unlike hard-deleted batch
+     * creations).
      */
     async undoImport(batch: NonNullable<RecordToast['undoImport']>): Promise<void> {
       await repo.deleteImport(batch.id, Date.now());
@@ -397,7 +420,7 @@ export function useRecordActions() {
       showToast({ message: t(locale, 'importUndone') });
     },
 
-    /** 一起删的几条一起放回来（D-547）。 */
+    /** Restores multiple simultaneously deleted entries together (D-547). */
     async restoreMany(ids: readonly string[]): Promise<void> {
       for (const id of ids) await repo.restoreRecord(id);
       bump();

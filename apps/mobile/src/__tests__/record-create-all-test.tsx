@@ -14,8 +14,10 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 import { widgetButtonAction } from '../widgets/ops';
 
-// 批量新建（D-567，创始人 2026-11-16 ④）：每月 1 号点「新建本月订单」，给每个老客户各建一条订单，引用这个客户，
-// 金额抄这个客户的常用金额（D-565）。先问，最多 200 条；建完提示条能一次撤回这一批（底线 11）。
+// Batch create (D-567, founder 2026-11-16 ④): on the 1st of each month, click "Create this month's
+// orders", create an order for each regular customer referencing that customer, copy the customer's
+// typical amount (D-565). Ask first, max 200 items; after creation, banner allows undoing this
+// entire batch at once (invariant 11).
 
 const customers: Collection = {
   id: 'customers',

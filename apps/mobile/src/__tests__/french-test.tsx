@@ -16,7 +16,7 @@ const start = () =>
 describe('French journeys', () => {
   it('opens the category library and prefills a French request from the starter home', async () => {
     await start();
-    // D-487：首页有一个主色的「打开文件」按钮（法语）和内设的「扫描成 PDF」方块。
+    // D-487: Home screen has a primary-colored "Open File" button (in French) and a preset "Scan to PDF" block.
     expect(await screen.findByText('Ouvrir les fichiers')).toBeTruthy();
     expect(screen.getByTestId('run-scan-camera')).toBeTruthy();
     await act(() => router.push('/quick-actions'));

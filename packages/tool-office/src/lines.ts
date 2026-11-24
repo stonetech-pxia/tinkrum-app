@@ -2,68 +2,81 @@ import { findSkew, localStats, sauvolaThreshold } from '@morph/tool-image';
 
 import type { Box, RgbaImage } from './types';
 
-// 找表格线（D-272）：局部阈值二值化（和扫描件增强的黑白模式同一个 Sauvola），按行、按列找长的深色段，
-// 相邻的段接成一条线，再只留下和别的线连在一起的：横竖线交成网格的（加上网格里只碰到一条线的 T 字形线），
-// 或者至少 3 条左右对齐的横线（只有横线的表）。单独的横线（文字下面的划线、删除线、分隔线）不算表格线。
-// 照片可能有一点倾斜：按 findSkew 估出的角度斜着扫描，线的坐标都是拉正后的（x' = x + y·t，y' = y − x·t）。
+// Find table lines (D-272): local threshold binarization (using the same Sauvola algorithm as
+// scanned document enhancement's black-and-white mode), finding long dark segments row by row and
+// column by column, connecting adjacent segments into lines, and retaining only those connected to
+// other lines: horizontal and vertical lines intersecting into a grid (plus T-shaped lines touching
+// only one line in the grid), or at least 3 left-right aligned horizontal lines (for tables with
+// only horizontal lines). Standalone horizontal lines (underlines beneath text, strikethroughs,
+// separators) are not considered table lines. Photos may have a slight tilt: scanned at the angle
+// estimated by `findSkew`, with line coordinates adjusted to be upright (x' = x + y·t, y' = y -
+// x·t).
 
-/** 一条线：横线的 pos 是 y、from / to 是 x；竖线反过来。坐标是拉正后的。 */
+/** A line: for horizontal lines, `pos` is y, `from` and `to` are x; for vertical lines, the reverse. Coordinates are post-rectification. */
 export interface RuleLine {
   pos: number;
   from: number;
   to: number;
   thickness: number;
-  /** 有墨的几段（按 from 排好，不重叠）。 */
+  /** Ink-containing segments (ordered by `from`, non-overlapping). */
   spans: [number, number][];
-  /** 实心横条的上边、下边（D-501）。 */
+  /** Upper and lower edges of solid horizontal bars (D-501). */
   band?: 'top' | 'bottom';
 }
 
 export interface PageLines {
   width: number;
   height: number;
-  /** 倾斜角（度）；坐标已经按它拉正。 */
+  /** Tilt angle (in degrees); coordinates are already rectified accordingly. */
   skew: number;
   horizontal: RuleLine[];
   vertical: RuleLine[];
 }
 
-/** 一张表的线和范围（拉正后的坐标）。 */
+/** Lines and bounds of a table (post-rectification coordinates). */
 export interface TableLines {
   hs: RuleLine[];
   vs: RuleLine[];
   box: Box;
 }
 
-/** 分析用的图长边不超过这么大，超过就先缩小。 */
+/** The long side of the image used for analysis does not exceed this size; if it exceeds it, it is downscaled first. */
 export const LINE_MAX_SIDE = 2000;
-/** 段里允许的断口（像素）。 */
+/** Allowed gaps within segments (in pixels). */
 const MAX_GAP = 3;
 /**
- * 线的最短长度：max(24 像素, 页宽或页高的 1.5%)。真实的表单里一行只有 30 像素高，竖线也要认出来；
- * 粗体字连成的「线」在 build.ts 里按识别框去掉（dropTextStrokes）。
+ * Minimum line length: max(24 pixels, 1.5% of page width or height). In real forms, a row is only
+ * 30 pixels high, so vertical lines must also be recognized; "lines" formed by connected bold
+ * text are removed in `build.ts` via `dropTextStrokes`.
  */
 const MIN_LENGTH = 24;
 const MIN_LENGTH_SHARE = 0.015;
-/** 粗细超过页面的 1.5% 是色块，不是线。 */
+/** Thickness exceeding 1.5% of the page is a color block, not a line. */
 const MAX_THICKNESS_SHARE = 0.015;
-/** 相邻的段合并成一条线：位置差不超过长边的 0.4%。 */
+/** Merge adjacent segments into a single line: position difference does not exceed 0.4% of the long side. */
 const MERGE_SHARE = 0.004;
 /**
- * 同一条线上的两段，中间断开不超过 max(8 像素, 页宽的 0.5%) 时接起来（复印件常有断线）。
- * 再大会把上下挨着的两个框（工资单里隔 15–20 像素）的边接成一条。
+ * Two segments on the same line are joined when the gap between them does not exceed max(8
+ * pixels, 0.5% of page width) (photocopies frequently have broken lines). A larger gap would
+ * wrongly connect the borders of vertically adjacent boxes (which are 15–20 pixels apart in
+ * payslips).
  */
 const JOIN_MIN = 8;
 const JOIN_SHARE = 0.005;
-/** 线和线算连在一起：端点离另一条线不超过长边的 0.5%（挨着的两个框不算连在一起）。 */
+/** Lines are considered connected: endpoints are no more than 0.5% of the long side away from another line (adjacent boxes are not considered connected). */
 const TOUCH_SHARE = 0.005;
 /**
- * 实心的横条（D-501：工资单、发票表头的深色底条，里面是白字）：比线粗、不超过页高的 6%，长至少是粗的 2 倍，
- * 六成以上是墨（字是白的）。只有至少两条竖线从它的上下边起止时（表格的列线）才算表格的一部分：
- * 当成一个框，上下边是两条横线、左右两头是两条竖线。横条里那一行没有竖线盖住，格子按上下的列线分
- * （表头格子之间的白缝在照片里常常看不出来，不靠它）。
- * 找竖线前先把它抹掉，不然从它下面往下画的竖线和它连成一大块，被当成色块整个丢掉。
- * 页边的黑边、彩色的箭头条、标志没有竖线起止，不算。
+ * Solid horizontal bars (D-501: dark background bars in payslips and invoice headers containing
+ * white text): thicker than lines, not exceeding 6% of page height, at least twice as long as
+ * they are thick, and consisting of ink for over 60% (with white text). Considered part of the
+ * table only when at least two vertical lines start or end at their top and bottom edges (table
+ * column lines): treated as a box where top and bottom edges are horizontal lines and left and
+ * right ends are vertical lines. The line of text inside the bar is not covered by vertical
+ * lines, and cells are divided according to upper and lower column lines (white gaps between
+ * header cells are often invisible in photos and cannot be relied upon). Erased before finding
+ * vertical lines, otherwise vertical lines drawn downward from it would merge with it into a
+ * large block and be entirely discarded as a color block. Page edge black borders, colored arrow
+ * bars, and logos lack starting/ending vertical lines and are excluded.
  */
 const BAND_MAX_SHARE = 0.06;
 const BAND_MIN_ELONGATION = 2;
@@ -71,32 +84,39 @@ const BAND_MIN_FILL = 0.6;
 const BAND_MIN_ANCHORS = 2;
 const BAND_RULED_GAP = 3;
 const BAND_RULED_MIN = 2;
-/** 竖线长到页高的这么多（95%），是纸边或中缝，不参加组表。 */
+/** Vertical lines reaching this proportion of the page height (95%) are paper edges or gutters and are excluded from table grouping. */
 const PAGE_EDGE_SHARE = 0.95;
-/** 只有横线的表：左右两端对齐的误差（页宽的 2%），相邻两条最远隔页高的 40%（三线表的表身很高）。 */
+/** Tables with only horizontal lines: left and right alignment error tolerance (2% of page width), with adjacent lines separated by at most 40% of page height (table bodies in three-line tables are very tall). */
 const ALIGN_SHARE = 0.02;
 const RULED_GAP_SHARE = 0.4;
 const RULED_MIN = 3;
 /**
- * 只有横线的一串，头两条线最远隔页高的 10%：三线表的顶线和表头线之间只有表头那一行，只有表身才可能很高。
- * 一开始就隔着一大段的，是一节一节表单框的底线、各处填空的横线（EU 样本 014），不是一张表。
+ * Sequences of horizontal-only lines where the first two lines are separated by at most 10% of
+ * page height: only the header row sits between the top line and header line of a three-line
+ * table, and only table bodies can be very tall. Those separated by a large gap from the start
+ * are bottom lines of section form boxes or fill-in lines (EU sample 014), not a table.
  */
 const RULED_HEAD_GAP_SHARE = 0.1;
-/** 等距的一串（最大间距不超过最小的 RULED_EVEN 倍）遇到超过间距 RULED_SPLIT_STEPS 倍的一段就断开。 */
+/** Equidistant sequences (maximum spacing does not exceed `RULED_EVEN` times the minimum) are split upon encountering a gap exceeding `RULED_SPLIT_STEPS` times the spacing. */
 const RULED_EVEN = 1.3;
 const RULED_SPLIT_STEPS = 2.5;
 
 /**
- * 很浅的表格线（转 Word 用，findLines 的 light）：电子版的发票模板、表单常用浅灰的线（最暗的通道 0.75–0.86），
- * Sauvola 在白纸上的阈值只有 0.7 左右，找不到。纸很白（整页一半以上的点至少 LIGHT_PAPER：电子版、干净的扫描件）时，
- * 比纸暗 LIGHT_CONTRAST 的点也算，但只算细的：横着找线时上下连着不超过 LIGHT_THICKNESS（竖线反过来）。
- * 浅色底纹的格子、色块又宽又高，不算（不然底纹的格子会被当成横条、把表切开）。照片的纸不够白，不受影响。
+ * Very faint table lines (for Word conversion, `findLines` light mode): digital invoice templates
+ * and forms commonly use light gray lines (darkest channel 0.75–0.86), while Sauvola's threshold
+ * on white paper is around 0.7, failing to find them. When paper is very white (over half the
+ * page points have at least `LIGHT_PAPER` brightness: digital documents, clean scans), points
+ * darker than the paper by `LIGHT_CONTRAST` are also counted, but only for thin elements:
+ * vertically connected points within `LIGHT_THICKNESS` when scanning horizontally (and vice versa
+ * for vertical lines). Wide and tall cells or color blocks with light shading are excluded
+ * (otherwise shaded cells would be treated as horizontal bars and split the table). Photos with
+ * insufficiently white paper are unaffected.
  */
 const LIGHT_PAPER = 0.95;
 const LIGHT_CONTRAST = 0.1;
 const LIGHT_THICKNESS_SHARE = 0.004;
 
-/** 整页纸的亮度：墨水深浅的中位数（按 1/256 分档）。 */
+/** Page paper brightness: median ink darkness (binned in 1/256 increments). */
 function paperOf(ink: Float32Array): number {
   const counts = new Uint32Array(257);
   for (let p = 0; p < ink.length; p++) counts[Math.round(ink[p]! * 256)]!++;
@@ -109,8 +129,10 @@ function paperOf(ink: Float32Array): number {
 }
 
 /**
- * 在 mask 上加上浅的细线：比纸暗 LIGHT_CONTRAST、沿 across 方向连着不超过 max 个点、两边是白纸的。
- * vertical 为 true 时按列数连着的点（给横线用），否则按行数（给竖线用）。
+ * Adds light thin lines to the mask: points darker than paper by `LIGHT_CONTRAST`, continuously
+ * connected along the `across` direction for at most `max` points, flanked by white paper. When
+ * `vertical` is true, points are connected along columns (for horizontal lines), otherwise along
+ * rows (for vertical lines).
  */
 function addThinLight(
   mask: Uint8Array,
@@ -133,7 +155,7 @@ function addThinLight(
       const dark = i < inner && ink[at(o, i)]! < limit;
       if (dark && start < 0) start = i;
       else if (!dark && start >= 0) {
-        // 两边隔一个点（线边上的灰边）还得是白纸：浅色底纹里的噪点、底纹夹在两行字中间的窄条不算。
+        // Both sides must still be white paper separated by one point (the gray fringe along line edges): noise in light shading or narrow strips of shading sandwiched between two text rows are excluded.
         const before = ink[at(o, Math.max(0, start - 2))]!;
         const after = ink[at(o, Math.min(inner - 1, i + 1))]!;
         if (i - start <= max && before >= bright && after >= bright)
@@ -146,16 +168,21 @@ function addThinLight(
 }
 
 /**
- * 亮度到这么高的颜色是底色，不是墨：黄色、浅绿、浅蓝的底纹格子（意大利电费单的黄色合并格 #FFCB35，EU 样本 057）
- * 最暗的通道很暗，按它算会和旁边的表格线连成一大块，整条线被当成色块丢掉，表格认不出来。
+ * Colors with brightness reaching this level are background colors rather than ink: yellow, light
+ * green, and light blue shaded cells (such as the yellow merged cell #FFCB35 in Italian
+ * electricity bills, EU sample 057) have very dark darkest channels, which would otherwise cause
+ * them to merge into large blocks with adjacent table lines, causing entire lines to be discarded
+ * as color blocks and preventing table recognition.
  */
 const FILL_LUMA = 0.7;
-/** 而且颜色很浓（最亮和最暗的通道差这么多）：浅蓝的格线、浅灰的底纹、字边上的杂色不算，照旧按最暗的通道。 */
+/** Also requires high color saturation (difference between brightest and darkest channels reaches this value): light blue grid lines, light gray shading, and artifacts around text are excluded, retaining evaluation by darkest channel as usual. */
 const FILL_CHROMA = 0.3;
 
 /**
- * 墨水深浅：三个通道里最暗的那个（0 黑 – 1 白），红字、蓝字的线也算；
- * 又亮又浓的颜色（FILL_LUMA、FILL_CHROMA：黄、橙黄的底）按亮度算，浅的彩色线在 light 里照样当浅线找。
+ * Ink darkness: the darkest of the three channels (0 black - 1 white), including red and blue
+ * text lines; bright and saturated colors (`FILL_LUMA`, `FILL_CHROMA`: yellow and orange-yellow
+ * backgrounds) are evaluated by brightness, while light colored lines are still found as light
+ * lines in light mode.
  */
 function inkOf(image: RgbaImage): Float32Array {
   const { width, height, data } = image;
@@ -172,7 +199,7 @@ function inkOf(image: RgbaImage): Float32Array {
   return out;
 }
 
-/** 整数倍缩小（取每块里最暗的，细线不会被平均掉）。 */
+/** Integer-factor downscaling (taking the darkest point in each block so that thin lines are not averaged out). */
 function shrink(image: RgbaImage, k: number): RgbaImage {
   const width = Math.max(1, Math.floor(image.width / k));
   const height = Math.max(1, Math.floor(image.height / k));
@@ -201,7 +228,7 @@ function shrink(image: RgbaImage, k: number): RgbaImage {
   return { width, height, data };
 }
 
-/** 二值化：Sauvola 局部阈值（统计图是半分辨率），1 是黑。 */
+/** Binarization: Sauvola local threshold (charts are at half resolution), where 1 is black. */
 function darkMask(ink: Float32Array, width: number, height: number): Uint8Array {
   const stats = localStats(ink, width, height);
   const sw = stats.width;
@@ -209,7 +236,7 @@ function darkMask(ink: Float32Array, width: number, height: number): Uint8Array 
   for (let p = 0; p < thresholds.length; p++) {
     const mean = stats.data[p * 4]! / 255;
     const sd = stats.data[p * 4 + 1]! / 255 / 2;
-    // 再加一道绝对门槛：浅灰的底纹、纸的纹理不算。
+    // Add an absolute threshold: light grey background shading and paper texture are not counted.
     thresholds[p] = Math.min(sauvolaThreshold(mean, sd), 0.75);
   }
   const mask = new Uint8Array(width * height);
@@ -223,7 +250,7 @@ function darkMask(ink: Float32Array, width: number, height: number): Uint8Array 
   return mask;
 }
 
-/** 实心的横条：first、last 是上下两边的扫描行号，from、to 是左右（拉正后、换算前）。 */
+/** Solid horizontal bar: first and last are the upper and lower scanning row numbers, from and to are left and right (after deskewing, before conversion). */
 interface Band {
   first: number;
   last: number;
@@ -240,37 +267,41 @@ interface Building {
   from: number;
   to: number;
   spans: [number, number][];
-  /** 每一行（从 first 起）的段长之和。 */
+  /** Sum of segment lengths for each row (starting from first). */
   lengths: number[];
-  /** 每一行（从 first 起）有墨的左右范围。 */
+  /** Left and right extent of ink for each row (starting from first). */
   ends: [number, number][];
 }
 
 /**
- * 线上紧贴着一小块颜色（荧光笔标出的金额、圈出名字的红圈，EU 样本 067）：连在一起太粗，整条线被当成色块丢掉。
- * 太粗的一块里，长度到最长一行的 CORE_SHARE 的那几行够细、别的行都不到最长的 CORE_REST：取那几行当线。
+ * A small patch of color touching a line (e.g., an amount highlighted with a highlighter, a red
+ * circle around a name, EU sample 067): if connected, it is too thick and the entire line would
+ * be dropped as a color block. Within a too-thick block, if lines whose length reaches CORE_SHARE
+ * of the longest row are sufficiently thin while other rows fall short of CORE_REST, take those
+ * specific rows as the line.
  */
 const CORE_SHARE = 0.8;
 const CORE_REST = 0.5;
-/** 标记离线的两头至少这么多像素（荧光笔标的金额在格子里，离右边的线还有几个像素）。 */
+/** Mark both ends of a line as being at least this many pixels away (e.g., highlighter-marked amount inside a box, several pixels away from the right-hand line). */
 const CORE_END_MARGIN = 3;
-/** 贴着线头的行至少这么多才是一块（不是线边上毛糙的一两行）。 */
+/** A block must have at least this many rows adjacent to the line end to be valid (rejecting rough 1-2 pixel fringes on the edge of a line). */
 const CORE_END_ROWS = 3;
 
 /**
- * 太粗的一块里贴着色块的细线（CORE_SHARE、CORE_REST）。色块从一条线连到下一条线时（上一排底下、下一排顶上都有标记），
- * 一块里有好几条，各取各的。
+ * Thin lines touching color blocks within a too-thick block (CORE_SHARE, CORE_REST). When a color
+ * block spans from one line to the next (with markings at the bottom of the previous row and top
+ * of the next row), a single block may contain multiple lines, each processed independently.
  */
 function thinCores(l: Building, maxThickness: number): Building[] {
-  // 中间隔了一两行没有墨的，那几行是空的。
+  // One or two inkless rows in between are considered empty.
   const lengths = Array.from(l.lengths, (n) => n ?? 0);
   const longest = Math.max(...lengths);
   const isCore = lengths.map((n) => n >= CORE_SHARE * longest);
   if (lengths.some((n, i) => !isCore[i] && n > CORE_REST * longest)) return [];
-  // 贴在线头上的一块（框角上的编号方块，EU 样本 068）是框的一部分，不当成线上的标记。
+  // A block touching a line end (such as a numbering box on a corner, EU sample 068) is part of the box, not a marking on the line.
   const from = Math.min(...l.ends.filter((_, i) => isCore[i]).map((e) => e[0]));
   const to = Math.max(...l.ends.filter((_, i) => isCore[i]).map((e) => e[1]));
-  // 线边上毛糙的一两行（稍斜的线在上下一行只有一截）不算。
+  // Rough 1-2 pixel fringes on the edge of a line (slightly slanted lines with only a segment on adjacent rows) are ignored.
   const atEnd = l.ends.filter(
     (e, i) => e && !isCore[i] && (e[0] - from < CORE_END_MARGIN || to - e[1] < CORE_END_MARGIN),
   ).length;
@@ -297,7 +328,7 @@ function thinCores(l: Building, maxThickness: number): Building[] {
   });
 }
 
-/** 一组段（不重叠、排好）里加一段，重叠或挨着（gap 以内）的接起来。 */
+/** Add a span to a set of spans (non-overlapping, sorted), merging overlapping or adjacent ones (within gap). */
 export function addSpan(spans: [number, number][], a: number, b: number, gap: number): void {
   let i = 0;
   while (i < spans.length && spans[i]![1] + gap < a) i++;
@@ -312,7 +343,7 @@ export function addSpan(spans: [number, number][], a: number, b: number, gap: nu
   spans.splice(i, j - i, [lo, hi]);
 }
 
-/** 一组段在 [a, b] 里盖住的长度。 */
+/** Length covered by a set of spans within [a, b]. */
 export function coveredLength(spans: readonly (readonly [number, number])[], a: number, b: number) {
   let sum = 0;
   for (const [s, e] of spans) {
@@ -324,8 +355,9 @@ export function coveredLength(spans: readonly (readonly [number, number])[], a: 
 }
 
 /**
- * 一个方向的线。horizontal 时沿 x 扫描每一行（行号是拉正后的 y），否则沿 y 扫描每一列。
- * t 是倾斜角的正切：横线上 y = r + x·t，竖线上 x = c − y·t。
+ * Line scan in one direction. When horizontal, scan each row along x (row number is deskewed y);
+ * otherwise, scan each column along y. t is the tangent of the tilt angle: for horizontal lines y
+ * = r + x*t, for vertical lines x = c - y*t.
  */
 function scan(
   mask: Uint8Array,
@@ -333,14 +365,16 @@ function scan(
   height: number,
   t: number,
   horizontal: boolean,
-  /** 给了就收集实心的横条（BAND_MAX_SHARE），不当成线。 */
+  /** If provided, collect solid horizontal bars (BAND_MAX_SHARE) and do not treat them as lines. */
   bands?: Band[],
   /**
-   * 找竖线时：已经找到的横线压着的点。竖着扫过去，墨断开的地方只隔着横线（线和线交叉）不算断；
-   * 断口里有白纸又连着横线时，横线那几点也算进断口（见 markLines）。
+   * When finding vertical lines: points covered by already found horizontal lines. Scanning
+   * vertically, breaks in ink separated only by horizontal lines (where lines intersect) are not
+   * counted as breaks; when a gap contains white paper yet connects to horizontal lines, those
+   * horizontal points are also included in the gap (see markLines).
    */
   crossing?: Uint8Array,
-  /** 找横线时：把找到的横线压着的点记在这里，给找竖线用。 */
+  /** When finding horizontal lines: record points covered by found horizontal lines here for use in finding vertical lines. */
   marks?: Uint8Array,
 ): RuleLine[] {
   const along = horizontal ? width : height;
@@ -353,12 +387,15 @@ function scan(
   const done: Building[] = [];
   let open: Building[] = [];
   for (let r = lo; r < hi; r++) {
-    // 这一行（列）的长段。
+    // Long segments in this row (or column).
     const runs: [number, number][] = [];
     let start = -1;
     let lastDark = -1;
-    // 上一个不是横线的墨点，和从那以后有没有白纸：密排的表里，上下几排字的竖笔画中间只隔着「白缝 + 行线 +
-    // 白缝」，几个像素的断口会把它们接成一条竖线（EU 样本 090）。行线本身不算墨，断口从上一个笔画算起。
+    // The previous non-horizontal-line ink point and whether there has been white space since: in
+    // densely packed tables, vertical strokes of text across adjacent rows are separated only by a
+    // "white gap + row line + white gap", and a gap of a few pixels would merge them into a single
+    // vertical line (EU sample 090). The row line itself is not ink; the gap is measured from the
+    // previous stroke.
     let lastInk = -1;
     let white = false;
     for (let i = 0; i <= along; i++) {
@@ -373,7 +410,7 @@ function scan(
         }
       }
       if (dark) {
-        // 上一个笔画以后隔着白纸和横线，加起来超过断口：断开，从这里起新的一段。
+        // After the previous stroke, if separated by white paper and a horizontal line exceeding MAX_GAP in total, break and start a new segment here.
         if (start >= 0 && !across_ && white && i - lastInk - 1 > MAX_GAP) {
           if (lastInk - start + 1 >= minLength) runs.push([start, lastInk]);
           start = -1;
@@ -451,7 +488,7 @@ function scan(
         bands.push({ first: l.first, last: l.last, from: l.from, to: l.to, spans: l.spans });
     }
   }
-  // 沿线方向的坐标也换到拉正后的：横线上 x' ≈ x + y'·t，竖线上 y' ≈ y − x'·t。
+  // Coordinates along the line direction are also converted to deskewed coordinates: for horizontal lines x' ≈ x + y'*t, for vertical lines y' ≈ y - x'*t.
   const kept = done.flatMap((l) => {
     if (l.last - l.first + 1 <= maxThickness) return [l];
     return thinCores(l, maxThickness);
@@ -482,7 +519,7 @@ function scan(
   );
 }
 
-/** 同一位置上的几段接成一条（断线、和别的线交叉处断开的）。 */
+/** Join multiple segments at the same position into a single line (broken lines or lines interrupted at intersections with other lines). */
 function joinCollinear(lines: RuleLine[], posTol: number, gapTol: number): RuleLine[] {
   const out = [...lines].sort((a, b) => a.pos - b.pos || a.from - b.from);
   let changed = true;
@@ -516,7 +553,7 @@ function joinCollinear(lines: RuleLine[], posTol: number, gapTol: number): RuleL
   return out;
 }
 
-/** 抹掉横条（扫描行号 r 上的点在 y = r + x·t）。 */
+/** Erase horizontal bars (points at scan row number r at y = r + x*t). */
 function eraseBands(
   mask: Uint8Array,
   width: number,
@@ -537,7 +574,7 @@ function eraseBands(
   return out;
 }
 
-/** 从横条的上下边起止的竖线有几条（位置相同的算一条：穿过横条被切成两段的竖线）。 */
+/** Number of vertical lines starting/ending at the top and bottom edges of a horizontal bar (positions that match are counted as one: a vertical line passing through the bar is cut into two segments). */
 function bandAnchors(band: Band, vertical: readonly RuleLine[], t: number, tol: number): number {
   const shift = ((band.first + band.last) / 2) * t;
   const at: number[] = [];
@@ -551,8 +588,11 @@ function bandAnchors(band: Band, vertical: readonly RuleLine[], t: number, tol: 
 }
 
 /**
- * 横条下面紧接着一串和它左右两头都对齐的横线（时刻表、价目表的深色表头下面只有横线，列线只有一两条，EU 样本 024）：
- * 算一条起止的线。头一条离横条底边不超过 BAND_RULED_GAP 个横条厚，至少 BAND_RULED_MIN 条，相邻两条也不隔更远。
+ * A series of horizontal lines immediately below a horizontal bar and aligned with both of its
+ * left and right ends (e.g., timetables or price lists where dark headers have only horizontal
+ * lines underneath and at most one or two column lines, EU sample 024): treated as a single
+ * bounding line. The first line is within BAND_RULED_GAP bar thicknesses of the bar's bottom
+ * edge, there are at least BAND_RULED_MIN lines, and adjacent lines are no further apart.
  */
 function bandRuledBelow(
   band: Band,
@@ -580,7 +620,7 @@ function bandRuledBelow(
   return n >= BAND_RULED_MIN ? 1 : 0;
 }
 
-/** 横条的上下边，当成两条横线（坐标换到拉正后，和 scan 的一样）。 */
+/** Treat the top and bottom edges of a horizontal bar as two horizontal lines (coordinates converted to deskewed space, same as scan). */
 function bandEdges(band: Band, t: number): RuleLine[] {
   return [band.first, band.last].map((pos, i) => {
     const shift = pos * t;
@@ -595,7 +635,7 @@ function bandEdges(band: Band, t: number): RuleLine[] {
   });
 }
 
-/** 横条的左右两头，当成两条竖线（坐标同 scan：x' = x + y'·t，沿线的 y' 就是扫描行号）。 */
+/** Treat the left and right ends of a horizontal bar as two vertical lines (coordinates same as scan: x' = x + y'*t, where y' along the line is the scan row number). */
 function bandSides(band: Band, t: number): RuleLine[] {
   const shift = ((band.first + band.last) / 2) * t;
   return [band.from, band.to].map((x) => ({
@@ -608,8 +648,9 @@ function bandSides(band: Band, t: number): RuleLine[] {
 }
 
 /**
- * 找一页里的横线和竖线。skew 不给时用 findSkew 估（增强过的图已经拉正，可以直接给 0）。
- * 图太大时先缩小，返回的坐标仍是这张图的像素。
+ * Find horizontal and vertical lines in a page. If skew is not provided, estimate it using
+ * findSkew (enhanced images are already deskewed and can pass 0 directly). If the image is too
+ * large, downscale it first; returned coordinates remain in full-resolution image pixels.
  */
 export function findLines(
   image: RgbaImage,
@@ -622,7 +663,7 @@ export function findLines(
   const skew = options.skew ?? findSkew(ink, width, height);
   const t = Math.tan((skew * Math.PI) / 180);
   const mask = darkMask(ink, width, height);
-  // 横线、竖线各用一张图：浅的细线只加在找它那个方向的图上（light）。
+  // Use separate images for horizontal and vertical lines: light thin lines are added only to the image corresponding to that search direction (light).
   let hMask = mask;
   let vMask = mask;
   const paper = options.light ? paperOf(ink) : 0;
@@ -648,7 +689,7 @@ export function findLines(
     (b) =>
       bandAnchors(b, vertical, t, tol) + bandRuledBelow(b, horizontal, t, tol) >= BAND_MIN_ANCHORS,
   );
-  // 不算的横条不抹（抹了会把穿过它的竖线切断）。
+  // Do not erase horizontal bars that are excluded (erasing them would cut vertical lines passing through them).
   if (bands.length < candidates.length)
     vertical = scan(
       eraseBands(vMask, width, height, t, bands),
@@ -692,19 +733,21 @@ export function findLines(
   };
 }
 
-/** 两条线（一横一竖）连在一起：交点在两条线上（端点允许差 tol）。 */
+/** Two lines (one horizontal, one vertical) are connected: their intersection lies on both lines (endpoints allowed to differ by tol). */
 const touches = (h: RuleLine, v: RuleLine, tol: number) =>
   v.pos >= h.from - tol && v.pos <= h.to + tol && h.pos >= v.from - tol && h.pos <= v.to + tol;
 
-/** 竖线在第 a 到第 b 段（不含 b）之间的那一截。 */
+/** The segment of a vertical line between the a-th and b-th segments (excluding b). */
 function piece(v: RuleLine, a: number, b: number): RuleLine {
   const spans = v.spans.slice(a, b);
   return { ...v, from: spans[0]![0], to: spans.at(-1)![1], spans };
 }
 
 /**
- * 竖线上的一处白缝，上头落在一条横线上、下头从另一条横线起：是上下两个框各自的边（发票的商品表下面
- * 隔一条 10 像素的白缝就是税额表和合计框，EU 样本 054），在这里断开，不当成复印件里断了的一条线接起来。
+ * A white gap on a vertical line starting at one horizontal line and ending at another represents
+ * boundaries of upper and lower boxes respectively (e.g., a 10-pixel white gap below the product
+ * table in an invoice separating the tax table and total box, EU sample 054); break here rather
+ * than bridging it as a broken line from a photocopy.
  */
 function splitAtBoxGaps(vs: readonly RuleLine[], hs: readonly RuleLine[], near: number) {
   const ruleAt = (x: number, y: number) => {
@@ -732,7 +775,7 @@ function splitAtBoxGaps(vs: readonly RuleLine[], hs: readonly RuleLine[], near: 
   });
 }
 
-/** 一条竖线（横线也一样）在 [lo, hi] 里的那一段。 */
+/** The segment of a vertical line (or horizontal line) within [lo, hi]. */
 function clip(v: RuleLine, lo: number, hi: number): RuleLine {
   if (v.from >= lo && v.to <= hi) return v;
   const from = Math.max(v.from, lo);
@@ -748,9 +791,12 @@ function clip(v: RuleLine, lo: number, hi: number): RuleLine {
 }
 
 /**
- * 叠着的几张表的分界（转 Word）：一条横贯整张表的横线，上面有里面的竖线（不算左右外框）止于它、
- * 下面有里面的竖线从它开始，而且上下的列线不一样（上面止的那条下面没有接着，下面起的那条上面没有）。
- * 表头一排横跨所有列（上面没有竖线）、列线一直往下的普通表都不分。
+ * Boundary between stacked tables (converting to Word): a horizontal line spanning the entire
+ * table where internal vertical lines (excluding left/right outer borders) stop above it,
+ * internal vertical lines start below it, and upper/lower column lines differ (the line above
+ * stops and has no continuation below, while the line below starts and has no continuation
+ * above). Simple tables where a header row spans all columns (no vertical lines above) and column
+ * lines run all the way down are not split.
  */
 function stackedCuts(hs: readonly RuleLine[], vs: readonly RuleLine[], tol: number): number[] {
   const left = Math.min(...hs.map((h) => h.from), ...vs.map((v) => v.pos));
@@ -774,11 +820,16 @@ function stackedCuts(hs: readonly RuleLine[], vs: readonly RuleLine[], tol: numb
 }
 
 /**
- * 并排的两张表（转 Word）：共用上面的表头（整页宽的标题框、「Dati paziente」一排），下面左右两张表中间隔着一道
- * 白缝，两边的横线各自止于白缝的两边、行也对不齐（化验申请单，EU 样本 090）。连成一张网格时两边的行线、列线
- * 交错，几十列的格子把字切碎。白缝两边各有一条竖线往下画满（至少三条横线止于它），白缝里没有竖线、没有字，
- * 而且最后一条横穿白缝的横线以下再没有横线穿过：在那条横线处切开，上面一张，下面左右各一张。
- * 底下又有横线把两边连起来（中间一列只是合并的一大格）不分。
+ * Side-by-side tables (converting to Word): share a top header (full-page title box, a row like
+ * "Dati paziente"), separated by a white gap between the left and right tables below, with
+ * respective horizontal lines ending at the edges of the white gap and unaligned rows (laboratory
+ * request form, EU sample 090). When connected into a grid, row and column lines intertwine, and
+ * multi-column grids chop up text. If there is a vertical line drawn down the full height on each
+ * side of the white gap (with at least three horizontal lines terminating at it), no vertical
+ * lines or text inside the white gap, and no horizontal lines crossing below the final horizontal
+ * line traversing the white gap: cut at that horizontal line, yielding one table on top and
+ * left/right tables below. Do not split if lower horizontal lines reconnect the two sides (where
+ * the middle column is just a merged large cell).
  */
 function sideBySide(
   t: TableLines,
@@ -797,7 +848,7 @@ function sideBySide(
     const starting = below.filter((h) => Math.abs(h.from - b) <= tol);
     if (ending.length < 3 || starting.length < 3) continue;
     const bottom = Math.max(...below.map((h) => h.pos));
-    // 白缝两边的竖线从切口往下画满两张表各自的大半。
+    // Vertical lines on both sides of the white gap extend downward from the cut to cover the major portion of each of the two tables.
     const side = (x: number, lines: readonly RuleLine[]) =>
       t.vs.some(
         (v) =>
@@ -845,28 +896,33 @@ function sideBySide(
 }
 
 /**
- * 只有和别的线连在一起的线才算表格线，连在一起的线组成一张表：
- * 横线至少碰到 2 条竖线、竖线至少碰到 2 条横线；或者至少 3 条左右两端对齐、上下挨得不远的横线（只有横线的表）。
+ * Only lines connected to other lines are considered table lines, and connected lines form a
+ * table: a horizontal line intersects at least 2 vertical lines, and a vertical line intersects
+ * at least 2 horizontal lines; or at least 3 left-right aligned, closely spaced horizontal lines
+ * (table with only horizontal lines).
  */
 export function findTables(
   page: PageLines,
   options: {
     /**
-     * 转 Word：上下叠着的几张表共用外框（表单的整页大框里一节一张表，EU 样本 004）时，在列线换了的横线处分开，
-     * 见 stackedCuts。转 Excel 不分（整页共用列线）。
+     * Convert to Word: when stacked tables share an outer border (e.g., separate tables within a
+     * full-page form box, EU sample 004), split at horizontal lines where column lines change,
+     * see stackedCuts. Do not split for Excel (shared column lines across the full page).
      */
     splitStacked?: boolean;
-    /** 页上的字（和线同一个坐标系）：等距的一串填写横线只在每一格里最多一个短标签时才在大空隙处断开。 */
+    /** Text on the page (in the same coordinate system as lines): evenly spaced fill-in horizontal lines are broken at large gaps only when there is at most one short label per cell. */
     text?: readonly { x: number; y: number; width: number; height: number }[];
   } = {},
 ): TableLines[] {
   const long = Math.max(page.width, page.height);
   const tol = Math.max(4, long * TOUCH_SHARE);
   const hs = page.horizontal;
-  // 端点落在横线上：离它不超过这么远（线宽加上抗锯齿的边，不跨过白缝）。
+  // Endpoint falls on a horizontal line: distance from it does not exceed this amount (line width plus anti-aliased edge, without crossing the white gap).
   const near = Math.max(MAX_GAP, tol * 0.4);
-  // 几乎从页顶通到页底的竖线是纸边、对折的中缝（拍的两页并排的说明书，EU 样本 100），不是哪张表的列线：
-  // 不然表格的横线一头离它不到 tol，整半页的字连同这张表被当成一张大网格。
+  // Vertical lines running almost from page top to page bottom are page margins or centerfolds
+  // (photographed two-page side-by-side manual, EU sample 100), not column lines of a table:
+  // otherwise, horizontal table lines within tol of it would cause half a page of text and the
+  // table to be treated as a single massive grid.
   const vs = splitAtBoxGaps(
     page.vertical.filter((v) => v.to - v.from < PAGE_EDGE_SHARE * page.height),
     hs,
@@ -875,14 +931,14 @@ export function findTables(
   const onRule = (x: number, y: number) =>
     hs.some((h) => Math.abs(h.pos - y) <= near && x >= h.from - near && x <= h.to + near);
   const ends = new Map(vs.map((v) => [v, [onRule(v.pos, v.from), onRule(v.pos, v.to)]] as const));
-  // 竖线的一头已经落在一条横线上时，不再算碰到这一头外面隔着白缝的横线（上下挨着的两个框不连成一张表）。
+  // Once an endpoint of a vertical line lands on a horizontal line, it is no longer considered to meet horizontal lines outside that endpoint separated by a white gap (preventing adjacent stacked boxes from merging into a single table).
   const meets = (h: RuleLine, v: RuleLine) => {
     const [top, bottom] = ends.get(v)!;
     return (
       touches(h, v, tol) && !(top && h.pos < v.from - near) && !(bottom && h.pos > v.to + near)
     );
   };
-  // 网格：反复去掉连得不够的线，直到不再变化。
+  // Grid: repeatedly remove insufficiently connected lines until stable.
   const hOk = hs.map(() => true);
   const vOk = vs.map(() => true);
   let changed = true;
@@ -903,7 +959,7 @@ export function findTables(
       }
     }
   }
-  // 并查集：横线 0..H-1，竖线 H..H+V-1。
+  // Disjoint-set data structure: horizontal lines 0..H-1, vertical lines H..H+V-1.
   const parent = [...hs, ...vs].map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
   const union = (a: number, b: number) => {
@@ -919,7 +975,7 @@ export function findTables(
       }
     }
   }
-  // 只碰到一条线、整条在网格里面的线也算（T 字形：表头里没画到顶的竖线、只画了半行的横线）。
+  // Lines that touch only a single line and lie entirely inside the grid are also included (T-shapes: vertical lines in headers that do not extend to the top, horizontal lines spanning only half a row).
   const extent = new Map<number, { l: number; r: number; t: number; b: number }>();
   for (const i of used) {
     const root = find(i);
@@ -961,11 +1017,11 @@ export function findTables(
       used.add(i);
     }
   }
-  // 只有横线的表：按位置从上到下，左右两端都和上一条对齐、离得不远的接成一串。
+  // Tables with only horizontal lines: ordered by vertical position, left and right ends aligned with the previous line and close by, merged into a chain.
   const align = page.width * ALIGN_SHARE;
   const maxGap = page.height * RULED_GAP_SHARE;
   const maxHeadGap = page.height * RULED_HEAD_GAP_SHARE;
-  // 一张网格的行高：网格里的横线相邻间距的中位数。
+  // Row height of a grid: median spacing between adjacent horizontal lines in the grid.
   const rowGapOf = (i: number) => {
     const ys = hs
       .filter((_, k) => hOk[k] && find(k) === find(i))
@@ -988,9 +1044,12 @@ export function findTables(
       if (gap > maxGap || Math.abs(h.from - last.from) > align || Math.abs(h.to - last.to) > align)
         return false;
       if (c.length === 1 && !hOk[i] && !hOk[lastIndex] && gap > maxHeadGap) return false;
-      // 隔着一大段（比这一串的间距大一倍以上）、中间压着另一张网格的横线：上下是两串，不跨过网格接起来
-      // （发票右边的填写横线，中间隔着整张商品栏，EU 样本 001）。一串紧挨着穿过网格的线照旧接
-      // （IRS Schedule B 金额栏的横线一格一条，中间的分节线也是网格的线）。
+      // Horizontal lines separated by a large gap (more than double the spacing of the chain) with
+      // another grid sandwiched in between: treated as two separate chains, not bridged across the
+      // grid (e.g., fill-in horizontal lines on the right side of an invoice separated by the
+      // entire product column in the middle, EU sample 001). Lines passing continuously through the
+      // grid are bridged as usual (e.g., IRS Schedule B amount column lines where each cell has a
+      // line, and sectional dividers are also grid lines).
       const step = c.length >= 2 ? last.pos - hs[c.at(-2)!]!.pos : null;
       if (
         !hOk[i] &&
@@ -1005,13 +1064,16 @@ export function findTables(
         )
       )
         return false;
-      // 等距的一串填写横线（每条间距差不多）后面隔着一大段（超过间距的 RULED_SPLIT_STEPS 倍、页高的 10%）：
-      // 中间是标题、条款，不是表的一排（EU 样本 041 的委托书：两组填写线中间隔着粗体的「erteile hiermit
-      // Vollmacht an」）。排高本来就不一样的表（格子折成几行）照旧接。
+      // An evenly spaced sequence of fill-in horizontal lines (with similar spacing) followed by a
+      // large gap (exceeding RULED_SPLIT_STEPS times the spacing, or 10% of page height): the
+      // middle contains titles or clauses, not table rows (e.g., authorization form in EU sample
+      // 041: bold "erteile hiermit Vollmacht an" between two groups of fill-in lines). Tables with
+      // inherently varying row heights (cells wrapped across multiple lines) are connected as
+      // usual.
       if (!hOk[i] && !hOk[lastIndex] && c.length >= RULED_MIN && gap > maxHeadGap) {
         const steps = c.slice(1).map((k, n) => hs[k]!.pos - hs[c[n]!]!.pos);
         const lo = Math.min(...steps);
-        // 表头那几排（「Libellé  Nombre  Débit  Crédit」）一排有好几块字或者很宽的一行：是表，接着往下接。
+        // Header rows ("Libellé Nombre Débit Crédit") containing multiple text blocks or a wide row: treated as part of the table and connected downward.
         const labelsOnly = c.slice(1).every((k, n) => {
           const [y0, y1] = [hs[c[n]!]!.pos, hs[k]!.pos];
           const inside = (options.text ?? []).filter(
@@ -1026,18 +1088,24 @@ export function findTables(
         if (labelsOnly && Math.max(...steps) <= RULED_EVEN * lo && gap > RULED_SPLIT_STEPS * lo)
           return false;
       }
-      // 两张网格（各自有竖线）宽度一样、上下排着，不接成一张（中间常隔着一段文字）。
+      // Two grids (each with vertical lines) of equal width stacked vertically are not merged into one (often separated by a block of text).
       if (hOk[i] && hOk[lastIndex]) return find(i) === find(lastIndex);
-      // 从网格的线接到不在网格里的线（或反过来）：只有间距和上一格差不多（不到 2 倍）时才接，
-      // 例如表头有竖线、下面只有横线的表；网格下面隔着标题的另一张只有横线的表不接上去。
+      // Connecting from grid lines to non-grid lines (or vice versa): connect only when spacing is
+      // similar to the previous cell (less than 2x), such as tables with vertical headers and only
+      // horizontal lines below; do not connect a table with only horizontal lines located below a
+      // grid separated by a title.
       if (hOk[i] !== hOk[lastIndex]) {
-        // 竖线画满了网格的好几行才停（超过两行，不像表头）：网格到这里就完了，下面只有横线的是另一张表
-        // （中间的标题加留白可能不到两行高）。
+        // Vertical lines spanning multiple rows of the grid before stopping (more than two rows,
+        // unlike headers): the grid ends here, and lines below consisting only of horizontal lines
+        // belong to a separate table (intermediate titles plus whitespace might be less than two
+        // rows high).
         if (hOk[lastIndex] && c.filter((k) => hOk[k] && find(k) === find(lastIndex)).length > 3)
           return false;
         const prev = c.length >= 2 ? last.pos - hs[c.at(-2)!]!.pos : null;
-        // 网格上面只有横线的一串往下接网格：间距还要和网格的行高差不多（表头上面的几行）。
-        // 各节标题下的分隔线彼此隔着整段文字，比网格的行高得多，不是这张表的。
+        // Connecting a sequence of horizontal-only lines above a grid downward: spacing must also
+        // roughly match the grid's row height (header rows above). Section dividers beneath section
+        // titles are separated by entire paragraphs, much larger than the grid row height, and do
+        // not belong to the table.
         if (hOk[i] && !c.some((k) => hOk[k]) && prev !== null && prev > 2 * rowGapOf(i))
           return false;
         return prev !== null && gap <= 2 * prev;
@@ -1047,9 +1115,11 @@ export function findTables(
     if (chain) chain.push(i);
     else chains.push([i]);
   }
-  // 三线表（顶线、紧挨着的表头线、表身下面的底线，表身里没有横线）到底线就完了：底线下面隔着一大段
-  // （合计、付款几行），又是挨得很近的两条线（另一张表的表头线和底线：酒店账单的税额栏，EU 样本 050），
-  // 是另一张表，不接上去。
+  // Three-line tables (top line, adjacent header line, bottom line below table body with no
+  // horizontal lines inside the body) end at the bottom line: a large gap below the bottom line
+  // (totals, payment rows) followed by another pair of closely spaced lines (header line and bottom
+  // line of another table, e.g., hotel bill tax column, EU sample 050) represents a separate table
+  // and is not connected.
   for (let n = 0; n < chains.length; n++) {
     const c = chains[n]!;
     if (c.length < 5 || c.slice(0, 5).some((k) => hOk[k])) continue;
@@ -1062,9 +1132,11 @@ export function findTables(
     if (s2 >= 3 * s1 && s3 > maxHeadGap && s3 >= 3 * s4 && s4 <= 2 * s1)
       chains.splice(n, 1, c.slice(0, 3), c.slice(3));
   }
-  // 句子里的填空横线（「(DNI/NIE ______),」：横线压在字的底线上，左边或右边紧挨着同一行的字，EU 样本 095）
-  // 不是表格线。一串只有横线的线大半是这样的，不当表（不然几处填空的末端碰巧对齐，接成一张高高的表，
-  // 把中间的正文都圈进去）。
+  // Fill-in horizontal lines within sentences ("(DNI/NIE ______),": lines positioned on the text
+  // baseline, immediately adjacent to text on the left or right within the same line, EU sample
+  // 095) are not table lines. Most horizontal-only line sequences are of this type and are not
+  // treated as tables (otherwise, coincidental alignment of fill-in line ends would form a tall
+  // pseudo-table enclosing intervening body text).
   const inline = (h: RuleLine) =>
     (options.text ?? []).some(
       (t) =>
@@ -1085,8 +1157,11 @@ export function findTables(
       used.add(i);
     }
   }
-  // 只有横线的一串里的列线（时刻表钟点那一列右边的竖线，左右没有外框）：每条横线只碰到它一条竖线，
-  // 上面的网格规则留不住它。整条在这一串的范围里、碰到这一串至少两条横线的竖线算这张表的列线。
+  // Column lines within a horizontal-only line sequence (e.g., time column vertical line in a
+  // timetable without outer borders): each horizontal line intersects only that single vertical
+  // line, which grid rules fail to catch. Vertical lines that span the entire range of the sequence
+  // and intersect at least two horizontal lines of the sequence are considered column lines of the
+  // table.
   for (const chain of chains) {
     if (chain.length < RULED_MIN) continue;
     const rules = chain.map((i) => hs[i]!);
@@ -1102,7 +1177,7 @@ export function findTables(
       used.add(hs.length + j);
     }
   }
-  // 一张表套在另一张表里（表单的大框里画着一张小表）：合成一张，不然外面那张会把里面的字都拿走。
+  // A table nested inside another table (a small table drawn within a large form box): merged into a single table, otherwise the outer one would absorb all interior text.
   const boxOf = (members: number[]) => {
     const th = members.filter((i) => i < hs.length).map((i) => hs[i]!);
     const tv = members.filter((i) => i >= hs.length).map((i) => vs[i - hs.length]!);
@@ -1148,8 +1223,9 @@ export function findTables(
   for (const members of groups.values()) {
     const allH = members.filter((i) => i < hs.length).map((i) => hs[i]!);
     const allV = members.filter((i) => i >= hs.length).map((i) => vs[i - hs.length]!);
-    // 表中间的实心横条（D-501）：上面有竖线止于它的上边，它是下面另一张表的表头
-    // （工资单的明细表下面接着汇总表，两张表的列不一样），在它的上边分成两张。
+    // Solid horizontal bars in the middle of a table (D-501): vertical lines terminate at their
+    // upper edge, acting as the header for another table below (e.g., payroll detail table followed
+    // by summary table with different columns), split into two tables at the upper edge.
     const cuts: number[] = allH
       .filter(
         (h) =>
@@ -1163,7 +1239,7 @@ export function findTables(
     for (let k = 0; k + 1 < bounds.length; k++) {
       const [lo, hi] = [bounds[k]!, bounds[k + 1]!];
       const th = allH.filter((h) => h.pos >= lo - tol && h.pos <= hi + tol);
-      // 分开叠着的表时，穿过分界线的竖线（外框的左右两边、上下共用的编号列线）两边各有一段。
+      // When separating stacked tables, vertical lines crossing the boundary (outer left/right borders, shared vertical numbering column lines) have a segment on each side.
       const tv = options.splitStacked
         ? allV.filter((v) => v.from < hi - tol && v.to > lo + tol).map((v) => clip(v, lo, hi))
         : allV.filter((v) => (v.from + v.to) / 2 > lo && (v.from + v.to) / 2 < hi);

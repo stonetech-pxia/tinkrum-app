@@ -15,16 +15,17 @@ import { t } from '../i18n';
 import { Icon, UiIcon } from './Icon';
 import type { Palette } from './theme';
 
-// 日期、时间的选择器（D-543）：纯 JS（不用原生组件）。月历格子和月历外观用同一套 core 函数
-// （monthWeeks、weekdayLabels、monthTitle），一周从哪天开始、一天从几点开始跟「设置 → 日期」。
+// Date and time picker (D-543): pure JS (no native components). Calendar grid and appearance share
+// core functions (monthWeeks, weekdayLabels, monthTitle); week start day and day start time follow
+// "Settings -> Date".
 
-/** YYYY-MM-DD → 天数（和 core 的 dateOfDayNumber 相反）。 */
+/** YYYY-MM-DD -> day count (inverse of core's dateOfDayNumber). */
 const dayOf = (date: string) => {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
   return Math.round(Date.UTC(y, m - 1, d) / 86_400_000);
 };
 
-/** 输入框旁边的日历按钮：打开、收起下面的选择器。 */
+/** Calendar button next to the input field: opens and collapses the picker below. */
 export function PickButton({
   open,
   onPress,
@@ -55,7 +56,7 @@ export function PickButton({
   );
 }
 
-/** 一个月的格子：点一天交出 YYYY-MM-DD。打开时是选中那天所在的月（没有就是这个月）。 */
+/** Monthly grid: tapping a day returns YYYY-MM-DD. When opened, defaults to the month of the selected day (or current month if none). */
 export function DayGrid({
   value,
   onPick,
@@ -144,7 +145,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
 const two = (n: number) => String(n).padStart(2, '0');
 
-/** 几点、几分（每 5 分钟一格）：点一下交出 HH:MM，另一半沿用已有的（没有时是 00）。 */
+/** Hour and minute (5-minute intervals): tapping returns HH:MM, retaining the existing value for the other part (defaults to 00 if none). */
 export function TimeChips({
   value,
   onPick,

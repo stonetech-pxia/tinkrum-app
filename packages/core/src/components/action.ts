@@ -2,22 +2,23 @@ import { z } from 'zod';
 
 import { t } from '../messages';
 import { ToolUseSchema } from '../record-ops-schema';
-// 只引用类型：值从 '../schema' 引会成环（schema → components → action → schema），PageSchema 的块会是 undefined。
+// Type-only import: importing values from '../schema' would cause a circular dependency (schema → components → action → schema), leaving PageSchema blocks as undefined.
 import type { QuickAction } from '../schema';
 import { findWorkflowTarget } from '../workflows/presets';
 import { type LookDefinitionOf, defineLook } from './define';
 
 const shape = {
   /**
-   * card = 卡片加「运行」按钮，row = 一行、右边 ▶，tile = 宫格小块；不写时按位置自动选（D-230）。
-   * icon = 只有图标的白底按钮，点了直接开始（D-449，新用户首页的「扫描」）。
+   * card = card with a "Run" button, row = single row with ▶ on the right, tile = grid tile;
+   * automatically selected by position when omitted (D-230). icon = white-background button with
+   * icon only, executes immediately on tap (D-449, "Scan" on the new user home screen).
    */
   show: z.strictObject({ shape: z.enum(['card', 'row', 'tile', 'icon']).optional() }).optional(),
-  /** 一个快捷操作：tools[] 里的，或者内设快捷操作的预设 ID（D-236、D-259，不用添加）。 */
+  /** A quick action: items in tools[], or preset ID for built-in quick actions (D-236, D-259, no addition needed). */
   tools: z.array(ToolUseSchema).min(1).max(1),
 };
 
-/** 显示一个快捷操作的块（原 workflowRunner）：点了运行（用户触发）。 */
+/** Displays a quick action block (formerly workflowRunner): tap to run (user-triggered). */
 export const actionComponent: LookDefinitionOf<'action', typeof shape> = defineLook({
   look: 'action',
   shape,

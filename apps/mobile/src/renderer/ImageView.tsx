@@ -9,8 +9,9 @@ import type { RenderEnv } from './components';
 import { Icon } from './Icon';
 import { pickPicture } from './pictures';
 
-// 图片组件（D-045）：AI 只放图片位；用户点图片位从相册选照片，照片存成用户文件，
-// 配置里只记录文件 ID。AI 看不到照片内容，也看不到文件名。
+// Image component (D-045): AI only provides image slots; user taps image slot to choose photos from
+// album, photos are saved as user files, and config records only the file ID. AI cannot see photo
+// content or file names.
 
 type ImageProps = BlockOf<'image'>['show'];
 
@@ -25,7 +26,7 @@ export function ImageView({
   props: ImageProps;
   env: RenderEnv;
   componentId: string;
-  /** 说明文字居中（组件的 style.align）。 */
+  /** Center description text (component's style.align). */
   center?: boolean;
 }) {
   const { palette, locale } = env;
@@ -33,7 +34,7 @@ export function ImageView({
   const proposeOps = useWorkspace((s) => s.proposeOps);
   const confirm = useWorkspace((s) => s.confirm);
   const bumpAssets = useWorkspace((s) => s.bumpAssets);
-  // undefined：读取中；null：文件不存在（例如来自另一台设备的版本）。
+  // undefined: loading; null: file does not exist (e.g., version from another device).
   const [uri, setUri] = useState<string | null | undefined>(props.asset ? undefined : null);
 
   useEffect(() => {

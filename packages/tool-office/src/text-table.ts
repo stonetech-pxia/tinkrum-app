@@ -1,11 +1,17 @@
 import type { Box, OcrBox, RgbaImage, TableBlock, TableCell } from './types';
 
-// 转 Word 的通用版面修正（D-471，创始人 2026-11-06：小票「转化的很差」，按建议做、「不要做小票特殊规则」）：
-// 1. 整页的倾斜：照片拍歪、纸弯了时，同一行右边的字比左边高（或低），按水平分行会把右边的字分到上一行。
-//    先估出整页的斜率，按斜线分行。
-// 2. 没有线的表：好几行都按同样的几列对齐（左边一段字、右边几列数字），按列排成一张没有边框的表，
-//    不再把几列接成一句话。至少三列、三行，两列的「标签：值」照旧（D-332）。
-// 3. 条形码：一片很密的竖条、里面没有字，当图片剪下来，不当成字。
+// General layout correction for Word conversion (D-471, founder 2026-11-06: receipt "conversion is
+// very poor", done as suggested, "do not make special receipt rules"):
+// 1. Whole-page skew: when photos are crooked or paper is curved, text on the right of the same
+// line is higher (or lower) than the left; splitting lines horizontally will split text on the
+// right into the previous row. Estimate the whole-page slope first, and split lines along the
+// slope.
+// 2. Borderless tables: multiple rows aligned to the same columns (a text segment on the left,
+// multiple number columns on the right), arranged into a borderless table by columns, avoiding
+// merging multiple columns into a single sentence. At least three columns and three rows;
+// two-column "label: value" pairs remain as before (D-332).
+// 3. Barcodes: dense vertical bars without text inside are clipped as images rather than treated as
+// text.
 
 const median = (values: readonly number[]) => {
   if (!values.length) return 0;
@@ -25,21 +31,22 @@ const unionBox = (boxes: readonly Box[]): Box => {
   };
 };
 
-// ---- 1. 倾斜 ----
+// ---- 1. Skew ----
 
-/** 斜率的搜索范围（约 ±5°）和步长。 */
+/** Search range (approx. +/-5 degrees) and step size for slope. */
 const MAX_SLOPE = 0.09;
 const SLOPE_STEP = 0.0025;
 
 /**
- * 整页的斜率（y 每往右 1 像素变多少）：试一串斜率，看哪个能让左右分开的行最多地对到同一高度。
- * 行太少、看不出来时是 0。
+ * Whole-page slope (change in y per 1 pixel rightward): test a series of slopes to see which
+ * aligns the maximum number of separated left/right rows to the same height. Returns 0 when there
+ * are too few rows to determine.
  */
 export function pageSlope(lines: readonly OcrBox[], lineHeight: number): number {
   return slopeFit(lines, lineHeight).slope;
 }
 
-/** 斜率和有多少对左右分开的行在这个斜率下对到了同一高度（越多越可信）。 */
+/** Slope and the number of pairs of separated left/right rows aligned to the same height at this slope (more is more reliable). */
 function slopeFit(lines: readonly OcrBox[], lineHeight: number): { slope: number; score: number } {
   if (lines.length < 4) return { slope: 0, score: 0 };
   const pts = lines.map((l) => ({
@@ -57,13 +64,13 @@ function slopeFit(lines: readonly OcrBox[], lineHeight: number): { slope: number
       for (let j = i + 1; j < pts.length; j++) {
         const a = pts[i]!;
         const b = pts[j]!;
-        // 只看左右分开的两块（同一列上下的行不说明倾斜）。
+        // Only consider two blocks separated horizontally (vertical rows in the same column do not indicate skew).
         if (a.right > b.left && b.right > a.left) continue;
         const dy = a.cy - s * a.cx - (b.cy - s * b.cx);
         if (Math.abs(dy) < tol) score++;
       }
     }
-    // 一样好时取更平的。
+    // When equally good, pick the flatter slope.
     if (score > best.score || (score === best.score && Math.abs(s) < Math.abs(best.slope))) {
       best = { slope: s, score };
     }
@@ -71,20 +78,22 @@ function slopeFit(lines: readonly OcrBox[], lineHeight: number): { slope: number
   return best.score > 0 ? best : { slope: 0, score: 0 };
 }
 
-/** 按斜线拉平以后的样子（只改 y；x、大小不变）。 */
+/** Appearance after leveling along the slope (only y changes; x and size remain unchanged). */
 export function levelLine(line: OcrBox, slope: number, centerX: number): OcrBox {
   if (!slope) return line;
   return { ...line, y: Math.round(line.y - slope * (line.x + line.width / 2 - centerX)) };
 }
 
-/** 局部的斜率按多高的一段算（行高的倍数）：纸弯了时上下的斜率不一样。 */
+/** Height of the segment for local slope calculation (multiple of row height): upper and lower slopes differ when paper is curved. */
 const BAND_LINES = 6;
-/** 一段里至少这么多对左右分开的行对上，这一段的斜率才可信。 */
+/** Minimum number of pairs of separated left/right rows required in a segment for its slope to be reliable. */
 const MIN_PAIRS = 3;
 
 /**
- * 每一行拉平（D-471）：页面按高度分成几段（每段几个行高，上下各多看半段），每段自己估斜率
- * （小票这样弯的纸，上面和下面斜得不一样）；一段里的行太少时用整页的斜率。
+ * Level each line (D-471): page is divided into segments by height (several row heights per
+ * segment, looking ahead/behind by half a segment), each segment estimates its own slope (for
+ * curved paper like receipts, top and bottom slopes differ); uses whole-page slope when rows in a
+ * segment are too few.
  */
 export function levelLines(
   lines: readonly OcrBox[],
@@ -95,7 +104,7 @@ export function levelLines(
   const band = BAND_LINES * lineHeight;
   const cy = (l: OcrBox) => l.y + l.height / 2;
   const slopes = new Map<number, number>();
-  // 第 k 段的斜率（中心在 (k + 0.5) × 段高）：对上的不到三对时不可信，用整页的。
+  // Slope of the k-th segment (centered at (k + 0.5) * segment height): unreliable when aligned pairs are fewer than three, falls back to whole-page slope.
   const slopeOf = (k: number) => {
     let s = slopes.get(k);
     if (s === undefined) {
@@ -106,7 +115,7 @@ export function levelLines(
     }
     return s;
   };
-  // 两段之间按位置平滑过渡：同一排的几块落在两段交界处时斜率差不多，不会被分开。
+  // Smooth transition between segments by position: blocks on the same row landing at segment boundaries have similar slopes and will not be separated.
   const at = (y: number) => {
     const t = y / band - 0.5;
     const k = Math.floor(t);
@@ -116,9 +125,9 @@ export function levelLines(
   return lines.map((l) => levelLine(l, at(cy(l)), centerX));
 }
 
-// ---- 2. 没有线的表 ----
+// ---- 2. Borderless tables ----
 
-/** 一排里隔开的一段（一格的候选）。 */
+/** A separated segment within a row (candidate cell). */
 interface Segment {
   lines: OcrBox[];
   x: number;
@@ -132,7 +141,7 @@ interface TextRow {
   bottom: number;
 }
 
-/** 拉平以后按高度分排（和上一排的中线差不到半个行高就是同一排），每排按空隙分段。 */
+/** After leveling, split into rows by height (same row if midline difference from previous row is less than half a row height), and segment each row by gaps. */
 function textRows(lines: readonly OcrBox[], lineHeight: number): TextRow[] {
   const sorted = [...lines].sort((a, b) => a.y + a.height / 2 - (b.y + b.height / 2));
   const groups: OcrBox[][] = [];
@@ -148,7 +157,7 @@ function textRows(lines: readonly OcrBox[], lineHeight: number): TextRow[] {
     const segments: Segment[] = [];
     for (const line of g) {
       const last = segments.at(-1);
-      // 挨得很近的两块是同一段（识别把一句话拆开了）。
+      // Two blocks very close together are the same segment (recognition split a sentence).
       if (last && line.x - last.right < 0.6 * lineHeight) {
         last.lines.push(line);
         last.right = Math.max(last.right, line.x + line.width);
@@ -163,7 +172,7 @@ function textRows(lines: readonly OcrBox[], lineHeight: number): TextRow[] {
   });
 }
 
-/** 列：几排里的段大多落在同一段横向范围里；列和列之间是几乎没有字的空白。 */
+/** Columns: segments across multiple rows mostly fall within the same horizontal range; columns are separated by whitespace with almost no text. */
 function columnBands(rows: readonly TextRow[]): { x: number; right: number }[] {
   const multi = rows.filter((r) => r.segments.length >= 2);
   const left = Math.min(...rows.flatMap((r) => r.segments.map((s) => s.x)));
@@ -175,7 +184,7 @@ function columnBands(rows: readonly TextRow[]): { x: number; right: number }[] {
       for (let x = Math.floor(s.x - left); x < Math.ceil(s.right - left); x++) cover[x]!++;
     }
   }
-  // 只有一两排跨过去的地方也算空白（一排长的字跨了两列）。
+  // Places where only one or two rows span across are also counted as whitespace (a long text line spanning two columns).
   const empty = Math.max(1, Math.floor(multi.length * 0.12));
   const bands: { x: number; right: number }[] = [];
   let start = -1;
@@ -190,7 +199,7 @@ function columnBands(rows: readonly TextRow[]): { x: number; right: number }[] {
   return bands;
 }
 
-/** 这一段落在哪几列（按和每列重叠的多少）。 */
+/** Which columns this paragraph falls into (based on the amount of overlap with each column). */
 function spanOf(seg: Segment, bands: readonly { x: number; right: number }[]): [number, number] {
   const hits = bands
     .map((b, i) => ({
@@ -199,7 +208,7 @@ function spanOf(seg: Segment, bands: readonly { x: number; right: number }[]): [
     }))
     .filter((h) => h.ov > 0.3 * Math.min(seg.right - seg.x, bands[h.i]!.right - bands[h.i]!.x));
   if (!hits.length) {
-    // 落在空白里：离中心最近的那列。
+    // Falls into whitespace: the column closest to the center.
     const c = (seg.x + seg.right) / 2;
     let best = 0;
     bands.forEach((b, i) => {
@@ -211,15 +220,17 @@ function spanOf(seg: Segment, bands: readonly { x: number; right: number }[]): [
   return [hits[0]!.i, hits.at(-1)!.i];
 }
 
-/** 一段字是一个数（金额、数量、比率）：有数字，字母不超过 3 个（「€」「kg」「%」这类单位）。 */
+/** A text segment is a number (amount, quantity, rate): contains digits, with at most 3 letters (units like "€", "kg", "%"). */
 const isNumber = (s: Segment) => {
   const text = s.lines.map((l) => l.text).join(' ');
   return /\d/.test(text) && (text.match(/\p{L}/gu)?.length ?? 0) <= MAX_UNIT_LETTERS;
 };
 
 /**
- * 一段字是一个单位（化验单「U/l」「mg/dl」「mmol/l」「%」「sec」，EU 样本 098）：一个词，不超过 6 个字，
- * 带「/」「%」或者不超过 3 个字母。数后面单独一列的单位和数一样，是数那几列的一部分。
+ * A text segment is a unit (lab test units like "U/l", "mg/dl", "mmol/l", "%", "sec", EU sample
+ * 098): a single word, at most 6 characters, containing "/" or "%" or at most 3 letters. A unit
+ * in a separate column following a number is treated the same as a number, and is part of those
+ * number columns.
  */
 const isUnit = (s: Segment) => {
   const text = s.lines.map((l) => l.text.trim()).join(' ');
@@ -230,10 +241,13 @@ const isUnit = (s: Segment) => {
 };
 
 /**
- * 第 k 列和第 k + 1 列之间隔得很远时，右边是不是一列列的数、一排一排对着左边（D-502）：
- * 右边的段至少七成是数，右边有字的排至少七成在左边也有字、而且左右两边的高度差不到 1/4 个行高
- * （拍得很斜、没拉平的照片里，碰巧挨上的左右两段差得多，配成一排会把金额配到别的项目旁边），
- * 这样的排至少三排。
+ * When there is a wide gap between column k and column k + 1, checks whether the right side
+ * consists of columns of numbers aligned row by row with the left side (D-502): at least 70% of
+ * the segments on the right are numbers, at least 70% of the text rows on the right also have
+ * text on the left, and the height difference between left and right sides is less than 1/4 of a
+ * line height (in highly skewed, unflattened photos, adjacent left/right segments might differ
+ * significantly, and pairing them into a row would misalign amounts next to other items);
+ * requires at least three such rows.
  */
 function lockedRows(
   spans: readonly { s: Segment; span: [number, number] }[][],
@@ -258,57 +272,65 @@ function lockedRows(
 }
 
 export interface TextTable {
-  /** 拉平以后的行（从 free 里拿掉）。 */
+  /** Flattened rows (removed from free). */
   lines: OcrBox[];
   table: TableBlock;
-  /** 每列的宽（原图像素）。 */
+  /** Width of each column (in original image pixels). */
   colWidths: number[];
-  /** 每列的字从哪到哪（x）：列线可以放在两列之间的空白里任何地方（D-506）。 */
+  /** Span of text for each column (x): column dividers can be placed anywhere in the whitespace between two columns (D-506). */
   bands: { x: number; right: number }[];
   box: Box;
 }
 
 /**
- * 一张没有线的表至少三列、三排分成了几段、其中两排用到了三列以上；格子里的字大多是短的
- * （三栏排的文章每段都长，不当表）。
+ * A borderless table must have at least 3 columns and 3 rows split into segments, with at least
+ * two rows using more than 3 columns; most text inside cells is short (three-column articles have
+ * long paragraphs and are not treated as tables).
  */
 const MIN_COLS = 3;
 const MIN_ROWS = 3;
 const MIN_WIDE_ROWS = 2;
 const MAX_CELL_CHARS = 24;
 const MAX_COL_GAP = 3;
-/** 隔得远的右边几列：至少这么多比例是数、这么多比例的排在左边有字（D-502）。 */
+/** For distant columns on the right: at least this proportion are numbers, and this proportion of rows have text on the left (D-502). */
 const LOCKED_SHARE = 0.7;
 const LOCKED_SKEW = 0.25;
 const MAX_UNIT_LETTERS = 3;
-/** 表上下的排算紧挨着：和表的隔开不超过表里最大的排间空隙再多这么多个行高（D-506）。 */
+/** Rows immediately above and below the table are considered adjacent: separated by no more than the maximum row gap inside the table plus this many additional line heights (D-506). */
 const NEAR_SLACK = 0.5;
 
-/** 这一排能按这张表的列排：至少两段，每段从不同的列开始（没有两段挤在同一列，跨到下一列的截到那一列为止）。 */
+/** This row can be laid out according to the table's columns: at least two segments, each starting from a different column (no two segments squeezed into the same column; text overflowing into the next column is truncated at that column). */
 function fitsBands(row: TextRow, bands: readonly Band[]): boolean {
   const starts = row.segments.map((seg) => spanOf(seg, bands)[0]);
   return starts.length >= 2 && new Set(starts).size === starts.length;
 }
 
 /**
- * 找没有线的表：连续几排（中间可以夹着只有一段的排，空隙不大），按列对齐，至少三列、三排用到三列以上。
- * lines 是拉平以后的行；original 把拉平的行换回原来的（格子在原图里的位置，截图核对、原图小窗用）。
+ * Finds borderless tables: consecutive rows (which may have rows with only a single segment
+ * interspersed, provided the gap is small), aligned by columns, with at least 3 columns and at
+ * least 3 rows using 3+ columns. lines are the flattened rows; original maps flattened rows back
+ * to their original positions (for cell positions in the original image, screenshot verification,
+ * and original image thumbnail views).
  */
 export function findTextTables(
   lines: readonly OcrBox[],
   lineHeight: number,
   original: (l: OcrBox) => OcrBox = (l) => l,
-  /** 已被可信表格区域圈定：仍要求多排对齐，但隔得远的列也可以是姓名、状态等文字。 */
+  /** Enclosed by a reliable table region: still requires multi-row alignment, but distant columns may also contain text such as names or statuses. */
   textColumns = false,
 ): TextTable[] {
   const rows = textRows(lines, lineHeight);
-  // 先找三列以上的表，再在剩下的排里找两列的清单（D-503）：两列的「项目 → 金额」不能抢三列的表的排
-  // （小票的合计把下面的 GST 汇总吞进一张两列的表、压成两列，或者先拿走汇总上面的几排、汇总凑不成表）。
+  // First find tables with 3+ columns, then find 2-column lists in the remaining rows (D-503): a
+  // 2-column "Item -> Amount" must not hijack rows from a 3-column table (e.g., receipt totals
+  // swallowing the GST summary below and compressing it into a 2-column table, or removing rows
+  // above the summary when the summary itself cannot form a table).
   const wide = runTables(rows, lineHeight, original, false, textColumns);
   const used = new Set(wide.flatMap(({ from, to }) => rows.slice(from, to + 1)));
-  // 三列以上的表下面紧挨着的一两排、自己凑不成表（小票的 GST 汇总：表头一排、数一排）：
-  // 能按这张表的列排（每段从不同的列开始），就接到这张表下面，列不重算（D-503）。
-  // 加进来一起算列的话，汇总的表头横在两列之间，会把三列并成两列。
+  // One or two rows immediately below a 3+ column table that do not form a table on their own
+  // (receipt GST summary: header row, number row): if they can be laid out according to the table's
+  // columns (each segment starting from a different column), they are appended below the table
+  // without recalculating columns (D-503). If included in column calculation, the summary header
+  // spanning across two columns would merge three columns into two.
   for (const w of wide) {
     const tail: TextRow[] = [];
     for (let k = w.to + 1; k < rows.length && !used.has(rows[k]!); k++) {
@@ -333,7 +355,7 @@ export function findTextTables(
   return out.sort((x, y) => x.box.y - y.box.y);
 }
 
-/** 一串连着的排里找表：从上往下，每处取最长的、还能成表的一段。twoColumns 时也收两列的清单。 */
+/** Finds tables within a sequence of connected rows: from top to bottom, takes the longest valid table segment at each location. Also collects 2-column lists when twoColumns is true. */
 function runTables(
   rows: readonly TextRow[],
   lineHeight: number,
@@ -348,7 +370,7 @@ function runTables(
       i++;
       continue;
     }
-    // 往下接：有两段以上的排，或者夹在两段以上的排之间、空隙不大的一段的排。
+    // Extending downward: rows with 2+ segments, or rows with a single segment sandwiched between 2+ segment rows with a small gap.
     let j = i;
     let lastMulti = i;
     while (j + 1 < rows.length) {
@@ -358,13 +380,16 @@ function runTables(
       if (next.segments.length >= 2) lastMulti = j;
       else if (j - lastMulti > 2) break;
     }
-    // 上下两部分的列不一样时（小票的商品和下面的合计）整段凑不成一张表：取从这里开始最长的、还能成表的一段。
+    // When column layouts differ between the upper and lower sections (e.g., receipt items and totals below), the entire section cannot form a single table: takes the longest valid table segment starting from here.
     let found: { table: TextTable; bands: Band[]; end: number } | null = null;
     for (let end = lastMulti; end >= i + MIN_ROWS - 1 && !found; end--) {
       if (rows[end]!.segments.length < 2) continue;
-      // 表上下紧挨着的两排（隔着不到 1.8 个行高）：看隔得远的数列有没有错位（D-502）。
-      // 错开的数是这张表自己的那列数，和表里的排一样密；隔得比表里任何两排之间都明显远（多半个行高以上）的
-      // 是另一块（发票表下面右边两列的 Subtotal / VAT / Total），不算错开的数（D-506）。
+      // Two rows immediately adjacent above/below the table (separated by less than 1.8 line
+      // heights): checks if distant number columns are misaligned (D-502). Shifted numbers
+      // belonging to the table's own number column have the same density as rows inside the table;
+      // numbers significantly farther than any row gap inside the table (more than half a line
+      // height) belong to another block (e.g., Subtotal / VAT / Total in the two columns on the
+      // bottom right of an invoice table) and are not considered shifted numbers (D-506).
       let spacing = 0;
       for (let k = i + 1; k <= end; k++) {
         spacing = Math.max(spacing, rows[k]!.top - rows[k - 1]!.bottom);
@@ -409,21 +434,27 @@ function tableOf(
   const bands = columnBands(run);
   if (bands.length < 2) return null;
   const spans = run.map((row) => row.segments.map((s) => ({ s, span: spanOf(s, bands) })));
-  // 列和列隔得太远（超过 3 个行高）的是并排的两块（左边地址、右边「标签：值」），不是一张表（和分块的规则一样）。
-  // 除非远处那几列是数，而且每一排的数在左边都有字（D-502：工资单、账单的表身，左边一列项目名、
-  // 隔得很远的右边几列金额；表格线没认出来时也按排排成表，不把项目名和金额分成两块，排对不上）。
+  // Columns separated by too great a distance (more than 3 line heights) represent two side-by-side
+  // blocks (left address, right "label: value") rather than a single table (same rule as block
+  // splitting). Unless those distant columns are numbers, and the numbers in every row have text on
+  // the left (D-502: payroll or billing table bodies, with item names in the left column and
+  // amounts in distant columns on the right; when table borders are not recognized, rows are still
+  // aligned as a table rather than splitting item names and amounts into two unaligned blocks).
   const far = bands
     .slice(1)
     .map((b, k) => k)
     .filter((k) => bands[k + 1]!.x - bands[k]!.right > MAX_COL_GAP * lineHeight);
   if (far.some((k) => !lockedRows(spans, k, lineHeight, textColumns))) return null;
-  // 表上下紧挨着有只在远处那几列、左边没字的数：数列整体错开了几排（拍得很斜、没拉平的照片，
-  // 碰巧对齐的是别的项目），按排配会配错，不成表（D-502）。
+  // Stray numbers immediately adjacent to the table that appear only in distant columns without
+  // text on the left: number columns shifted globally by several rows (in highly skewed,
+  // unflattened photos where other items happen to align), which would be mispaired if matched by
+  // row, preventing table formation (D-502).
   const stray = (row: TextRow, k: number) =>
     row.segments.some(isNumber) && row.segments.every((x) => spanOf(x, bands)[0] > k);
   if (far.some((k) => near.some((row) => stray(row, k)))) return null;
-  // 两列的也算（D-502）：左边项目、隔得很远的右边一列数（小票的合计、账单的费用清单），一排一排对着；
-  // 隔得近的两列「标签：值」照旧（D-332）。
+  // Two-column tables are also included (D-502): left item, distant single column of numbers on the
+  // right (receipt totals, bill fee lists), matched row by row; closely spaced two-column "label:
+  // value" pairs remain unchanged (D-332).
   const minCols = twoColumns && bands.length === 2 && far.length === 1 ? 2 : MIN_COLS;
   if (bands.length < minCols) return null;
   const wide = spans.filter((r) => new Set(r.map((x) => x.span[0])).size >= minCols).length;
@@ -438,7 +469,7 @@ function tableOf(
 
 type Band = { x: number; right: number };
 
-/** 按给定的列把几排排成一张表。 */
+/** Arranges rows into a table according to specified columns. */
 function buildTable(
   run: readonly TextRow[],
   bands: readonly Band[],
@@ -447,7 +478,7 @@ function buildTable(
   const spans = run.map((row) => row.segments.map((s) => ({ s, span: spanOf(s, bands) })));
   const cells: TableCell[] = [];
   for (const [r, row] of spans.entries()) {
-    // 同一列里的几段接起来；跨列的段占几列。
+    // Concatenates segments within the same column; multi-column segments span multiple columns.
     const byCol = new Map<number, { segs: Segment[]; end: number }>();
     for (const { s, span } of row) {
       const at = byCol.get(span[0]);
@@ -471,7 +502,7 @@ function buildTable(
       const band = { x: bands[start]!.x, right: bands[last]!.right };
       const segLeft = Math.min(...segs.map((s) => s.x));
       const segRight = Math.max(...segs.map((s) => s.right));
-      // 数字一列常常靠右对齐：右边贴着、左边空得多。
+      // Numeric columns are often right-aligned: flush against the right, with more space on the left.
       const align =
         segRight - segLeft < 0.7 * (band.right - band.x) &&
         band.right - segRight < 0.5 * (segLeft - band.x)
@@ -490,7 +521,7 @@ function buildTable(
     }
     for (; c < bands.length; c++) cells.push(emptyCell(r, c));
   }
-  // 对齐按列定：一列里大多数格子靠右，整列都靠右（一列里有的靠右、有的靠左看着乱）。
+  // Alignment determined per column: if most cells in a column are right-aligned, the entire column is right-aligned (mixed right and left alignment within a column looks messy).
   for (let c = 0; c < bands.length; c++) {
     const inCol = cells.filter((x) => x.col === c && x.colSpan === 1 && x.text);
     const right = inCol.filter((x) => x.align === 'right').length;
@@ -501,7 +532,7 @@ function buildTable(
   }
   const all = run.flatMap((row) => row.lines);
   const box = unionBox(all.map(original));
-  // 列宽：列和列之间的空白平分给两边。
+  // Column widths: whitespace between columns is split equally between both sides.
   const edges = [
     box.x,
     ...bands.slice(1).map((b, k) => (bands[k]!.right + b.x) / 2),
@@ -525,17 +556,21 @@ const emptyCell = (row: number, col: number): TableCell => ({
   text: '',
 });
 
-// ---- 3. 条形码 ----
+// // ---- 3. Barcodes ----
 
-/** 一条横线上黑白交替至少这么多次（条形码有几十条竖线；一行字也会，所以有字的地方不看）。 */
+/** Black and white alternates at least this many times along a horizontal line (barcodes have dozens of vertical bars; lines of text do as well, so text regions are ignored). */
 const BAR_TRANSITIONS = 24;
-/** 相邻两条横线上至少这么多比例的黑白交替位置对得上，才是同一片竖条。 */
+/** At least this proportion of black/white transition positions match on two adjacent horizontal lines to be considered the same vertical barcode region. */
 const BAR_MATCH = 0.7;
 
 /**
- * 条形码的竖条从上到下贯穿整片：按这片里最深和最浅的中间分黑白，至少两成的列有黑，其中一半以上的列黑的高度过半。
- * 纸面纹理在整行平均亮度上下跳（扫描件的噪点上下几行一样），夹着一条斜的虚线时也会凑够黑白交替，
- * 但真正黑的只有虚线那几个像素高、或者只有旁边几个字（D-533 以后零星的字旁边也找条形码，D-471）。
+ * Whether barcode vertical bars span the entire region from top to bottom: splits black and white
+ * based on the midpoint between the darkest and lightest points in the region, with at least 20%
+ * of columns containing black, and over half of those black columns having a height exceeding
+ * 50%. Paper texture fluctuates around average line brightness (scan noise is similar across
+ * adjacent lines), and diagonal dashed lines can also accumulate enough black/white transitions,
+ * but truly black regions are only as tall as those dashed pixels or adjacent text (starting
+ * after D-533, barcodes are also searched near sporadic text, D-471).
  */
 function barsFillHeight(image: RgbaImage, box: Box): boolean {
   const { width, data } = image;
@@ -566,15 +601,18 @@ function barsFillHeight(image: RgbaImage, box: Box): boolean {
 }
 
 /**
- * 一片「竖条」里认出来成词的字（三个以上的字母，不全是 I、l 这类竖笔），就不是条形码，是印着正文的底纹：
- * 车票的防伪三角纹每行都黑白交替，上下又对得齐，夹着的「Von: Fulda」整片被当成条形码剪掉（EU 样本 066）。
- * 条形码里认出来的零星的字是数字和竖笔。
+ * Recognized words forming readable terms within a "vertical bar" region (3+ letters, not
+ * consisting solely of vertical strokes like I or l) indicate it is not a barcode, but patterned
+ * background text: ticket security triangles alternate black and white on every line and align
+ * vertically, causing the enclosed "Von: Fulda" region to be mistakenly cropped out as a barcode
+ * (EU sample 066). Sporadic words recognized inside barcodes are numbers and vertical strokes.
  */
 const wordy = (text: string) => (text.match(/\p{L}{3,}/gu) ?? []).some((w) => /[^IilL]/u.test(w));
 
 /**
- * 条形码这样的一片竖条：从上到下几条横线都有很多次黑白交替、而且那里没有认出来的字。
- * 返回它们的范围（原图像素）；高度不到一个行高的不要。
+ * Finds vertical bar regions like barcodes: multiple horizontal lines from top to bottom have
+ * frequent black/white transitions with no recognized text present. Returns their bounding boxes
+ * (original image pixels); ignores regions with a height less than one line height.
  */
 export function findBarcodes(
   image: RgbaImage,
@@ -594,14 +632,14 @@ export function findBarcodes(
   const pad = 0.3 * lineHeight;
   const covered = (y: number) => lines.some((l) => y >= l.y - pad && y <= l.y + l.height + pad);
   const hits: { y: number; x0: number; x1: number; edges: number[] }[] = [];
-  // 有字的横线不看；记下来：条形码中间夹着一行认出来的零星的字时，上下两半还是同一片。
+  // Ignored lines with text; recorded: when a barcode is interrupted by a single line of recognized sporadic text, the upper and lower halves still belong to the same region.
   const skipped = new Set<number>();
   for (let y = 0; y < height; y += step) {
     if (covered(y)) {
       skipped.add(y);
       if (!localText) continue;
     }
-    // 这一行的亮度，用这一行的平均值分黑白。
+    // Brightness of this line, used to split black and white based on the line's average value.
     const lum = new Float32Array(width);
     let sum = 0;
     for (let x = 0; x < width; x++) {
@@ -633,7 +671,7 @@ export function findBarcodes(
       }
       prev = dark;
     }
-    // 只算差别够大的（纯白纸上的噪点不算）。
+    // Only counts differences large enough (noise on pure white paper is excluded).
     let min = 255;
     let max = 0;
     for (let x = 0; x < width; x++) {
@@ -643,7 +681,7 @@ export function findBarcodes(
     if (count >= BAR_TRANSITIONS && max - min > 80) {
       if (!localText) hits.push({ y, x0, x1, edges });
       else {
-        // 零星页框不能把裁图拉到旁边的字段；分开的两组竖条也各自保留。
+        // Isolated page boxes must not pull crops into neighboring fields; separate groups of vertical bars are also preserved individually.
         const clusters: number[][] = [];
         for (const x of edges) {
           const last = clusters.at(-1);
@@ -656,7 +694,7 @@ export function findBarcodes(
       }
     }
   }
-  // 竖条上下是同一根：相邻两条横线上的黑白交替大多在同样的位置（字的笔画、照片的纹理不会）。
+  // Whether vertical bars align vertically: black/white transitions on adjacent horizontal lines mostly occur at the same positions (text strokes and photo textures do not).
   const sameBars = (a: number[], b: number[]) => {
     const tol = Math.max(2, Math.round(width / 400));
     let j = 0;
@@ -667,7 +705,7 @@ export function findBarcodes(
     }
     return match >= BAR_MATCH * Math.max(a.length, b.length);
   };
-  // 连着的几条横线合成一片。
+  // Combines consecutive horizontal lines into a single region.
   const out: Box[] = [];
   if (localText) {
     const groups: (typeof hits)[] = [];
@@ -713,7 +751,7 @@ export function findBarcodes(
     const last = group.at(-1);
     let apart = last ? h.y - last.y : 0;
     if (last) {
-      // 中间跳过的都是有字的横线时不算隔开。
+      // Skipped lines in between that contain text are not counted as gaps.
       for (let y = last.y + step; y < h.y && skipped.has(y); y += step) apart -= step;
     }
     if (last && (apart > 2 * step || !sameBars(last.edges, h.edges))) flush();

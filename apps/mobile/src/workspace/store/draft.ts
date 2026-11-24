@@ -13,17 +13,20 @@ import type { Kernel } from './kernel';
 import type { SessionStore } from './session';
 import type { Draft, DraftChatReply, DraftStep, WorkspaceState } from './types';
 
-// AI 修改的草稿（D-190）：存盘、启动或回到草稿时在最新版本上重新套用、退一步、应用（合成一个可撤销的版本）、
-// 离开、删除、显示出错时退一步；样板 App 也作为草稿的一步（D-260、D-262）。
+// AI modification draft (D-190): Reapply on the latest version upon saving, startup, or returning
+// to draft, step back, apply (synthesize into an undoable version), leave, delete, step back when
+// display error occurs; sample apps also serve as a draft step (D-260, D-262).
 
 const DRAFT_META_KEY = 'draft';
 
-/** 带给 AI 的最近几句（D-207）。 */
+/** Recent sentences brought to the AI (D-207). */
 const EARLIER_LIMIT = 5;
 
 /**
- * 草稿聊天框里之前说过的话，按说的顺序，最多 EARLIER_LIMIT 句；退一步不算一句。
- * 现在说过的话都在工具清单里（D-414）：这里只给旧版 App 留下的草稿接到清单上用。
+ * Previously spoken words in the draft chat box, in the order spoken, up to EARLIER_LIMIT
+ * sentences; stepping back does not count as a sentence. Spoken words are now all in the tool
+ * list (D-414): here it is only kept for connecting drafts left by older app versions to the
+ * list.
  */
 function earlierOf(draft: Draft): PlanEarlier[] {
   const all: PlanEarlier[] = [];
@@ -41,7 +44,7 @@ function earlierOf(draft: Draft): PlanEarlier[] {
   return all.slice(-EARLIER_LIMIT);
 }
 
-/** 草稿只留前几步时，排在去掉的那些步后面的回复也去掉。 */
+/** When the draft retains only the first few steps, replies located after the removed steps are also removed. */
 function keepSteps(draft: Draft, steps: DraftStep[]): Draft {
   return {
     ...draft,
@@ -63,10 +66,12 @@ export function createDraft(k: Kernel, session: SessionStore) {
   }
 
   /**
-   * 把草稿的每一步重新套在最新版本上（离开草稿期间可能撤销过、添加过工具）。
-   * 套不上的那一步和后面的都去掉，并提示用户。
-   * cleanup：这次功能修改的善后操作里，正式版本上跳过的那些（D-413）：改的块只在草稿里，这里跟着套上，
-   * 写进那一步的操作里，以后重新套用不用再算（配置自洽，底线 18）。
+   * Reapply each step of the draft onto the latest version (undone or tools added may have
+   * occurred while leaving the draft). The un-applyable step and subsequent ones are removed, and
+   * the user is notified. cleanup: Those skipped on the official version among the cleanup
+   * operations of this feature modification (D-413): modified blocks are only in the draft,
+   * reapplied here accordingly, written into that step's operations, and no longer computed upon
+   * future reapplication (configuration self-consistency, Invariant 18).
    */
   function rebaseDraft(
     draft: Pick<Draft, 'origin' | 'open' | 'replies'> & { steps: Omit<DraftStep, 'config'>[] },
@@ -78,7 +83,7 @@ export function createDraft(k: Kernel, session: SessionStore) {
     const steps: DraftStep[] = [];
     let base = config;
     let left = [...cleanup];
-    /** 这一步本身套不上（加的块读到了刚删的字段）：连同还套得上的善后操作一起算。 */
+    /** This step itself cannot be reapplied (added block read a just-deleted field): Computed together with still-applyable cleanup operations. */
     const withCleanup = (ops: readonly Op[]) => {
       const applied = applyOps(base, ops, ctx);
       if (!applied.ok) return null;
@@ -102,7 +107,7 @@ export function createDraft(k: Kernel, session: SessionStore) {
       steps.push({ ...step, ops: fixed.all, config: base });
     }
     const dropped = draft.steps.length - steps.length;
-    // 每一步都套得上时，剩下的善后操作放在最后一步里做（模型要清理的不一定校验得出来）。
+    // When every step can be reapplied, remaining cleanup operations are performed in the final step (what the model wants to clean up might not necessarily be verifiable).
     const last = steps.at(-1);
     if (dropped === 0 && last && left.length > 0) {
       const usable = applicableOps(last.config, left, ctx);
@@ -132,9 +137,12 @@ export function createDraft(k: Kernel, session: SessionStore) {
   }
 
   /**
-   * 正式版本变了（功能直接生效、撤销，D-411）：开着的草稿马上套到新版本上。不套的话，应用草稿会用
-   * 旧的配置盖掉这次变化。一步都套不上时草稿就没了（rebaseDraft 已经提示）。
-   * 带善后操作时（D-413）离开了的草稿也马上套，这些操作不存盘，等不到下次打开。
+   * Official version changed (features take effect directly, undo, D-411): Open draft immediately
+   * reapplies to the new version. If not reapplied, applying the draft would overwrite this
+   * change with the old configuration. The draft is discarded if not a single step can be applied
+   * (rebaseDraft has already notified). When accompanied by cleanup operations (D-413), left
+   * drafts are also reapplied immediately; these operations are not persisted and will not wait
+   * for the next open.
    */
   async function rebaseOpenDraft(cleanup: readonly Op[] = []) {
     const draft = get().draft;
@@ -150,7 +158,7 @@ export function createDraft(k: Kernel, session: SessionStore) {
     try {
       const stored = JSON.parse(raw) as Pick<Draft, 'origin'> & {
         steps: Omit<DraftStep, 'config'>[];
-        /** D-207 之前存的草稿没有。 */
+        /** Drafts saved prior to D-207 do not have this. */
         replies?: DraftChatReply[];
       };
       const draft = rebaseDraft({ ...stored, replies: stored.replies ?? [], open: false });
@@ -193,7 +201,7 @@ export function createDraft(k: Kernel, session: SessionStore) {
 
     closeDraft() {
       const draft = get().draft;
-      // 草稿里唯一的提示是「应用之后才能用」，离开时一起收掉。
+      // The only prompt in the draft is "Available after applying", which is cleared together upon leaving.
       if (draft?.open) set({ draft: { ...draft, open: false }, toast: null });
     },
 
@@ -238,7 +246,7 @@ export function createDraft(k: Kernel, session: SessionStore) {
     async applyDraft() {
       const { head, config } = get();
       let { draft } = get();
-      // 离开了的草稿先套到最新版本上，不然会盖掉这期间的变化（「应用草稿并继续」从 AI 修改页来，D-413）。
+      // The left draft is first reapplied to the latest version, otherwise changes during this period would be overwritten ("Apply draft and continue" comes from the AI modification page, D-413).
       if (draft && !draft.open) {
         draft = rebaseDraft(draft);
         set({ draft });
@@ -277,7 +285,7 @@ export function createDraft(k: Kernel, session: SessionStore) {
           draft.steps.map((step) => step.changeRequestId),
           revision.id,
         );
-        // 被移除的工具失去文件授权；文件本身保留（§7G）。
+        // Removed tools lose file authorization; files themselves are retained (§7G).
         const remaining = new Set(after.packages.map((t) => t.id));
         for (const tool of config.packages) {
           if (!remaining.has(tool.id)) await repo.revokeToolGrants(tool.id);

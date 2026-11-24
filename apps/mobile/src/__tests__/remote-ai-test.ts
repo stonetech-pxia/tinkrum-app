@@ -11,7 +11,7 @@ const respond = (status: number, body: unknown) =>
   jest.fn(
     async () => ({ ok: status < 400, status, json: async () => body }) as unknown as Response,
   );
-/** 服务器转发回来的一次模型回复（D-193）。 */
+/** A model response forwarded back by the server (D-193). */
 const completion = (text: string) => ({
   text,
   stopReason: 'end_turn',
@@ -40,7 +40,7 @@ describe('remote AI provider', () => {
     expect(url).toBe('http://api.test/v1/complete');
     const body = bodyOf(fetchImpl);
     expect(Object.keys(body)).toEqual(['system', 'messages']);
-    // 提示词按需加载默认关（创始人 2026-10-31）：发完整的提示词。
+    // Prompt on-demand loading default disabled (founder 2026-10-31): send the full prompt.
     expect(body.system).toBe(systemPromptFor(registry, 'full'));
     expect(body.messages).toHaveLength(1);
     expect(body.messages[0]).toMatchObject({ role: 'user' });
@@ -100,7 +100,7 @@ describe('remote AI provider', () => {
     const down = make({
       fetchImpl: jest.fn(async () => Promise.reject(new TypeError('Network request failed'))),
     });
-    // 连不上不是「做不到」：用 unavailable，不显示「把这个需求告诉我们」（D-189）。
+    // A connection failure is not "cannot do": use `unavailable`, avoiding "tell us about this request" (D-189).
     expect(await down.plan('x', ctx)).toMatchObject({ kind: 'reject', reason: 'unavailable' });
     expect(
       await make({ fetchImpl: respond(502, { error: 'ai_unavailable' }) }).plan('x', ctx),

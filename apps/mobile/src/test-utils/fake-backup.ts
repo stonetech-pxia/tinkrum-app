@@ -1,9 +1,11 @@
 import { DB_ENTRY, FILE_DIRS, MANIFEST_NAME, buildManifest } from '../backup/manifest';
 import type { ArchiveNative, ArchiveProgress, BackupEnv, StagedDb } from '../backup/service';
 
-// 整体导出和恢复的替身环境（D-600）：一块内存里的「磁盘」、一个按原生模块的规则工作的 zip、两份数据库（正在用的、解开的）。
-// 替身要像真的一样会出问题：目录改名会连里面的东西一起搬；删除只删前缀；压缩包有坏的、不是 zip 的、名字不安全的；
-// 取消要在写到一半时生效；选择器给的压缩包在磁盘外面（原件），谁删它测试就报错。
+// Mock environment for full export and restore (D-600): a "disk" in memory, a zip working according
+// to native module rules, and two databases (live, unpacked). The mock should fail realistically:
+// directory renaming moves contents along with it; deletion only deletes prefixes; archives can be
+// corrupted, non-zip, or have unsafe names; cancellation must take effect mid-write; archives
+// provided by pickers outside the disk (originals) throw tests if anyone deletes them.
 
 export const DOC = 'file:///doc/';
 export const CACHE = 'file:///cache/';
@@ -13,35 +15,35 @@ export interface DbState {
   userVersion: number;
   schemaVersion: number | null;
   records: number;
-  /** 数据库里当前版本的编号。 */
+  /** Current version number in the database. */
   headId: number;
-  /** 为 true：整个文件读不出来（完整性检查不过）。 */
+  /** When true: the entire file cannot be read (integrity check fails). */
   corrupt?: boolean;
-  /** 为 true：打开时进入错误状态（重建界面时读不回来）。 */
+  /** When true: enters an error state upon opening (fails to read back when rebuilding UI). */
   unbootable?: boolean;
 }
 
 export interface FakeArchive {
-  /** 条目名 → 内容；content 为 null 的是不存在。 */
+  /** Entry name -> content; content as null means non-existent. */
   entries: Record<string, string>;
   manifest: string | null;
-  /** 让检查或解压抛出这个原生错误代码。 */
+  /** Make check or decompression throw this native error code. */
   error?: string;
 }
 
 export class FakeBackup {
-  /** 磁盘上的文件：file:// 地址 → 内容。目录是前缀。 */
+  /** Files on disk: file:// URL -> content. Directories are prefixes. */
   files = new Map<string, string>();
   dirs = new Set<string>();
   archives = new Map<string, FakeArchive>();
   live: DbState = { userVersion: 5, schemaVersion: 39, records: 3, headId: 7 };
   free = 10 * 1024 ** 3;
-  /** 压缩包解开后的总字节（给空间检查用）。 */
+  /** Total bytes of the extracted archive (for space checks). */
   archiveBytes = 1000;
   calls: string[] = [];
-  /** 登记过的 removeTree，用来断言没删过选择器的压缩包。 */
+  /** Registered removeTree calls, used to assert that the picker's archive was never deleted. */
   removed: string[] = [];
-  /** 取消用：写和解压到这里停下，等测试放行。 */
+  /** For cancellation: writing and extraction stop here, waiting for the test to release. */
   gate: Promise<void> | null = null;
   cancelled = false;
   failMoveAt: number | null = null;
@@ -49,12 +51,12 @@ export class FakeBackup {
   listeners = new Set<(e: ArchiveProgress) => void>();
   notified: string[] = [];
   reloads: (number | undefined)[] = [];
-  /** 当前「界面在用」的数据库状态（reload 时从磁盘读）。 */
+  /** Current "active in UI" database state (read from disk on reload). */
   runtimeHead: number | null = null;
   migrated = 0;
 
   constructor() {
-    // 正在用的数据：数据库目录和一个用户文件。
+    // Live data: database directory and a user file.
     this.files.set(`${DOC}SQLite/morph.db`, JSON.stringify(this.live));
     this.files.set(`${DOC}assets/a1/photo.jpg`, 'PHOTO');
     this.files.set(`${DOC}assets/a1/.thumb.jpg`, 'THUMB');
@@ -64,7 +66,7 @@ export class FakeBackup {
     this.runtimeHead = this.live.headId;
   }
 
-  /** 做一份能恢复的压缩包（放在磁盘外面，像选择器给的原件）。 */
+  /** Create a restorable archive (placed outside the disk, like originals provided by pickers). */
   addArchive(
     uri = PICKED,
     patch: {
@@ -178,7 +180,7 @@ export class FakeBackup {
       }
     },
     removeTree: async (uri) => {
-      // 选择器给的压缩包是用户的原件（在磁盘外面）：谁也不能删。
+      // Archives provided by pickers are user originals (outside the disk): nobody may delete them.
       if (this.archives.has(uri) && !uri.startsWith(DOC) && !uri.startsWith(CACHE)) {
         throw new Error(`removed the user's archive: ${uri}`);
       }
@@ -240,7 +242,7 @@ export class FakeBackup {
         live: {
           snapshotTo: async (dest) => {
             this.calls.push('snapshot');
-            // 一致的拷贝：此刻数据库里的东西。
+            // Consistent copy: current contents of the database.
             this.files.set(dest, this.files.get(`${DOC}SQLite/morph.db`) ?? '{}');
           },
           info: async () => {
@@ -277,7 +279,7 @@ export class FakeBackup {
     };
   }
 
-  /** 磁盘上 Documents 里除了 .restore 之外的全部东西（用来断言「什么都没变」）。 */
+  /** Everything in Documents on disk except .restore (used to assert "nothing changed"). */
   snapshotLive(): Record<string, string> {
     return Object.fromEntries(
       [...this.files].filter(([k]) => k.startsWith(DOC) && !k.startsWith(`${DOC}.restore/`)),

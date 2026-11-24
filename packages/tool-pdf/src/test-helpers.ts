@@ -4,9 +4,9 @@ import { deflateSync, inflateSync } from 'node:zlib';
 
 import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, degrees } from 'pdf-lib';
 
-// 仅供测试：生成真实 PDF / PNG，读取 JPEG 样本，解出页面内容流。
+// For testing only: generate a real PDF / PNG, read a JPEG sample, and decode the page content stream.
 
-/** 每页一个 [宽, 高]（或只给宽，高 800），可选旋转角。 */
+/** One [width, height] per page (or width only, height defaults to 800), with an optional rotation angle. */
 export async function makePdf(
   pages: (number | { size: [number, number]; rotate?: number })[],
 ): Promise<Uint8Array> {
@@ -22,7 +22,7 @@ export async function makePdf(
   return doc.save();
 }
 
-/** trailer 里带 /Encrypt 的 PDF，pdf-lib 默认拒绝加载。 */
+/** A PDF with /Encrypt in the trailer, which pdf-lib rejects by default. */
 export async function makeEncryptedPdf(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.addPage([100, 100]);
@@ -50,12 +50,12 @@ function pngChunk(type: string, data: Uint8Array): Buffer {
   return Buffer.concat([head, data, crc]);
 }
 
-/** 真实的 RGB PNG（渐变色）。 */
+/** Real RGB PNG (color gradient). */
 export function makePng(width: number, height: number): Uint8Array {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // 位深
+  ihdr[8] = 8; // Bit depth
   ihdr[9] = 2; // RGB
   const row = width * 3 + 1;
   const raw = Buffer.alloc(row * height);
@@ -77,7 +77,7 @@ export function makePng(width: number, height: number): Uint8Array {
   );
 }
 
-/** 带噪点的 RGB（或 RGBA）PNG：压不小，嵌进 PDF 后够大，压缩 PDF 的测试用。 */
+/** Noisy RGB (or RGBA) PNG: hard to compress, large enough when embedded in PDF, for PDF compression tests. */
 export function makeNoisyPng(width: number, height: number, alpha = false): Uint8Array {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
@@ -103,19 +103,19 @@ export function makeNoisyPng(width: number, height: number, alpha = false): Uint
   );
 }
 
-/** 400×300 带噪点的 JPEG（约 90 KB，用 macOS sips 转出）。 */
+/** 400×300 noisy JPEG (approx. 90 KB, converted using macOS sips). */
 export function readNoisyJpeg(): Uint8Array {
   return new Uint8Array(readFileSync(new URL('./__fixtures__/noise-400x300.jpg', import.meta.url)));
 }
 
-/** 60×40 的真实 JPEG（用 macOS sips 从渐变 PNG 转出）。 */
+/** 60×40 real JPEG (converted from gradient PNG using macOS sips). */
 export function readJpeg(): Uint8Array {
   return new Uint8Array(
     readFileSync(new URL('./__fixtures__/gradient-60x40.jpg', import.meta.url)),
   );
 }
 
-/** 页面内容流（解压后拼成 latin1 字符串），用于检查绘制指令。 */
+/** Page content stream (decompressed and concatenated into a latin1 string), used to check drawing instructions. */
 export async function pageContent(bytes: Uint8Array, index: number): Promise<string> {
   const doc = await PDFDocument.load(bytes);
   const contents = doc.getPage(index).node.Contents();
@@ -132,7 +132,7 @@ export async function pageContent(bytes: Uint8Array, index: number): Promise<str
     .join('\n');
 }
 
-/** 内容流中所有文字矩阵 Tm（a b c d e f）及紧随其后的十六进制文字。 */
+/** All text matrices Tm (a b c d e f) in the content stream and the hex text following them. */
 export function textDraws(content: string): { m: number[]; text: string }[] {
   const re = /(\S+) (\S+) (\S+) (\S+) (\S+) (\S+) Tm\s*<([0-9A-Fa-f]*)> Tj/g;
   return [...content.matchAll(re)].map((match) => ({
@@ -141,7 +141,7 @@ export function textDraws(content: string): { m: number[]; text: string }[] {
   }));
 }
 
-/** 内容流中 drawImage 的平移、旋转和缩放（pdf-lib 固定的指令顺序：平移、旋转、缩放、斜切）。 */
+/** Translation, rotation, and scaling of drawImage in the content stream (fixed order of instructions in pdf-lib: translate, rotate, scale, skew). */
 export function imageDraws(
   content: string,
 ): { x: number; y: number; rot: number[]; w: number; h: number }[] {
@@ -156,7 +156,7 @@ export function imageDraws(
   });
 }
 
-/** 一页用到的字体：子类型、编码、有没有 ToUnicode、有没有嵌入字体文件。 */
+/** Fonts used on a page: subtype, encoding, presence of ToUnicode, and whether a font file is embedded. */
 export async function pageFonts(
   bytes: Uint8Array,
   index: number,

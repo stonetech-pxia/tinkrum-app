@@ -6,16 +6,18 @@ import { FieldSchema } from './fields';
 import { isEmoji, unsafeLinks } from './richtext';
 import { ConditionSchema, FieldRefSchema, IdSchema, boundedText } from './schema-primitives';
 
-// 配置结构里组件以外的部分（图标、主题、数据表、筛选、导航）。组件定义（components/）要用到这些，
-// 所以单独放一个文件，避免 schema.ts 和组件定义互相引用。对外仍从 schema.ts 导出。
+// Non-component parts of the config schema (icons, themes, tables, filters, navigation). Component
+// definitions (components/) depend on these, so they are kept in a separate file to prevent
+// circular references between schema.ts and component definitions. Exported externally via
+// schema.ts.
 
 export * from './schema-primitives';
 
 export const HexColorSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'color must be #RRGGBB');
 
-// ---- 图标白名单 ----
+// ---- Icon Whitelist ----
 
-/** 组件、页面和导航可用的图标。渲染器把每个名字映射到 iOS / Android 的系统图标。 */
+/** Icons available for components, pages, and navigation. The renderer maps each name to iOS / Android system icons. */
 export const ICON_NAMES = [
   'home',
   'apps',
@@ -56,9 +58,9 @@ export const ICON_NAMES = [
   'mail',
   'globe',
   'share',
-  // D-552：「拍表格转 Excel」用，和扫成 PDF / Word 的图标分开。
+  // D-552: Used for "Scan table to Excel", separated from the icon for scanning to PDF / Word.
   'table',
-  // 自带的图形图标（D-485，按预设画的）：渲染时用图片，不是系统图标。
+  // Built-in graphic icons (D-485, drawn from presets): rendered using images rather than system icons.
   'wallet',
   'rings',
   'moon',
@@ -69,7 +71,7 @@ export const ICON_NAMES = [
   'vinyl',
   'paper',
 ] as const;
-/** 自带图形的图标（ICON_NAMES 里排在最后的）：没有对应的系统图标。 */
+/** Icons with built-in graphics (the last items in ICON_NAMES): have no corresponding system icons. */
 export const CUSTOM_ICON_NAMES = [
   'wallet',
   'rings',
@@ -86,12 +88,12 @@ export type CustomIconName = (typeof CUSTOM_ICON_NAMES)[number];
 export const IconSchema = z.enum(ICON_NAMES);
 export type IconName = z.infer<typeof IconSchema>;
 
-/** 图标：白名单里的名字，或者一个 emoji（D-046）。没有图标库的地方（下载的工具）用这个。 */
+/** Icon: a whitelisted name, or an emoji (D-046). Used where icon libraries are unavailable (downloaded tools). */
 export const ListedIconValueSchema = z.union([
   IconSchema,
   z.string().refine(isEmoji, { message: 'icon must be a listed icon name or a single emoji' }),
 ]);
-/** 配置里的图标：白名单里的名字、一个 emoji，或者图标库里画出来的 "my:<id>"（D-625）。 */
+/** Icon in config: a whitelisted name, an emoji, or a custom-drawn icon from the icon library `"my:<id>"` (D-625). */
 export const IconValueSchema = z.union([
   IconSchema,
   z.string().refine((s) => isEmoji(s) || isDrawnIconRef(s), {
@@ -100,15 +102,17 @@ export const IconValueSchema = z.union([
 ]);
 export type IconValue = IconName | (string & {});
 
-/** 用户文件的 ID（图片组件引用用户选择的照片）。 */
+/** User file ID (image components reference user-selected photos). */
 export const AssetIdSchema = z.string().regex(/^[a-z0-9]{6,40}$/, 'invalid asset id');
 
-/** 图片背景（D-258）的遮罩深浅（不透明度见 theme.ts 的 OVERLAY_OPACITY）。 */
+/** Backdrop opacity level for image backgrounds (D-258) (see OVERLAY_OPACITY in theme.ts for opacity values). */
 export const OverlayLevelSchema = z.enum(['light', 'medium', 'strong']);
 
 /**
- * 图片背景（D-258）：卡片类组件的 style.backdrop 和页面的 backdrop。AI 只能打开（写 overlay）、关掉、调遮罩深浅；
- * 用哪张图片由用户在长按编辑里选，assetId 和图片组件一样只指向用户文件。没有图片时照常显示底色。
+ * Image background (D-258): style.backdrop for card components and page backdrops. The AI can
+ * only turn it on (write overlay), turn it off, or adjust the mask opacity; the specific image is
+ * chosen by the user in long-press editing, and assetId points to user files just like image
+ * components. Falls back to base color when there is no image.
  */
 export const BackdropSchema = z.strictObject({
   overlay: OverlayLevelSchema,
@@ -116,14 +120,14 @@ export const BackdropSchema = z.strictObject({
 });
 export type Backdrop = z.infer<typeof BackdropSchema>;
 
-/** 修改操作里的图片背景：只写要改的；assetId 为 null 时去掉图片（图片背景仍开着）。 */
+/** Image background in patch operations: only writes modified fields; removes image when assetId is null (image background remains enabled). */
 export const BackdropPatchSchema = z.strictObject({
   overlay: OverlayLevelSchema.optional(),
   assetId: AssetIdSchema.nullable().optional(),
 });
 export type BackdropPatch = z.infer<typeof BackdropPatchSchema>;
 
-/** 套用一次修改：没开时按「中」打开。 */
+/** Apply a patch: turns on with "medium" opacity if currently disabled. */
 export function patchBackdrop(current: Backdrop | undefined, patch: BackdropPatch): Backdrop {
   const next: Backdrop = { ...(current ?? { overlay: 'medium' }) };
   if (patch.overlay) next.overlay = patch.overlay;
@@ -132,13 +136,13 @@ export function patchBackdrop(current: Backdrop | undefined, patch: BackdropPatc
   return next;
 }
 
-/** 富文本（richtext.ts）：链接只能是 https 或 mailto。 */
+/** Rich text (richtext.ts): links must be https or mailto. */
 export const richText = (max: number) =>
   boundedText(1, max).refine((s) => unsafeLinks(s).length === 0, {
     message: 'links must be https:// or mailto: addresses',
   });
 
-// ---- 主题：白名单样式 token ----
+// ---- Theme: Whitelisted style tokens ----
 
 export const FONT_CHOICES = ['clay', 'system', 'serif', 'mono', 'inter'] as const;
 
@@ -146,7 +150,7 @@ export const ThemeColorsSchema = z.strictObject({
   background: HexColorSchema.optional(),
   surface: HexColorSchema.optional(),
   text: HexColorSchema.optional(),
-  /** 卡片上的文字颜色（D-409）；不写时等于 text。写了时 text 只管页面背景上的文字。 */
+  /** Text color on cards (D-409); defaults to `text` when omitted. When specified, `text` only applies to text on the page background. */
   surfaceText: HexColorSchema.optional(),
   secondary: HexColorSchema.optional(),
   tertiary: HexColorSchema.optional(),
@@ -154,8 +158,10 @@ export const ThemeColorsSchema = z.strictObject({
 export type ThemeColors = z.infer<typeof ThemeColorsSchema>;
 
 /**
- * 自定义卡片边框和阴影里的颜色（D-624）：只能是角色，不能写色值；渲染时按主题配色取，深色模式跟着变。
- * text = 页面上的文字色，border / shadow = 配色里的分隔线色和阴影色（内置卡片样式用的同一组）。
+ * Colors in custom card borders and shadows (D-624): must be roles, cannot be raw color values;
+ * resolved from theme colors during rendering, adapting automatically to dark mode. `text` = page
+ * text color, `border` / `shadow` = separator line and shadow colors from the palette (same group
+ * used by built-in card styles).
  */
 export const CARD_COLOR_ROLES = [
   'text',
@@ -168,7 +174,7 @@ export const CARD_COLOR_ROLES = [
   'black',
 ] as const;
 export type CardColorRole = (typeof CARD_COLOR_ROLES)[number];
-/** 自定义卡片最多几层阴影。 */
+/** Maximum number of shadow layers for custom cards. */
 export const MAX_CARD_SHADOWS = 3;
 export const CARD_BORDER_WIDTH = { min: 0.5, max: 4 } as const;
 export const CARD_SHADOW_X = { min: -16, max: 16 } as const;
@@ -179,8 +185,10 @@ export const CARD_OPACITY = { min: 0.05, max: 1 } as const;
 const cardOpacity = z.number().min(CARD_OPACITY.min).max(CARD_OPACITY.max);
 
 /**
- * 卡片的边框和阴影用参数写（D-624）：写了就替换 cardStyle 自己的边框和阴影，底色仍跟 cardStyle
- * （毛玻璃的半透明底、金属的渐变）。浅色和深色用同一组参数；opacity 不写是 1。
+ * Custom card border and shadow parameters (D-624): overrides cardStyle's own border and shadow
+ * when specified, while the background color continues to follow cardStyle (translucent frosted
+ * glass, metallic gradient). Light and dark modes use the same parameter set; opacity defaults to
+ * 1 when omitted.
  */
 export const ThemeCardSchema = z
   .strictObject({
@@ -214,19 +222,21 @@ export type ThemeCard = z.infer<typeof ThemeCardSchema>;
 export const ThemeSchema = z.strictObject({
   primaryColor: HexColorSchema,
   mode: z.enum(['light', 'dark', 'system']),
-  /** 覆盖默认配色；未设置的颜色使用默认风格（Clay）的值。 */
+  /** Overrides the default palette; unconfigured colors use values from the default style (Clay). */
   colors: ThemeColorsSchema,
-  /** 深色模式下的颜色覆盖；没设置的颜色依次使用 colors、默认风格的深色值。 */
+  /** Color overrides for dark mode; unconfigured colors fall back to colors and then the default dark style values in order. */
   darkColors: ThemeColorsSchema.optional(),
-  /** 字体组合：clay = 标题 Sora + 正文 Karla；inter = Inter（D-591，数字和大标题用中等粗细）。 */
+  /** Font family combination: clay = Sora (headings) + Karla (body); inter = Inter (D-591, with medium weight for numbers and major headings). */
   font: z.enum(FONT_CHOICES),
   fontScale: z.number().min(0.85).max(1.3),
-  /** 卡片圆角（pt）；按钮等控件的圆角随之缩放。 */
+  /** Card corner radius (pt); control elements like buttons scale their radii accordingly. */
   radius: z.number().int().min(0).max(28),
   density: z.enum(['compact', 'comfortable', 'spacious']),
   /**
-   * brutal = 粗边 + 硬阴影（新粗野），soft = 双向柔和阴影（新拟物），puffy = 内高光 + 柔和阴影（黏土），
-   * glass = 半透明毛玻璃，glow = 主色外发光（霓虹），chrome = 金属渐变 + 高光（Y2K）。
+   * brutal = thick borders + hard shadows (neo-brutalism), soft = dual-directional soft shadows
+   * (neumorphism), puffy = inner highlights + soft shadows (claymorphism), glass = translucent
+   * frosted glass, glow = primary color outer glow (neon), chrome = metallic gradient +
+   * highlights (Y2K).
    */
   cardStyle: z.enum([
     'shadow',
@@ -239,17 +249,17 @@ export const ThemeSchema = z.strictObject({
     'glow',
     'chrome',
   ]),
-  /** 卡片的边框和阴影用参数写，替换 cardStyle 的边框和阴影（D-624）。 */
+  /** Custom card border and shadow parameters, overriding cardStyle's border and shadow (D-624). */
   card: ThemeCardSchema.optional(),
-  /** 页面背景：纯色（默认）、主色到辅助色的渐变、三色极光。颜色都从主题配色算出，深色模式自动跟着变。 */
+  /** Page backdrop: solid color (default), primary-to-secondary gradient, or three-color aurora. Colors are derived from the theme palette and adapt automatically in dark mode. */
   backdrop: z.enum(['plain', 'gradient', 'aurora']).optional(),
   navStyle: z.enum(['iconLabel', 'label', 'icon']),
-  /** 图标底色：solid = 实色底白图标，tint = 浅色底彩色图标；不写时各组件用自己的默认（D-230）。 */
+  /** Icon background style: solid = solid color background with white icon, tint = light background with colored icon; components use their own defaults when omitted (D-230). */
   iconStyle: z.enum(['solid', 'tint']).optional(),
 });
 export type Theme = z.infer<typeof ThemeSchema>;
 
-// ---- 用户数据：数据表结构（在配置里，随版本）。记录本身不在配置里，见 docs/DATA_DESIGN.md ----
+// ---- User Data: Table structure (in config, versioned). Records themselves are not in config, see docs/DATA_DESIGN.md ----
 
 export {
   ChoiceOptionSchema,
@@ -270,20 +280,23 @@ export {
 } from './fields';
 
 /**
- * 记录页顶部的一个按钮（D-428）：一个快捷操作（第一步收文字或记录）；第一步收文字时 field 说交哪个字段的值。
- * 配置里只有 ID，没有值（底线 14）。
+ * A button at the top of the record page (D-428): a quick action (first step collects text or
+ * records); when collecting text, `field` specifies which field receives the value. Contains only
+ * IDs in the config, no values (Invariant 14).
  */
 export const RecordRowItemSchema = z.strictObject({ tool: IdSchema, field: IdSchema.optional() });
 export type RecordRowItem = z.infer<typeof RecordRowItemSchema>;
-/** 记录页顶部最多几个按钮。 */
+/** Maximum number of buttons at the top of the record page. */
 export const MAX_RECORD_ROW = 10;
 
-/** 记录表单最多分几段（D-570）。 */
+/** Maximum number of sections in a record form (D-570). */
 export const MAX_FORM_SECTIONS = 10;
 
 /**
- * 记录表单的一段（D-570）：标题、放哪几个字段，可以带 1–3 个条件（并且），只看这一条自己填的字段，而且不看这一段里的
- * 字段。条件不成立时这一段不显示：里面的字段存着的值不动，藏着时也不按必填检查。
+ * A section in a record form (D-570): title, assigned fields, can have 1–3 conditions (using
+ * AND), evaluating only fields filled in this record, excluding fields within this section. When
+ * conditions are not met, the section is hidden: field values stored within remain unchanged, and
+ * validation ignores required checks while hidden.
  */
 export const FormSectionSchema = z.strictObject({
   title: boundedText(1, 40).optional(),
@@ -293,40 +306,44 @@ export const FormSectionSchema = z.strictObject({
 export type FormSection = z.infer<typeof FormSectionSchema>;
 
 /**
- * 记录表单怎么排（D-570，创始人 2026-11-16 决定 ①）：只有分段和条件显示；提示和范围在字段上。保存、删除、附件、候选值
- * 仍归内核。没写进任何一段的字段排在所有段后面（按表里的顺序），加字段不会找不到。
+ * Layout of the record form (D-570, founder decision 2026-11-16 ①): contains only sections and
+ * conditional visibility; hints and scopes belong on fields. Saving, deletion, attachments, and
+ * candidate values remain handled by the core. Fields not assigned to any section are placed
+ * after all sections (in table order), ensuring new fields are never lost.
  */
 export const EntryFormSchema = z.strictObject({
   sections: z.array(FormSectionSchema).min(1).max(MAX_FORM_SECTIONS),
 });
 export type EntryForm = z.infer<typeof EntryFormSchema>;
 
-/** 数据表（v34 data.tables，原 collections）。 */
+/** Data table (v34 data.tables, formerly collections). */
 export const CollectionSchema = z.strictObject({
   id: IdSchema,
   name: boundedText(1, 40),
-  /** 属于哪个 app（D-485）；没写属于主页。 */
+  /** Which app it belongs to (D-485); defaults to the home page when omitted. */
   app: IdSchema.optional(),
   icon: IconValueSchema.optional(),
   fields: z.array(FieldSchema).min(1).max(30),
-  /** 新记录表单自动读附件、给候选（D-394、D-397）。不写就是打开；只读不写，不是工作流。 */
+  /** Automatically read attachments and provide suggestions in new record forms (D-394, D-397). Enabled by default when omitted; read-only behavior, not a workflow. */
   readAttachments: z.boolean().optional(),
-  /** 读附件给候选时，通用规则之外再用哪组规则（D-421）。不写就只有通用规则。 */
+  /** Additional rule groups to apply alongside general rules when reading attachments for suggestions (D-421). Only general rules apply when omitted. */
   prefillRules: z.enum(['receipt', 'card']).optional(),
   /**
-   * 已有记录的记录页顶部的一排按钮（D-428）。记录页由内核提供、一张表一页，所以放在表上（和 readAttachments 一样）。
-   * 不写就没有这一排。
+   * A row of buttons at the top of existing record pages (D-428). Record pages are provided by
+   * the core, one page per table, so this is defined at the table level (like readAttachments).
+   * No button row is shown when omitted.
    */
   recordRow: z.array(RecordRowItemSchema).max(MAX_RECORD_ROW).optional(),
-  /** 记录表单的分段和条件显示（D-570）。不写就是一段，按字段的顺序。 */
+  /** Record form sections and conditional visibility (D-570). Defaults to a single section ordered by field sequence when omitted. */
   form: EntryFormSchema.optional(),
 });
 export type Collection = z.infer<typeof CollectionSchema>;
 export type Table = Collection;
 
 /**
- * 一天、一周从什么时候开始（D-286，schemaVersion 20）：dayStartHour 0–6 点，weekStart 周一或周日，
- * twoWeekStart 是两周一段的锚定日。都不写就是 0 点、周一。
+ * Start time for days and weeks (D-286, schemaVersion 20): dayStartHour 0–6, weekStart as Monday
+ * or Sunday, twoWeekStart as the anchor day for two-week periods. Defaults to 0:00 and Monday
+ * when omitted.
  */
 export const CalendarSchema = z.strictObject({
   dayStartHour: z.number().int().min(0).max(6).optional(),
@@ -344,22 +361,23 @@ export const SortSchema = z.strictObject({
 });
 export type Sort = z.infer<typeof SortSchema>;
 
-/** 记录块的排序（D-560）：一个，或 1–3 个依次排（先按第一个，一样的再按下一个）。一个对象和以前一样。 */
+/** Sorting for record blocks (D-560): a single sort rule, or 1–3 sequential sort rules (primary, then secondary, etc.). A single object works as before. */
 export const SortKeysSchema = z.union([SortSchema, z.array(SortSchema).min(1).max(3)]);
 export type SortKeys = z.infer<typeof SortKeysSchema>;
 
-/** 排序写成的一个或几个，统一成列表。 */
+/** Converts a single sort or an array of sorts into a uniform list. */
 export const sortList = (sort: Sort | readonly Sort[] | undefined): readonly Sort[] =>
   sort === undefined ? [] : Array.isArray(sort) ? sort : [sort as Sort];
 
-// ---- 导航 ----
+// ---- Navigation ----
 
 export const SYSTEM_TARGETS = ['tools', 'ai', 'history', 'settings', 'quickActions'] as const;
 export type SystemTarget = (typeof SYSTEM_TARGETS)[number];
 
 /**
- * 受保护元素（§5.1）：必须始终出现在导航栏或浮动入口中。
- * 只有「设置」受保护：设置页由内核固定提供「AI 修改」和「历史」入口，保证随时能修改和撤销。
+ * Protected elements (§5.1): Must always appear in the navigation bar or floating entry point.
+ * Only "Settings" is protected: the settings page is fixed by the kernel to provide "AI modify"
+ * and "History" entry points, ensuring modifications and undoes are always available.
  */
 export const PROTECTED_TARGETS: readonly SystemTarget[] = ['settings'];
 
@@ -377,10 +395,13 @@ export const NavTargetSchema = z.custom<NavTarget>(
 export const pageTarget = (pageId: string): PageTarget => `page:${pageId}`;
 
 /**
- * 打开哪里（v34 opens，导航，不写东西）：页面或系统入口；tool:<id> 把快捷操作摆出来，用户点「开始」才运行
- * （提醒 D-251、P-043；按钮和快捷入口 D-256，id 是配置里的快捷操作，按钮还可以是内设快捷操作的预设 ID）；
- * package:<id> 是一个工具包的页面（原 toolCard，标题、图标按工具包现取）；{file} 是一个用户文件（原 fileSlot，
- * null = 空位，用户点了自己选，AI 不写，D-257）。
+ * Where to open (v34 opens, navigation, nothing written): A page or system entry point;
+ * `tool:<id>` exposes a quick action that runs only when the user taps "Start" (reminders D-251,
+ * P-043; buttons and quick entry points D-256, where id is the quick action in the config, and
+ * buttons can also be preset IDs of built-in quick actions); `package:<id>` is a tool package
+ * page (formerly `toolCard`, title and icon fetched dynamically from the package); `{file}` is a
+ * user file (formerly `fileSlot`, null = empty slot, chosen by the user upon tap, never written
+ * by AI, D-257).
  */
 export type ToolTarget = `tool:${string}`;
 export type PackageTarget = `package:${string}`;
@@ -392,7 +413,7 @@ const TOOL_TARGET = /^tool:[a-z][a-z0-9-]{0,47}$/;
 const PACKAGE_TARGET = /^package:[a-z][a-z0-9-]{0,47}$/;
 export const FileTargetSchema = z.strictObject({ file: AssetIdSchema.nullable() });
 
-/** 打开的目标；kinds 限定能写哪几种（提醒不能打开工具包、文件）。 */
+/** Open target; `kinds` restricts the allowed target types (reminds that tool packages and files cannot be opened). */
 export const openTargetSchema = (
   message: string,
   kinds: readonly ('tool' | 'package' | 'app' | 'file')[] = ['tool', 'package', 'app', 'file'],
@@ -407,11 +428,11 @@ export const openTargetSchema = (
     { message },
   );
 
-/** app:<id> → id；不是 app 入口时为 null。 */
+/** app:<id> -> id; returns null if not an app entry point. */
 export const appTargetId = (target: OpenTarget): string | null =>
   typeof target === 'string' && target.startsWith('app:') ? target.slice('app:'.length) : null;
 export const appTarget = (appId: string): AppTarget => `app:${appId}`;
-/** tool:<id> → id；不是快捷操作时为 null。 */
+/** tool:<id> -> id; returns null if not a quick action. */
 export const toolTargetId = (target: OpenTarget): string | null =>
   typeof target === 'string' && target.startsWith('tool:') ? target.slice('tool:'.length) : null;
 /** package:<id> → id。 */
@@ -430,7 +451,7 @@ export const isFileTarget = (target: OpenTarget): target is FileTarget =>
 
 export const MAX_APPS = 12;
 
-/** app 底栏里能放的：这个 app 的页面，或 Tink（ai）。设置、改动记录等系统页不放，回主页去（D-485）。 */
+/** Items allowed in the app bottom bar: pages of this app, or Tink (ai). System pages such as settings and change history are excluded; return to the home screen instead (D-485). */
 export type AppBarTarget = 'ai' | PageTarget;
 export const AppBarTargetSchema = z.custom<AppBarTarget>(
   (v) => typeof v === 'string' && (v === 'ai' || PAGE_TARGET_PATTERN.test(v)),
@@ -438,8 +459,10 @@ export const AppBarTargetSchema = z.custom<AppBarTarget>(
 );
 
 /**
- * 一个 app：自己的名字、图标、底栏和主题（新建时从主页主题复制一份，之后各改各的，不继承）。
- * 页面、表、快捷操作用自己的 `app` 字段说属于哪个 app，没写属于主页。
+ * An app: its own name, icon, bottom bar, and theme (copied from the home screen theme upon
+ * creation, then edited independently without inheritance). Pages, tables, and quick actions
+ * specify which app they belong to via their `app` field; unassigned items belong to the home
+ * screen.
  */
 export const AppSchema = z.strictObject({
   id: IdSchema,
@@ -450,22 +473,23 @@ export const AppSchema = z.strictObject({
 });
 export type App = z.infer<typeof AppSchema>;
 
-/** 手机桌面菜单里的一项（D-485）：快捷操作的 ID，或 app:<id>（点了进那个 App）。 */
+/** An item in the mobile home screen menu (D-485): a quick action ID, or `app:<id>` (tapping enters that app). */
 export const HomeScreenEntrySchema = z.union([
   IdSchema,
   z.string().regex(/^app:[a-z][a-z0-9-]{0,47}$/),
 ]);
 
 /**
- * 导航（v34 也是容器，D-368）：bar 导航栏（1–5，原 shell.nav）、floating 浮动入口（≤3）、
- * phoneHomeScreen 长按 Morph 图标的菜单里的快捷操作（≤4，D-271，原 workflow.homeScreen）。
+ * Navigation (also a container in v34, D-368): bar navigation bar (1-5, formerly `shell.nav`),
+ * floating entry points (≤3), `phoneHomeScreen` quick actions in the menu upon long-pressing the
+ * Morph icon (≤4, D-271, formerly `workflow.homeScreen`).
  */
 export const NavSchema = z.strictObject({
   bar: z.array(NavTargetSchema).min(1).max(5),
   floating: z.array(NavTargetSchema).max(3),
-  /** 主页之外的 app（D-485）。主页就是顶层的 bar + theme；没有时只有主页。 */
+  /** Apps other than the home screen (D-485). The home screen consists of the top-level bar and theme; when absent, only the home screen exists. */
   apps: z.array(AppSchema).max(MAX_APPS).optional(),
-  /** 上限 MAX_HOME_SCREEN 在 validate.ts 里查（给 AI 一句能照着改的话）。 */
+  /** The upper limit `MAX_HOME_SCREEN` is checked in `validate.ts` (provides the AI with an instruction it can follow and modify). */
   phoneHomeScreen: z.array(HomeScreenEntrySchema).max(100).optional(),
 });
 export type Nav = z.infer<typeof NavSchema>;

@@ -20,7 +20,7 @@ import { t } from '../../i18n';
 import type { ImageFormat, ImageOps, VisionPlatform } from '../platform';
 import { fileItems, freshName, readItem, writeItem, type RunServices } from './helpers';
 
-// 图片动作的实现。像素处理交给平台（expo-image-manipulator），算法在 packages/tool-image。
+// Image action implementation. Pixel processing delegated to platform (expo-image-manipulator), algorithms in packages/tool-image.
 
 type Impl = ActionImpl<RunServices>;
 type Ctx = Parameters<Impl>[2];
@@ -32,7 +32,7 @@ const MIME: Record<ImageFormat, string> = {
   webp: 'image/webp',
 };
 
-/** 保持原格式；HEIC 等不能输出的格式改成 JPG（D-047：默认永远不输出 HEIC）。 */
+/** Preserve original format; unsupported formats like HEIC are converted to JPG (D-047: never output HEIC by default). */
 function keepFormat(item: RunItem): ImageFormat {
   if (item.mimeType === 'image/png') return 'png';
   if (item.mimeType === 'image/webp') return 'webp';
@@ -51,7 +51,7 @@ export async function sizeOf(ctx: Ctx, item: RunItem) {
   }
 }
 
-/** 处理一张图片，输出本次运行里的新临时文件。 */
+/** Process an image, outputting a new temporary file in the current run. */
 export async function encode(
   ctx: Ctx,
   item: RunItem,
@@ -84,7 +84,7 @@ export async function encode(
   };
 }
 
-/** 逐张处理，带进度和取消。 */
+/** Process images one by one, with progress tracking and cancellation support. */
 export async function eachImage(
   input: Parameters<Impl>[0],
   ctx: Ctx,
@@ -101,7 +101,9 @@ export async function eachImage(
 }
 
 /**
- * 去背景、证件照换底色要的系统模型：不支持时说明原因；Android 第一次用要先问用户、再让 Google Play 服务下载模型。
+ * System models required for background removal and ID photo background replacement: explains
+ * reason when unsupported; on Android, prompts user on first use before letting Google Play
+ * Services download the model.
  */
 export async function backgroundModel(ctx: Ctx): Promise<VisionPlatform> {
   const vision = ctx.services.files.vision;
@@ -210,7 +212,7 @@ export const IMAGE_IMPLS: Record<string, Impl> = {
       let last: RunItem | null = null;
       const result = await searchForTargetSize({
         targetBytes: target,
-        // 最小缩到长边 64 像素，避免压成看不清的小图。
+        // Minimum scale down to a 64-pixel long side to prevent compression into illegible thumbnails.
         minScale: Math.min(1, 64 / Math.max(size.width, size.height)),
         encode: async (quality, scale) => {
           ctx.throwIfCancelled();
@@ -265,14 +267,14 @@ export const IMAGE_IMPLS: Record<string, Impl> = {
       if (item.mimeType === 'image/jpeg') {
         const bytes = await readItem(ctx.services, item);
         const { orientation } = readExif(bytes);
-        // 方向是 1（或没有）时无损去掉；否则先按方向摆正再重新编码，避免照片转向。
+        // Losslessly strip orientation when it is 1 (or absent); otherwise straighten according to orientation before re-encoding to prevent image rotation issues.
         if (orientation === null || orientation === 1) {
           try {
             const stripped = stripJpegMetadata(bytes).bytes;
             const { uri: _uri, size: _size, ...rest } = item;
             return await writeItem(ctx.services, stripped, rest);
           } catch {
-            // 不是标准 JPEG：退回重新编码。
+            // Not standard JPEG: fallback to re-encoding.
           }
         }
       }

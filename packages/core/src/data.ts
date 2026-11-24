@@ -46,9 +46,11 @@ import {
   type SystemField,
 } from './schema';
 
-// 用户数据（记录）的纯函数：写入校验、宽容读取、筛选、排序、统计、显示格式、CSV 导出。
-// 记录存在配置之外（App 的数据库里），从不进入 WorkspaceConfig，所以也从不发给 AI。
-// 设计见 docs/DATA_DESIGN.md。每种字段的读取、写入、显示在 fields/<type>.ts（docs/FIELDS.md）。
+// Pure functions for user data (records): write validation, lenient reading, filtering, sorting,
+// aggregation, display formatting, and CSV export. Records are stored outside configuration (in the
+// app database) and never enter WorkspaceConfig, hence never sent to the AI. Design details in
+// docs/DATA_DESIGN.md. Reading, writing, and display for each field type are in fields/<type>.ts
+// (docs/FIELDS.md).
 
 export {
   MAX_ATTACHMENTS,
@@ -66,23 +68,24 @@ export {
 } from './field-values';
 
 export const RECORD_LIMITS = {
-  /** 每张表的软上限：超过后不能再添加。 */
+  /** Soft limit per table: cannot add more once exceeded. */
   perCollection: 10_000,
-  /** 软删除的记录保留天数（D-037）。 */
+  /** Retention days for soft-deleted records (D-037). */
   deletedRetentionDays: 30,
 } as const;
 
 export interface DataRecord {
   id: string;
   collectionId: string;
-  /** 字段 ID → 值。可能包含已删除字段的值（保留，不显示）。 */
+  /** Field ID → value. May contain values of deleted fields (retained, not displayed). */
   values: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
 }
 
 /**
- * 时间段对应的本地日期范围（含两端）。「今天」和一周的第一天按 cal（D-286，默认 0 点、周一）。
+ * Local date range corresponding to a time period (inclusive of both ends). "Today" and the first
+ * day of the week follow cal (D-286, default 00:00, Monday).
  */
 export function periodRange(
   period: Period,
@@ -97,7 +100,7 @@ export function periodRange(
   const [y, m, d] = dateOfDayNumber(today).split('-').map(Number) as [number, number, number];
   const monthEnd = localDate(new Date(y, m, 0));
   const ym = `${y}-${String(m).padStart(2, '0')}`;
-  /** 这个月往前（负数）或往后数第几个月的一整个月。 */
+  /** An entire month, being the N-th month before (negative) or after the current month. */
   const month = (by: number): [string, string] => {
     const first = new Date(y, m - 1 + by, 1);
     return [localDate(first), localDate(new Date(first.getFullYear(), first.getMonth() + 1, 0))];
@@ -131,7 +134,7 @@ export function periodRange(
       return span(today, 30);
     case 'next90days':
       return span(today, 90);
-    // 日历上前后的一整段（D-559）。
+    // A full consecutive range before and after on the calendar (D-559).
     case 'yesterday':
       return span(today - 1, 1);
     case 'tomorrow':
@@ -156,7 +159,7 @@ export function fieldOf(collection: Collection, ref: string): Field | undefined 
   return collection.fields.find((f) => f.id === ref);
 }
 
-/** 宽容读取：值和当前字段定义对不上时返回 undefined（只是不显示，绝不报错）。 */
+/** Lenient reading: returns undefined when the value does not match the current field definition (simply not displayed, never throws errors). */
 export function readValue(field: Field, raw: unknown): FieldValue | undefined {
   return fieldDefinition(field.type).read(field, raw);
 }
@@ -173,9 +176,12 @@ function formulaNode(expression: string): FormulaNode | null {
 }
 
 /**
- * 公式字段在一条记录上的值：引用的字段都有值时才有值，结果按字段的小数位（默认 2 位）取整。
- * 日期字段按天数算，today 是 now 那天（D-247；一天从几点开始按 cal，D-286）；时间、日期时间按分钟数算（D-280）。
- * 引用的公式（D-281）用它取整以后的值；绕回自己的（校验会挡住，旧数据里可能有）没有值。
+ * Value of a formula field on a record: has a value only when all referenced fields have values;
+ * result is rounded according to the field's decimal places (default 2). Date fields are
+ * calculated in days, where today is based on the day of now (D-247; day start hour determined by
+ * cal, D-286); time and datetime fields are calculated in minutes (D-280). Referenced formulas
+ * (D-281) use their rounded values; circular references to itself (caught by validation, though
+ * possible in legacy data) have no value.
  */
 function formulaValue(
   field: Extract<Field, { type: 'formula' }>,
@@ -191,7 +197,7 @@ function formulaValue(
     const ref = fieldOf(collection, id);
     return (ref && fieldDefinition(ref.type).formula) ?? null;
   };
-  // 空着的数算 0（D-619）：只在公式字段写了 empty "zero" 时；日期、时间照旧没有值。
+  // Empty numbers count as 0 (D-619): only when the formula field specifies empty "zero"; date and time fields remain without a value as usual.
   const zero = field.empty === 'zero';
   const value = evaluateFormula(
     node,
@@ -210,10 +216,10 @@ function formulaValue(
     if (!ref || !kind) return undefined;
     if (ref.type === 'formula')
       return formulaValue(ref, record, collection, now, cal, [...using, field.id]);
-    // 日程（D-295）在公式里是它的下一次。
+    // Schedules (D-295) evaluate to their next occurrence in formulas.
     if (ref.type === 'schedule') return scheduleStatusOf(record, collection, ref, now, cal)?.next;
     const v = readValue(ref, record.values[id]);
-    // 勾选框、单选（D-569）按字段定义换成数。
+    // Checkboxes and single-selects (D-569) are converted to numbers according to field definitions.
     const def = fieldDefinition(ref.type);
     if (def.formulaNumber) return def.formulaNumber(ref, v);
     if (typeof v === 'number') return kind === 'number' ? v : undefined;
@@ -225,9 +231,11 @@ function formulaValue(
 }
 
 /**
- * 记录上某个日期类字段落在哪一天（本地日期 YYYY-MM-DD）：系统字段、日期是它自己，日期时间是它那一天
- * （D-279），钟点早于一天开始的钟点时算前一天（D-286）；别的字段没有。筛选的 inPeriod、日期比较、
- * 图表的按时间分组和按日子的统计（D-284）都用它。
+ * The calendar day corresponding to a date-type field on a record (local date YYYY-MM-DD): for
+ * system fields and dates, it is the date itself; for datetimes, it is that date (D-279),
+ * treating times earlier than the day start hour as belonging to the previous day (D-286); other
+ * fields have none. Used by filter inPeriod, date comparisons, chart time-grouping, and day-based
+ * aggregation (D-284).
  */
 export function recordDay(
   record: DataRecord,
@@ -237,7 +245,7 @@ export function recordDay(
   cal: Calendar = DEFAULT_CALENDAR,
 ): string | undefined {
   const field = fieldOf(collection, ref);
-  // 日程（D-295）落在它的下一次那天。
+  // Schedules (D-295) fall on their next occurrence day.
   if (field?.type === 'schedule') {
     const next = scheduleStatusOf(record, collection, field, now, cal)?.next;
     return next === undefined ? undefined : dateOfDayNumber(next);
@@ -251,13 +259,16 @@ export function recordDay(
 }
 
 /**
- * 一条记录上日程字段的状态（D-292、D-293）：规则读不出来时没有。做过的日子来自 lastDone 指向的日期或
- * 日期时间字段（按一天从几点开始归到哪一天），或者汇总字段被汇总的那些记录的日子（rollupDays）；
- * 没有 lastDone 或它没有值时只按规则本身算。
+ * Status of a schedule field on a record (D-292, D-293): absent when rules cannot be parsed.
+ * Completed days come from the date or datetime field pointed to by lastDone (attributed to a
+ * calendar day based on day start hour), or from the days of those records aggregated by a rollup
+ * field (rollupDays); when lastDone is absent or empty, calculation is based solely on the rules.
  */
 /**
- * 汇总字段（D-288）在每条算好的记录上留下被汇总的那些记录各在哪一天（天数），日程的 lastDone 指向汇总时
- * 用它（D-293）：「每周 3 次」要知道这周做了几天，只看最近一次不够。只在内存里，不进数据库。
+ * Rollup fields (D-288) record on each computed record the respective days (in day numbers) of
+ * the aggregated source records; schedule lastDone references use this during rollups (D-293): "3
+ * times a week" requires knowing how many days were completed this week, and looking only at the
+ * most recent occurrence is insufficient. Stored in memory only, not in the database.
  */
 export const rollupDays = new WeakMap<DataRecord, Map<string, readonly number[]>>();
 
@@ -279,7 +290,7 @@ export function scheduleStatusOf(
   );
 }
 
-/** 日程字段的 countEarly（D-341）从记录创建那天开始数。 */
+/** Schedule field countEarly (D-341) counts starting from the record creation day. */
 export function scheduleOptionsOf(
   record: DataRecord,
   field: Extract<Field, { type: 'schedule' }>,
@@ -290,7 +301,7 @@ export function scheduleOptionsOf(
     : {};
 }
 
-/** 一条记录上日程字段做过的日子（天数）：来自 lastDone 指向的字段或汇总（见 scheduleStatusOf）。 */
+/** Completed days (in days) for a schedule field on a record: derived from the field pointed to by lastDone or rollups (see scheduleStatusOf). */
 export function scheduleDoneDays(
   record: DataRecord,
   collection: Collection,
@@ -306,8 +317,9 @@ export function scheduleDoneDays(
 }
 
 /**
- * 记录上某个字段（包括系统字段）的值；系统字段的值是本地日期（一天开始的钟点之前算前一天，D-286），
- * 公式现算（用到 today 时按 now 那天）。
+ * Value of a specified field (including system fields) on a record; system field values are local
+ * dates (times before the day start hour count as the previous day, D-286), and formulas are
+ * computed on the fly (using the day of now when referencing today).
  */
 export function recordValue(
   record: DataRecord,
@@ -324,8 +336,9 @@ export function recordValue(
 }
 
 /**
- * 算出来的日期（D-542）：from 那天（日期时间按它那一天，D-286）加 add 天或 add 个月；月份加完超过那个月的
- * 最后一天时取最后一天（1 月 31 日加一个月是 2 月 28 日）。from 或 add 没有值时没有值。
+ * Computed date (D-542): adds add days or add months to from date (datetimes use their calendar
+ * day, D-286); when the resulting month exceeds its last day, clamp to the last day (e.g., Jan 31
+ * plus one month is Feb 28). No value if from or add has no value.
  */
 function dateOffsetValue(
   field: Extract<Field, { type: 'dateOffset' }>,
@@ -344,8 +357,9 @@ function dateOffsetValue(
 }
 
 /**
- * 某一天（YYYY-MM-DD）加 add 天或 add 个月（四舍五入成整数）；月份加完超过那个月的最后一天时取最后一天。
- * 算出来的日期（D-542）和一键记录工具写的日期（D-565）共用。日子读不出来时没有。
+ * Adds add days or add months (rounded to an integer) to a given day (YYYY-MM-DD); clamps to the
+ * last day of the month if the result exceeds it. Shared between computed dates (D-542) and
+ * quick-log tool entry dates (D-565). Empty when the date cannot be parsed.
  */
 export function offsetDay(start: string, n: number, unit: OffsetUnit): string | undefined {
   const day = dayNumber(start);
@@ -360,9 +374,9 @@ export function offsetDay(start: string, n: number, unit: OffsetUnit): string | 
   return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
 }
 
-// ---- 写入 ----
+// ---- Writing ----
 
-/** 写不进去的一个字段。tooSmall / tooLarge（D-570）：超出字段的 min / max，limit 是那个界限。 */
+/** A field that failed to write. tooSmall / tooLarge (D-570): exceeds field min / max, where limit is that bound. */
 export type FieldIssue = {
   fieldId: string;
   code: 'required' | 'invalid' | 'tooLong' | 'tooSmall' | 'tooLarge';
@@ -372,7 +386,7 @@ export type FieldIssue = {
 export type PreparedValues =
   { ok: true; values: Record<string, unknown> } | { ok: false; issues: FieldIssue[] };
 
-/** 新记录的默认值：定义里的 default（日期的 today 换成今天）。 */
+/** Default value for a new record: default from the definition (replacing date 'today' with current date). */
 function defaultValue(field: Field, now: Date, cal: Calendar): FieldValue | undefined {
   const def = fieldDefinition(field.type);
   if (def.initial) return def.initial(field, now, dayOf(now, cal));
@@ -386,7 +400,8 @@ const isBlank = (v: unknown) =>
   (Array.isArray(v) && v.length === 0);
 
 /**
- * 记录表单里这时藏着的字段（D-570）：所在的段有条件、按 values（存的值）不成立。只看这一条自己的值。
+ * Fields currently hidden in the record form (D-570): their container section has conditions that
+ * evaluate to false based on values. Evaluates only this record's own values.
  */
 export function hiddenFormFields(
   collection: Collection,
@@ -411,7 +426,7 @@ export function hiddenFormFields(
   return hidden;
 }
 
-/** 字段的范围（D-570）：数字超出 min / max 时是哪一种问题。 */
+/** Field range (D-570): specific issue type when numbers exceed min / max. */
 function rangeIssue(field: Field, value: unknown): FieldIssue | undefined {
   if (typeof value !== 'number') return undefined;
   const { min, max } = field as { min?: number; max?: number };
@@ -421,10 +436,12 @@ function rangeIssue(field: Field, value: unknown): FieldIssue | undefined {
 }
 
 /**
- * 写入时严格校验：input 只包含要修改的字段（字段 ID → 表单值，空字符串表示清空）。
- * previous 为 null 表示新记录，此时套用默认值（今天按 cal 算）。已删除字段的旧值原样保留。
- * D-570：数字超出字段的 min / max 不能存，但只查这次改了的值（范围是后加的、存着的旧值照样能存别的字段）；
- * 记录表单里藏着的段（条件不成立）里的字段不按必填查。
+ * Strict validation during write: input contains only fields to be modified (field ID → form
+ * value, empty string means clear). previous being null indicates a new record, applying default
+ * values (computed via cal for today). Old values of deleted fields are preserved as-is. D-570:
+ * numbers exceeding field min / max cannot be saved, but only newly modified values are checked
+ * (ranges are added later; stored legacy values can still save other fields); fields inside
+ * hidden form sections (unsatisfied conditions) are not checked for required status.
  */
 export function prepareRecordValues(
   collection: Collection,
@@ -437,7 +454,7 @@ export function prepareRecordValues(
   const issues: FieldIssue[] = [];
   for (const field of collection.fields) {
     const def = fieldDefinition(field.type);
-    // 不存值的字段（公式，D-188）：输入里有也忽略。
+    // Read-only fields (formulas, D-188): ignored even if present in input.
     if (!def.write) {
       delete values[field.id];
       continue;
@@ -446,12 +463,14 @@ export function prepareRecordValues(
     if (Object.prototype.hasOwnProperty.call(input, field.id)) raw = input[field.id];
     else if (previous !== null) raw = previous[field.id];
     else raw = defaultValue(field, now, cal);
-    // 新记录里没有值时存的值（没勾选的勾选框是 false）。
+    // Value stored when a new record has no value (unchecked checkboxes default to false).
     if (def.emptyNew !== undefined && raw === undefined && previous === null) raw = def.emptyNew;
 
     const result = isBlank(raw) ? null : def.write(field, raw);
-    // 单选、多选存着的值这次没改、现在又写不进去（选项删了，多选改回单选后留着的列表，D-607）：原样留着，
-    // 不挡住保存别的字段（底线 5）。用户自己改这个字段时照常检查。
+    // Stored values for single/multi-selects that were not changed now but are no longer valid
+    // under current definitions (options deleted, multi-select changed back to single-select,
+    // D-607): kept as-is, without blocking the saving of other fields (invariant 5). Checked
+    // normally when the user explicitly modifies this field.
     const kept =
       field.type === 'choice' &&
       previous !== null &&
@@ -470,7 +489,7 @@ export function prepareRecordValues(
       values[field.id] = result.value;
     }
   }
-  // 藏着的段里的字段不按必填查（D-570）：按写好的值看哪些段藏着。
+  // Fields in hidden sections are exempt from required validation (D-570): sections visibility is determined by evaluated values.
   const hidden = issues.some((i) => i.code === 'required')
     ? hiddenFormFields(collection, values, now, cal)
     : new Set<string>();
@@ -478,11 +497,11 @@ export function prepareRecordValues(
   return kept.length > 0 ? { ok: false, issues: kept } : { ok: true, values };
 }
 
-// ---- 筛选、排序、统计 ----
+// ---- Filtering, Sorting, Statistics ----
 
 function compare(a: FieldValue, b: FieldValue): number {
   if (typeof a === 'number' && typeof b === 'number') return a - b;
-  // 附件（一组文件 ID）按个数比。
+  // Attachments (a group of file IDs) compared by count.
   if (Array.isArray(a) || Array.isArray(b))
     return (Array.isArray(a) ? a.length : 0) - (Array.isArray(b) ? b.length : 0);
   if (typeof a === 'boolean' && typeof b === 'boolean') return Number(a) - Number(b);
@@ -497,18 +516,18 @@ export function matchesCondition(
   cal: Calendar = DEFAULT_CALENDAR,
 ): boolean {
   const field = fieldOf(collection, condition.field);
-  // gt / lt 日期可以写 "today"（D-537）：按逻辑上的今天（一天从几点开始按 cal）。
+  // gt / lt dates can be written as "today" (D-537): based on logical today (when a day starts depends on cal).
   const target =
     (condition.op === 'gt' || condition.op === 'lt') && condition.value === 'today'
       ? dateOfDayNumber(todayNumber(now, cal))
       : condition.value;
-  // 日期时间（D-279）按它那一天筛选：时间段、日期比较，以及 is / isNot 一个日期。
+  // Date-time (D-279) filtered by its day: time ranges, date comparisons, and is / isNot a date.
   if (condition.op === 'due') {
     const status =
       field?.type === 'schedule' && scheduleStatusOf(record, collection, field, now, cal);
     return !!status && scheduleDue(status, target as ScheduleDue, todayNumber(now, cal), cal);
   }
-  // 日程（D-295）按它的下一次筛选。
+  // Schedule (D-295) filtered by its next occurrence.
   const byDay =
     field !== undefined &&
     (fieldDefinition(field.type).day !== undefined || field.type === 'schedule') &&
@@ -519,8 +538,9 @@ export function matchesCondition(
   const value = byDay
     ? recordDay(record, collection, condition.field, now, cal)
     : recordValue(record, collection, condition.field, now, cal);
-  // 附件（D-263）：一组文件 ID。is / isNot 看有没有这个文件，其他比较都不成立。
-  // 多选（D-607）：一组选项 ID，is 一个列表是「含有其中一个」。
+  // Attachments (D-263): a group of file IDs. is / isNot checks for the presence of the file; other
+  // comparisons do not apply. Multi-select (D-607): a group of option IDs, is a list means
+  // "contains one of these".
   if (Array.isArray(value)) {
     const wanted: unknown[] = Array.isArray(target) ? target : [target];
     const has = wanted.some((x) => typeof x === 'string' && value.includes(x));
@@ -535,7 +555,7 @@ export function matchesCondition(
     case 'isNotEmpty':
       return value !== undefined && value !== '';
     case 'is':
-      // 单选「是其中一个」（D-538）。
+      // Single-select "is one of" (D-538).
       if (Array.isArray(target)) return typeof value === 'string' && target.includes(value);
       return value !== undefined && target !== undefined && value === target;
     case 'isNot':
@@ -574,8 +594,10 @@ export function filterRecords(
 type SortKey = { field: string; direction: 'asc' | 'desc' };
 
 /**
- * 排序：空值总在最后；单选按选项顺序；日程按下一次（D-295）；默认按创建时间从新到旧。
- * 可以是 1–3 个依次排（D-560）：第一个一样的按第二个，每一个都是空值在最后；都一样时按创建时间从新到旧。
+ * Sorting: empty values always last; single-select by option order; schedule by next occurrence
+ * (D-295); default by creation time newest to oldest. Can have 1–3 sequential sort keys (D-560):
+ * ties on the first are broken by the second, with empty values last in each case; ties across
+ * all are broken by creation time newest to oldest.
  */
 export function sortRecords(
   records: readonly DataRecord[],
@@ -592,7 +614,7 @@ export function sortRecords(
       key: sortKeyOf(collection, field, now, cal),
     }),
   );
-  // 每条的键先算一次再排（公式、日程每次现算很贵），比较的规则不变。
+  // Compute sort keys for each record once beforehand (formulas and schedules are expensive to evaluate repeatedly), keeping comparison rules unchanged.
   const keyed = records.map((r) => ({ r, k: keys.map((x) => x.key(r)) }));
   keyed.sort((a, b) => {
     for (let i = 0; i < keys.length; i++) {
@@ -609,7 +631,7 @@ export function sortRecords(
   return keyed.map((x) => x.r);
 }
 
-/** 一条记录按这个字段排时的键。 */
+/** Sort key when a record is sorted by this field. */
 function sortKeyOf(
   collection: Collection,
   field: string,
@@ -621,13 +643,13 @@ function sortKeyOf(
   const key = (r: DataRecord): FieldValue | undefined => {
     if (isSystemField(field)) return r[field];
     if (def?.type === 'schedule') {
-      // 同一天的按钟点排（D-346），没有钟点的排在那天最后。
+      // Same-day items sorted by hour (D-346), with untimed items placed at the end of that day.
       const next = scheduleStatusOf(r, collection, def, now, cal)?.next;
       const time = (readValue(def, r.values[def.id]) as { time?: string } | undefined)?.time;
       return next === undefined ? undefined : next + (time ? minuteOfDay(time)! / 1440 : 0.9999);
     }
     const v = recordValue(r, collection, field, now, cal);
-    // 有的字段按自己的顺序排（单选按选项顺序）。
+    // Some fields use their own sort order (e.g., single-select uses option order).
     return def && sortKey && v !== undefined ? sortKey(def, v) : v;
   };
   return key;
@@ -635,7 +657,7 @@ function sortKeyOf(
 
 export type Aggregate = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
-/** 统计结果；没有可用数值时返回 null。 */
+/** Aggregation result; returns null when no numeric values are available. */
 export function aggregateRecords(
   records: readonly DataRecord[],
   collection: Collection,
@@ -664,8 +686,9 @@ export function aggregateRecords(
 }
 
 /**
- * 每一笔单独选货币的金额（D-429）：合计、平均这些按货币分开算，写成「$100.00 · €50.00」，不换算。
- * 别的字段、别的聚合、一笔金额都没有时 null（照常显示）。
+ * Per-currency amounts (D-429): sums, averages, etc., are calculated separately per currency and
+ * formatted as "$100.00 · €50.00" without conversion. Returns null if there are other fields,
+ * other aggregations, or no monetary values (displayed normally).
  */
 export function perCurrencyText(
   records: readonly DataRecord[],
@@ -698,7 +721,7 @@ export function perCurrencyText(
 }
 
 export interface StatGroup {
-  /** 选项 ID；null 是没选的记录。 */
+  /** Option ID; null for unselected records. */
   optionId: string | null;
   label: string;
   count: number;
@@ -706,8 +729,9 @@ export interface StatGroup {
 }
 
 /**
- * 按单选字段分组统计（D-248）：每个选项一行（按选项顺序，没有记录的选项也列出），
- * 没选的记录有的话放在最后一行（label 用 noChoice）。选项已删掉的值算作没选。
+ * Grouped statistics by single-select field (D-248): one row per option (in option order,
+ * including options with no records), with unselected records (if any) placed in the last row
+ * (labeled using noChoice). Options whose values have been deleted are treated as unselected.
  */
 export function groupedAggregate(
   records: readonly DataRecord[],
@@ -726,7 +750,7 @@ export function groupedAggregate(
   );
 }
 
-/** 按引用字段分组（D-336）时，被引用的那张表和它的记录：每条一组，标题同引用里显示的。 */
+/** When grouping by a reference field (D-336), the referenced table and its records: one group per entry, with the title matching the display text in the reference. */
 export interface LinkedGroups {
   collection: Collection;
   records: readonly DataRecord[];
@@ -734,9 +758,12 @@ export interface LinkedGroups {
 }
 
 /**
- * 按单选或引用字段分组（groupedAggregate 的分组部分）：每组自己算值，例如每个习惯的连续天数（D-284）。
- * 顺序和「未选」一行同 groupedAggregate。引用字段（D-336）要 linked：被引用的表里每条记录一组
- * （按创建时间从旧到新，没有记录的也列出），没选的、指向已删除记录的算「未选」；没有 linked 时没有组。
+ * Group records by single-select or reference field (grouping part of groupedAggregate): each
+ * group computes its own value, e.g., streak days for each habit (D-284). Order and the
+ * "unselected" row match groupedAggregate. Reference fields (D-336) require linked: one group per
+ * record in the referenced table (ordered from oldest to newest creation time, including those
+ * with no records), with unselected or deleted-target references treated as "unselected"; no
+ * groups are produced if unlinked.
  */
 export function groupRecords(
   records: readonly DataRecord[],
@@ -756,7 +783,7 @@ export function groupRecords(
   for (const id of labels.keys()) buckets.set(id, []);
   for (const r of records) {
     const v = readValue(field, r.values[groupBy]);
-    // 多选（D-607）：一条记录算进它选的每一项，所以各组加起来可能比记录多。
+    // Multi-select (D-607): a record is counted in each item it selects, so the sum of all groups may exceed the record count.
     const keys = [v].flat().filter((k): k is string => typeof k === 'string' && labels.has(k));
     for (const key of keys.length > 0 ? keys : [null])
       buckets.set(key, [...(buckets.get(key) ?? []), r]);
@@ -775,11 +802,11 @@ export function groupRecords(
   );
 }
 
-// ---- 显示与导出 ----
+// ---- Display & Export ----
 
 /**
- * 一张表在引用里显示哪个字段：按字段定义的 titleRank（第一个文字字段，没有就是第一个长文本、单选、
- * 数字、金额或日期字段）。
+ * Which field a table displays in references: based on field definition titleRank (first text
+ * field, falling back to the first long text, single-select, number, amount, or date field).
  */
 export function linkTitleField(collection: Collection): Field | undefined {
   const ranked = FIELDS.flatMap((d) => (d.titleRank === undefined ? [] : [d])).sort(
@@ -792,7 +819,7 @@ export function linkTitleField(collection: Collection): Field | undefined {
   return undefined;
 }
 
-/** 一条记录作为被引用的一方时显示的标题（没有可显示的字段时用创建时间）。 */
+/** Title displayed when a record is referenced by another (falls back to creation time if no displayable field exists). */
 export function linkTitle(record: DataRecord, collection: Collection, locale: Locale): string {
   const field = linkTitleField(collection);
   const title = field
@@ -802,8 +829,10 @@ export function linkTitle(record: DataRecord, collection: Collection, locale: Lo
 }
 
 /**
- * 列表、卡片、看板上标题为空时显示的：表名 · 存的那天（「购物凭证 · 10月31日」，不是今年的带年份）。
- * 只是显示，不写进标题字段；用户填了标题就显示填的（D-392 真机反馈，创始人 2026-10-31 在对话里选定）。
+ * Displayed when title is empty in lists, cards, or kanban: table name · saved date ("Shopping
+ * Receipt · Oct 31", without year if not current year). Display-only, not written to the title
+ * field; displays the user-entered title if provided (D-392 real-device feedback, selected by
+ * founder in conversation on 2026-10-31).
  */
 export function untitledRecordTitle(
   record: DataRecord,
@@ -816,7 +845,7 @@ export function untitledRecordTitle(
   return `${collection.name} · ${shortDate(day, todayNumber(now, cal), locale)}`;
 }
 
-/** 一条记录给人看的标题（报表的图注、保存前的提示，D-425、D-426）：填了标题字段就是它，没填时同列表上的写法。 */
+/** Human-readable title of a record (report captions, pre-save prompts, D-425, D-426): uses the title field if filled, otherwise falls back to the list display format. */
 export function recordTitle(
   record: DataRecord,
   collection: Collection,
@@ -835,7 +864,7 @@ export function recordTitle(
   return title || untitledRecordTitle(record, collection, locale, now, cal);
 }
 
-/** 按读到的记录（表 ID → 没删的记录）查引用的标题。 */
+/** Resolves reference titles using loaded records (table ID → non-deleted records). */
 export function makeLinkResolver(
   collections: readonly Collection[],
   records: ReadonlyMap<string, readonly DataRecord[]>,
@@ -848,7 +877,7 @@ export function makeLinkResolver(
   };
 }
 
-/** 读出被引用的表的记录（listRecords 只给没删的），做成查标题的函数。列表、导出 CSV、生成 PDF 共用。 */
+/** Loads records of referenced tables (listRecords only returns non-deleted ones) and constructs a title resolution function. Shared by lists, CSV export, and PDF generation. */
 export async function loadLinkResolver(
   listRecords: (collectionId: string) => Promise<DataRecord[]>,
   collections: readonly Collection[],
@@ -860,14 +889,15 @@ export async function loadLinkResolver(
   return makeLinkResolver(collections, records, locale);
 }
 
-/** 一张表的引用字段指向哪些表（读记录时要连它们一起读）。 */
+/** Which tables are pointed to by a table's reference fields (those tables must be loaded together with records). */
 export const linkedCollectionIds = (collection: Collection): string[] => [
   ...new Set(collection.fields.flatMap((f) => (f.type === 'link' ? [f.table] : []))),
 ];
 
 /**
- * 字段值的显示文字；值无效或为空时返回空字符串。公式字段请用 formatRef（要整条记录才能算）。
- * 引用字段要 links 才能显示标题；被引用的记录删掉了时显示「已删除的记录」（D-250）。
+ * Display text for a field value; returns an empty string if invalid or empty. For formula
+ * fields, use formatRef (requires the full record to compute). Reference fields require links to
+ * display titles; displays "Deleted record" if the referenced record has been deleted (D-250).
  */
 export function formatValue(
   field: Field,
@@ -880,7 +910,7 @@ export function formatValue(
   return value === undefined ? '' : def.format(field, value, locale, links);
 }
 
-/** 某个字段引用（包括系统字段）在一条记录上的显示文字。 */
+/** Display text for a field reference (including system fields) on a record. */
 export function formatRef(
   record: DataRecord,
   collection: Collection,
@@ -894,16 +924,16 @@ export function formatRef(
   const field = fieldOf(collection, ref);
   if (field?.type === 'formula' || field?.type === 'dateOffset')
     return formatValue(field, recordValue(record, collection, ref, now, cal), locale);
-  // 日程（D-292）：规则 · 下一次（今天、明天、过期几天或日期）。
+  // Schedule (D-292): rule · next occurrence (today, tomorrow, days overdue, or a date).
   if (field?.type === 'schedule') {
     const status = scheduleStatusOf(record, collection, field, now, cal);
     const rule = formatValue(field, record.values[ref], locale);
     if (!status) return rule;
-    // 「一次」（D-340）只写日期或状态（明天、11月5日、已完成），不再重复「一次」。
+    // "Once" (D-340) writes only the date or status (tomorrow, Nov 5, completed) without repeating "once".
     const read = readValue(field, record.values[ref]) as { repeat: string; time?: string };
     const once = read.repeat === 'once';
     const text = scheduleStatusText(status, todayNumber(now, cal), locale, once);
-    // 「一次」带钟点时跟在日子后面（明天 03:00，D-346）；重复的规则文字里已经有钟点。
+    // "Once" with a specific time follows the date (tomorrow 03:00, D-346); recurring rule text already includes the time.
     if (!once) return `${rule} · ${text}`;
     return read.time && status.next !== undefined
       ? t(locale, 'scheduleAtTime', { rule: text, time: read.time })
@@ -921,7 +951,7 @@ export function formatRef(
 
 const csvCell = (s: string) => (/[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 
-/** 导出 CSV（带 BOM，Excel 可直接打开中文）。只导出当前字段和创建时间。 */
+/** Exports CSV (with BOM, allowing Excel to open Chinese correctly). Exports only current fields and creation time. */
 export function recordsToCsv(
   collection: Collection,
   records: readonly DataRecord[],

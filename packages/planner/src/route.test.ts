@@ -14,7 +14,7 @@ import {
 } from './prompt';
 import { routeCovers, routeRequest } from './route';
 
-// 提示词按需加载：路由只在本机按字符串挑部分；拿不准就发完整的。
+// Prompt on-demand loading: routing selects parts locally by string matching; falls back to full if unsure.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const full = buildSystemPrompt(registry, 'full');
@@ -37,11 +37,11 @@ describe('prompt routes', () => {
       expect(prompt).toContain('## Output\n');
       expect(prompt).toContain('## Tools\n');
       for (const n of RULE_GROUPS.core) expect(prompt).toMatch(new RegExp(`\\n${n}\\. `));
-      // 办事拒绝（D-113）、看不到数据：原句都在。
+      // Action refusal (D-113) and data privacy: original phrases are retained.
       expect(prompt).toContain('You change the app; you never run the user');
       expect(prompt).toContain('reason "userData"');
       expect(prompt).toContain('You only see the structure, never the entries.');
-      // 省掉的部分有目录，模型能要完整的。
+      // Omitted parts include a catalog so the model can request the full version.
       expect(prompt).toContain('{"kind": "needMore"}');
     });
 
@@ -206,10 +206,11 @@ describe('planner with routes', () => {
   });
 });
 
-// 评测里每个通过的用例每一轮（scripts/eval-needs.ts 从 Haiku 的全量评测取出）：
-// 路由给的部分必须包含这一轮的计划用到的部分，否则模型是在缺说明的情况下做对的。
+// Each passing test case per round in evals (scripts/eval-needs.ts extracts from Haiku full eval):
+// route-provided parts must include those used by that round's plan, otherwise the model succeeded
+// without sufficient documentation.
 type Part = 'data' | 'containers' | 'theme' | 'files' | 'records' | 'look' | 'style';
-/** 一种路由给了哪些部分（从 ROUTE_PARTS 推出来）。 */
+/** Parts provided by a route (derived from ROUTE_PARTS). */
 function routeHas(route: PromptRoute): Part[] {
   const { sections, rules } = ROUTE_PARTS[route];
   const parts: Part[] = rules.filter((g) => g !== 'core' && g !== 'files') as Part[];
@@ -240,7 +241,7 @@ interface SlimOp {
   step?: boolean;
 }
 
-/** 一个操作要用到提示词的哪些部分。 */
+/** Prompt parts required by an operation. */
 function partsFor(op: SlimOp): Part[] {
   switch (op.op) {
     case 'setTheme':
@@ -261,7 +262,7 @@ function partsFor(op: SlimOp): Part[] {
     default: {
       if (op.nav) return op.nav.includes('phoneHomeScreen') ? ['files'] : ['containers', 'look'];
       const looks = op.looks ?? [];
-      // 首页放一个快捷操作的 action 块：写法整个在规则 20 里（files）。
+      // Homepage features an action block for a quick action: writing structure is fully defined in rule 20 (files).
       if (looks.length > 0 && looks.every((l) => l === 'action')) return ['files'];
       const parts: Part[] = ['containers', 'look'];
       if (looks.some((l) => RECORD_LOOKS.includes(l)) || (op.tools && !looks.includes('action')))

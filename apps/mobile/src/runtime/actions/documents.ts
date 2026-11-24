@@ -5,11 +5,15 @@ import { countPages } from '@morph/tool-pdf';
 import { jpegDataUrl, wordPageHtml } from '../../desk/word-page';
 import { displayName, fileItems, freshName, type RunServices } from './helpers';
 
-// 文档转 PDF（D-186）：排版交给平台（iOS 系统的文档预览，Android 用 mammoth 转 Word），这里检查格式、
-// 报进度、把结果交给下一步。转 Word 做出来的、带着中间格式的 docx（D-466）按编辑页的版面打印：和编辑页看到的一样
-// （原图的位置、空白、字号、对齐），不受平台排版的影响（Android 的 mammoth 不认对齐、缩进和字号）。
+// Print a docx copy via intermediate format; returns null when intermediate format cannot be read
+// (falls back to platform layout). Document to PDF conversion (D-186): platform handles layout (iOS
+// document preview, Android converts Word via mammoth), this function checks progress, hands
+// results to the next step. docx generated from Word containing intermediate format (D-466) is
+// printed according to edit page layout: matches what is seen on the edit page (original image
+// positions, whitespace, font size, alignment), unaffected by platform layout (Android mammoth
+// ignores alignment, indentation, and font size).
 
-/** 按中间格式打印一份 docx；中间格式读不出来时返回 null（交给平台排版）。 */
+/** Print a docx copy via intermediate format; returns null when intermediate format cannot be read (falls back to platform layout). */
 async function docDocToPdf(
   services: RunServices,
   item: RunItem,
@@ -26,7 +30,7 @@ async function docDocToPdf(
     try {
       images[block.src] = jpegDataUrl(await files.readUri(block.src));
     } catch {
-      // 读不到的图片空着（和编辑页一样画成灰块）。
+      // Unreadable images are left empty (rendered as gray blocks, matching the edit page).
     }
   }
   const html = wordPageHtml(doc, page.width, images, true);
@@ -36,13 +40,13 @@ async function docDocToPdf(
     top: 0,
     bottom: 0,
   });
-  // Android 的 expo-print 报的页数总是 1：从 PDF 本身数。
+  // Android expo-print always reports page count as 1: count pages directly from the PDF itself.
   return { ...pdf, pageCount: await countPages(await files.readUri(pdf.uri)) };
 }
 
 type Impl = ActionImpl<RunServices>;
 
-/** 纸张大小（点）。 */
+/** Paper sizes (points). */
 const PAGES = {
   a4: { width: 595.28, height: 841.89 },
   letter: { width: 612, height: 792 },
@@ -54,7 +58,7 @@ export const DOCUMENT_IMPLS: Record<string, Impl> = {
     const { documents } = ctx.services.files;
     const { runId } = ctx.services;
     const items = fileItems(input);
-    // 先全部检查一遍格式，免得转了几个才发现后面的不行。
+    // Check format for all items upfront to avoid failing midway through processing.
     for (const item of items) {
       if (!documents.extensions.includes(item.ext.toLowerCase())) {
         throw new RunError('documentUnsupported', {

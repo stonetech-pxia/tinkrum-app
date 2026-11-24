@@ -8,16 +8,16 @@ import { type LookDefinitionOf, defineLook } from './define';
 
 const shape = {
   show: z.strictObject({ title: boundedText(1, 60).optional() }).optional(),
-  /** 读快捷操作目录（我的 + 内设 + 工具包带的）；运行、编辑、「＋ 添加」是内核工具，不进配置。 */
+  /** Read quick action catalog (mine + presets + included in tool packs); run, edit, and "+ Add" are core tools and do not enter the config. */
   source: z.strictObject({
     catalog: z.literal('quickActions'),
     kind: z.enum(QUICK_ACTION_KINDS).optional(),
-    /** 最近用过的快捷操作（D-452）：读运行记录，一行小胶囊；有 recent 时不看 kind。 */
+    /** Recently used quick actions (D-452): reads run history, shown as a row of small capsules; when recent is present, kind is ignored. */
     recent: z.literal(true).optional(),
   }),
 };
 
-/** 快捷操作库放进页面（原 quickActionList）。 */
+/** Quick action library placed into the page (formerly quickActionList). */
 export const libraryComponent: LookDefinitionOf<'library', typeof shape> = defineLook({
   look: 'library',
   shape,

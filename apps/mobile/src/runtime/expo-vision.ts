@@ -17,14 +17,15 @@ import {
 } from './ppocr';
 import { ocrPixels, openFlattenPage } from './skia';
 
-// VisionPlatform 的实现：本地 Expo 模块 MorphVision（iOS：Vision，D-084；Android：ML Kit，D-087）。
-// 文字识别用 PP-OCRv6（D-269）：中文、日文、英法德西葡意；其余语言用系统自带的（iOS Vision、Android 只剩韩文用 ML Kit）。
-// 没有这个模块（Expo Go）时为 null。
+// Implementation of VisionPlatform: local Expo module MorphVision (iOS: Vision, D-084; Android: ML
+// Kit, D-087). Uses PP-OCRv6 for text recognition (D-269): Chinese, Japanese, English, French,
+// German, Spanish, Portuguese, Italian; system-default for remaining languages (iOS Vision, Android
+// ML Kit only for Korean). Null when this module is absent (Expo Go).
 
-/** 只用来找文字识别模型的文件（下载由 App 根布局负责，D-064）；和根布局是同一个（D-510）。 */
+/** Used exclusively to locate text recognition model files (downloads are handled by the app root layout, D-064); shares the same instance as the root layout (D-510). */
 const ocrPacks = expoPackStore;
 
-/** 拉正后和文档相机页面的 JPG 质量。 */
+/** JPG quality after straightening, matching the document camera page. */
 const QUALITY = 0.9;
 
 export function expoVision(
@@ -50,7 +51,7 @@ export function expoVision(
                   try {
                     dir.delete();
                   } catch {
-                    // 已经删掉了。
+                    // Already deleted.
                   }
                 },
               };
@@ -66,7 +67,7 @@ export function expoVision(
         )
       : null;
   const { modelRun } = native;
-  // 扫描展平（D-274）：模型在扩展包里；找文字行和文字识别共用 PP-OCRv6 的模型。
+  // Scan flattening (D-274): the model resides in the extension pack; text line detection and text recognition share the PP-OCRv6 model.
   const flattener = modelRun
     ? createFlattener(
         { modelRun, ...(ocrLoad && ocrDetect ? { ocrLoad, ocrDetect } : {}) },
@@ -89,7 +90,7 @@ export function expoVision(
                 try {
                   dir.delete();
                 } catch {
-                  // 已经删掉了。
+                  // Already deleted.
                 }
               },
             };
@@ -99,7 +100,7 @@ export function expoVision(
         { ocrPack: PPOCR_PACK, quality: QUALITY },
       )
     : null;
-  // 转 Word 的版面分析（D-328）：和展平一样用 modelRun 跑扩展包里的模型。
+  // Layout analysis for Word conversion (D-328): runs models from the extension pack via modelRun, identical to flattening.
   const layout = modelRun
     ? createLayoutDetector(
         { modelRun },
@@ -121,7 +122,7 @@ export function expoVision(
                 try {
                   dir.delete();
                 } catch {
-                  // 已经删掉了。
+                  // Already deleted.
                 }
               },
             };
@@ -129,7 +130,7 @@ export function expoVision(
         },
       )
     : null;
-  /** 这组语言用 PP-OCRv6 识别（第一种是用户选的语言）。 */
+  /** Recognize this group of languages using PP-OCRv6 (the first is the user-selected language). */
   const viaPpocr = (languages: readonly string[]) =>
     ppocr !== null && languages[0] !== undefined && coversLanguage(languages[0]);
   return {
@@ -199,7 +200,7 @@ export function expoVision(
     },
 
     async recognizeText(uri, languages) {
-      // 按每行的位置排版，同一段里折行的行接回去（D-268）；没有位置时用原生排好的文字。
+      // Format layout according to line positions, re-joining wrapped lines within the same paragraph (D-268); falls back to natively arranged text when positions are absent.
       if (viaPpocr(languages)) return layoutOcrLines((await ppocr!.recognize(uri)).lines);
       const { text, items } = await native.recognizeText(uri, languages);
       return items.length > 0 ? layoutOcrLines(items) : text;
@@ -225,7 +226,7 @@ export function expoVision(
       return { width, height, lines: items };
     },
 
-    // 展平模型只在配置了扩展包地址时提示下载；没配置但已经装好（模拟器测试）时照样展平。
+    // Prompt for flattening model download only when the extension pack URL is configured; still flatten if unconfigured but already installed (simulator testing).
     ...(flattener && process.env.EXPO_PUBLIC_MORPH_PACKS_URL
       ? { flattenModel: { pack: DEWARP_PACK } }
       : {}),
@@ -234,18 +235,18 @@ export function expoVision(
           async flatten(uri: string, runId: string, relPath: string) {
             const output = runFileUri(runId, relPath);
             const done = await flattener.flatten(uri, output);
-            // 每一步的耗时（开发版的日志里看，测手机上的性能）。
+            // Execution time for each step (visible in dev build logs for performance profiling on devices).
             if (__DEV__ && done) console.log('[flatten]', JSON.stringify(done.timing));
             return done && { uri: output, ...done };
           },
         }
       : {}),
-    // 版面分析模型和展平模型一样，只在配置了扩展包地址时提示下载；没配置但已经装好时照样用。
+    // Layout analysis model, similar to the flattening model, prompts for download only when the extension pack URL is configured; used as-is if unconfigured but already installed.
     ...(layout && process.env.EXPO_PUBLIC_MORPH_PACKS_URL
       ? { layoutModel: { pack: LAYOUT_PACK } }
       : {}),
     ...(layout ? { detectLayout: (pixels: Pixels) => layout.detect(pixels) } : {}),
-    // 和 PP-OCRv6 识别时解码得一样（同样的大小），找线和认字可以共用一份像素（D-272）。
+    // Decoded identically to PP-OCRv6 recognition (same size), allowing line detection and character recognition to share a single pixel buffer (D-272).
     tablePixels: async (uri) => ocrPixels(await new File(uri).bytes(), PPOCR_INPUT_SIDE),
 
     canFindPaper: native.canFindPaper(),

@@ -25,10 +25,14 @@ import type { Palette } from '../renderer/theme';
 import { Crop } from '../run/Crop';
 import { SheetView } from '../run/SheetView';
 
-// 桌上的 Excel 就是编辑器（file-room §11.3，D-366）：大预览就是表格视图，点一下选中、
-// 再点一下编辑。选中时下面换成编辑层：原图里这一块的截图，加上对它有用的操作（编辑、插删行列、删除）；
-// 房间的工具栏这时收起来（编辑层不进工具栏配置，AI 改不了）。Word 整页直接改，见 WordEditor（D-465）。
-// 一页超过 2000 格时只能看（D-272）。改动交给 onApply，记撤销、合成版本的是房间（useDeskEdit）。
+// The Excel-like editor on the desk (file-room §11.3, D-366): the large preview is the spreadsheet
+// view, tap to select, tap again to edit. When selected, the bottom changes to an editing layer
+// containing a crop of this area from the original image plus useful operations (edit,
+// insert/delete rows or columns, delete); the room toolbar is tucked away at this point (the
+// editing layer is not part of toolbar config and cannot be modified by the AI). Word pages are
+// edited directly in place, see WordEditor (D-465). When a page exceeds 2000 cells, it is view-only
+// (D-272). Edits are handed to onApply, with the room handling undo, history snapshots, and version
+// synthesis (useDeskEdit).
 
 type Selection = { kind: 'sheet'; block: number; cell?: number };
 
@@ -50,10 +54,10 @@ export function DeskEditor({
   doc: TableDoc;
   palette: Palette;
   locale: Locale;
-  /** 编辑器的宽（点）。 */
+  /** Editor width (points). */
   width: number;
   onApply: (next: TableDoc) => void;
-  /** 选中了东西（房间收起工具栏，换成编辑层）。 */
+  /** Something is selected (room tucks away the toolbar and switches to the editing layer). */
   onSelecting: (on: boolean) => void;
 }) {
   const [pageIndex, setPageIndex] = useState(0);
@@ -73,7 +77,7 @@ export function DeskEditor({
   useEffect(() => {
     onSelecting(selected !== null);
   }, [selected, onSelecting]);
-  // 换成别的文件（撤销到照片、切文件）时编辑器不在了：工具栏要回来。
+  // When switching to another file (undoing to photos, switching files) and the editor is gone: the toolbar must return.
   useEffect(() => () => onSelecting(false), [onSelecting]);
 
   const clear = () => {
@@ -85,7 +89,7 @@ export function DeskEditor({
     if (!keep) clear();
   };
 
-  // ---- 表格（转 Excel） ----
+  // ---- Spreadsheet (to Excel) ----
   const sheetCell =
     selected?.kind === 'sheet' && layout
       ? (layout.cells.find((c) => c.block === selected.block && c.cell === selected.cell) ?? null)
@@ -105,7 +109,7 @@ export function DeskEditor({
       selected.block === cell.block &&
       selected.cell === cell.cell
     ) {
-      // 图片没有字可改：再点一下也只是选着。
+      // Images have no text to edit: tapping again only keeps it selected.
       if (!cell.image) setEditing({ text: sheetText(sel) });
       return;
     }
@@ -186,7 +190,7 @@ export function DeskEditor({
     ];
   }
 
-  // ---- 共用 ----
+  // ---- Shared ----
   function startEdit() {
     if (selected?.kind === 'sheet' && page) setEditing({ text: sheetText(selected) });
   }
@@ -207,7 +211,7 @@ export function DeskEditor({
     }
     setEditing(null);
   }
-  /** 选中的这一块在原图里的位置和那一页（截图用）。 */
+  /** Position of the selected area in the original image and its page index (for screenshots). */
   function sourceOf(): {
     page: { source: string; width: number; height: number };
     box?: Box;
@@ -249,7 +253,7 @@ export function DeskEditor({
   const source = sourceOf();
   const hasOriginal = !!page?.source;
   const radius = palette.radius;
-  // 底部的编辑层：浮在页面上的圆角面板，跟着主题的卡片样式。
+  // Bottom editing layer: a floating rounded panel on the page following the theme's card style.
   const layer = [
     styles.layer,
     palette.cardStyle(palette.surface),
@@ -269,7 +273,7 @@ export function DeskEditor({
           {t(locale, 'tableEmpty')}
         </Text>
       ) : table && layout ? (
-        // D-488：表格放在圆角的「纸张卡片」里（外层给阴影，里层裁圆角），和预览页、桌面一样。
+        // D-488: Tables are placed inside rounded "paper cards" (outer layer provides shadow, inner layer clips corners), matching the preview page and desk.
         <View style={[styles.paper, palette.cardStyle(palette.surface), { borderRadius: radius }]}>
           <View style={[styles.paperClip, { borderRadius: Math.max(0, radius - 2) }]}>
             <SheetView
@@ -304,7 +308,7 @@ export function DeskEditor({
       ) : selected ? (
         <View testID="desk-edit-bar" style={layer}>
           <View style={styles.sourceRow}>
-            {/* 这一页没有原图（外来的 xlsx 读进来的，D-509）：不显示「原件」这一栏。 */}
+            {/* This page has no original image (imported externally via xlsx, D-509): do not display the "Original" section. */}
             <Text style={[palette.font('bodyBold', 13), styles.flex, { color: palette.muted }]}>
               {hasOriginal ? t(locale, 'tableSource') : ''}
             </Text>
@@ -319,7 +323,7 @@ export function DeskEditor({
             </Pressable>
           </View>
           {!hasOriginal ? null : source?.box ? (
-            // 面板左右各留 12，面板里再缩进 14（D-488）。
+            // Leave 12 padding on both sides of the panel, and inset by 14 inside the panel (D-488).
             <Crop page={source.page} box={source.box} maxWidth={width - 52} palette={palette} />
           ) : (
             <Text style={[palette.font('body', 13), { color: palette.muted }]}>
@@ -334,9 +338,11 @@ export function DeskEditor({
           </ScrollView>
         </View>
       ) : table && (pages > 1 || hasText) ? (
-        // 没选中东西：识别范围（只影响写不写表外的文字）和页签。一行普通高度：横向 ScrollView 默认
-        // flexGrow: 1，不压住会和表格平分高度，按钮被撑成大竖条（三星真机，2026-10-30）。
-        // 没有表外的文字时（外来的 xlsx 读进来的，D-509）识别范围不起作用，只有页签。
+        // Nothing selected: recognition scope (only affects text outside tables) and tabs. Standard
+        // row height: horizontal ScrollView defaults to flexGrow: 1, otherwise it shares height
+        // equally with the table, stretching buttons into large vertical bars (Samsung physical
+        // device, 2026-10-30). When there is no text outside tables (external xlsx loaded, D-509),
+        // the recognition scope has no effect, showing only tabs.
         <ScrollView
           horizontal
           testID="desk-scope-bar"

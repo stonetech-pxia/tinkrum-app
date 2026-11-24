@@ -1,14 +1,17 @@
-// 给别的 AI 的结构模式（D-603）：网上的模板库（Notion、Airtable、Google Sheets、Microsoft、Numbers）里反复出现的
-// 8 种结构（第 9 种「连接带数据」是 D-616 加的），各做成一份能导入、没有设计建议的 App 文件，创始人 2026-11-20 看过模拟器截图后同意收录。
-// docs/agent/tinkrum-app-patterns.md 由快照测试从这里生成；调研和截图在 side-session-notes/template-library-2026-11-20。
+// Structural patterns for other AIs (D-603): 8 structures that repeatedly appear in online template
+// libraries (Notion, Airtable, Google Sheets, Microsoft, Numbers; the 9th "connection with data"
+// was added in D-616), each made into an importable app file with no design suggestions, approved
+// by the founder on 2026-11-20 after viewing simulator screenshots.
+// docs/agent/tinkrum-app-patterns.md is generated from here by snapshot testing; research and
+// screenshots are in side-session-notes/template-library-2026-11-20.
 
 export interface AgentPattern {
   name: string;
-  /** 什么时候用（接在 "Use it when" 后面）。 */
+  /** When to use (appended after "Use it when"). */
   when: string;
-  /** 怎么搭：关键的几处。 */
+  /** How to build: key steps. */
   how: readonly string[];
-  /** 一份完整的 App 文件。 */
+  /** A complete app file. */
   app: object;
 }
 

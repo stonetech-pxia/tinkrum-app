@@ -8,8 +8,11 @@ import { CollectionSchema, type Collection, type Field } from './schema';
 import { registry } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 公式里空着的数算 0（D-619，创始人 2026-11-21「做前三个」）：公式字段写 empty: "zero" 才这样，不写照旧（有一个空着就没有值）。
-// 只管数（数字、金额、评分、时长、勾选框、单选的值、别的公式、查找和汇总来的数）；日期、时间空着照旧没有值。除以 0 照旧没有值。
+// Empty numbers in formulas count as 0 (D-619, founder 2026-11-21 "do the first three"): only
+// applies when formula field has empty: "zero", otherwise unchanged (having an empty value yields
+// no value). Applies only to numbers (numbers, amounts, ratings, durations, checkboxes, choice
+// values, other formulas, lookup and summary numbers); dates and times left empty still have no
+// value. Division by zero still yields no value.
 
 const NOW = new Date(2026, 10, 18, 12);
 
@@ -123,7 +126,7 @@ describe('empty counts as 0 in a formula, only when asked (D-619)', () => {
     const table = guests();
     expect(recordValue(entry({ reply: 'yes' }), table, 'party', NOW)).toBe(1);
     expect(recordValue(entry({ reply: 'yes', plus: 2 }), table, 'party', NOW)).toBe(3);
-    // 没回复（单选空着）也算 0。
+    // Unanswered (empty radio) also counts as 0.
     expect(recordValue(entry({ plus: 2 }), table, 'party', NOW)).toBe(0);
     const list = [
       entry({ reply: 'yes' }),
@@ -152,9 +155,9 @@ describe('empty counts as 0 in a formula, only when asked (D-619)', () => {
     expect(recordValue(entry({ arrive: '2026-11-20' }), table, 'wait', NOW)).toBe(2);
     expect(recordValue(entry({ price: 10 }), table, 'share', NOW)).toBeUndefined();
     expect(recordValue(entry({ price: 10, plus: 4 }), table, 'share', NOW)).toBe(2.5);
-    // 另一个公式没有值时（这里是除以 0）也算 0。
+    // Also counts as 0 when another formula has no value (here division by zero).
     expect(recordValue(entry({ price: 10 }), table, 'outer', NOW)).toBe(1);
-    // if 的比较也把空着的数当 0。
+    // If comparisons also treat empty numbers as 0.
     expect(recordValue(entry({}), table, 'big', NOW)).toBe(0);
   });
 

@@ -29,7 +29,7 @@ const pages: TextPage[] = [
 ];
 const blank = (): Collection => draftTable('blank', createDefaultWorkspace('en'), 'en');
 
-describe('draftEngine（手机上发现的问题）', () => {
+describe('draftEngine (issues found on mobile)', () => {
   const doc: TextPage[] = [
     {
       width: 800,
@@ -40,7 +40,7 @@ describe('draftEngine（手机上发现的问题）', () => {
       ],
     },
   ];
-  it('字段名和文件上的标签一样时，它旁边的值是第一个候选，编号也算', async () => {
+  it('When field name matches the label on the file, its adjacent value is the first candidate, and numbering also counts', async () => {
     const t = addDraftField(
       addDraftField(blank(), 'Numéro de contrat', doc, 'fr'),
       'Prime annuelle',
@@ -53,7 +53,7 @@ describe('draftEngine（手机上发现的问题）', () => {
     expect(got[number.id]![0]!.value).toBe('CT-77120');
     expect(got[premium.id]![0]!.value).toBe('214.00');
   });
-  it('金额字段一定有货币：看文件上的符号，没有就按界面语言', () => {
+  it('Amount fields must have a currency: check the symbol on the file; fallback to UI locale if none', () => {
     const t = addDraftField(blank(), 'Prime annuelle', doc, 'en');
     expect(t.fields.find((f) => f.name === 'Prime annuelle')).toMatchObject({
       type: 'money',
@@ -70,7 +70,7 @@ describe('draftEngine（手机上发现的问题）', () => {
   });
 });
 
-describe('隐藏预设的字段认得出别的语言的标签（手机上法语保单配中文字段没有候选）', () => {
+describe('Hidden presets can recognize labels in other languages (mobile: French policy with Chinese fields has no candidate)', () => {
   const page = (...rows: string[]): TextPage[] => [
     {
       width: 900,
@@ -93,7 +93,7 @@ describe('隐藏预设的字段认得出别的语言的标签（手机上法语�
     const got = await draftEngine({ fields: t.fields, pages, locale });
     return Object.fromEntries(t.fields.map((f) => [f.id, got[f.id]?.[0]?.value]));
   };
-  it('法语保单 → 中文字段', async () => {
+  it('French policy -> Chinese fields', async () => {
     const got = await values(
       'insurance',
       page(
@@ -105,7 +105,7 @@ describe('隐藏预设的字段认得出别的语言的标签（手机上法语�
     );
     expect(got).toMatchObject({ provider: 'Mutuelle Azur', number: 'CT-77120', end: '2025-12-31' });
   });
-  it('西语保单 → 英语字段', async () => {
+  it('Spanish policy -> English fields', async () => {
     const got = await values(
       'insurance',
       page(
@@ -117,7 +117,7 @@ describe('隐藏预设的字段认得出别的语言的标签（手机上法语�
     );
     expect(got).toMatchObject({ provider: 'Mutua Levante', number: 'PZ-33091', end: '2026-02-28' });
   });
-  it('英语疫苗记录 → 中文字段', async () => {
+  it('English vaccination record -> Chinese fields', async () => {
     const got = await values(
       'vaccination',
       page('Patient: Noor Haddad', 'Vaccine: tetanus booster', 'Administered: 3 March 2025'),
@@ -132,13 +132,13 @@ describe('隐藏预设的字段认得出别的语言的标签（手机上法语�
 });
 
 describe('draft fields', () => {
-  it('类型从旁边的值判断，看不出来是文字', () => {
+  it('Type is determined from the adjacent value; if unclear, it is text', () => {
     expect(fieldTypeFor('Annual premium', pages, 'en').type).toBe('money');
     expect(fieldTypeFor('Start of cover', pages, 'en').type).toBe('date');
     expect(fieldTypeFor('Insurer', pages, 'en').type).toBe('text');
     expect(fieldTypeFor('Nothing', pages, 'en').type).toBe('text');
   });
-  it('加在附件前面，重复和空名不加', () => {
+  it('Added before attachments; duplicates and empty names are skipped', () => {
     let t = addDraftField(blank(), 'Insurer', pages, 'en');
     expect(t.fields.map((f) => f.name)).toEqual(['Title', 'Insurer', 'Attachments']);
     expect(addDraftField(t, ' insurer ', pages, 'en')).toBe(t);
@@ -147,14 +147,14 @@ describe('draft fields', () => {
     expect(t.fields[0]!.name).toBe('Name');
     expect(renameDraftField(t, 'title', 'Insurer')).toBe(t);
   });
-  it('附件字段去不掉', () => {
+  it('Attachment field cannot be removed', () => {
     const t = removeDraftField(removeDraftField(blank(), 'title'), 'attachments');
     expect(t.fields.map((f) => f.id)).toEqual(['attachments']);
   });
 });
 
 describe.each([...FILE_RECORD_PRESETS, ...HIDDEN_RECORD_PRESETS])('preset %s', (preset) => {
-  it.each(['en', 'zh', 'fr'] as const)('%s：完整和去掉字段后都能建（底线 18）', (locale) => {
+  it.each(['en', 'zh', 'fr'] as const)('%s: can build both fully and after removing fields (invariant 18)', (locale) => {
     const config = createDefaultWorkspace(locale);
     const table = draftTable(preset, config, locale);
     const whole = applyOps(config, draftTableOps(table, preset, config, locale), {
@@ -173,14 +173,14 @@ describe.each([...FILE_RECORD_PRESETS, ...HIDDEN_RECORD_PRESETS])('preset %s', (
   });
 });
 
-describe('隐藏的预设', () => {
-  it('不在用户平时看到的预设里', () => {
+describe('Hidden preset', () => {
+  it('Not in the presets normally visible to users', () => {
     for (const p of HIDDEN_RECORD_PRESETS)
       expect(FILE_RECORD_PRESETS as readonly string[]).not.toContain(p);
   });
 });
 
-// 金额的货币跟着文件（D-548）：用文件建表时，金额字段用小票上的货币，认不出才按界面语言。
+// File currency linkage (D-548): when creating tables from files, amount fields use the currency from the receipt, falling back to UI language only if unrecognized.
 describe('fileCurrency', () => {
   const page = (...texts: string[]): TextPage[] => [
     {
@@ -214,9 +214,9 @@ describe('fileCurrency', () => {
   });
 });
 
-// 收据类的表每一笔自己带货币，预填从小票上给候选（D-549）。
+// Receipt-type tables carry their own currency per entry, suggesting prefill candidates from the receipt (D-549).
 describe('receipt tables: each entry carries its own currency (D-549)', () => {
-  // 购物凭证和样板「收据」还没改：它们的开销图表要把金额加起来（等创始人定）。
+  // Shopping voucher and sample "Receipt" tables not yet updated: their expense charts need to sum amounts (pending founder decision).
   const RECEIPT_TABLES = ['bill', 'reimbursement'] as const;
   const page = (...texts: string[]): TextPage[] => [
     {
@@ -247,7 +247,7 @@ describe('receipt tables: each entry carries its own currency (D-549)', () => {
         const choice = currencyChoice(table);
         expect(choice).toBeDefined();
         expect(choice!.default).toBeUndefined();
-        // 文件上认得出的货币都在选项里。
+        // All currencies recognized on the file are included in the options.
         for (const texts of receipts) {
           const code = fileCurrency(page(...texts), locale)!;
           expect(choice!.options.map((o) => o.id)).toContain(code.toLowerCase());

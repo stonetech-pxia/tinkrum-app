@@ -16,12 +16,12 @@ import { expandCollection } from './related';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 每种登记的字段都要满足的事（新增字段类型时这里自动检查它，见 docs/FIELDS.md）。
+// Requirements for each registered field type (new field types are automatically checked here, see docs/FIELDS.md).
 
 const LOCALES: Locale[] = ['en', 'zh', 'fr'];
 const NOW = new Date(2026, 9, 27, 10);
 
-/** 一张表放上每种字段的 example（引用字段指向它自己，公式用 weight）。 */
+/** A table populated with an example for each field type (reference field points to itself, formula uses weight). */
 const table: Collection = {
   id: 'expenses',
   name: 'Expenses',
@@ -62,7 +62,7 @@ it.each(LOCALES)('a table with every field example is valid in %s', (locale) => 
 
 describe.each(FIELDS.map((d) => [d.type, d] as const))('field %s', (_type, def) => {
   const field = def.example as Field;
-  // 查找、汇总、上一条按它们显示的那种字段筛选、排序、统计、进公式（D-287–D-289）。
+  // Lookup, rollup, previous-item display filtering, sorting, statistics, and formulas use these kinds of fields (D-287–D-289).
   const shown = fieldDefinition(
     expandCollection([table], table).fields.find((f) => f.id === field.id)!.type,
   );
@@ -96,7 +96,7 @@ describe.each(FIELDS.map((d) => [d.type, d] as const))('field %s', (_type, def) 
       expect(formatValue(field, stored, locale, () => 'Linked')).not.toBe('');
       expect(recordsToCsv(table, [record], locale, () => 'Linked')).toContain('\r\n');
     }
-    // 读不懂的值只是不显示。
+    // Unrecognized values are simply not displayed.
     for (const raw of [undefined, null, {}, [], 'no such value', -1, Number.NaN]) {
       expect(() => formatValue(field, raw, 'en')).not.toThrow();
     }
@@ -122,9 +122,9 @@ describe.each(FIELDS.map((d) => [d.type, d] as const))('field %s', (_type, def) 
       shown.filter.compare !== undefined && !shown.filter.emptyOnly,
     );
     expect(at({ op: 'due', value: 'today' }).length === 0).toBe(def.filter.schedule === true);
-    // 日程的值是一份规则（D-292），不能拿来比 is。
+    // Schedule values are rules (D-292) and cannot be compared with 'is'.
     if (def.exampleValue !== undefined && !def.filter.schedule) {
-      // 附件的值是一组文件 ID，筛选时比的是其中一个。
+      // Attachment values are sets of file IDs, filtered by comparing against one of them.
       const value = Array.isArray(def.exampleValue) ? def.exampleValue[0] : def.exampleValue;
       expect(at({ op: 'is', value }).length === 0).toBe(!shown.filter.emptyOnly);
     }

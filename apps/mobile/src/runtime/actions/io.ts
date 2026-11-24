@@ -43,7 +43,7 @@ import {
 import { VISION_LANGUAGES } from './ocr';
 import { SCAN_OUTPUT_SIDE } from './scan';
 
-// 内核输入输出动作的实现（TOOLS_DESIGN §5）。
+// Core I/O action implementations (TOOLS_DESIGN §5).
 
 type Impl = ActionImpl<RunServices>;
 
@@ -86,8 +86,10 @@ function matches(accept: string, mime: string, name: string): boolean {
 }
 
 /**
- * 把选中的文件复制进本次运行的临时目录。keepSource：收件页面的那一批（分享、App 里选的、上一次的结果）
- * 原地使用、不移走，「再来一次」还要用；运行中途再选的文件照常移进来，运行结束一起删。
+ * Copy selected files into the current run's temporary directory. keepSource: files in the inbox
+ * batch (shared, selected in app, or from previous results) are used in place and not moved so
+ * "try again" can still use them; files selected mid-run are moved in as usual and deleted
+ * together at the end of the run.
  */
 async function importPicked(
   services: RunServices,
@@ -102,7 +104,7 @@ async function importPicked(
     const mimeType = mimeOf(clean, f.mimeType);
     const ext = extOf(clean) || (mimeType === 'application/pdf' ? 'pdf' : 'jpg');
     const name = baseName(clean);
-    // 视频和音频可能有几个 GB：不复制，移进来或原地使用（D-142）。
+    // Videos and audio can be several GBs in size: do not copy, move them in or use in place (D-142).
     const media = isMediaFile({ name: clean, mimeType });
     let stored;
     try {
@@ -112,7 +114,7 @@ async function importPicked(
     } catch {
       throw new RunError('accessDenied', { name: f.name });
     }
-    // 桌上的 Word 带着中间格式（D-466）：存进这次运行，后面的步骤（文档转 PDF）按它排。
+    // Word documents on the desk containing intermediate format (D-466): saved into the current run, subsequent steps (document to PDF) lay them out accordingly.
     const docDoc = f.docDoc
       ? await services.files.writeRunFile(
           services.runId,
@@ -143,8 +145,8 @@ async function importPicked(
 }
 
 /**
- * 这个快捷操作上次存下的结果（D-197）：运行记录里最近一次成功、存了文件的那次。文件已经删了、
- * 或者没有授权给它（§7G）时为 null。
+ * Results saved by this quick action previously (D-197): the most recent successful run that
+ * saved a file. Returns null if the file has been deleted or authorization was revoked (§7G).
  */
 async function lastResult(ctx: Parameters<Impl>[2]): Promise<PickedFile | null> {
   const { repo, files, grantee } = ctx.services;
@@ -179,8 +181,9 @@ function checkCount(count: number, min: number, max: number, kind: string) {
 }
 
 /**
- * 从别的 App 分享进来的文件（D-115）：只在第一步用，代替选择器。类型、个数、大小和选择器一样检查，
- * 收件页面已经只列出接得上的工作流，这里是再检查一次。
+ * Files shared from other apps (D-115): used only in the first step to replace the picker. Type,
+ * count, size, and selector checks are performed similarly; the inbox page already filters for
+ * compatible workflows, and this serves as a re-verification.
  */
 async function importShared(
   ctx: Parameters<Impl>[2],
@@ -200,7 +203,7 @@ async function importShared(
   return { type: fit.type, items: await importPicked(ctx.services, shared, ctx, true) };
 }
 
-/** 把临时文件存成用户文件（file.save 步骤和结果页的「保存」共用）。已经存过的跳过。 */
+/** Save temporary files as user files (shared by file.save step and result page "Save"). Skips files that are already saved. */
 export async function saveItems(
   services: Pick<RunServices, 'files' | 'repo' | 'grantee'>,
   items: readonly RunItem[],
@@ -235,31 +238,33 @@ export async function saveItems(
         createdAt: ctx.now().getTime(),
       });
     } catch (e) {
-      // 结果文件已经存进文档库目录、登记不上：删掉这个新副本，别留下看不见的文件（R10）。
+      // Result file already saved to document library directory but failed to register: delete this new copy to avoid leaving orphan files (R10).
       await files.removeAssetFile(stored.path).catch(() => undefined);
       throw new RunError('saveFailed', { detail: String(e) });
     }
-    // 工作流产生的文件授权给它（§7G）。
+    // Grant authorization for workflow-generated files to the workflow (§7G).
     await repo.grantAsset(grantee, id);
-    // 转 Excel、转 Word 的结果：中间格式和原图跟着存，以后还能从存储空间放到桌上改（D-400）。
+    // Results of Excel and Word conversion: intermediate format and original images are saved alongside so they can later be restored from storage to the desk for editing (D-400).
     await saveRunItemSource(files, item, id);
     saved.push({ ...item, assetId: id, name: baseName(name) });
     toIndex.push({ path: stored.path, mimeType: item.mimeType });
     ctx.progress?.(i + 1, items.length);
   }
-  // 文件里的文字在后面读，不让运行等（D-455）。
+  // Text in files is read afterwards without blocking execution (D-455).
   void (async () => {
     for (const asset of toIndex) await indexAssetText(files, asset);
   })();
   return saved;
 }
 
-/** 命名用的识别语言：界面语言（中文是简体），系统识别会再补上英文。 */
+/** OCR language for naming: interface language (Chinese is Simplified), system recognition will supplement with English. */
 const NAMING_OCR_LANGUAGE: Record<Locale, OcrLanguage> = { zh: 'chi_sim', en: 'eng', fr: 'fra' };
 
 /**
- * 给一个文件取名前在本机识别（D-244）：只看图片（PDF、视频不识别，规则取不到时用原来的名字）。
- * 文字识别要系统自带的（iOS Vision、Android ML Kit），没有时（Expo Go）报 needsRecognition；二维码纯 JS，哪里都能读。
+ * Local recognition before naming a file (D-244): images only (PDFs and videos are not
+ * recognized; falls back to original name if rules fail). OCR requires system capabilities (iOS
+ * Vision, Android ML Kit), throws needsRecognition when unavailable (Expo Go); QR codes are pure
+ * JS and readable anywhere.
  */
 async function recognizeForName(
   ctx: Parameters<Impl>[2],
@@ -298,12 +303,12 @@ export const IO_IMPLS: Record<string, Impl> = {
     const { files, ui } = ctx.services;
     let picked: PickedFile[] = [];
     if (source === 'scanner' && files.vision?.documentCamera) {
-      // 系统文档相机（iOS 的 VisionKit、Android 的 ML Kit）：实时找边、自动拍摄、多页，拍完已经拉正（D-086、D-087）。
+      // System document camera (iOS VisionKit, Android ML Kit): real-time edge detection, auto-capture, multi-page, straightens images upon completion (D-086, D-087).
       const pages = await files.vision.scanDocuments(ctx.services.runId, SCAN_OUTPUT_SIDE);
       if (!pages || pages.length === 0) throw new RunCancelled();
       picked = pages;
     } else if (source === 'camera' || source === 'scanner') {
-      // 没有文档相机（Expo Go、模拟器、没有 Google Play 服务的 Android）时用相机拍，后面的找边步骤再拉正。
+      // Fallback to standard camera when document camera is unavailable (Expo Go, simulator, Android without Google Play Services), with subsequent edge detection step straightening the image.
 
       while (picked.length < max) {
         const photo = await files.takePhoto();
@@ -319,7 +324,7 @@ export const IO_IMPLS: Record<string, Impl> = {
       }
       if (picked.length === 0) throw new RunCancelled();
     } else if (source === 'files') {
-      // 从「文件」选（D-184）：下载的、电脑传来的图片，包括 HEIC。
+      // Pick from Files (D-184): downloaded or transferred images, including HEIC.
       const result = await files.pickDocuments(DOCUMENT_TYPES.images!, max > 1);
       if (!result) throw new RunCancelled();
       for (const f of result) {
@@ -342,7 +347,7 @@ export const IO_IMPLS: Record<string, Impl> = {
     const shared = await importShared(ctx, params, 'video');
     if (shared) return shared;
     const { source, min, max } = params as { source?: string; min: number; max: number };
-    // 从「文件」选（D-185）：电脑拷来的、下载的视频一般不在相册里。
+    // Pick from "Files" (D-185): Videos copied from a computer or downloaded are usually not in the photo library.
     const picked =
       source === 'files'
         ? await ctx.services.files.pickDocuments(DOCUMENT_TYPES.videos!, max > 1)
@@ -358,7 +363,7 @@ export const IO_IMPLS: Record<string, Impl> = {
     return { type: 'video', items: await importPicked(ctx.services, picked, ctx) };
   },
 
-  // 音频（D-154）：从「文件」选，或者打开录音界面现在录一段；分享进来的录音直接用。
+  // Audio (D-154): Pick from "Files", or open the recorder interface to record a clip now; recordings shared in are used directly.
   async 'in.audio'(_input, params, ctx) {
     const shared = await importShared(ctx, params, 'audio');
     if (shared) return shared;
@@ -413,7 +418,7 @@ export const IO_IMPLS: Record<string, Impl> = {
   async 'file.rename'(input, params, ctx) {
     const { template } = params as { template: string };
     const items = fileItems(input);
-    // D-244：模板里有 {ocr:…} / {qr:…} 时先在本机识别每个文件，文字只用来取名，不留下、不发给 AI。
+    // D-244: When the template contains {ocr:...} or {qr:...}, recognize each file locally first. The text is used only for naming; it is neither retained nor sent to the AI.
     const reads = templateReads(template);
     const recognized: { ocr?: string; qr?: string }[] = [];
     if (reads.ocr || reads.qr) {
@@ -432,19 +437,19 @@ export const IO_IMPLS: Record<string, Impl> = {
         ...(item.takenAt !== undefined ? { takenAt: new Date(item.takenAt) } : {}),
         ...(recognized[i] ? { recognized: recognized[i], locale: ctx.locale } : {}),
       });
-      // 同一批文件不重名：报告、报告-2、报告-3。
+      // No duplicate names in the same batch: report, report-2, report-3.
       const name = baseName(uniqueFileName(base, item.ext, taken));
       taken.push(`${name}.${item.ext}`);
       return { ...item, name };
     });
-    // 临时文件也换成新名字（分享出去的文件名就是它）。
+    // Temporary files are also renamed to the new name (the shared file name becomes this).
     const renamed: RunItem[] = [];
     const { files, runId } = ctx.services;
-    // 收件页面那一批原地使用（再来一次还要用），不能被改名移走。
+    // Use the inbox batch in place (needed again for retries), without being renamed or moved.
     const incoming = new Set(ctx.services.incoming?.map((f) => f.uri));
     for (const item of named) {
       const fileName = freshName(item.name, item.ext);
-      // 视频和音频很大：临时文件直接改名（移动），只有收件页面的原件才复制（D-142）。
+      // Videos and audio are large: temporary files are directly renamed (moved), and only originals from the inbox page are copied (D-142).
       let uri: string | null = null;
       if (isMediaFile({ name: `${item.name}.${item.ext}`, mimeType: item.mimeType })) {
         const moved = await files.adoptIntoRun(item.uri, runId, fileName, incoming.has(item.uri));
@@ -466,7 +471,7 @@ export const IO_IMPLS: Record<string, Impl> = {
     };
   },
 
-  // D-242：按固定条件筛选。方向要宽高、时长要时长：选择器没给时先在本机读出来（只在这次运行里用）。
+  // D-242: Filter by fixed conditions. Orientation needs width/height, duration needs duration: if not provided by the selector, read them locally first (used only for this run).
   async 'file.filter'(input, params, ctx) {
     const items = fileItems(input);
     const filter = params as unknown as FileFilter;
@@ -480,7 +485,7 @@ export const IO_IMPLS: Record<string, Impl> = {
         try {
           next = { ...next, ...(await ctx.services.files.imageSize(item.uri)) };
         } catch {
-          // 读不到尺寸：不满足方向条件。
+          // Cannot read dimensions: does not meet the orientation condition.
         }
       }
       const media = ctx.services.files.media;
@@ -488,7 +493,7 @@ export const IO_IMPLS: Record<string, Impl> = {
         try {
           next = { ...next, durationMs: (await media.probe(item.uri)).durationMs };
         } catch {
-          // 读不到时长：不满足时长条件。
+          // Cannot read duration: does not meet the duration condition.
         }
       }
       known.push(next);
@@ -537,8 +542,10 @@ export const IO_IMPLS: Record<string, Impl> = {
   },
 
   async 'out.saveToFolder'(input, _params, ctx) {
-    // 有记住的文件夹就直接存进去，第一次才让用户选（D-123）；每个快捷操作记自己的（D-196）。
-    // 用户关掉选择器不算失败（和关掉分享面板一样），结果页上还可以再存。
+    // If a remembered folder exists, save directly into it; prompt the user to choose only the
+    // first time (D-123); each quick action remembers its own (D-196). Closing the selector is not
+    // considered a failure (just like closing the share sheet), and saving can be done again on the
+    // results page.
     await ctx.services.files.saveToFolder(fileItems(input), ctx.workflow.id);
     return input!;
   },

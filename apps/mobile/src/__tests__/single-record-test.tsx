@@ -13,7 +13,7 @@ import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 一张表的一条记录（single，D-424）和按表有没有记录显示（showIf）：没有记录、有记录、内容太多放不进二维码。
+// A single record of a table (single, D-424) and display based on record existence (showIf): no records, has records, content too large for QR code.
 
 const FIELDS: Field[] = [
   { id: 'name', name: '姓名', type: 'text' },
@@ -51,7 +51,7 @@ const seed = (locale: Locale, registry: Registry) => {
         },
       },
       {
-        // 给一条记录用的页面（D-342）上显示打开的那一条（D-558）。
+        // Display the opened record (D-558) on the page dedicated to a single record (D-342).
         op: 'addContainer',
         page: {
           id: 'one-page',

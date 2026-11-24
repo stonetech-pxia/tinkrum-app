@@ -1,14 +1,16 @@
-// v33 → v34（D-368，创始人 2026-10-30 定）：「数据 · 容器 · 工具」。
-// ID 一律不改（表、字段、选项、页面、块、快捷操作；提醒只在和快捷操作撞号时改，M1）。
-// 只吃 v33 的形状（M13：更早的版本先经过前面的迁移）。纯 JSON 进、JSON 出，不依赖 v34 的结构定义，
-// 这样下载的工具包页面（tool-download.ts）、模版和样板（templates/、samples/）也能用同一套转换。
+// v33 to v34 migration (D-368, decided by founder 2026-10-30): "Data · Containers · Tools". IDs are
+// never changed (tables, fields, options, pages, blocks, quick actions; reminders are changed only
+// when colliding with quick actions, M1). Accepts only v33 structure (M13: earlier versions pass
+// through prior migrations first). Pure JSON in and out, independent of v34 structure definitions,
+// allowing downloadable tool packages (tool-download.ts), templates, and samples (templates/,
+// samples/) to use the same conversion logic.
 
 type Json = Record<string, any>;
 
 const isObject = (v: unknown): v is Json =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** 去掉值是 undefined 的键（迁移结果和手写的 JSON 一样干净）。 */
+/** Remove keys whose values are undefined (making migration output as clean as hand-written JSON). */
 function clean<T extends Json>(o: T): T {
   const out: Json = {};
   for (const [k, v] of Object.entries(o)) if (v !== undefined) out[k] = v;
@@ -18,7 +20,7 @@ function clean<T extends Json>(o: T): T {
 const nonEmpty = <T>(list: T[] | undefined): T[] | undefined =>
   list && list.length > 0 ? list : undefined;
 
-/** v33 的组件类型（D-254：别的都是更新的 App 加的，迁移成 look "$unknown"）。 */
+/** v33 component types (D-254: all others were added in newer app versions and are migrated to look "$unknown"). */
 const V33_TYPES = new Set([
   'header',
   'text',
@@ -43,7 +45,7 @@ const V33_TYPES = new Set([
   'chart',
 ]);
 
-/** 迁移时要知道的表结构（"row" 只在引用字段上换成 "$row"、汇总按哪个日期筛）。 */
+/** Table structure required during migration ("row" is replaced with "$row" only on reference fields, and rollup date filtering field). */
 export interface V33Tables {
   find(id: string): Json | undefined;
 }
@@ -52,11 +54,11 @@ export const v33Tables = (collections: readonly Json[]): V33Tables => ({
   find: (id) => collections.find((c) => c.id === id),
 });
 
-/** workflow:<id> → tool:<id>（打开快捷操作，只摆出来不运行）。 */
+/** workflow:<id> -> tool:<id> (opens quick action, displayed without running). */
 const target = (t: unknown): unknown =>
   typeof t === 'string' && t.startsWith('workflow:') ? `tool:${t.slice('workflow:'.length)}` : t;
 
-/** 一个值：v33 的 "row"（这一行）只在引用字段上是「这一行」，换成 "$row"；单选的 row 选项不动（M5）。 */
+/** A single value: v33 "row" (this row) becomes "$row" only on reference fields; single-choice row options remain unchanged (M5). */
 function value(v: unknown, table: Json | undefined, fieldId: string): unknown {
   if (v !== 'row') return v;
   const field = (table?.fields as Json[] | undefined)?.find((f) => f.id === fieldId);
@@ -68,7 +70,7 @@ function values(vs: unknown, table: Json | undefined): Json | undefined {
   return Object.fromEntries(Object.entries(vs).map(([k, v]) => [k, value(v, table, k)]));
 }
 
-/** 汇总按哪个日期（related.ts 的 rollupDate = dateFieldOf）：dateField，第一个日期、日期时间字段，创建时间。 */
+/** Rollup date field (rollupDate = dateFieldOf in related.ts): dateField, first date/datetime field, or creation time. */
 function defaultDate(table: Json | undefined, dateField: unknown): string {
   if (typeof dateField === 'string') return dateField;
   const fields = (table?.fields as Json[] | undefined) ?? [];
@@ -79,7 +81,7 @@ function defaultDate(table: Json | undefined, dateField: unknown): string {
   );
 }
 
-/** 按日子算的参数（stat、rollup 各写一遍的 5 个）→ days 块。 */
+/** Day-based parameters (5 parameters duplicated across stat and rollup) -> days block. */
 function days(o: Json): Json | undefined {
   const skip =
     o.skipField !== undefined || o.skipOption !== undefined
@@ -89,7 +91,7 @@ function days(o: Json): Json | undefined {
   return Object.keys(d).length > 0 ? d : undefined;
 }
 
-/** 字段（键名统一，Q5；rollup 的 period 迁移成 filter 末尾的一条 inPeriod，M3）。 */
+/** Fields (unified key names, Q5; rollup period migrated to an inPeriod condition at the end of filter, M3). */
 export function migrateFieldV33(f: Json, tables: V33Tables): Json {
   switch (f.type) {
     case 'link': {
@@ -143,7 +145,7 @@ export function migrateTableV33(c: Json, tables: V33Tables): Json {
   return { ...c, fields: (c.fields as Json[]).map((f) => migrateFieldV33(f, tables)) };
 }
 
-/** 一键记录操作 → 就地的一键记录工具（v33 的 create / set / toggle / increment / setAll / open）。 */
+/** One-tap record actions -> in-place one-tap record tools (v33 create / set / toggle / increment / setAll / open). */
 function recordTool(a: Json, listTable: string | undefined, tables: V33Tables): Json {
   switch (a.do) {
     case 'create': {
@@ -156,7 +158,7 @@ function recordTool(a: Json, listTable: string | undefined, tables: V33Tables): 
       });
     }
     case 'open':
-      // 按钮上的 open = 新记录的表单（行上的 open 是导航，见 rowTool）。
+      // open on a button = new record form (open on a row is navigation, see rowTool).
       return { do: 'create', table: a.collectionId, ask: 'all' };
     case 'setAll': {
       const table = tables.find(a.collectionId);
@@ -184,7 +186,7 @@ function recordTool(a: Json, listTable: string | undefined, tables: V33Tables): 
   }
 }
 
-/** 行上的操作 → 就地工具：tiles 上是 tap（点一下），其余是 button；open 是导航到这一条的编辑页。 */
+/** Row actions -> in-place tools: tap on tiles, button elsewhere; open navigates to the edit page for that entry. */
 function rowTool(a: Json, as: 'tap' | 'button', listTable: string, tables: V33Tables): Json {
   const use = clean({ as, label: a.label, when: a.when });
   if (a.do === 'open') return { ...use, opens: 'record' };
@@ -196,7 +198,7 @@ function block(base: Json, rest: Json): Json {
   return clean({ ...base, ...rest });
 }
 
-/** 一个 v33 组件 → v34 块（docs/ARCHITECTURE.md §11 的表）。不认识的组件包成 look "$unknown"（M8）。 */
+/** A v33 component -> v34 block (table in docs/ARCHITECTURE.md §11). Unrecognized components are wrapped as look "$unknown" (M8). */
 export function migrateComponentV33(c: Json, tables: V33Tables): Json {
   if (!isObject(c) || typeof c.type !== 'string' || !V33_TYPES.has(c.type)) {
     return clean({ id: c?.id, look: '$unknown', hidden: c?.hidden, raw: c });
@@ -239,14 +241,14 @@ export function migrateComponentV33(c: Json, tables: V33Tables): Json {
         opens: target(p.target),
       });
     case 'catalogLink':
-      // 渲染器给 catalogLink 画的是主色标题、加号图标、默认大块（M7）。
+      // The renderer draws catalogLink with a primary-color title, plus icon, and default large block (M7).
       return block(base, {
         look: 'entry',
         show: { title: p.title, icon: 'plus', shape: p.look ?? 'tile', accent: true },
         opens: 'tools',
       });
     case 'toolCard':
-      // 标题、图标、说明按工具包现取（换语言跟着变）；默认是大块（ToolCard 的 look ?? 'tile'）。
+      // Title, icon, and description are retrieved dynamically from the tool package (updating with language changes); default is a large block (ToolCard look ?? 'tile').
       return block(base, {
         look: 'entry',
         show: { shape: p.look ?? 'tile' },
@@ -259,7 +261,7 @@ export function migrateComponentV33(c: Json, tables: V33Tables): Json {
         opens: { file: p.assetId ?? null },
       });
     case 'fileList': {
-      // FileList.tsx：mimeType 是一大类时按前缀筛，不写时列出不是图片的文件。
+      // FileList.tsx: When mimeType is a broad category, filter by prefix; when omitted, list non-image files.
       const kind: Record<string, Json> = {
         'application/pdf': { field: 'kind', op: 'is', value: 'pdf' },
         'image/*': { field: 'kind', op: 'is', value: 'image' },
@@ -303,8 +305,9 @@ export function migrateComponentV33(c: Json, tables: V33Tables): Json {
     case 'recordForm': {
       const table = tables.find(p.collectionId);
       if (p.mode === 'button') {
-        // v33 的按钮模式忽略 values（data.tsx 的 openEditor 不带预填），v34 预填（Q6，当成修 bug）。
-        // fieldIds、smartDate 在按钮模式下本来就不起作用（打开的是完整表单），丢掉。
+        // v33 button mode ignores values (openEditor in data.tsx has no prefills), whereas v34
+        // prefills them (Q6, treated as bug fix). fieldIds and smartDate are ignored in button mode
+        // anyway (since they open the full form), so they are discarded.
         return block(base, {
           look: 'button',
           show: { label: p.submitLabel, variant: 'filled' },
@@ -372,7 +375,7 @@ export function migrateComponentV33(c: Json, tables: V33Tables): Json {
           aggregate: p.aggregate,
           field: p.fieldId,
           filter: p.filter,
-          // 按单选分组时 distinctDays 仍按 dateField 数日子。
+          // When grouped by single choice, distinctDays still counts days using dateField.
           days: byChoice && p.dateField !== undefined ? { date: p.dateField } : undefined,
           group,
         }),
@@ -389,10 +392,10 @@ function recordList(p: Json, tables: V33Tables): Json {
   let group: Json | undefined;
   if (p.display === 'checklist' && p.checkField !== undefined)
     tools.push({ as: 'check', do: 'toggle', table, field: p.checkField });
-  // 非 checklist 上的 checkField 渲染器不用（data.tsx 第 1035 行），丢掉（B6 #24）。
+  // checkField renderers on non-checklist components are unused (data.tsx line 1035) and discarded (B6 #24).
   if (p.display === 'board' && p.groupField !== undefined) {
     group = clean({ by: p.groupField, filter: p.groupFilter });
-    // v33 的看板总能拖动：拖动是一个改分栏字段的 set。
+    // v33 kanban boards are always draggable: dragging is a set operation updating the grouping field.
     tools.push({ as: 'drag', do: 'set', table, field: p.groupField, value: '$group' });
   } else if (p.display === 'calendar') {
     group = clean({ by: p.dateField, unit: 'day' });
@@ -419,7 +422,7 @@ function recordList(p: Json, tables: V33Tables): Json {
   };
 }
 
-/** v33 页面 → v34 页面（toolId → package，recordOf → of，components → blocks）。 */
+/** v33 page -> v34 page (toolId -> package, recordOf -> of, components -> blocks). */
 export function migratePageV33(page: Json, tables: V33Tables): Json {
   const { toolId, recordOf, components, ...rest } = page;
   return clean({
@@ -430,7 +433,7 @@ export function migratePageV33(page: Json, tables: V33Tables): Json {
   });
 }
 
-/** v33 工作流 → v34 快捷操作（toolId → package，presetId → preset；homeScreen 挪进 nav）。 */
+/** v33 workflow -> v34 quick action (toolId -> package, presetId -> preset; homeScreen moved into nav). */
 export function migrateWorkflowV33(w: Json): Json {
   const { toolId, presetId, homeScreen: _home, id, name, icon, steps, ...rest } = w;
   return clean({
@@ -445,7 +448,7 @@ export function migrateWorkflowV33(w: Json): Json {
   });
 }
 
-/** v33 提醒 → v34 提醒（schedule + time + weekdays + collectionId + fieldId + daysBefore → when）。 */
+/** v33 reminder -> v34 reminder (schedule + time + weekdays + collectionId + fieldId + daysBefore -> when). */
 export function migrateReminderV33(r: Json, tables: V33Tables): Json {
   const at = r.time;
   const on = { table: r.collectionId, field: r.fieldId };
@@ -496,7 +499,7 @@ export function migrateReminderV33(r: Json, tables: V33Tables): Json {
   });
 }
 
-/** 房间布局：上下的组件按块转，工具栏的 {workflowId} → 快捷操作 ID。 */
+/** Room layout: top and bottom components converted block by block, toolbar {workflowId} -> quick action ID. */
 function desk(d: unknown, tables: V33Tables): Json | undefined {
   if (!isObject(d)) return undefined;
   const slot = (list: unknown) =>
@@ -517,7 +520,7 @@ function desk(d: unknown, tables: V33Tables): Json | undefined {
   return clean({ ...d, above: slot(d.above), below: slot(d.below), tools });
 }
 
-/** 撞号时给提醒换一个不重复的 ID（M1：快捷操作的 ID 被运行记录、上次结果、使用习惯引用得更多）。 */
+/** Assign a unique replacement ID to colliding reminders (M1: quick action IDs are referenced more heavily by run records, last results, and usage habits). */
 function uniqueReminderId(id: string, taken: Set<string>): string {
   if (!taken.has(id)) return id;
   for (let n = 2; ; n++) {

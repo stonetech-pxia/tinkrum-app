@@ -10,11 +10,12 @@ import { EditSheet } from './EditSheet';
 import { directEditEntry } from './entry';
 import { useSingleDrag } from './useSingleDrag';
 
-// 可以直接编辑的页面（D-052）：外壳和独立页面用它代替 PageView。
-// 长按只选中单个组件并可继续拖动（D-235）；整页编辑保留 ArrangeView。
-// 「完成」时整份草稿合成一个版本（D-054）。预览和系统页面不用它。
+// Pages that can be edited directly (D-052): used in place of PageView for the shell and standalone
+// pages. Long press selects only a single component and allows continued dragging (D-235);
+// full-page editing retains ArrangeView. The entire draft is synthesized into a single version upon
+// "Done" (D-054). Previews and system pages do not use it.
 
-/** 保存版本后页面会重新挂载；记住滚动位置，改完仍停在原处。 */
+/** The page remounts after saving a version; remember the scroll position so it stays in place after editing. */
 const scrollOffsets = new Map<string, number>();
 
 function rememberScroll(key: string): ScrollViewProps {
@@ -35,7 +36,7 @@ export function EditablePage({
   page: Page;
   env: RenderEnv;
   bottomInset?: number;
-  /** 页面下方的固定区要让开多高（PageView）。 */
+  /** How much clearance to leave for the fixed area at the bottom of the page (PageView). */
   zoneInset?: number;
 }) {
   const editing = useWorkspace((s) => (s.editing?.pageId === page.id ? s.editing : null));

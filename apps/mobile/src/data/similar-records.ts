@@ -5,14 +5,16 @@ import { Alert } from 'react-native';
 import { t } from '../i18n';
 import { useCalendar, useWorkspaceContext } from '../workspace/context';
 
-// 保存新记录前问一句（D-426）：表上有 prefillRules、而且有看起来一样的记录时才问。只读，只在点保存时读记录，
-// 打字不受影响；只在本机。总能选「仍然保存」（底线 19），不合并、不删除任何记录（底线 5）。
+// Prompts before saving a new record (D-426): triggers only if the table has `prefillRules` and
+// similar-looking records exist. Read-only, reads records only upon tapping save so typing remains
+// unaffected; runs entirely locally. The user can always choose "Save anyway" (invariant 19), with
+// no records merged or deleted (invariant 5).
 
-/** 返回一个函数：可以接着存时 true；用户选回到表单（或正在问）时 false。 */
+/** Returns a function: returns true if saving can proceed; false if the user chooses to return to the form (or while prompting). */
 export function useSimilarCheck() {
   const { repo, locale } = useWorkspaceContext();
   const cal = useCalendar();
-  // 连点两下保存：第一下还在问的时候，第二下什么都不做。
+  // Double-tap save protection: while the first tap is still prompting, subsequent taps do nothing.
   const asking = useRef(false);
   return async function mayProceed(
     collection: Collection,
@@ -24,9 +26,9 @@ export function useSimilarCheck() {
     try {
       const now = new Date();
       const prepared = prepareRecordValues(collection, input, null, now, cal);
-      // 校验不过：接着走，保存那一步会说哪里不对。
+      // Validation fails: proceeds anyway, letting the save step report validation errors.
       if (!prepared.ok) return true;
-      // 读不了记录也不挡保存。
+      // Failing to read records does not block saving.
       const records = await repo.listRecords(collection.id).catch(() => []);
       const similar = findSimilarRecords(collection, prepared.values, records);
       const first = similar[0];
@@ -52,7 +54,7 @@ export function useSimilarCheck() {
             },
             { text: t(locale, 'similarRecordSave'), onPress: () => resolve(true) },
           ],
-          // Android 点外面关掉：回到表单，不会卡住。
+          // Android touch outside to close: returns to the form without hanging.
           { cancelable: true, onDismiss: () => resolve(false) },
         );
       });

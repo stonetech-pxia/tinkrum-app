@@ -2,7 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 
 import type { ToolFs } from './store';
 
-// ToolFs 的 Expo 实现：documentDirectory/tools/。目录和清单都很小，直接用 fetch 读进内存。
+// Expo implementation of ToolFs: documentDirectory/tools/. Directories and manifests are small, read directly into memory via fetch.
 
 const root = () => new Directory(Paths.document, 'tools');
 

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
   <cache-path name="runs" path="runs/" />
-  <!-- 收件页面预览时复制的那一份（D-238）。 -->
+  <!-- The copy duplicated during inbox preview (D-238). -->
   <cache-path name="preview" path="preview/" />
-  <!-- 分享前复制的那一份（桌上、文档库里的文件不在 runs/ 里，D-466）。 -->
+  <!-- The copy duplicated before sharing (files on desk or in document library are not in runs/, D-466). -->
   <cache-path name="share" path="share/" />
 </paths>

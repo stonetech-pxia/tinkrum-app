@@ -8,7 +8,7 @@ import { pageTarget, TOOLBOX_PAGE_ID } from './schema';
 import { createStarterWorkspace } from './starter';
 import { registry } from './test-helpers';
 
-// 用户报告（2026-11-06 模拟器）：中文建的工作空间切到法文后，工具箱的分组名、已装工具的名字还是中文。
+// User report (2026-11-06 emulator): workspace created in Chinese retains Chinese group names and installed tool names in the toolbox after switching to French.
 describe('builtinText', () => {
   const zh = createStarterWorkspace('zh', registry);
   const toolbox = zh.containers.pages.find((p) => p.id === TOOLBOX_PAGE_ID)!;
@@ -42,7 +42,7 @@ describe('builtinText', () => {
     );
   });
 
-  // 模拟器上发现（2026-11-14）：门户的 Clay 预设切到法文后，「文件」页的标题、说明和书架名还是英文。
+  // Found on simulator (2026-11-14): Portal's Clay preset retains English title, description, and bookshelf name on the "Files" page after switching to French.
   it('shows every text of the Clay preset in French and Chinese', () => {
     const file = JSON.parse(
       readFileSync(join(__dirname, 'fixtures', 'portal-apps', 'tinkrum-app-clay.json'), 'utf8'),
@@ -55,7 +55,7 @@ describe('builtinText', () => {
           .filter((v): v is string => typeof v === 'string'),
       ),
     ]);
-    // 和英文写法一样的词（名字、格式名，法文的 Images）不用换。
+    // Words with identical English spelling (names, format names, French "Images") require no translation.
     const same = {
       fr: ['Tinkrum', 'PDF', 'Word', 'Excel', 'Images'],
       zh: ['Tinkrum', 'PDF', 'Word', 'Excel'],

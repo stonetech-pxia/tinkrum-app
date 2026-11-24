@@ -67,9 +67,9 @@ import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 import { FakeFiles } from './fake-files';
 
-// 工具和工作流旅程测试共用：真实路由 + 内存存储 + 假文件平台。
+// Shared by tool and workflow journey tests: real routing + in-memory storage + mock file platform.
 
-// 草稿模式的界面状态是模块级的（D-190）：每个测试从关着的聊天框开始。
+// Draft mode UI state is module-scoped (D-190): each test starts with the chat box closed.
 afterEach(() => useAiReturn.setState({ pending: null }));
 afterEach(() => useDraftUi.setState({ chatOpen: false, seenStep: null }));
 
@@ -84,13 +84,13 @@ const memorySecrets = (): SecretStore => {
   };
 };
 
-/** 和根布局一样接收分享（原生模块在测试里是假的或没有）。 */
+/** Receives shares like the root layout (native modules are mocked or absent in tests). */
 function ShareListener({ files }: { files: FakeFiles }) {
   useIncomingShare(files);
   return null;
 }
 
-/** 新用户做完引导第 1 步的样子（D-231）：空白首页加上「打开相册」「打开文件」。 */
+/** Appearance of a new user completing onboarding step 1 (D-231): blank home screen plus "Open photo library" and "Open files". */
 export function starterAfterGuide(locale: Locale, registry: Registry): WorkspaceConfig {
   const config = createStarterWorkspace(locale, registry);
   const result = applyOps(config, homeFileEntryOps(config, locale), { registry, locale });
@@ -101,18 +101,18 @@ export function starterAfterGuide(locale: Locale, registry: Registry): Workspace
 export async function renderToolsApp(
   repo = new MemoryWorkspaceRepo(),
   files = new FakeFiles(),
-  /** 下载的工具（D-177）：要用自己的注册表，下载时会往里面加工具。 */
+  /** Downloaded tools (D-177): uses its own registry, which acquires tools during download. */
   options: {
     registry?: Registry;
     locale?: Locale;
     toolDownloads?: ToolDownloads;
-    /** 第一个版本；不传时是空白工作空间（App 里用 createStarterWorkspace）。 */
+    /** Initial version; defaults to a blank workspace when omitted (uses createStarterWorkspace in the app). */
     seed?: (locale: Locale, registry: Registry) => WorkspaceConfig;
-    /** 手机桌面（D-271）：假的长按菜单 / 桌面图标；不传时和 Expo Go 一样没有。 */
+    /** Home screen (D-271): fake long-press menu / home screen icons; matches Expo Go by default when omitted. */
     homeScreen?: HomeScreenPlatform;
-    /** 桌面小组件（D-321）：假的平台；不传时和 Expo Go 一样没有。 */
+    /** Home screen widgets (D-321): fake platform; matches Expo Go by default when omitted. */
     widgets?: WidgetPlatform;
-    /** 扩展包环境（D-064）：假的页面通道和内存里的 PackStore；不传时没有（usePacks 为 null）。 */
+    /** Packs environment (D-064): fake page channels and in-memory PackStore; absent by default (usePacks is null). */
     packs?: Packs;
   } = {},
 ) {
@@ -201,14 +201,14 @@ export async function renderToolsApp(
   return { repo, store, files, router };
 }
 
-/** 系统确认框：直接点非取消的按钮（例如「应用更改」）。 */
+/** System confirmation dialog: directly taps the non-cancel button (e.g., "Apply changes"). */
 export function acceptNextAlert() {
   jest.spyOn(Alert, 'alert').mockImplementationOnce((_title, _message, buttons) => {
     buttons?.find((b) => b.style !== 'cancel')?.onPress?.();
   });
 }
 
-/** 首页的「打开文件」图标按钮（D-449）：先问从相册还是从「文件」选，这里替用户点一个。 */
+/** Home screen "Open files" icon button (D-449): prompts whether to select from photo library or Files, here auto-selecting one for the user. */
 export async function openPick(from: 'media' | 'files') {
   jest.spyOn(Alert, 'alert').mockImplementationOnce((_title, _message, buttons) => {
     buttons?.[from === 'media' ? 0 : 1]?.onPress?.();

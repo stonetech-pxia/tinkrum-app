@@ -6,10 +6,11 @@ import { useAISettings } from '../ai/context';
 import { t } from '../i18n';
 import type { Palette } from '../renderer/theme';
 
-// 需求回收（D-189）：AI 做不到时，在回答下面显示「把这个需求告诉我们」，用户点了才把那一句话发给 Morph
-// （不含文件、记录和设置）。AI 修改页和草稿聊天框共用。
+// Requirement recycling (D-189): when AI cannot fulfill a request, display "Tell us about this
+// requirement" below the answer; only when tapped is that single sentence sent to Morph (excluding
+// files, records, and settings). Shared between AI modification page and draft chat box.
 
-/** 这几种拒绝是「做不到」，值得把需求收回来；userData、protected、unavailable 等不是。 */
+/** These rejection types are "impossible", worth taking the requirements back; userData, protected, unavailable, etc. are not. */
 const NEED_REASONS = ['unknown', 'errand', 'notInstalled'] as const;
 
 export function NeedButton({

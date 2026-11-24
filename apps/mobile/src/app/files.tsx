@@ -39,7 +39,7 @@ const KIND_LABELS: Record<FileKind, StringKey> = {
   audio: 'filesKindAudio',
   other: 'filesKindOther',
 };
-/** 文件名里没有、文字里有搜索词时，显示文字里那一段（前后各留一点）。 */
+/** When search terms are missing from the filename but present in the text, display the matching text segment (with surrounding context). */
 function snippetOf(text: string | undefined, name: string, query: string, locale: string) {
   const word = query.trim().split(/\s+/)[0]?.toLocaleLowerCase(locale);
   if (!text || !word || name.toLocaleLowerCase(locale).includes(word)) return undefined;
@@ -58,10 +58,14 @@ const KIND_ORDER: FileKind[] = ['pdf', 'image', 'doc', 'sheet', 'video', 'audio'
 const baseOf = (name: string) => name.replace(/\.[^./]+$/, '');
 
 /**
- * 全部文件（D-453）：首页「最近文件」的「全部」打开这里。和收据、名片模版一样，上面是搜索框、排序和类型筛选，
- * 下面是列表。点一行进文件预览页（D-458）。搜索、排序、筛选、勾选都不写数据（底线 15）。
- * 每行右边一个选择框（D-472）：选了以后下面出现一排按钮，重命名（只选一个时）、合并（选了两个以上、都是 PDF 时，
- * 合成一个新文件，原来的不动）、分享、删除（先问，用在记录或页面里的说明）。每一样都是用户点了才做。
+ * All Files (D-453): opened by the 'All' option under home screen 'Recent Files'. Like receipts
+ * and business card templates, features a search bar, sorting, and type filter at the top, and a
+ * list below. Tapping a row opens the file preview page (D-458). Search, sort, filter, and
+ * selection do not write data (invariant 15). Each row has a selection checkbox on the right
+ * (D-472): selecting it reveals a button toolbar below for renaming (when single selection),
+ * merging (when two or more PDFs are selected, combining them into a new file while leaving
+ * originals untouched), sharing, and deleting (with confirmation, used in records or page notes).
+ * Every action is user-initiated.
  */
 export default function FilesScreen() {
   const { repo, files, locale } = useWorkspaceContext();
@@ -72,16 +76,16 @@ export default function FilesScreen() {
   const bumpAssets = useWorkspace((s) => s.bumpAssets);
   const palette = usePalette(theme);
   const insets = useSafeAreaInsets();
-  // 两条线（D-454）：搜索框、列表的边和排序、类型两行贴着页面边距；搜索框里的字和列表里的缩略图缩进 inset。
+  // Two lines (D-454): search bar, list borders, and sort/type rows align with page margins; text in the search bar and thumbnails in the list are indented by inset.
   const inset = palette.inset;
   const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<Sort>('newest');
   const [kind, setKind] = useState<FileKind | null>(null);
-  // 文件里的文字（D-455）：有搜索词时才读，只在这一页的内存里。
+  // Text inside files (D-455): only read when there is a search term, kept solely in this page's memory.
   const [texts, setTexts] = useState<Record<string, string>>({});
   const searching = query.trim().length > 0;
-  // 按点的先后排（合并按这个顺序）。
+  // Ordered by tap sequence (merging follows this order).
   const [selected, setSelected] = useState<string[]>([]);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -120,7 +124,7 @@ export default function FilesScreen() {
 
   const shown = useMemo(() => {
     const words = query.trim().toLocaleLowerCase(locale).split(/\s+/).filter(Boolean);
-    // 文件名或文件里的文字（D-455）都算。
+    // Matches either filename or text inside the file (D-455).
     const list = assets.filter((a) => {
       if (kind !== null && fileKindOf(a.mimeType) !== kind) return false;
       const name = a.name.toLocaleLowerCase(locale);
@@ -137,7 +141,7 @@ export default function FilesScreen() {
     );
   }, [assets, query, kind, sort, locale, texts]);
 
-  // 删掉、搬走的文件不再算选中。
+  // Deleted or moved files are no longer counted as selected.
   const picked = useMemo(
     () =>
       selected.flatMap((id) => {
@@ -177,7 +181,7 @@ export default function FilesScreen() {
     });
   }
 
-  /** 合成一个新 PDF，进它的预览页（和做完一个快捷操作一样，D-457）。 */
+  /** Combine into a new PDF and open its preview page (analogous to completing a quick action, D-457). */
   function merge() {
     void work(async () => {
       const merged = await mergeUserPdfs(
@@ -470,7 +474,7 @@ export default function FilesScreen() {
   );
 }
 
-/** 行右边的选择框：和记录列表的勾选框一样大（选中时主色底、白勾）。 */
+/** Row selection checkbox: same size as record list checkboxes (primary color fill with white checkmark when selected). */
 function Check({
   on,
   label,

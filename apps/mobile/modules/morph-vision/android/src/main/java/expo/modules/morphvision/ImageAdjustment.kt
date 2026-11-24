@@ -11,7 +11,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 object ImageAdjustment {
-  /** 长边上限：再大的照片（三星 50 / 200 MP）先缩到这么大再处理，避免内存不足。 */
+  /** Long side upper limit: extremely large photos (Samsung 50 / 200 MP) are downscaled to this size before processing to avoid out-of-memory errors. */
   private const val MAX_SIDE = 6144
 
   fun adjust(context: Context, uri: Uri, options: Map<String, Any?>, format: String, output: File): Map<String, Any> {
@@ -21,7 +21,7 @@ object ImageAdjustment {
       var contrast = (options["contrast"] as? Number)?.toDouble() ?: 100.0
       var saturation = (options["saturation"] as? Number)?.toDouble() ?: 100.0
       if (options["mode"] == "auto") {
-        // 最多采样约 65536 像素，不保留内容；适度提亮暗图，避免把全黑图变成灰色。
+        // Samples at most about 65536 pixels without retaining content; moderately brightens dark images while preventing pure black images from turning gray.
         val step = max(1, sqrt(bitmap.width.toDouble()*bitmap.height/65536).toInt())
         var sum = 0.0; var weight = 0.0
         for (y in 0 until bitmap.height step step) for (x in 0 until bitmap.width step step) {
@@ -36,7 +36,7 @@ object ImageAdjustment {
       val scale = (contrast/100).toFloat()
       val offset = (128*(1-scale)+brightness*255/100).toFloat()
       val m = ColorMatrix().apply { setSaturation((saturation/100).toFloat()); postConcat(ColorMatrix(floatArrayOf(scale,0f,0f,0f,offset, 0f,scale,0f,0f,offset, 0f,0f,scale,0f,offset, 0f,0f,0f,1f,0f))) }.array
-      // 逐行在同一张位图上改，不另建一张结果图（大照片少占一份内存）。透明度不变。
+      // Modifies the bitmap row-by-row in place without allocating a separate result image (saving memory on large photos). Transparency remains unchanged.
       val row = IntArray(bitmap.width)
       fun channel(i: Int, r: Int, g: Int, b: Int, a: Int) = (m[i]*r + m[i+1]*g + m[i+2]*b + m[i+3]*a + m[i+4]).roundToInt().coerceIn(0, 255)
       for (y in 0 until bitmap.height) {

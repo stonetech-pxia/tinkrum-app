@@ -3,15 +3,18 @@ import { registryRevision, type Registry } from './registry';
 import type { Locale, WorkspaceConfig } from './schema';
 import { createStarterWorkspace, filesByTypePage, homeFileEntryOps } from './starter';
 
-// 内置文字跟着界面语言显示：新用户的首页、工具箱、工具页和内设快捷操作的文字，是建立时按当时的语言
-// 写进配置的。设置里改了语言以后，显示时把和某种语言的内置文字一字不差的换成新语言；用户自己改过的
-// 不动。只在显示时换，不写配置（语言是设备偏好，不进配置和版本历史，D-459；底线 15）。
+// Built-in text follows the interface language: the home page, toolbox, tool pages, and built-in
+// quick action texts for new users are written into the configuration according to the language at
+// the time of creation. When the language is changed in settings, built-in text matching a specific
+// language is replaced character-for-character with the new language; user-modified text is left
+// untouched. Replaced only at render time, not written to the configuration (language is a device
+// preference, excluded from configuration and version history, D-459; invariant 15).
 
 const LOCALES: readonly Locale[] = ['en', 'zh', 'fr'];
 
 type Variants = Record<Locale, string>;
 
-/** 三种语言的同一份东西按位置对齐，同一位置上三种语言写法不同的字符串就是一条内置文字。 */
+/** Aligns the same content across three languages by position; strings at the same position with different spellings in the three languages form a single built-in text entry. */
 function pairStrings(versions: readonly unknown[], out: Map<string, Variants | null>) {
   const [first] = versions;
   if (typeof first === 'string') {
@@ -21,7 +24,7 @@ function pairStrings(versions: readonly unknown[], out: Map<string, Variants | n
     const variants = Object.fromEntries(LOCALES.map((l, i) => [l, texts[i]])) as Variants;
     for (const s of new Set(texts)) {
       const known = out.get(s);
-      // 同一句话在不同地方翻法不同时，不知道该换成哪个，干脆不换。
+      // When the same phrase has different translations in different contexts and it is unclear which one to use, skip replacement altogether.
       if (known === undefined) out.set(s, variants);
       else if (known && LOCALES.some((l) => known[l] !== variants[l])) out.set(s, null);
     }
@@ -64,7 +67,7 @@ function builtinIndex(registry: Registry): Map<string, Variants | null> {
     LOCALES.map((l) => starterWithEntries(l, registry)),
     index,
   );
-  // 门户预设里的「文件」页（D-582）。
+  // The "Files" page in the portal presets (D-582).
   pairStrings(
     LOCALES.map((l) => filesByTypePage(l)),
     index,
@@ -87,7 +90,7 @@ function builtinIndex(registry: Registry): Map<string, Variants | null> {
   return index;
 }
 
-/** 配置里的一段文字按界面语言显示：是内置文字时换成这种语言的写法，否则原样返回。 */
+/** A segment of text in the configuration displayed according to the interface language: replaced with the localized variant if it is built-in text, otherwise returned as-is. */
 export function builtinText(text: string, locale: Locale, registry: Registry): string;
 export function builtinText(
   text: string | undefined,

@@ -7,9 +7,11 @@ import {
 } from '../backup/service';
 import { CACHE, DOC, FakeBackup, PICKED } from '../test-utils/fake-backup';
 
-// 整体导出和恢复的流程（D-600，backup/service.ts）：用替身磁盘、替身 zip 和替身数据库走一遍。
-// 每条都要在去掉对应的代码后失败：检查不通过时什么都不变、换目录失败时全部换回去、取消时留不下东西、
-// 选择器给的压缩包（用户的原件）一次都没删过（底线 4）。
+// Full export and restore workflow (D-600, backup/service.ts): run through using mock disk, mock
+// zip, and mock database. Every step must fail if the corresponding code is removed: nothing
+// changes when checks fail, everything rolls back when directory switching fails, no residue is
+// left on cancellation, and compressed archives provided by the selector (user originals) are never
+// deleted even once (invariant 4).
 
 let disk: FakeBackup;
 let service: BackupService;
@@ -32,7 +34,7 @@ const status = () => useBackupStatus.getState();
 const notUntouched = (before: Record<string, string>) =>
   expect(disk.snapshotLive()).toEqual(before);
 
-describe('导出', () => {
+describe('Export', () => {
   beforeEach(() => setup());
 
   it('writes one archive with the manifest, the database copy and every user file directory, and not the packs', async () => {
@@ -51,7 +53,7 @@ describe('导出', () => {
         'files/tools/pack/manifest.json',
       ].sort(),
     );
-    // 数据库的内容是那份一致的拷贝；模型包（packs/）不在里面。
+    // Database content is that consistent copy; model packs (packs/) are not included.
     expect(JSON.parse(archive.entries[DB_ENTRY]!)).toMatchObject({ headId: 7, records: 3 });
     expect(Object.keys(archive.entries).some((n) => n.includes('model'))).toBe(false);
     const manifest = parseManifest(archive.manifest);
@@ -63,7 +65,7 @@ describe('导出', () => {
         contains: { records: 3, files: 4 },
       },
     });
-    // 数据库拷贝不留在缓存里（已经在压缩包里了）；原来的数据没动。
+    // Database copy does not remain in cache (already in the archive); original data is untouched.
     expect(disk.files.has(`${CACHE}backup-export/morph.db`)).toBe(false);
     expect(disk.calls).toContain('snapshot');
     expect(disk.files.get(`${DOC}assets/a1/photo.jpg`)).toBe('PHOTO');
@@ -84,7 +86,7 @@ describe('导出', () => {
     expect(status().error).toMatchObject({ kind: 'noSpace' });
     expect(status().error!.needed).toBeGreaterThan(100);
     expect(disk.calls).not.toContain('createArchive');
-    // 缓存里什么都没留下。
+    // Nothing is left in cache.
     expect([...disk.files.keys()].filter((k) => k.startsWith(CACHE))).toEqual([]);
   });
 
@@ -105,7 +107,7 @@ describe('导出', () => {
   });
 });
 
-describe('恢复：检查不通过时什么都不变', () => {
+describe('Restore: nothing changes when checks fail', () => {
   beforeEach(() => setup());
 
   const cases: [string, (d: FakeBackup) => void, string][] = [
@@ -169,7 +171,7 @@ describe('恢复：检查不通过时什么都不变', () => {
     expect(disk.calls).not.toContain('release');
     expect(disk.calls).not.toContain('extractArchive');
     notUntouched(before);
-    // 原件还在。
+    // Original is still there.
     expect(disk.removed).not.toContain(PICKED);
   });
 
@@ -191,7 +193,7 @@ describe('恢复：检查不通过时什么都不变', () => {
     expect(status().error).toMatchObject({ kind: 'damaged' });
     expect(disk.calls).not.toContain('release');
     notUntouched(before);
-    // 解开的东西删掉了。
+    // Extracted items are deleted.
     expect([...disk.files.keys()].some((k) => k.includes('.restore/staging'))).toBe(false);
   });
 
@@ -210,22 +212,22 @@ describe('恢复：检查不通过时什么都不变', () => {
   });
 });
 
-describe('恢复', () => {
+describe('Restore', () => {
   beforeEach(() => setup());
 
   it('replaces everything, keeps the previous data aside, reads the new data back, then undo returns the old state', async () => {
     disk.addArchive();
     const old = disk.snapshotLive();
     expect(await service.restore(PICKED, yes)).toBe('restored');
-    // 新数据在原来的位置：数据库、用户文件；packs 没动；旧的用户文件不再在原位置。
+    // New data in original locations: database, user files; packs untouched; old user files no longer in original location.
     expect(JSON.parse(disk.files.get(`${DOC}SQLite/morph.db`)!)).toMatchObject({ headId: 21 });
     expect(disk.files.get(`${DOC}assets/b1/receipt.pdf`)).toBe('RECEIPT');
     expect(disk.files.has(`${DOC}assets/a1/photo.jpg`)).toBe(false);
     expect(disk.files.get(`${DOC}packs/model.bin`)).toBe('BIG MODEL');
-    // 旧数据整个留在 .restore/previous（改名，不是复制）。
+    // Old data is entirely left in .restore/previous (renamed, not copied).
     expect(disk.files.get(`${DOC}.restore/previous/assets/a1/photo.jpg`)).toBe('PHOTO');
     expect(disk.files.get(`${DOC}.restore/previous/SQLite/morph.db`)).toBeDefined();
-    // 关闭数据库 → 换 → 重开并读回来（读到的当前版本必须是压缩包里的那个）。
+    // Close database -> replace -> reopen and read back (the read current version must match the one in the archive).
     expect(disk.calls.indexOf('release')).toBeLessThan(disk.calls.indexOf('reload'));
     expect(disk.reloads).toEqual([21]);
     expect(disk.runtimeHead).toBe(21);
@@ -238,7 +240,7 @@ describe('恢复', () => {
     expect(disk.runtimeHead).toBe(7);
     expect(disk.notified).toEqual(['restored', 'undone']);
     expect(service.hasUndo()).toBe(false);
-    // 恢复进来的那份和留着的旧数据都清掉了。
+    // Both the incoming restored copy and the retained old data are cleared.
     expect([...disk.files.keys()].filter((k) => k.startsWith(`${DOC}.restore/`))).toEqual([]);
     expect(disk.removed).not.toContain(PICKED);
   });
@@ -255,7 +257,7 @@ describe('恢复', () => {
     expect(await service.restore(PICKED, yes)).toBe('failed');
     expect(status().error).toMatchObject({ kind: 'switchFailed' });
     expect(disk.snapshotLive()).toEqual(old);
-    // 关了又重开旧的：先 release，再试新的，失败后再读回旧的。
+    // Closed and reopened the old one: first release, then try the new one, and upon failure read back the old one.
     expect(disk.reloads).toEqual([21, undefined]);
     expect(disk.runtimeHead).toBe(7);
     expect(disk.notified).toEqual([]);
@@ -264,7 +266,7 @@ describe('恢复', () => {
   });
 
   it('goes back to the old data when the app falls back to an older version instead of reading the new head', async () => {
-    // 数据库里的当前版本读不懂（工具缺了之类）：重建时退回了旧版本，不能当成功。
+    // Current version in database cannot be parsed (e.g., missing tool): reverted to old version during rebuild, not counted as success.
     disk.addArchive(PICKED, { db: { headId: 21 } });
     const env = disk.env();
     const reload = env.runtime.reload;
@@ -331,7 +333,7 @@ describe('恢复', () => {
     const kept = `${DOC}.restore/previous/assets/a1/photo.jpg`;
     expect(disk.files.has(kept)).toBe(true);
     const undoing = service.undoRestore();
-    // 撤销开始之后提示被关掉：留着的数据正是撤销要用的，不能删。
+    // Prompt dismissed after undo started: the retained data is required for the undo, so it cannot be deleted.
     await service.discardPrevious();
     expect(await undoing).toBe(true);
     expect(disk.files.get(`${DOC}assets/a1/photo.jpg`)).toBe('PHOTO');

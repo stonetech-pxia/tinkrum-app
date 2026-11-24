@@ -23,12 +23,13 @@ import {
   type ToolManifest,
 } from '@morph/core';
 
-// 发布下载的工具（D-177、D-178，docs/TOOL_DOWNLOAD_DESIGN.md §9）。
-//   build：tools/<id>/manifest.json → <out>/tools/<id>/<version>.json + <out>/catalog.json（未签名）
-//   sign：在离线的机器上用私钥给 <out>/catalog.json 签名 → <out>/catalog.sig
-//   revoke：把一个版本写进停用名单（之后要重新签名）
-//   verify：上传前再检查一遍签名、大小和哈希
-// <out> 目录整个上传到托管（Cloudflare R2）；托管的地方不需要可信，内容都签了名。
+// Publish downloaded tools (D-177, D-178, docs/TOOL_DOWNLOAD_DESIGN.md §9).
+//    build: tools/<id>/manifest.json → <out>/tools/<id>/<version>.json + <out>/catalog.json (unsigned)
+//    sign: sign <out>/catalog.json with private key on an offline machine → <out>/catalog.sig
+//    revoke: write a version to the revocation list (requires re-signing afterward)
+//    verify: re-check signature, size, and hash before upload
+// The entire <out> directory is uploaded to hosting (Cloudflare R2); the hosting provider need not
+// be trusted because all contents are signed.
 
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const readCatalog = (out: string): Catalog | null =>
@@ -39,8 +40,9 @@ const writeCatalog = (out: string, catalog: Catalog) =>
   writeFileSync(join(out, 'catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
 
 /**
- * 新版本必须能接受老版本的配置（§5）：在空白工作空间里添加老版本，再用新版本校验。
- * 用户已经添加的快捷操作在「更新」之前仍是老版本的步骤，新版本不能让它们校验不过。
+ * The new version must accept old configurations (§5): add the old version in an empty workspace,
+ * then validate with the new version. Quick actions already added by the user remain old-version
+ * steps until "Update", and the new version must not cause them to fail validation.
  */
 function compatibilityProblems(previous: ToolManifest, next: ToolManifest): string[] {
   const problems: string[] = [];
@@ -62,8 +64,10 @@ function compatibilityProblems(previous: ToolManifest, next: ToolManifest): stri
 }
 
 /**
- * 把 tools/ 下的每个清单检查一遍，复制进输出目录，生成新的目录（seq 加 1，停用名单保留）。
- * 版本号不能比已发布的旧；版本号没变时内容也不能变（已经发出去的文件不能悄悄换掉）。
+ * Inspect each manifest under tools/, copy them into the output directory, and generate a new
+ * catalog (seq incremented by 1, revocation list preserved). The version number must not be older
+ * than published versions; content must not change when the version number remains unchanged
+ * (already published files cannot be silently replaced).
  */
 export function buildCatalog(toolsDir: string, out: string, now = new Date()): Catalog {
   const previous = readCatalog(out);
@@ -112,7 +116,7 @@ export function buildCatalog(toolsDir: string, out: string, now = new Date()): C
       icon: manifest.icon,
     });
   }
-  // 已发布、但这次 tools/ 里没有的工具也要留着：已经添加了它的用户还要用（计划服务靠目录认识它）。
+  // Published tools that are absent from the current tools/ directory must also be kept: users who have already added them still need them (planner service recognizes them via the catalog).
   for (const old of previous?.tools ?? []) {
     if (!entries.some((e) => e.id === old.id)) {
       problems.push(`${old.id}: was published before; keep it in tools/ (revoke it instead)`);
@@ -132,7 +136,7 @@ export function buildCatalog(toolsDir: string, out: string, now = new Date()): C
   return catalog;
 }
 
-/** 停用一个版本（id@version）。改了目录，要重新签名。 */
+/** Revoke a version (id@version). After modifying the catalog, it must be re-signed. */
 export function revokeVersion(out: string, idAtVersion: string, now = new Date()): Catalog {
   const catalog = readCatalog(out);
   if (!catalog) throw new Error('no catalog.json; run build first');
@@ -150,7 +154,7 @@ export function revokeVersion(out: string, idAtVersion: string, now = new Date()
   return next;
 }
 
-/** 读私钥文件：一行 base64，# 开头的行是说明。 */
+/** Read private key file: one line of base64, with lines starting with # as comments. */
 export function readSecretKey(file: string): string {
   const line = readFileSync(file, 'utf8')
     .split('\n')
@@ -160,7 +164,7 @@ export function readSecretKey(file: string): string {
   return line;
 }
 
-/** 用私钥（base64）给目录签名，返回签名用的公钥（发布前对一下是不是 App 里内置的那一个）。 */
+/** Sign the catalog with a private key (base64) and return the public key for signing (verify against the one built into the app before publishing). */
 export function signCatalogWithKey(out: string, secretKey: string): string {
   let publicKey: string;
   try {
@@ -173,12 +177,12 @@ export function signCatalogWithKey(out: string, secretKey: string): string {
   return publicKey;
 }
 
-/** 用私钥文件给目录签名（开发密钥 tools/dev-signing-key.txt 这样用）。 */
+/** Sign the catalog with a private key file (used like the dev key tools/dev-signing-key.txt). */
 export function signCatalogFile(out: string, secretKeyFile: string): string {
   return signCatalogWithKey(out, readSecretKey(secretKeyFile));
 }
 
-/** 上传前检查：签名、每个清单的大小和哈希、清单能装进内置注册表。 */
+/** Pre-upload check: signature, size and hash of each manifest, and ensure manifests fit into the built-in registry. */
 export function verifyOutput(out: string, trustedKeys: readonly string[]): Catalog {
   const catalog = verifyCatalog(
     readFileSync(join(out, 'catalog.json')),
@@ -196,7 +200,7 @@ export function verifyOutput(out: string, trustedKeys: readonly string[]): Catal
   return catalog;
 }
 
-/** 新的一对密钥：私钥写进文件（只有自己能读），返回公钥。 */
+/** Generate a new key pair: write private key to file (readable only by owner), and return the public key. */
 export function keygen(file: string): string {
   if (existsSync(file)) throw new Error(`${file} already exists; not overwriting a key`);
   const { secretKey, publicKey } = generateSigningKey();

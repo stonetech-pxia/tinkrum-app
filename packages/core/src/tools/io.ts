@@ -8,7 +8,7 @@ import { MEDIA_LIMITS } from '../limits';
 import { IdSchema, PERIODS } from '../schema';
 import type { ActionDefinition, ValueType } from '../workflow/contract';
 
-// 内核的输入输出动作：不属于任何工具，所有工作流都可以使用（TOOLS_DESIGN §5）。
+// Kernel input/output actions: not bound to any specific tool and available to all workflows (TOOLS_DESIGN §5).
 
 export const nameTemplateSchema = z
   .string()
@@ -34,7 +34,7 @@ const countFields = (max: number) =>
     },
   ] as const;
 
-/** in.files 选什么文件 → 输出类型。documents：Word、Excel、PowerPoint 等办公文档（D-186）。 */
+/** File acceptance mapping for in.files -> output type. documents: office documents such as Word, Excel, PowerPoint, etc. (D-186). */
 export const FILE_ACCEPT: Record<string, ValueType> = {
   pdf: 'pdf',
   images: 'images',
@@ -46,13 +46,13 @@ export const FILE_ACCEPT: Record<string, ValueType> = {
   any: 'files',
 };
 
-/** 用户自己输入的文字最长多少字（文字转 PDF、二维码）。 */
+/** Maximum length of user-input text (text-to-PDF, QR code). */
 export const MAX_INPUT_TEXT = 5000;
 
-/** Wi-Fi 网络名最长 32 字节（IEEE 802.11）；这里按字数先挡一下，运行时再按字节检查。 */
+/** Wi-Fi network name maximum length of 32 bytes (IEEE 802.11); validated roughly by character count here, then checked by bytes at runtime. */
 export const WIFI_NAME_MAX = 32;
 
-/** 读取记录的时间范围：表里第一个日期字段（没有就用创建时间）落在这段时间里。 */
+/** Time range for reading records: the first date field in the table (or creation time if none) falls within this period. */
 export const RECORD_PERIODS = ['all', ...PERIODS] as const;
 
 const RECORD_PERIOD_OPTIONS = [
@@ -81,7 +81,7 @@ const RECORD_PERIOD_OPTIONS = [
     value: 'last365days',
     label: { en: 'Last 365 days', zh: '最近 365 天', fr: '365 derniers jours' },
   },
-  // D-285：两周一段从「设置 → 日期」的起算日算，半月是 1–15 号或 16 号到月底。
+  // D-285: two-week period calculated from the starting day in "Settings -> Date"; half-month spans from the 1st to the 15th or the 16th to the end of the month.
   {
     value: 'thisTwoWeeks',
     label: { en: 'These two weeks', zh: '这两周', fr: 'Ces deux semaines' },
@@ -90,7 +90,7 @@ const RECORD_PERIOD_OPTIONS = [
     value: 'thisHalfMonth',
     label: { en: 'This half-month', zh: '这半个月', fr: 'Cette quinzaine' },
   },
-  // D-537：往后几天，含今天。
+  // D-537: subsequent days, including today.
   { value: 'next7days', label: { en: 'Next 7 days', zh: '往后 7 天', fr: '7 prochains jours' } },
   {
     value: 'next30days',
@@ -100,7 +100,7 @@ const RECORD_PERIOD_OPTIONS = [
     value: 'next90days',
     label: { en: 'Next 90 days', zh: '往后 90 天', fr: '90 prochains jours' },
   },
-  // D-559：日历上前后的一整段。
+  // D-559: a full contiguous range around the calendar date.
   { value: 'yesterday', label: { en: 'Yesterday', zh: '昨天', fr: 'Hier' } },
   { value: 'lastWeek', label: { en: 'Last week', zh: '上周', fr: 'La semaine dernière' } },
   { value: 'lastMonth', label: { en: 'Last month', zh: '上个月', fr: 'Le mois dernier' } },
@@ -115,7 +115,7 @@ export const MAX_PICK = 50;
 const dateText = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date like 2026-10-22');
 const ANY = { en: 'Any', zh: '不限', fr: 'Peu importe' };
 
-/** file.filter 的「全部不限」：预设在它上面只改一两项。 */
+/** "All / no filter" option for file.filter: presets modify only one or two items on top of it. */
 const NO_FILTER = {
   kind: 'any',
   size: 'any',
@@ -189,7 +189,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: ['files.pick'],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -201,7 +201,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
           /^(?:从相册)?(?:选|选择|挑)(?:几张|多张|一张)?(?:照片|图片|截图)$|^(?:choose|pick|select) (?:some |a )?(?:photos?|pictures?|images?|screenshots?)$/i,
         step: () => ({ params: { source: 'library', min: 1, max: 30 } }),
       },
-      // 文档相机（D-084）：实时找边、自动拍、多页；单说「扫描」仍是找边拉正（scan.detect）。
+      // Document camera (D-084): real-time edge detection, auto capture, multi-page; calling "scan" simply refers to edge detection and perspective correction (scan.detect).
       {
         match:
           /^(?:用文档相机)?扫描(?:文档|纸张|收据|几页纸?)$|^scan (?:documents?|paper|pages|receipts?)$/i,
@@ -284,9 +284,9 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: ['files.pick'],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
-      // 办公文档（D-186）。
+      // Office documents (D-186).
       {
         match:
           /^(?:选|选择)\s*(?:一个|几个)?\s*(?:(?:word|excel|ppt|powerpoint|office)(?:\s*或\s*(?:word|excel|ppt|powerpoint))?\s*(?:文档|文件|表格|幻灯片)?|文档)$|^(?:choose|pick|select) (?:a |some )?(?:word|excel|powerpoint|office) (?:documents?|files?)$|^(?:choose|pick|select) (?:a |some )?documents?$/i,
@@ -320,7 +320,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     output: 'video',
     params: z
       .strictObject({
-        // D-185：以前没有这一项（只从相册选），所以可以不写，不写就是相册。
+        // D-185: previously this option did not exist (only selected from the photo library), so it is optional; omitting it defaults to the photo library.
         source: z.enum(['library', 'files']).optional(),
         min: z.number().int().min(1).max(MEDIA_LIMITS.maxCount),
         max: z.number().int().min(1).max(MEDIA_LIMITS.maxCount),
@@ -360,15 +360,15 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: ['files.pick'],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
-      // 从「文件」选（D-184、D-185）：电脑传来的、下载的照片和视频。
+      // Select from Files (D-184, D-185): photos and videos transferred from a computer or downloaded.
       {
         match:
           /^从文件(?:里|app 里)?(?:选|选择|挑)(?:几个|一个|一段)?视频$|^(?:choose|pick|select) (?:some |a )?videos? from (?:the )?files(?: app)?$/i,
         step: () => ({ params: { source: 'files', min: 1, max: 10 } }),
       },
-      // 视频（D-147）：从相册选；压缩、转成 MP4、剪一段。
+      // Videos (D-147): select from photo library; compress, convert to MP4, trim a segment.
       {
         match:
           /^(?:从相册)?(?:选|选择|挑)(?:几个|一个|一段)?视频$|^(?:choose|pick|select) (?:some |a )?videos?$/i,
@@ -377,7 +377,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     ],
   },
   {
-    // 音频（D-154）：从「文件」选录音或音乐（语音备忘录分享出来的、微信下载的），或者现在录一段。
+    // Audio (D-154): select recordings or music from Files (shared from Voice Memos, downloaded via WeChat), or record a new segment now.
     id: 'in.audio',
     ai: 'Audio starts here: source "files" for recordings and music in the Files app, "record" to record now with the microphone (autoStart: true starts recording as soon as the screen opens and one tap on Stop hands the recording on, for "say it and go" flows); shared recordings fill it either way.',
     label: {
@@ -397,7 +397,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
         source: z.enum(['files', 'record']),
         min: z.number().int().min(1).max(MEDIA_LIMITS.maxCount),
         max: z.number().int().min(1).max(MEDIA_LIMITS.maxCount),
-        /** 现在录音时（D-587）：录音页一打开就开始录，按钮是「停止」，点一下停下并直接进入下一步。 */
+        /** When recording now (D-587): starts recording as soon as the recording page opens, button shows "Stop", tapping it stops and directly proceeds to the next step. */
         autoStart: z.boolean().optional(),
       })
       .refine((p) => p.min <= p.max, { message: 'min must not exceed max' })
@@ -449,7 +449,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: ['files.pick'],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match: /^(?:现在)?录(?:音|一段|一段音|一段录音)$|^record(?: audio| a voice memo| now)?$/i,
@@ -483,7 +483,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -493,7 +493,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     ],
   },
   {
-    // D-199：给客人连 Wi-Fi 的二维码。网络名是用户写的（发给 AI 前换成占位符），密码每次运行时问、不保存。
+    // D-199: QR code for guests to connect to Wi-Fi. Network name is entered by the user (replaced with a placeholder before sending to the AI), password is asked at runtime and never saved.
     id: 'in.wifi',
     label: { en: 'Wi-Fi details', zh: 'Wi-Fi 信息', fr: 'Infos Wi-Fi' },
     description: {
@@ -568,7 +568,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     requires: [],
   },
   {
-    // D-187：快捷操作写记录。AI 只选哪张表；填什么由用户在运行时的表单里填，记录不进配置、不发给 AI（D-036）。
+    // D-187: quick action to write records. AI only selects the table; fields are filled by the user in the runtime form, records are not stored in the config nor sent to the AI (D-036).
     id: 'out.addRecord',
     label: { en: 'Add a record', zh: '记一笔', fr: 'Ajouter un enregistrement' },
     description: {
@@ -583,7 +583,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
       .strictObject({
         collectionId: IdSchema,
         each: z.boolean().optional(),
-        /** 新建一条（不写就是这个），或放进运行时用户选的一条已有记录（D-443）。 */
+        /** Create a new entry (default if omitted), or add to an existing record selected by the user at runtime (D-443). */
         into: z.enum(['new', 'existing']).optional(),
       })
       .refine((p) => !(p.into === 'existing' && p.each === true), {
@@ -629,7 +629,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     ],
     local: 'recordEntry',
     requires: ['files.write'],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -645,7 +645,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
   },
   {
     id: 'file.rename',
-    // 提示词里只关于这个动作的规则。
+    // Rules in the prompt specifically regarding this action.
     aiRules: [
       {
         n: 15,
@@ -685,7 +685,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match: /^(?:按|用)?\s*"?(.+?)"?\s*命名$|^name (?:it|them) "?(.+?)"?$/i,
@@ -707,13 +707,13 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     fields: [],
     local: 'reorder',
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [{ match: /^(?:排序|排好顺序|调整顺序)$|^(?:put (?:them )?in order|reorder)$/i }],
   },
   {
-    // D-242：按固定条件筛选文件（类型、大小、方向、日期、时长），全部满足才保留。没有表达式。
+    // D-242: filter files by fixed criteria (type, size, orientation, date, duration), retaining only those meeting all conditions. No expressions.
     id: 'file.filter',
-    // 提示词里只关于这个动作的规则。
+    // Rules in the prompt specifically regarding this action.
     aiRules: [
       {
         n: 28,
@@ -915,7 +915,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     requires: [],
   },
   {
-    // D-197：一份报销单越攒越多。默认接上这个快捷操作上次存下的结果；选中的文件只在这次运行里用。
+    // D-197: expense claims accumulating over time. By default, appends to the results saved by the previous run of this quick action; selected files are used only for this run.
     id: 'file.addExisting',
     ai: 'To add new pages to a PDF made before ("add this receipt to last time\'s expense report", "keep one growing PDF") → this (position "before") then pdf.merge, after the new pages; the user picks the earlier file when it runs (by default the last result this quick action saved, so end with file.save).',
     label: { en: 'Add an existing file', zh: '加上已有文件', fr: 'Ajouter un fichier existant' },
@@ -957,7 +957,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     params: z.strictObject({}),
     fields: [],
     requires: ['files.write'],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -979,9 +979,9 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     params: z.strictObject({}),
     fields: [],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
-      // 一次分享全部文件（D-119）；发到哪个 App 由用户在分享面板里选，不会自动发给某个人。
+      // Share all files at once (D-119); target app is chosen by the user in the share sheet and is never sent automatically to any specific person.
       {
         match:
           /^(?:一次|一起|全部|一次性)?分享(?:全部|所有文件|出去)?$|^(?:发|分享)到(?:微信|WhatsApp|QQ|邮件|邮箱)$|^share(?: it| them| them all| all(?: at once)?| all the files)?(?: at once)?$/i,
@@ -1002,10 +1002,11 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     params: z.strictObject({}),
     fields: [],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
-      // 存到用户在「文件」里选的文件夹（D-120）：本机、iCloud 云盘、Google Drive、Dropbox 都走系统选择器。
-      // 按钮叫「存到手机」，照着说也认。
+      // Save to a folder selected by the user in Files (D-120): local storage, iCloud Drive, Google
+      // Drive, and Dropbox all use the system picker. Button is labeled "Save to device", which is
+      // recognized when spoken.
       {
         match:
           /^(?:存到|保存到|存进)手机(?:里)?$|^save (?:it |them )?(?:to|on|onto) (?:my |the )?phone$/i,
@@ -1029,7 +1030,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     params: z.strictObject({}),
     fields: [],
     requires: ['photos.save'],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [{ match: /^存到相册$|^save to photos$/i }],
   },
   {
@@ -1045,14 +1046,14 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     params: z.strictObject({}),
     fields: [],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [{ match: /^打印$|^print(?: it)?$/i }],
   },
-  // ---- 把容器交来的值打开（D-428）：系统的拨号、短信、写信、浏览器页面，什么都没有发出去 ----
-  // 和 out.share 一样只能是快捷操作的一步（底线 10）：提醒、定时没有步骤；只有用户点了才运行。
+  // ---- Open values passed by containers (D-428): system dialer, SMS, email compose, browser pages—nothing is transmitted externally ----
+  // Like out.share, this can only be a step in a quick action (invariant 10): reminders and timers have no steps; they run only when tapped by the user.
   {
     id: 'out.call',
-    // 提示词里只关于「容器把值交给工具」的规则（D-428）：放在第一个这样的动作上。
+    // Rules in the prompt exclusively concerning "container passing values to tools" (D-428): placed on the first such action.
     aiRules: [
       {
         n: 54,
@@ -1133,7 +1134,7 @@ export const IO_ACTIONS: readonly ActionDefinition[] = [
     requires: [],
   },
   {
-    // D-428：和 records.toVCard 一样的内容，但是文字，所以能接 qr.generate。
+    // D-428: identical content to records.toVCard, but in text format so it can be chained into qr.generate.
     id: 'records.toVCardText',
     recordFits: (fields, values) => recordToVCard(fields, values) !== null,
     label: { en: 'Records to vCard text', zh: '记录生成 vCard 文字', fr: 'Entrées en texte vCard' },

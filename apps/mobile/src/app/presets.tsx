@@ -34,14 +34,16 @@ import { Toast } from '@/shell/Toast';
 import type { SavedPreset } from '@/storage/types';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
 
-/** 网站上「用你自己的 AI 做 App」的页面（D-593）：写法说明、示例和 App 文件检查。只打开网页，不带任何数据。 */
+/** "Build Apps with your own AI" page on website (D-593): writing instructions, examples, and app file checks. Opens webpage only, without transmitting any data. */
 const MAKE_WITH_AI_URL = `${SITE_URL}/make.html`;
 
 /**
- * 「设置 → 我的预设」（D-410）：把整个 App 存起来，以后换回来。系统层的页面，AI 改不了（底线 8）。
- * 应用和恢复历史版本一样先问一句，确认后生成一个版本，能撤销（底线 7）；记录都留着（底线 5）。
- * 「从文件导入」也在这里（D-497）：App 文件加成新 App，整份配置存成预设。
- * 样板 App 也列在这里（D-544）：和引导第 3 步同一条路，先进草稿，「应用」后能撤销。
+ * Settings -> My Presets (D-410): save the entire app to switch back later. System-layer page,
+ * cannot be modified by AI (invariant 8). Applying and restoring history versions prompts first,
+ * generates a version upon confirmation, and is undoable (invariant 7); records are preserved
+ * (invariant 5). "Import from file" is also located here (D-497): app file added as a new app,
+ * entire config saved as a preset. Sample apps are also listed here (D-544): same path as
+ * tutorial step 3, enters draft first, undoable after "Apply".
  */
 export default function PresetsRoute() {
   const { repo, files, locale, registry } = useWorkspaceContext();
@@ -59,7 +61,7 @@ export default function PresetsRoute() {
   const [presets, setPresets] = useState<SavedPreset[] | null>(null);
   const [name, setName] = useState('');
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
-  // 展开的是哪一块（D-614）：添加 App 的几种方式、示例 App、保存现在的样子。
+  // Expanded section (D-614): app addition methods, sample apps, save current state.
   const [open, setOpen] = useState<'add' | 'samples' | 'save' | null>(null);
   const sample = usePickSample();
   const { importText, pasteFile, apply } = useConfigImport();
@@ -78,7 +80,7 @@ export default function PresetsRoute() {
     if (result.kind !== 'saved') return;
     setName('');
     setOpen(null);
-    // 这个 App 做好了：工具清单可以清掉，开始下一个（D-414）。
+    // This app is completed: tool list can be cleared, ready for the next one (D-414).
     if (hasSession)
       Alert.alert(t(locale, 'sessionClearAfterPreset'), undefined, [
         { text: t(locale, 'sessionKeep'), style: 'cancel' },
@@ -87,8 +89,9 @@ export default function PresetsRoute() {
   }
 
   /**
-   * 从文件导入（D-497）：App 文件（tinkrum-app，D-485）先问一句，确认后加成一个新 App，能撤销；
-   * 整份配置的文件（morph-app-config）存成一个新预设，当前的 App 不变，点「应用」才换。
+   * Import from file (D-497): app file (tinkrum-app, D-485) prompts first, adds as a new app upon
+   * confirmation, undoable; full config file (morph-app-config) saved as a new preset, current
+   * app unchanged until "Apply" is tapped.
    */
   async function importFile() {
     const title = t(locale, 'presetsImport');
@@ -107,10 +110,10 @@ export default function PresetsRoute() {
 
   const caption = [palette.font('body', 13), { color: palette.caption }];
   const full = presets !== null && !canSavePreset(presets.length);
-  // 这个 App 现在的完成度（D-417）：只提醒，不阻止（底线 19）。
+  // Current completion status of this app (D-417): warning only, does not block (invariant 19).
   const check = useMemo(() => {
     const { tools, issues } = checkTools(config, registry);
-    // 工具包自带的快捷操作不算用户做的工具，否则一个空 App 也有几十个。
+    // Quick actions bundled with tool packs are not counted as user-created tools, otherwise an empty app would have dozens.
     const packaged = new Set(
       quickActionsOf(config)
         .filter((w) => w.package)
@@ -122,7 +125,7 @@ export default function PresetsRoute() {
     };
   }, [config, registry]);
 
-  /** 预设旁边的「⋯」：改名、删除（D-614）。 */
+  /** "..." next to preset: rename, delete (D-614). */
   function presetMenu(preset: SavedPreset) {
     Alert.alert(preset.name, undefined, [
       {
@@ -138,7 +141,7 @@ export default function PresetsRoute() {
     ]);
   }
 
-  /** 「添加 App」里的一项：点了先收起，再做。 */
+  /** Item in "Add App": collapses upon tap, then executes. */
   const addRow = (testID: string, label: string, value: string, run: () => void) => ({
     testID,
     label,
@@ -149,8 +152,10 @@ export default function PresetsRoute() {
     },
   });
 
-  // 一屏看完（D-614）：上面「添加 App」「保存现在的样子」两个按钮，点了在下面展开；再下面是我的预设，
-  // 点一下换成它，「⋯」里改名、删除。不用弹出层：iOS 上弹出层收起时接着打开文件选择或分享面板会失败。
+  // Viewable in a single screen (D-614): top "Add App" and "Save current state" buttons expand
+  // downward when tapped; below that are my presets, tap to switch, use "..." to rename or delete.
+  // Avoid popups: opening file pickers or share panels immediately after closing popups fails on
+  // iOS.
   return (
     <View style={styles.flex}>
       <ScrollView
@@ -217,7 +222,7 @@ export default function PresetsRoute() {
               busy={sample.busy}
               onPick={(id) =>
                 void sample.pick(id, () => {
-                  // 回到主页看草稿。
+                  // Return to home screen to view draft.
                   leaveApp();
                   router.back();
                 })

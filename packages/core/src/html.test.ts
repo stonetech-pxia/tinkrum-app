@@ -112,9 +112,9 @@ describe('report attachments (D-425)', () => {
     expect(list.map((a) => a.assetId)).toEqual(['f1', 'f2', 'f3', 'f4']);
     expect(list[1]).toMatchObject({ title: 'Taxi', index: 2, total: 3 });
     expect(list[1]!.detail).toContain('12.00');
-    // 没有标题的记录：和列表上一样，表名 · 日期。
+    // Records without a title: same as in lists, table name · date.
     expect(list[3]!.title).toMatch(/^Claims · /);
-    // 文件 ID 不是用户要看的，也不算印出来的值。
+    // File IDs are not meant for the user to see, nor do they count as printed values.
     expect(list[0]!.detail).not.toContain('attachment');
   });
 
@@ -157,7 +157,7 @@ describe('report attachments (D-425)', () => {
     expect(reportAttachmentNotes({ overLimit: [], unreadable: ['C'] }, 'en')[0]).toMatch(
       /^1 attachment could/,
     );
-    // 法语 0、1 是单数。
+    // French 0 and 1 are singular.
     expect(reportAttachmentNotes({ overLimit: [], unreadable: ['C'] }, 'fr')[0]).toMatch(
       /^1 pièce jointe illisible/,
     );

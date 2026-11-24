@@ -16,7 +16,7 @@ function message(text: string): Anthropic.Beta.BetaMessage {
   } as unknown as Anthropic.Beta.BetaMessage;
 }
 
-/** 假的批处理接口：记下提交的批次，第二次查询才结束，结果倒序返回。 */
+/** Mock batch interface: records submitted batches, completes only on second query, returns results in reverse order. */
 function fakeClient(results: (requests: { custom_id: string }[]) => unknown[]) {
   const created: { custom_id: string; params: Record<string, unknown> }[][] = [];
   let polls = 0;
@@ -46,7 +46,7 @@ const request = (text: string) => ({
 });
 
 describe('createBatchRelay', () => {
-  it('把同时到达的请求合成一批，按 custom_id 对回结果，不加 fallbacks', async () => {
+  it('batch concurrently arriving requests, route results back by custom_id without fallbacks', async () => {
     const { client, created } = fakeClient((requests) =>
       requests.map((r) => ({
         custom_id: r.custom_id,
@@ -81,7 +81,7 @@ describe('createBatchRelay', () => {
     });
   });
 
-  it('出错或缺失的结果让对应请求失败，不影响其他请求', async () => {
+  it('errored or missing results cause corresponding requests to fail without affecting others', async () => {
     const { client } = fakeClient(() => [
       { custom_id: '0', result: { type: 'errored', error: { type: 'overloaded_error' } } },
     ]);

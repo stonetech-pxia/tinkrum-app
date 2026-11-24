@@ -14,12 +14,12 @@ import {
   verifyOutput,
 } from './publish';
 
-// 发布下载的工具（D-177、D-178）。
+// Published downloadable tools (D-177, D-178).
 
 const repo = resolve(import.meta.dirname, '../../..');
 const devKey = join(repo, 'tools/dev-signing-key.txt');
 
-/** 一个临时的 tools/ 目录（复制仓库里的示例工具）和输出目录。 */
+/** A temporary `tools/` directory (copying sample tools from repository) and output directory. */
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), 'morph-tools-'));
   const tools = join(dir, 'tools');
@@ -43,7 +43,7 @@ describe('publishing downloaded tools', () => {
     ]);
     expect(signCatalogFile(out, devKey)).toBe(DEV_TOOL_SIGNING_KEY);
     expect(verifyOutput(out, [DEV_TOOL_SIGNING_KEY]).seq).toBe(1);
-    // 正式的公钥验不过开发私钥的签名。
+    // The official public key cannot verify the signature of the development private key.
     expect(() => verifyOutput(out, [])).toThrow(/signature/);
   });
 
@@ -73,7 +73,7 @@ describe('publishing downloaded tools', () => {
   it('refuses an update that would break quick actions people already added', () => {
     const { tools, out } = setup();
     buildCatalog(tools, out);
-    // 新版本不再声明「选文件」权限：老版本的快捷操作就校验不过了。
+    // The new version no longer declares the "pick file" permission: old quick actions fail validation.
     editManifest(tools, (m) => {
       m.version = '1.1.0';
       m.permissions = [];
@@ -90,7 +90,7 @@ describe('publishing downloaded tools', () => {
     expect(revoked.seq).toBe(2);
     expect(revoked.revoked).toEqual(['job-apply@1.0.0']);
     expect(() => revokeVersion(out, 'nothing@1.0.0')).toThrow();
-    // 停用名单在下一次 build 时保留。
+    // The revocation list is preserved on the next build.
     expect(buildCatalog(tools, out).revoked).toEqual(['job-apply@1.0.0']);
   });
 });

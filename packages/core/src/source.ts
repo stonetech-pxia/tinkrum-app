@@ -36,27 +36,31 @@ import { calculatedNumber, latestNumber } from './stat-calc';
 import { recordsInRange, type DayRange } from './page-period';
 export { latestNumber } from './stat-calc';
 
-// 共用的读法（v34 D-370 规则 2）：块的 source 读出什么。记录块的 6 种外观、数字、图表、文件列表
-// 都从这里读，App 只负责画（以前每个组件各写一遍筛选、排序、分组）。筛选、排序、分组（Grouping）、
-// 按日子算（Days）都只有一份实现：这里把 source 交给 data.ts、list-groups.ts、board-view.ts、month-view.ts、
-// chart.ts、compare.ts、sequence.ts、stat-minus.ts 里的算法。查找、汇总、上一条的值按 related.ts 算好（只读）。
-// 纯函数：记录从调用方来（App 的数据库里没删的记录），从不进入配置，也不发给 AI（D-042）。
+// Shared reader logic (v34 D-370 rule 2): what a block's source reads. The 6 record block
+// appearances, numbers, charts, and file lists all read from here, and the app only handles
+// rendering (previously each component implemented its own filtering, sorting, and grouping).
+// Filtering, sorting, grouping, and days calculations each have a single implementation: here the
+// source is passed to algorithms in data.ts, list-groups.ts, board-view.ts, month-view.ts,
+// chart.ts, compare.ts, sequence.ts, and stat-minus.ts. Lookups, rollups, and previous values are
+// computed via related.ts (read-only). Pure function: records come from the caller (undeleted
+// records in the app database), never enter the configuration, and are never sent to the AI
+// (D-042).
 
 export interface SourceContext {
   config: WorkspaceConfig;
-  /** 表 ID → 存着的、没删的记录（要包括 sourceTableIds 列出的表）。查找、汇总、上一条在这里算。 */
+  /** Table ID -> stored, undeleted records (must include tables listed in sourceTableIds). Lookups, rollups, and previous values are computed here. */
   records: ReadonlyMap<string, readonly DataRecord[]>;
   now: Date;
-  /** 不写用配置里的设置（calendarOf）。 */
+  /** If omitted, uses configuration settings (calendarOf). */
   cal?: Calendar;
   locale: Locale;
-  /** 给一条记录用的页面（page.of，D-342）打开的那一条：筛选里的 "$record" 换成它。 */
+  /** The specific record opened by a record-specific page (page.of, D-342): "$record" in filters is replaced with it. */
   recordId?: string;
-  /** 页面选中的范围（不写时桌面小组件使用自己的筛选）。 */
+  /** Range selected on the page (desktop widgets use their own filters when omitted). */
   range?: DayRange;
 }
 
-/** 一张表读出来的样子：存的表（改记录用）、显示用的表（查找、汇总换成它们显示的字段）、算好的记录。 */
+/** Read representation of a table: stored table (for modifying records), display table (lookups and rollups replaced with their display fields), and computed records. */
 export interface TableRead {
   table: Collection;
   view: Collection;
@@ -67,7 +71,7 @@ const tableCache = new WeakMap<SourceContext, Map<string, TableRead | undefined>
 
 const calOf = (ctx: SourceContext): Calendar => ctx.cal ?? calendarOf(ctx.config);
 
-/** 一张表算好的记录（同一个 ctx 只算一次）；表不存在时为 undefined。 */
+/** Computed records for a table (computed once per ctx); undefined if the table does not exist. */
 export function readTable(ctx: SourceContext, tableId: string): TableRead | undefined {
   let cache = tableCache.get(ctx);
   if (!cache) tableCache.set(ctx, (cache = new Map()));
@@ -83,14 +87,14 @@ export function readTable(ctx: SourceContext, tableId: string): TableRead | unde
   return read;
 }
 
-/** 筛选里的 "$record" 换成打开的那一条（没有打开的那一条时不换，条件什么都不满足）。 */
+/** Replaces "$spec" or "$record" in filters with the opened record (if no record is opened, leaves unchanged and conditions evaluate to nothing). */
 function bind(filter: readonly Condition[] | undefined, ctx: SourceContext): Condition[] {
   return (filter ?? []).map((c) =>
     c.value === RECORD_REF && ctx.recordId !== undefined ? { ...c, value: ctx.recordId } : c,
   );
 }
 
-/** 按引用字段分组时被引用的那张表和它算好的记录（D-336）；不是引用字段时为 undefined。 */
+/** The referenced table and its computed records when grouping by a reference field (D-336); undefined when not a reference field. */
 function linkedOf(
   ctx: SourceContext,
   view: Collection,
@@ -108,8 +112,9 @@ function linkedOf(
 }
 
 /**
- * 读这个 source 要哪些表的记录（App 先读它们再调用这里的函数）：这张表和它的查找、汇总要的表，
- * 按引用字段分组时被引用的表，minus 和 calc.with 的表。
+ * Table records required to read this source (app reads them first then calls functions here):
+ * this table and tables required by its lookups and aggregates, referenced tables when grouped by
+ * reference fields, and tables from minus and calc.with.
  */
 export function sourceTableIds(
   source: {
@@ -136,19 +141,19 @@ export function sourceTableIds(
   return [...ids];
 }
 
-// ---- 记录块（list cards checklist tiles board calendar table gallery grid）----
+// ---- Record blocks (list cards checklist tiles board calendar table gallery grid) ----
 
-/** 列表的一段（source.group）：count 是这一段一共几条，records 最多 limit 条。 */
+/** A list section (source.group): count is the total number of items in this section, records up to limit items. */
 export interface SourceGroup {
   key: string;
   label: string;
-  /** 在这一段添加时分组字段预设成什么（list-groups.ts 的 preset）。 */
+  /** Preset for grouping fields when adding in this section (preset in list-groups.ts). */
   preset?: unknown;
   count: number;
   records: DataRecord[];
 }
 
-/** 月历的月份或日范围：每天的记录（不截 limit），max 是最多的条数或每日数值的最大绝对值。 */
+/** Month or day range for the calendar: daily records (without limit truncation), where max represents the maximum count or maximum absolute daily numerical value. */
 export interface MonthRead {
   month: string;
   days: Map<number, MonthDay>;
@@ -158,25 +163,25 @@ export interface MonthRead {
 export interface RecordsRead {
   table: Collection;
   view: Collection;
-  /** 换好 "$record" 的筛选（就地添加时带上它的等于条件，hereValues）。 */
+  /** Filter with "$record" replaced (includes equality conditions for inline creation, hereValues). */
   filter: Condition[];
-  /** 分组用的字段：分段、看板的 group.by，月历的日期（不写 by 时是默认的日期字段）。 */
+  /** Grouping field: group.by for sections and boards, date for calendars (defaults to default date field when by is omitted). */
   by?: string;
-  /** 筛选、排好序的全部记录。 */
+  /** All filtered and sorted records. */
   rows: DataRecord[];
-  /** 不分组时显示的：最多 limit 条（大圆块最多 MAX_TILES 个）。 */
+  /** Displayed items when ungrouped: up to limit items (at most MAX_TILES for large tile blocks). */
   shown: DataRecord[];
-  /** list / cards / checklist 有 source.group 时：每段。 */
+  /** When list / cards / checklist has source.group: per section. */
   groups?: SourceGroup[];
-  /** board：每栏（每栏最多 limit 条）；分栏字段不对时没有。 */
+  /** board: per column (at most limit items per column); absent when grouping field is invalid. */
   columns?: BoardColumn[];
-  /** calendar：这个月（options.month，默认今天所在的月）。 */
+  /** calendar: this month (options.month, defaults to month containing today). */
   days?: MonthRead;
-  /** grid（D-610）：行 × 列（options.page 往前翻几页）；分行字段不对时没有。 */
+  /** grid (D-610): rows x columns (options.page offset pagination); absent when row grouping field is invalid. */
   grid?: GridRead;
 }
 
-/** 一个记录块读出来的东西；表不存在时为 undefined。 */
+/** Read output of a record block; undefined if table does not exist. */
 export function readRecords(
   block: {
     look: RecordLook;
@@ -230,7 +235,7 @@ export function readRecords(
       (block.show?.span === 'week'
         ? { start: dateOfDayNumber(start), end: dateOfDayNumber(start + 6) }
         : undefined);
-    // 同一天的先后由 monthDays 定（不跟着排序）。
+    // Order within the same day is determined by monthDays (independent of sorting).
     const { days, max } = monthDays(
       filtered,
       view,
@@ -251,7 +256,7 @@ export function readRecords(
   return { ...base, by, groups };
 }
 
-/** 月历选中的那天列出的记录：有 source.sort 时按它排，最多 limit 条。 */
+/** Records listed for the calendar's selected day: sorted by source.sort if present, up to limit items. */
 export function dayShown(
   read: RecordsRead,
   source: RecordSource,
@@ -264,7 +269,7 @@ export function dayShown(
   ).slice(0, source.limit);
 }
 
-/** 月历在某天添加时日期字段预设成什么：日期字段是这一天，日程是「一次，这一天」，日期时间、系统字段不预设。 */
+/** Default preset for date fields when adding from a calendar date: date field is set to that day, events are set to "once, that day", date-times and system fields have no preset. */
 export function dayValue(read: RecordsRead, day: number): unknown {
   const type = read.by === undefined ? undefined : fieldOf(read.view, read.by)?.type;
   const date = dateOfDayNumber(day);
@@ -272,8 +277,9 @@ export function dayValue(read: RecordsRead, day: number): unknown {
 }
 
 /**
- * "$here"（就地添加，D-349）：列表筛选里的等于条件（filterPresets）加上这一段、这一栏、这一天的值
- * （groupValue：段的 preset、栏的 option、dayValue；undefined / null 不预设）。
+ * "$here" (inline creation, D-349): filter presets in list filters plus values from this section,
+ * column, or day (groupValue: section preset, column option, dayValue; undefined / null leaves
+ * unpreset).
  */
 export function hereValues(read: RecordsRead, groupValue?: unknown): Record<string, unknown> {
   const values = filterPresets(read.view, read.filter);
@@ -282,40 +288,42 @@ export function hereValues(read: RecordsRead, groupValue?: unknown): Record<stri
   return values;
 }
 
-// ---- 数字（number）----
+// ---- Number (number) ----
 
 export interface NumberGroup {
-  /** 选项 ID（引用字段是被引用的那条的 ID）；null 是「未选」。 */
+  /** Option ID (reference fields use the ID of the referenced entry); null means "unselected". */
   optionId: string | null;
   label: string;
   count: number;
   value: number | null;
-  /** 每笔自己选货币时（D-429）按货币分开写好的文字。 */
+  /** Text formatted separately per currency when users choose their own currency per entry (D-429). */
   text?: string;
   best?: number;
-  /** compare：这一组上一段同期的值。 */
+  /** compare: value from the previous period corresponding to this group. */
   previous?: number | null;
 }
 
 export interface NumberRead {
   view: Collection;
-  /** 算过 minus / calc 的值；没有可算的为 null。 */
+  /** Computed minus / calc value; returns null when uncomputable. */
   value: number | null;
-  /** 每笔自己选货币时（D-429）按货币分开写好的文字；有它就显示它。 */
+  /** Custom text written separately per currency when the user selects a currency per entry (D-429); displayed if present. */
   text?: string;
-  /** streak 的最佳连续。 */
+  /** The best streak count. */
   best?: number;
-  /** compare：上一段同期（筛选里唯一的 inPeriod 换成上一段）的值。 */
+  /** compare: The value from the corresponding period in the previous cycle (replacing the only inPeriod filter with the previous period). */
   previous?: { period: Period; value: number | null };
-  /** source.group：每个选项一行（D-248、D-336）。 */
+  /** source.group: One row per option (D-248, D-336). */
   groups?: NumberGroup[];
 }
 
 /**
- * 数字块的 latest（D-618）：最新一条的 field 的值，和汇总字段的 latest 同一个「最新」（related.ts 的 latestValue；
- * 日期是 days.date，没写是存的表 table 里第一个日期字段）。不是数时为 null（检查只让数字类字段用）。
+ * Latest value for a number block (D-618): The field value of the latest entry, sharing the same
+ * definition of "latest" as summary fields (latestValue in related.ts; date is days.date, or
+ * defaults to the first date field in the table if unspecified). Returns null if not a number
+ * (validation restricts this to numeric fields only).
  */
-/** 数字块的值（D-248、D-284、D-307、D-308、D-337）；表不存在时为 undefined。 */
+/** Value of a number block (D-248, D-284, D-307, D-308, D-337); returns undefined if the table does not exist. */
 export function readNumber(source: NumberSource, ctx: SourceContext): NumberRead | undefined {
   const read = readTable(ctx, source.table);
   if (!read) return undefined;
@@ -406,9 +414,9 @@ export function readNumber(source: NumberSource, ctx: SourceContext): NumberRead
   return out;
 }
 
-// ---- 图表（chart）----
+// ---- Charts ----
 
-/** 图表的点（饼图再交给 pieSlices）；表不存在时为 undefined。 */
+/** Data points for a chart (pie charts are further processed by pieSlices); returns undefined if the table does not exist. */
 export function readChart(
   source: ChartSource,
   ctx: SourceContext,
@@ -446,9 +454,9 @@ export function readChart(
   return { view, points };
 }
 
-// ---- 文件列表（files，读 $files）----
+// ---- File list (files, reading $files) ----
 
-/** 文件列表要用到的文件信息（App 的文件记录有这几项）。 */
+/** File metadata required by the file list (app file records contain these properties). */
 export interface FileMeta {
   mimeType: string;
   name: string;
@@ -464,7 +472,7 @@ interface FilesSource {
   limit?: number;
 }
 
-/** 一份文件当成 $files 的一条记录（kind 按 MIME 类型认，fileKindOf）。 */
+/** Treat a file as a single record in $files (kind is identified by MIME type via fileKindOf). */
 const fileRecord = (f: FileMeta): DataRecord => ({
   id: '',
   collectionId: FILES_TABLE,
@@ -473,7 +481,7 @@ const fileRecord = (f: FileMeta): DataRecord => ({
   updatedAt: f.createdAt,
 });
 
-/** 文件列表的筛选（source.filter，条件之间是「并且」）。 */
+/** Filter for the file list (source.filter, conditions are joined by AND). */
 export function filesFilter(
   source: FilesSource,
   now: Date = new Date(),
@@ -486,7 +494,7 @@ export function filesFilter(
   };
 }
 
-/** 文件列表显示哪些：筛选，排序（不写是创建时间从新到旧），最多 limit 个。 */
+/** Determines which files to display in the file list: filtered, sorted (defaults to creation time from newest to oldest), up to a maximum limit. */
 export function readFiles<T extends FileMeta>(
   source: FilesSource,
   files: readonly T[],

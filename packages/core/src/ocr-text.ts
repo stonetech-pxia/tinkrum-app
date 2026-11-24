@@ -1,9 +1,12 @@
 import { T2S_FROM, T2S_TO } from './ocr-t2s';
 
-// 识别结果整理成文字（D-268）：按位置排成行和段，同一段里因为排版折行的行接回去（复制出来是完整的段落）；
-// 简体中文把混进来的繁体字换回简体；中文旁边的半角标点换成全角。都在本机做，不改动识别出的字以外的内容。
+// Organize OCR results into text (D-268): layout into lines and paragraphs by position, re-joining
+// lines wrapped due to formatting within the same paragraph (resulting in complete copied
+// paragraphs); convert accidental Traditional Chinese characters to Simplified; convert half-width
+// punctuation next to Chinese characters to full-width. All done locally, without modifying content
+// other than recognized characters.
 
-/** 识别出的一行：像素坐标，原点在左上角。 */
+/** Recognized text line: pixel coordinates, origin at top-left. */
 export interface OcrLine {
   text: string;
   x: number;
@@ -12,11 +15,11 @@ export interface OcrLine {
   height: number;
 }
 
-/** 中日韩文字和全角标点。 */
+/** CJK characters and full-width punctuation. */
 const CJK =
   '\\u3000-\\u303f\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uff00-\\uffef';
 const IS_CJK = new RegExp(`[${CJK}]`);
-/** 列表项的开头：项目符号、「1.」「2、」「(3)」「①」。 */
+/** Start of list item: bullet points, "1.", "2、", "(3)", "①-①". */
 const LIST_ITEM = /^\s*(?:[•·\-–—*▪●○◦■□]|\d{1,3}[.、)）]|[(（]\d{1,3}[)）]|[①-⑳])/;
 
 interface Row {
@@ -32,7 +35,7 @@ function median(values: number[]): number {
   return sorted.length ? sorted[sorted.length >> 1]! : 0;
 }
 
-/** 两行之间怎么接：中日韩文字之间不加空格；英文行尾「词-」接小写字母时去掉连字符；其余加一个空格。 */
+/** How to join two lines: no spaces between CJK characters; strip hyphen when an English end-of-line "word-" connects to a lowercase letter; otherwise add a space. */
 function joiner(prev: string, next: string): { prev: string; sep: string } {
   const last = prev.slice(-1);
   const first = next.charAt(0);
@@ -43,13 +46,17 @@ function joiner(prev: string, next: string): { prev: string; sep: string } {
 }
 
 /**
- * 把识别出的行排成文字：先按竖直方向的重叠分成一排一排（同一排的几块从左到右用空格接上），
- * 上下间距超过一行半的地方空一行（分段）。同一段里，写到右边、下一行又没有缩进也不是列表项的，
- * 是排版折行，接成一行。
+ * Arrange recognized lines into text: first group into rows by vertical overlap (joining blocks
+ * in the same row from left to right with spaces), leaving a blank line (paragraph break) where
+ * vertical spacing exceeds 1.5 lines. Within the same paragraph, lines that extend to the right
+ * without indentation or list markers are considered layout wraps and are joined into a single
+ * line.
  */
 /**
- * 下一行的第一个词接在上一行后面放不放得下：左对齐的正文右边参差不齐，上一行没写到头是因为下一个词放不下。
- * 很短的行（标签一列）长短不一是常事，不用这个判断；中日文第一个字就能折行。
+ * Check if the first word of the next line fits at the end of the previous line: left-aligned
+ * body text has a ragged right edge, and the previous line fell short because the next word
+ * wouldn't fit. Very short lines (such as a column of labels) frequently vary in length and do
+ * not use this check; CJK text can wrap at the first character.
  */
 function wordFits(
   prev: { left: number; right: number; text: string },
@@ -97,7 +104,7 @@ function ocrRows(lines: readonly OcrLine[]): { rows: Row[]; typical: number } {
   return { rows, typical };
 }
 
-/** Word 已经按位置确定了同一段，只接回折行，不再按列表符号或参差的行尾重新分段。 */
+/** Word has already determined paragraphs by position; only re-join line wraps, without re-segmenting based on list markers or ragged line ends. */
 export function joinOcrParagraph(lines: readonly OcrLine[]): string {
   const { rows } = ocrRows(lines);
   let text = '';
@@ -106,7 +113,7 @@ export function joinOcrParagraph(lines: readonly OcrLine[]): string {
       text = row.text;
       continue;
     }
-    // 数字范围保留连字符；它和英文单词在行尾拆开的连字符不同。
+    // Retain hyphens in number ranges; different from hyphens splitting English words at line ends.
     const { prev, sep } =
       /\d[-–—]$/.test(text) && /^\d/.test(row.text)
         ? { prev: text, sep: '' }
@@ -119,7 +126,7 @@ export function joinOcrParagraph(lines: readonly OcrLine[]): string {
 export function layoutOcrLines(lines: readonly OcrLine[]): string {
   const { rows, typical } = ocrRows(lines);
   if (!rows.length) return '';
-  // 分段：上下间距超过一行半就是新的一段。
+  // Paragraphs: vertical spacing exceeding 1.5 lines constitutes a new paragraph.
   const blocks: Row[][] = [];
   for (const row of rows) {
     const block = blocks.at(-1);
@@ -152,7 +159,7 @@ export function layoutOcrLines(lines: readonly OcrLine[]): string {
 
 let t2s: Map<string, string> | null = null;
 
-/** 简体中文的识别结果里混进来的繁体字换成简体（只换一对一、简体里不会用到的字，D-268）。 */
+/** Convert accidental Traditional Chinese characters in Simplified Chinese recognition results to Simplified (only converting one-to-one characters never used in Simplified, D-268). */
 export function toSimplifiedChinese(text: string): string {
   if (!t2s) {
     const from = [...T2S_FROM];
@@ -174,19 +181,23 @@ const FULL: Record<string, string> = {
 };
 
 /**
- * 中文旁边的半角标点换成全角（识别器常把「，：（）」认成半角）：逗号、冒号、分号挨着中文时换
- * （数字之间的 1,000、12:30 两边不是中文，不换）；句点只在中文后面、后面不是字母数字时换成「。」；
- * 问号、叹号跟在中文后面时换；括号里面或外面挨着中文时换，左右括号一起换。全角标点两边的空格去掉。
+ * Convert half-width punctuation next to Chinese to full-width (recognizers often output `,`,
+ * `:`, `()` as half-width): convert commas, colons, and semicolons when adjacent to Chinese
+ * (numbers like 1,000 or 12:30 are not adjacent to Chinese and are left unchanged); convert
+ * periods only when preceded by Chinese and not followed by alphanumeric characters; convert
+ * question marks and exclamation points when following Chinese; convert brackets when adjacent to
+ * Chinese inside or outside, changing opening and closing brackets together. Remove spaces around
+ * full-width punctuation.
  */
 export function cjkPunctuation(text: string): string {
   const chars = Array.from(text);
   const isCjk = (c: string | undefined) => c !== undefined && IS_CJK.test(c);
-  // 左括号换没换，右括号跟着一样（「像素(px)」→「像素（px）」）。
+  // If the left parenthesis changes, the right parenthesis follows accordingly ("pixel(px)" -> "pixel (px)").
   const open: boolean[] = [];
   const out = chars.map((c, i) => {
     const prev = chars[i - 1];
     const next = chars[i + 1];
-    // 半角标点前后可能隔着一个空格（「中文 , 中文」）。
+    // Half-width punctuation may have a space before and after it ("Chinese , Chinese").
     const before = prev === ' ' ? chars[i - 2] : prev;
     const after = next === ' ' ? chars[i + 2] : next;
     switch (c) {
@@ -215,7 +226,7 @@ export function cjkPunctuation(text: string): string {
   return out.join('').replace(/ *([，。：；？！（）、]) */g, '$1');
 }
 
-/** 一种识别语言的整理：简体中文换繁体、换标点；繁体中文只换标点；其他语言原样（D-268）。 */
+/** Refinement for a recognition language: convert Simplified to Traditional and polish punctuation for Simplified Chinese; polish punctuation only for Traditional Chinese; leave other languages unchanged (D-268). */
 export function polishOcrText(text: string, lang: 'zh-Hans' | 'zh-Hant' | 'other'): string {
   if (lang === 'zh-Hans') return cjkPunctuation(toSimplifiedChinese(text));
   if (lang === 'zh-Hant') return cjkPunctuation(text);

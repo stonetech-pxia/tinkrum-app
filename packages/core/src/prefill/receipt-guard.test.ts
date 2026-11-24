@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import type { Field, Locale } from '../schema';
 import { ruleEngine } from './engine';
 
-// 不倒退的守护（D-403）：自己编的中文、英文、法语、西语、德语小票和发票，只断言「原来就认对了」的格子，
-// 加上「宁可不填」的情况（没标税额不给税额、一个日期也要给、什么都没有就什么都不填）。
-// 这组测试在加规则之前的代码上也通过；以后改规则，这里红了就是倒退了。
+// Regression guard (D-403): handcrafted Chinese, English, French, Spanish, and German receipts and
+// invoices, asserting only previously correct fields, plus 'better empty' cases (no tax label means
+// no tax amount, single dates are accepted, completely empty means nothing filled). These tests
+// pass on code prior to rule additions; future rule changes causing failures indicate regressions.
 
 const NOW = new Date('2026-11-02T00:00:00Z');
 
@@ -39,8 +40,8 @@ async function run(rows: string[], opts: { currency?: string; locale?: Locale } 
 }
 const num = (v: string | undefined) => Number(v);
 
-describe('中文', () => {
-  it('超市小票：合计、日期', async () => {
+describe('Chinese', () => {
+  it('Supermarket receipt: total, date', async () => {
     const r = await run(
       [
         '美佳乐超市',
@@ -58,7 +59,7 @@ describe('中文', () => {
     expect(r.date[0]).toBe('2026-09-18');
   });
 
-  it('药房小票：有税额就给税额，合计不被找零带走', async () => {
+  it('Pharmacy receipt: provide tax if present, total not carried away by change', async () => {
     const r = await run(
       [
         '康乐药房',
@@ -77,7 +78,7 @@ describe('中文', () => {
     expect(r.merchant[0]).toBe('康乐药房');
   });
 
-  it('增值税发票：税额、开票日期、销售方', async () => {
+  it('VAT invoice: tax, invoice date, seller', async () => {
     const r = await run(
       [
         '增值税普通发票',
@@ -94,7 +95,7 @@ describe('中文', () => {
     expect(r.merchant[0]).toBe('星河科技有限公司');
   });
 
-  it('餐馆小票：应收、日期、店名', async () => {
+  it('Restaurant receipt: due amount, date, store name', async () => {
     const r = await run(
       ['老张面馆', '日期：2026-10-02', '牛肉面 28.00', '凉菜 12.00', '应收 40.00', '实收 40.00'],
       { currency: 'CNY', locale: 'zh' },
@@ -105,8 +106,8 @@ describe('中文', () => {
   });
 });
 
-describe('英文', () => {
-  it('餐馆：小计、税、合计，美式日期月在前', async () => {
+describe('English', () => {
+  it('Restaurant: subtotal, tax, total, US-style date with month first', async () => {
     const r = await run([
       "JOE'S DINER",
       '123 Main St',
@@ -124,7 +125,7 @@ describe('英文', () => {
     expect(r.merchant[0]).toBe("JOE'S DINER");
   });
 
-  it('零售：找零不是合计', async () => {
+  it('Retail: change is not total', async () => {
     const r = await run([
       'NORTHSIDE HARDWARE',
       'Store 1234',
@@ -143,7 +144,7 @@ describe('英文', () => {
     expect(r.merchant[0]).toBe('NORTHSIDE HARDWARE');
   });
 
-  it('发票：Total due、Invoice date、公司名', async () => {
+  it('Invoice: Total due, Invoice date, company name', async () => {
     const r = await run([
       'Acme Plumbing LLC',
       'Invoice No 2026-114',
@@ -160,7 +161,7 @@ describe('英文', () => {
     expect(r.merchant[0]).toBe('Acme Plumbing LLC');
   });
 
-  it('没写税的小票：合计、日期、店名照给', async () => {
+  it('Receipt without tax specified: total, date, store name still provided', async () => {
     const r = await run([
       'FARMERS MARKET STAND',
       'June 4, 2026',
@@ -175,8 +176,8 @@ describe('英文', () => {
   });
 });
 
-describe('法语', () => {
-  it('餐厅：Total TTC、dont TVA', async () => {
+describe('French', () => {
+  it('Restaurant: Total TTC, montant TVA', async () => {
     const r = await run(
       [
         'BRASSERIE DU COIN',
@@ -196,7 +197,7 @@ describe('法语', () => {
     expect(r.merchant[0]).toBe('BRASSERIE DU COIN');
   });
 
-  it('发票：日在前', async () => {
+  it('Invoice: day first', async () => {
     const r = await run(
       [
         'Dupont Plomberie SARL',
@@ -215,7 +216,7 @@ describe('法语', () => {
     expect(r.merchant[0]).toBe('Dupont Plomberie SARL');
   });
 
-  it('只有一个日期也要给', async () => {
+  it('Single date provided even when only one exists', async () => {
     const r = await run(['Boulangerie Martin', '28/02/2026', 'Baguette 1,20', 'Total 1,20'], {
       currency: 'EUR',
       locale: 'fr',
@@ -226,8 +227,8 @@ describe('法语', () => {
   });
 });
 
-describe('西班牙语', () => {
-  it('小票：没标税额就不给税额', async () => {
+describe('Spanish', () => {
+  it('Receipt: no tax specified means no tax amount', async () => {
     const r = await run(
       [
         'SUPERMERCADO LA PLAZA',
@@ -246,7 +247,7 @@ describe('西班牙语', () => {
     expect(r.merchant[0]).toBe('SUPERMERCADO LA PLAZA');
   });
 
-  it('发票：Total factura、日期、公司', async () => {
+  it('Invoice: Total factura, date, company', async () => {
     const r = await run(
       [
         'Servicios Torres SL',
@@ -264,8 +265,8 @@ describe('西班牙语', () => {
   });
 });
 
-describe('德语', () => {
-  it('收银小票：Summe，不是 Gegeben', async () => {
+describe('German', () => {
+  it('Cash register receipt: Summe, not Gegeben', async () => {
     const r = await run(
       [
         'BAECKEREI MUELLER',
@@ -282,7 +283,7 @@ describe('德语', () => {
     expect(r.merchant[0]).toBe('BAECKEREI MUELLER');
   });
 
-  it('发票：Gesamtbetrag、Rechnungsdatum', async () => {
+  it('Invoice: Gesamtbetrag, Rechnungsdatum', async () => {
     const r = await run(
       [
         'Schmidt Elektro GmbH',
@@ -300,15 +301,15 @@ describe('德语', () => {
   });
 });
 
-describe('宁可不填', () => {
-  it('什么都没有的单据：金额、税额、日期都不填', async () => {
+describe('Better empty', () => {
+  it('Completely empty document: amount, tax, and date are left blank', async () => {
     const r = await run(['Thank you', 'Please come again', 'Have a nice day']);
     expect(r.total).toEqual([]);
     expect(r.tax).toEqual([]);
     expect(r.date).toEqual([]);
   });
 
-  it('两个日期：开票日排第一，到期日不抢', async () => {
+  it('Two dates: invoice date ranked first, due date does not preempt', async () => {
     const r = await run(['Shop', 'Date 2026-03-04', 'Due date 2026-04-03', 'Total 8.00']);
     expect(r.date[0]).toBe('2026-03-04');
     expect(r.tax).toEqual([]);

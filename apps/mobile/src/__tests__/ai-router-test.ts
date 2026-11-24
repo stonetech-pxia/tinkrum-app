@@ -174,7 +174,7 @@ describe('AI router', () => {
   });
 });
 
-// 自带 key 选 OpenAI 兼容接口（D-241）。
+// OpenAI-compatible provider selected via custom key (D-241).
 describe('OpenAI-compatible provider', () => {
   const green = { kind: 'ops', ops: [{ op: 'setTheme', primaryColor: '#2F9E44' }] };
   const OTHER_KEY = 'sk-or-v1-' + 'y'.repeat(30) + 'ABCD';
@@ -209,7 +209,7 @@ describe('OpenAI-compatible provider', () => {
       provider: 'openai',
       baseUrl: 'https://openrouter.ai/api/v1',
       customModel: 'some/model',
-      // Anthropic 的模型选择不受影响。
+      // Anthropic model selection is unaffected.
       model: 'claude-haiku-5-5',
     });
   });

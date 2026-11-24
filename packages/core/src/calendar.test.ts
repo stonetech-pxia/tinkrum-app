@@ -11,7 +11,7 @@ import { migrateWorkspace } from './migrate';
 import type { Collection } from './schema';
 import { registry, v33Fixture, workspace } from './test-helpers';
 
-// 2026-10-22 是星期四。
+// 2026-10-22 is Thursday.
 const thursday = new Date(2026, 9, 22, 9, 0);
 const sunday: Calendar = { ...DEFAULT_CALENDAR, weekStart: 'sunday' };
 const twoAm: Calendar = { ...DEFAULT_CALENDAR, dayStartHour: 2 };
@@ -37,7 +37,7 @@ describe('future periods and "today" in comparisons (D-537)', () => {
     expect(periodRange('next7days', thursday)).toEqual(['2026-10-22', '2026-10-28']);
     expect(periodRange('next30days', thursday)).toEqual(['2026-10-22', '2026-11-20']);
     expect(periodRange('next90days', thursday)).toEqual(['2026-10-22', '2027-01-19']);
-    // 一天从 2 点开始时，1 点半还算昨天。
+    // When a day starts at 2 AM, 1:30 AM still counts as yesterday.
     expect(periodRange('next7days', new Date(2026, 9, 23, 1, 30), twoAm)).toEqual([
       '2026-10-22',
       '2026-10-28',
@@ -56,7 +56,7 @@ describe('future periods and "today" in comparisons (D-537)', () => {
     expect(ids({ field: 'due', op: 'lt' })).toEqual(['past']);
     expect(ids({ field: 'due', op: 'gt' })).toEqual(['future']);
     expect(ids({ field: 'at', op: 'lt' })).toEqual(['past']);
-    // 2 点开始的一天：10-23 01:00 的「今天」是 10-22，10-23 00:30 算 10-22。
+    // A day starting at 2 AM: for 2026-10-23 01:00, "today" is 10-22; 2026-10-23 00:30 counts as 10-22.
     expect(ids({ field: 'at', op: 'gt' }, new Date(2026, 9, 23, 1), twoAm)).toEqual([]);
   });
 
@@ -112,7 +112,7 @@ describe('when a day and a week start (D-286)', () => {
   it('weeks start on Monday by default, or on Sunday', () => {
     expect(periodRange('thisWeek', thursday)).toEqual(['2026-10-19', '2026-10-25']);
     expect(periodRange('thisWeek', thursday, sunday)).toEqual(['2026-10-18', '2026-10-24']);
-    // 周日当天：周一开始时是这周的最后一天，周日开始时是新一周的第一天。
+    // Sunday itself: treated as the last day of the week when the week starts on Monday, or the first day of a new week when the week starts on Sunday.
     const sun = new Date(2026, 9, 25, 10);
     expect(periodRange('thisWeek', sun)).toEqual(['2026-10-19', '2026-10-25']);
     expect(periodRange('thisWeek', sun, sunday)).toEqual(['2026-10-25', '2026-10-31']);
@@ -122,7 +122,7 @@ describe('when a day and a week start (D-286)', () => {
     const lateNight = new Date(2026, 9, 23, 1, 30);
     expect(periodRange('today', lateNight)).toEqual(['2026-10-23', '2026-10-23']);
     expect(periodRange('today', lateNight, twoAm)).toEqual(['2026-10-22', '2026-10-22']);
-    // 月初凌晨 1 点：还在上个月。
+    // 1:00 AM on the first day of the month: still in the previous month.
     expect(periodRange('thisMonth', new Date(2026, 10, 1, 1), twoAm)).toEqual([
       '2026-10-01',
       '2026-10-31',
@@ -237,7 +237,7 @@ describe('calendar settings in the config (D-286)', () => {
   });
 
   it('v19 → v20 only raises the version', () => {
-    // 旧版本的形状（v33 存下来的默认配置），不是 v34 的。
+    // Shape of an old version (default configuration saved in v33), not v34.
     const previous = { ...v33Fixture('default-en'), schemaVersion: 19 };
     expect(migrateWorkspace(previous, undefined, 20)).toEqual({
       ok: true,

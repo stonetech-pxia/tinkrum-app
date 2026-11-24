@@ -1,7 +1,9 @@
-// 底线 4：原件永远不移动、不删除（相册、「文件」、content://），只处理副本。
-// 这里用真的文件平台（expo-platform.ts），只把 expo-file-system 换成记下每次删除和移动的替身：
-// 把原件的地址交给每个会删、会移动的入口，原件一个都不能少。真机上的行为（系统相册、分享扩展的目录）
-// 只能在手机上验证，见 INVARIANTS_AUDIT.md。
+// Invariant 4: Originals are never moved or deleted (photo library, "Files", content://), only
+// copies are processed. Uses the real file platform (expo-platform.ts) with expo-file-system
+// replaced by a mock that records every deletion and move: passing the original URI to every entry
+// point that deletes or moves, ensuring not a single original is lost. Real-device behavior (system
+// photo library, share extension directory) can only be verified on device, see
+// INVARIANTS_AUDIT.md.
 
 import { expoFilePlatform } from '../runtime/expo-platform';
 import { copyHandedFiles } from '../runtime/runner';
@@ -82,7 +84,7 @@ jest.mock('expo-image-manipulator', () => {
   };
 });
 
-/** 用户的原件：相册、「文件」、Android 的 content://、App 自己存的用户文件。 */
+/** User originals: photo library, "Files", Android content://, and user files stored by the app itself. */
 const ORIGINALS = [
   'content://media/external/images/media/42',
   'content://com.android.providers.downloads.documents/document/7',
@@ -91,7 +93,7 @@ const ORIGINALS = [
   'file:///doc/assets/abcdef12/合同.pdf',
 ];
 
-describe('底线 4：原件永远不移动、不删除', () => {
+describe('Invariant 4: Originals are never moved or deleted', () => {
   beforeEach(() => {
     mockTouched.length = 0;
   });
@@ -103,7 +105,7 @@ describe('底线 4：原件永远不移动、不删除', () => {
       await expoFilePlatform.removeShared([], [uri]);
       await expoFilePlatform.readPickedText(uri);
     }
-    // removeShared 每次都清掉 Android 预览的缓存目录（cache/preview），那是 App 自己的副本。
+    // removeShared clears the Android preview cache directory (cache/preview) every time, which is the app's own private copy.
     expect(mockTouched.filter((t) => !t.uri.startsWith('file:///cache/'))).toEqual([]);
   });
 
@@ -113,7 +115,7 @@ describe('底线 4：原件永远不移动、不删除', () => {
       expect(used.uri).toBe(uri);
     }
     expect(mockTouched).toEqual([]);
-    // 选择器放在缓存里的副本可以移进运行目录（属于这一批，不是原件）。
+    // Copies placed in cache by the file picker can be moved into the run directory (belongs to this batch, not an original).
     await expoFilePlatform.adoptIntoRun('file:///cache/ImagePicker/x.jpg', 'run1', 'b.jpg');
     expect(mockTouched.filter((t) => t.op === 'move')).toEqual([
       { op: 'move', uri: 'file:///cache/ImagePicker/x.jpg' },
@@ -121,7 +123,7 @@ describe('底线 4：原件永远不移动、不删除', () => {
     expect(mockTouched.every((t) => t.uri.startsWith('file:///cache/'))).toBe(true);
   });
 
-  // D-425：报表带附件时把原件缩成 JPEG：动的只是缩出来的那份（在缓存里），原件不动。
+  // D-425: When a report includes attachments, shrink originals to JPEG: only the generated copy (in cache) is modified; originals remain untouched.
   it('reducing a photo for a report never touches the original', async () => {
     for (const uri of ORIGINALS) {
       const out = await expoFilePlatform.reducedJpeg(uri, 1400, 0.75, 'run1', 'a/x.jpg');
@@ -131,7 +133,7 @@ describe('底线 4：原件永远不移动、不删除', () => {
     expect(mockTouched.filter((t) => ORIGINALS.includes(t.uri))).toEqual([]);
   });
 
-  // D-442：记录的附件交给工具时，处理的是副本；用户文件（assets/）原样不动，视频原地用、不移走。
+  // D-442: When passing attachments to a run, copies are processed and user files (assets/) are never moved or deleted; user files are used in place and not relocated.
   it('handing attachments to a run copies them and never moves or deletes the user files', async () => {
     const assets = new Map(
       [
@@ -160,7 +162,7 @@ describe('底线 4：原件永远不移动、不删除', () => {
       name: 'Scan',
     });
     expect(value.type).toBe('files');
-    // 文档类的复制进运行目录，视频原地用。
+    // Document-type files are copied into the run directory, while videos are used in place.
     const uris = (value as { items: { uri: string }[] }).items.map((i) => i.uri);
     expect(uris[0]).toContain('/runs/run1/');
     expect(uris[1]).toContain('/assets/a2/clip.mp4');

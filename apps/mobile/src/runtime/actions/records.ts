@@ -20,12 +20,14 @@ import { newAssetId } from '../ids';
 import { saveItems } from './io';
 import type { RunServices } from './helpers';
 
-// 记一笔（D-187、D-397）：这次的文件（或这段文字）在一张数据表里加一条记录。表单由用户在运行时填，
-// 文件先存成 Morph 的文件再放进附件字段。记录直接写数据库，不进配置、不生成版本，也不发给 AI（D-036）。
+// Log an expense / entry (D-187, D-397): add a record to a table using current files (or text). The
+// form is filled by the user at runtime, and files are first saved as Morph files before being
+// placed into attachment fields. Records are written directly to the database without entering the
+// config, generating versions, or being sent to the AI (D-036).
 
 type Impl = ActionImpl<RunServices>;
 
-// 文件放进哪个字段、文字放进哪个字段：core 的 recordTargets（放进已有记录时用同一份规则）。
+// Which field receives files or text: core's recordTargets (uses the same rules when appending to existing records).
 export { recordTargets };
 
 export const RECORD_IMPLS: Record<string, Impl> = {
@@ -41,8 +43,9 @@ export const RECORD_IMPLS: Record<string, Impl> = {
     if (into === 'existing') return addToExisting(input, collection, ctx);
     const { fileField, textField } = recordTargets(collection);
     const items = isFileValue(input) ? input.items : null;
-    // 默认这次的文件都进同一条记录（一份两页的合同是一条，D-397）；每个文件一条要写 each。
-    // 表里没有附件字段时文件放不进去，每个文件一张表单，让用户看着它填。
+    // Default to placing current files into the same record (a two-page contract is one record,
+    // D-397); specify each to create a record per file. If the table has no attachment fields,
+    // files cannot be placed, prompting a form per file for the user to fill out.
     const together = items !== null && fileField !== undefined && each !== true;
     const entries: RunItem[][] =
       items === null
@@ -61,13 +64,15 @@ export const RECORD_IMPLS: Record<string, Impl> = {
         throw new RunError('tooMany', { max: RECORD_LIMITS.perCollection });
       }
       const prefill: Record<string, unknown> = {};
-      // 用户说的话放进备注这类字段（D-576），不放进商家这种第一个文字字段。
+      // Place user spoken text into fields like notes (D-576) rather than primary text fields like merchant.
       const spokenField =
         input?.type === 'text' && input.spoken ? spokenTextTarget(collection) : undefined;
       const intoField = spokenField ?? textField;
       if (items === null && input?.type === 'text' && intoField) prefill[intoField] = input.text;
-      // 打开表单前就存成用户文件，表单才能读它们（D-394）。这一步新存的是这张表单的副本：
-      // 没进记录的（跳过、关掉、从表单里去掉、写入失败）都删掉；之前的步骤存好的不归它。
+      // Save as user files before opening the form so the form can read them (D-394). Newly saved
+      // items in this step are copies for this form: those not entered into records (skipped,
+      // closed, removed from form, write failure) are deleted; files saved by previous steps are
+      // excluded.
       const saved = fileField ? await saveItems(ctx.services, entry, ctx) : entry;
       const unused = new Set(
         saved.filter((_, n) => !entry[n]!.assetId).map((file) => file.assetId!),
@@ -90,7 +95,7 @@ export const RECORD_IMPLS: Record<string, Impl> = {
         const values = { ...prefill, ...answer.values };
         const now = ctx.now();
         const prepared = prepareRecordValues(collection, values, null, now, ctx.services.calendar);
-        // 表单已经按同样的规则校验过；这里出错说明表结构在运行中变了。
+        // The form was already validated with the same rules; an error here indicates the table schema changed at runtime.
         if (!prepared.ok) throw new RunError('badField', { name: prepared.issues[0]!.fieldId });
         await repo.insertRecord({
           id: newAssetId(),
@@ -118,9 +123,12 @@ export const RECORD_IMPLS: Record<string, Impl> = {
 };
 
 /**
- * 放进已有的记录（D-443）：用户在运行时选这张表里的一条记录，文件接在它的附件后面、文字接在它的文字后面，
- * 表单里核对并保存才写进去。只追加：原来的文件和文字一个都不替换、不删除（用户自己在表单里改是用户的事）。
- * 这一步新存的文件是这张表单的副本：没写进记录的（取消、记录已经没了、写入失败）都删掉，之前步骤存好的不归它。
+ * Add to existing record (D-443): the user selects a record in this table at runtime, appending
+ * files after its attachments and text after its text, then reviews and saves via the form.
+ * Append-only: existing files and text are neither replaced nor deleted (modifying them in the
+ * form is up to the user). Newly saved files in this step are copies for this form: those not
+ * written to records (canceled, record deleted, write failure) are deleted, excluding files saved
+ * by previous steps.
  */
 async function addToExisting(
   input: Parameters<Impl>[0],
@@ -131,7 +139,7 @@ async function addToExisting(
   const { fileField, textField } = recordTargets(collection);
   const items = isFileValue(input) ? input.items : null;
   const text = input?.type === 'text' ? input.text : null;
-  // 放不进去的（表里没有对应的字段）配置检查就不让存；这里是表在运行中变了。
+  // Unwritable items (corresponding fields missing in the table) are caught by config validation; this error indicates the table changed at runtime.
   if ((items !== null && fileField === undefined) || (text !== null && textField === undefined))
     throw new RunError('unexpected', { detail: `no place in ${collection.id}` });
   ctx.throwIfCancelled();
@@ -144,7 +152,7 @@ async function addToExisting(
   if (!record || record.deletedAt !== null)
     throw new RunError('notFound', { name: collection.name });
 
-  // 附件放得下几个：满了就不运行，不要先把文件存下来又删掉。
+  // Attachment capacity check: abort execution if full, avoiding saving and subsequently deleting files.
   let toAdd: RunItem[] = [];
   if (items !== null) {
     const room = attachRoom(collection, record.values);
@@ -167,7 +175,7 @@ async function addToExisting(
       total: 1,
     });
     if (!answer || 'skip' in answer) throw new RunCancelled();
-    // 表单开着的时候这条记录可能被删了：什么都不写。
+    // The record might have been deleted while the form was open: write nothing.
     const fresh = await repo.getRecord(record.id);
     if (!fresh || fresh.deletedAt !== null)
       throw new RunError('notFound', { name: collection.name });
@@ -190,7 +198,7 @@ async function addToExisting(
   } finally {
     await deleteUserFiles([...unused], repo, files);
   }
-  // 文件原样交给下一步（用保存好的那一份，和新建一样）。
+  // Pass files to the next step as-is (using the saved copy, same as creation).
   if (items === null) return input!;
   const stored = new Map(toAdd.map((item, n) => [item, saved[n]!] as const));
   return { ...(input as object), items: items.map((item) => stored.get(item) ?? item) } as never;

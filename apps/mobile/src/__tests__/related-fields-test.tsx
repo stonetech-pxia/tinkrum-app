@@ -13,7 +13,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 查找、汇总、上一条（D-287–D-291）：列表和记录页显示本机算出来的值，表单里不能填。
+// Lookup, rollup, previous record (D-287–D-291): list and record pages display locally computed values, non-editable in forms.
 
 const jobs: Collection = {
   id: 'jobs',
@@ -117,7 +117,7 @@ it('shows the looked-up rate in the pay and the totals and streak per job', asyn
   expect(screen.getByText(formatMoney(75, 'CNY', 'zh'))).toBeTruthy();
   expect(screen.getByText('6.5 h')).toBeTruthy();
   expect(screen.getByText('2 天')).toBeTruthy();
-  // 没有工时的那份工作：合计 0，连续 0 天。
+  // Job without hours: total 0, consecutive 0 days.
   expect(screen.getByText('0 h')).toBeTruthy();
   expect(screen.getByText('0 天')).toBeTruthy();
 });
@@ -133,7 +133,7 @@ it('adding an entry updates the rollup; the form has no box for computed fields'
   await fireEvent.press(screen.getByTestId('form-log-submit'));
   expect(await screen.findByText('7.5 h')).toBeTruthy();
   const saved = (await repo.listRecords('shifts')).find((r) => r.values.hours === 1)!;
-  // 算出来的值从不存进记录。
+  // Computed values are never stored in records.
   expect(Object.keys(saved.values).sort()).toEqual(['date', 'hours', 'job']);
 });
 

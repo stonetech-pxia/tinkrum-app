@@ -1,8 +1,9 @@
 import { CollectionSchema, migrateWorkspace, type Collection } from '@morph/core';
 
 /**
- * 一个历史版本里的数据表（v34 之前的版本先升级，v33 的引用字段写法不一样）。
- * 用来找回已移出界面的表的结构（版本只追加、不删除）。读不出来的版本跳过。
+ * Data tables in a historical version (upgrade pre-v34 versions first, v33 reference field syntax
+ * differs). Used to find structures of tables moved out of the interface (versions are
+ * append-only, never deleted). Skip unreadable versions.
  */
 export function revisionTables(raw: unknown): Collection[] {
   const migrated = migrateWorkspace(raw);

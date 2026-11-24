@@ -17,12 +17,13 @@ import {
 } from '@morph/core';
 import { Platform, useColorScheme, type TextStyle, type ViewStyle } from 'react-native';
 
-// 主题 token → 渲染用的颜色、字体和尺寸。颜色的计算在 core（校验器也要用）；这里只加上平台相关的部分。
-// 默认风格 Clay 来自 Docudis：Sora 标题、Karla 正文、22pt 圆角、暖色柔和阴影。
+// Theme tokens → colors, fonts, and dimensions for rendering. Color calculations are performed in
+// core (also used by the validator); platform-specific parts are added here. The default style Clay
+// comes from Docudis: Sora title, Karla body, 22pt border radius, warm soft shadows.
 
 export type FontRole = 'display' | 'heading' | 'title' | 'body' | 'bodyMedium' | 'bodyBold';
 
-/** Clay 字体按字重分别注册（expo-google-fonts 的静态字体），不能再叠加 fontWeight。 */
+/** Clay fonts registered individually by font weight (static fonts from expo-google-fonts), avoiding overlapping fontWeight. */
 export const CLAY_FONTS: Record<FontRole, string> = {
   display: 'Sora_700Bold',
   heading: 'Sora_700Bold',
@@ -33,8 +34,8 @@ export const CLAY_FONTS: Record<FontRole, string> = {
 };
 
 /**
- * Inter（D-591）：每个字重一个静态字体。display（数字、大标题）用中等粗细 500，不是粗体；
- * 标题 600，正文 400，正文加重 500，正文粗体 700。
+ * Inter (D-591): a separate static font for each weight. Display (numbers, large headings) uses
+ * medium 500 instead of bold; headings use 600, body 400, body medium 500, and body bold 700.
  */
 export const INTER_FONTS: Record<FontRole, string> = {
   display: 'Inter_500Medium',
@@ -58,44 +59,45 @@ const SERIF = Platform.select({ ios: 'Georgia', default: 'serif' });
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' });
 
 export interface Palette extends ResolvedColors {
-  /** 旧名字，等同于 surface / muted。 */
+  /** Legacy name, equivalent to surface / muted. */
   card: string;
-  /** 实色强调底上的可读文字。 */
+  /** Readable text on solid accent backgrounds. */
   onAccent: typeof onAccent;
   subtext: string;
   theme: Theme;
   radius: number;
-  /** 按钮、输入框等控件的圆角。 */
+  /** Border radius for controls such as buttons and input fields. */
   controlRadius: number;
   /**
-   * 页面边距和组件间距。页面上只有两条竖线（D-454）：方块（卡片、按钮、输入框、列表）的边和方块外面的字
-   * 贴着 pad；方块里面的内容缩进 inset（卡片的内边距）。
+   * Page margins and component spacing. Pages have only two vertical alignment lines (D-454): the
+   * edges of boxes (cards, buttons, input fields, lists) align with pad outside the boxes, while
+   * content inside boxes is indented by inset (card padding).
    */
   pad: number;
   inset: number;
   gap: number;
-  /** 某个角色的字体，size 会乘以主题的字号比例。 */
+  /** Font for a specific role, where size is multiplied by the theme's font scale ratio. */
   font(role: FontRole, size: number): TextStyle;
-  /** 卡片的底色、边框和阴影。 */
+  /** Card background color, border, and shadow. */
   cardStyle(background?: string): ViewStyle;
-  /** 毛玻璃卡片：卡片里要再铺一层 GlassFill。 */
+  /** Glassmorphism card: requires an additional GlassFill layer inside the card. */
   glass: boolean;
-  /** 主题设了渐变 / 极光页面背景。 */
+  /** Theme specifies gradient / aurora page background. */
   hasBackdrop: boolean;
-  /** 页面根容器的背景（底色 + 渐变）。 */
+  /** Background of the page root container (base color + gradient). */
   backdrop: ViewStyle;
-  /** 底部导航栏的底色（毛玻璃主题下半透明）。 */
+  /** Background color of the bottom navigation bar (semi-transparent under glassmorphism themes). */
   barBackground: string;
-  /** 主题设了 surfaceText（D-409）时才有：放在卡片上的内容用的配色。用 onSurface 取。 */
+  /** Present only when the theme sets surfaceText (D-409): color scheme used for content placed on cards. Access via onSurface. */
   surfacePalette?: Palette;
-  /** 卡片配色上才有：回到页面背景上的配色。用 onPage 取。 */
+  /** Present only on card color schemes: color scheme reverting to the page background. Access via onPage. */
   pagePalette?: Palette;
 }
 
-/** 放在卡片上的内容用的配色（D-409）；没设 surfaceText 时就是它自己。 */
+/** Color scheme used for content placed on cards (D-409); defaults to itself when surfaceText is not set. */
 export const onSurface = (palette: Palette): Palette => palette.surfacePalette ?? palette;
 
-/** 放在页面背景上的内容用的配色（D-409）；块画在卡片配色里，块里压在页面上的标题要换回来。 */
+/** Color scheme used for content placed on page backgrounds (D-409); blocks are rendered in card color schemes, and block titles overlaid on the page must switch back. */
 export const onPage = (palette: Palette): Palette => palette.pagePalette ?? palette;
 
 const DENSITY = {
@@ -104,14 +106,14 @@ const DENSITY = {
   spacious: { pad: 24, gap: 20 },
 } as const;
 
-/** 页面背景的 CSS 渐变（RN 的 backgroundImage）；色标和校验器用的是同一组颜色。 */
+/** CSS gradient for page background (RN backgroundImage); color stops and validator share the same set of colors. */
 function backdropImage(theme: Theme, c: ResolvedColors): string | undefined {
   const stops = backdropStops(theme, c);
   if (theme.backdrop === 'gradient') {
     return `linear-gradient(170deg, ${stops[0]} 0%, ${stops[1]} 55%, ${stops[2]} 100%)`;
   }
   if (theme.backdrop === 'aurora') {
-    // 三团光：主色在左上、辅助色在右侧、第三色在底部；边缘渐隐到同色的全透明，避免发灰。
+    // Three light sources: primary color in top-left, secondary color on the right, third color at the bottom; edges fade out to fully transparent of the same color to avoid grayish tones.
     const alpha = c.dark ? AURORA_ALPHA.dark : AURORA_ALPHA.light;
     const blob = (color: string, at: string, size: number) =>
       `radial-gradient(circle at ${at}, ${rgba(color, alpha)} 0%, ${rgba(color, 0)} ${size}%)`;
@@ -124,7 +126,7 @@ function backdropImage(theme: Theme, c: ResolvedColors): string | undefined {
   return undefined;
 }
 
-/** 金属卡片的渐变：上亮下暗、中段由亮转暗。 */
+/** Metallic card gradient: bright top, dark bottom, middle transitions from bright to dark. */
 const chromeImage = (top: string, mid: string, low: string, bottom: string) =>
   `linear-gradient(180deg, ${top} 0%, ${mid} 42%, ${low} 60%, ${bottom} 100%)`;
 
@@ -137,7 +139,7 @@ export function makePalette(theme: Theme, systemDark: boolean): Palette {
   return palette;
 }
 
-/** colors 是这份配色的颜色；page 是页面背景那份，卡片压在页面上的硬阴影、新拟物高光和页面背景都看它。 */
+/** colors represents the colors for this palette; page represents the page background palette, which governs hard shadows of cards on the page background, neumorphic highlights, and page background. */
 function buildPalette(theme: Theme, colors: ResolvedColors, page: ResolvedColors): Palette {
   const radius = theme.radius;
   const image = backdropImage(theme, page);
@@ -176,8 +178,9 @@ function buildPalette(theme: Theme, colors: ResolvedColors, page: ResolvedColors
     cardStyle: (background = colors.surface) => {
       const base: ViewStyle = { backgroundColor: background, borderRadius: radius };
       if (theme.card) {
-        // 自定义边框和阴影（D-624）：底色仍跟 cardStyle（毛玻璃的半透明底、金属的渐变），
-        // 边框和阴影全换成参数里的。
+        // Custom borders and shadows (D-624): base color follows cardStyle (semi-transparent
+        // background for glassmorphic, gradient for metallic), while borders and shadows are
+        // entirely replaced by parameters.
         const roles = cardRoleColors(colors, page);
         const parts = customCardParts(theme.card, (role) => roles[role]);
         if (theme.cardStyle === 'glass')
@@ -200,7 +203,7 @@ function buildPalette(theme: Theme, colors: ResolvedColors, page: ResolvedColors
       if (theme.cardStyle === 'outline')
         return { ...base, borderWidth: 1, borderColor: colors.border };
       if (theme.cardStyle === 'flat') return base;
-      // 下面三种用 boxShadow（新架构自带）：旧的 shadow* 属性做不出硬阴影、多层阴影和内阴影。
+      // The following three use boxShadow (provided by the new architecture): legacy shadow* properties cannot produce hard shadows, multi-layer shadows, or inner shadows.
       if (theme.cardStyle === 'brutal') {
         return {
           ...base,
@@ -210,13 +213,13 @@ function buildPalette(theme: Theme, colors: ResolvedColors, page: ResolvedColors
         };
       }
       if (theme.cardStyle === 'soft') {
-        // 新拟物：左上亮、右下暗，卡片和背景同色时最像。
+        // Neumorphism: light top-left, dark bottom-right, most closely resembling the background when cards and background share the same color.
         const light = colors.dark ? rgba('#FFFFFF', 0.06) : mix(page.background, '#FFFFFF', 0.8);
         const dark = rgba(colors.dark ? '#000000' : colors.shadow, colors.dark ? 0.6 : 0.16);
         return { ...base, boxShadow: `-5px -5px 12px ${light}, 6px 6px 14px ${dark}` };
       }
       if (theme.cardStyle === 'glass') {
-        // 半透明底色 + 细亮边；模糊由卡片里的 GlassFill 提供（iOS 26 原生玻璃，否则 BlurView）。
+        // Semi-transparent background color + thin bright border; blur is provided by GlassFill inside the card (native glass on iOS 26, otherwise BlurView).
         return {
           ...base,
           backgroundColor: rgba(background, GLASS_OPACITY),
@@ -234,7 +237,7 @@ function buildPalette(theme: Theme, colors: ResolvedColors, page: ResolvedColors
         };
       }
       if (theme.cardStyle === 'chrome') {
-        // 金属：上亮下暗、中段由亮转暗，顶边一条高光。
+        // Metal: bright top, dark bottom, middle transitions from bright to dark, with a highlight along the top edge.
         const [top, mid, low, bottom] = chromeStops(background, colors.dark);
         return {
           ...base,
@@ -248,7 +251,7 @@ function buildPalette(theme: Theme, colors: ResolvedColors, page: ResolvedColors
         };
       }
       if (theme.cardStyle === 'puffy') {
-        // 黏土：外面一层柔和阴影，里面上亮下暗的内阴影让卡片像鼓起来。
+        // Clay: A soft shadow on the outside, and an inner shadow with a bright top and dark bottom on the inside, making the card look puffed up.
         return {
           ...base,
           boxShadow: [
@@ -274,7 +277,7 @@ export function usePalette(theme: Theme): Palette {
   return makePalette(theme, useColorScheme() === 'dark');
 }
 
-/** 卡片类组件的 tone 是底色；图标块使用同一色系的强调色。 */
+/** The tone of card components is the background color; icon blocks use an accent color from the same family. */
 export function cardColors(palette: Palette, tone: ComponentStyle['tone']) {
   switch (tone) {
     case 'primary':
@@ -291,8 +294,10 @@ export function cardColors(palette: Palette, tone: ComponentStyle['tone']) {
 }
 
 /**
- * 图标块的颜色（D-230）：主题设了 iconStyle 时所有图标块都跟着它，没设时用组件自己的默认。
- * solid = 实色底、白图标；tint = 浅色底、彩色图标（卡片本身有底色时用卡片色系的强调色）。
+ * Icon block color (D-230): When the theme specifies iconStyle, all icon blocks follow it;
+ * otherwise, they use the component's own default. solid = solid background, white icon; tint =
+ * light background, colored icon (uses the accent color of the card family when the card itself
+ * has a background).
  */
 export function iconColors(
   palette: Palette,

@@ -11,10 +11,12 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp, starterAfterGuide } from '../test-utils/render-app';
 
-// 门户网站的展示预设（App 文件，D-485）：每一份从「设置 → 我的预设 → 从文件导入」选进来，加成一个新 App，原来的不动；
-// 进到这个 App 里，导航栏每一项、每个页面、每张表的新记录页和记录页都要能渲染，不能出错、不能被回退。
+// Portal website display presets (App files, D-485): each selected via "Settings -> My presets ->
+// Import from file" is added as a new App, leaving the original unchanged; entering this App, every
+// navigation bar item, every page, every table's new record page and record page must render
+// successfully without errors or rollbacks.
 
-// 每个预设要走完所有页面，几十个测试一起跑时比较慢。
+// Each preset has to go through all pages, which is relatively slow when dozens of tests run together.
 jest.setTimeout(30000);
 
 const DIR = join(__dirname, '../../../../packages/core/src/fixtures/portal-apps');
@@ -22,7 +24,7 @@ const manifest = JSON.parse(readFileSync(join(DIR, 'manifest.json'), 'utf8')) as
   apps: { id: string; name: string; file: string }[];
 };
 
-/** 每张表放三条记录（字段按类型填一个合法的例子值，选项轮着用，关联指向对方表的第一条）。 */
+/** Put three records in each table (fill fields with valid example values according to type, cycle through options, and set relations to point to the first record of the counterpart table). */
 async function fillTables(
   repo: MemoryWorkspaceRepo,
   config: WorkspaceConfig,
@@ -78,7 +80,7 @@ describe.each(manifest.apps.map((a) => [a.name, a] as const))('app file %s', (_n
     };
     return { pages: new Set(f.pages.map((p) => p.id)), tables: new Set(f.tables.map((t) => t.id)) };
   })();
-  // 做成 App 的按 app 字段认；导入主页的没有 app，按文件里的 ID 认。
+  // Apps identified by app field for app mode; home imports have no app and are identified by ID in the file.
   let mode: 'app' | 'home' = 'app';
   const ownedPage = (p: { id: string; app?: string | undefined }) =>
     mode === 'app' ? p.app === entry.id : fileIds.pages.has(p.id);
@@ -91,7 +93,7 @@ describe.each(manifest.apps.map((a) => [a.name, a] as const))('app file %s', (_n
       }
     ).app.theme.primaryColor;
 
-  /** 从「设置 → 我的预设」的「从文件导入」选进来（和用户做的一样），点「应用」。 */
+  /** Selected via "Settings -> My presets" -> "Import from file" (same as user action), tap "Apply". */
   async function importThroughUi(withData: boolean) {
     const repo = new MemoryWorkspaceRepo();
     const files = new FakeFiles();
@@ -103,7 +105,7 @@ describe.each(manifest.apps.map((a) => [a.name, a] as const))('app file %s', (_n
     const uri = `file:///picked/${entry.file}`;
     files.pickedTexts.set(uri, readFileSync(join(DIR, entry.file), 'utf8'));
     files.nextPick = [{ uri, name: entry.file, size: null, mimeType: 'application/json' }];
-    // 先问怎么导入（导入主页 / 做成新 App），再预览，点「应用」。
+    // Ask how to import first (import to home / create new app), then preview, and tap "Apply".
     jest
       .spyOn(Alert, 'alert')
       .mockImplementationOnce(
@@ -137,14 +139,14 @@ describe.each(manifest.apps.map((a) => [a.name, a] as const))('app file %s', (_n
     const home = config.containers.pages.find((p) => p.id === 'home')!;
     let bar: readonly string[];
     if (mode === 'app') {
-      // 导入是一个版本（改动记录里能撤销），主页上多了进这个 App 的入口。
+      // Import is a version (undoable in change history), and an entry point to this App appears on the home screen.
       expect(JSON.stringify(home.blocks)).toContain(`app:${entry.id}`);
       healthy();
-      // 进到这个 App 里：底栏每一项。
+      // Entering this App: every item in the bottom bar.
       await act(async () => store.getState().enterApp(entry.id));
       bar = config.nav.apps!.find((a) => a.id === entry.id)!.bar;
     } else {
-      // 导入主页：风格换成了它的，没有做成 App，它的页面进了主页的导航栏。
+      // Import home: style switched to its style, no app was created, its pages entered the home screen navigation bar.
       expect(config.nav.apps).toBeUndefined();
       expect(config.theme.primaryColor).toBe(readTheme());
       expect(config.nav.bar.some((t) => t.startsWith('page:') && t !== 'page:home')).toBe(true);
@@ -158,7 +160,7 @@ describe.each(manifest.apps.map((a) => [a.name, a] as const))('app file %s', (_n
       if (target === 'ai') await act(async () => router.back());
     }
 
-    // 这个 App 的每个页面（给一条记录用的页面带一条记录）。
+    // Each page of this App (a page for a single record takes that single record).
     let n = 0;
     for (const page of config.containers.pages.filter(ownedPage)) {
       let params: Record<string, string> = { pageId: page.id };
@@ -182,7 +184,7 @@ describe.each(manifest.apps.map((a) => [a.name, a] as const))('app file %s', (_n
       await act(async () => router.back());
     }
 
-    // 每张表的新记录页；有数据时再打开第一条记录。
+    // New record page for each table; opens the first record if data is present.
     for (const table of config.data.tables.filter(ownedTable)) {
       await act(async () =>
         router.push({ pathname: '/record/[collectionId]', params: { collectionId: table.id } }),
@@ -242,7 +244,7 @@ describe('restore the original look (D-485)', () => {
     await waitFor(() => expect(store.getState().config!.nav.apps?.[0]?.id).toBe('habits'));
     const original = store.getState().config!.nav.apps![0]!;
 
-    // 用户把它改了：删一页、改风格、改名。
+    // The user modified it: deleted a page, changed style, or renamed it.
     await act(async () => {
       await store.getState().proposeOps(
         [
@@ -256,7 +258,7 @@ describe('restore the original look (D-485)', () => {
     });
     expect(store.getState().config!.nav.apps![0]!.name).toBe('Changed');
 
-    // 长按这个 App：菜单里有「恢复初始样子」；点它，预览里点「应用」。
+    // Long-press this App: the menu includes "Restore to original appearance"; tap it, then tap "Apply" in the preview.
     jest
       .spyOn(Alert, 'alert')
       .mockImplementationOnce((_t, _m, buttons) => void buttons?.[1]?.onPress?.());
@@ -268,10 +270,10 @@ describe('restore the original look (D-485)', () => {
     const after = store.getState().config!;
     expect(after.nav.apps![0]!.theme).toEqual(original.theme);
     expect(after.containers.pages.some((p) => p.id === 'habits-insights')).toBe(true);
-    // 记录的表都还在。
+    // All tables with records are still present.
     expect(after.data.tables.filter((t) => t.app === 'habits').length).toBeGreaterThan(0);
 
-    // 不是从文件导入的 App（这里手做一个）没有这一项。
+    // Apps not imported from a file (created manually here) do not have this item.
     await act(async () => {
       await store
         .getState()

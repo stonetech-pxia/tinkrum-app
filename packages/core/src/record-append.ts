@@ -2,10 +2,12 @@ import { MAX_ATTACHMENTS, attachmentIds } from './field-values';
 import { FREE_NOTE } from './prefill/code-rules';
 import type { Collection } from './schema';
 
-// 把一次运行的结果放进一条已有的记录（out.addRecord 的 into: "existing"，D-443）：只追加，不替换、不删除。
-// 这里是纯规则：放哪个字段、还能放几个、表单开始时填什么。选记录、存文件、写数据库在 App 里，表单由用户确认。
+// Which field to put files into, which field to put text into: first attachment field; first long
+// text field, or first text field if none. Pure rules: which field to put into, how many more can
+// be added, what to prefill when form opens. Record selection, file storage, and database writes
+// happen in the app; the form is confirmed by the user.
 
-/** 文件放进哪个字段、文字放进哪个字段：第一个附件字段；第一个长文本，没有就第一个文字字段。 */
+/** Which field to put files into, which field to put text into: first attachment field; first long text field, or first text field if none. */
 export function recordTargets(collection: Collection) {
   return {
     fileField: collection.fields.find((f) => f.type === 'file')?.id,
@@ -17,8 +19,10 @@ export function recordTargets(collection: Collection) {
 }
 
 /**
- * 用户说的一句话（D-575）原样放进哪个字段：长文本，没有就名字是「备注」这类的文字字段，再没有才是第一个文字字段。
- * 收据表的第一个文字字段是「商家」，整句放进去用户还得删（D-576）。
+ * Which field to put spoken text verbatim (D-575) into: long text field, or text field named
+ * "Notes" etc. if no long text field, and only as a last resort the first text field. The first
+ * text field of a receipt table is "Merchant"; putting the whole sentence there would force the
+ * user to delete it (D-576).
  */
 export function spokenTextTarget(collection: Collection): string | undefined {
   return (
@@ -28,7 +32,7 @@ export function spokenTextTarget(collection: Collection): string | undefined {
   )?.id;
 }
 
-/** 这条记录的附件字段还能再放几个文件；表里没有附件字段是 0。 */
+/** How many more files can be added to the attachment fields of this record; 0 if there are no attachment fields in the table. */
 export function attachRoom(collection: Collection, values: Readonly<Record<string, unknown>>) {
   const { fileField } = recordTargets(collection);
   if (fileField === undefined) return 0;
@@ -36,8 +40,10 @@ export function attachRoom(collection: Collection, values: Readonly<Record<strin
 }
 
 /**
- * 往一条已有的记录里追加东西时，表单开始时要改的字段（只含改了的）：文件接在原来的后面，不重复、不超过上限；
- * 文字在字段是空的（或只有空白）时写进去，否则另起一行接在后面，原来的一个字不动。
+ * When appending items to an existing record, fields to modify when the form opens (containing
+ * only changed ones): files are appended after existing ones, without duplication and within
+ * limits; text is written if the field is empty (or blank), otherwise appended on a new line
+ * leaving existing text untouched.
  */
 export function appendPrefill(
   collection: Collection,

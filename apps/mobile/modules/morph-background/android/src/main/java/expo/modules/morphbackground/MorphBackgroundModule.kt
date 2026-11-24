@@ -12,8 +12,9 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.records.Field
 import expo.modules.kotlin.records.Record
 
-// 长任务切到后台也继续的 Android 部分（D-160–D-162）。JS 在一次运行开始时 begin、运行中 update、
-// 结束时 end；服务见 MorphBackgroundService.kt。和 iOS 的 JS 接口相同。
+// Android portion for keeping long tasks running in the background (D-160–D-162). JS calls begin at
+// the start of a run, update during execution, and end upon completion; implemented in
+// MorphBackgroundService.kt. Shares the same JS interface as iOS.
 
 class DoneNotice : Record {
   @Field val title: String = ""
@@ -28,8 +29,9 @@ class MorphBackgroundModule : Module() {
     get() = requireNotNull(appContext.reactContext) { "React Application Context is null" }
 
   /**
-   * begin 成功后、end 之前为 true。只在这期间、而且服务真的进了前台时改进度通知：
-   * 不然发出去的是一条普通通知，停服务带不走它。
+   * True after successful begin and before end. Only during this period and when the service has
+   * truly entered the foreground will progress notifications be updated; otherwise, an ordinary
+   * notification would be sent that cannot be dismissed by stopping the service.
    */
   private var active = false
   private var title = ""
@@ -39,7 +41,7 @@ class MorphBackgroundModule : Module() {
 
     Constant("continuesInBackground") { true }
 
-    // Android 13 起要用户允许才显示通知：没允许过就问一次，以后不再问（D-161）。拒绝了任务照常跑。
+    // Starting with Android 13, user permission is required to show notifications: ask once if never permitted, and never ask again (D-161). If denied, the task runs as usual.
     AsyncFunction("ensureNotificationPermission") { promise: Promise ->
       val permissions = appContext.permissions
       if (Build.VERSION.SDK_INT < 33 || permissions == null) {
@@ -83,7 +85,7 @@ class MorphBackgroundModule : Module() {
       }
     }
 
-    // 提醒按钮的后台处理（D-318）在 Android 上由 expo-task-manager 的后台任务管，这里不用做什么。
+    // Background handling for the reminder button (D-318) on Android is managed by expo-task-manager's background task, so nothing needs to be done here.
     Function("releaseActionTime") {}
 
     Function("end") { done: DoneNotice? ->

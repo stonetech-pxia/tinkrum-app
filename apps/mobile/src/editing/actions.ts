@@ -4,8 +4,10 @@ import { Alert } from 'react-native';
 import { t } from '../i18n';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 
-// 直接编辑（D-052–D-054）：界面上的每个操作都翻译成语义化修改操作，先经过校验加入编辑模式的草稿；
-// 点「完成」时整份草稿走和 AI 相同的协议：proposeOps → confirm，生成一个 source 为 user 的版本，提示条可撤销。
+// Direct editing (D-052–D-054): every action on the interface is translated into semantic
+// modification operations, validated first and added to the edit mode draft; upon tapping "Done",
+// the entire draft goes through the same protocol as AI (`proposeOps` -> `confirm`), generating a
+// version with source `user`, with an undoable banner.
 
 export function useEditActions(page: Page) {
   const { registry, locale } = useWorkspaceContext();
@@ -22,7 +24,7 @@ export function useEditActions(page: Page) {
 
   const blocked = (issues: string[]) => Alert.alert(t(locale, 'invalidPlan'), issues.join('\n'));
 
-  /** 把一个操作加入草稿；未通过校验时提示原因，草稿不变。 */
+  /** Adds an operation to the draft; shows the reason for failure and leaves the draft unchanged if validation fails. */
   function edit(ops: Op[]): boolean {
     const result = editOps(ops);
     if (result.ok) return true;

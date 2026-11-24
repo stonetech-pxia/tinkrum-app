@@ -102,9 +102,9 @@ describe('reminder settings (D-251)', () => {
     expect(
       ok({ ...dueSoon, when: { before: { table: 'bills', field: 'due' }, at: '08:30' } }),
     ).toBe(false);
-    // 只有 when.each 能有「完成」「稍后提醒」「除非」。
+    // Only when.each can have "done", "snooze", or "unless".
     expect(ok({ snoozeMinutes: 10 })).toBe(false);
-    // 不能带任何「运行」之类的设置。
+    // Cannot carry any "run" settings.
     expect(ok({ run: true })).toBe(false);
   });
 
@@ -156,8 +156,8 @@ describe('planNotifications', () => {
         'bills',
         [
           bill('rent', '房租', '2026-11-01'),
-          bill('phone', '话费', '2026-10-24'), // 提醒时间 10-21，已经过了
-          bill('water', '水费', '2026-10-25'), // 提醒时间是今天 08:30，已经过了
+          bill('phone', '话费', '2026-10-24'), // Reminder time 10-21, already passed
+          bill('water', '水费', '2026-10-25'), // Reminder time is today at 08:30, already passed
           bill('gas', '燃气'),
           bill('net', '宽带', '2026-10-26'),
         ],
@@ -174,7 +174,7 @@ describe('planNotifications', () => {
       title: '账单快到期了',
       body: '「账单」里有一条记录还有 3 天到期（2026-10-26）',
     });
-    // 通知会出现在锁屏上：正文只写表名，不写记录的标题（P-043 ②）。
+    // Notifications appear on the lock screen: body only writes the table name, not the record title (P-043 ②).
     for (const n of planned) expect(n.body).not.toMatch(/宽带|房租/);
   });
 
@@ -201,7 +201,7 @@ describe('planNotifications', () => {
   });
 });
 
-// 加完一条记录过几分钟提醒一次（创始人 2026-10-31：「给账单的记录增加两分钟的提醒」，选了「加完两分钟后提醒」）。
+// Remind a few minutes after each entry is added (founder 2026-10-31: "add a two-minute reminder for bill records", selected "remind two minutes after adding").
 describe('a reminder some minutes after each entry is added', () => {
   const afterAdd = (minutes: number): Reminder =>
     ({

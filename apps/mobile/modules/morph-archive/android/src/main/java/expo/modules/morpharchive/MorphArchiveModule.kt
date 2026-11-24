@@ -12,11 +12,14 @@ import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
-// 整体导出和恢复的 Android 实现（D-600）：把目录和文件写成一个标准 zip，把 zip 安全地解到一个目录。
-// 读写都是流式的（ZipCodec.kt），不把文件读进内存；一次只做一件事；cancel() 让正在做的事在下一块数据处停下，
-// 删掉没写完的文件后以 ERR_ARCHIVE_CANCELLED 结束。压缩包可以是 content:// 地址：直接读文件描述符，不先复制；
-// 描述符不能随机读时（有的文档提供者）才复制一份进缓存，用完就删（复制的是我们的，原件不动）。
-// 只用本机文件，不联网。文件名和内容不写日志。
+// Android implementation of bulk export and restore (D-600): serializes directories and files into
+// a standard ZIP, and safely extracts a ZIP into a directory. Read and write are entirely streaming
+// (ZipCodec.kt) without loading files into memory; processes one task at a time; cancel() halts
+// ongoing work at the next data chunk, deletes unfinished files, and terminates with
+// ERR_ARCHIVE_CANCELLED. Archives may be content:// URIs: reads file descriptors directly without
+// prior copying; copies into cache only when descriptors do not support random access (found in
+// some document providers), deleting after use (our copies are used, originals remain untouched).
+// Local files only, no networking. File names and contents are never logged.
 
 class ArchiveException(code: String, detail: String) : CodedException(code, detail, null)
 
@@ -40,7 +43,7 @@ class MorphArchiveModule : Module() {
 
     Function("cancel") { cancelRequested.set(true) }
 
-    // 这些目录里有多少个文件、一共多少字节（不跟随符号链接）。
+    // Number of files and total bytes in these directories (does not follow symlinks).
     AsyncFunction("scanTree") { uris: List<String>, promise: Promise ->
       perform(promise) {
         var files = 0
@@ -53,7 +56,7 @@ class MorphArchiveModule : Module() {
       }
     }
 
-    // sources：{ dir, prefix } 目录里的全部文件放在 prefix/ 下；{ file, name } 一个文件；{ text, name } 一段文字。
+    // sources: all files in directory { dir, prefix } placed under prefix/; single file { file, name }; text block { text, name }.
     AsyncFunction("createArchive") { dest: String, sources: List<Map<String, Any?>>, promise: Promise ->
       perform(promise) {
         val items = ArrayList<Item>()
@@ -76,8 +79,9 @@ class MorphArchiveModule : Module() {
       }
     }
 
-    // 读压缩包的目录并逐条检查（不解压）：名字、符号链接、加密、压缩方式、大小。
-    // 返回每个文件的名字和大小，以及 tinkrum-backup.json 的内容（没有时为 null）。
+    // Reads archive directory and inspects entries sequentially (without extraction): name,
+    // symlink, encryption, compression method, size. Returns name and size for each file, along
+    // with tinkrum-backup.json content (null if absent).
     AsyncFunction("inspectArchive") { src: String, promise: Promise ->
       perform(promise) {
         val reader = ZipReader(openSource(src))
@@ -106,7 +110,7 @@ class MorphArchiveModule : Module() {
       }
     }
 
-    // 把压缩包解到 dest（必须还不存在）。出错或取消时 dest 整个删掉。
+    // Extracts archive to dest (which must not yet exist). On error or cancellation, dest is completely deleted.
     AsyncFunction("extractArchive") { src: String, dest: String, promise: Promise ->
       perform(promise) {
         val root = fileOf(dest)
@@ -122,7 +126,7 @@ class MorphArchiveModule : Module() {
             var lastReport = 0L
             for (entry in reader.entries) {
               val target = File(root, entry.name)
-              // 解出来的位置必须在 dest 里面（名字已经检查过，这里再挡一次）。
+              // The extracted path must reside inside dest (names already checked, blocked here as a secondary safeguard).
               if (!target.canonicalPath.startsWith(base)) throw ZipFail.Unsafe("path")
               reader.extract(entry, target, { cancelRequested.get() }, { })
               done += entry.size
@@ -143,7 +147,7 @@ class MorphArchiveModule : Module() {
       }
     }
 
-    // 改名移动（同一个卷里，瞬间完成，不复制）：to 必须还不存在。恢复时换数据目录用。
+    // Rename/move (in the same volume, instantaneous, no copy): 'to' must not exist yet. Used when changing data directory during restore.
     AsyncFunction("moveTree") { from: String, to: String, promise: Promise ->
       thread {
         val target = fileOf(to)
@@ -166,7 +170,7 @@ class MorphArchiveModule : Module() {
     }
   }
 
-  /** 一次只做一件事；放到后台线程；错误换成带代码的异常。 */
+  /** Do only one thing at a time; run on a background thread; replace errors with code-bearing exceptions. */
   private fun perform(promise: Promise, body: () -> Any?) {
     if (!running.compareAndSet(false, true)) {
       promise.reject(ArchiveException("ERR_ARCHIVE_BUSY", "Another archive operation is running"))
@@ -196,8 +200,9 @@ class MorphArchiveModule : Module() {
   }
 
   /**
-   * 打开压缩包：file:// 直接读；content:// 读文件描述符。描述符不能随机读（管道）时复制一份进缓存再读，
-   * 关的时候删掉这份复制（原件不动）。
+   * Open archive: read file:// directly; read content:// file descriptor. If the descriptor
+   * cannot be read randomly (pipe), copy it to cache first and read from the copy, deleting the
+   * copy upon closing (original untouched).
    */
   private fun openSource(uri: String): ZipSource {
     val parsed = Uri.parse(uri)
@@ -217,7 +222,7 @@ class MorphArchiveModule : Module() {
         }
       }
     } catch (_: Exception) {
-      // 不能随机读：下面复制一份。
+      // Cannot read randomly: copy one below.
     }
     val copy = File.createTempFile("archive-copy", ".zip", context.cacheDir)
     try {
@@ -234,7 +239,7 @@ class MorphArchiveModule : Module() {
     return ZipSource(RandomAccessFile(copy, "r").channel) { copy.delete() }
   }
 
-  /** 目录里的全部普通文件（含 . 开头的），按名字排序；符号链接和别的特殊文件不要。 */
+  /** All regular files in the directory (including those starting with .), sorted by name; ignore symbolic links and other special files. */
   private fun walk(dir: File, prefix: String): List<Item> {
     val items = ArrayList<Item>()
     fun visit(folder: File, relative: String) {

@@ -1,6 +1,8 @@
-// 音频（D-152、D-153）：「压到指定大小 / 音质」「转格式」时的码率、声道和采样率。
-// 真正的编码在 App 的原生模块 morph-media 里（iOS AVFoundation、Android Media3），这里只有纯计算。
-// 输出默认 M4A（AAC），微信、邮件、电脑和所有手机都能放；也能输出 WAV（不压缩）和 MP3（LAME，D-183）。
+// Audio (D-152, D-153): Bitrate, channels, and sample rate when "compressing to specified size /
+// audio quality" or "converting format". Actual encoding happens in the app's native module
+// `morph-media` (iOS AVFoundation, Android Media3); only pure computation is done here. Outputs M4A
+// (AAC) by default, which plays on WeChat, email, PC, and all phones; can also output WAV
+// (uncompressed) and MP3 (LAME, D-183).
 
 export const AUDIO_QUALITIES = ['high', 'standard', 'voice'] as const;
 export type AudioQuality = (typeof AUDIO_QUALITIES)[number];
@@ -8,7 +10,7 @@ export type AudioQuality = (typeof AUDIO_QUALITIES)[number];
 export const AUDIO_FORMATS = ['m4a', 'wav', 'mp3'] as const;
 export type AudioFormat = (typeof AUDIO_FORMATS)[number];
 
-/** 编码要求（交给原生模块）。WAV 只用 channels / sampleRate。 */
+/** Encoding requirements (passed to the native module). WAV uses only channels / sampleRate. */
 export interface AudioPlan {
   format: AudioFormat;
   bitrateKbps: number;
@@ -16,18 +18,18 @@ export interface AudioPlan {
   sampleRate: number;
 }
 
-/** 音质档位：高（音乐）、标准、语音（录音、讲课，单声道）。 */
+/** Audio quality tiers: high (music), standard, voice (recordings, lectures, mono). */
 export const AUDIO_QUALITY_PLANS: Record<AudioQuality, Omit<AudioPlan, 'format'>> = {
   high: { bitrateKbps: 192, channels: 2, sampleRate: 44100 },
   standard: { bitrateKbps: 128, channels: 2, sampleRate: 44100 },
   voice: { bitrateKbps: 48, channels: 1, sampleRate: 22050 },
 };
 
-/** 再低 AAC 就听不清了：目标大小算出来更低时直接报错，告诉用户至少要多大。 */
+/** AAC becomes unintelligible at lower bitrates: throws an error directly when the calculated target size is lower, telling the user the minimum required size. */
 export const MIN_AUDIO_KBPS = 24;
-/** 压到指定大小时最高用到的码率（再高听不出区别）。 */
+/** Maximum bitrate used when compressing to a specified size (higher yields no audible difference). */
 export const MAX_AUDIO_KBPS = 192;
-/** 容器开销和编码器的码率误差。 */
+/** Container overhead and encoder bitrate error margin. */
 export const AUDIO_SIZE_MARGIN = 0.94;
 
 export interface AudioSource {
@@ -35,7 +37,7 @@ export interface AudioSource {
   size: number;
   channels?: number;
   sampleRate?: number;
-  /** 原来的码率（读不到时按大小和时长算）。 */
+  /** Original bitrate (falls back to calculating from size and duration if unreadable). */
   kbps?: number;
 }
 
@@ -44,7 +46,7 @@ export type AudioSizePlan =
 
 const MB = 1024 * 1024;
 
-/** 原来的码率（kbps）：读不到时按大小和时长算，都没有时为 0。 */
+/** Original bitrate (kbps): calculated from size and duration if unreadable, returns 0 if neither is available. */
 export const audioSourceKbps = (s: AudioSource) =>
   s.kbps && s.kbps > 0
     ? s.kbps
@@ -52,7 +54,7 @@ export const audioSourceKbps = (s: AudioSource) =>
       ? (s.size * 8) / (s.durationMs / 1000) / 1000
       : 0;
 
-/** 码率 → 声道和采样率：立体声要 96 kbps 以上，太低时单声道、22.05 kHz（AAC 编码器的要求）。 */
+/** Bitrate → channels and sample rate: stereo requires > 96 kbps; falls back to mono and 22.05 kHz when too low (AAC encoder requirement). */
 function shapeFor(kbps: number, sourceChannels: number): Omit<AudioPlan, 'format'> {
   const stereo = kbps >= 96 && sourceChannels !== 1;
   return {
@@ -63,8 +65,8 @@ function shapeFor(kbps: number, sourceChannels: number): Omit<AudioPlan, 'format
 }
 
 /**
- * 压到不超过 targetBytes：本来就不超过时原样留着；按时长算码率，最高 192 kbps；
- * 低于 24 kbps 时报错（带「至少 X MB」）。
+ * Compress to at most `targetBytes`: keeps original if already within limit; calculates bitrate
+ * based on duration with a 192 kbps cap; throws an error if below 24 kbps (with "at least X MB").
  */
 export function planAudioSize(source: AudioSource, targetBytes: number, factor = 1): AudioSizePlan {
   if (factor === 1 && source.size > 0 && source.size <= targetBytes) return { kind: 'keep' };
@@ -80,7 +82,7 @@ export function planAudioSize(source: AudioSource, targetBytes: number, factor =
   return { kind: 'encode', plan: { format: 'm4a', ...shapeFor(kbps, source.channels ?? 2) } };
 }
 
-/** 按音质：不比原来的码率高（压小不会变大）；单声道的原文件不升成立体声。 */
+/** By audio quality: does not exceed original bitrate (compressing a smaller file won't make it larger); mono original files are not upmixed to stereo. */
 export function planAudioQuality(source: AudioSource, quality: AudioQuality): AudioPlan {
   const tier = AUDIO_QUALITY_PLANS[quality];
   const original = audioSourceKbps(source);
@@ -98,8 +100,9 @@ export function planAudioQuality(source: AudioSource, quality: AudioQuality): Au
 }
 
 /**
- * 转格式（剪一段、合成、从视频取声音也用它）：M4A 码率跟着原来的走（48–192 kbps）；
- * WAV 是不压缩的 16 位 PCM，保持原来的声道（最多 2 个）和采样率。
+ * Convert format (also used for trimming, mixing, and extracting audio from video): M4A bitrate
+ * follows the original (48–192 kbps); WAV is uncompressed 16-bit PCM, preserving the original
+ * channels (up to 2) and sample rate.
  */
 export function planAudioConvert(source: AudioSource, format: AudioFormat): AudioPlan {
   const channels: 1 | 2 = source.channels === 1 ? 1 : 2;
@@ -108,7 +111,7 @@ export function planAudioConvert(source: AudioSource, format: AudioFormat): Audi
     const sampleRate = source.sampleRate ? Math.min(48000, source.sampleRate) : 44100;
     return { format, bitrateKbps: 0, channels, sampleRate };
   }
-  // 码率跟着原来的走（再编码一次略加一点，免得音质变差），不把低码率的录音变大：48–192 kbps。
+  // Bitrate follows the original (slightly increased upon re-encoding to avoid quality degradation), does not inflate low-bitrate recordings: 48–192 kbps.
   const original = audioSourceKbps(source);
   const kbps = Math.round(
     original > 0 ? Math.min(MAX_AUDIO_KBPS, Math.max(48, original * 1.2)) : 160,
@@ -116,12 +119,14 @@ export function planAudioConvert(source: AudioSource, format: AudioFormat): Audi
   return { format, bitrateKbps: kbps, channels: kbps >= 64 ? channels : 1, sampleRate: 44100 };
 }
 
-/** MP3 的标准码率（kbps）：LAME 只按这些档位编码。 */
+/** Standard MP3 bitrates (kbps): LAME encodes only using these tiers. */
 export const MP3_BITRATES = [128, 160, 192, 224, 256, 320] as const;
 
 /**
- * MP3：同样的音质比 AAC 要多一些码率，按原来的 1.5 倍取最近的标准档（128–320 kbps）；读不到原码率时 192。
- * 采样率统一 44.1 kHz（各种播放器都认）；单声道的录音保持单声道。
+ * MP3: requires slightly higher bitrate than AAC for equivalent quality, takes the nearest
+ * standard tier at 1.5x the original (128–320 kbps); defaults to 192 if original bitrate is
+ * unreadable. Sample rate standardized to 44.1 kHz (recognized by all players); mono recordings
+ * remain mono.
  */
 function planMp3(source: AudioSource): AudioPlan {
   const original = audioSourceKbps(source);
@@ -135,7 +140,7 @@ function planMp3(source: AudioSource): AudioPlan {
   };
 }
 
-/** 预计大小（字节）：检查剩余空间用。 */
+/** Estimated size (bytes): used for checking remaining space. */
 export function estimateAudioBytes(plan: AudioPlan, durationMs: number): number {
   const seconds = durationMs / 1000;
   if (plan.format === 'wav') return plan.sampleRate * plan.channels * 2 * seconds + 44;

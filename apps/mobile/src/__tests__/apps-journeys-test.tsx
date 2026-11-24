@@ -19,9 +19,9 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp, starterAfterGuide, testRegistry } from '../test-utils/render-app';
 
-// 多个 app（D-485）：从主页的入口进入，底栏换成 app 自己的，固定的「返回 Tinkrum」回主页。
+// Multiple apps (D-485): enter via main page entry point, bottom bar switches to the app's own, with a fixed "Back to Tinkrum" to return home.
 
-/** 一个健身 app：两页，底栏是两页加 Tink；主页上有入口按钮。 */
+/** A fitness app: two pages, bottom bar is two pages plus Tink; entry button on the main page. */
 function withFitness(locale: 'zh' | 'en' | 'fr', registry: typeof testRegistry) {
   const base = starterAfterGuide(locale, registry);
   const ops: Op[] = [
@@ -40,7 +40,7 @@ function withFitness(locale: 'zh' | 'en' | 'fr', registry: typeof testRegistry) 
         opens: 'app:fit',
       } as never,
     },
-    // 入口卡片：不写名字和图标，按 app 现取。
+    // Entry card: name and icon omitted, retrieved dynamically from the app.
     {
       op: 'addContainer',
       page: 'home',
@@ -56,7 +56,7 @@ describe('apps (UI)', () => {
   const start = () =>
     renderToolsApp(new MemoryWorkspaceRepo(), new FakeFiles(), { seed: withFitness });
 
-  // 子 App 里没有「返回 Tinkrum」（D-485）：离开 App 再回来就是回到主页。
+  // No "Back to Tinkrum" inside sub-apps (D-485): leaving the app and returning brings you back to the home screen.
   const handlers: ((state: string) => void)[] = [];
   const toState = (state: string) => handlers.forEach((h) => h(state));
   const appState = () =>
@@ -67,7 +67,7 @@ describe('apps (UI)', () => {
       handlers.push(handler);
       return { remove: () => {} };
     }) as never);
-  /** 等一会儿（让 700 毫秒的延迟检查跑完）。 */
+  /** Wait a moment (allowing the 700 ms debounce check to finish). */
   const wait = async (ms: number) => {
     const t0 = Date.now();
     await waitFor(
@@ -77,12 +77,12 @@ describe('apps (UI)', () => {
       { timeout: ms + 3000, interval: 50 },
     );
   };
-  /** 离开 App 再回来（点手机上的 Tinkrum 图标）；默认离开 31 秒，超过 30 秒才算离开（D-612）。 */
+  /** Leave the app and return (tapping the Tinkrum icon on the phone); default absence is 31 seconds, counted as leaving only after exceeding 30 seconds (D-612). */
   let clockSkew = 0;
   let dateSpy: jest.SpyInstance | undefined;
   const leaveAndReturn = async (awayMs = 31_000) => {
     await act(async () => toState('background'));
-    // 只把时钟往前拨，等待的时间照常（测试里的计时器是真的）。
+    // Advance the clock only, wait duration proceeds normally (timers in tests are real).
     dateSpy?.mockRestore();
     const now = Date.now.bind(Date);
     clockSkew = awayMs;
@@ -99,7 +99,7 @@ describe('apps (UI)', () => {
     await screen.findByTestId('nav-settings');
 
     await fireEvent.press((await screen.findAllByText('健身'))[0]!);
-    // app 的底栏：自己的两页和 Tink；主页的设置不在，也没有返回主页的入口。
+    // App's bottom bar: its own two pages and Tink; home settings are absent, and there is no entry to return home.
     expect(await screen.findByTestId('nav-page:fit-home')).toBeTruthy();
     expect(screen.getByTestId('nav-page:fit-plan')).toBeTruthy();
     expect(screen.getByTestId('nav-ai')).toBeTruthy();
@@ -110,18 +110,18 @@ describe('apps (UI)', () => {
     await fireEvent.press(screen.getByTestId('nav-page:fit-plan'));
     expect(store.getState().tab).toBe('page:fit-plan');
 
-    // 离开再回来：回到真正的主页。
+    // Leave and return: returns to the true home screen.
     await leaveAndReturn();
     expect(await screen.findByTestId('nav-settings')).toBeTruthy();
     expect(store.getState().appId).toBeNull();
-    // 进出 app 不写任何数据（底线 15）：版本没变。
+    // Entering and exiting apps writes no data (invariant 15): version remains unchanged.
     expect(store.getState().head!.id).toBe(1);
   });
 
   it('an entry card that opens an app takes its name from the app, and Settings lists the app', async () => {
     const { store } = await start();
     await screen.findByTestId('nav-settings');
-    // 按钮和入口卡片各有一个“健身”。
+    // Button and entry card each have one "Fitness".
     expect(screen.getAllByText('健身').length).toBe(2);
     await fireEvent.press(screen.getByTestId('nav-settings'));
     expect(await screen.findByText('我的 App'.toUpperCase())).toBeTruthy();
@@ -165,7 +165,7 @@ describe('apps (UI)', () => {
   it('opening a page of another app switches to that app', async () => {
     const { store } = await start();
     await screen.findByTestId('nav-settings');
-    // 例如提醒、小组件打开 app 里的页面：先切到它的 app。
+    // E.g. reminders, widgets opening pages inside an app: switch to its app first.
     let shown = false;
     await act(async () => {
       const nav = store.getState();
@@ -176,7 +176,7 @@ describe('apps (UI)', () => {
     expect(store.getState().tab).toBe('page:fit-plan');
   });
 
-  // 在 app 里的 Tink 只能改这个 app（D-485，暂定规则）。
+  // Tink inside an app can only modify this app (D-485, provisional rule).
   const planning = (ops: Op[]): AIProvider => ({ plan: async () => ({ kind: 'ops', ops }) });
   const table = { id: 'logs', name: '记录', fields: [{ id: 'title', name: '标题', type: 'text' }] };
 
@@ -197,7 +197,7 @@ describe('apps (UI)', () => {
   it('inside an app Tink cannot change the home; the same change from the home works', async () => {
     const { store } = await start();
     await screen.findByTestId('nav-settings');
-    // 没写 app 的风格在 app 里是这个 app 的风格（opsForApp）；主页的页面在 app 里改不了。
+    // Unspecified app style inside the app uses this app's style (opsForApp); main page pages cannot be modified inside the app.
     const homeChange = planning([
       { op: 'addData', table } as never,
       {
@@ -227,7 +227,7 @@ describe('apps (UI)', () => {
     expect(store.getState().config!.data.tables.some((t) => t.id === 'logs')).toBe(true);
   });
 
-  // 创始人 2026-11-08 在手机上：子 App 的 Tink 页「选风格」和两个预设句子都被「超出范围」拦下。
+  // Founder on phone, 2006-11-08: sub-app Tink page "Pick a style" and both preset sentences blocked as "out of scope".
   it('inside an app, Pick a style changes the app style, not the home style', async () => {
     const { store } = await start();
     await screen.findByTestId('nav-settings');
@@ -243,9 +243,9 @@ describe('apps (UI)', () => {
       ),
     );
     expect(store.getState().config!.theme).toEqual(homeTheme);
-    // 草稿和应用以后都还在这个 app 里（风格的修改不带页面，不能回落到主页）。
+    // Draft and application remain within this app afterwards (style modifications carry no pages and cannot fall back to home).
     expect(store.getState().appId).toBe('fit');
-    // 再打开选风格：标出的是这个 app 现在的风格。
+    // Open style selection again: highlights this app's current style.
     await fireEvent.press(await screen.findByTestId('nav-ai'));
     await fireEvent.press(await screen.findByTestId('change-pick-style'));
     expect((await screen.findByTestId('style-material')).props.accessibilityState.selected).toBe(
@@ -268,7 +268,7 @@ describe('apps (UI)', () => {
       expect(store.getState().config!.data.tables.find((t) => t.id === tableId)?.app).toBe('fit'),
     );
     expect(screen.queryByTestId('change-feedback')).toBeNull();
-    // 页面在草稿里：应用草稿后都属于这个 app，主页面进了 app 的底栏，主页没动。
+    // Pages in draft: after applying draft they belong to this app, main page enters the app's bottom bar, home remains untouched.
     await fireEvent.press(await screen.findByTestId('draft-apply'));
     await waitFor(() => expect(store.getState().draft).toBeNull());
     const after = store.getState().config!;
@@ -286,7 +286,7 @@ describe('apps (UI)', () => {
     );
   });
 
-  // 桌面菜单里的 App 和深链接（D-485）。
+  // Apps in desktop menu and deep links (D-485).
   class FakeHomeScreen implements HomeScreenPlatform {
     menus: HomeScreenEntry[][] = [];
     pinned: HomeScreenEntry[] = [];
@@ -327,12 +327,12 @@ describe('apps (UI)', () => {
     const fake = new FakeHomeScreen();
     const { store } = await withHomeScreen(fake);
     await fireEvent.press(await screen.findByTestId('nav-settings'));
-    // 长按弹出菜单，点「放到桌面」。
+    // Long press to pop up menu, tap "Add to Home Screen".
     await fireEvent(await screen.findByTestId('settings-app-fit'), 'longPress');
     await fireEvent.press(await screen.findByText('放到桌面'));
     await screen.findByText('在桌面菜单里');
     expect(store.getState().config!.nav.phoneHomeScreen).toEqual(['app:fit']);
-    // 桌面上画的是这个 App 自己的图标，底色是它自己的主色（D-606）。
+    // Rendered on the desktop with the app's own icon and primary color background (D-606).
     expect(fake.menus.at(-1)).toEqual([
       {
         id: 'app:fit',
@@ -341,13 +341,13 @@ describe('apps (UI)', () => {
         art: { icon: 'heart', background: '#2255aa', foreground: '#FFFFFF' },
       },
     ]);
-    // 点桌面菜单：进那个 App。
+    // Tap desktop menu: enter that app.
     await act(async () => fake.tap('app:fit'));
     expect(store.getState().appId).toBe('fit');
     expect(await screen.findByTestId('nav-page:fit-home')).toBeTruthy();
   });
 
-  // 换图标（D-606）：长按菜单里选一个内置图标或填一个表情；桌面上的图标跟着换。
+  // Change icon (D-606): long press menu to select a built-in icon or enter an emoji; desktop icon updates accordingly.
   const openMenu = async (id = 'fit') => {
     await fireEvent(await screen.findByTestId(`settings-app-${id}`), 'longPress');
     await screen.findByTestId('app-menu');
@@ -361,19 +361,19 @@ describe('apps (UI)', () => {
     await fireEvent.press(screen.getByText('放到桌面'));
     await screen.findByText('在桌面菜单里');
     const head = store.getState().head!.id;
-    // 打开菜单、打开图标格子只是看：什么都不改（底线 15）。
+    // Opening the menu and icon grid is for viewing only: modifies nothing (invariant 15).
     await openMenu();
     await fireEvent.press(screen.getByText('换图标'));
     await screen.findByTestId('app-icon-star');
     expect(store.getState().head!.id).toBe(head);
-    // 现在用的那个标出来了。
+    // The currently used one is highlighted.
     expect(screen.getByTestId('app-icon-heart').props.accessibilityState).toMatchObject({
       selected: true,
     });
     await fireEvent.press(screen.getByTestId('app-icon-star'));
     await waitFor(() => expect(store.getState().config!.nav.apps![0]!.icon).toBe('star'));
     await waitFor(() => expect(screen.queryByTestId('app-menu')).toBeNull());
-    // 是一次能在改动记录里撤销的修改，别的都没动。
+    // A modification that can be undone in change history, with nothing else touched.
     expect(store.getState().head!.id).not.toBe(head);
     expect(store.getState().config!.nav.apps![0]).toMatchObject({ id: 'fit', name: '健身' });
     await waitFor(() =>
@@ -398,7 +398,7 @@ describe('apps (UI)', () => {
     await fireEvent.press(screen.getByTestId('app-icon-emoji-use'));
     await screen.findByText('只能填一个表情。');
     expect(store.getState().head!.id).toBe(head);
-    // 前后的空格不算。
+    // Leading and trailing spaces are ignored.
     await fireEvent.changeText(screen.getByTestId('app-icon-emoji'), ' 🏋️ ');
     await fireEvent.press(screen.getByTestId('app-icon-emoji-use'));
     await waitFor(() => expect(store.getState().config!.nav.apps![0]!.icon).toBe('🏋️'));
@@ -419,7 +419,7 @@ describe('apps (UI)', () => {
     expect(store.getState().head!.id).toBe(head);
   });
 
-  // 系统弹窗在 Android 上最多三个按钮：导入的 App 放到桌面以后菜单有五六项，「添加到桌面」以前被丢掉了。
+  // Android system dialogs support at most three buttons: imported app menu had five or six items after adding to desktop, causing "Add to Home Screen" to be dropped previously.
   it('an imported app on the menu still offers its own home screen icon, next to the other items', async () => {
     const fake = new FakeHomeScreen();
     const repo = new MemoryWorkspaceRepo();
@@ -427,7 +427,7 @@ describe('apps (UI)', () => {
       seed: withFitness,
       homeScreen: fake,
     });
-    // 从文件导入的 App 在本机留着原文件（「恢复初始样子」用）。
+    // App imported from file retains original file locally (used for "Restore initial state").
     await saveAppOrigin(
       repo,
       'fit',
@@ -435,7 +435,7 @@ describe('apps (UI)', () => {
     );
     await fireEvent.press(await screen.findByTestId('nav-settings'));
     await openMenu();
-    // 还没放到桌面菜单里：没有「添加到桌面」。
+    // Not yet placed in the desktop menu: no "Add to Home Screen".
     expect(screen.queryByText('添加到桌面')).toBeNull();
     await fireEvent.press(screen.getByText('放到桌面'));
     await screen.findByText('在桌面菜单里');
@@ -490,7 +490,7 @@ describe('apps (UI)', () => {
     await screen.findByTestId('nav-settings');
     await act(async () => toState('background'));
     await act(async () => toState('active'));
-    // 回到前台以后桌面菜单的点按才到：进入 App 比离开晚，所以留在 App 里。
+    // Desktop menu tap registers only after returning to foreground: entering app is later than leaving, so it stays in the app.
     await act(async () => fake.tap('app:fit'));
     await wait(900);
     expect(store.getState().appId).toBe('fit');
@@ -507,7 +507,7 @@ describe('apps (UI)', () => {
     );
     await screen.findByTestId('page-ai');
     await leaveAndReturn();
-    // 推入的页面还在，也没有退出 App。
+    // Pushed page remains, and app is not exited.
     expect(store.getState().appId).toBe('fit');
     expect(screen.getByTestId('page-ai')).toBeTruthy();
   });
@@ -521,7 +521,7 @@ describe('apps (UI)', () => {
     await leaveAndReturn(30_000);
     expect(store.getState().appId).toBe('fit');
     expect(screen.getByTestId('nav-page:fit-home')).toBeTruthy();
-    // 超过 30 秒才回主页。
+    // Exceed 30 seconds to return to home screen.
     await leaveAndReturn(30_001);
     expect(store.getState().appId).toBeNull();
   });
@@ -536,11 +536,11 @@ describe('apps (UI)', () => {
   });
 });
 
-// 分享一个 App（D-545）：设置 → 我的 App 里长按，「分享这个 App」；分享出去的是 App 文件，只有结构。
+// Share an app (D-545): Settings -> long press in My Apps, "Share this App"; shares an app file containing only structure.
 describe('share an app', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  /** 长按 App，点菜单里的这一项。 */
+  /** Long press app, tap this item in the menu. */
   async function longPressAndPick(id: string, item: string) {
     await fireEvent(await screen.findByTestId(`settings-app-${id}`), 'longPress');
     await screen.findByTestId('app-menu');

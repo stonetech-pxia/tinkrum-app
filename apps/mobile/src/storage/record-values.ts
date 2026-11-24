@@ -1,4 +1,4 @@
-/** 稳定的 JSON：对象的键排好序，同样的内容不管键怎么排都得到同样的字符串。 */
+/** Stable JSON: sort object keys so identical content produces the exact same string regardless of key ordering. */
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -10,6 +10,6 @@ function canonical(value: unknown): string {
   return JSON.stringify(value) ?? 'null';
 }
 
-/** 两条记录的值是不是一样（不管键的顺序）：条件写入（updateRecordIfUnchanged）用它判断记录有没有被改过。 */
+/** Check if two records have identical values (regardless of key order): used by conditional writes (updateRecordIfUnchanged) to determine if a record has been modified. */
 export const sameValues = (a: Record<string, unknown>, b: Record<string, unknown>) =>
   canonical(a) === canonical(b);

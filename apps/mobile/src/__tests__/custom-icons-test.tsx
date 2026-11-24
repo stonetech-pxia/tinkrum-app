@@ -6,7 +6,7 @@ import { render } from '@testing-library/react-native';
 
 import { Icon, iosSymbolName } from '../renderer/Icon';
 
-// 预设自带的图形图标（D-485，D-487 加了第 9 个 paper）：9 个，每个有源 SVG 和按主题染色的 PNG，配置里可以当图标名用。
+// Preset built-in graphic icons (D-485, D-487 added the 9th icon paper): 9 icons in total, each with a source SVG and theme-tinted PNGs, usable as icon names in the config.
 
 const ASSETS = join(__dirname, '../../assets');
 
@@ -34,7 +34,7 @@ describe('custom icons', () => {
     const png = join(ASSETS, 'images/preset-icons', `${name}.png`);
     expect(existsSync(svg)).toBe(true);
     expect(readFileSync(svg, 'utf8')).toContain('viewBox="0 0 24 24"');
-    // PNG 签名；144×144，有透明底（RGBA）。
+    // PNG signature; 144×144 with a transparent background (RGBA).
     const bytes = readFileSync(png);
     expect([...bytes.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
     expect(bytes.readUInt32BE(16)).toBe(144);
@@ -46,7 +46,7 @@ describe('custom icons', () => {
     const { getByTestId } = await render(<Icon name={name} size={30} color="#ff0000" />);
     const style = getByTestId(`icon-${name}`).props.style;
     expect(style).toMatchObject({ width: 30, height: 30, tintColor: '#ff0000' });
-    // 系统图标库里没有，长按菜单里不带图标。
+    // Not present in the system icon library, so the long-press menu does not include an icon.
     expect(iosSymbolName(name)).toBeUndefined();
   });
 });

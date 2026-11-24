@@ -7,8 +7,9 @@ import { Alert, type AlertButton } from 'react-native';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 选几条一起删（D-547）：「设置 → 数据」每张表上「选几条删除」，进系统层的选择页；
-// 删之前先问（底线 11），删了进 30 天的回收站，提示条能撤销，回收站里也能一条条恢复。
+// Select multiple items to delete together (D-547): "Settings -> Data", select items to delete on
+// each table, enters system-level selection page; prompt before deleting (invariant 11), deleted
+// items enter 30-day trash, prompt bar allows undo, individual recovery also available in trash.
 
 const seed = (locale: Locale, registry: Registry) => {
   const r = applyOps(
@@ -38,13 +39,13 @@ async function start(titles: string[], locale: Locale = 'zh') {
   const app = await renderToolsApp(repo, undefined, { seed, locale });
   await screen.findByTestId('nav-settings');
   await act(() => router.push('/data'));
-  // 每张表一页（D-614）：选择删除在表的页面里。
+  // One page per table (D-614): deletion selection is within the table page.
   await fireEvent.press(await screen.findByTestId('table-notes'));
   await screen.findByTestId('data-table-screen');
   return app;
 }
 
-/** 下一个提问：记下内容，按 label 那个按钮。 */
+/** Next prompt: record content, press the button matching label. */
 function answerNext(label: string) {
   const asked: {
     title: string | null | undefined;
@@ -67,7 +68,7 @@ function answerNext(label: string) {
 const alive = async (repo: MemoryWorkspaceRepo) =>
   (await repo.listRecords('notes')).map((r) => r.values.title).sort();
 
-/** 删除和恢复是几步异步的写：让它们走完（这里的计时器是假的）。 */
+/** Deletion and recovery are asynchronous write steps: let them finish (timers here are mocked). */
 async function flush() {
   for (let i = 0; i < 5; i++) await act(async () => {});
 }
@@ -84,7 +85,7 @@ it('with data: select two, it asks first; cancel keeps them, delete moves them t
   const head = store.getState().head!.id;
   await fireEvent.press(screen.getByTestId('select-notes'));
   expect(await screen.findByTestId('select-records')).toBeTruthy();
-  // 没选的时候删除按钮不能点。
+  // Delete button disabled when nothing is selected.
   expect(screen.getByTestId('select-delete')).toBeDisabled();
   await fireEvent.press(screen.getByTestId('select-row-note0aaaa'));
   await fireEvent.press(screen.getByTestId('select-row-note2aaaa'));
@@ -105,13 +106,13 @@ it('with data: select two, it asks first; cancel keeps them, delete moves them t
     'note0aaaa',
     'note2aaaa',
   ]);
-  // 删掉的不在列表里了；提示条能撤销。
+  // Deleted items absent from list; prompt bar supports undo.
   expect(screen.queryByTestId('select-row-note0aaaa')).toBeNull();
   expect(await screen.findByTestId('toast')).toHaveTextContent(/已删除 2 条记录/);
   await fireEvent.press(screen.getByTestId('toast-undo'));
   await flush();
   expect(await alive(repo)).toEqual(['一', '三', '二'].sort());
-  // 记录不是版本：删和撤销都不产生新版本。
+  // Records are not versions: neither deletion nor undo creates new versions.
   expect(store.getState().head!.id).toBe(head);
 });
 

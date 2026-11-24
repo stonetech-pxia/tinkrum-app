@@ -11,8 +11,9 @@ import {
   type ValueType,
 } from './contract';
 
-// 工作流的静态检查（D-060）：动作登记、参数、运行时询问的参数、相邻两步的类型能否接上。
-// 校验器、编辑器（只列出能插入的动作）和执行器共用这里。
+// Workflow static checks (D-060): action registration, parameters, runtime-prompted parameters, and
+// type compatibility between adjacent steps. Shared by the validator, editor (listing insertable
+// actions only), and executor.
 
 export interface StepProblem {
   stepId: string;
@@ -21,8 +22,10 @@ export interface StepProblem {
 }
 
 /**
- * 这个快捷操作要容器交什么（D-428）：第一步不是输入动作、而且收文字、记录或文件时，是那种值；否则 null（自己选输入）。
- * 这种快捷操作只能从交得出这种值的容器上运行：记录页的按钮、记录块、单条记录块。
+ * What input this quick action expects from the container (D-428): when the first step is not an
+ * input action and accepts text, records, or files, it is that value type; otherwise null (manual
+ * input selection). Such quick actions can only run from containers that can supply such values:
+ * record page buttons, record blocks, single record blocks.
  */
 export function handedInput(steps: readonly WorkflowStep[], registry: Registry): HandedType | null {
   const first = steps[0] && registry.actions.get(steps[0].action);
@@ -30,8 +33,9 @@ export function handedInput(steps: readonly WorkflowStep[], registry: Registry):
 }
 
 /**
- * 容器交来的值在第一步眼里的类型：文字、记录，文件是第一步收的那种（pdf、images……）。
- * handedInput 只说交哪一类，这里给后面各步接类型用。
+ * The value type supplied by the container as viewed by the first step: text, records, or the
+ * file type accepted by the first step (pdf, images, etc.). handedInput specifies the category,
+ * while this defines types for subsequent steps.
  */
 export function handedValueType(
   steps: readonly WorkflowStep[],
@@ -44,7 +48,8 @@ export function handedValueType(
 }
 
 /**
- * 每一步执行之后的值类型（下标 i = 第 i 步的输出）。遇到无法确定的步骤（未登记或类型接不上）之后为 null。
+ * Value type after executing each step (index i = output of step i). Returns null upon
+ * encountering undetermined steps (unregistered or type mismatch).
  */
 export function typesAlong(
   steps: readonly WorkflowStep[],
@@ -71,7 +76,7 @@ export function typesAlong(
   return out;
 }
 
-/** 能插入到第 index 步之前的动作（第 0 步只能是输入动作；后面的步骤要能接上前后两步）。 */
+/** Actions insertable before the given index (step 0 can only be an input action; subsequent steps must bridge preceding and succeeding steps). */
 export function insertableActions(
   steps: readonly WorkflowStep[],
   index: number,
@@ -83,7 +88,7 @@ export function insertableActions(
   const next = steps[index] ? registry.actions.get(steps[index]!.action) : undefined;
   return [...registry.actions.values()].filter((action) => {
     if (index === 0) {
-      // 第一步只能是输入动作，而且原来的第一步（也是输入动作）不能被挤到后面。
+      // The first step can only be an input action, and the original first step (also an input action) cannot be pushed down.
       return isSourceAction(action) && (!next || !isSourceAction(next));
     }
     if (isSourceAction(action) || !actionAccepts(action, before!)) return false;
@@ -95,8 +100,9 @@ export function insertableActions(
 }
 
 /**
- * 新插入一步时的参数：默认参数，否则按界面元数据给每个参数一个初始值（选项取第一个、数字取最小值、
- * 开关为关、文字为空）。结果不一定能通过校验（例如必填的文字），编辑页会提示用户填写。
+ * Parameters when inserting a new step: default parameters, or initial values generated from UI
+ * metadata per parameter (first option, minimum number, toggle off, empty text). Results may not
+ * pass validation (e.g., required text), prompting the user to fill them in the editor.
  */
 export function initialParams(action: ActionDefinition): Record<string, unknown> {
   const defaults = defaultParams(action);
@@ -113,7 +119,7 @@ export function initialParams(action: ActionDefinition): Record<string, unknown>
   return params;
 }
 
-/** 动作的默认参数：第一个预设，否则参数结构接受空对象时为 {}。 */
+/** Default action parameters: first preset, or {} if the parameter schema accepts an empty object. */
 export function defaultParams(action: ActionDefinition): Record<string, unknown> | null {
   const preset = action.presets?.[0]?.values;
   if (preset && action.params.safeParse(preset).success) return { ...preset };
@@ -152,7 +158,7 @@ export function workflowProblems(wf: Workflow, registry: Registry): StepProblem[
         broken = true;
       }
     } else if (i === 0) {
-      // 收文字、记录的动作可以不要输入步骤（D-428）：容器点了才交给它。
+      // Actions that receive text or records do not require input steps (D-428): executed upon container tap.
       if (current === null) {
         problem(
           'source',

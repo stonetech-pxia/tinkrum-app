@@ -3,15 +3,18 @@ import { z } from 'zod';
 import { localDate } from './data';
 import type { ParamField } from './workflow/contract';
 
-// 分组后各出一份（D-243）：图片转 PDF、合并 PDF、打包 ZIP 可以按规则把文件分成几组，每组出一个文件。
-// 规则只有固定几种（每 N 个、同一天、同一个月），没有循环和表达式：仍然是一步一个动作，只是这一步的输出有几个文件。
+// Produce individual files per group (D-243): operations like convert images to PDF, merge PDFs, or
+// archive to ZIP can group files according to rules, producing one output file per group. Rules are
+// limited to a fixed set of options (every N items, same day, same month) without loops or
+// expressions: it remains a step-by-step action sequence, simply yielding multiple output files for
+// that step.
 
 export const GROUP_RULES = ['none', 'count', 'day', 'month'] as const;
 export type GroupRule = (typeof GROUP_RULES)[number];
 
 export const MAX_GROUP_SIZE = 50;
 
-/** 加在动作参数里的两个键（旧配置没有，当作不分组）。 */
+/** Two keys added to action parameters (absent in older configurations, treated as ungrouped). */
 export const groupParams = {
   group: z.enum(GROUP_RULES).optional(),
   groupSize: z.number().int().min(1).max(MAX_GROUP_SIZE).optional(),
@@ -58,14 +61,16 @@ export interface GroupableItem {
 }
 
 export interface FileGroup<T> {
-  /** 这一份的名字（不含扩展名）：按日期分时是日期，否则是第一个文件的名字。 */
+  /** Name of the output file (excluding extension): date when grouped by date, or the name of the first file otherwise. */
   name: string;
   items: T[];
 }
 
 /**
- * 按规则分组。count：按原来的顺序每 N 个一组。day / month：按拍摄时间（没有时用修改时间）的本地日期，
- * 组按日期从早到晚排，组内保持原来的顺序；读不到日期的放在最后一组，名字用 undated。
+ * Group items according to rules. count: groups every N items in their original order. day /
+ * month: groups by local date based on capture time (falling back to modification time if
+ * absent), ordered chronologically by group date while preserving original item order within each
+ * group; items with unparseable dates are placed in a final group named "undated".
  */
 export function groupItems<T extends GroupableItem>(
   items: readonly T[],

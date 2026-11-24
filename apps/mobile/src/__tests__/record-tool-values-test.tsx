@@ -15,8 +15,9 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 import { widgetRowAction } from '../widgets/ops';
 
-// 一键记录工具能写的值（D-565）：从今天或这一条的日期起算的日期、点的那一刻抄这一条的字段（算出来的也行）、
-// 加这一条的一个数字字段。
+// Values writable by one-tap record tool (D-565): date calculated from today or this entry's date,
+// copy fields of this entry at the moment of tapping (computed ones allowed), add to a numeric
+// field of this entry.
 
 const cards: Collection = {
   id: 'cards',
@@ -151,7 +152,7 @@ it('a card with no interval: nothing is written and the banner says so, not "don
   const toast = await screen.findByTestId('toast');
   expect(toast).toHaveTextContent(/什么都没改/);
   expect(toast).not.toHaveTextContent(/记住了/);
-  // 没有写：值和修改时间都还是原来的。
+  // Unwritten: both value and modification time remain unchanged.
   const stored = await repo.getRecord('c2');
   expect(stored?.values).toEqual({ front: 'chien', score: 2 });
   expect(stored?.updatedAt).toBe(1);
@@ -165,7 +166,7 @@ it('an order copies the product’s values at the moment of the tap, a computed 
   await screen.findByTestId('toast');
   const [order] = await repo.listRecords('orders');
   expect(order!.values).toEqual({ product: 'p1', price: 15, qty: 2, what: '咖啡豆' });
-  // 之后商品涨价，订单上的价格不变：抄的是值，不是引用。
+  // Product price increases later, price on order remains unchanged: copies values, not references.
   await repo.updateRecord('p1', { name: '咖啡豆', price: 20, qty: 2 }, Date.now());
   expect((await repo.getRecord(order!.id))?.values.price).toBe(15);
 });

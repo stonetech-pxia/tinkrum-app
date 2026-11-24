@@ -12,13 +12,15 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * 读成摆正的、可修改的 ARGB 位图，长边不超过 maxSide。三星 50 / 200 MP 的照片原样解码一份就要
- * 200–800 MB，同时再有一两份就会内存不足：所以解码时就缩小，后面的处理也尽量在这一份上做。
+ * Reads into an oriented, mutable ARGB bitmap with a long side not exceeding maxSide. Decoding
+ * Samsung 50 / 200 MP photos raw consumes 200–800 MB each, leading to out-of-memory errors if
+ * multiple copies exist: therefore, downscale during decoding, and perform subsequent processing
+ * on this single instance where possible.
  */
 object ImageLoading {
   fun decodeUpright(context: Context, uri: Uri, maxSide: Int): Bitmap {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-      // ImageDecoder 按 EXIF 摆正（HEIC 也认），并直接解成目标尺寸，不多占一份内存。
+      // ImageDecoder corrects orientation via EXIF (HEIC is also supported) and decodes directly to the target dimensions without allocating extra memory.
       val source = ImageDecoder.createSource(context.contentResolver, uri)
       return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
         val side = max(info.size.width, info.size.height)

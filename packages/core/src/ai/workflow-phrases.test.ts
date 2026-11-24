@@ -7,8 +7,10 @@ import { CORE_ACTIONS } from '../registry';
 import { BUILTIN_TOOLS } from '../tools';
 import { parseStepPhrase, splitStepPhrases } from './workflow-phrases';
 
-// 步骤说法写在各个动作的定义里（D-265），内置规则按动作逐个查：两个动作的说法认同一个短语时，
-// 结果就取决于查的先后。这里用说法清单和内置规则测试里出现的短语检查，不能有这种重叠。
+// Step phrasings are defined within individual action definitions (D-265), and built-in rules are
+// checked action by action: when phrasings of two actions match a single phrase, the result depends
+// on the check order. We check this using the phrase list and phrases appearing in built-in rule
+// tests to prevent such overlaps.
 
 const actions = [...CORE_ACTIONS, ...BUILTIN_TOOLS.flatMap((t) => t.actions)];
 
@@ -20,7 +22,7 @@ function fragments(): Set<string> {
       .filter((f) => /^mock.*\.test\.ts$|^eval-cases\.ts$/.test(f))
       .map((f) => path.join(__dirname, f)),
   ];
-  // 清单里没写全的说法（两个动作都可能认的）。
+  // Phrases missing from the list (which could be recognized by both actions).
   const all = new Set<string>([
     '合并成一个',
     '合成一个',
@@ -68,7 +70,7 @@ describe('step phrases in action definitions', () => {
       params: { template: '合并-{date:YYYY-MM-DD}' },
     });
     expect(parseStepPhrase('翻译', 'fr')).toMatchObject({ action: 'translate.text', ask: ['to'] });
-    // 转 Excel（D-272）：语言跟界面语言，默认全部内容。
+    // Export to Excel (D-272): language matches interface language, defaults to all content.
     expect(parseStepPhrase('表格转 Excel', 'zh')).toEqual({
       action: 'ocr.toExcel',
       params: { lang: 'auto', scope: 'all' },
@@ -77,7 +79,7 @@ describe('step phrases in action definitions', () => {
       action: 'ocr.toExcel',
       params: { lang: 'auto', scope: 'all' },
     });
-    // 转 Word（D-328）：语言自动。
+    // Convert to Word (D-328): automatic language.
     expect(parseStepPhrase('转成 Word', 'zh')).toEqual({
       action: 'ocr.toWord',
       params: { lang: 'auto' },
@@ -88,7 +90,7 @@ describe('step phrases in action definitions', () => {
     });
   });
 
-  // 按钮改叫「存到手机」「存到 Tinkrum」之后（2026-11-09），照按钮上的字说也要认。
+  // After the save buttons were renamed to "Save to phone" and "Save to Tinkrum" (2026-11-09), phrasing matching the button text must also be recognized.
   it('knows the words on the save buttons', () => {
     expect(parseStepPhrase('存到手机', 'zh')?.action).toBe('out.saveToFolder');
     expect(parseStepPhrase('save to phone', 'en')?.action).toBe('out.saveToFolder');

@@ -8,7 +8,7 @@ import { findFillIns, joinShadedBlanks, leaderDots, withFillIns } from './word-f
 const W = 1000;
 const H = 1400;
 const page = { width: W, height: H };
-/** 一串点：每隔 pitch 一个 3×3 的点。 */
+/** A series of dots: a 3x3 dot every `pitch` interval. */
 const dotRow = (x: number, y: number, width: number, pitch = 8): Rect[] =>
   Array.from({ length: Math.floor(width / pitch) }, (_, i) => ({
     x: x + i * pitch,
@@ -22,7 +22,7 @@ describe('fill-in lines of forms (EU sample 021, 030)', () => {
     const image = renderPage(W, H, [
       ...glyphs(100, 200, 150, 18),
       ...dotRow(260, 215, 600),
-      // 虚线的短划（扁的）：分隔线。
+      // Dashed line segments (flat): separator lines.
       ...Array.from({ length: 60 }, (_, i) => ({ x: 100 + i * 12, y: 400, width: 7, height: 2 })),
     ]);
     const { dots } = leaderDots(image, [], 24);
@@ -33,7 +33,7 @@ describe('fill-in lines of forms (EU sample 021, 030)', () => {
 
   it('puts the leader after its label and a leader inside a line in its place', () => {
     const label = fakeLine('Name ...', { x: 100, y: 200, width: 180, height: 24 }, page, true);
-    // 「from」在 100–180、「to」在 480–520：中间的点识别成两个空格（字的位置按 CTC 给）。
+    // "from" at 100-180, "to" at 480-520: intermediate dots are recognized as two spaces (text positions determined by CTC).
     const xs = [110, 130, 150, 170, 300, 400, 490, 510];
     const inner = {
       text: 'from  to',
@@ -45,9 +45,9 @@ describe('fill-in lines of forms (EU sample 021, 030)', () => {
     };
     const fills = [
       { kind: 'dots' as const, x: 240, y: 218, width: 600, height: 3 },
-      // 「from」和「to」之间的点（识别读成两个空格）。
+      // Dots between "from" and "to" (recognized as two spaces).
       { kind: 'dots' as const, x: 260, y: 318, width: 200, height: 3 },
-      // 一排里没有字的点线自成一行。
+      // Dotted lines without text in a row form their own separate line.
       { kind: 'dots' as const, x: 100, y: 418, width: 700, height: 3 },
     ];
     const { lines, source } = withFillIns([label, inner], fills, 24);
@@ -63,14 +63,14 @@ describe('fill-in lines of forms (EU sample 021, 030)', () => {
 
   it('takes a solid answer line right of a label, not a text underline or a frame edge', () => {
     const rects: Rect[] = [
-      // 标签和它右边的答题线（L 形：左边一小截竖线）。
+      // Labels and their associated answer lines on the right (L-shaped: a small vertical line on the left).
       ...glyphs(100, 200, 120, 18),
       { x: 400, y: 219, width: 450, height: 2 },
       { x: 400, y: 211, width: 2, height: 10 },
-      // 字的下划线。
+      // Underline for text.
       ...glyphs(100, 300, 300, 18),
       { x: 100, y: 321, width: 300, height: 2 },
-      // 一节的外框：标题压在上边上，两头连着竖线。
+      // Section outer frame: title presses against the top border, with vertical lines connected at both ends.
       ...glyphs(100, 492, 150, 18),
       { x: 260, y: 500, width: 600, height: 2 },
       { x: 858, y: 500, width: 2, height: 200 },
@@ -90,7 +90,7 @@ describe('fill-in lines of forms (EU sample 021, 030)', () => {
   });
 
   it('takes the last answer line of a framed row that runs into the right side of the frame (EU sample 046)', () => {
-    // 一节表单的外框（左右两条竖边）；一排「Localidad ____ C.P. ____ Provincia ____」，最后一条线画到框的右边。
+    // Outer frame of a form section (left and right vertical borders); a sequence of "Localidad ____ C.P. ____ Provincia ____", with the final line extending to the right border of the frame.
     const rects: Rect[] = [
       { x: 60, y: 150, width: 2, height: 200 },
       { x: 940, y: 150, width: 2, height: 200 },
@@ -117,10 +117,10 @@ describe('fill-in lines of forms (EU sample 021, 030)', () => {
 
   it('takes a light grey answer line, but not the edge of a shaded row (EU sample 001, 025)', () => {
     const rects: Rect[] = [
-      // 浅灰（#bbb）的填写线，左边是标签。
+      // Light gray (#bbb) fill-in line with a label on the left.
       ...glyphs(100, 200, 120, 18),
       { x: 300, y: 219, width: 300, height: 2, shade: 187 },
-      // 浅色底纹的一排（绿底接着灰底），左边也有字：底纹的边不是填写线。
+      // A row with light shading (green shading followed by gray shading) with text on the left: shading boundaries are not fill-in lines.
       ...glyphs(100, 400, 120, 18),
       { x: 300, y: 380, width: 600, height: 40, shade: 237 },
       { x: 300, y: 420, width: 600, height: 40, shade: 187 },
@@ -135,7 +135,7 @@ describe('fill-in lines of forms (EU sample 021, 030)', () => {
   });
 
   it('keeps label lines with leaders as separate lines, before the captions under them', () => {
-    // 两行「标签 + 点线」，第一行下面居中一行说明；点线不见了时两行标签会接成一段、说明排到后面。
+    // Two rows of "label + dotted line", with a centered explanatory line below the first row; when dotted lines disappear, the two label rows merge into a single paragraph and the explanation shifts down.
     const rects: Rect[] = [
       ...glyphs(100, 200, 160, 18),
       ...dotRow(270, 215, 620),
@@ -158,8 +158,9 @@ describe('fill-in lines of forms (EU sample 021, 030)', () => {
   });
 
   it('joins the pieces of a sentence cut by shaded blanks, in order (EU sample 082)', () => {
-    // 合同模板：要填的地方是一块块青色的底（约 70×25 像素），识别在每块那里断开，一行成了三段；
-    // 最后一段「De」比第一段高一个像素，排序时跑到了整段前面。
+    // Contract templates: fill-in areas are cyan background blocks (~70x25 pixels), causing OCR to
+    // break at each block, splitting a single line into three segments; the final segment "De" is 1
+    // pixel taller than the first segment, causing it to sort before the rest of the text.
     const teal: [number, number, number] = [0, 139, 139];
     const rows = [
       [
@@ -191,7 +192,7 @@ describe('fill-in lines of forms (EU sample 021, 030)', () => {
   });
 
   it('does not join a label and its value on a shaded row band (EU sample 025)', () => {
-    // 账单的一行浅绿底：标签和金额都压在底纹上，中间的空隙也是底纹，不是要填的空格。
+    // A bill row with light green background: labels and amounts both lie on the shading, and the gap between them is also shading, not a fill-in blank.
     const green: [number, number, number] = [214, 230, 200];
     const lines = [
       fakeLine('Konzessionsabgabe', { x: 100, y: 300, width: 220, height: 24 }, page, true),

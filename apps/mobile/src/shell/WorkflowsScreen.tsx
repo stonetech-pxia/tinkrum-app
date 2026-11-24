@@ -31,7 +31,7 @@ import { packsNeeded } from '../runtime/runner';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { Banner } from './Banner';
 
-/** 步骤串成一行：「选照片 → 证件照 → 命名」。 */
+/** Steps chained into a single line: "Select photo -> Passport photo -> Rename". */
 export function stepChain(wf: Pick<Workflow, 'steps'>, registry: Registry, locale: Locale): string {
   return wf.steps
     .map((s) => stepLabel(registry.actions.get(s.action), s.params, locale) ?? s.action)
@@ -39,10 +39,11 @@ export function stepChain(wf: Pick<Workflow, 'steps'>, registry: Registry, local
 }
 
 /**
- * 快捷操作分类页：先做自己的，再是这一类的全部快捷操作，用得多、最近用过的在前。
- * 由内核提供（AI 不能修改这个页面）；内设的快捷操作不用添加，直接运行（D-236）。
- * inPage：作为页面上的 quickActionList 组件显示（D-230），不滚动、没有提示条；
- * guard 返回 true 时不响应点按（草稿、预览）。
+ * Quick action category page: shows own quick actions first, followed by all quick actions in
+ * this category, with frequently used and recently used ones appearing at the top. Provided by
+ * the core (AI cannot modify this page); built-in quick actions do not need to be added and can
+ * be run directly (D-236). inPage: displayed as a quickActionList component on a page (D-230),
+ * non-scrolling, without a toast bar; guard returns true to ignore taps (draft, preview).
  */
 export function WorkflowsScreen({
   palette,
@@ -74,7 +75,7 @@ export function WorkflowsScreen({
     [files, shared],
   );
   const [usage, setUsage] = useState<SucceededRuns>(new Map());
-  // 已经装好的扩展包，包括随 App 打包的（D-510）：用到它们的内设不再写「首次使用需要下载」。读出来之前先不写。
+  // Already installed packs, including those bundled with the App (D-510): built-ins using them no longer state "Requires download for first use". Left blank until loaded.
   const packs = usePacks();
   const [havePacks, setHavePacks] = useState<ReadonlySet<string> | null>(packs ? null : new Set());
   useEffect(() => {
@@ -98,7 +99,7 @@ export function WorkflowsScreen({
           if (alive) setUsage(counts);
         })
         .catch(() => {
-          /* 统计暂时不可用时仍能浏览分类。 */
+          /* Allows browsing categories even when statistics are temporarily unavailable. */
         });
       return () => {
         alive = false;
@@ -107,7 +108,7 @@ export function WorkflowsScreen({
   );
   const inCategory = (w: Workflow) => !kind || workflowKinds(w).includes(kind);
   const builtIn = builtInWorkflows(quickActionsOf(config), locale);
-  // 没用过的按：自己的、内设的、工具带的。
+  // Unused items ordered by: own, built-in, tool-provided.
   const all = [
     ...quickActionsOf(config).filter((w) => !w.package),
     ...builtIn,
@@ -157,9 +158,9 @@ export function WorkflowsScreen({
     const toolName = wf.package
       ? (localize(registry.tools.get(wf.package)?.name, locale) ?? wf.package)
       : undefined;
-    // 内设的有一句说明，就不再列步骤（说明里已经讲了这几步）。
+    // Built-in items have a description sentence, so steps are not listed (the steps are already covered in the description).
     const description = preset && localize(preset.description, locale);
-    // iOS 用系统的识别和扫描，不需要扫描包和文字识别包（D-084）。
+    // iOS uses system recognition and scanning, so scanning and OCR packs are not needed (D-084).
     const needsDownload =
       preset &&
       havePacks !== null &&
@@ -212,7 +213,7 @@ export function WorkflowsScreen({
         inPage={inPage}
         testID="workflows-screen"
         gap={inPage ? palette.gap - 4 : palette.gap}>
-        {/* 页面栈里顶部已有标题，不再重复；嵌在主界面里时没有顶部标题。 */}
+        {/* The page stack header already has a title, so it is not repeated; no header when embedded in the main interface. */}
         {inPage ? null : embedded ? (
           <PageTitle palette={palette}>
             {t(locale, 'WorkflowsScreen_What_Morph_can_do_8f4f4')}
@@ -244,7 +245,7 @@ export function WorkflowsScreen({
 
   return (
     <Body palette={palette} inPage={inPage} testID={`quick-actions-${kind}`} gap={palette.gap - 4}>
-      {/* 分类页总在页面栈里，顶部已有分类名。 */}
+      {/* The category page is always in the page stack and its header already displays the category name. */}
       {embedded || inPage ? null : <Banner palette={palette} />}
       <Button
         palette={palette}
@@ -267,7 +268,7 @@ export function WorkflowsScreen({
   );
 }
 
-/** 页面组件里不滚动，也没有提示条（页面自己有）；标题由 AI 决定。 */
+/** Page components do not scroll and have no toast bar (the page has its own); title is determined by the AI. */
 function Body({
   palette,
   inPage,
@@ -300,7 +301,7 @@ function Body({
   );
 }
 
-/** 卡片右边的圆形图标按钮（运行、编辑）；文字留给读屏。 */
+/** Circular icon button on the right side of the card (run, edit); text is reserved for screen readers. */
 function IconAction({
   palette,
   icon,

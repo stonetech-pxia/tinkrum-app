@@ -30,8 +30,10 @@ import { createStarterWorkspace } from './starter';
 import { registry } from './test-helpers';
 import { checkTools } from './tool-check';
 
-// 门户网站的展示预设（App 文件，tinkrum-app，D-485）：每个预设是一个 App，导入时加到现有的工作区里。
-// 每一份都要能读、能导入、不撞 ID、不带用户文件，导入后配置自洽；九个可以一起装（D-487 加了 Clay）。
+// Portal website presentation presets (App files, tinkrum-app, D-485): each preset is an App, added
+// to the existing workspace upon import. Each must be readable, importable, conflict-free in IDs,
+// free of user files, and result in a self-consistent config; all nine can be installed together
+// (Clay added in D-487).
 
 const DIR = join(__dirname, 'fixtures', 'portal-apps');
 interface Entry {
@@ -58,7 +60,7 @@ function importApp(config: WorkspaceConfig, file: AppFile, mode?: ImportMode): W
   return result.after;
 }
 
-describe('展示预设（App 文件）', () => {
+describe('Preset display (App file)', () => {
   it('lists nine apps, each with its own drawn icon, and every file exists', () => {
     expect(manifest.apps).toHaveLength(9);
     expect(new Set(manifest.apps.map((a) => a.id)).size).toBe(9);
@@ -84,14 +86,14 @@ describe('展示预设（App 文件）', () => {
       expect(app.bar[0]).toMatch(/^page:/);
       expect(app.bar.at(-1)).toBe('ai');
       const mine = (owner: string | undefined) => owner === entry.id;
-      // 数量和说明对得上；全部属于这个 App。
+      // Counts and descriptions match; all belong to this App.
       expect(after.containers.pages.filter((p) => mine(p.app)).map((p) => p.title)).toEqual(
         entry.pages,
       );
       expect(after.data.tables.filter((t) => mine(t.app)).map((t) => t.name)).toEqual(entry.tables);
       expect(remindersOf(after).filter((r) => mine(r.app))).toHaveLength(entry.reminders);
       expect(quickActionsOf(after).filter((q) => mine(q.app))).toHaveLength(entry.quickActions);
-      // 原来的页面、表、快捷操作一个没少；主页只多了一个入口。
+      // Original pages, tables, and quick actions remain intact; only a single entry point is added to the home screen.
       for (const p of before.containers.pages) {
         const now = after.containers.pages.find((x) => x.id === p.id)!;
         if (p.id !== HOME_PAGE_ID) expect(now).toEqual(p);
@@ -104,7 +106,7 @@ describe('展示预设（App 文件）', () => {
       expect(after.theme).toEqual(before.theme);
     });
 
-    it('is self-contained: no user files, no dangling references, nothing the tool check blocks (底线 3、14、18)', () => {
+    it('is self-contained: no user files, no dangling references, nothing the tool check blocks (invariants 3, 14, 18)', () => {
       const before = starter();
       const after = importApp(before, file!);
       expect(newFileRefs(before, after)).toEqual([]);
@@ -121,7 +123,7 @@ describe('展示预设（App 文件）', () => {
       expect(!again.ok && again.error).toMatch(/already exist/);
     });
 
-    it('can be removed again, keeping its tables (底线 5, 18)', () => {
+    it('can be removed again, keeping its tables (invariants 5, 18)', () => {
       const once = importApp(starter(), file!);
       const removed = applyOps(once, [{ op: 'removeContainer', app: entry.id }], ctx);
       expect(removed.ok).toBe(true);
@@ -140,7 +142,7 @@ describe('展示预设（App 文件）', () => {
     expect(referenceProblems(config, registry)).toEqual([]);
   });
 
-  it('migrates an older file (底线 12)', () => {
+  it('migrates an older file (invariant 12)', () => {
     const old = text('tinkrum-app-habits.json').replace(
       `"schemaVersion": ${CURRENT_SCHEMA_VERSION}`,
       '"schemaVersion": 38',
@@ -209,7 +211,7 @@ describe('appFileFromWorkspace', () => {
   });
 });
 
-// ---- 导入主页、接回已有的表、恢复初始样子（D-485）----
+// ---- Import home page, reconnect existing tables, and restore initial appearance (D-485) ----
 
 const load = (entry: Entry) => readAppFile(text(entry.file))!;
 const run = (config: WorkspaceConfig, ops: Parameters<typeof prepareOps>[1]) => {
@@ -218,7 +220,7 @@ const run = (config: WorkspaceConfig, ops: Parameters<typeof prepareOps>[1]) => 
   return result.after;
 };
 
-describe.each(manifest.apps.map((a) => [a.name, a] as const))('导入主页 %s', (_name, entry) => {
+describe.each(manifest.apps.map((a) => [a.name, a] as const))('Import home page %s', (_name, entry) => {
   const file = load(entry);
 
   it('changes the home style and puts the pages in the bar, without making an app', () => {
@@ -227,19 +229,19 @@ describe.each(manifest.apps.map((a) => [a.name, a] as const))('导入主页 %s',
     expect(after.nav.apps).toBeUndefined();
     expect(after.theme).toEqual(file.app.theme);
     expect(after.nav.bar.length).toBeLessThanOrEqual(5);
-    // 放得下的页面进了导航栏；原来的 home、Tink、设置还在。
+    // Pages that fit were entered into the navigation bar; the original Home, Tink, and Settings remain.
     const added = after.nav.bar.filter((t) => t.startsWith('page:') && t !== 'page:home');
     expect(added.length).toBeGreaterThan(0);
     expect(after.nav.bar).toContain('page:home');
     expect(after.nav.bar).toContain('settings');
-    // 页面、表、快捷操作、提醒都是主页的（没有 app）。
+    // Pages, tables, quick actions, and reminders belong to the home page (no app property).
     expect(after.containers.pages.filter((p) => p.app !== undefined)).toEqual([]);
     expect(after.data.tables.filter((t) => t.app !== undefined)).toEqual([]);
     expect(after.data.tables.length).toBe(before.data.tables.length + entry.tables.length);
     expect(remindersOf(after)).toHaveLength(entry.reminders);
   });
 
-  it('keeps every page reachable and the workspace consistent (底线 18)', () => {
+  it('keeps every page reachable and the workspace consistent (invariant 18)', () => {
     const before = starter();
     const after = importApp(before, file, 'home');
     expect(referenceProblems(after, registry)).toEqual([]);
@@ -254,11 +256,11 @@ describe.each(manifest.apps.map((a) => [a.name, a] as const))('导入主页 %s',
   });
 });
 
-describe('接回已有的表和恢复初始样子', () => {
+describe('Reconnect existing tables and restore initial appearance', () => {
   const entry = manifest.apps.find((a) => a.id === 'habits')!;
   const file = load(entry);
   const habits = 'habits-habits';
-  /** 比装上去的版本多一个字段的原文件（App 文件升级了）。 */
+  /** Original file has one more field than the installed version (App file has been upgraded). */
   const newer: AppFile = {
     ...file,
     tables: file.tables.map((t) =>
@@ -268,7 +270,7 @@ describe('接回已有的表和恢复初始样子', () => {
     ),
   };
 
-  it('imports again after the app was removed: its tables are taken back (底线 5)', () => {
+  it('imports again after the app was removed: its tables are taken back (invariant 5)', () => {
     const installed = importApp(starter(), file);
     const removed = run(installed, [{ op: 'removeContainer', app: 'habits' }]);
     expect(removed.data.tables.find((t) => t.id === habits)!.app).toBeUndefined();
@@ -303,9 +305,9 @@ describe('接回已有的表和恢复初始样子', () => {
   it('restores the app to the file: pages, style, bar, reminders; user tables stay on the home', () => {
     const base = starter();
     let config = importApp(base, file);
-    // 放进桌面菜单。
+    // Place into the Home Screen menu.
     config = run(config, [homeScreenOp(config, 'app:habits', true)]);
-    // 用户把它改得面目全非：删一页、加一页、改风格、改名、加自己的表、删一个提醒。
+    // The user heavily modified it: deleted a page, added a page, changed style, changed name, added own table, deleted a reminder.
     const reminder = remindersOf(config).find((r) => r.app === 'habits')!;
     config = run(config, [
       { op: 'removeContainer', page: 'habits-insights' },
@@ -337,9 +339,9 @@ describe('接回已有的表和恢复初始样子', () => {
         .sort(),
     ).toEqual(file.pages.map((p) => p.id).sort());
     expect(remindersOf(after).filter((r) => r.app === 'habits')).toHaveLength(entry.reminders);
-    // 用户自己的表留着，转给了主页，记录不动。
+    // The user's own table is kept, transferred to the home page, and records remain untouched.
     expect(after.data.tables.find((t) => t.id === 'habits-extra')!.app).toBeUndefined();
-    // 原文件多出来的字段补上了；桌面菜单还在；主页入口只有一个。
+    // Extra fields from the original file are filled in; Home Screen menu remains; there is only one home page entry point.
     expect(after.data.tables.find((t) => t.id === habits)!.fields.map((f) => f.id)).toContain(
       'extra',
     );
@@ -376,11 +378,11 @@ describe('接回已有的表和恢复初始样子', () => {
   });
 });
 
-// 分享一个装好的 App（D-545）：做成 App 文件，只有结构；别人（或换一台手机）导入后是一样的 App。
+// Share an installed App (D-545): packaged as an App file containing only structure; when imported by someone else (or on another phone), it is the same App.
 describe('appFileOfApp', () => {
   const wallet = readAppFile(text('tinkrum-app-wallet.json'))!;
   const installed = () => importApp(starter(), wallet);
-  /** 在 App 的第一页上放一张图片、一个文件位，指向用户的文件。 */
+  /** Place an image and a file slot on the first page of the App pointing to the user's files. */
   const withFiles = (config: WorkspaceConfig) => {
     const page = config.containers.pages.find((p) => p.app === 'wallet')!.id;
     const r = applyOps(
@@ -427,7 +429,7 @@ describe('appFileOfApp', () => {
         'schemaVersion',
         'tables',
         'tools',
-        // 用到了什么（D-556）：给读的版本看，不是 App 的一部分。
+        // Uses (D-556): for the reader version, not part of the App.
         'uses',
         'version',
       ].sort(),
@@ -444,7 +446,7 @@ describe('appFileOfApp', () => {
     expect(again.nav.apps![0]).toEqual(config.nav.apps![0]);
   });
 
-  it('carries no references to the user’s files: images and file slots come out empty (底线 3)', () => {
+  it('carries no references to the user’s files: images and file slots come out empty (invariant 3)', () => {
     const config = withFiles(installed());
     const text = appFileText(appFileOfApp(config, 'wallet')!, NOW);
     expect(text).not.toContain('userphoto1');
@@ -467,7 +469,7 @@ describe('appFileOfApp', () => {
     expect(appFileOfApp(starter(), 'wallet')).toBeNull();
   });
 
-  // 新版本加了形状（新的样子、新的字段类型）但版本号没变：旧版本读得出文件，导入时校验不过，整份不导入（底线 18）。
+  // Using something this build does not know is refused as a whole, rather than partially (invariant 18).
   it('a file using something this build does not know is refused as a whole, not half imported', () => {
     const file = readAppFile(text('tinkrum-app-wallet.json'))!;
     const odd = JSON.parse(JSON.stringify(file)) as AppFile;

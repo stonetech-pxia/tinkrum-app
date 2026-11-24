@@ -4,7 +4,7 @@ import { en } from './messages/en';
 import { fr } from './messages/fr';
 import { zh } from './messages/zh';
 
-// D-436：界面上叫 Tink，但信任说明必须告诉用户它是 AI、默认由谁提供。
+// D-436: Named Tink in the UI, but the trust notice must inform the user that it is an AI and state who provides it by default.
 describe('trust note says what Tink is', () => {
   it.each([
     ['en', en.trustNote, /Tink is this app’s AI/],

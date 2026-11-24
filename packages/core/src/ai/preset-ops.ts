@@ -1,17 +1,20 @@
 import type { Locale, WorkspaceConfig } from '../schema';
 import { newWorkflowId, presetById, presetWorkflow } from '../workflows/presets';
 
-// 预设的简写（D-259）：AI 写 addTool {tool: {preset, params?, id?, name?, icon?}}，不写 steps，由 App 用
-// presetWorkflow() 展开成和用户自己添加时完全一样的快捷操作；params 按步骤 ID 覆盖参数。展开在 PlanSchema 之前做，
-// 后面的校验（参数是否合法）、修改说明、草稿看到的都是完整的 addTool {tool: {kind: "quickAction", …}}。
-// 也接受把这几个键直接写在操作上（addTool {preset, …}，和 v33 的 addWorkflow {presetId} 一样）。
+// Preset shorthand (D-259): AI writes addTool {tool: {preset, params?, id?, name?, icon?}} without
+// steps; the app uses presetWorkflow() to expand it into the exact same quick action as when the
+// user adds it themselves; params override parameters by step ID. Expansion happens before
+// PlanSchema, so subsequent validation (whether parameters are valid), change descriptions, and
+// draft views all see the full addTool {tool: {kind: "quickAction", ...}}. Also accepts writing
+// these keys directly on the operation (addTool {preset, ...}, same as v33's addWorkflow
+// {presetId}).
 
 const SHORT_KEYS = new Set(['kind', 'preset', 'params', 'id', 'name', 'icon']);
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** 一个 addTool 是不是简写：没有 tool 而有 preset，或 tool 是没有 steps、有 preset 的快捷操作。 */
+/** Whether an addTool is shorthand: has preset without tool, or tool is a quick action without steps and with a preset. */
 function shorthand(op: Record<string, unknown>): Record<string, unknown> | null {
   if (op.op !== 'addTool') return null;
   if (op.tool === undefined && 'preset' in op) {
@@ -32,8 +35,9 @@ function shorthand(op: Record<string, unknown>): Record<string, unknown> | null 
 }
 
 /**
- * 把模型回复里的预设简写展开。value 是展开后的回复（没有简写时原样返回），issues 是写错的地方
- * （预设 ID 不存在、步骤 ID 不对、多了不认识的键），会发回给模型改正。
+ * Expand preset shorthands in model responses. value is the expanded response (returned as-is if
+ * no shorthands), issues are places where errors occurred (non-existent preset ID, incorrect step
+ * ID, unrecognized extra keys), which are sent back to the model for correction.
  */
 export function expandPresetWorkflows(
   reply: unknown,
@@ -42,7 +46,7 @@ export function expandPresetWorkflows(
 ): { value: unknown; issues: string[] } {
   if (!isRecord(reply) || !Array.isArray(reply.ops)) return { value: reply, issues: [] };
   const issues: string[] = [];
-  // 快捷操作和提醒共用一套 ID。
+  // Quick actions and reminders share a single set of IDs.
   const taken: { id: string }[] = [...config.tools];
   const ops = reply.ops.map((raw, i) => {
     if (!isRecord(raw)) return raw;

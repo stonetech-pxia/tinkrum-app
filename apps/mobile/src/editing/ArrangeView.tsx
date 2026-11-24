@@ -27,9 +27,11 @@ import { ComponentView } from '../renderer/registry';
 import { Pill } from '../renderer/ui';
 import { edgeSpeed } from './edge-speed';
 
-// 编辑模式（D-052–D-054）：每个组件带拖动把手和 ↑ ↓ 按钮，隐藏的组件也显示出来，点组件打开操作面板。
-// 拖动只在界面上移动；松手时翻译成一个 moveComponent 加入编辑草稿，「完成」时整份草稿合成一个版本。
-// 拖到页面上下边缘时自动滚动（D-059）。
+// Editing mode (D-052–D-054): each component comes with a drag handle and ↑ ↓ buttons; hidden
+// components are also displayed, and tapping a component opens the action sheet. Dragging only
+// moves it on the interface; upon release, it is translated into a `moveComponent` operation added
+// to the editing draft, and upon "Done", the entire draft is synthesized into a single version.
+// Automatically scrolls when dragged to the top or bottom edge of the page (D-059).
 
 interface Line {
   slot: DropSlot;
@@ -51,7 +53,7 @@ function measure(view: HostInstance | undefined): Promise<{ y: number; height: n
   });
 }
 
-/** 一个组件的编辑行：内容（点按打开操作面板）+ 把手 + ↑ ↓。 */
+/** Editing row for a component: content (tap to open action sheet) + handle + ↑ ↓. */
 function Row({
   component,
   env,
@@ -85,7 +87,7 @@ function Row({
 }) {
   const { palette, locale } = env;
   const id = component.id;
-  // PanResponder 只创建一次。拖动回调只依赖 ref 和这一页的配置；配置一变（新版本），整个页面会重新挂载。
+  // PanResponder is created only once. Drag callbacks depend only on ref and the configuration of this page; whenever the configuration changes (new version), the entire page is remounted.
   const [responder] = useState(() =>
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -197,19 +199,19 @@ export function ArrangeView({
   onCancel: () => void;
 }) {
   const { palette, locale } = env;
-  // 编辑行里的组件只展示，不响应点按。
+  // Components within editing rows are for display only and do not respond to taps.
   const viewEnv: RenderEnv = { ...env, pageId: page.id, interactive: false };
   const views = useRef(new Map<string, HostInstance>());
   const lines = useRef<Line[]>([]);
   const [translateY] = useState(() => new Animated.Value(0));
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
-  // 编辑草稿变化时页面不会重新挂载，拖动回调要用最新的页面。
+  // When the editing draft changes, the page is not remounted; drag callbacks must use the latest page.
   const latest = useRef({ page, onMove });
   useEffect(() => {
     latest.current = { page, onMove };
   });
-  // 自动滚动：可见区域、内容高度、当前滚动位置，以及拖动开始和测量时的滚动位置。
+  // Auto-scroll: visible area, content height, current scroll position, and scroll positions at drag start and measurement.
   const scrollRef = useRef<ScrollViewInstance>(null);
   const viewport = useRef<HostInstance>(null);
   const bounds = useRef({ top: 0, bottom: 0, content: 0, height: 0 });
@@ -240,7 +242,7 @@ export function ArrangeView({
       bounds.current.top = area.y;
       bounds.current.bottom = area.y + area.height;
     }
-    // 记下每个可放下位置在屏幕上的高度；之后页面滚动多少，就把它们平移多少。
+    // Record the screen height of each drop target location; subsequently, translate them by the page scroll amount.
     const boxes = new Map<string, { y: number; height: number } | null>();
     await Promise.all(
       [...views.current].map(async ([key, view]) => boxes.set(key, await measure(view))),
@@ -268,7 +270,7 @@ export function ArrangeView({
     if (dragRef.current?.id === id) lines.current = result;
   }
 
-  /** 根据手指位置和页面滚动的距离，更新被拖组件的位置和插入位置。 */
+  /** Update the position of the dragged component and the insertion position based on finger position and page scroll distance. */
   function follow() {
     const current = dragRef.current;
     if (!current) return;
@@ -282,7 +284,7 @@ export function ArrangeView({
     if (best && !sameSlot(current.slot, best.slot)) update({ ...current, slot: best.slot });
   }
 
-  /** 手指停在边缘区域时每帧滚动一次；离开边缘、滚到头或松手时停止。 */
+  /** Scroll once per frame when the finger stays in the edge region; stops when leaving the edge, reaching the scroll limit, or releasing the finger. */
   function autoScroll() {
     frame.current = null;
     if (!dragRef.current) return;

@@ -4,33 +4,35 @@ import type { Registry } from './registry';
 import type { Locale, Workflow } from './schema';
 import { formatParamValue } from './workflow/format';
 
-// 从使用习惯里提议（D-127）：同一个快捷操作连续几次在「每次运行时问」里选了同样的值（例如都压到
-// 200 KB），结果页问一句要不要做成一个不用再选的快捷操作、放到首页。只在本机统计，不发给 AI，
-// 也不会自己改 App：用户点「做一个」才生成一次可撤销的修改。
+// Suggestions based on usage habits (D-127): when the same choice is made in "Ask every run" for a
+// quick action across several consecutive runs (e.g., always compressing to 200 KB), the result
+// screen prompts whether to save it as a quick action that skips prompting and place it on the home
+// screen. Statistics are kept entirely on-device, never sent to the AI, and never modify the app
+// autonomously: an undoable modification is generated only when the user taps "Create one".
 
-/** 连续几次选同样的值才提议。 */
+/** Number of consecutive identical choices required before suggesting. */
 export const HABIT_RUNS = 3;
 
-/** 一次运行里，某一步「每次运行时问」的回答。 */
+/** The answer provided for an "Ask every run" prompt during a single run. */
 export interface AskedAnswer {
   stepId: string;
   values: Record<string, unknown>;
 }
 
-/** 存在本机的统计（每个快捷操作一条）。 */
+/** Local statistical record (one per quick action). */
 export interface HabitRecord {
-  /** 最近一次回答（habitKey）。 */
+  /** Most recent answer (habitKey). */
   key: string;
-  /** 连续几次是这个回答。 */
+  /** Number of consecutive times this answer was given. */
   count: number;
-  /** 用户点过「不用了」的回答，不再提。 */
+  /** Answers dismissed by the user via "No thanks", which will no longer be suggested. */
   dismissed: string[];
 }
 
-/** 只记数字、选项和开关；文件名、用户写的文字、颜色这类回答不记。 */
+/** Only numbers, choices, and toggles are tracked; inputs like filenames, user-typed text, and colors are ignored. */
 const REMEMBERED = new Set(['number', 'choice', 'toggle']);
 
-/** 去掉不该记的回答；什么都不剩时返回 null（这次运行不算）。 */
+/** Strip out answers that should not be tracked; returns null if nothing remains (this run is ignored). */
 export function rememberedAnswers(
   workflow: Workflow,
   answers: readonly AskedAnswer[],
@@ -54,7 +56,7 @@ export function rememberedAnswers(
   return out.length > 0 ? out : null;
 }
 
-/** 回答的稳定表示（键按字母排序），用来比较两次是否一样。 */
+/** Stable representation of answers (keys sorted alphabetically), used to compare whether two runs match. */
 export function habitKey(answers: readonly AskedAnswer[]): string {
   return JSON.stringify(
     [...answers]
@@ -68,7 +70,7 @@ export function habitKey(answers: readonly AskedAnswer[]): string {
   );
 }
 
-/** 记一次运行：和上次一样就加一，不一样从 1 开始；没有可记的回答时清零。 */
+/** Log a run: increment count if identical to the last run, reset to 1 if different; clears if there are no trackable answers. */
 export function recordHabit(prev: HabitRecord | null, key: string | null): HabitRecord {
   const dismissed = prev?.dismissed ?? [];
   if (key === null) return { key: '', count: 0, dismissed };
@@ -78,13 +80,13 @@ export function recordHabit(prev: HabitRecord | null, key: string | null): Habit
 export const shouldSuggest = (record: HabitRecord): boolean =>
   record.count >= HABIT_RUNS && !record.dismissed.includes(record.key);
 
-/** 用户点「不用了」：这个回答以后不再提。 */
+/** User tapped "No thanks": this answer will no longer be suggested. */
 export const dismissHabit = (record: HabitRecord): HabitRecord => ({
   ...record,
   dismissed: [...record.dismissed.filter((k) => k !== record.key), record.key].slice(-10),
 });
 
-/** 回答写成短短的一句：用上常用规格的名字（「500 KB」「护照 35×45」），否则写出值。 */
+/** Format the answer into a short descriptive phrase: uses common specification names ("500 KB", "Passport 35x45"), falling back to the raw value. */
 export function habitLabel(
   workflow: Workflow,
   answers: readonly AskedAnswer[],
@@ -112,8 +114,9 @@ export function habitLabel(
 }
 
 /**
- * 做成的新快捷操作：复制原来的步骤，把回答写进参数、不再问这几项（其余照问，例如文件名）。
- * 是用户自己的快捷操作（没有 package），移除工具时不会跟着消失。
+ * Newly created quick action: copies original steps, embeds the answers into parameters to skip
+ * prompting for those items (while prompting for remaining ones like filenames). Treated as a
+ * user-created quick action (without a package), so it will not disappear when removing a tool.
  */
 export function habitWorkflow(
   workflow: Workflow,
@@ -140,7 +143,7 @@ export function habitWorkflow(
   };
 }
 
-/** 用户自己的快捷操作里已经有一样的（步骤和参数都相同）时不再提议。 */
+/** Suppress suggestions if an identical quick action (matching steps and parameters) already exists among user quick actions. */
 export function hasSameWorkflow(workflows: readonly Workflow[], candidate: Workflow): boolean {
   const shape = (w: Workflow) =>
     JSON.stringify(w.steps.map((s) => [s.action, s.params, s.ask ?? []]));

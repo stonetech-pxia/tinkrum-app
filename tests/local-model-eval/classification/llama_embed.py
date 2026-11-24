@@ -1,4 +1,6 @@
-"""启动并停止自己的 llama-server（--embedding --pooling last），只在 127.0.0.1 上，返回归一化的向量。"""
+"""Start and stop an isolated `llama-server` instance (`--embedding --pooling last`) strictly on
+127.0.0.1, returning normalized vectors.
+"""
 from __future__ import annotations
 
 import math
@@ -64,7 +66,9 @@ class LlamaEmbedder:
 
 
 def rank(query: list[float], candidates: list[tuple[str, list[float]]]) -> tuple[str | None, float, float, list]:
-    """返回最高分的 id、最高分、和第二名的差（只有一个候选时差为无穷大）以及全部分数。"""
+    """Return the top-scoring ID, top score, margin to the second place (infinity if there is only
+    one candidate), and all scores.
+    """
     scores = sorted(((sum(a * b for a, b in zip(query, vector)), cid) for cid, vector in candidates),
                     reverse=True)
     if not scores:

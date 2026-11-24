@@ -13,8 +13,10 @@ import { useFieldSuggestions } from '../data/field-suggestions';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeVision, TINY_JPEG } from '../test-utils/fake-files';
 
-// 表单只认预填引擎的接口（D-398）：引擎是异步的（本机模型要跑一会儿），拿到带位置的文字，
-// 结果原样成为候选；报错就没有候选；离开表单时通知它取消，晚到的结果不算。
+// The form only accepts the prefill engine interface (D-398): the engine is asynchronous (the
+// on-device model takes a moment to run), retrieves text with positions, and yields results
+// directly as candidates; errors result in no candidates; informs it to cancel upon leaving the
+// form, and late-arriving results are ignored.
 
 const mockContext: { repo?: MemoryWorkspaceRepo; files?: FakeFiles } = {};
 jest.mock('../workspace/context', () => ({ useWorkspaceContext: () => mockContext }));
@@ -58,10 +60,10 @@ const open = (engine: PrefillEngine) =>
     useFieldSuggestions({ enabled: true, collection, values, locale: 'en', engine }),
   );
 
-describe('预填引擎（D-398）', () => {
+describe('Prefill engine (D-398)', () => {
   beforeEach(setup);
 
-  it('引擎拿到字段和带位置的文字，它给的就是候选', async () => {
+  it('The engine receives fields and position-annotated text, and directly provides the resulting candidates', async () => {
     const engine = jest.fn<ReturnType<PrefillEngine>, Parameters<PrefillEngine>>(async () => FOUND);
     const { result } = await open(engine);
     await waitFor(() => expect(result.current.suggestions).toEqual(FOUND));
@@ -71,7 +73,7 @@ describe('预填引擎（D-398）', () => {
     expect(input.pages).toEqual([{ width: 600, height: 400, lines: [LINE] }]);
   });
 
-  it('引擎拿到表上的 prefillRules（D-421）', async () => {
+  it('The engine receives prefillRules on the table (D-421)', async () => {
     const cards: Collection = { ...collection, prefillRules: 'card' };
     const engine = jest.fn<ReturnType<PrefillEngine>, Parameters<PrefillEngine>>(async () => ({}));
     await renderHook(() =>
@@ -81,7 +83,7 @@ describe('预填引擎（D-398）', () => {
     expect(engine.mock.calls[0]![0].rules).toBe('card');
   });
 
-  it('引擎报错：没有候选，不再显示正在读', async () => {
+  it('Engine error: no candidates, no longer displays reading status', async () => {
     const { result } = await open(async () => {
       throw new Error('model failed');
     });
@@ -89,7 +91,7 @@ describe('预填引擎（D-398）', () => {
     expect(result.current.suggestions).toEqual({});
   });
 
-  it('引擎分两步（D-398）：先给的立刻显示、不再显示正在读，后来的补上', async () => {
+  it('Engine in two steps (D-398): initial results appear immediately and stop displaying reading status, subsequent results fill in later', async () => {
     let finish: ((s: FieldSuggestions) => void) | undefined;
     const { result } = await open(
       (_input, _signal, onPartial) =>
@@ -99,7 +101,7 @@ describe('预填引擎（D-398）', () => {
         }),
     );
     await waitFor(() => expect(result.current.suggestions).toEqual(FOUND));
-    // 引擎还没结束，但「正在读」那一行已经收起来：它晚收起来，下面的字段会在用户点了以后往上跳（D-388）。
+    // The engine has not finished, but the "Reading" line has already collapsed: if it collapsed late, fields below would jump upward after the user taps (D-388).
     expect(result.current.working).toBe(false);
     const later: FieldSuggestions = {
       total: [{ value: '7', score: 0, pick: { label: '', relY: 0 } }, ...FOUND.total!],
@@ -108,7 +110,7 @@ describe('预填引擎（D-398）', () => {
     expect(result.current.suggestions).toEqual(later);
   });
 
-  it('在文字里找不到位置的候选：点了也不记，字段原来的记忆还在', async () => {
+  it('Candidates whose positions cannot be found in the text: tapping them does nothing, and the field\'s original memory remains', async () => {
     const good = { label: 'Total', relY: 0.5 };
     await mockContext.repo!.setMeta(
       PICK_STORE_KEY,
@@ -123,7 +125,7 @@ describe('预填引擎（D-398）', () => {
     expect(stored.c?.total).toEqual(good);
   });
 
-  it('点过候选的字段（D-388）：后来的结果不再动它的候选，别的字段照常补', async () => {
+  it('Fields with selected candidates (D-388): subsequent results do not update their candidates, while other fields are filled as usual', async () => {
     const one = (id: string, value: string): FieldSuggestions[string] => [
       { value, score: 1, pick: { label: id, relY: 0.5 } },
     ];
@@ -143,7 +145,7 @@ describe('预填引擎（D-398）', () => {
     expect(result.current.suggestions).toEqual({ total: first.total, other: later.other });
   });
 
-  it('引擎拿到这张表存过的店名（现查记录，只读）', async () => {
+  it('The engine retrieves stored store names for this table (checked on the fly, read-only)', async () => {
     const merchant: Collection = {
       id: 'c',
       name: 'Receipts',
@@ -169,7 +171,7 @@ describe('预填引擎（D-398）', () => {
     expect(JSON.stringify(await mockContext.repo!.listRecords('c'))).toBe(before);
   });
 
-  it('离开表单：通知引擎取消', async () => {
+  it('Leaving the form: notify the engine to cancel', async () => {
     let signal: AbortSignal | undefined;
     const { unmount } = await open((_input, s) => {
       signal = s;

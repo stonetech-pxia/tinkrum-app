@@ -6,8 +6,10 @@ import type { Op } from './ops';
 import type { Collection, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// 提示卡（D-580）：文字里的 {count}、{sum:字段} 按符合条件的记录算，卡片里最多两个按钮（一个一键记录、一个打开页面）。
-// 只读和一键记录，不存任何数字（底线 14）；配置里的引用被删了要被拒绝（底线 18）。
+// Callout cards (D-580): text placeholders {count} and {sum:field} are computed from matching
+// records; cards support up to two buttons (one quick-action record creator, one page opener).
+// Read-only and quick action, stores no numeric data (invariant 14); configuration references that
+// are deleted will be rejected (invariant 18).
 
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 17) };
 const subs: Collection = {

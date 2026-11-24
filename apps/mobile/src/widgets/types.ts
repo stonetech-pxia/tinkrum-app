@@ -1,23 +1,25 @@
-// 桌面小组件（D-321–D-325）：App 在本机算好、写给小组件的画面，和小组件写回来的点按。
-// iOS 扩展（targets/widget/Snapshot.swift）和 Android（modules/morph-widgets/…/WidgetStore.kt）按这份格式读，
-// 改格式时三处一起改。AI 看不到这些（D-042）：只在本机算、只写进本机的共享存储。
+// Desktop widgets (D-321-D-325): The UI calculated on device by the app and written for the widget,
+// along with taps written back by the widget. The iOS extension (targets/widget/Snapshot.swift) and
+// Android (modules/morph-widgets/.../WidgetStore.kt) read this format; when changing the format,
+// update all three places together. AI cannot see these (D-042): calculated only on device and
+// written only to on-device shared storage.
 
-/** 一行：列表的一条记录、tiles 的一个圆、分组统计的一个选项。 */
+/** Row: a list record, a tiles circle, or an option in grouped statistics. */
 export interface WidgetRow {
   id: string;
   title: string;
   trailing?: string;
-  /** 点一下执行的操作（snapshot.ops 的键）。 */
+  /** Action executed on tap (key in snapshot.ops). */
   op?: string;
-  /** 点一下打开 App 的地址。 */
+  /** URL opened on tap. */
   link?: string;
-  /** 进度环（0–1）。 */
+  /** Progress ring (0-1). */
   ratio?: number;
-  /** 到了目标，圆填满。 */
+  /** Target reached, circle filled. */
   full?: boolean;
 }
 
-/** 一个组件的画面。message：不支持的组件、已经删掉的组件。 */
+/** Widget view. message: unsupported widgets, deleted widgets. */
 export type WidgetView =
   | {
       kind: 'stat';
@@ -26,7 +28,7 @@ export type WidgetView =
       ratio?: number;
       percent?: string;
       note?: string;
-      /** 按单选分组：每个选项一行。 */
+      /** By single-select group: one row per option. */
       rows?: WidgetRow[];
       link?: string;
     }
@@ -43,7 +45,7 @@ export type WidgetView =
 
 export type WidgetViews = Record<string, WidgetView>;
 
-/** 一段时间里的画面：现在这份，和每个操作连点 1…N 次以后的（D-322）。 */
+/** View over a period: current view, and after 1...N consecutive operations (D-322). */
 export interface WidgetState {
   from: number;
   until: number;
@@ -51,7 +53,7 @@ export interface WidgetState {
   after: Record<string, WidgetViews[]>;
 }
 
-/** 小组件上能点的操作：哪个组件、哪条记录（列表每一行的操作），hash 是当时的操作定义（改过就不执行）。 */
+/** Operations triggerable on the widget: which widget, which record (operations for each list row), hash is the operation definition at the time (if modified, it won't execute). */
 export interface WidgetOpRef {
   component: string;
   record?: string;
@@ -68,26 +70,26 @@ export interface WidgetSnapshot {
   v: 1;
   strings: { stale: string };
   colors: { light: WidgetPalette; dark: WidgetPalette };
-  /** 放到桌面的组件，最近放的在最后（iOS「编辑小组件」的列表；没选时显示最后一个）。 */
+  /** Widgets placed on the desktop, most recently placed at the end (iOS "Edit Widget" list; shows the last one when none selected). */
   items: { id: string; name: string }[];
   ops: Record<string, WidgetOpRef>;
-  /** 今天和明天（跨天时小组件自己换上，不用等 App 打开）。 */
+  /** Today and tomorrow (widget updates itself across days without waiting for the app to open). */
   states: WidgetState[];
 }
 
-/** 小组件写进队列的一次点按（at：点的时间，毫秒）。 */
+/** A tap queued by the widget (at: tap time in milliseconds). */
 export interface QueuedWidgetOp extends WidgetOpRef {
   op: string;
   at: number;
 }
 
-/** 本机记着的「放到桌面」（不进配置，D-325）。 */
+/** "Placed on desktop" recorded locally (does not enter config, D-325). */
 export interface PlacedWidget {
   componentId: string;
   placedAt: number;
 }
 
-/** 队列里的一次点按：id 是它在队列里的文件名（确认删除用），text 是写进去的 JSON。 */
+/** A tap in the queue: id is its filename in the queue (for confirming deletion), text is the written JSON. */
 export interface QueueEntry {
   id: string;
   text: string;
@@ -95,12 +97,12 @@ export interface QueueEntry {
 
 export interface WidgetPlatform {
   setSnapshot(json: string): Promise<void>;
-  /** 读出点了还没处理的操作，不删（R07）。 */
+  /** Read unprocessed taps without deleting them (R07). */
   readQueue(): Promise<QueueEntry[]>;
-  /** 确认这些点按已经处理好了，把它们删掉。没有的 id 不算错。 */
+  /** Confirm these taps have been processed and delete them. Missing IDs are not considered errors. */
   removeQueue(ids: string[]): Promise<void>;
   canPin(): boolean;
   pin(itemId: string, label: string): Promise<boolean>;
-  /** Android：App 开着时小组件上点了操作。返回取消订阅。 */
+  /** Android: Widget tapped while app is open. Returns unsubscribe function. */
   onQueue(listener: () => void): () => void;
 }

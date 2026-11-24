@@ -1,4 +1,4 @@
-// 工具定义和动态参数说明中旧名称对的法语翻译。
+// French translations of old names in tool definitions and dynamic parameter descriptions.
 export const FRENCH_PAIRS: Readonly<Record<string, string>> = {
   text: 'texte',
   'long text': 'texte long',

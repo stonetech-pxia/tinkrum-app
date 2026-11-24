@@ -1,4 +1,4 @@
-// 中文文案。键和 en.ts 完全一致（MessageTable）；中文不分单复数，没有单数表。
+// Chinese copy. Keys match en.ts exactly (MessageTable); Chinese does not distinguish singular/plural and has no singular table.
 import type { MessageTable } from './en';
 
 export const zh: MessageTable = {
@@ -34,7 +34,7 @@ export const zh: MessageTable = {
   sharePhotoSummary: '{n} 张照片',
   loading: '正在载入…',
 
-  // 修改流程
+  // Modification workflow
   changeTitle: '修改这个 App',
   changeHint: '用一句话描述想怎么改。改之前会先给你看预览。',
   changePlaceholder: '例如：字体大一点，去掉阴影',
@@ -62,7 +62,7 @@ export const zh: MessageTable = {
   undoSummary: '撤销',
   undoneBanner: '已回到改之前的样子',
 
-  // 改动记录（D-112）
+  // Change history (D-112)
   historyTitle: '改动记录',
   current: '现在的样子',
   restoreThis: '回到这时候的样子',
@@ -78,7 +78,7 @@ export const zh: MessageTable = {
   dateToday: '今天 {time}',
   dateYesterday: '昨天 {time}',
 
-  // 工具目录
+  // Tool catalog
   toolsTitle: '工具',
   install: '添加',
   open: '打开',
@@ -91,7 +91,7 @@ export const zh: MessageTable = {
   uninstallTitle: '移除{name}工具？',
   removeCardSummary: '从首页移除了{name}',
   addCardSummary: '把{name}放到了首页',
-  // 下载的工具（D-177）
+  // Downloaded tools (D-177)
   toolDownloadSize: '需要下载 {size}',
   toolDownloading: '正在下载…',
   toolNeedsAppUpdate: '需要先更新 App 才能添加',
@@ -106,7 +106,7 @@ export const zh: MessageTable = {
   toolDeleteMessage: '以后可以在「工具」里再下载。',
   toolDeleteAdded: '这个工具还在用。先到「工具」里移除它，再回来删除。',
 
-  // 设置
+  // Settings
   settingsTitle: '设置',
   thisApp: '这个 App',
   general: '通用',
@@ -127,19 +127,19 @@ export const zh: MessageTable = {
   aiEngineMock: '内置规则（离线）',
   aiEngineByok: '我自己的 API key（{model}）',
 
-  // AI 设置
+  // AI Settings
   aiSettingsTitle: 'Tink',
   aiModeQuestion: 'Tink 用什么修改这个 App',
   aiModeMock: '内置规则',
   aiModeMockNote: '离线、免费，只认识固定的几种说法。',
   aiModeServer: 'Tinkrum 服务器',
   aiModeServerNote: '通过服务器调用模型。',
-  // 测试期服务器保存请求（D-240）：只在用 Tinkrum 服务器时显示。
+  // Server storage note during testing (D-240): displayed only when using the Tinkrum server.
   aiServerStoredNote:
     '测试期间会保存你对 Tink 说的话和 App 的结构，用来改进 Tinkrum。文件和记录不会发送。',
   aiModeByok: 'API key',
   aiModeByokNote: '用你自己的 key 直连 Claude 或兼容服务，费用记在你的账号上。',
-  // 自带 key 的两种 provider（D-241）
+  // Two providers supporting BYOK (Bring Your Own Key) (D-241)
   byokProviderLabel: '服务商',
   byokSentNote: '修改时，你说的话和 App 的结构会发到 {host}，文件和记录不会。',
   baseUrlLabel: '地址',
@@ -184,7 +184,7 @@ export const zh: MessageTable = {
   about: '关于',
   aboutValue: 'Tinkrum 原型 · AGPL-3.0 · schema v{schema} · 版本 #{revision}',
 
-  // 页面组件
+  // Page components
   noFiles: '扫描或保存的文件会出现在这里',
   filesAll: '全部',
   filesAllTitle: '全部文件',
@@ -275,7 +275,7 @@ export const zh: MessageTable = {
   updateTool: '更新',
   updateSummary: '更新了{name}工具',
 
-  // 运行页面
+  // Run page
   runTitle: '运行',
   runCancel: '停止',
   runProgress: '{done}/{total}',
@@ -323,7 +323,7 @@ export const zh: MessageTable = {
   packDeleteMessage: '下次用到时可以再下载。',
   packDeleteWithLanguages: '它的 {count} 种语言也会删掉，用到时可以再下载。',
 
-  // 图片与链接
+  // Images and links
   imagePlaceholder: '点按选择一张照片',
   imageTitle: '图片',
   imageMissing: '这张图片不在这台设备上，点按换一张。',
@@ -393,7 +393,7 @@ export const zh: MessageTable = {
   listToolAll: '共 {n} 条',
   listToolFound: '只有找到的 {n} 条',
 
-  // 用户数据
+  // User data
   noRecords: '还没有记录',
   today: '今天',
   yesterday: '昨天',
@@ -541,7 +541,7 @@ export const zh: MessageTable = {
   recordPageMissing: '这条记录已经删除，或者这个页面要从列表里点一条打开。',
   recordPageEdit: '编辑这条记录',
   pageMissing: '这个页面已不存在。',
-  // 「设置 → 数据」：App 配置导出、预填记忆（D-244）
+  // "Settings -> Data": App configuration export, prefill memory (D-244)
   appConfigTitle: 'App 配置',
   appConfigHint: '页面、数据表的结构、快捷操作和提醒，存成一个文件。不含你的记录和文件。',
   exportAppConfig: '导出 App 配置',
@@ -615,14 +615,14 @@ export const zh: MessageTable = {
   prefillMemoryRestoreInvalid: '这个文件不是 Tinkrum 导出的预填记忆，没有恢复。',
   prefillMemoryRestored: '已恢复 {count} 种单据版式。',
   prefillMemoryPicks: '记住了 {count} 个字段点过的候选',
-  // 新记录表单：从附件里找的候选值（D-394）
+  // New record form: Candidate values found in attachments (D-394)
   suggestionFill: '把 {value} 填进「{field}」',
   heardFilled: '按你说的填的',
   suggestionsWorking: '正在从附件里找可以填的内容…',
   suggestionsNeedDownload: '要从附件里找出可以填的内容，需要先下载一次。',
   suggestionsDownload: '找可以填的内容',
 
-  // 直接编辑（长按一块、调整顺序）
+  // Direct edit (long-press a block, adjust order)
   editText: '改文字',
   editColor: '颜色',
   editAlign: '对齐',
@@ -669,7 +669,7 @@ export const zh: MessageTable = {
   deleteGroupMessage: '里面的 {count} 块也会一起删除。点「取消」可以放弃这次编辑，保存后也能撤销。',
   deleteDataMessage:
     '记录不会被删除（在「设置 → 数据」里）。点「取消」可以放弃这次编辑，保存后也能撤销。',
-  // AI 只改 App（D-113、D-124–D-130）
+  // AI only changes the app (D-113, D-124–D-130)
   readyTitle: '快捷操作做好了',
   readyRunNow: '现在就用一次',
   readyLater: '先不用',
@@ -701,7 +701,7 @@ export const zh: MessageTable = {
   habitNo: '不用了',
   habitMade: '已把「{name}」放到首页',
 
-  // ---- 翻译（D-170–D-176）：错误说明拼进「不支持这个步骤：…」/「需要的内容没有下载好：…」 ----
+  // ---- Translation (D-170–D-176): Error descriptions interpolated into "Unsupported step: ..." / "Required content not downloaded: ..." ----
   translateNeedsFullApp: '翻译（要在正式版 Tinkrum 里用，这个预览版里没有本机翻译）',
   translateOsTooOld: '翻译（需要 iOS 18 或更新的系统）',
   translatePairUnsupported: '把{from}翻成{to}（这台手机不支持）',
@@ -716,7 +716,7 @@ export const zh: MessageTable = {
   translateLanguageHint: '约 30 MB，用来在本机翻译（Google ML Kit）。',
   translateDeleteMessage: '下次翻译这种语言时会再问你是否下载。',
   translateNote: '本机翻译，适合看懂意思；正式文件请找专业翻译。',
-  // ---- 视频、音频和压缩 PDF（D-140–D-148）。音频工具的文字请另起一块，方便合并。----
+  // ---- Video, audio, and PDF compression (D-140–D-148). Place text for audio tools in a separate section for easy merging. ----
   runPercent: '{done}%',
   runError_needsFullApp: '视频和音频要在正式版 Tinkrum 里处理，这个预览版里不行。',
   subtitlesNeedApp: '导出带时间的字幕需要更新后的 Tinkrum App。',
@@ -756,7 +756,7 @@ export const zh: MessageTable = {
   runError_notEnoughSpace: '手机空间不够，还需要大约 {gb} GB。',
   runError_targetTooSmall: '「{name}」压到 {target} 画面会看不清。至少要 {mb} MB，或者先剪短一点。',
   runError_interrupted: '处理时切到了别的 App，没有完成。请留在 Tinkrum 里，再点「再来一次」。',
-  // 长任务切到后台也继续（D-160–D-162）：运行页的提示，Android 通知栏的进度和完成通知。
+  // Long-running tasks continue when switched to background (D-160–D-162): Run page prompts, Android notification bar progress and completion notifications.
   runCanLeave: '可以切到别的 App，Tinkrum 会在后台接着处理。',
   runStayInMorph: '处理时请留在 Tinkrum 里。',
   bgPreparing: '准备中…',
@@ -783,7 +783,7 @@ export const zh: MessageTable = {
   sharedVideos: '{n} 个视频',
   sharedAudio: '{n} 个音频',
 
-  // AI 修改的草稿（D-190）
+  // AI modification draft (D-190)
   draftDropped: '离开草稿之后 App 又改过，有 {n} 步套不上了，已经去掉。',
   draftFirstStep: '这已经是草稿的第一步了。要整个丢掉，去「修改这个 App」删除草稿。',
   draftEdit: '修改',
@@ -810,8 +810,8 @@ export const zh: MessageTable = {
   wantCardsChip: '我想要存名片',
   draftRenderFailed: '刚才那一步显示不出来，已经撤掉。',
 
-  // 功能和外观分开改（D-191）
-  // 工具检查补救后还有问题（AGENT_PLAN §3.6）：只提醒。
+  // Separate changes for features and look (D-191). Remaining issues after tool checks and
+  // remediation (AGENT_PLAN §3.6): warning only.
   planCheckParams: '你说的数值或语言可能没有写进快捷操作，用之前看一下它的设置。',
   planCheckTools:
     '这里有些东西可能还用不了：可能打不开、加不了记录或看不到记录。告诉我缺什么，我接着加。',
@@ -871,11 +871,11 @@ export const zh: MessageTable = {
   tableReadyRecord: '现在就记一笔',
   tableReadyWhere: '记录存在本机，在「设置 → 数据」里也能看到这张表。',
 
-  // 新手引导（D-149）
+  // Newcomer onboarding (D-149)
   guideSkip: '跳过',
   guideNext: '下一步',
   guideStart: '开始',
-  // 划屏介绍：每页一张图配一句话。
+  // Swipe introduction: one image and one sentence per page.
   guideIntro1: '拍下纸质文件，变成清晰的 PDF、Word 或 Excel',
   guideIntro1Sub: '免费，无广告。文件只在你的手机上处理。',
   guideIntro2: '扫描、打开文件或说一句，都能记',
@@ -913,7 +913,7 @@ export const zh: MessageTable = {
   guideTinkDone: '搭好了，以后你想改什么都可以和我说哦！',
   guideGotIt: '我知道了',
   guideLater: '以后再说',
-  // 引导第 3 步：样板 App（D-260）。
+  // Onboarding step 3: Sample apps (D-260).
   guideSamplesTitle: '第 3 步',
   guideSamplesBody: '还能把 Tinkrum 变成你自己的 App，选一个试试。',
   sampleDraftInput: '套用样板「{name}」',
@@ -923,20 +923,20 @@ export const zh: MessageTable = {
   sampleReadyDismiss: '知道了',
   sampleFailed: '这个样板没能加上，换一个试试。',
   sampleContinuePrompt: '在{name}的基础上改：',
-  // ---- 音频工具（D-150–D-156，音频会话）----
+  // ---- Audio tools (D-150–D-156, audio session) ----
   runError_audioTooSmall: '「{name}」压到 {target} 声音会听不清。至少要 {mb} MB，或者先剪短一点。',
   runError_noAudio: '「{name}」里没有声音。',
-  // ---- 格式转换的缺口（D-183–D-186）----
+  // ---- Format conversion gaps (D-183–D-186) ----
   runError_formatUnsupported:
     '「{name}」是 {format} 格式，这台手机打不开。可以先在电脑上转成 MP4。',
-  // ---- 需求回收（D-189）----
+  // ---- Requirement backlog (D-189) ----
   needSend: '把这个需求告诉我们',
   needRetry: '没发出去，再试一次',
   needSent: '收到了，谢谢。新功能会通过更新和下载内容加进来。',
   needPrivacy: '只发送这一句话给 Tinkrum，不含文件、记录和设置。',
   needsSettingTitle: 'Tink 做不到时，可以把需求告诉我们',
   needsSettingNote: '回答下面会多一个按钮，你点了才发送那句话。',
-  // ---- 记一笔、附件和公式字段（D-187、D-188）----
+  // ---- Quick entry, attachment, and formula fields (D-187, D-188) ----
   attachmentMissing: '文件已经删掉了',
   removeAttachment: '去掉',
   attachmentAdd: '添加照片或文件',
@@ -944,7 +944,7 @@ export const zh: MessageTable = {
   attachmentMoveUp: '上移',
   attachmentMoveDown: '下移',
   attachmentsFull: '最多 {n} 个文件',
-  // ---- 附件的「…」和放回记录（D-395）----
+  // ---- Attachment menu ("...") and returning records (D-395) ----
   attachmentMore: '「{name}」的更多操作',
   deskBackTitle: '放回记录',
   deskBackMessage: '桌上的文件要怎么放进这条记录？',
@@ -963,7 +963,7 @@ export const zh: MessageTable = {
   speechDownload: '下载',
   speechDownloadFailed: '{lang}的语音模型',
   speechNote: '本机自动识别，有噪音或口音时可能有错字，请核对。',
-  // ---- 文字转语音（D-270）：错误说明拼进「不支持这个步骤：…」----
+  // ---- Text-to-speech (D-270): Error descriptions interpolated into "Unsupported step: ..." ----
   speakNoVoice:
     '朗读{lang}（这台手机没有这种语言的声音；可以在手机设置里添加：iPhone 在「辅助功能 → 朗读内容 → 声音」，Android 在「文字转语音输出」）',
   speakNotDownloaded:
@@ -985,22 +985,22 @@ export const zh: MessageTable = {
   recordDiscardTitle: '不要这段录音了？',
   recordDiscard: '不要了',
   recordKeep: '继续录',
-  // 按条件筛选（D-242）
+  // Filter by condition (D-242): None of the {count} files meet the conditions of "Keep only"
   runError_noneMatched: '{count} 个文件都不满足「按条件筛选」的条件。',
-  // 分组后各出一份（D-243）
+  // Separate exports per group (D-243)
   groupUndated: '没有日期',
 
-  // 命名用识别出的文字（D-244）
+  // Naming using recognized text (D-244)
   runError_needsRecognition:
     '这个文件名要用文件里识别出的文字，这台设备不能在本机识别文字。请用完整版 Tinkrum，或者去掉文件名里的这一部分。',
-  // 统计按选项分组（D-248）
+  // Statistics grouped by option (D-248)
   statNoChoice: '未选',
-  // 图表（D-249）
+  // Chart (D-249)
   describeCallout: '提示卡“{v0}”',
   describeChart: '图表「{v0}」',
-  // D-254：更新的 App 加的组件，这个版本不认识，原样保留。
+  // D-254: Content from a newer version of the app not recognized by this version, preserved as-is.
   describeUnknownComponent: '新版本 App 才能显示的内容',
-  // v34 修改说明（describe.ts）
+  // v34 modification description (describe.ts)
   v34descDeskAddAbove: '在桌上的预览上方加上{v0}',
   v34descDeskAddBelow: '在桌上的预览下方加上{v0}',
   v34descDeskRemove: '从桌上移除{v0}',
@@ -1044,7 +1044,7 @@ export const zh: MessageTable = {
   periodRangeText: '{start} 到 {end}',
   compare_page: '上一期：{value}',
   chartShare: '{value}（{percent}）',
-  // 表和表之间引用（D-250）
+  // Inter-table references (D-250)
   linkDeleted: '已删除的记录',
   linkNone: '没有选',
   linkChoose: '选一条…',
@@ -1052,11 +1052,11 @@ export const zh: MessageTable = {
   linkNew: '在「{name}」里新加一条',
   linkClear: '不选了',
   linkEmptyTable: '「{name}」里还没有记录。',
-  // 提醒（D-251）
+  // Reminder (D-251): "{title}" ({when})
   describeAddReminder: '新建提醒「{title}」（{when}）',
   describeUpdateReminder: '修改提醒「{title}」',
   describeRemoveReminder: '移除提醒「{title}」',
-  // 手机桌面（D-271）
+  // Home Screen (D-271)
   describeHomeScreenOn: '把「{name}」放到手机桌面：长按 Tinkrum 图标就能看到',
   describeHomeScreenOff: '把「{name}」从手机桌面拿掉',
   homeScreenTitle: '在手机桌面上',
@@ -1126,12 +1126,12 @@ export const zh: MessageTable = {
   reminderRemove: '移除',
   reminderOpenTitle: '来自你的提醒',
   reminderOpenRun: '开始',
-  // D-256：按钮、快捷入口打开的快捷操作（只摆出来，用户点「开始」才运行）。
+  // D-256: Quick action opened by a button or quick entry (only displayed; runs only when the user taps "Start").
   openQuickActionTitle: '快捷操作',
   openQuickActionMissing: '这个快捷操作已经不在了。',
   reminderOpenMissing: '这个提醒对应的快捷操作已经不在了。',
   remindersRowHint: '{n} 个提醒',
-  // 样板 App（D-260）：放不下时不套用，说明原因。
+  // Sample app (D-260): Not applied when there is insufficient space; explains the reason.
   sampleTooManyTables:
     '「{name}」要新建数据表，可 App 里的数据表快到 20 张的上限了。先移除用不到的表，再来试试。',
   sampleTooManyPages:
@@ -1143,7 +1143,7 @@ export const zh: MessageTable = {
   sampleHomeFull:
     '「{name}」要在首页放一个入口，可首页已经放满了。先从首页移除一些内容，再来试试。',
 
-  // ==== 从界面代码里抽出来的文案（键名是「文件_英文开头_哈希」） ====
+  // // ==== Copy extracted from interface code (key format: "file_englishPrefix_hash") ====
   planner_This_request_can_t_be_handled_Try_desc_04270:
     '这个请求无法处理，请换一种说法描述你想怎么修改这个 App。',
   prompt_English_fafbe: 'Simplified Chinese',
@@ -1555,7 +1555,7 @@ export const zh: MessageTable = {
   _kind__Category_not_found_5faf2: '找不到这个分类',
   _id__This_quick_action_no_longer_exists_35f5a: '这个快捷操作已经不在了。',
 
-  // ==== 其他文案 ====
+  // // ==== Other copy ====
   retry: '重试',
   sharedFilesReceived: '收到 {n} 个文件',
   workflowFromTool: '这个快捷操作来自「{name}」工具：可以修改，移除工具时会一起移除。',
@@ -1587,7 +1587,7 @@ export const zh: MessageTable = {
   describeUpdatedTool: '更新「{tool}」工具：新增 {names}；你改过的内容保留',
   separatorList: '、',
   separatorComma: '，',
-  // 按顺序的聚合（D-284）
+  // Sequential aggregation (D-284)
   seqDays: '{n} 天',
   seqWeeks: '{n} 周',
   seqMonths: '{n} 个月',
@@ -1595,7 +1595,7 @@ export const zh: MessageTable = {
   seqToday: '今天',
   seqDaysAgo: '{n} 天前',
   seqAvgDays: '平均 {n} 天',
-  // 一天、一周从什么时候开始（D-286）
+  // When a day or week starts (D-286)
   describeDayStart: '一天从 {hour} 点开始',
   describeReadAttachmentsOn: '「{name}」：新记录自动读取附件，给出候选',
   describeRecordRow: '「{name}」：改记录页顶部的按钮',
@@ -1630,7 +1630,7 @@ export const zh: MessageTable = {
     '两周一段（例如发薪周期）从一周的第一天开始。要指定从哪天起算，告诉 Tink。',
   separatorSemicolon: '；',
 
-  // 扫描件转 Excel（D-272）
+  // Scan to Excel (D-272)
   runError_tableUnsupported: '这台设备还不能识别这种语言的表格。请给「转 Excel」换一种语言。',
   resultTablesMissing: '第 {pages} 页没有找到带线的表格，已按全部内容输出。',
   tableSheetName: '第 {n} 页',
@@ -1652,7 +1652,7 @@ export const zh: MessageTable = {
   tableDeleteImage: '删除这张图片',
   tableEmpty: '这一页没有识别出内容。',
   tableReadOnly: '这一页超过 {max} 个格子，这里只能查看。要修改，请用别的 App 打开这个文件。',
-  // 扫描件转 Word（D-328）
+  // Scan to Word (D-328)
   runError_wordUnsupported: '这台设备还不能识别这种语言的文档。请给「转 Word」换一种语言。',
   wordFileName: '文档-{date}',
   wordBigger: '字变大',
@@ -1667,7 +1667,7 @@ export const zh: MessageTable = {
   wordHideKeyboard: '收起键盘',
   wordDeleteTable: '删除表格',
   wordEmpty: '没有识别出内容。',
-  // 日程（D-292–D-296）
+  // Schedule (D-292–D-296)
   scheduleDaily: '每天',
   scheduleWeekdays: '每{days}',
   scheduleTimesWeek: '每周 {n} 次',
@@ -1735,7 +1735,7 @@ export const zh: MessageTable = {
   recordActionTooLarge: '什么都没改：「{field}」不能大于 {limit}。',
   recordActionFailed: '没有修改：出了点问题，一条也没改。',
   recordUndoFailed: '这条记录之后又改过，没有撤销。',
-  // 勾上盖掉了原来有的值（D-617）：取消只会清空，所以这一次有撤销。
+  // Ticked. Replaced an existing value (D-617): Unchecking only clears, so this operation is undoable.
   recordCheckOverwrote: '已勾上，原来填的值换掉了。',
   recordCreateAllConfirm: '将在「{table}」新建 {n} 条记录。',
   recordCreateAllConfirmButton: '新建',
@@ -1752,7 +1752,7 @@ export const zh: MessageTable = {
   recordActionChangedMeanwhile: '有记录在你确认前被改过，这次一条也没改。再点一次就按最新的来。',
   recordActionTooMany: '一次最多修改 {max} 条，这次会修改 {n} 条。',
   recordActionGone: '这条记录已经删除。',
-  // 月历、显示格式、统计的目标和比较（D-305–D-308）
+  // Calendar, display format, statistic targets and comparisons (D-305–D-308)
   statPercent: '{value}%',
   calendarPrevWeek: '上一周',
   calendarNextWeek: '下一周',
@@ -1787,7 +1787,7 @@ export const zh: MessageTable = {
   calendarDayEmpty: '这一天没有记录。',
   elapsedRunning: '已经进行了 {time}',
   progressOfGoal: '{value} / {goal}',
-  // 打卡格（D-610）
+  // Check-in grid (D-610)
   gridCellLabel: '{row}，{column}：{n} 条',
   gridRange: '{from} – {to}',
   gridCellTitle: '{row} · {column}',
@@ -1817,14 +1817,14 @@ export const zh: MessageTable = {
   compareDown: '↓ {n}%',
   compareUpNoPercent: '↑ 增加',
   compareSame: '持平',
-  // 大圆块和看板（D-311–D-314）
+  // Large round blocks and kanban boards (D-311–D-314)
   boardNotSet: '未分',
   boardMoveTitle: '移到哪一栏？',
   boardMoveTo: '移到「{column}」',
   boardMoved: '已移到「{column}」',
   boardColumnEmpty: '这一栏没有记录',
   boardCardHint: '轻点可以打开或移到另一栏，长按可以拖动',
-  // 桌面小组件（D-321–D-325）。
+  // Home Screen widget (D-321–D-325).
   widgetAdd: '放到桌面',
   widgetRemove: '从桌面移除',
   widgetUnsupportedTitle: '这个组件还不能放到桌面',
@@ -1843,7 +1843,7 @@ export const zh: MessageTable = {
     '这个桌面不能从 Tinkrum 直接添加小组件。请长按桌面，选「小组件」，添加 Tinkrum。',
   widgetDone: '记下了桌面小组件上的 {n} 次点按',
   widgetSkipped: '页面改过了，小组件上的 {n} 次点按没有记下',
-  // 文件房间（D-357–D-360）。
+  // File desk workspace (D-357–D-360).
   deskPlace: '放到桌上',
   deskPlaceAbout: '一个一个工具地改，边改边看，能撤销',
   deskGone: '这个桌面已经清空了。',
@@ -1891,7 +1891,7 @@ export const zh: MessageTable = {
   deskStorageTitle: '桌上的文件',
   deskStorageAbout: '房间里正在改的文件和它们的版本（最近 20 个，最多 500 MB）。',
   deskStale: '{n} 天没动了，可以清掉',
-  // 收件页面「存成记录」（D-392）。
+  // Inbox "Save as an entry" (D-392).
   shareRecord: '存成记录',
   shareRecordAbout: '放进一张表，其余的自己填',
   shareRecordChoose: '选择',
@@ -1929,7 +1929,7 @@ export const zh: MessageTable = {
   newTableTinkAbout: 'Tink 看不到文件内容，只知道这张表有哪些字段。会先建好这张表。',
   shareRecordTooMany: '一条记录最多放 {n} 个文件，只放前 {n} 个。',
   shareRecordNewTable: '新建数据表「{name}」',
-  // 表格文件的行导进表（D-574）：「设置 → 数据」，系统层。
+  // Importing table rows into a table (D-574): "Settings -> Data", system layer.
   importEntries: '从文件导入记录',
   importTitle: '导入记录',
   importIntro:

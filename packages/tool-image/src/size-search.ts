@@ -1,7 +1,8 @@
-// 按目标体积搜索编码参数。真正的编码由 App（expo-image-manipulator）完成，
-// 这里只决定"用什么质量、缩放到多少"去编码，并保证调用次数有上限。
+// Encodes once using the given quality (0-1) and scale (≤1), returning the encoded byte size. Real
+// encoding is performed by the app (`expo-image-manipulator`), while this function only decides
+// what quality and scale to use and ensures call counts have an upper limit.
 
-/** 用给定质量（0–1）和缩放（≤1）编码一次，返回编码后的字节数。 */
+/** Encodes once with the given quality (0-1) and scale (<=1), returning the encoded byte count. */
 export type EncodeFn = (quality: number, scale: number) => Promise<number>;
 
 export interface TargetSizeOptions {
@@ -9,25 +10,25 @@ export interface TargetSizeOptions {
   targetBytes: number;
   minQuality?: number;
   maxQuality?: number;
-  /** encode 调用次数上限（含最后一次重编码）。 */
+  /** Maximum number of encode calls (including the final re-encode). */
   maxEncodes?: number;
-  /** 缩放下限，默认 0.05；App 应按原图尺寸传入，避免缩到几个像素。 */
+  /** Lower bound for scale, default 0.05; apps should pass the original image dimensions to avoid scaling down to a few pixels. */
   minScale?: number;
 }
 
 export interface SharedTargetOptions extends Omit<TargetSizeOptions, 'encode'> {
-  /** 用同一质量和缩放编码全部图片，返回字节数之和。 */
+  /** Encodes all images using the same quality and scale, returning the sum of byte counts. */
   encodeAll: EncodeFn;
-  /** 容器本身的开销（如 PDF 结构），计入总体积。 */
+  /** Container overhead (such as PDF structure), included in the total size. */
   overheadBytes: number;
 }
 
 export interface TargetSizeResult {
   quality: number;
   scale: number;
-  /** 返回参数对应的字节数（共享搜索时含 overheadBytes）。 */
+  /** Returns the byte count corresponding to the parameters (includes overheadBytes for shared search). */
   bytes: number;
-  /** 是否满足目标；不满足时返回尝试过的最小结果。 */
+  /** Whether the target is met; returns the smallest tried result when not met. */
   met: boolean;
   encodes: number;
 }
@@ -39,9 +40,9 @@ interface Trial {
 }
 
 const QUALITY_ROUNDS = 7;
-/** 质量区间小于此值就不再二分。 */
+/** Stop binary searching when the quality range is smaller than this value. */
 const QUALITY_STEP = 0.01;
-/** 缩小时多留 5% 余量，降低再缩一次的概率。 */
+/** Leave a 5% margin when scaling down to reduce the probability of needing another scale-down. */
 const SCALE_MARGIN = 0.95;
 
 function round(value: number, digits: number): number {
@@ -62,13 +63,13 @@ async function search(
     trials.push(trial);
     return trial;
   };
-  // 始终留一次调用，用于最后把最佳参数重编码一遍。
+  // Always reserve one call for final re-encoding with the best parameters.
   const canSearch = () => trials.length < budget - 1;
 
   const first = await run(maxQuality, 1);
   let fit: Trial | undefined = first.bytes <= target ? first : undefined;
 
-  // 最低质量仍然太大时按面积估算缩小，直到最低质量能放下。
+  // Estimate scale by area when the lowest quality is still too large, until the lowest quality fits.
   let scale = 1;
   while (!fit && canSearch()) {
     const low = await run(minQuality, scale);
@@ -81,7 +82,7 @@ async function search(
     scale = Math.max(minScale, round(scale * factor, 4));
   }
 
-  // 在找到的缩放下二分质量，取能放下的最高质量。
+  // Binary search quality at the found scale, taking the highest quality that fits.
   if (fit && fit !== first) {
     let lo = fit.quality;
     let hi = maxQuality;
@@ -98,15 +99,16 @@ async function search(
   }
 
   let best = fit ?? trials.reduce((a, b) => (b.bytes < a.bytes ? b : a));
-  // App 只保留最后一次输出：最佳结果不是最后一次时重编码一次。
+  // The app keeps only the final output: re-encode once if the best result is not the last one.
   if (best !== trials.at(-1)) best = await run(best.quality, best.scale);
   return { trial: best, met: best.bytes <= target, encodes: trials.length };
 }
 
 /**
- * 搜索不超过 targetBytes 的最高质量编码：先试最高质量原尺寸，
- * 再二分质量，最低质量仍放不下时缩小尺寸再搜。
- * 最后一次 encode 调用的参数总是等于返回值。
+ * Search for the highest quality encoding not exceeding targetBytes: try highest quality at
+ * original size first, then binary search quality, and scale down and search again if the lowest
+ * quality still does not fit. The parameters of the final encode call always equal the return
+ * value.
  */
 export async function searchForTargetSize(options: TargetSizeOptions): Promise<TargetSizeResult> {
   const { encode, targetBytes, ...rest } = options;
@@ -115,7 +117,7 @@ export async function searchForTargetSize(options: TargetSizeOptions): Promise<T
   return { ...trial, met, encodes };
 }
 
-/** 多张图片共用一个质量和缩放（如"图片转 PDF ≤ X MB"），总体积含容器开销。 */
+/** Multiple images share a quality and scale (e.g., "convert images to PDF <= X MB"), with total size including container overhead. */
 export async function searchSharedQuality(options: SharedTargetOptions): Promise<TargetSizeResult> {
   const { encodeAll, targetBytes, overheadBytes, ...rest } = options;
   if (!(targetBytes > 0)) throw new RangeError('targetBytes');

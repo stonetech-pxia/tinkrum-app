@@ -22,8 +22,10 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp, starterAfterGuide, openPick } from '../test-utils/render-app';
 
-// 新手引导第 3 步：样板 App（D-260）。第 2 步结束后首页列出五个样板；点一个整套进草稿（D-190），
-// 「应用」后合成一个版本（顶部「已改好 · 撤销」），回到样板的主页面，提示可以用 AI 接着改。不经过 AI。
+// Onboarding step 3: Sample apps (D-260). After step 2, the home screen lists five samples; tapping
+// one loads the complete set into a draft (D-190), which upon "Apply" merges into a version (top
+// bar reads "Changes applied · Undo"), returning to the sample's main page with a hint that AI can
+// be used for further edits. Bypasses AI.
 
 const TYPED = { timeout: 4000 };
 
@@ -42,7 +44,7 @@ async function start(
   });
 }
 
-/** 在 starterAfterGuide 上再做几处修改的初始版本。 */
+/** Initial version with a few modifications applied on top of `starterAfterGuide`. */
 const seedWith =
   (ops: (config: WorkspaceConfig) => Op[], base: Seed = starterAfterGuide): Seed =>
   (locale, registry) => {
@@ -59,7 +61,7 @@ describe('guide step 3: sample apps', () => {
     useSampleHint.setState({ hint: null });
   });
 
-  // D-447：第 3 步取消了。新用户走完第 1、2 步（或第 2 步时打开了文件）引导就结束，不再列出样板。
+  // D-447: Step 3 is removed. New users finishing steps 1 and 2 (or opening a file during step 2) complete onboarding directly without sample lists.
   it('a new user who finishes steps 1 and 2 does not get step 3', async () => {
     const { repo } = await start(undefined, { seed: createStarterWorkspace });
     await fireEvent.press(await screen.findByTestId('welcome-skip'));
@@ -123,7 +125,7 @@ describe('guide step 3: sample apps', () => {
     const revisions = (await store.getState().listRevisions(50)).length;
     await fireEvent.press(await screen.findByTestId('guide-sample-expense-helper'));
 
-    // 先进草稿：能看不能用，正式的版本没变（D-190）。
+    // Enter draft mode first: view-only and inactive, official version unchanged (D-190).
     expect(await screen.findByTestId('draft-bar')).toBeTruthy();
     const draft = store.getState().draft!;
     expect(draft.steps).toHaveLength(1);
@@ -132,10 +134,10 @@ describe('guide step 3: sample apps', () => {
     expect(store.getState().config).toBe(before);
     expect(store.getState().tab).toBe('page:expenses');
     expect(await screen.findByText('报销助手')).toBeTruthy();
-    // 选了样板，引导就结束了。
+    // Selecting a sample completes the onboarding guide.
     expect(await repo.getMeta('guide')).toBe('done');
 
-    // 应用：一个版本，表、快捷操作、页面、提醒一起加上；顶部照常「已改好 · 撤销」（不是引导的小改动，D-239 不适用）。
+    // Apply: tables, quick actions, pages, and reminders are added together as a single version; top bar shows standard "Changes applied · Undo" (not small guide edits, so D-239 does not apply).
     await fireEvent.press(screen.getByTestId('draft-apply'));
     await waitFor(() => expect(store.getState().draft).toBeNull());
     const after = store.getState().config!;
@@ -157,13 +159,13 @@ describe('guide step 3: sample apps', () => {
     const hint = await screen.findByTestId('sample-hint');
     expect(hint).toHaveTextContent(/「报销助手」装好了/);
 
-    // 「用 AI 接着改」：开头填进输入框，不自动发送。
+    // "Continue modifying with AI": populate the input box with the starting text without auto-sending.
     await fireEvent.press(screen.getByTestId('sample-hint-change'));
     const input = await screen.findByTestId('change-input');
     expect(input).toHaveProp('value', '在报销助手的基础上改：');
     expect(store.getState().draft).toBeNull();
     expect(store.getState().config).toBe(after);
-    // 整个过程没有发任何请求。
+    // No network requests were sent throughout the entire process.
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -226,7 +228,7 @@ describe('guide step 3: sample apps', () => {
   });
 
   it('a full navigation bar puts the sample on the home page and opens its page after applying', async () => {
-    // 默认工作空间的导航栏是满的：首页、工具、AI、历史、设置。
+    // Default workspace navigation bar is full: Home, Tools, AI, History, Settings.
     const seed = seedWith(
       (config) => homeFileEntryOps(config, 'zh'),
       (locale) => createDefaultWorkspace(locale),
@@ -243,7 +245,7 @@ describe('guide step 3: sample apps', () => {
         .find((p) => p.id === 'home')!
         .blocks.some((c) => c.look === 'entry' && c.opens === 'page:study'),
     ).toBe(true);
-    // 不在导航栏里的主页面推入一个新页面，提示卡片在那一页上。
+    // Push a new page into a main page not present in the navigation bar, displaying the hint card on that page.
     expect(await screen.findByTestId('sample-hint')).toHaveTextContent(/「学习助手」装好了/);
   });
 
@@ -269,8 +271,9 @@ describe('guide step 3: sample apps', () => {
   });
 });
 
-// 样板一直找得到（D-544）：「设置 → 更多 → 我的预设」里列出全部样板，点一个和引导第 3 步走同一条路：
-// 进草稿，「应用」后是一个版本，能撤销。
+// Sample apps always accessible (D-544): "Settings → More → My Presets" lists all samples; tapping
+// one follows the same path as onboarding step 3: enters draft, applies as a version, and supports
+// undo.
 describe('sample apps on My presets', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -282,7 +285,7 @@ describe('sample apps on My presets', () => {
     await fireEvent.press(await screen.findByTestId('nav-settings'));
     await fireEvent.press(await screen.findByTestId('settings-presets'));
     const screenEl = await screen.findByTestId('presets-screen');
-    // 示例 App 在「添加 App」里（D-614）。
+    // Sample apps located in "Add App" (D-614).
     await fireEvent.press(screen.getByTestId('preset-add'));
     await fireEvent.press(screen.getByTestId('preset-samples'));
     return screenEl;

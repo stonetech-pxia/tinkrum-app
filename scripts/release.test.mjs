@@ -22,7 +22,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 function cmd(bin, args, cwd, env = process.env) {
-  // 子进程中的 node --test 是独立命令，不能继承父测试 runner 的递归标记。
+  // node --test in child processes is an independent command and must not inherit the parent test runner's recursion flags.
   const childEnv = { ...env };
   delete childEnv.NODE_TEST_CONTEXT;
   return spawnSync(bin, args, { cwd, env: childEnv, encoding: 'utf8' });
@@ -74,7 +74,7 @@ function deployFixture() {
   const trace = join(f.root, 'trace');
   const executable = (name, body) =>
     writeFileSync(join(bin, name), '#!/bin/sh\nset -eu\n' + body, { mode: 0o755 });
-  // 真实 Git 操作；npm、launchd 和 health 只用替身，绝不接触生产进程或端口。
+  // Real Git operations; use mocks for npm, launchd, and health checks, never touching production processes or ports.
   executable(
     'npm',
     'echo "npm:$*:$(pwd)" >> "$TEST_TRACE"\nif [ "$*" = "run check" ] && [ "${TEST_FAIL_CHECK:-0}" = 1 ]; then exit 7; fi\n',
@@ -279,7 +279,7 @@ test('deleted and renamed prose files are not passed to the formatter at their o
   assert.equal(result.status, 0, result.stderr);
   assert.match(readFileSync(trace, 'utf8'), /prettier.*docs\/new name.md/);
   assert.doesNotMatch(readFileSync(trace, 'utf8'), /removed.md|renamed.md/);
-  // 即使文档缓存已通过，推送 main 或标签仍必须升级成全量。
+  // Even if doc caches pass, pushing main or tags must still trigger a full check.
   result = hook(f, base, env, 'refs/heads/main');
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /running npm run check:full/);
@@ -302,7 +302,7 @@ test('push ranges include earlier commits and every ref; new, missing and rewoun
   const bin = join(f.root, 'bin'),
     trace = join(f.root, 'trace');
   mkdirSync(bin);
-  // npm 的选择记录用替身；其余 Git/钩子/缓存走真实路径，不安装或联网下载任何依赖。
+  // Mock npm selection logs; use real paths for the rest of Git/hooks/caches without installing or downloading any dependencies over the network.
   writeFileSync(
     join(bin, 'npm'),
     '#!/bin/sh\nif [ "$1" = --version ]; then echo fixture; else echo "$*" >> "$TEST_TRACE"; fi\n',
@@ -325,11 +325,11 @@ test('push ranges include earlier commits and every ref; new, missing and rewoun
   assert.equal(result.status, 0, result.stderr);
   assert.doesNotMatch(readFileSync(trace, 'utf8'), /check:full/);
   assert.match(readFileSync(trace, 'utf8'), /prettier.*docs\/new.md/);
-  // 同一 HEAD，另一个远端基线还包含前一个代码提交；文档检查的缓存不能当全量。
+  // Same HEAD, but another remote baseline also contains the previous code commit; doc check cache cannot be treated as a full check.
   result = hook(f, baseline, env);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /running npm run check:full/);
-  // 同时推两个 ref，不能只看最后一条文档范围。
+  // When pushing two refs simultaneously, do not check only the last doc scope.
   rmSync(join(f.repo, '.git/morph-checks'), { recursive: true });
   result = spawnSync('sh', [join(f.repo, '.githooks/pre-push')], {
     cwd: f.repo,
@@ -345,7 +345,7 @@ test('push ranges include earlier commits and every ref; new, missing and rewoun
     rmSync(join(f.repo, '.git/morph-checks'), { recursive: true });
     assert.match(hook(f, base, env).stdout, /running npm run check:full/);
   }
-  // 远端不在 HEAD 的祖先链：模拟强推。
+  // Remote is not in HEAD's ancestor chain: simulates a force push.
   git(f.repo, 'checkout', '--detach', baseline);
   writeFileSync(join(f.repo, 'docs/diverged.md'), 'diverged\n');
   git(f.repo, 'add', '.');

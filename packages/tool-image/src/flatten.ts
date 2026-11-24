@@ -1,50 +1,54 @@
 import { clamp } from '@morph/core/math';
-// 扫描页面展平（D-274）的纯几何计算：四角拉正之后，UVDoc 模型估计纸面的弯曲（45×31 的变形网格），
-// 再按文字行精修（整页去倾斜 + 逐行拉直），三步合成一张三角网格，App 里用 Skia 的 drawVertices 只重采样一次。
-// 跑模型、画图在 App 里（ONNX Runtime、Skia），这里只处理小图和坐标，在 Node 里可以直接测。
+// Pure geometric computation for scanned page flattening (D-274): after four-corner rectification,
+// UVDoc estimates paper curvature (45x31 deformation mesh), then refines by text lines (full-page
+// deskew + row-by-row straightening), combining three steps into one triangle mesh for single-pass
+// resampling via Skia's drawVertices in the app. Model inference and rendering run in-app (ONNX
+// Runtime, Skia); this module handles small images and coordinates for direct testing in Node.
 //
-// 坐标一律是「像素序号」：第 0 个像素的中心是 0，最后一个是 width - 1（和 OpenCV 的 remap 一样）；
-// 交给 Skia 时再加 0.5（Skia 的像素中心在 0.5）。做法和参数来自 2026-10-29 的实验（side-session-notes 里的
-// dewarp-exp/REPORT.md 第一、二轮：拉正 → 补边 + UVDoc → 找文字行 → 去倾斜 + 逐行拉直）。
+// Coordinates are strictly "pixel indices": center of pixel 0 is 0, last is width - 1 (same as
+// OpenCV remap); 0.5 is added when passed to Skia (Skia's pixel center is at 0.5). Approach and
+// parameters originate from 2026-10-29 experiments (dewarp-exp/REPORT.md rounds 1 & 2 in
+// side-session-notes: rectification -> padding + UVDoc -> text line detection -> deskew + row
+// straightening).
 
 import type { Size } from './geometry';
 import type { Point } from './quad';
 import type { RgbaImage } from './scan-enhance';
 
-/** 送进 UVDoc 之前四周补的深色边（长边的 6%）：不补时模型会把拉正图当成「纸 + 背景」，往里多裁一圈。 */
+/** Dark border padded around the sides before feeding into UVDoc (6% of long side): without padding, the model treats the rectified image as "paper + background" and crops inward. */
 export const FLATTEN_PAD_SHARE = 0.06;
-/** 补边的颜色（RGB 都是 40）。 */
+/** Padding color (RGB values are all 40). */
 export const FLATTEN_PAD_GRAY = 40;
-/** UVDoc 的输入大小（宽 488、高 712，不管页面是横是竖都这样缩，和官方用法一样）。 */
+/** UVDoc input size (width 488, height 712, scaled this way regardless of whether page is landscape or portrait, matching official usage). */
 export const UVDOC_INPUT: Size = { width: 488, height: 712 };
-/** UVDoc 输出的网格（宽 31、高 45 个点，值是 -1…1 的源图坐标，四角对齐）。 */
+/** UVDoc output grid (width 31, height 45 points, values are source image coordinates in -1...1, four corners aligned). */
 export const UVDOC_GRID: Size = { width: 31, height: 45 };
 
-/** 精修：少于这么多条文字行的页不精修（只展平）。 */
+/** Refinement: pages with fewer than this number of text lines are not refined (only flattened). */
 export const REFINE_MIN_LINES = 5;
-/** 精修：整页转正的角度上限（度）；小于 0.1° 不转。 */
+/** Refinement: upper limit for full-page deskew angle (degrees); less than 0.1° is not deskewed. */
 export const DESKEW_LIMIT = 0.5;
 const DESKEW_MIN = 0.1;
-/** 精修：位移不超过长边的 2%。 */
+/** Refinement: displacement does not exceed 2% of the long side. */
 export const SHIFT_LIMIT_SHARE = 0.02;
-/** 位移网格（也是最后画图的三角网格）的步长：长边约 190 格（实验里是长边约 4500 像素时 24 像素一格）。 */
+/** Step size of displacement grid (also triangle mesh for final rendering): approximately 190 cells on long side (corresponds to ~24 pixels per cell at ~4500 pixels long side in experiments). */
 const MESH_CELLS_LONG = 190;
-/** 一张网格最多这么多个顶点（索引是 16 位）。 */
+/** Maximum vertices per mesh (indices are 16-bit). */
 const MAX_VERTICES = 65_000;
 
-/** 补边的宽度（像素，四周一样宽）。 */
+/** Padding width (pixels, uniform on all four sides). */
 export function padMargin(page: Size): number {
   return Math.floor(FLATTEN_PAD_SHARE * Math.max(page.width, page.height));
 }
 
-/** 补边后的大小。 */
+/** Size after padding. */
 export function paddedSize(page: Size): Size {
   const m = padMargin(page);
   return { width: page.width + 2 * m, height: page.height + 2 * m };
 }
 
 /**
- * UVDoc 的输入张量 [1, 3, 712, 488]：BGR，÷255。image 是补过边、已经缩到 488×712 的 RGBA。
+ * UVDoc input tensor [1, 3, 712, 488]: BGR, /255. image is RGBA, padded and scaled to 488x712.
  */
 export function uvdocInput(image: RgbaImage): Float32Array {
   const { width, height, data } = image;
@@ -62,15 +66,17 @@ export function uvdocInput(image: RgbaImage): Float32Array {
   return out;
 }
 
-/** UVDoc 的结果：网格（[2, 45, 31]）和它对应的页面（拉正图）大小。 */
+/** UVDoc result: grid ([2, 45, 31]) and its corresponding page (rectified image) size. */
 export interface UvdocWarp {
   grid: Float32Array;
   page: Size;
 }
 
 /**
- * 展平图上的一点（页面像素序号，展平图和拉正图一样大）在拉正图上的位置：网格按四角对齐双线性插值
- * （和官方把网格放大到输出大小一样），换算到补边后的图，再减掉边宽；落在纸外的夹到边上。
+ * Position on rectified image for a point on flattened image (page pixel index, flattened image
+ * and rectified image are same size): grid bilinear interpolation aligned to four corners (same
+ * as official upscaling of grid to output size), scaled to padded image, minus border width;
+ * points outside paper are clamped to edge.
  */
 export function uvdocSource(warp: UvdocWarp, x: number, y: number): Point {
   const { grid, page } = warp;
@@ -95,23 +101,23 @@ export function uvdocSource(warp: UvdocWarp, x: number, y: number): Point {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 文字行和表格线
+// Text lines and table lines
 
-/** 一条横向的文字行或表格线：每列的中心（页面像素）。 */
+/** A horizontal text line or table line: center of each column (page pixels). */
 export interface PageLine {
   xs: number[];
   ys: number[];
-  /** 行高（文字行）；表格线是 0。 */
+  /** Line height (text lines); 0 for table lines. */
   thickness: number;
-  /** 左右跨度（页面像素）。 */
+  /** Horizontal span (page pixels). */
   length: number;
-  /** 长行（长度 ≥ 8 倍行高），整页转正时用它的角度。 */
+  /** Long line (length >= 8x line height), its angle is used for full-page deskew. */
   long: boolean;
-  /** 拟合直线的角度（度，y 向下，正数是往右下斜）。 */
+  /** Fitted line angle (degrees, y downwards, positive means sloping down-right). */
   angle: number;
 }
 
-/** 最小二乘多项式（x 先归一化，避免大数值的病态），返回求值函数。 */
+/** Least squares polynomial (x is pre-normalized to avoid ill-conditioning with large numbers), returns evaluation function. */
 export function polyfit(xs: readonly number[], ys: readonly number[], degree: number) {
   const n = xs.length;
   let mean = 0;
@@ -122,7 +128,7 @@ export function polyfit(xs: readonly number[], ys: readonly number[], degree: nu
   spread = spread || 1;
   const d = Math.max(0, Math.min(degree, n - 1));
   const m = d + 1;
-  // 正规方程 A c = b。
+  // Normal equations A c = b.
   const A = Array.from({ length: m }, () => new Float64Array(m));
   const b = new Float64Array(m);
   const pw = new Float64Array(2 * m);
@@ -135,7 +141,7 @@ export function polyfit(xs: readonly number[], ys: readonly number[], degree: nu
       for (let c = 0; c < m; c++) A[r]![c]! += pw[r + c]!;
     }
   }
-  // 高斯消元（列主元）。
+  // Gaussian elimination (partial pivoting).
   const c = new Float64Array(m);
   for (let col = 0; col < m; col++) {
     let piv = col;
@@ -168,8 +174,10 @@ const angleOf = (xs: readonly number[], ys: readonly number[]) =>
   (Math.atan(polyfit(xs, ys, 1).slope) * 180) / Math.PI;
 
 /**
- * 找文字行的概率图（PP-OCR det 的输出，每像素概率 × 255）→ 横向的文字块：超过 0.3 的像素按 8 连通分块，
- * 宽至少是高的 4 倍、至少是图宽的 4%、平均概率至少 0.6 的块，按列取中心。坐标换算到页面像素。
+ * Find text line probability map (PP-OCR det output, probability per pixel x 255) -> horizontal
+ * text blocks: pixels with > 0.3 probability grouped into 8-connected components; blocks with
+ * width at least 4x height, at least 4% of image width, and average probability at least 0.6 have
+ * their centers taken column-wise. Coordinates converted to page pixels.
  */
 export function textLinesFromProb(
   prob: Uint8Array,
@@ -183,7 +191,7 @@ export function textLinesFromProb(
   const stack: number[] = [];
   const lines: PageLine[] = [];
   let label = 0;
-  // 一块里每列像素的个数和 y 之和。
+  // Pixel count and sum of y coordinates per column in a block.
   const count = new Int32Array(width);
   const sum = new Float64Array(width);
   for (let start = 0; start < prob.length; start++) {
@@ -250,7 +258,7 @@ export function textLinesFromProb(
   return lines;
 }
 
-/** 灰度（和 OpenCV 的 RGB → GRAY 一样的权重）。 */
+/** Grayscale (same weights as OpenCV RGB -> GRAY). */
 export function grayOf(image: RgbaImage): Uint8Array {
   const { width, height, data } = image;
   const out = new Uint8Array(width * height);
@@ -261,9 +269,12 @@ export function grayOf(image: RgbaImage): Uint8Array {
 }
 
 /**
- * 表格的长线（横线宽 ≥ 图宽 25%，竖线高 ≥ 图高 15%）：局部均值阈值找出深色像素，只留够长的横向（竖向）连续段，
- * 稍微加粗后分块，每块按列（竖线按行）取中心。参数按长边 2000 定的，别的大小按比例换算。
- * 返回页面像素；竖线的 xs / ys 也是页面坐标（angle 是相对竖直方向的偏角）。
+ * Long lines of tables (horizontal line width >= 25% of image width, vertical line height >= 15%
+ * of image width): local mean thresholding finds dark pixels, keeping only sufficiently long
+ * horizontal (vertical) continuous segments, slightly dilating them, then blocking them and
+ * taking the center by column (or row for vertical lines). Parameters are based on a 2000-pixel
+ * long side, scaled proportionally for other sizes. Returns page pixels; vertical line xs / ys
+ * are also page coordinates (angle is the offset angle relative to the vertical direction).
  */
 export function ruleLines(
   gray: Uint8Array,
@@ -272,10 +283,10 @@ export function ruleLines(
   page: Size,
   vertical: boolean,
 ): PageLine[] {
-  // 竖线：转置后当横线找。
+  // Vertical lines: transposed and searched as horizontal lines.
   const w = vertical ? height : width;
   const h = vertical ? width : height;
-  // 转置成一块连续的内存（手机上的 JS 没有 JIT，逐像素的函数调用很贵）。
+  // Transposed into a single continuous memory block (JS on mobile lacks JIT, so per-pixel function calls are expensive).
   let g = gray;
   if (vertical) {
     g = new Uint8Array(w * h);
@@ -285,7 +296,7 @@ export function ruleLines(
   }
   const s = Math.max(width, height) / 2000;
   const half = Math.max(1, Math.round((31 * s - 1) / 2));
-  // 局部均值（积分图，窗口截在图内）。
+  // Local mean (integral image, window clipped within the image).
   const W1 = w + 1;
   const integral = new Int32Array(W1 * (h + 1));
   for (let y = 0; y < h; y++) {
@@ -315,11 +326,11 @@ export function ruleLines(
       const b = xb[x]!;
       const total = integral[yb + b]! - integral[ya + b]! - integral[yb + a]! + integral[ya + a]!;
       const area = rows * (b - a);
-      // g ≤ 均值 − 12，两边乘面积，免去除法。
+      // g <= mean - 12, multiplied by area on both sides to avoid division.
       if (g[r + x]! * area <= total - 12 * area) dark[r + x] = 1;
     }
   }
-  // 只留至少 L 长的横向连续段（形态学开运算），再上下各加 1 行、左右各加 reach 列。
+  // Keep only horizontal continuous segments of length at least L (morphological opening), then add 1 row above and below, and reach columns left and right.
   const L = Math.max(2, Math.floor(w / (vertical ? 14 : 12)));
   const reach = Math.max(1, Math.round(7 * s));
   const mask = new Uint8Array(w * h);
@@ -342,7 +353,7 @@ export function ruleLines(
       x = e;
     }
   }
-  // 分块（8 连通）。
+  // Blocking (8-connected).
   const seen = new Uint8Array(w * h);
   const stack: number[] = [];
   const count = new Int32Array(w);
@@ -394,7 +405,7 @@ export function ruleLines(
     }
     if (!keep) continue;
     const angle = angleOf(along, across);
-    // 换算到页面像素。
+    // Scaled to page pixels.
     const kx = page.width / width;
     const ky = page.height / height;
     const xs = vertical ? across.map((v) => v * kx) : along.map((v) => v * kx);
@@ -412,23 +423,23 @@ export function ruleLines(
 }
 
 // ---------------------------------------------------------------------------------------------
-// 精修：整页去倾斜 + 逐行拉直
+// Refinement result: deskew angle and displacement grid (in flattened image pixels, one point per step pixels).
 
-/** 精修的结果：转正的角度和位移网格（在展平图的像素上，每 step 像素一个点）。 */
+/** Refinement result: deskew angle and displacement grid (in flattened image pixels, one point per step pixels). */
 export interface Refinement {
-  /** 整页转正的角度（度，正数表示行往右下斜、要逆时针转回来）。 */
+  /** Full-page deskew angle (degrees, positive means lines slope down to the right and need to be rotated counterclockwise back). */
   angle: number;
   step: number;
   cols: number;
   rows: number;
-  /** 每个网格点上：输出 (x, y) 取精修前（转正后）的 (x + dx, y + dy)。 */
+  /** At each grid point: output (x, y) takes pre-refinement (post-deskew) (x + dx, y + dy). */
   dx: Float32Array;
   dy: Float32Array;
-  /** 用来拉直的文字行条数；少于 REFINE_MIN_LINES 时没有拉直（位移全是 0），也不转。 */
+  /** Number of text lines used for straightening; fewer than REFINE_MIN_LINES means no straightening (displacements are all 0) and no rotation. */
   lines: number;
 }
 
-/** 位移网格的步长（像素）。 */
+/** Step size of the displacement grid (pixels). */
 export function meshStep(page: Size): number {
   const long = Math.max(page.width, page.height);
   let step = Math.max(4, Math.round(long / MESH_CELLS_LONG));
@@ -437,7 +448,7 @@ export function meshStep(page: Size): number {
   return step;
 }
 
-/** 按长度加权的中位数（和 numpy 的 searchsorted 写法一样：累计权重第一次到一半的那个）。 */
+/** Length-weighted median (same writing as numpy's searchsorted: the one where cumulative weight first reaches half). */
 function weightedMedian(values: readonly number[], weights: readonly number[]): number {
   const order = values.map((_, i) => i).sort((a, b) => values[a]! - values[b]!);
   let total = 0;
@@ -451,8 +462,10 @@ function weightedMedian(values: readonly number[], weights: readonly number[]): 
 }
 
 /**
- * 整页转正的角度：长文字行和表格横线的角度，按长度取加权中位数。少于 5 条、小于 0.1° 不转；
- * 限在 ±0.5° 以内；只有一条竖线时不转（拉正后残留一点剪切时，按文字转正会把这条竖线转歪）。
+ * Full-page deskew angle: angle of long text lines and table horizontal lines, using
+ * length-weighted median. Fewer than 5 lines or less than 0.1 deg is not rotated; bounded within
+ * +/-0.5 deg; when there is only a single vertical line, do not rotate (when correcting residual
+ * shear after straightening, rotating by text would tilt this vertical line).
  */
 export function deskewAngle(
   text: readonly PageLine[],
@@ -469,7 +482,7 @@ export function deskewAngle(
   return clamp(a, -DESKEW_LIMIT, DESKEW_LIMIT);
 }
 
-/** 以页面中心转 angle 度（正数：往右下斜的行变水平）。inverse 是反过来。 */
+/** Rotate by angle degrees around the page center (positive: lines sloping down to the right become horizontal). inverse is the reverse. */
 export function rotatePoint(page: Size, angle: number, p: Point, inverse = false): Point {
   if (!angle) return p;
   const a = ((inverse ? -angle : angle) * Math.PI) / 180;
@@ -494,7 +507,7 @@ function rotateLine(page: Size, angle: number, line: PageLine): PageLine {
   return { ...line, xs, ys, angle: line.angle - angle };
 }
 
-/** 同一行被断开的几段接起来：左右相邻、间隔小于 4 倍行高、接口处高度差小于 0.6 倍行高、行高相近。 */
+/** Connect broken segments of the same line: horizontally adjacent, gap less than 4x line height, height difference at interface less than 0.6x line height, similar line heights. */
 export function chainLines(lines: readonly PageLine[]): PageLine[] {
   const median = (v: number[]) => {
     const s = [...v].sort((a, b) => a - b);
@@ -508,7 +521,7 @@ export function chainLines(lines: readonly PageLine[]): PageLine[] {
     .sort((a, b) => a.x - b.x)
     .map((e) => e.l);
   const starts = sorted.map((l) => lo(l.xs));
-  // 每条线开头一段（3 倍行高以内）的中值高度，只算一次。
+  // Median height of the starting segment of each line (within 3x line height), counted only once.
   const heads = sorted.map((l, j) => {
     const x0 = starts[j]!;
     return median(l.ys.filter((_, k) => l.xs[k]! <= x0 + 3 * l.thickness));
@@ -552,7 +565,7 @@ export function chainLines(lines: readonly PageLine[]): PageLine[] {
   return out;
 }
 
-/** 滑动中值（窗口 size，边缘取最近的值）。 */
+/** Moving median (window size, edges take nearest values). */
 function medianFilter(v: Float64Array, size: number): Float64Array {
   const r = size >> 1;
   const out = new Float64Array(v.length);
@@ -566,7 +579,7 @@ function medianFilter(v: Float64Array, size: number): Float64Array {
   return out;
 }
 
-/** 一维高斯平滑（截到 4σ，边缘取最近的值）。 */
+/** 1D Gaussian smoothing (truncated to 4 sigma, edges take nearest values). */
 function gaussian1d(v: Float64Array, sigma: number): Float64Array {
   const r = Math.round(4 * sigma);
   const k = new Float64Array(2 * r + 1);
@@ -581,7 +594,7 @@ function gaussian1d(v: Float64Array, sigma: number): Float64Array {
   return out;
 }
 
-/** 线性插值（xp 递增；两头取端点的值，和 numpy.interp 一样）。 */
+/** Linear interpolation (xp increasing; endpoints take boundary values, same as numpy.interp). */
 function interp(x: number, xp: ArrayLike<number>, fp: ArrayLike<number>): number {
   const n = xp.length;
   if (x <= xp[0]!) return fp[0]!;
@@ -597,7 +610,7 @@ function interp(x: number, xp: ArrayLike<number>, fp: ArrayLike<number>): number
   return span > 0 ? fp[lo]! + ((fp[hi]! - fp[lo]!) * (x - xp[lo]!)) / span : fp[lo]!;
 }
 
-/** 一条线拉直的样本：它的目标位置（横线是高度）、左右范围和每处的位移。 */
+/** Sample for straightening a line: its target position (height for horizontal lines), left/right range, and displacement at each location. */
 interface Sample {
   target: number;
   from: number;
@@ -605,7 +618,7 @@ interface Sample {
   shift: (along: number) => number;
 }
 
-/** 一条文字行的样本：长行（≥ 页宽 25%）滑动中值 + 高斯平滑，短行 2 次多项式；目标是它的平均高度。 */
+/** Sample for a text line: moving median + Gaussian smoothing for long lines (>= 25% page width), 2nd-order polynomial for short lines; target is its average height. */
 function lineSample(line: PageLine, pageWidth: number): Sample {
   const order = line.xs.map((_, i) => i).sort((a, b) => line.xs[a]! - line.xs[b]!);
   const x = order.map((i) => line.xs[i]!);
@@ -642,7 +655,7 @@ function lineSample(line: PageLine, pageWidth: number): Sample {
   };
 }
 
-/** 表格线的样本：2 次多项式（竖线是 x 关于 y 的多项式）。 */
+/** Sample for a table line: 2nd-order polynomial (vertical lines are polynomials of x with respect to y). */
 function ruleSample(line: PageLine, vertical: boolean): Sample {
   const along = vertical ? line.ys : line.xs;
   const across = vertical ? line.xs : line.ys;
@@ -659,8 +672,10 @@ function ruleSample(line: PageLine, vertical: boolean): Sample {
 }
 
 /**
- * 样本 → 位移场（rows × cols，按行存）：沿线方向的每一列，把覆盖它的线按目标位置排好，在线与线之间线性插值，
- * 两头取常数；没有线的列从左右相邻的列插值。transpose 时 major 是 y（竖线）。
+ * Sample -> displacement field (rows x cols, stored by row): for each column along the line
+ * direction, lines covering it are sorted by target position, linearly interpolated between
+ * lines, taking constants at both ends; columns without lines are interpolated from adjacent
+ * left/right columns. When transposed, major is y (vertical lines).
  */
 function field(
   samples: readonly Sample[],
@@ -696,7 +711,7 @@ function field(
   return out;
 }
 
-/** 二维高斯平滑（可分离，边缘按 OpenCV 的 BORDER_REFLECT_101），sx / sy 是两个方向的 σ（网格单位）。 */
+/** 2D Gaussian smoothing (separable, edges using OpenCV's BORDER_REFLECT_101), sx / sy are sigma in both directions (grid units). */
 function blur2d(f: Float32Array, cols: number, rows: number, sx: number, sy: number): Float32Array {
   const kernel = (sigma: number) => {
     const r = Math.floor((Math.round(sigma * 8 + 1) | 1) / 2);
@@ -735,9 +750,12 @@ function blur2d(f: Float32Array, cols: number, rows: number, sx: number, sy: num
 }
 
 /**
- * 精修的计划：先算整页转正的角度，把行和表格线按它转过去（不用再找一遍），再逐行拉直：
- * 每条行（≥ 页宽 6%，断开的先接起来）的目标是一条水平线，竖直位移 = 中心线 − 目标；
- * 表格横线一样；有两条以上竖线时，同样的办法算水平位移让竖线变直。位移网格平滑后限幅在长边的 2% 以内。
+ * Refinement plan: first calculate the full-page deskew angle, rotate lines and table lines by it
+ * (without searching again), then straighten line by line: each line (>= 6% page width, broken
+ * ones connected first) targets a horizontal line, vertical displacement = center line - target;
+ * table horizontal lines are similar; when there are two or more vertical lines, use the same
+ * method to calculate horizontal displacement to straighten vertical lines. After smoothing, the
+ * displacement grid is clamped within 2% of the long side.
  */
 export function planRefinement(
   page: Size,
@@ -776,7 +794,7 @@ export function planRefinement(
   if (rulesV.length >= 2) {
     const vs = rulesV.map(turn).map((l) => ruleSample(l, true));
     const t = field(vs, rows, cols, step, 0.03 * H);
-    // field 按 [cols 行, rows 列] 排（major 是 y），转回 [rows, cols]。
+    // Field arranged as [cols rows, rows cols] (major is y), transposed back to [rows, cols].
     for (let i = 0; i < cols; i++)
       for (let j = 0; j < rows; j++) dx[j * cols + i] = t[i * rows + j]!;
   }
@@ -790,7 +808,7 @@ export function planRefinement(
   return { angle, step, cols, rows, dx, dy, lines: lines.length };
 }
 
-/** 位移网格在一点上的值（双线性，边缘取边缘值）。 */
+/** Value of the displacement grid at a point (bilinear, edges take edge values). */
 function shiftAt(r: Refinement, x: number, y: number): Point {
   const gx = clamp(x / r.step, 0, r.cols - 1);
   const gy = clamp(y / r.step, 0, r.rows - 1);
@@ -806,8 +824,9 @@ function shiftAt(r: Refinement, x: number, y: number): Point {
 }
 
 /**
- * 输出图上一点 → 拉正图上的位置（三步合成）：先加精修的位移，再按转正的角度转回去，最后查 UVDoc 网格。
- * 没有 UVDoc（只精修）或没有精修（只展平）时跳过那一步。
+ * Point on output image -> position on straightened image (three steps combined): first add
+ * refinement displacement, then rotate back by deskew angle, and finally look up UVDoc grid.
+ * Skipped when there is no UVDoc (refinement only) or no refinement (flattening only).
  */
 export function flattenSource(
   page: Size,
@@ -827,8 +846,9 @@ export function flattenSource(
 }
 
 /**
- * 拉正图上的一点 → 输出图上的位置（flattenSource 反过来，用于把找到的文字行换算到展平后的图上）：
- * 不动点迭代，位移场很平滑，几次就收敛。只在没有 UVDoc 的那一步（精修）上用。
+ * Point on straightened image -> position on output image (reverse of flattenSource, used to map
+ * found text lines to the flattened image): fixed-point iteration, displacement field is very
+ * smooth, converges in a few iterations. Used only in the step without UVDoc (refinement).
  */
 export function refinedPosition(page: Size, refine: Refinement, p: Point): Point {
   const q = rotatePoint(page, refine.angle, p);
@@ -840,7 +860,7 @@ export function refinedPosition(page: Size, refine: Refinement, p: Point): Point
   return out;
 }
 
-/** 给 Skia 的 drawVertices：三角形的顶点（输出图上的位置）、纹理坐标（源图上的位置）和索引。 */
+/** For Skia's drawVertices: triangle vertices (positions on output image), texture coordinates (positions on source image), and indices. */
 export interface WarpMesh {
   positions: Float32Array;
   texcoords: Float32Array;
@@ -848,8 +868,10 @@ export interface WarpMesh {
 }
 
 /**
- * 三步合成的三角网格：顶点在输出图上均匀分布（每 step 像素一个，四边贴着画布边缘），纹理坐标来自 flattenSource。
- * out 是要画出来的大小（可以比页面小，例如给找文字行用的小图），坐标按比例换算；Skia 的像素中心在 0.5。
+ * Triangle mesh synthesized from three steps: vertices evenly distributed on the output image
+ * (one per step pixels, four sides hugging the canvas edges), texture coordinates from
+ * flattenSource. out is the size to be drawn (can be smaller than the page, e.g., small image for
+ * finding text lines), coordinates scaled proportionally; Skia's pixel center is at 0.5.
  */
 export function flattenMesh(
   page: Size,
@@ -875,7 +897,7 @@ export function flattenMesh(
       const o = (j * nx + i) * 2;
       positions[o] = xs[i]! * kx;
       positions[o + 1] = ys[j]! * ky;
-      // 画布边缘（连续坐标）对应的像素序号：中心在 +0.5。
+      // Pixel indices corresponding to canvas edges (continuous coordinates): center at +0.5.
       const s = flattenSource(page, warp, refine, xs[i]! - 0.5, ys[j]! - 0.5);
       texcoords[o] = s.x + 0.5;
       texcoords[o + 1] = s.y + 0.5;

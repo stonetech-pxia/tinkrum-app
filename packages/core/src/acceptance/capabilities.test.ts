@@ -50,7 +50,7 @@ import {
 
 const IDS = new Set(CAPABILITIES.map((c) => c.id));
 
-/** 这几样东西配置里有，但不是个人记录能力：摆样子或者属于文件那边，单列出来，新外观不会悄悄漏掉。 */
+/** These items exist in config but are not personal record capabilities: presentation elements or belonging to the file side; listed separately so new looks don't accidentally omit them. */
 const NOT_RECORD_LOOKS = new Set([
   'header',
   'text',
@@ -65,9 +65,9 @@ const NOT_RECORD_LOOKS = new Set([
   'packages',
   'action',
 ]);
-/** 写块放在 write.look.*，别的在 read.look.*。 */
+/** Write blocks are located under `write.look.*`, others under `read.look.*`. */
 const WRITE_LOOKS = new Set(['form', 'button']);
-/** 提醒上的键：基本信息、when 和 opens 另有能力。 */
+/** Keys on reminders: basic info, `when`, and `opens` are separate capabilities. */
 const REMINDER_PLAIN_KEYS = new Set([
   'id',
   'kind',
@@ -89,36 +89,36 @@ const NUMBER_SOURCE_PLAIN_KEYS = new Set([
 ]);
 const SCHEDULE_PLAIN_KEYS = new Set(['id', 'name', 'required', 'hint', 'type', 'default']);
 
-describe('完整性守护：schema 和登记表多一种东西，能力表少一个就失败', () => {
+describe('Integrity guard: Fails if schema or registry adds an item while capabilities list drops one', () => {
   const missing = (expected: string[]) => expected.filter((id) => !IDS.has(id));
 
-  it('每种字段类型', () => {
+  it('Every field type', () => {
     expect(missing(FIELDS.map((f) => `field.${f.type}`))).toEqual([]);
   });
 
-  it('日程字段的每个选项', () => {
+  it('Every option of choice fields', () => {
     const keys = Object.keys(scheduleField.schema.shape).filter((k) => !SCHEDULE_PLAIN_KEYS.has(k));
     expect(missing(keys.map((k) => `field.schedule.${k}`))).toEqual([]);
   });
 
-  it('每种一键记录工具和出现方式', () => {
+  it('Every one-tap record tool and appearance mode', () => {
     expect(missing(RECORD_TOOL_KINDS.map((k) => `write.do.${k}`))).toEqual([]);
     expect(missing(TOOL_USE_AS.map((k) => `write.as.${k}`))).toEqual([]);
   });
 
-  it('每种外观都分过类，读写块都有能力', () => {
+  it('Every look is categorized; both read and write blocks have capabilities', () => {
     const looks = LEAF_COMPONENTS.map((c) => c.look as string);
     const record = looks.filter((l) => !NOT_RECORD_LOOKS.has(l));
     expect(
       missing(record.map((l) => (WRITE_LOOKS.has(l) ? `write.look.${l}` : `read.look.${l}`))),
     ).toEqual([]);
     expect(record).toEqual(expect.arrayContaining([...RECORD_LOOKS, 'number', 'chart']));
-    // 读表、写记录的外观不能被划到「不是记录能力」里（action 只是运行快捷操作，out.addRecord 有自己的能力）。
+    // Table reading and record writing looks cannot be classified as "not record capabilities" (actions simply run quick actions, while `out.addRecord` has its own capabilities).
     for (const c of LEAF_COMPONENTS)
       if (c.reads === 'table' || c.writes) expect(NOT_RECORD_LOOKS.has(c.look)).toBe(false);
   });
 
-  it('每种聚合、筛选条件、时间段、分组单位、连续的单位', () => {
+  it('Every aggregation, filter condition, time range, grouping unit, and consecutive unit', () => {
     expect(missing(AGGREGATES.map((a) => `read.aggregate.${a}`))).toEqual([]);
     expect(missing(ConditionSchema.shape.op.options.map((o) => `read.op.${o}`))).toEqual([]);
     expect(missing(PERIODS.map((p) => `read.period.${p}`))).toEqual([]);
@@ -126,7 +126,7 @@ describe('完整性守护：schema 和登记表多一种东西，能力表少一
     expect(missing(STREAK_UNITS.map((u) => `read.streak.unit.${u}`))).toEqual([]);
   });
 
-  it('每种图表、表单方式、右侧格式', () => {
+  it('Every chart, form mode, and right-side format', () => {
     const kinds = chartComponent.schema.shape.show.shape.kind.options;
     expect(missing(kinds.map((k: string) => `read.chart.${k}`))).toEqual([]);
     const modes = formComponent.schema.shape.show.shape.mode.options;
@@ -135,14 +135,14 @@ describe('完整性守护：schema 和登记表多一种东西，能力表少一
     expect(missing(formats.map((k) => `read.format.${k}`))).toEqual([]);
   });
 
-  it('数字块的每个选项', () => {
+  it('Every option of number blocks', () => {
     const keys = Object.keys(NumberSourceSchema.shape).filter(
       (k) => !NUMBER_SOURCE_PLAIN_KEYS.has(k),
     );
     expect(missing(keys.map((k) => `read.number.${k}`))).toEqual([]);
   });
 
-  it('每种提醒时间和提醒上的选项', () => {
+  it('Every reminder time and reminder option', () => {
     const whens = ReminderWhenSchema.options.map((o) => {
       const shape = o.shape as Record<string, { value?: string }>;
       if (shape.every)
@@ -168,7 +168,7 @@ describe('完整性守护：schema 和登记表多一种东西，能力表少一
     expect(missing(keys.map((k) => `remind.${k}`))).toEqual([]);
   });
 
-  it('每个读写数据表的动作', () => {
+  it('Every action that reads or writes data tables', () => {
     const actions = [...BUILTIN_TOOLS.flatMap((t) => t.actions), ...CORE_ACTIONS].filter((a) =>
       a.fields.some((f) => f.kind === 'collection'),
     );
@@ -179,12 +179,12 @@ describe('完整性守护：schema 和登记表多一种东西，能力表少一
     }
   });
 
-  it('能力 ID 不重复', () => {
+  it('Capability IDs are unique', () => {
     expect(IDS.size).toBe(CAPABILITIES.length);
   });
 });
 
-/** 一份什么都用上的配置：证明每个谓词都能成立，没有写死成假。 */
+/** A configuration using everything: proves that every predicate can hold and none are hardcoded to false. */
 function everything() {
   const periods = [
     'today',
@@ -214,7 +214,7 @@ function everything() {
     addTable('items', [
       text('title'),
       { id: 'body', name: 'body', type: 'note' },
-      // D-570：填写提示和范围。
+      // D-570: Input prompt and range.
       { id: 'qty', name: 'qty', type: 'number', min: 0, hint: 'How many' },
       money(),
       { id: 'done', name: 'done', type: 'checkbox' },
@@ -224,7 +224,7 @@ function everything() {
       { id: 'mins', name: 'mins', type: 'duration' },
       {
         ...choice('status', ['a', 'b', 'skip'], { default: 'a' }),
-        // D-568：选项代表的数和颜色。
+        // D-568: Numbers and colors represented by options.
         options: [
           { id: 'a', label: 'a', value: 1, color: 'green' },
           { id: 'b', label: 'b' },
@@ -235,7 +235,7 @@ function everything() {
       { id: 'photo', name: 'photo', type: 'file' },
       link('group', 'groups'),
       { id: 'twice', name: 'twice', type: 'formula', expression: '{qty} * 2' },
-      // D-569：公式读勾选框和单选。
+      // D-569: Formula reading checkboxes and radio buttons.
       { id: 'flags', name: 'flags', type: 'formula', expression: '{done} + {status}' },
       { id: 'group-name', name: 'group-name', type: 'lookup', via: 'group', field: 'name' },
       { id: 'before', name: 'before', type: 'previous', field: 'qty' },
@@ -257,7 +257,7 @@ function everything() {
         readAttachments: true,
         prefillRules: 'receipt',
         recordRow: [{ tool: 'record-vcard' }],
-        // D-570：记录表单分两段，第二段勾了 done 才显示。
+        // D-570: Record form split into two sections, the second section shown only when `done` is checked.
         form: {
           sections: [
             { title: 'Main', fields: ['title', 'done'] },
@@ -421,7 +421,7 @@ function everything() {
         look: 'divider',
         showIf: { table: 'items', has: 'none' },
       },
-      // D-616：下面的「添加」勾几个分组，每个建一条。
+      // D-616: The "Add" action below picks multiple groups, creating an entry for each.
       records('cards', 'picked', 'items', 'title', {
         tools: [
           {
@@ -504,7 +504,7 @@ function everything() {
       }),
       records('table', 'grid', 'items', 'title', { show: { columns: ['qty', 'status'] } }),
       records('gallery', 'pics', 'items', 'title'),
-      // 打卡格（D-610）：每个分组一行，按天一列；点空格新建、点只有一条的格子删掉。
+      // Habit tracking grid (D-610): One row per group, one column per day; tap empty space to create, tap single-item cells to delete.
       records('grid', 'week', 'items', 'title', {
         source: {
           group: { by: 'group', showEmpty: true },
@@ -691,18 +691,18 @@ function everything() {
   ]);
 }
 
-describe('每个谓词', () => {
-  it('在什么都用上的配置上都成立', () => {
+describe('Every predicate', () => {
+  it('Holds true on the all-inclusive config', () => {
     const v = viewOf(everything(), registry);
     expect(CAPABILITIES.filter((c) => !c.test(v)).map((c) => c.id)).toEqual([]);
   });
 
-  it('在新配置上都不成立', () => {
+  it('Does not hold true on a new config', () => {
     const v = viewOf(createDefaultWorkspace('en'), registry);
     expect(CAPABILITIES.filter((c) => c.test(v)).map((c) => c.id)).toEqual([]);
   });
 
-  it('藏起来的块、进不去的页面、关掉的提醒都不算', () => {
+  it('Hidden blocks, inaccessible pages, and disabled reminders are excluded', () => {
     const has = (config: object, id: string) =>
       CAPABILITIES.find((c) => c.id === id)!.test(viewOf(config as never, registry));
     const base = everything();
@@ -733,7 +733,7 @@ describe('每个谓词', () => {
     ).toBe(false);
   });
 
-  it('只读，不改配置', () => {
+  it('Read-only, config is unmodified', () => {
     const config = everything();
     const before = JSON.stringify(config);
     const v = viewOf(config, registry);

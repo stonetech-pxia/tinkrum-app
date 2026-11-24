@@ -16,15 +16,16 @@ import {
 } from '../desk/store';
 import { FakeFiles } from '../test-utils/fake-files';
 
-// 桌面的存储（file-room DESIGN §3、§11.1，D-357）：原件只复制；运行目录的结果移进来；
-// 中间格式的图片搬进 assets/、JSON 写相对路径；撤销重做存下来；超过上限的旧版本的文件删掉。
+// Desk storage (file-room DESIGN §3, §11.1, D-357): originals are only copied; run directory
+// outputs are moved in; intermediate format images are moved into assets/, JSON uses relative
+// paths; undo/redo states are stored; old version files exceeding limits are deleted.
 
 const bytes = (n: number) => new Uint8Array(n).fill(7);
 const DAY = 24 * 60 * 60 * 1000;
 
 function setup() {
   const files = new FakeFiles();
-  // 相册的原件（content://）和选择器放在缓存里的副本：都不属于桌面。
+  // Album originals (content://) and cache selector copies: neither belongs to the desk.
   files.disk.set('content://media/photo1', bytes(300));
   files.disk.set('picker://ImagePicker/scan.pdf', bytes(500));
   return files;
@@ -47,15 +48,15 @@ const original = [
   },
 ];
 
-/** 一次运行在运行目录里产出的文件。 */
+/** Files produced in the run directory during a run. */
 function runFile(files: FakeFiles, runId: string, name: string, n = 100) {
   const uri = `runs/${runId}/${name}`;
   files.disk.set(uri, bytes(n));
   return uri;
 }
 
-describe('放到桌上', () => {
-  it('每份复制一份工作副本，原件不动；桌面写成 desk.json', async () => {
+describe('Place on desk', () => {
+  it('Make a working copy for each, originals remain untouched; desk written as desk.json', async () => {
     const files = setup();
     const desk = await placeOnDesk(files, original, 1000, 'd1');
     expect(files.disk.has('content://media/photo1')).toBe(true);
@@ -67,14 +68,14 @@ describe('放到桌上', () => {
     ]);
     expect(files.disk.get('desk/d1/v1-0.jpg')).toEqual(bytes(300));
     expect(await loadDesk(files, 'd1')).toEqual(desk);
-    // 交给运行时：用桌上的副本，不是原件。
+    // Hand over to runtime: use desk copies, not originals.
     expect(deskPicked(files, desk, currentFiles(desk)).map((p) => p.uri)).toEqual([
       'desk/d1/v1-0.jpg',
       'desk/d1/v1-1.pdf',
     ]);
   });
 
-  it('手机空间不够时不复制、不留下半个桌面', async () => {
+  it('Do not copy or leave half a desk when storage space is insufficient', async () => {
     const files = setup();
     files.freeBytes = 200;
     await expect(placeOnDesk(files, original, 1000, 'd1')).rejects.toMatchObject({
@@ -84,8 +85,8 @@ describe('放到桌上', () => {
   });
 });
 
-describe('工具的结果放回桌上', () => {
-  it('运行目录里的结果移进桌面，生成新版本；撤销、重做存下来', async () => {
+describe('Return tool results to the desk', () => {
+  it('Move run directory results into the desk, generate a new version; save undo and redo states', async () => {
     const files = setup();
     let desk = await placeOnDesk(files, original.slice(0, 1), 1000, 'd1');
     const out = runFile(files, 'r1', 'IMG_0001-small.jpg', 80);
@@ -106,7 +107,7 @@ describe('工具的结果放回桌上', () => {
     expect(currentFiles(desk).map((f) => [f.id, f.path, f.size])).toEqual([
       ['f2-0', 'v2-0.jpg', 80],
     ]);
-    // 第 1 版的文件还在（能撤销）。
+    // Version 1 file is still present (can be undone).
     expect(files.disk.has('desk/d1/v1-0.jpg')).toBe(true);
 
     desk = await undo(files, desk, 3000);
@@ -116,7 +117,7 @@ describe('工具的结果放回桌上', () => {
     expect((await loadDesk(files, 'd1'))?.touchedAt).toBe(4000);
   });
 
-  it('文字结果（识别文字）不生成版本，只交回文字', async () => {
+  it('Text results (recognized text) do not generate versions, only return text', async () => {
     const files = setup();
     const desk = await placeOnDesk(files, original.slice(0, 1), 1000, 'd1');
     const result = await commitRun(
@@ -132,7 +133,7 @@ describe('工具的结果放回桌上', () => {
     expect((await loadDesk(files, 'd1'))?.versions).toHaveLength(1);
   });
 
-  it('快捷操作把桌上的文件原样交回（最后一步是分享）：不生成新版本', async () => {
+  it('Quick actions hand desk files back as-is (last step is sharing): do not generate a new version', async () => {
     const files = setup();
     const desk = await placeOnDesk(files, original.slice(0, 1), 1000, 'd1');
     const item = {
@@ -153,7 +154,7 @@ describe('工具的结果放回桌上', () => {
     expect(result.desk).toBe(desk);
   });
 
-  it('超过 20 个版本时，最旧的版本的文件从磁盘上删掉', async () => {
+  it('Delete oldest version files from disk when exceeding 20 versions', async () => {
     const files = setup();
     let desk = await placeOnDesk(files, original.slice(0, 1), 1000, 'd1');
     for (let i = 0; i < DESK_MAX_VERSIONS; i++) {
@@ -177,7 +178,7 @@ describe('工具的结果放回桌上', () => {
   });
 });
 
-describe('版本里的中间格式（§11.1）', () => {
+describe('Intermediate formats in versions (§11.1)', () => {
   const tableDoc = (source: string): TableDoc => ({
     version: 3,
     scope: 'all',
@@ -194,7 +195,7 @@ describe('版本里的中间格式（§11.1）', () => {
     ],
   });
 
-  it('转 Excel：xlsx、TableDoc、原图都进桌面；JSON 里写相对路径，读出来时换成现在的地址', async () => {
+  it('Convert to Excel: xlsx, TableDoc, and original image all enter the desk; JSON uses relative paths, replaced with current addresses upon reading', async () => {
     const files = setup();
     let desk = await placeOnDesk(files, original.slice(0, 1), 1000, 'd1');
     const page = runFile(files, 'r1', 'input-0.jpg', 300);
@@ -235,14 +236,14 @@ describe('版本里的中间格式（§11.1）', () => {
     expect(loaded?.kind === 'table' && loaded.doc.pages[0]!.source).toBe(
       'desk/d1/assets/v2-0-0.jpg',
     );
-    // 退回照片那一版，中间格式还在（重做后还能看）。
+    // Revert to photo version, intermediate format is still present (still viewable after redo).
     desk = await undo(files, desk, 3000);
     expect(currentFiles(desk)[0]!.ext).toBe('jpg');
     desk = await redo(files, desk, 4000);
     expect(currentFiles(desk)[0]!.source?.path).toBe('v2-0.json');
   });
 
-  it('转 Word：剪下来的图片也进 assets/；同一张图只存一份', async () => {
+  it('Convert to Word: clipped images also enter assets/; store only one copy of duplicate images', async () => {
     const files = setup();
     let desk = await placeOnDesk(files, original.slice(0, 1), 1000, 'd1');
     const page = runFile(files, 'r1', 'input-0.jpg', 300);
@@ -297,7 +298,7 @@ describe('版本里的中间格式（§11.1）', () => {
     ]);
   });
 
-  it('转 Excel：剪下来的图片也进 assets/，编辑合上时重新写进 xlsx（D-520）', async () => {
+  it('Convert to Excel: clipped images also enter assets/, rewritten into xlsx when edit is closed (D-520)', async () => {
     const files = setup();
     let desk = await placeOnDesk(files, original.slice(0, 1), 1000, 'd1');
     const page = runFile(files, 'r1', 'input-0.jpg', 300);
@@ -357,7 +358,7 @@ describe('版本里的中间格式（§11.1）', () => {
       null,
       'desk/d1/assets/v2-0-1.jpg',
     ]);
-    // 编辑合上：重新生成的 xlsx 里有这张图片，中间格式里的路径还是相对路径。
+    // Edit closed: regenerated xlsx contains this image, path in intermediate format remains relative.
     const edited = await commitEdit(
       files,
       desk,
@@ -374,7 +375,7 @@ describe('版本里的中间格式（§11.1）', () => {
     expect(againImage?.kind === 'image' && againImage.src).toBe('assets/v2-0-1.jpg');
   });
 
-  it('后面的步骤生成了新文件（中间格式不是为它存的）：这一版没有中间格式', async () => {
+  it('Subsequent steps generated new files (intermediate format not stored for it): this version has no intermediate format', async () => {
     const files = setup();
     let desk = await placeOnDesk(files, original.slice(0, 1), 1000, 'd1');
     const xlsx = runFile(files, 'r1', 'b.xlsx');
@@ -402,8 +403,8 @@ describe('版本里的中间格式（§11.1）', () => {
   });
 });
 
-describe('清理', () => {
-  it('列出所有桌面，7 天没动的标出来；清空桌面删掉整个目录，原件不动', async () => {
+describe('Cleanup', () => {
+  it('List all desks, flag those inactive for 7 days; clearing the desk deletes the entire directory, originals untouched', async () => {
     const files = setup();
     await placeOnDesk(files, original.slice(0, 1), 1000, 'old');
     await placeOnDesk(files, original.slice(1), 9 * DAY, 'new');

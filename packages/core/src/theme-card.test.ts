@@ -14,8 +14,9 @@ import {
 } from './theme';
 import { validateWorkspace } from './validate';
 
-// 卡片的边框和阴影用参数写（D-624）：theme.card 替换 cardStyle 的边框和阴影，底色仍跟 cardStyle；
-// 颜色只能是角色；只换 cardStyle 时 card 一起去掉。
+// Configures card borders and shadows via parameters (D-624): theme.card overrides cardStyle
+// borders and shadows, while the background color continues to follow cardStyle; colors must be
+// semantic roles; if only cardStyle is replaced, card is cleared accordingly.
 
 const BRUTAL_LIKE: ThemeCard = {
   border: { width: 2, color: 'text' },
@@ -70,7 +71,7 @@ describe('setTheme card (D-624)', () => {
     expect(custom.theme).toMatchObject({ cardStyle: 'flat', card: BRUTAL_LIKE });
     expect(validateWorkspace(custom, registry).ok).toBe(true);
 
-    // 别的键不动 card。
+    // Other keys leave card untouched.
     expect(apply(custom, [{ op: 'setTheme', radius: 4 }]).theme.card).toEqual(BRUTAL_LIKE);
     expect(apply(custom, [{ op: 'setTheme', card: null }]).theme).not.toHaveProperty('card');
     expect(apply(custom, [{ op: 'setTheme', cardStyle: 'outline' }]).theme).not.toHaveProperty(

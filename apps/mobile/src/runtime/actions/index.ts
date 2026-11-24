@@ -17,7 +17,7 @@ import { SCAN_IMPLS } from './scan';
 import { TRANSLATE_IMPLS } from './translate';
 import { VIDEO_IMPLS } from './video';
 
-// 所有动作实现。登记表里的每个动作都必须在这里有实现（runner-test 检查）。
+// All action implementations. Every action in the registry must have a corresponding implementation here (verified by runner-test).
 export const ACTION_IMPLS: Readonly<Record<string, ActionImpl<RunServices>>> = {
   ...IO_IMPLS,
   ...RECORD_IMPLS,

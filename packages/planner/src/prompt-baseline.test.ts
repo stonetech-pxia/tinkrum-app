@@ -14,9 +14,11 @@ import { describe, expect, it } from 'vitest';
 
 import { buildSystemPrompt, buildUserMessage } from './prompt';
 
-// 发给模型的提示词的快照：改了提示词（这里或登记表里的 ai.doc、ai.rule、aiRules）要有意地更新快照，并跑受影响的评测。
-// 外观说明和外观规则、只关于一个动作的规则（动作的 aiRules）、风格预设的叫法（said）都从定义生成。
-// v34（2026-10-30）：按「数据 · 容器 · 工具」重写，规则 66 → 51 条，加关系规则 R1–R14。
+// Snapshot of the prompt sent to the model: modifications to the prompt (here or in registries like
+// ai.doc, ai.rule, aiRules) should intentionally update snapshots and run affected evals.
+// Appearance descriptions and rules, single-action rules (action aiRules), and style preset names
+// (said) are generated from definitions. v34 (2026-10-30): rewritten by data · containers · tools,
+// rules reduced from 66 to 51, adding relation rules R1-R14.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 

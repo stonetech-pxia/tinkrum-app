@@ -3,8 +3,10 @@ import { localDate, periodRange } from './data';
 import { isOfficeFile, mediaKindOf } from './media';
 import type { Period } from './schema';
 
-// 按条件筛选文件（file.filter，D-242）：条件只能从固定的几种里选（类型、大小、图片方向、日期、时长），
-// 每种最多一条，全部满足才保留。没有表达式，AI 只能选条件和数字，看不到文件。
+// Filter files by conditions (file.filter, D-242): Conditions must be chosen from a fixed set
+// (type, size, image orientation, date, duration), with at most one rule per kind, and all
+// conditions must be satisfied. There are no arbitrary expressions; the AI can only choose
+// conditions and numbers, and cannot see file contents.
 
 export const FILTER_KINDS = ['any', 'images', 'pdf', 'video', 'audio', 'documents'] as const;
 export const FILTER_ORIENTATIONS = ['any', 'landscape', 'portrait', 'square'] as const;
@@ -16,18 +18,18 @@ export interface FileFilter {
   orientation: (typeof FILTER_ORIENTATIONS)[number];
   date: 'any' | 'lastDays' | 'period' | 'between';
   days?: number;
-  /** 日历上的一段：本周、本月、今年……（和数据表筛选同一套）。 */
+  /** A calendar time span: this week, this month, this year, etc. (shares the same scheme as data table filters). */
   period?: Period;
-  /** YYYY-MM-DD，含这一天。 */
+  /** YYYY-MM-DD, inclusive of that day. */
   from?: string;
   to?: string;
   duration: 'any' | 'longer' | 'shorter';
   seconds?: number;
-  /** 一个都不剩时：stop = 停下并说明，skip = 这一步不筛，原样交给下一步。 */
+  /** Behavior when none remain: stop = stop execution and explain, skip = skip this step and pass files unchanged to the next step. */
   whenEmpty: 'stop' | 'skip';
 }
 
-/** 筛选时用到的文件信息（RunItem 的一部分）。 */
+/** File information used during filtering (part of RunItem). */
 export interface FilterableItem {
   name: string;
   ext: string;
@@ -36,16 +38,16 @@ export interface FilterableItem {
   width?: number;
   height?: number;
   durationMs?: number;
-  /** 照片的拍摄时间（毫秒）。 */
+  /** Photo capture timestamp (milliseconds). */
   takenAt?: number;
-  /** 文件的修改时间（毫秒，「文件」App 选的文件有）。 */
+  /** File modification time in milliseconds (available for files selected from the Files app). */
   modifiedAt?: number;
 }
 
-/** 宽高差在 2% 以内算方的（手机拍的 1:1 照片常差几个像素）。 */
+/** Width and height differences within 2% are considered square (photos taken on phones often differ by a few pixels). */
 const SQUARE_TOLERANCE = 0.02;
 
-/** 这一组条件里有没有真的条件（全是「不限」的筛选没有意义）。 */
+/** Checks whether there are any active conditions in this group (filters consisting entirely of 'Any' are meaningless). */
 export const hasFileCondition = (
   f: Pick<FileFilter, 'kind' | 'size' | 'orientation' | 'date' | 'duration'>,
 ) =>
@@ -55,7 +57,7 @@ export const hasFileCondition = (
   f.date !== 'any' ||
   f.duration !== 'any';
 
-/** 要判断方向就要宽高，要判断时长就要时长：运行时先补齐这些信息。 */
+/** Determining orientation requires dimensions, and determining duration requires duration: runtime populates these details first. */
 export function fileFilterNeeds(f: FileFilter): { dimensions: boolean; duration: boolean } {
   return { dimensions: f.orientation !== 'any', duration: f.duration !== 'any' };
 }
@@ -86,8 +88,9 @@ function kindMatches(kind: FileFilter['kind'], item: FilterableItem): boolean {
 }
 
 /**
- * 一个文件是否满足全部条件。读不到的信息（没有拍摄 / 修改日期、没有宽高、不是视频音频没有时长）
- * 算不满足这一条：「最近 7 天的照片」不会把不知道日期的照片也留下。
+ * Whether a file satisfies all conditions. Missing metadata (unknown capture/modification date,
+ * missing dimensions, or non-video/audio files lacking duration) does not satisfy the condition:
+ * "Photos from the last 7 days" will not include photos with unknown dates.
  */
 export function matchesFileFilter(
   item: FilterableItem,
@@ -115,7 +118,7 @@ export function matchesFileFilter(
       );
       if (day < start || day > localDay(now.getTime())) return false;
     } else if (f.date === 'period') {
-      // 日历上的一段按「一天、一周从什么时候开始」（D-286）。
+      // A calendar time span based on "when a day or week begins" (D-286).
       const [start, end] = periodRange(f.period ?? 'today', now, cal);
       if (day < start || day > end) return false;
     } else if (day < (f.from ?? '') || day > (f.to ?? '9999-12-31')) return false;

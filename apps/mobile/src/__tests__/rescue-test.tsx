@@ -8,11 +8,11 @@ import { stepBack } from '../rescue/step-back';
 import { RescueScreen } from '../rescue/RescueScreen';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 
-// 体检 6.6 的兜底页：导出备份、回到上一个版本、分享错误信息、去官网。
+// Health check 6.6 rescue page: export backup, go back to previous version, share error info, go to official website.
 
 const NOW = new Date(2026, 10, 22, 12, 0);
 
-// 三个版本只差主色，好认出现在是哪一个。
+// The three versions differ only in their primary color, making it easy to identify which one is active.
 const COLORS: Record<string, string> = { 一: '#111111', 二: '#222222', 三: '#333333' };
 function named(name: string): WorkspaceConfig {
   const config = createDefaultWorkspace('zh');
@@ -59,10 +59,10 @@ describe('going back a version from the rescue page', () => {
     const state = {};
     await stepBack(repo, state, 'zh', NOW);
     expect(await titleOf(repo)).toBe('二');
-    // 再点一次：再往前一个，不是回到刚才那个坏的。
+    // Tap again: go back one more version, not returning to the broken one just visited.
     await stepBack(repo, state, 'zh', NOW);
     expect(await titleOf(repo)).toBe('一');
-    // 历史只往后加（§7D），记录一条不动（底线 5）。
+    // History only appends forward (§7D), and records remain completely untouched (invariant 5).
     expect(await repo.listRevisions(10)).toHaveLength(5);
     expect((await repo.getRecord('r'))!.values).toEqual({ a: 1 });
     expect((await repo.getHead())!.source).toBe('restore');
@@ -121,7 +121,7 @@ describe('the rescue page', () => {
   });
 });
 
-// 兜底页要在主流程坏掉时也能打开：它和启动门只能静态引用这些，别的（数据库、备份、界面）在点按钮时才加载。
+// The rescue page and start gate must load nothing from the main flow until a button is tapped: they can only statically reference these items, while everything else (database, backups, UI) is loaded on demand when a button is pressed.
 it('the rescue page and the start gate load nothing from the main flow until a button is tapped', () => {
   const allowed = [
     /^react$/,

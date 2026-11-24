@@ -10,8 +10,9 @@ import {
 } from './schema';
 import { handedInput } from './workflow/check';
 
-// 首页入口（D-109，易用性排名的方案甲）：AI 新建的快捷操作不再由 AI 顺手放到首页，
-// 而是在预览里单列一项「在首页放一个入口」，用户自己勾选。
+// Home screen entry point (D-109, usability ranking scheme A): quick actions created by the AI are
+// no longer automatically placed on the home screen by the AI; instead, a separate "Place an entry
+// on the home screen" option is listed in the preview for the user to manually select.
 
 const hasRunner = (config: WorkspaceConfig, id: string) =>
   config.containers.pages.some((p) =>
@@ -24,8 +25,9 @@ const hasRunner = (config: WorkspaceConfig, id: string) =>
   );
 
 /**
- * 这次修改新建、但哪个页面上都没有运行它的块（look action）的快捷操作。
- * 要容器交值的（D-428）不算：它们放在记录页和记录块上，首页的块没有值可交。
+ * Quick actions created in this modification that lack a running block (look action) on any page.
+ * Excludes those requiring container-passed values (D-428), which reside on record pages and
+ * record blocks where home screen blocks cannot supply values.
  */
 export function workflowsWithoutEntry(
   ops: readonly Op[],
@@ -41,7 +43,7 @@ export function workflowsWithoutEntry(
   });
 }
 
-/** 在首页标题之后为这些快捷操作各加一个运行它的块。 */
+/** Add a running block for each of these quick actions immediately following the home screen title. */
 export function homeEntryOps(config: WorkspaceConfig, workflowIds: readonly string[]): Op[] {
   const home = config.containers.pages.find((p) => p.id === HOME_PAGE_ID);
   if (!home) return [];

@@ -6,7 +6,7 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
-/** 两遍流式解码：先测 LUFS/峰值，再把安全增益写进临时 PCM 文件。 */
+/** Two-pass streaming decoding: measures LUFS/peak first, then writes safety gain into a temporary PCM file. */
 object AudioVolume {
   fun prepare(context: Context, uri: Uri, output: File, automatic: Boolean, db: Double,
               cancelled: AtomicBoolean, durationMs: Double, progress: (Double) -> Unit) {

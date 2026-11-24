@@ -7,7 +7,7 @@ import { makePalette } from '../renderer/theme';
 import { NeedButton } from '../shell/NeedButton';
 import { createNeedSender } from '../workspace/remote-ai';
 
-// 需求回收（D-189）：AI 做不到时，用户点了才把那一句话发给 Tinkrum；发的内容只有这句话和几项元数据。
+// Requirement recovery (D-189): when AI fails, user manually sends that sentence to Tinkrum; content sent includes only this sentence and a few metadata items.
 
 const secrets = (): SecretStore => {
   const data = new Map<string, string>();

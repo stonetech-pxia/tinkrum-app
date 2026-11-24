@@ -7,7 +7,7 @@ import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 点一根柱子，页面的时间范围改成那个月（D-585）：同一页上跟着时间范围的数字一起变；只改页面上的选择，什么都不写（底线 15）。
+// Tap a bar to change the page's time range to that month (D-585): the numbers on the same page update alongside the time range; only modifies the page selection and writes nothing (invariant 15).
 
 const seed = (locale: Locale, registry: Registry) => {
   const r = applyOps(
@@ -100,16 +100,16 @@ it('tapping the bar of another month sets the page range to that month', async (
   await act(() => router.push({ pathname: '/page/[pageId]', params: { pageId: 'hist' } }));
   await settle();
 
-  // 默认上个月：合计是 30，读数也在上个月那一根。
+  // Default to last month: total is 30, and the reading corresponds to that month's bar.
   const total = () => screen.getByTestId('stat-value-tx-合计').props.children;
   expect(await screen.findByTestId('stat-value-tx-合计')).toBeTruthy();
   expect(total()).toBe('¥30.00');
-  // 点两个月前那一根（12 根里倒数第三根，下标 9）：合计变成 700，读数跟着那一根。
+  // Tap the bar from two months ago (third from last out of 12 bars, index 9): total becomes 700, and the reading follows that bar.
   await fireEvent.press(screen.getByTestId('chart-bar-9'));
   await settle();
   expect(total()).toBe('¥700.00');
   expect(screen.getByTestId('chart-readout-tx').props.children).toMatch(/¥700\.00$/);
-  // 只改了页面上的选择，记录没动。
+  // Only the page selection was changed; records remain untouched.
   const stored = await repo.listRecords('tx');
   expect(stored.map((r) => r.updatedAt)).toEqual([100, 101]);
 });

@@ -7,25 +7,28 @@ import type { Page, WorkspaceConfig } from '../schema';
 import { BackdropSchema, IdSchema, type Collection, type FieldType } from '../schema-base';
 import { filterSchema } from '../schema-primitives';
 
-// 块的登记表（v34：容器）：每种外观（look）一份定义（新增外观的步骤见 docs/COMPONENTS.md），
-// 结构校验、引用检查、草稿说明、长按编辑、提示词都从这里读，不再各写一份按类型的 switch。
-// 每个块都是同样的几个键（D-368）：look 怎么画、show 这种外观自己的选项、source 读什么（只读）、
-// tools 引用哪些工具（会写的都在这里）、opens 点了去哪（导航，不写东西）、children（只有 group）。
+// Component registry (v34: containers): one definition per look (steps to add a new look in
+// docs/COMPONENTS.md); structural validation, reference checks, draft notes, long-press editing,
+// and prompts are all read from here, eliminating type-specific switch statements. Every block
+// shares the same keys (D-368): look for rendering, show for look-specific options, source for data
+// sources (read-only), tools for referenced tools (all write operations are here), opens for
+// navigation targets (stateless), children (group only).
 
-/** 每个块都可以有的外观设置。tone 对文字块是文字颜色，对卡片类块是底色。 */
+/** Look settings available on every block. tone specifies text color for text blocks and background color for card blocks. */
 export const ComponentStyleSchema = z.strictObject({
   align: z.enum(['start', 'center']).optional(),
   tone: z.enum(['default', 'primary', 'secondary', 'tertiary', 'muted']).optional(),
   size: z.enum(['small', 'medium', 'large']).optional(),
-  /** 用一张图片代替底色（D-258，schemaVersion 18）；只有定义里 edit.backdrop 为 true 的卡片类块可以用。 */
+  /** Uses an image instead of a background color (D-258, schemaVersion 18); available only on card blocks where edit.backdrop is true in definition. */
   backdrop: BackdropSchema.optional(),
 });
 export type ComponentStyle = z.infer<typeof ComponentStyleSchema>;
 
 /**
- * 块只在一张表有（some）或没有（none）记录时显示（D-424）。只影响画不画，不写东西。
- * filter（D-579）：只数符合这些条件的记录，写法和列表的筛选一样，汇总、查找算出来的字段也能用
- * （例如「本月还没记的订阅」有 → 显示待确认的提示）。
+ * Blocks display only when a table has some or no records (D-424). Affects rendering only, no
+ * state changes. filter (D-579): counts only records matching these conditions, using list filter
+ * syntax, including computed fields from summaries/lookups (e.g., show confirmation prompt when
+ * "unbilled subscriptions this month" > 0).
  */
 export const ShowIfSchema = z.strictObject({
   table: IdSchema,
@@ -35,8 +38,10 @@ export const ShowIfSchema = z.strictObject({
 export type ShowIf = z.infer<typeof ShowIfSchema>;
 
 /**
- * 块固定在页面的上方或下方，不跟着中间滚动（创始人 2026-11-04 定）。只是页面顶层一个块的属性：每种遍历（删除、引用、
- * 说明、AI 的修改）都照常走 page.blocks；分组里的块不能有（validate.ts）。
+ * Pins a block to the top or bottom of the page, preventing it from scrolling with the middle
+ * content (determined by founder on 2026-11-04). Simply an attribute of a top-level page block:
+ * all traversals (deletion, references, documentation, AI edits) process page blocks normally;
+ * grouped blocks cannot have this (validate.ts).
  */
 export const PinSchema = z.enum(['top', 'bottom']);
 export type Pin = z.infer<typeof PinSchema>;
@@ -49,20 +54,23 @@ export const blockBase = {
   pin: PinSchema.optional(),
 };
 
-/** 入口类卡片的样子（D-230）：row = 设置页那种一行、右边有箭头；tile = 大图标块。 */
+/** Appearance of entry cards (D-230): row = settings-style single line with an arrow on the right; tile = large icon block. */
 export const EntryLookSchema = z.enum(['row', 'tile']);
 export type EntryLook = z.infer<typeof EntryLookSchema>;
 
 /**
- * 块的键引用了配置里的什么（通用引用检查和 blockTable 这类辅助函数读它）。键是路径（"source.table"、
- * "show.title"、"source.group.by"）：
- * - table：数据表 ID；同一个块里的 field、filter 都指这张表（"$files" 是系统表，见 files-table.ts）。
- * - field：这张表的字段（也可以是 createdAt / updatedAt），值可以是一个或一组；
- *   types 限定字段类型（系统字段算日期），role 是问题文字里的名字，不写就用键名；one：单选字段只能是选一个的
- *   （多选不行，D-607）。
- * - filter：这张表的筛选条件。
- * - target：页面、系统入口、tool:<id>、package:<id> 或 {file}（opens）。
- * - package：installed = 已添加的工具包（一个），catalog = 目录里的工具包（一组）。
+ * What config references are pointed to by block keys (read by generic reference helpers like
+ * reference checks and blockTable). Keys are paths ("source.table", "show.title",
+ * "source.group.by"):
+ * - table: data table ID; field and filter in the same block refer to this table ("$files" is the
+ * system table, see files-table.ts).
+ * - field: fields of this table (or createdAt / updatedAt), can be a single field or array of
+ * fields; types restrict field types (system fields count as dates), role is the display name in
+ * issue text, defaults to key name; one: single-choice field must be single-select (multi-select
+ * not allowed, D-607).
+ * - filter: filter conditions for this table.
+ * - target: page, system entry point, tool:<id>, package:<id>, or {file} (opens).
+ * - package: installed = installed tool pack (single), catalog = tool pack catalog (group).
  */
 export type ComponentRef =
   | { to: 'table' }
@@ -71,72 +79,76 @@ export type ComponentRef =
   | { to: 'target' }
   | { to: 'package'; in: 'installed' | 'catalog' };
 
-/** 求和、平均等要用的字段类型（字段定义里的 numeric）。 */
+/** Field types required for sum, average, etc. (numeric flag in field definitions). */
 export { NUMERIC_FIELD_TYPES } from '../fields';
 
-/** 每条记录都有的系统字段，当作日期。 */
+/** System field present in every record, used as a date. */
 export const isSystemField = (id: string) => id === 'createdAt' || id === 'updatedAt';
 
 export interface CheckContext {
   config: WorkspaceConfig;
   registry: Registry;
   page: Page;
-  /** 块读的数据表（查找、汇总换成它们显示的那种字段）。只有读表的块有；表不存在时不会调用 check。 */
+  /** Table read by the block (lookup and summary fields are mapped to the fields they display). Present only on table-reading blocks; check is not called when the table does not exist. */
   collection?: Collection;
-  /** 外层的分组（块在分组里时）。 */
+  /** Outer group (when the block is inside a group). */
   parent?: { id: string; look: 'group' };
 }
 
-/** 长按编辑（D-052）里能直接改的一个文字（show 里的键）。 */
+/** A text that can be edited directly in long-press edit (D-052) (key in show). */
 export interface EditableText {
   prop: string;
-  /** 与结构里的长度上限一致（components.test.ts 会检查）；超出时校验器也会拦截。 */
+  /** Matches the length limit in the schema (checked by components.test.ts); also intercepted by the validator when exceeded. */
   max: number;
   optional?: boolean;
   multiline?: boolean;
-  /** 支持粗体、斜体、链接和列表（richtext.ts）。 */
+  /** Supports bold, italic, links, and lists (richtext.ts). */
   rich?: boolean;
 }
 
 export type StyleKey = 'tone' | 'align' | 'size';
 
 /**
- * 长按编辑里能改什么（D-052）。只列渲染器真正会显示出来的外观；
- * 数据块不能改文字（只调整位置、颜色、隐藏和删除）。
+ * What can be changed in long-press edit (D-052). Lists only appearances actually rendered by the
+ * renderer; data blocks cannot have their text changed (only position, color, hiding, and
+ * deletion).
  */
 export interface ComponentEdit {
   text: EditableText[];
   style: StyleKey[];
-  /** 长按编辑里能选、换、移除的用户文件（文件位的 opens.file，D-257）：file = 照片或「文件」里的任意文件。 */
+  /** User file that can be selected, changed, or removed in long-press edit (opens.file in file slots, D-257): file = a photo or any file from "Files". */
   asset?: 'file';
-  /** 是有底色的卡片，可以用图片代替底色（style.backdrop，D-258）；渲染器要真的画出来。 */
+  /** A card with a background color, which can be replaced by an image (style.backdrop, D-258); the renderer must actually draw it. */
   backdrop?: true;
 }
 
-/** 发给 AI 的说明（packages/planner/src/prompt.ts 读它，英文）。改了要跑受影响的评测。 */
+/** Instructions sent to the AI (read by packages/planner/src/prompt.ts, in English). Run affected evaluations if modified. */
 export interface ComponentAI {
-  /** 提示词外观列表里的一行，look 名后面的部分：键（? 表示可以不写，列出可选值和范围）和用法。 */
+  /** A line in the prompt appearance list, following the look name: key (? means optional, lists optional values and range) and usage. */
   doc: string;
-  /** 在提示词里排在哪个外观后面；不写就按登记顺序。 */
+  /** Which appearance to place after in the prompt; defaults to registration order if omitted. */
   docAfter?: string;
-  /** 和这个外观有关的规则；n 是规则编号。 */
+  /** Rule associated with this appearance; n is the rule number. */
   rule?: { n: number; text: string };
 }
 
 export const ALL_STYLES: StyleKey[] = ['tone', 'align', 'size'];
 
-/** 块自己的检查发现的问题。只写文字时是数据问题（code data，前面加块 ID）。 */
+/** Issues found during the block's own check. Plain text indicates data issues (code data, prefixed with block ID). */
 export type CheckProblem = string | { code: string; message: string };
 
 /**
- * 登记表的归类（v34「数据 · 容器 · 工具」，关系规则 1–6）：块都是容器，只读；
- * reads 是 source 读什么，writes 是块上能不能挂会写的工具（就地的一键记录工具）。
- * tools 列出这种外观能挂的工具：as 是出现方式（"self" = 不写 as，块本身被点时做），do 是一键记录的种类，
- * ref 是能引用的独立工具（quickAction = 快捷操作，pick = 内核的打开相册 / 文件），open = 行上的「打开」。
+ * Classification in the registry (v34 "Data · Container · Tool", relation rules 1-6): blocks are
+ * containers, read-only; reads specifies what source reads, writes specifies whether tools that
+ * write can be attached to the block (in-place quick record tools). tools lists tools attachable
+ * to this appearance: as is the trigger mode ("self" = no as specified, executed when the block
+ * itself is tapped), do is the kind of quick record, ref is independent tools that can be
+ * referenced (quickAction = quick action, pick = core open photo/file), open is "open" on the
+ * row.
  */
 export interface LookMeta {
   kind: 'container';
-  /** 作用在哪层：记录列表、表单作用在记录上，数字、图表作用在表上（汇总），文件读 $files。 */
+  /** Layer it applies to: record lists and forms apply to records, numbers and charts apply to tables (aggregates), file reading uses $files. */
   layer?: 'value' | 'record' | 'table' | 'file' | 'config';
   reads: 'none' | 'table' | 'files' | 'catalog';
   writes: boolean;
@@ -145,7 +157,7 @@ export interface LookMeta {
     do?: readonly RecordToolKind[];
     ref?: readonly ('quickAction' | 'pick')[];
     open?: true;
-    /** 最多几个（一共）。 */
+    /** Maximum count (total). */
     max: number;
   };
 }
@@ -160,32 +172,37 @@ export function lookSchema<L extends string, X extends z.ZodRawShape>(look: L, s
 
 export interface LookSpec<L extends string, X extends z.ZodRawShape> extends LookMeta {
   look: L;
-  /** 除了 id / hidden / style / look 以外的键（show、source、tools、opens、children）。 */
+  /** Keys other than id / hidden / style / look (show, source, tools, opens, children). */
   shape: X;
   /**
-   * 通用引用检查会查的键（validate.ts），路径写法见 ComponentRef。要看别的键才知道该不该查的引用，写在 check 里。
+   * Keys checked by generic reference checks (validate.ts); see ComponentRef for path syntax. To
+   * check references that require other keys, implement them in check.
    */
   refs?: Readonly<Record<string, ComponentRef>>;
   /**
-   * 通用检查以外的规则。读表的块在字段引用之后、筛选条件之前检查，其余块在页面、工具引用之后。
-   * 问题文字会发给 AI 让它改正，改文字要想清楚。
+   * Rules beyond generic checks. Table-reading blocks are checked after field references and
+   * before filter conditions; other blocks are checked after page and tool references. Problem
+   * messages are sent to the AI for correction, so message wording should be carefully
+   * considered.
    */
   check?: (c: Instance<L, X>, ctx: CheckContext) => CheckProblem[];
-  /** 修改说明里怎么称呼这个块（例如「标题“记账”」）。 */
+  /** How to refer to this block in modification descriptions (e.g., "title "Accounting""). */
   describe: (c: Instance<L, X>, config: WorkspaceConfig, ctx: DescribeContext) => string;
   edit: ComponentEdit;
   ai: ComponentAI;
   /**
-   * 一个能用的例子（不含 id 和 look）：components.test.ts 拿它在三种语言下校验、生成说明，
-   * App 的 registry-test 拿它渲染。只引用样例配置里有的：数据表 expenses（记账模版的
-   * amount、category、date、note），已添加的工具包 pdf，它的快捷操作 pdf-merge。
+   * A usable example (excluding id and look): components.test.ts uses it to validate across three
+   * languages and generate descriptions, and App's registry-test uses it for rendering.
+   * References only items present in sample configs: data table expenses (amount, category, date,
+   * note in the bookkeeping template), added tool pack pdf, and its quick action pdf-merge.
    */
   example: Omit<Instance<L, X>, 'id' | 'look'>;
 }
 
 /**
- * 一份外观定义，加上由它生成的完整结构 schema。
- * 定义文件里要写明这个类型（回调用到了配置的类型，而配置的类型又由块定义生成，不写 TypeScript 推不出来）。
+ * An appearance definition, plus the complete schema generated from it. Must be explicitly
+ * specified in definition files (callbacks reference config types, which are generated from block
+ * definitions, so TypeScript cannot infer them without it).
  */
 export type LookDefinitionOf<L extends string, X extends z.ZodRawShape> = LookSpec<L, X> & {
   schema: ReturnType<typeof lookSchema<L, X>>;
@@ -197,7 +214,7 @@ export function defineLook<const L extends string, X extends z.ZodRawShape>(
   return { ...spec, schema: lookSchema(spec.look, spec.shape) };
 }
 
-/** 列表里出现了不止一次的值。 */
+/** Values appearing more than once in the list. */
 export function duplicates(ids: readonly string[]): string[] {
   const seen = new Set<string>();
   const dup = new Set<string>();
@@ -205,12 +222,12 @@ export function duplicates(ids: readonly string[]): string[] {
   return [...dup];
 }
 
-/** 数据表的名字；表不在了就用 ID。 */
+/** Name of the data table; falls back to ID if the table no longer exists. */
 export function collectionName(id: string, config: WorkspaceConfig): string {
   return config.data.tables.find((c) => c.id === id)?.name ?? id;
 }
 
-/** 按路径（"source.group.by"）取块里的值。 */
+/** Gets a value from a block by path ("source.group.by"). */
 export function valueAt(block: unknown, path: string): unknown {
   let v: unknown = block;
   for (const key of path.split('.')) {

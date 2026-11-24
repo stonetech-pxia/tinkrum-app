@@ -17,7 +17,7 @@ export function shareRecommendations(
   locale: Locale,
   newest?: string,
 ) {
-  // 内设的快捷操作（D-236）排在配置里的后面：没用过时先补自己的，再补内设的和工具带的。
+  // Built-in quick actions (D-236) are ordered after configured ones: when unused, fill in custom ones first, then built-in and tool-provided ones.
   const builtIns = builtInWorkflows(workflows, locale);
   const existing = [...workflows, ...builtIns]
     .filter(runsHere)
@@ -32,8 +32,10 @@ export function shareRecommendations(
       return y.count - x.count || y.lastAt - x.lastAt;
     });
   const unused = existing.filter(({ wf }) => wf.id !== newest && !usage.has(wf.id));
-  // 内设的和工具带的按这类文件最常用的排（D-237）：工具带的可能和清单里的内设的同一个 ID
-  // （video-frame），这时内设的不列出来，由工具带的占它的位置。不在清单里的照原来的顺序跟在后面。
+  // Built-in and tool-provided ones are ordered by frequency for this file type (D-237): a
+  // tool-provided one might share the same ID as a built-in one in the list (video-frame), in which
+  // case the built-in one is omitted and the tool-provided one takes its place. Those not in the
+  // list follow in their original order.
   const order = sharePresetOrder(infos);
   const rank = (wf: Workflow) => {
     const i = order.indexOf(wf.id);
@@ -47,8 +49,9 @@ export function shareRecommendations(
       ...unused.filter(({ wf }) => wf.package),
     ].sort((a, b) => rank(a.wf) - rank(b.wf)),
   ];
-  // 只有能运行的才算「用过的够了」：先保证至少 3 个能运行的，再放用过但个数不对的（灰卡片，
-  // 说明原因），剩下的位置用没用过的补；灰卡片不能把能用的挤到「查看全部」里去。
+  // Only runnable ones count as "enough used": ensure at least 3 runnable ones first, then include
+  // used ones with incorrect counts (grey cards with explanations), and fill remaining slots with
+  // unused ones; grey cards must not push runnable ones into "View all".
   const usedOk = used.filter(({ fit }) => fit.ok);
   const usedOff = used.filter(({ fit }) => !fit.ok);
   const lead = fresh.length + usedOk.length;

@@ -16,7 +16,7 @@ import {
 } from './types';
 import { sameValues } from './record-values';
 
-// 内存实现：用于测试，语义与 SQLite 实现一致。数据以 JSON 字符串保存，模拟“写入后重新读取”。
+// In-memory implementation: used for testing, semantics match the SQLite implementation. Data is saved as JSON strings, simulating "read after write".
 
 export class MemoryWorkspaceRepo implements WorkspaceRepo {
   private revisions: (Omit<RevisionRecord, 'config'> & { configJson: string })[] = [];
@@ -26,11 +26,11 @@ export class MemoryWorkspaceRepo implements WorkspaceRepo {
   private grants = new Set<string>();
   private toolRuns: ToolRunRecord[] = [];
   private meta = new Map<string, string>();
-  /** 记录以 JSON 保存，模拟数据库的写入与读取。 */
+  /** Records are saved as JSON, simulating database write and read operations. */
   private records = new Map<string, string>();
-  /** 导入的一批批记录（D-574）：一批和它的记录 ID。 */
+  /** Batches of imported records (D-574): each batch and its record IDs. */
   private imports: { batch: Omit<RecordImport, 'present'>; ids: string[] }[] = [];
-  /** 预设也以 JSON 保存。 */
+  /** Presets are also saved as JSON. */
   private presets = new Map<string, string>();
   private clock = 0;
 
@@ -43,7 +43,7 @@ export class MemoryWorkspaceRepo implements WorkspaceRepo {
     return { ...rest, config: JSON.parse(configJson) };
   }
 
-  /** 测试用：直接写入任意（可能损坏的）快照并设为 head。 */
+  /** Test utility: write arbitrary (possibly corrupted) snapshot directly and set as head. */
   forceHead(config: unknown, parentId: number | null = this.headId): number {
     const id = this.revisions.length + 1;
     this.revisions.push({
@@ -286,7 +286,7 @@ export class MemoryWorkspaceRepo implements WorkspaceRepo {
     writes: readonly RecordWrite[],
     meta?: { key: string; value: string },
   ): Promise<'applied' | 'conflict'> {
-    // 做在副本上，全部成功才换过来：和数据库的事务一样，中途失败什么都不留下。
+    // Execute on a copy, and swap in only if everything succeeds: like a database transaction, leaving nothing behind if it fails midway.
     const records = new Map(this.records);
     const metaCopy = new Map(this.meta);
     const take = this.records;
@@ -379,7 +379,7 @@ export class MemoryWorkspaceRepo implements WorkspaceRepo {
     batch: Omit<RecordImport, 'count' | 'present'>,
     records: readonly DataRecord[],
   ) {
-    // 和 SQLite 的事务一样：先查完，有一条写不进去就一条都不写。
+    // Like a SQLite transaction: check everything first, and if a single item cannot be written, write nothing.
     if (this.imports.some((i) => i.batch.id === batch.id)) throw new Error('duplicate import');
     if (
       records.some(

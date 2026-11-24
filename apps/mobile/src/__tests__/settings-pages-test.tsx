@@ -6,8 +6,10 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 设置里的「App 和预设」「数据」一屏看完（D-614）：设置页直接有三行；预设页只有两个按钮和预设列表，
-// 添加的几种方式、示例 App、保存的表单点了才展开；数据页每张表一行，表的操作在表自己的页面里。
+// "Apps & Presets" and "Data" in settings visible in a single screen (D-614): three rows directly
+// on the settings page; presets page has only two buttons and preset list, with addition methods,
+// sample apps, and saved forms expanding on tap; data page has one row per table, with table
+// operations inside each table's own page.
 
 const seed = (locale: Locale, registry: Registry, withApp = false) => {
   const r = applyOps(
@@ -17,7 +19,7 @@ const seed = (locale: Locale, registry: Registry, withApp = false) => {
         op: 'addData',
         table: { id: 'notes', name: '笔记', fields: [{ id: 'title', name: '标题', type: 'text' }] },
       },
-      // 第二个 App 和它的表：数据页按 App 分组（D-615）。
+      // Second app and its tables: data page grouped by app (D-615).
       ...(withApp
         ? [
             { op: 'addContainer', app: { id: 'fit', name: '健身', icon: 'heart' } },
@@ -107,21 +109,21 @@ describe('Data page', () => {
     await start();
     await fireEvent.press(await screen.findByTestId('settings-data'));
     expect(await screen.findByTestId('table-notes')).toHaveTextContent(/笔记/);
-    // 一行只有名字和条数；只有一个 App 时标题是「数据表」（D-615）。
+    // A row has only name and count; title is "Data tables" when there is only a single app (D-615).
     expect(screen.getByTestId('table-notes')).toHaveTextContent(/^笔记1 条记录›$/);
     expect(screen.getByText('数据表')).toBeTruthy();
     expect(screen.queryByText('主页')).toBeNull();
     expect(screen.queryByTestId('export-notes')).toBeNull();
     expect(screen.queryByTestId('select-notes')).toBeNull();
     expect(screen.getByTestId('data-deleted')).toBeTruthy();
-    // 没有不在界面里的表，这一行就不出现。
+    // If there are no unused tables in the UI, this row does not appear.
     expect(screen.queryByTestId('data-unused')).toBeNull();
 
     await fireEvent.press(screen.getByTestId('table-notes'));
     expect(await screen.findByTestId('data-table-screen')).toBeTruthy();
     expect(screen.getByTestId('export-notes')).toBeTruthy();
     expect(screen.getByTestId('select-notes')).toBeTruthy();
-    // 没有文件字段的表没有附件的设置。
+    // Tables without file fields have no attachment settings.
     expect(screen.queryByTestId('read-attachments-notes')).toBeNull();
 
     await act(() => router.back());
@@ -136,7 +138,7 @@ describe('Data page', () => {
     const labels = screen.getAllByText(/^(主页|健身|数据表)$/).map((n) => n.props.children);
     expect(labels).toEqual(['主页', '健身']);
     expect(screen.getByTestId('table-runs')).toHaveTextContent(/^跑步0 条记录›$/);
-    // 最近删除和更多在表的上面，表再多也在第一屏（D-615）。
+    // Trash and more appear above tables, keeping tables on the first screen no matter how many there are (D-615).
     const order = screen
       .getAllByTestId(/^(data-deleted|data-more|table-notes|table-runs)$/)
       .map((n) => n.props.testID);

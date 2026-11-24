@@ -54,7 +54,7 @@ import {
 } from './helpers';
 import { OCR_IMPLS } from './ocr';
 
-// PDF 动作的实现：字节处理全部在 packages/tool-pdf（pdf-lib），这里只负责读写临时文件。
+// Implementation of PDF actions: byte processing is entirely in packages/tool-pdf (pdf-lib), while this file only handles reading and writing temporary files.
 
 type Impl = ActionImpl<RunServices>;
 type Ctx = Parameters<Impl>[2];
@@ -62,10 +62,10 @@ type Ctx = Parameters<Impl>[2];
 const MB = 1024 * 1024;
 const fileName = (item: RunItem) => `${item.name}.${item.ext}`;
 
-// pdfError / guard 在 ../pdf-errors（存储也用）；这里照旧导出，其他动作文件还是从 ./pdf 引。
+// pdfError / guard are in ../pdf-errors (used by storage as well); exported here as usual, and other action files still import them from ./pdf.
 export { guard, pdfError };
 
-/** 文件已经打开之后出的错：PDF 自己的问题照常说明，其他的照实报出来（不说成「文件可能已损坏」）。 */
+/** Errors occurring after the file is already open: explain PDF-specific issues as usual, and report others as they are (do not label them as "file may be corrupted"). */
 function arrangeError(e: unknown): unknown {
   if (e instanceof PdfError || e instanceof RunError || e instanceof RunCancelled) return e;
   return new RunError('unexpected', { detail: String(e instanceof Error ? e.message : e) });
@@ -80,7 +80,7 @@ async function arranged(name: string, fn: () => Promise<Uint8Array>): Promise<Ui
   }
 }
 
-/** 输出一个 PDF 临时文件。 */
+/** Output a temporary PDF file. */
 export async function writePdf(ctx: Ctx, bytes: Uint8Array, name: string): Promise<RunItem> {
   const pages = await pageInfo(bytes);
   return writeItem(ctx.services, bytes, {
@@ -91,7 +91,7 @@ export async function writePdf(ctx: Ctx, bytes: Uint8Array, name: string): Promi
   });
 }
 
-/** 对每个 PDF 做同一件事。 */
+/** Perform the same operation on each PDF. */
 type AnnotateTool = ImageAnnotation['kind'] | 'note';
 
 async function eachPdf(
@@ -114,13 +114,15 @@ function ruleOf(params: Record<string, unknown>): PageRule {
   return params.rule === 'range' ? { range: String(params.range) } : (params.rule as PageRule);
 }
 
-/** 图片的 JPEG / PNG 字节：pdf-lib 只能嵌入这两种；HEIC、WebP 和很大的 PNG 先转成 JPEG。 */
-/** 文字层识别用的西欧语言（D-195）。 */
+/** JPEG / PNG bytes of images: pdf-lib can only embed these two formats; HEIC, WebP, and very large PNGs are first converted to JPEG. */
+/** Western European languages used for text layer recognition (D-195). */
 const LATIN_TEXT_LAYER = ['en-US', 'fr-FR', 'de-DE', 'es-ES', 'it-IT', 'pt-BR'] as const;
 
 /**
- * 文字层识别用的语言（D-266）：手机的语言列表或界面语言里有中文、日文、韩文时先认它（附带英文，
- * 这些识别器也认拉丁字母），写进 PDF 用无字形字体；没有时认西欧语言。第一种必须是系统支持的。
+ * Languages used for text layer recognition (D-266): if Chinese, Japanese, or Korean is present
+ * in the device's language list or UI language, prioritize it (along with English, as these
+ * recognizers also recognize Latin characters) and write to the PDF using a glyphless font;
+ * otherwise, use Western European languages. The first language must be supported by the system.
  */
 export function textLayerLanguages(
   locale: Locale,
@@ -184,7 +186,7 @@ async function imageBytes(
 
 const isImage = (item: RunItem) => item.mimeType.startsWith('image/');
 
-/** 页面上的位置 → stampImage 用的左上角比例坐标。 */
+/** Position on page -> top-left proportional coordinates used by stampImage. */
 function stampBox(
   position: string,
   page: { width: number; height: number },
@@ -209,8 +211,10 @@ function stampBox(
 }
 
 /**
- * 走 PDF 预览包（WebView + pdf.js）的动作要把整份文件塞进 WebView：模拟器里实测内存约是文件的 20–30 倍
- * （49 MB 约 1.9 GB，99 MB 约 2.8 GB），远高于只用 pdf-lib 的动作，所以仍按 50 MB 收，不跟着 PDF 的 100 MB 走（D-601）。
+ * Actions using the PDF preview package (WebView + pdf.js) must fit the entire document into the
+ * WebView: measured memory in the simulator is about 20–30x the file size (~49 MB is ~1.9 GB, ~99
+ * MB is ~2.8 GB), which is much higher than actions using only pdf-lib. Therefore, it is still
+ * capped at 50 MB rather than following the PDF limit of 100 MB (D-601).
  */
 function checkViewSize(item: RunItem): void {
   if (item.size > FILE_LIMITS.maxFileBytes) {
@@ -218,7 +222,7 @@ function checkViewSize(item: RunItem): void {
   }
 }
 
-/** 用 PDF 预览包把页面渲染成 JPEG（App 里的 WebView + pdf.js）。返回本次运行的临时图片。 */
+/** Render pages into JPEGs using the PDF preview package (WebView + pdf.js in the app). Returns temporary images for the current run. */
 export async function renderPages(
   ctx: Ctx,
   item: RunItem,
@@ -261,7 +265,7 @@ export async function renderPages(
   return out;
 }
 
-/** 分组（D-243）：不分组时是一组，名字是第一个文件的名字（和以前一样）。 */
+/** Grouping (D-243): when ungrouped, treated as a single group named after the first file (same as before). */
 function groupsOf(input: Parameters<Impl>[0], params: Record<string, unknown>, ctx: Ctx) {
   return groupItems(
     fileItems(input),
@@ -271,7 +275,7 @@ function groupsOf(input: Parameters<Impl>[0], params: Record<string, unknown>, c
   );
 }
 
-/** 一组 PDF 和图片按顺序合成一个 PDF。 */
+/** Merge a group of PDFs and images into a single PDF in order. */
 async function mergeGroup(
   ctx: Ctx,
   items: RunItem[],
@@ -301,19 +305,22 @@ async function mergeGroup(
     fit: 'contain',
   };
   const result = await guard('', () =>
-    // 只有 PDF 时沿用原来的合并（至少 2 个）。
+    // When only PDFs are present, retain the original merging behavior (at least 2).
     allPdf ? mergePdfs(inputs) : mergeDocuments(inputs, pageOpts),
   );
   return writePdf(ctx, result.bytes, name);
 }
 
 /**
- * 一页的文字层（D-267）：先在增强前的图上认（更准），框换算到这张图上；
- * 增强前的图读不了，或者宽高比对不上（例如方向不同）时，在这张图上认。
+ * Single-page text layer (D-267): recognize on the pre-enhanced image first (more accurate) and
+ * map bounding boxes to this image; if the pre-enhanced image cannot be read or aspect ratios do
+ * not match (e.g., different orientation), recognize on this image.
  */
 /**
- * 页面预览上认出的行（预览图的点）：标注时新写的字照最近的一行定字号，签名照它定高度（2026-11-09 用户测试：
- * 默认的字和签名比合同正文大好几倍）。只在本机认，不存不发；认不出、没有文字识别时是空的。
+ * Lines recognized on the page preview (preview image points): when annotating, new text uses the
+ * nearest line to determine font size, and signatures use it for height (2026-11-09 user test:
+ * default text and signatures were several times larger than contract body text). Recognized
+ * locally only, never stored or sent; empty if recognition fails or OCR is unavailable.
  */
 function previewLines(ctx: Ctx, preview: RunItem) {
   const vision = ctx.services.files.vision;
@@ -354,13 +361,13 @@ async function pageTextLayer(
         };
       }
     } catch {
-      // 用这张图认。
+      // Recognize using this image.
     }
   }
   return vision.recognizeLines(item.uri, languages);
 }
 
-/** 一组图片排成一个 PDF；大小上限对这一个 PDF 算（D-073）。 */
+/** Arrange a group of images into a PDF; size limit is calculated for this single PDF (D-073). */
 async function imagesPdf(
   ctx: Ctx,
   items: RunItem[],
@@ -381,7 +388,7 @@ async function imagesPdf(
   };
   let images: ImageInput[] = [];
   if (maxMB > 0) {
-    // 「PDF ≤ X MB」：所有图片共用一个质量和缩放，生成前按总大小搜索（D-073）。
+    // "PDF <= X MB": all images share a single quality and scale setting, searched by total size prior to generation (D-073).
     const target = maxMB * MB;
     const result = await searchSharedQuality({
       targetBytes: target,
@@ -408,26 +415,26 @@ async function imagesPdf(
       ctx.progress(i + 1, items.length);
     }
   }
-  // 能搜索的 PDF（D-195）：每页识别文字和位置。没有系统自带的识别（Expo Go）时不加；某一页识别失败只是那页不加。
+  // Searchable PDF (D-195): recognize text and positions for each page. Omitted when system built-in recognition (Expo Go) is unavailable; failure on a specific page simply omits text for that page.
   const vision = textLayer ? ctx.services.files.vision : null;
   if (vision) {
     const languages = textLayerLanguages(ctx.locale, deviceLanguageTags());
     for (const [i, item] of items.entries()) {
       ctx.throwIfCancelled();
-      // 中日韩识别失败（旧系统不支持）时再按西欧语言认一次；还失败就这一页不加文字层。
+      // If CJK recognition fails (unsupported on old systems), retry with Western European languages; if it still fails, omit the text layer for this page.
       for (const attempt of languages === LATIN_TEXT_LAYER
         ? [languages]
         : [languages, LATIN_TEXT_LAYER]) {
         try {
           const layer = await pageTextLayer(vision, item, attempt);
-          // 中文按识别语言整理（D-268）：简体换掉混进来的繁体字，中文用全角标点。
+          // Organize Chinese by recognized language (D-268): simplify any stray traditional characters, and use full-width punctuation for Chinese.
           const kind =
             attempt[0] === 'zh-Hans' ? 'zh-Hans' : attempt[0] === 'zh-Hant' ? 'zh-Hant' : 'other';
           const lines = layer.lines.map((l) => ({ ...l, text: polishOcrText(l.text, kind) }));
           images[i] = { ...images[i]!, text: { ...layer, lines } };
           break;
         } catch {
-          // 换下一组语言。
+          // Move to the next language group.
         }
       }
       ctx.progress(i + 1, items.length);
@@ -439,7 +446,7 @@ async function imagesPdf(
 
 export const PDF_IMPLS: Record<string, Impl> = {
   async 'pdf.merge'(input, params, ctx) {
-    // D-243：分组时每组合成一个 PDF；分出来只有一个 PDF 的组原样留着（合并至少要 2 个，不分组时照旧报错）。
+    // D-243: when grouped, merge each group into a PDF; groups resulting in a single PDF are left as-is (merging requires at least 2 files; throws an error as usual when ungrouped).
     const grouped = params.group !== undefined && params.group !== 'none';
     const out: RunItem[] = [];
     for (const group of groupsOf(input, params, ctx)) {
@@ -470,7 +477,7 @@ export const PDF_IMPLS: Record<string, Impl> = {
       ctx.throwIfCancelled();
       const bytes = await readItem(ctx.services, item);
       const pages = await guard(fileName(item), () => pageInfo(bytes));
-      // 装了 PDF 预览包就显示缩略图；没装也能按页码整理（不会为此弹出下载）。
+      // Display thumbnails if the PDF preview package is installed; otherwise, organize by page number without triggering a download prompt.
       let thumbnails: string[] | undefined;
       if (ctx.services.packs && (await ctx.services.packs.isInstalled('pdfview'))) {
         try {
@@ -481,7 +488,7 @@ export const PDF_IMPLS: Record<string, Impl> = {
           thumbnails = undefined;
         }
       }
-      // 整理界面出的错不是文件坏了，照实报出来（不经过 guard）。
+      // Errors from the organizing UI are not file corruption issues and are reported as-is (bypassing guard).
       let chosen;
       try {
         chosen = await ctx.services.ui.open('pages', {
@@ -493,7 +500,7 @@ export const PDF_IMPLS: Record<string, Impl> = {
         throw arrangeError(e);
       }
       if (!chosen) throw new RunCancelled();
-      // 什么都没改（最常见：合并后直接点「完成」）就原样留着，不再把每一页复制一遍。
+      // If nothing changed (most common: tapping "Done" immediately after merging), leave it as-is without re-copying every page.
       const unchanged =
         chosen.length === pages.length && chosen.every((p, j) => p.index === j && !p.rotate);
       const result = unchanged
@@ -602,7 +609,7 @@ export const PDF_IMPLS: Record<string, Impl> = {
       throw new RunError('unreadable', { name: fileName(item), detail: String(e) });
     }
     const pages = result.pages.map((p) => fixCjkRadicals(p).trim());
-    // 扫描件（或扫描的那几页）没有文字层：把这几页画成图，用文字识别读（创始人 2026-10-31）。
+    // Scans (or scanned pages) lacking a text layer: render these pages as images and read them using OCR (founder 2026-10-31).
     const blank = pages.flatMap((p, i) => (p ? [] : [i]));
     if (blank.length > 0) {
       try {
@@ -622,12 +629,12 @@ export const PDF_IMPLS: Record<string, Impl> = {
         }
       } catch (e) {
         if (e instanceof RunCancelled) throw e;
-        // 画不出来或认不了时照旧：只交出有文字层的页。
+        // If rendering or recognition fails, behave as usual: output only pages that have a text layer.
       }
     }
     const text = pages.filter(Boolean).join('\n\n');
     if (!text) throw new RunError('notFound', { name: fileName(item) });
-    // 文字只留在本机，绝不发给 AI（D-036）。
+    // Text remains strictly local and is never sent to the AI (D-036).
     return { type: 'text', text, name: item.name };
   },
 
@@ -647,8 +654,9 @@ export const PDF_IMPLS: Record<string, Impl> = {
         if (!preview || marks.length === 0) continue;
         ctx.throwIfCancelled();
         if (marks.some((m) => m.kind === 'erase' || m.kind === 'mosaic')) {
-          // 擦除、打码：盖一层只是挡住，下面的文字还能选中复制。这一页换成一张画好的图
-          // （页面文字没有了），用更大的图画，免得放大后发虚。
+          // Erase, redact: overlay a mask that simply blocks content, while underlying text can
+          // still be selected and copied. Replace this page with a rendered image (page text is
+          // removed), drawn at a higher resolution to prevent blurriness when zoomed in.
           const [big] = await renderPages(ctx, item, { maxSide: 2400, quality: 0.9, pages: [i] });
           if (!big) throw new RunError('unreadable', { name: fileName(item) });
           const k = big.width! / preview.width!;
@@ -666,7 +674,7 @@ export const PDF_IMPLS: Record<string, Impl> = {
           });
           continue;
         }
-        // 其余的标注：给这一页盖一层和页面一样大的透明图层，原来的文字和页面不动。
+        // Other annotations: overlay a transparent layer of the same size as the page, leaving original text and page intact.
         const layer = await drawMarks(
           ctx,
           preview.name,
@@ -708,7 +716,7 @@ export const PDF_IMPLS: Record<string, Impl> = {
     return eachPdf(input, ctx, async (bytes, item) => {
       const fields = await listFormFields(bytes);
       if (fields.filter((f) => !f.readOnly && f.type !== 'other').length === 0) {
-        // 签回表格：有的 PDF 只需要签名，没有表单就原样交给下一步。
+        // Sign returning forms: some PDFs only require a signature; if there are no form fields, pass them to the next step as-is.
         if (params.whenNoFields === 'skip') return bytes;
         throw new RunError('noFormFields', { name: fileName(item) });
       }
@@ -741,7 +749,7 @@ export const PDF_IMPLS: Record<string, Impl> = {
           pages,
         });
       }
-      // 标准字体写不了中文和 emoji：用系统字体画成图片再盖上去（D-073）。
+      // Standard fonts cannot render Chinese and emoji: render them into images using system fonts and overlay them (D-073).
       const scale = 3;
       const image = await ctx.services.files.renderText(text, {
         fontSize: fontSize * scale,

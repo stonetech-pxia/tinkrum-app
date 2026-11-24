@@ -6,10 +6,11 @@ import { THEME_PRESETS } from './presets';
 import { apply, fromV33, registry, v33Fixture } from './test-helpers';
 import { DEFAULT_THEME } from './theme';
 
-// v33 的 39 个修改操作在 v34 怎么写（D-371）：每个旧操作一个例子。
-// 写法：一份 v33 的配置 before，按 v33 那个操作的效果改出 v33 的 after（edit）；
-// 把 before 迁移到 v34 再执行 v34 的操作，结果应该和 after 迁移到 v34 一模一样。
-// 这样每个例子同时证明：新操作做到了旧操作的事，而且和迁移对得上。
+// How v33's 39 modification operations are written in v34 (D-371): one example per old operation.
+// Method: a v33 config before, modified via the v33 operation effect to produce v33 after (edit);
+// migrate before to v34 and execute the v34 operation, the result should be identical to after
+// migrated to v34. This proves for each example that the new operation achieves the old operation's
+// effect and matches migration.
 
 type Json = Record<string, any>;
 
@@ -24,7 +25,7 @@ const shareIt = {
   ],
 };
 
-/** v33：默认首页 + 一张笔记表和它的页面、一个快捷操作、一个提醒。 */
+/** v33: Default home screen + a notes table with its page, a quick action, and a reminder. */
 function base33(): Json {
   const d = clone(v33Fixture('default-zh')) as Json;
   d.collections = [
@@ -108,12 +109,12 @@ const comp = (d: Json, id: string): Json => {
 };
 
 interface Case {
-  /** v33 的操作（写出来便于对照）。 */
+  /** v33 operations (written out for easy comparison). */
   v33: Json;
-  /** 先在 v33 的配置上准备一下（例如先放一个入口）。 */
+  /** Prepare on the v33 config first (e.g., adding an entry point first). */
   prep?: (d: Json) => void;
   v34: Op[];
-  /** v33 那个操作对配置的效果。 */
+  /** Effect of the v33 operation on the config. */
   edit: (d: Json) => void;
 }
 
@@ -180,7 +181,7 @@ const CASES: Case[] = [
       }),
   },
   {
-    // 连带：指向它的入口、浮动入口，以及要打开它的提醒。
+    // Cascading: entry points pointing to it, floating entry points, and reminders opening it.
     v33: { op: 'removePage', pageId: 'notes-page' },
     prep: (d) => {
       d.pages[0].components.push({
@@ -208,7 +209,7 @@ const CASES: Case[] = [
     },
   },
   {
-    // 一个 props 补丁，v34 按 show / source 分开合并。
+    // A props patch, merged separately by v34 based on show / source.
     v33: {
       op: 'setComponentProps',
       pageId: 'notes-page',
@@ -304,7 +305,7 @@ const CASES: Case[] = [
     edit: (d) => d.workflows.push({ ...clone(shareIt), id: 'share-2' }),
   },
   {
-    // 连带：运行它的卡片、打开它的入口；提醒要打开它时提醒也移除。
+    // Cascading: cards running it, entry points opening it; remove the reminder when it opens it.
     v33: { op: 'removeWorkflow', workflowId: 'share-it' },
     prep: (d) => {
       d.pages[0].components.push(
@@ -422,7 +423,7 @@ const CASES: Case[] = [
     edit: (d) => d.collections[0].fields.unshift(d.collections[0].fields.pop()),
   },
   {
-    // 连带：用到这个字段的行按钮去掉（D-304）。
+    // Cascading: remove row buttons using this field (D-304).
     v33: { op: 'removeField', collectionId: 'notes', fieldId: 'kind' },
     v34: [{ op: 'removeData', table: 'notes', field: 'kind' }],
     edit: (d) => {
@@ -431,7 +432,7 @@ const CASES: Case[] = [
     },
   },
   {
-    // 连带：读它的块（列表、表单、分组里的数字）。
+    // Cascading: blocks reading it (lists, forms, numbers in groupings).
     v33: { op: 'removeCollection', collectionId: 'notes' },
     v34: [{ op: 'removeData', table: 'notes' }],
     edit: (d) => {

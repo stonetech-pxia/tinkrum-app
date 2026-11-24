@@ -21,9 +21,9 @@ import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import type { NotificationPermission, NotificationPlatform } from './platform';
 import type { ReminderActionResult } from './reminder-actions';
 
-// 提醒（D-251）：配置或记录有变化时重新排本地通知；点提醒只打开页面或快捷操作，绝不运行。
+// Reminder (D-251): reschedule local notifications when config or records change; tapping reminder only opens page or quick action, never runs it.
 
-/** 通知权限的状态（设置 → 提醒 显示「通知已关闭」用）。 */
+/** Notification permission status (used for displaying "Notifications disabled" in Settings -> Reminders). */
 export const useNotificationState = create<{ permission: NotificationPermission | null }>(() => ({
   permission: null,
 }));
@@ -31,9 +31,12 @@ export const useNotificationState = create<{ permission: NotificationPermission 
 let syncing: Promise<unknown> = Promise.resolve();
 
 /**
- * 重新排提醒。没有开着的提醒时只清掉已排的，不问权限；第一次真的有提醒要排时才弹系统的权限请求，
- * 用户拒绝了就不排（设置页说明怎么打开）。返回权限状态（没有提醒时为 null）。
- * 一次排完再排下一次：界面和提醒按钮（D-318）可能同时要重排，交错着取消和排会留下旧的通知。
+ * Reschedule reminders. When there are no active reminders, only clear scheduled ones without
+ * asking for permission; pop up system permission request only the first time a reminder is
+ * actually scheduled, and if user declines, do not schedule (Settings page explains how to
+ * enable). Returns permission status (null when no reminders). Complete one batch before the
+ * next: UI and reminder buttons (D-318) might request rescheduling simultaneously, and
+ * interleaving cancellations and scheduling will leave old notifications.
  */
 export function syncReminders(
   platform: NotificationPlatform,
@@ -62,7 +65,7 @@ async function sync(
   let permission = await platform.permission();
   if (permission === 'undetermined') permission = (await platform.request()) ? 'granted' : 'denied';
   if (permission !== 'granted') return permission;
-  // 算好的记录：日程的「上次完成」可能是汇总，unless 的筛选可能用查找来的值（D-316、D-317）。
+  // Calculated records: "Last completed" for schedules might be aggregates, and unless filters might use lookup values (D-316, D-317).
   const records = new Map<string, DataRecord[]>();
   for (const id of reminderCollections(config)) {
     const collection = config.data.tables.find((c) => c.id === id);
@@ -81,24 +84,24 @@ async function sync(
   return permission;
 }
 
-/** 配置里的提醒、用到的表或记录变了就重排（D-251）。 */
+/** Reschedule when reminders in config, referenced tables, or records change (D-251). */
 export function useReminderSync(platform: NotificationPlatform | null) {
   const { repo, locale } = useWorkspaceContext();
   const config = useWorkspace((s) => s.config);
   const recordsVersion = useWorkspace((s) => s.recordsVersion);
-  // remindersOf 每次给新数组：依赖 tools（提醒在里面）。
+  // remindersOf returns a new array each time: depends on tools (reminders reside inside).
   const tools = config?.tools;
   useEffect(() => {
     if (!platform || !config) return;
     syncReminders(platform, config, (id) => repo.listRecords(id), locale, new Date())
       .then((permission) => permission && useNotificationState.setState({ permission }))
       .catch(() => undefined);
-    // 只在提醒的设置、用到的表或记录变了时重排（config 里其他部分变了不用）。
+    // Reschedule only when reminder settings, referenced tables, or records change (other parts of config changing do not trigger it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform, tools, config?.data.tables, recordsVersion, repo, locale]);
 }
 
-/** 点了提醒去哪里：快捷操作去它的提醒页（不是运行页，运行页一打开就开始运行），其他照常打开。 */
+/** Where to go when tapping a reminder: quick actions go to their reminder page (not execution page, which runs immediately upon opening), others open normally. */
 export function reminderDestination(
   opens: ReminderTarget,
 ): { kind: 'workflow'; workflowId: string } | { kind: 'target'; target: NavTarget } {
@@ -108,7 +111,7 @@ export function reminderDestination(
     : { kind: 'target', target: opens as NavTarget };
 }
 
-/** 点了提醒：快捷操作打开它的提醒页（用户自己点「开始」），页面和系统入口照常打开。 */
+/** Tapped a reminder: quick actions open their reminder page (user taps "Start"), pages and system entry points open normally. */
 export function useReminderOpen(platform: NotificationPlatform | null) {
   const router = useRouter();
   const navigate = useNavigate();
@@ -125,8 +128,8 @@ export function useReminderOpen(platform: NotificationPlatform | null) {
 }
 
 /**
- * 界面开着时点了提醒上的「完成」（D-318）：记录列表刷新，提示一下写了哪条。onAction 是入口里
- * background.ts 的 onReminderAction。
+ * Tapped "Done" on a reminder while UI is active (D-318): refresh record list, show feedback on
+ * which item was written. onAction is background.ts's onReminderAction in entry points.
  */
 export function useReminderActionFeedback(
   onAction: (listener: (result: ReminderActionResult) => void) => () => void,

@@ -1,9 +1,10 @@
 import type { DataRecord, WorkspaceConfig } from '@morph/core';
 
-// 本地存储契约（M1/M2 以设备本地为唯一权威来源，§5.4）。
-// SQLite 实现用于 App，内存实现用于测试；两者必须满足同样的语义。
+// Local storage contract (M1/M2 treating device-local as the sole authoritative source, §5.4).
+// SQLite implementation is used for the app, memory implementation for tests; both must satisfy
+// identical semantics.
 
-/** applyRecordWrites 的一条写入。 */
+/** A single write operation for applyRecordWrites. */
 export type RecordWrite =
   | { kind: 'insert'; record: DataRecord }
   | {
@@ -11,12 +12,13 @@ export type RecordWrite =
       id: string;
       values: Record<string, unknown>;
       updatedAt: number;
-      /** 给了就要求现在存的还是这份，否则整批不做。 */
+      /** If provided, requires the current stored value to still match this version, otherwise rejects the entire batch. */
       expected?: Record<string, unknown>;
     }
   /**
-   * 撤销点一下新建的那条（D-566、D-567）：真删，不进「最近删除」（是工具写的值，不是用户输入的内容，D-303）。
-   * 要求现在存的还是 expected（新建时的样子），否则整批不做。
+   * Undo a newly created record (D-566, D-567): hard delete, bypassing the Recycle Bin (it is a
+   * tool-generated value, not user-input content, D-303). Requires the current stored value to
+   * still match expected (its state upon creation), otherwise rejects the entire batch.
    */
   | { kind: 'remove'; id: string; expected: Record<string, unknown> };
 
@@ -26,7 +28,7 @@ export interface RevisionRecord {
   id: number;
   parentId: number | null;
   schemaVersion: number;
-  /** 原始 JSON：读取后必须经过 prepareSnapshot（迁移 + 校验）才能使用。 */
+  /** Raw JSON: must pass through prepareSnapshot (migration + validation) before use after reading. */
   config: unknown;
   source: RevisionSource;
   summary: string;
@@ -58,7 +60,7 @@ export class RevisionConflictError extends Error {
 }
 
 export interface CommitInput {
-  /** 生成这次修改时看到的 head；与当前 head 不一致时提交失败（§7D baseRevision）。 */
+  /** Head revision seen when generating this change; commit fails if it differs from the current head (§7D baseRevision). */
   baseId: number | null;
   config: WorkspaceConfig;
   source: RevisionSource;
@@ -66,15 +68,16 @@ export interface CommitInput {
 }
 
 /**
- * 用户文件（§6 UserAsset）：归属工作空间，不随版本恢复，回滚和卸载工具都不会删除；
- * 只有用户在「设置 → 存储空间」里删除（D-264）。
+ * User file (§6 UserAsset): belongs to the workspace, not restored with version rollbacks, and
+ * neither rollbacks nor tool uninstalls will delete it; can only be deleted by the user in
+ * Settings -> Storage (D-264).
  */
 export interface AssetRecord {
   id: string;
   name: string;
   mimeType: string;
   size: number;
-  /** 相对于 App 文档目录的路径。 */
+  /** Path relative to the app documents directory. */
   path: string;
   source: 'picked' | 'generated';
   createdAt: number;
@@ -82,7 +85,7 @@ export interface AssetRecord {
 
 export type ToolRunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 
-/** 工作流执行记录（§6 ToolRun）：只记录状态和错误代码，不记录文件内容。 */
+/** Workflow execution record (§6 ToolRun): records status and error codes only, excluding file contents. */
 export interface ToolRunRecord {
   id: number;
   toolId: string;
@@ -95,22 +98,23 @@ export interface ToolRunRecord {
   finishedAt: number | null;
 }
 
-/** 用户数据的一条记录（docs/DATA_DESIGN.md）。不属于任何版本：撤销、恢复都不会改动它。 */
+/** A single user data record (docs/DATA_DESIGN.md). Belongs to no version: undo and restore operations never modify it. */
 export interface StoredRecord extends DataRecord {
-  /** 软删除时间；null 表示正常。 */
+  /** Soft deletion timestamp; null indicates active. */
   deletedAt: number | null;
 }
 
 /**
- * 用户保存的预设（D-410）：一份内核配置，不带记录和文件引用。只存在本机，不在配置里，
- * 所以不会跟着配置发给云端 AI（底线 1、2）。
+ * User-saved preset (D-410): a kernel configuration snapshot without records or file references.
+ * Exists locally only and is not part of configuration, so it is never sent to cloud AI
+ * (Invariants 1, 2).
  */
 export interface SavedPreset {
   id: string;
   name: string;
   createdAt: number;
   schemaVersion: number;
-  /** 原始 JSON：可能是旧版本，读取后必须经过 preparePreset（迁移 + 校验）才能使用。 */
+  /** Raw JSON: may be an older version; must pass through preparePreset (migration + validation) before use after reading. */
   config: unknown;
 }
 
@@ -119,10 +123,10 @@ export type SucceededRuns = Map<string, { count: number; lastAt: number }>;
 export interface WorkspaceRepo {
   getHead(): Promise<RevisionRecord | null>;
   getRevision(id: number): Promise<RevisionRecord | null>;
-  /** 最新的在前。 */
-  /** 从新到旧取 limit 个版本；beforeId 给了就只取比它更早的（翻页：下一页用上一页最后一个的 id）。 */
+  /** Retrieve up to limit versions from newest to oldest; if beforeId is provided, retrieve only versions older than it (pagination: next page uses the ID of the last item on the previous page). */
+  /** Retrieve up to limit versions from newest to oldest; if beforeId is provided, retrieve only versions older than it (pagination: next page uses the ID of the last item on the previous page). */
   listRevisions(limit: number, beforeId?: number): Promise<RevisionRecord[]>;
-  /** 原子操作：检查 head、写入新 revision、移动 head。冲突时抛 RevisionConflictError。 */
+  /** Atomic operation: check head, write new revision, advance head. Throws RevisionConflictError on conflict. */
   commitRevision(input: CommitInput): Promise<RevisionRecord>;
 
   createChangeRequest(input: {
@@ -140,20 +144,22 @@ export interface WorkspaceRepo {
 
   addAsset(asset: AssetRecord): Promise<void>;
   getAsset(id: string): Promise<AssetRecord | null>;
-  /** 最新的在前。 */
+  /** Retrieve up to limit versions from newest to oldest; if beforeId is provided, retrieve only versions older than it (pagination: next page uses the ID of the last item on the previous page). */
   listAssets(): Promise<AssetRecord[]>;
   /**
-   * 永久删除一个用户文件的记录和它的授权（「设置 → 存储空间」，D-264）；运行记录里指向它的结果清空。
-   * 磁盘上的文件由 FilePlatform.removeAssetFile 删（storage/user-files.ts 的 deleteUserFiles 两步一起做）。
+   * Permanently delete a user file record and its permissions (Settings -> Storage, D-264);
+   * clears references in execution logs. The physical file on disk is removed by
+   * FilePlatform.removeAssetFile (deleteUserFiles in storage/user-files.ts performs both steps
+   * together).
    */
   deleteAsset(id: string): Promise<void>;
-  /** 改用户看到的文件名（全部文件页面的「重命名」）：磁盘上的文件和旁边的缩略图、中间格式不动。 */
+  /** Rename a user-visible file name (Rename in all files view): physical files on disk, thumbnails, and intermediate formats remain unchanged. */
   renameAsset(id: string, name: string): Promise<void>;
 
-  /** AssetGrant（§7G）：工具只能读取授权给它的文件。 */
+  /** AssetGrant (§7G): tools can only read files explicitly granted to them. */
   grantAsset(toolId: string, assetId: string): Promise<void>;
   hasGrant(toolId: string, assetId: string): Promise<boolean>;
-  /** 卸载工具时只删除授权，不删除文件。 */
+  /** Uninstalling a tool removes its permissions only, without deleting files. */
   revokeToolGrants(toolId: string): Promise<void>;
 
   startToolRun(input: { toolId: string; workflowId: string; revisionId: number }): Promise<number>;
@@ -164,32 +170,35 @@ export interface WorkspaceRepo {
   listToolRuns(limit: number): Promise<ToolRunRecord[]>;
   countSucceededRuns(): Promise<SucceededRuns>;
 
-  // ---- 设备上的小设置（不属于配置、不进版本，例如使用习惯的统计 D-127）----
+  // ---- Device-local settings (not part of configuration, excluded from versioning, e.g., usage statistics D-127) ----
   getMeta(key: string): Promise<string | null>;
   setMeta(key: string, value: string): Promise<void>;
 
-  // ---- 保存的预设（D-410）：只由用户在「设置 → 我的预设」里操作 ----
-  /** 最新的在前。 */
+  // ---- Saved presets (D-410): managed exclusively by the user in Settings -> My Presets ----
+  /** Retrieve up to limit versions from newest to oldest; if beforeId is provided, retrieve only versions older than it (pagination: next page uses the ID of the last item on the previous page). */
   listPresets(): Promise<SavedPreset[]>;
   getPreset(id: string): Promise<SavedPreset | null>;
   insertPreset(preset: SavedPreset): Promise<void>;
   renamePreset(id: string, name: string): Promise<void>;
   deletePreset(id: string): Promise<void>;
 
-  // ---- 用户记录：只由用户在页面上的操作读写，从不经过 AI ----
-  /** 某张表未删除的记录（顺序不保证，由调用方排序）。 */
+  // ---- User records: read and written solely via user page actions, never processed by AI ----
+  /** Active (non-deleted) records in a given table (order is not guaranteed, sorted by caller). */
   listRecords(collectionId: string): Promise<DataRecord[]>;
   /**
-   * 只读一段日子的记录（月历一个月，D-305）：by 是日期或日期时间字段时按存着的文字 from ≤ 值 < until，
-   * 是 createdAt / updatedAt 时按毫秒 fromMs ≤ 时间 < untilMs。
+   * Read records within a date range only (calendar month view, D-305): when querying by date or
+   * datetime fields, matches stored text via from <= value < until; when querying by createdAt or
+   * updatedAt, matches timestamps via fromMs <= time < untilMs.
    */
   listRecordsInRange(collectionId: string, range: RecordRange): Promise<DataRecord[]>;
   getRecord(id: string): Promise<StoredRecord | null>;
   insertRecord(record: DataRecord): Promise<void>;
   updateRecord(id: string, values: Record<string, unknown>, updatedAt: number): Promise<void>;
   /**
-   * 条件写入（R05）：记录现在存的值还是 expected（表单打开时的那份）才写；已经被别处改过返回 'conflict'，
-   * 不写；不存在或在「最近删除」里返回 'gone'。判断和写入在同一个事务里，中间插不进别的写入。
+   * Conditional write (R05): writes only if the currently stored record value still matches
+   * expected (the state when the form was opened); returns 'conflict' and skips writing if
+   * modified elsewhere; returns 'gone' if missing or in the Recycle Bin. Check and write occur
+   * within a single transaction without interleaving writes.
    */
   updateRecordIfUnchanged(
     id: string,
@@ -198,59 +207,63 @@ export interface WorkspaceRepo {
     updatedAt: number,
   ): Promise<'updated' | 'conflict' | 'gone'>;
   /**
-   * 几条记录的写入（和一个可选的标记）在同一个事务里做完，要么全做、要么全不做（R06、R09）。
-   * 某条写不进去就抛错，前面的也不生效；update 带了 expected 的，现在存的不是这份（改过了、删了）
-   * 就整批不做，返回 'conflict'。meta 是和写入一起生效的标记（例如「这次点击处理过了」）。
+   * Writes multiple record updates (and an optional flag) atomically within a single
+   * transaction—all succeed or all fail (R06, R09). Throws an error and rolls back prior writes
+   * if any single write fails; returns 'conflict' if expected values mismatch (modified or
+   * deleted) for updates carrying an expected state, rejecting the entire batch. meta is a flag
+   * that takes effect alongside the writes (e.g., "this tap has been processed").
    */
   applyRecordWrites(
     writes: readonly RecordWrite[],
     meta?: { key: string; value: string },
   ): Promise<'applied' | 'conflict'>;
-  /** 软删除：可以撤销，「最近删除」里保留 30 天。 */
+  /** Soft delete: undoable, retained in the Recycle Bin for 30 days. */
   deleteRecord(id: string, deletedAt: number): Promise<void>;
   restoreRecord(id: string): Promise<void>;
-  /** 最近删除的在前。 */
+  /** Recently deleted items first. */
   listDeletedRecords(): Promise<StoredRecord[]>;
-  /** 永久清除在 before 之前软删除的记录，返回清除的数量。 */
+  /** Permanently purge records soft-deleted before the specified timestamp, returning the count of cleared records. */
   purgeDeletedRecords(before: number): Promise<number>;
-  /** 每张表未删除的记录数（包括已经不在配置里的表）。 */
+  /** Active (non-deleted) record count per table (including tables no longer present in configuration). */
   countRecords(): Promise<{ collectionId: string; count: number }[]>;
-  /** 用户确认后永久删除一张表的全部记录。 */
+  /** Permanently delete all records of a table upon user confirmation. */
   purgeCollection(collectionId: string): Promise<void>;
 
-  // ---- 从表格文件导入（D-574）：只由用户在「设置 → 数据」里操作 ----
-  /** 这些记录和这一批的记号在同一个事务里写，要么全写、要么全不写。 */
+  // ---- Import from spreadsheet files (D-574): operated exclusively by the user in Settings -> Data ----
+  /** Write these records and the batch marker within a single transaction—all succeed or all fail. */
   importRecords(
     batch: Omit<RecordImport, 'count' | 'present'>,
     records: readonly DataRecord[],
   ): Promise<void>;
-  /** 一张表的导入，最新的在前（present 为 0 的也在，由调用方决定显不显示）。 */
+  /** Imports for a table, newest first (including those with present count of 0, leaving visibility decisions to the caller). */
   listImports(collectionId: string): Promise<RecordImport[]>;
   /**
-   * 撤销一次导入、删除这次导入：这一批里现在还在的记录软删除（进「最近删除」，30 天，和一条条删一样），
-   * 之后改过的也一起；已经删了的不算。返回删了几条。
+   * Undo an import and delete the batch: soft-deletes active records currently in this batch
+   * (moving to Recycle Bin for 30 days, matching individual deletion), including any subsequent
+   * modifications; excludes already deleted records. Returns the number of deleted records.
    */
   deleteImport(id: string, deletedAt: number): Promise<number>;
 }
 
 /**
- * 一次从表格文件导入的一批记录（D-574）：只在本机的数据库里，不在配置里、不随版本恢复，也不发给 AI（底线 1、2、14）。
- * 文件名只是给用户看是哪一次。
+ * A batch of records imported from a spreadsheet file (D-574): stored solely in the local
+ * database, excluded from configuration and version rollbacks, and never sent to AI (Invariants
+ * 1, 2, 14). The file name is solely for user reference regarding the import session.
  */
 export interface RecordImport {
   id: string;
   collectionId: string;
   fileName: string;
-  /** 导入时写了几条。 */
+  /** Number of items written during import. */
   count: number;
-  /** 现在还在的（没删、不在「最近删除」里）几条。 */
+  /** Number of items currently present (not deleted and not in Recycle Bin). */
   present: number;
   createdAt: number;
 }
 
-/** listRecordsInRange 的范围（core 的 monthQueryRange 加上按哪个字段）。 */
+/** Range specification for listRecordsInRange (core's monthQueryRange plus target field specification). */
 export interface RecordRange {
-  /** 跨日记录：只要起止与范围重叠就读取。 */
+  /** Cross-day records: read as long as start and end overlap with the range. */
   endBy?: string | undefined;
   by: string;
   from: string;

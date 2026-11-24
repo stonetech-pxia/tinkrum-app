@@ -1,4 +1,4 @@
-// 网站上的 App 文件检查页用的脚本（D-593）：和 App 导入时同一套检查，在浏览器里跑，不联网。
+// Script used by the app file check page on the website (D-593): the same check suite as app import, running in the browser without network access.
 import {
   BUILTIN_TOOLS,
   appLink,
@@ -14,7 +14,7 @@ const registry = createRegistry(BUILTIN_TOOLS);
 (globalThis as { tinkrumCheckAppFile?: unknown }).tinkrumCheckAppFile = (text: string) =>
   checkHandoffFileText(text, { registry, locale: 'en', now: new Date() });
 
-// /open 与检查页共用检查器，以及 core 中唯一的压缩编码。
+// Shares the checker between /open and inspection pages, along with the sole compression encoding implementation in core.
 Object.assign(globalThis, {
   tinkrumAppLink: appLink,
   tinkrumReadAppLink: readAppLink,

@@ -26,15 +26,16 @@ import {
   boundedText,
 } from './schema';
 
-// 语义化修改操作（§7D），v34 一共 14 个（D-371）：数据 4 个、容器 4 个、工具 4 个、主题、工具包。
-// AI 只能输出这些操作；applyOps（ops.ts）是纯函数，不修改输入，只负责执行和引用检查，完整合法性由
-// validateWorkspace 判定。每个操作一个结构（按 op 区分），同一个操作的几种写法在 refine 里说清楚，
-// 问题文字会发给 AI。
+// Semantic modification operations (§7D), 14 in total in v34 (D-371): 4 data, 4 container, 4 tool,
+// theme, and pack. AI can only output these operations; applyOps (ops.ts) is a pure function that
+// does not mutate inputs, handling execution and reference checks only, while full validity is
+// determined by validateWorkspace. Each operation has a structure (differentiated by op),
+// variations of the same operation are detailed in refine, and error messages are sent to the AI.
 
-/** null 表示恢复默认值 / 去掉。 */
+/** null indicates reverting to default / removing. */
 const resettable = <T extends z.ZodType>(schema: T) => schema.nullable().optional();
 const index = z.number().int().min(0);
-/** 合并的补丁：值是 null 的键去掉。 */
+/** Merged patch: keys with null values are removed. */
 const patch = z.record(z.string(), z.unknown());
 
 const ColorOverridesSchema = z.strictObject({
@@ -46,32 +47,32 @@ const ColorOverridesSchema = z.strictObject({
   tertiary: resettable(HexColorSchema),
 });
 
-/** 块的修改（updateContainer 的 changes）：style、show、source 合并（null 去掉一项），tools、opens 整个换。 */
+/** Block modifications (changes in updateContainer): style, show, and source are merged (null removes an item), while tools and opens are replaced entirely. */
 export const BlockChangesSchema = z.strictObject({
   style: z
     .strictObject({
       align: resettable(ComponentStyleSchema.shape.align.unwrap()),
       tone: resettable(ComponentStyleSchema.shape.tone.unwrap()),
       size: resettable(ComponentStyleSchema.shape.size.unwrap()),
-      /** 图片背景（D-258）：只写要改的，合进已有的；null 关掉。 */
+      /** Image background (D-258): write only modified fields, merged into existing ones; null disables it. */
       backdrop: resettable(BackdropPatchSchema),
     })
     .optional(),
   hidden: z.boolean().optional(),
-  /** 整个换；null 去掉（D-424）。 */
+  /** Replaced entirely; null removes it (D-424). */
   showIf: ShowIfSchema.nullable().optional(),
-  /** null 不再固定，回到中间。 */
+  /** null unpins it, returning to the center. */
   pin: PinSchema.nullable().optional(),
   show: patch.optional(),
   source: patch.optional(),
-  /** 整个换；null 去掉块上的全部工具。 */
+  /** Replaced entirely; null removes all tools on the block. */
   tools: z.array(z.unknown()).nullable().optional(),
-  /** 整个换；null 去掉。 */
+  /** Replaced entirely; null removes it. */
   opens: z.unknown().optional(),
 });
 export type BlockChanges = z.infer<typeof BlockChangesSchema>;
 
-/** 页面的修改：名字、图标（null 去掉）、背景图片（合进已有的；null 关掉）。 */
+/** Page modifications: name, icon (null removes), background image (merged into existing; null disables). */
 export const PageChangesSchema = z.strictObject({
   title: z.string().optional(),
   icon: IconValueSchema.nullable().optional(),
@@ -81,7 +82,7 @@ export const PageChangesSchema = z.strictObject({
 export const NavChangesSchema = z.strictObject({
   bar: z.array(NavTargetSchema).min(1).max(5).optional(),
   floating: z.array(NavTargetSchema).max(3).optional(),
-  /** 整个列表（≤4，D-271）；[] 是一个都不放。 */
+  /** Entire list (≤4, D-271); [] means none. */
   phoneHomeScreen: z.array(HomeScreenEntrySchema).optional(),
 });
 
@@ -90,7 +91,7 @@ export const NewAppSchema = z.strictObject({
   name: boundedText(1, 40),
   icon: IconValueSchema.optional(),
   bar: z.array(AppBarTargetSchema).min(1).max(5).optional(),
-  /** 不写时从主页风格复制一份；导入 App 文件时带着自己的风格（D-485）。 */
+  /** Copied from home page style when omitted; imported app files carry their own style (D-485). */
   theme: ThemeSchema.optional(),
 });
 export const AppChangesSchema = z.strictObject({
@@ -103,8 +104,8 @@ export const AppChangesSchema = z.strictObject({
 const deskSlot = z.enum(['above', 'below']);
 
 export const OpSchema = z.discriminatedUnion('op', [
-  // ---- 数据（功能）：只改结构，从不碰记录内容 ----
-  /** {table: 一张新表} 或 {table: 表 ID, field: 新字段, index?}。 */
+  // ---- Data (features): structural changes only, never touching record content ----
+  /** {table: a new table} or {table: table ID, field: new field, index?}. */
   z
     .strictObject({
       op: z.literal('addData'),
@@ -117,8 +118,9 @@ export const OpSchema = z.discriminatedUnion('op', [
         'addData takes {table: {id, name, fields}} for a new table, or {table: "<table id>", field} for a new field',
     }),
   /**
-   * {table, changes: {name?, icon?}}、{table, field, changes}（合并进字段定义；null 去掉；type 只能在兼容的
-   * 类型之间换）或 {calendar: {dayStartHour?, weekStart?, twoWeekStart?}}（null 恢复默认）。
+   * {table, changes: {name?, icon?}}, {table, field, changes} (merged into field definition; null
+   * removes; type can only be changed between compatible types), or {calendar: {dayStartHour?,
+   * weekStart?, twoWeekStart?}} (null restores default).
    */
   z
     .strictObject({
@@ -141,21 +143,21 @@ export const OpSchema = z.discriminatedUnion('op', [
           : o.table !== undefined && o.changes !== undefined,
       { message: 'updateData takes {table, field?, changes} or {calendar: {…}}' },
     ),
-  /** 去掉字段：记录里的旧值保留；移出表：记录保留，可在「设置 → 数据」里导出或由用户永久删除。 */
+  /** Remove field: old values in records are retained; remove from table: records are retained and can be exported in "Settings -> Data" or permanently deleted by the user. */
   z.strictObject({ op: z.literal('removeData'), table: IdSchema, field: IdSchema.optional() }),
   z.strictObject({ op: z.literal('moveData'), table: IdSchema, field: IdSchema, toIndex: index }),
 
-  // ---- 容器（外观；就地的一键记录工具跟着块一起加、改、删）----
-  /** {page: 一个新页面}、{page: 页面 ID, block, parent?, index?} 或 {desk: "above"|"below", block, index?}。 */
+  // ---- Containers (appearance; inline one-tap logging tools are added, modified, and deleted along with blocks) ----
+  /** {page: a new page}, {page: page ID, block, parent?, index?} or {desk: "above" | "below", block, index?}. */
   z
     .strictObject({
       op: z.literal('addContainer'),
       page: z.union([IdSchema, PageSchema.omit({ package: true })]).optional(),
       desk: deskSlot.optional(),
-      /** 新 app（D-485）：主题从当前主页主题复制；bar 不写是只有 Tink。页面、表要自己用 app 字段放进去。 */
+      /** New app (D-485): theme copied from current home page theme; bar defaults to Tink only. Pages and tables must be added using the app field. */
       app: NewAppSchema.optional(),
       block: ComponentSchema.optional(),
-      /** 加入某个分组；省略时加在页面顶层。 */
+      /** Join a group; added to the page top-level when omitted. */
       parent: IdSchema.optional(),
       index: index.optional(),
     })
@@ -181,8 +183,9 @@ export const OpSchema = z.discriminatedUnion('op', [
       },
     ),
   /**
-   * {page, changes: {title?, icon?, backdrop?}}、{page, block, changes: {style?, hidden?, show?, source?, tools?,
-   * opens?}}、{nav: {bar?, floating?, phoneHomeScreen?}} 或 {desk: {toolbar?, preview?, strip?, tools?}}。
+   * {page, changes: {title?, icon?, backdrop?}}, {page, block, changes: {style?, hidden?, show?,
+   * source?, tools?, opens?}}, {nav: {bar?, floating?, phoneHomeScreen?}}, or {desk: {toolbar?,
+   * preview?, strip?, tools?}}.
    */
   z
     .strictObject({
@@ -191,7 +194,7 @@ export const OpSchema = z.discriminatedUnion('op', [
       block: IdSchema.optional(),
       changes: z.union([BlockChangesSchema, PageChangesSchema]).optional(),
       nav: NavChangesSchema.optional(),
-      /** 改一个 app 的名字、图标、底栏（D-485）；风格用 setTheme {app}。 */
+      /** Change an app's name, icon, or bottom bar (D-485); use setTheme {app} for style. */
       app: AppChangesSchema.optional(),
       desk: patch.optional(),
     })
@@ -218,7 +221,7 @@ export const OpSchema = z.discriminatedUnion('op', [
       op: z.literal('removeContainer'),
       page: IdSchema.optional(),
       desk: deskSlot.optional(),
-      /** 移除一个 app（D-485）：它的页面和快捷操作一起移除，表和记录归到主页。 */
+      /** Remove an app (D-485): its pages and quick actions are removed together, and tables and records are moved to the home page. */
       app: IdSchema.optional(),
       block: IdSchema.optional(),
     })
@@ -238,14 +241,15 @@ export const OpSchema = z.discriminatedUnion('op', [
     page: IdSchema,
     block: IdSchema,
     toIndex: index,
-    /** 移入某个分组；省略时移到页面顶层。 */
+    /** Move into a specific group; when omitted, moves to the top level of the page. */
     parent: IdSchema.optional(),
   }),
 
-  // ---- 工具（功能）：快捷操作、提醒 ----
+  // ---- Tools (features): quick actions, reminders ----
   /**
-   * {tool: 一个新的快捷操作或提醒}（都不能属于工具包，提醒也不从预设来；放到手机桌面用 updateContainer {nav}），
-   * 或 {tool: 快捷操作 ID, step, index?}（插在第几步之前；省略 = 最后）。
+   * {tool: a new quick action or reminder} (neither can belong to a tool package, and reminders
+   * do not come from presets; place on the phone home screen using updateContainer {nav}), or
+   * {tool: quick action ID, step, index?} (inserted before the specified step; omitted = end).
    */
   z
     .strictObject({
@@ -263,8 +267,9 @@ export const OpSchema = z.discriminatedUnion('op', [
         'addTool takes {tool: {kind: "quickAction"|"reminder", …}} for a new tool, or {tool: "<quick action id>", step, index?}',
     }),
   /**
-   * {tool, changes}：快捷操作 {name?, icon?, steps?}（整体替换步骤：快捷操作编辑页保存、恢复预设），
-   * 提醒合并（null 去掉可选的键）；{tool, step, changes: {params?（合并）, ask?（整个换，[] 都不问）}}。
+   * {tool, changes}: quick action {name?, icon?, steps?} (replace all steps: save quick action
+   * edit page, restore presets), merge reminders (null removes optional keys); {tool, step,
+   * changes: {params? (merged), ask? (replace entirely, [] for no questions)}}.
    */
   z.strictObject({
     op: z.literal('updateTool'),
@@ -272,16 +277,16 @@ export const OpSchema = z.discriminatedUnion('op', [
     step: IdSchema.optional(),
     changes: patch,
   }),
-  /** 删除用户自己的快捷操作（连同运行它、打开它的块）或提醒；或者快捷操作的一步。工具包自带的不能删。 */
+  /** Delete a user's own quick action (along with blocks running or opening it) or reminder, or a step of a quick action. Built-in tool package items cannot be deleted. */
   z.strictObject({ op: z.literal('removeTool'), tool: IdSchema, step: IdSchema.optional() }),
   z.strictObject({ op: z.literal('moveTool'), tool: IdSchema, step: IdSchema, toIndex: index }),
 
-  // ---- 主题（外观）----
-  /** {preset}、{reset: true} 或一个补丁（只写要改的）。 */
+  // ---- Theme (appearance) ----
+  /** {preset}, {reset: true}, or a patch (specifying only modified properties). */
   z
     .strictObject({
       op: z.literal('setTheme'),
-      /** 改这个 app 的风格；不写是主页（D-485）。 */
+      /** Change the style of this app; defaults to the home page if omitted (D-485). */
       app: IdSchema.optional(),
       preset: z.enum(THEME_PRESET_IDS).optional(),
       reset: z.literal(true).optional(),
@@ -295,16 +300,17 @@ export const OpSchema = z.discriminatedUnion('op', [
       density: ThemeSchema.shape.density.optional(),
       cardStyle: ThemeSchema.shape.cardStyle.optional(),
       /**
-       * 卡片的边框和阴影（D-624）；null 去掉。只改 cardStyle 不带 card 时也去掉，
-       * 选一种卡片样式就看到那种样式。
+       * Card border and shadow (D-624); null removes it. Removing cardStyle when card is absent
+       * also removes it; selecting a card style applies that style.
        */
       card: ThemeCardSchema.nullable().optional(),
       navStyle: ThemeSchema.shape.navStyle.optional(),
       backdrop: ThemeSchema.shape.backdrop,
       iconStyle: ThemeSchema.shape.iconStyle,
       /**
-       * 图标库（D-625）：写了的加上或换掉，null 去掉。整个工作区一份，写不写 app 都改它；
-       * preset、reset 不动它。
+       * Icon library (D-625): specified icons are added or replaced, null removes them. Applies
+       * workspace-wide regardless of whether an app is specified; preset and reset operations do
+       * not affect it.
        */
       icons: DrawnIconsPatchSchema.optional(),
     })
@@ -316,8 +322,8 @@ export const OpSchema = z.discriminatedUnion('op', [
       { message: 'setTheme takes {preset}, {reset: true} or the theme keys to change' },
     ),
 
-  // ---- 工具包（功能；界面上叫「工具」）----
-  /** add 建工具包页面和它的快捷操作；remove 一起移除；update 升级到当前版本，保留用户的修改。 */
+  // ---- Tool packages (features; called "Tools" in the UI) ----
+  /** add creates the tool package page and its quick actions; remove deletes them together; update upgrades to the current version while preserving user modifications. */
   z.strictObject({
     op: z.literal('setPackage'),
     package: IdSchema,
@@ -326,16 +332,18 @@ export const OpSchema = z.discriminatedUnion('op', [
 ]);
 export type Op = z.infer<typeof OpSchema>;
 export type OpOf<K extends Op['op']> = Extract<Op, { op: K }>;
-/** 一次修改（一个版本）最多包含的操作数。 */
+/** Maximum number of operations allowed per change (version). */
 export const MAX_OPS_PER_CHANGE = 30;
 export const OpListSchema = z.array(OpSchema).min(1).max(MAX_OPS_PER_CHANGE);
 /**
- * 导入、恢复一个 App 文件的操作（D-554）：不限步数，大小由配置本身的上限管（表、页面、快捷操作、提醒的条数），
- * 照样是一个版本，整份校验。只给 App 文件用；AI 的计划和别的修改还是 OpListSchema。
+ * Operations for importing and restoring an App file (D-554): unlimited steps, size governed by
+ * configuration limits (number of tables, pages, quick actions, and reminders), processed as a
+ * single version with full validation. Restricted to App files; AI plans and other modifications
+ * use OpListSchema.
  */
 export const AppFileOpListSchema = z.array(OpSchema).min(1);
 
-/** 功能（数据、独立工具、工具包、手机桌面）和外观（容器、就地工具、主题、导航栏）分两轮（规则 26）。 */
+/** Features (data, standalone tools, tool packages, phone home screen) and appearance (containers, local tools, theme, navigation bar) are processed in two rounds (Rule 26). */
 export function isFunctionOp(op: Op): boolean {
   switch (op.op) {
     case 'addData':
@@ -350,7 +358,7 @@ export function isFunctionOp(op: Op): boolean {
       return true;
     case 'addContainer':
     case 'removeContainer':
-      // 新建、移除一个 app 是功能（表和快捷操作要指向它）；它的页面、底栏、风格是外观。
+      // Creating or removing an app is a feature operation (tables and quick actions must point to it); its pages, bottom bar, and style are appearance operations.
       return op.app !== undefined;
     case 'updateContainer':
       if (op.app !== undefined) return op.app.bar === undefined;

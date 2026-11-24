@@ -9,10 +9,12 @@ import {
   type Page,
 } from './schema';
 
-// 直接编辑（D-052）：页面上的「上移 / 下移」和拖放翻译成 moveContainer 操作，
-// 和 AI 的修改一样经过校验、生成新版本、可以撤销。分组最多两层（Q3）：里面那层不能再放分组。
+// Direct editing (D-052): "Move up" / "Move down" and drag-and-drop on pages are translated into
+// moveContainer operations, going through validation, generating a new version, and supporting undo
+// just like AI modifications. Groups support at most two levels (Q3): the inner level cannot
+// contain further groups.
 
-/** 插入位置：某个列表（页面顶层或某个分组）里的第 index 个位置，按移出前的列表计算。 */
+/** Drop slot: the index-th position in a list (either the page top level or inside a group), calculated based on the list before removal. */
 export interface DropSlot {
   parentId?: string;
   index: number;
@@ -40,7 +42,7 @@ function locate(page: Page, id: string): Location | null {
 
 const isGroup = (c: Component) => isKnownComponent(c) && c.look === 'group';
 
-/** 这个分组能不能放下 moving（不看满没满）：不能放进自己里面；分组只能放进顶层的分组，而且它自己里面不能有分组。 */
+/** Whether this group can hold moving (without checking capacity): cannot be placed inside itself; groups can only be placed inside top-level groups, and they cannot contain groups themselves. */
 function canHold(page: Page, group: Component, moving: Component): boolean {
   if (!isGroup(group) || group.id === moving.id) return false;
   if (allComponents({ ...page, blocks: childrenOf(moving) }).some((c) => c.id === group.id))
@@ -58,8 +60,10 @@ function move(page: string, block: string, toIndex: number, parent?: string): Op
 }
 
 /**
- * 上移 / 下移一格。经过分组时会先进入分组，再从另一头出来，所以只用箭头也能把块移入、移出分组
- * （分组经过分组时直接越过，不会被放进去）。已经在最上面或最下面时返回 null。
+ * Move up / down by one slot. When passing through groups, it first enters the group and then
+ * exits from the other end, so blocks can be moved into and out of groups using only arrows
+ * (groups passing through other groups are skipped directly and not placed inside). Returns null
+ * if already at the very top or bottom.
  */
 export function moveStepOp(page: Page, componentId: string, direction: 'up' | 'down'): Op | null {
   const at = locate(page, componentId);
@@ -78,7 +82,7 @@ export function moveStepOp(page: Page, componentId: string, direction: 'up' | 'd
   return move(page.id, componentId, at.index + (up ? -1 : 1), at.parent?.id);
 }
 
-/** 拖动时可以放下的位置：页面顶层的每个位置，以及每个放得下它、还没满的分组里的每个位置。 */
+/** Available positions when dragging: every position at the page top level, and every position inside each group that can hold it and is not full. */
 export function dropSlots(page: Page, componentId: string): DropSlot[] {
   const at = locate(page, componentId);
   if (!at) return [];
@@ -91,7 +95,7 @@ export function dropSlots(page: Page, componentId: string): DropSlot[] {
   return slots;
 }
 
-/** 把块放到某个位置；位置不变或不允许时返回 null。 */
+/** Place a block into a position; returns null if the position is unchanged or not allowed. */
 export function dropOp(page: Page, componentId: string, slot: DropSlot): Op | null {
   const at = locate(page, componentId);
   if (!at) return null;
@@ -103,13 +107,13 @@ export function dropOp(page: Page, componentId: string, slot: DropSlot): Op | nu
     return null;
   const sameList = (at.parent?.id ?? undefined) === slot.parentId;
   if (!sameList) return move(page.id, componentId, slot.index, slot.parentId);
-  // moveContainer 的 toIndex 是移出之后的位置。
+  // toIndex in moveContainer is the position after removal.
   const toIndex = slot.index > at.index ? slot.index - 1 : slot.index;
   if (toIndex === at.index) return null;
   return move(page.id, componentId, toIndex, slot.parentId);
 }
 
-/** 改的是同一个块（updateContainer 改块、moveContainer）。 */
+/** Refers to the same block (updateContainer modifying a block, moveContainer). */
 const sameBlock = (a: Op, b: Op) =>
   'block' in a &&
   'block' in b &&
@@ -119,13 +123,13 @@ const sameBlock = (a: Op, b: Op) =>
   'page' in b &&
   a.page === b.page;
 
-/** 两次块的修改合成一次：show、source 逐项合并，tools、opens、hidden 取后一次，style 见下。不能合时返回 null。 */
+/** Merge two block modifications into one: show and source are merged item by item, tools, opens, and hidden take the latter, and style is handled as below. Returns null if they cannot be merged. */
 function mergeChanges(a: BlockChanges, b: BlockChanges): BlockChanges | null {
   const out: BlockChanges = { ...a, ...b };
   for (const key of ['show', 'source'] as const)
     if (a[key] && b[key]) out[key] = { ...a[key], ...b[key] };
   if (a.style && b.style) {
-    // 图片背景（D-258）是逐项合进已有的：两次修改也逐项合并。先关掉再打开不能合：打开时不带关掉前的图片。
+    // Image backgrounds (D-258) are merged item by item into existing ones: modifications from two sources are also merged item by item. Turning off and then turning back on cannot be merged: turning on does not carry the image from before it was turned off.
     const [x, y] = [a.style.backdrop, b.style.backdrop];
     if (x === null && y) return null;
     const backdrop = x && y ? { backdrop: { ...x, ...y } } : {};
@@ -135,9 +139,11 @@ function mergeChanges(a: BlockChanges, b: BlockChanges): BlockChanges | null {
 }
 
 /**
- * 编辑模式结束时把一串操作合并成一个版本之前，先合并相邻的同类操作（D-054）：
- * 连续移动同一个块只保留最后一次（其他块的相对顺序不变，结果相同），
- * 连续修改同一个块合并成一个。结果与按顺序执行原列表完全一样。
+ * Before coalescing a series of operations into a new version when edit mode ends, first merge
+ * adjacent operations of the same type (D-054): consecutive moves of the same block retain only
+ * the final one (relative order of other blocks remains unchanged, yielding the same result), and
+ * consecutive modifications of the same block are merged into one. The result is identical to
+ * executing the original list in order.
  */
 export function coalesceOps(ops: readonly Op[]): Op[] {
   const out: Op[] = [];

@@ -19,17 +19,21 @@ import { splitRuns } from './doc-runs';
 import { imageExt } from './docx-import';
 import { escapeXml } from './xlsx';
 
-// 写 docx（D-328）：自己写最少的 OOXML，用 fflate 的同步 API 打包（和写 xlsx 一样，D-272）。
-// 无衬线的默认字体（D-330），段落（标题用加粗的 Heading1 / Heading2 样式，首行缩进）、run 的粗体 / 颜色 / 字号、编号列表（numbering.xml）、
-// 表格（gridSpan / vMerge 合并）、图片（内嵌 JPG）、并排行（无边框的排版表格，D-331）。A4 纵向，每页原图之间分页。
-// 位置（D-463，对标 CamScanner）：都是普通段落，不用文本框；段落的左缩进按它在原图里的左边，段前距按它和上一块之间原来空着的高度。
+// Write docx (D-328): write minimal OOXML ourselves, packaged using fflate's synchronous API (same
+// as writing xlsx, D-272). Default sans-serif font (D-330), paragraphs (headings use bold Heading1
+// / Heading2 styles, first-line indent), run bold / color / font size, numbering lists
+// (numbering.xml), tables (gridSpan / vMerge merging), images (embedded JPG), side-by-side rows
+// (borderless layout tables, D-331). A4 portrait, page break between original pages. Positioning
+// (D-463, benchmarked against CamScanner): all ordinary paragraphs, no text boxes; paragraph left
+// indent matches its left position in the original image, space-before matches the original empty
+// height between it and the previous block.
 
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const PKG_REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
 const HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 
-/** A4（twip，1/20 磅）和页边距（2 厘米）。 */
+/** A4 (twips, 1/20 pt) and page margins (2 cm). */
 const PAGE_W = 11906;
 const PAGE_H = 16838;
 const MARGIN = 1134;
@@ -37,33 +41,35 @@ const CONTENT_W = PAGE_W - 2 * MARGIN;
 const TABLE_FONT_PAGE_SHARE = CONTENT_W / PAGE_W;
 /** 1 twip = 635 EMU。 */
 const EMU_PER_TWIP = 635;
-/** 所有表格每格左右的边距（twip）；文件里的实际值和量字预算共用。 */
+/** Left/right cell padding for all tables (twips); shared by actual file values and dimension budget estimation. */
 const CELL_PAD = 80;
 
 function cellMarginsXml(): string {
   return `<w:tblCellMar><w:left w:w="${CELL_PAD}" w:type="dxa"/><w:right w:w="${CELL_PAD}" w:type="dxa"/></w:tblCellMar>`;
 }
-/** 分段的空隙写成段前间距（twip）：块没有可用的位置（文字转 Word 的占位框）时用。 */
+/** Paragraph spacing before written as space-before (twips): used when a block has no available position (text-to-Word placeholder frame). */
 const SPACED_BEFORE = 160;
-/** 一行字在 Word 里的高度 ≈ 字号的这么多倍（D-463）：Arial 的上下伸出 1.117 × 默认行距 1.15。 */
+/** Height of a line of text in Word ≈ multiple of font size (D-463): Arial ascents/descents 1.117 × default line spacing 1.15. */
 const LINE_HEIGHT = 1.28;
-/** 单元格用 Word 的单倍行距；仍按字体的真实上下伸出排版，不用固定高度裁字。 */
+/** Cells use Word single line spacing; layout still uses fonts' true ascents and descents, without clipping text using fixed heights. */
 const CELL_LINE_HEIGHT = 1.12;
-/** 不到这么多（twip：6 磅、3 磅）的左缩进、段前距不写：识别框的抖动，字的左边和页边距差一点。 */
+/** Left indents and space-befores smaller than this (twip: 6 pt, 3 pt) are not written: recognition box jitter, slight difference between text left edge and page margin. */
 const MIN_INDENT = 120;
 const MIN_BEFORE = 60;
-/** 一行的段落在 Word 里可能比原图宽一点（字体不同）：缩进留出这么多余量，不让它折到下一行。 */
-/** 左边差不到这么多个字宽的块对齐到同一个位置。 */
+/** Blocks whose left side differs by less than this many character widths are aligned to the same position. */
+/** Blocks whose left side differs by less than this many character widths are aligned to the same position. */
 const SNAP_EM = 0.7;
 const WIDTH_SLACK = 1.1;
 
 /**
- * 默认字体（D-330）：无衬线，和 CamScanner 一样。西文 Arial，中文微软雅黑（Windows 和 Mac 版 Office 都带）；
- * 字体表写明是无衬线（swiss），没有这个字体的电脑换成别的无衬线字体（Mac 上是 Helvetica、苹方）。
+ * Default font (D-330): sans-serif, same as CamScanner. Western Arial, Chinese Microsoft YaHei
+ * (included in Windows and Mac Office versions); font table specifies sans-serif (swiss),
+ * computers lacking this font fall back to another sans-serif font (Helvetica or PingFang on
+ * Mac).
  */
 const LATIN_FONT = 'Arial';
 const CJK_FONT = 'Microsoft YaHei';
-/** 每个 run 也写一遍字体：苹果的预览（Mac、iPhone 的「文件」）不读默认样式里的字体，只认 run 上的。 */
+/** Write font on every run: Apple's Preview (Mac, iPhone "Files") does not read fonts from default styles, recognizing only run-level fonts. */
 const RUN_FONTS = `<w:rFonts w:ascii="${LATIN_FONT}" w:hAnsi="${LATIN_FONT}" w:eastAsia="${CJK_FONT}" w:cs="${LATIN_FONT}"/>`;
 
 function fontTableXml(): string {
@@ -77,20 +83,21 @@ function fontTableXml(): string {
   );
 }
 
-/** 一张剪好的图片：JPG 字节和像素大小。 */
+/** A cropped image: JPG bytes and pixel dimensions. */
 export interface DocxImage {
   bytes: Uint8Array;
   width: number;
   height: number;
 }
 
-/** 标题样式比正文大多少（Heading1、Heading2）。 */
+/** Heading style scale relative to body text (Heading1, Heading2). */
 const HEADING_SCALE: Record<string, number> = { Heading1: 1.6, Heading2: 1.3 };
 
 /**
- * 一段文字的 run：换行写成 <w:br/>，制表符写成 <w:tab/>（D-332），前后的空格保留。
- * 每个 run 都写字号（D-335）：苹果的预览不读默认样式里的字号（一律当 12 磅），只认 run 上的；
- * 没有自己字号的用标题样式或正文的字号。
+ * Runs for a paragraph of text: line breaks written as <w:br/>, tabs written as <w:tab/> (D-332),
+ * surrounding spaces preserved. Every run writes font size (D-335): Apple's Preview does not read
+ * font sizes from default styles (treating all as 12 pt), recognizing only run-level sizes; those
+ * without their own size use heading style or body font size.
  */
 function sizeXml(style: DocStyle, bodySize: number, styleId?: string): string {
   const body = Math.round(bodySize * 2);
@@ -109,7 +116,7 @@ function runXml(text: string, style: DocStyle, bodySize: number, styleId?: strin
     (style.italic ? '<w:i/><w:iCs/>' : '') +
     (style.color ? `<w:color w:val="${style.color}"/>` : '') +
     sizeXml(style, bodySize, styleId) +
-    // schema 的顺序：color、sz/szCs 在 u 前面。
+    // Schema order: color, sz/szCs come before u.
     (style.underline ? '<w:u w:val="single"/>' : '');
   const rPr = `<w:rPr>${props}</w:rPr>`;
   return text
@@ -126,7 +133,7 @@ function runXml(text: string, style: DocStyle, bodySize: number, styleId?: strin
     .join('');
 }
 
-/** 一段的字：样式不同的几截（D-465）各自写成 run，没写的跟着整段。 */
+/** Text of a paragraph: distinct styled sections (D-465) written as individual runs, unstyled ones follow the paragraph default. */
 function runsXml(
   text: string | readonly DocRun[] | undefined,
   style: DocStyle,
@@ -146,13 +153,13 @@ function paragraphXml(
   extra: {
     styleId?: string;
     spaced?: boolean;
-    /** 段前距（twip，D-463）：有时代替 spaced；标题也写段后 0（不用标题样式的段前段后）。 */
+    /** Space before paragraph (twips, D-463): sometimes replaces spaced; headings also set space-after to 0 (avoiding heading style default before/after spacing). */
     before?: number;
     numId?: number;
     pageBreak?: boolean;
-    /** 首行缩进（twip）。 */
+    /** First-line indent (twips). */
     indent?: number;
-    /** 左缩进（twip，D-463）：原图里的左边。 */
+    /** Left indent (twips, D-463): left position in original image. */
     left?: number;
     fill?: string;
     tabs?: number[];
@@ -168,7 +175,7 @@ function paragraphXml(
       : extra.spaced
         ? `<w:spacing w:before="${SPACED_BEFORE}"/>`
         : '';
-  // 列表项的左缩进加在编号的缩进（420）上，悬挂缩进不变。
+  // Left indent for list items is added to the numbering indent (420), keeping hanging indent unchanged.
   const left = extra.left ? (extra.numId ? 420 + extra.left : extra.left) : 0;
   const ind =
     left || extra.indent
@@ -178,7 +185,7 @@ function paragraphXml(
     (extra.styleId ? `<w:pStyle w:val="${extra.styleId}"/>` : '') +
     (extra.pageBreak ? '<w:pageBreakBefore/>' : '') +
     (extra.numId ? `<w:numPr><w:ilvl w:val="0"/><w:numId w:val="${extra.numId}"/></w:numPr>` : '') +
-    // schema 的顺序：shd、tabs 在 spacing、ind 前面。
+    // Schema order: shd, tabs come before spacing, ind.
     (extra.fill || style.fill
       ? `<w:shd w:val="clear" w:color="auto" w:fill="${extra.fill ?? style.fill}"/>`
       : '') +
@@ -190,34 +197,39 @@ function paragraphXml(
     (style.align && style.align !== 'left'
       ? `<w:jc w:val="${style.align === 'center' ? 'center' : 'right'}"/>`
       : '') +
-    // 段落标记的字号（D-335）：空段落、空格子的高度按它算。
+    // Paragraph mark font size (D-335): empty paragraphs and empty cell heights are calculated based on it.
     `<w:rPr>${sizeXml(style, bodySize, extra.styleId)}</w:rPr>`;
   return `<w:p><w:pPr>${pPr}</w:pPr>${runsXml(text, style, bodySize, extra.styleId)}</w:p>`;
 }
 
-/** 空段落（表格后面的分隔、空格子）：段落标记也写字号（D-335），不然按默认样式（苹果的预览按 12 磅）撑高。 */
+/** Empty paragraph (separators after tables, empty cells): paragraph marks also write font size (D-335), otherwise default styles inflate the height (Apple's Preview uses 12 pt). */
 function blankXml(size: number, single = false): string {
   return `<w:p><w:pPr>${single ? '<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>' : size <= 1 ? '<w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/>' : ''}<w:rPr>${sizeXml({}, size)}</w:rPr></w:pPr></w:p>`;
 }
 
-/** 表格格子左右的边距加起来（磅），和写入每张表的值一致。 */
+/** Combined left and right cell padding for tables (points), matching the value written into each table. */
 const TABLE_CELL_PAD_PT = (2 * CELL_PAD) / 20;
-/** 表里的字为了放下最长的词最多缩到这么小（磅，D-335）。 */
+/** The maximum font size reduction for text in the table to fit the longest word (in points, D-335). */
 const TABLE_MIN_SIZE = 5;
 /**
- * 一格放不下它最长的词时，整张表最多跟着缩到这么多倍（相对表本来的比例），一般的表仍是一个字号（D-335）；
- * 还放不下的个别格子自己再缩。不然一个很窄的格子（多出来的假列）会把整张表、连同长段的说明都缩到 5 磅。
+ * When a cell cannot fit its longest word, the entire table shrinks by at most this multiplier
+ * relative to its original proportion, while general tables retain their font size (D-335);
+ * individual cells that still cannot fit shrink further on their own. Otherwise, a very narrow
+ * cell (an extraneous dummy column) would shrink the entire table and long descriptive paragraphs
+ * down to 5 pt.
  */
 const TABLE_SHRINK_FLOOR = 0.6;
 
-/** 一格左右的边距加起来（twip）：窄格子的边距不超过格宽的 1/4，不让 8 磅的边距占掉一个 10 磅宽的格子。 */
+/** Combined left and right cell padding (twips): padding for narrow cells is capped at 1/4 of the cell width, preventing an 8 pt padding from consuming a 10 pt wide cell. */
 function cellPadTwip(width: number): number {
   return Math.min(2 * CELL_PAD, Math.round(width / 4));
 }
 
 /**
- * 一个词在 Arial 里大概多宽（以字号为单位，D-335）：大写字母约 0.7，小写约 0.52，数字 0.56，
- * 中日韩的字 1（每个字都能断行，单独算一个词），其他符号 0.35。宁可估宽一点（宽了只是字小一点，窄了会把词拆开）。
+ * Approximate width of a word in Arial (in font-size units, D-335): uppercase letters ~0.7,
+ * lowercase ~0.52, digits ~0.56, CJK characters 1 (each character can break and is counted as a
+ * separate word), other symbols ~0.35. Better to slightly overestimate (overestimation just
+ * results in smaller text, whereas underestimation splits words).
  */
 function longestWordEm(text: string): number {
   let best = 0;
@@ -249,8 +261,11 @@ function longestWordEm(text: string): number {
 }
 
 /**
- * 原图像素 → twip：整页宽度按 A4 宽算，放不下时按内容区等比缩小。表里的字号（D-335）按表自己的字号跟着一起缩小，
- * 哪一格最长的词放不下时整张表再一起缩小，但最多缩到 TABLE_SHRINK_FLOOR；还放不下的格子自己再缩，最小 5 磅（取到半磅）。
+ * Original image pixels -> twips: total page width is based on A4 width, scaled down
+ * proportionally to the content area if it does not fit. Font sizes in tables (D-335) scale down
+ * together with the table's own font size; if the longest word in any cell still does not fit,
+ * the table shrinks further overall, but by at most TABLE_SHRINK_FLOOR; cells that still do not
+ * fit shrink individually down to a minimum of 5 pt (rounded to the nearest half point).
  */
 function tableMetrics(
   block: DocTable,
@@ -268,7 +283,7 @@ function tableMetrics(
   const widths = raw.map((w) => Math.max(200, Math.round(w * k)));
   const sourceSize = block.size ?? bodySize;
   const base = Math.min(k, fontMaxWidth / total);
-  // 每格放得下最长的词的比例；整张表取其中最小的，但不小于 base 的 TABLE_SHRINK_FLOOR 倍。
+  // Ratio at which each cell fits its longest word; the minimum of these is taken for the entire table, but it is not less than base multiplied by TABLE_SHRINK_FLOOR.
   const fits = new Map<DocTable['table']['cells'][number], number>();
   for (const cell of table.cells) {
     const em = longestWordEm(cell.text);
@@ -289,7 +304,7 @@ function tableMetrics(
     Math.max(base * TABLE_SHRINK_FLOOR, Math.min(base, ...fits.values())),
   );
   const size = Math.max(TABLE_MIN_SIZE, Math.floor(sourceSize * scale * 2) / 2);
-  /** 一格的字号：按整张表的比例，这一格自己放不下最长的词时再缩。 */
+  /** Font size of a cell: scaled according to the table-wide ratio, then shrunk further if the cell itself cannot fit its longest word. */
   const sizeOfCell = (c: DocTable['table']['cells'][number]) => {
     const own = Math.min(scale, fits.get(c) ?? scale);
     return c.size === undefined && own === scale
@@ -327,8 +342,10 @@ function tableMetrics(
       ? Math.max(min, (raw / page.height) * page.paper.height * 20 * k)
       : min;
   });
-  // 来源标签靠近格底时，段前距加正常字行可能比来源格高更大。
-  // 量页和写行共用这个下限，不能只量 trHeight 而漏掉 Word 自动撑高的格内段落。
+  // When the source label is near the bottom of a cell, adding line spacing for paragraph-before
+  // might exceed the height of the source cell. Page measurement and line writing share this lower
+  // limit; we cannot measure only trHeight while missing paragraphs inside cells that are
+  // automatically expanded by Word.
   const contents = table.cells
     .filter((c) => c.rowSpan === 1)
     .map((c) => {
@@ -384,7 +401,7 @@ function tableXml(
   const { table } = block;
   const metrics = tableMetrics(block, page, bodySize, maxWidth, fontMaxWidth);
   const { widths, k, size, sizeOfCell } = metrics;
-  // 每个位置属于哪一格（合并格子的左上角以外的位置写成 vMerge 的续格）。
+  // Mapping of each position to its cell (positions other than the top-left of a merged cell are written as vMerge continuation cells).
   const at = new Map<string, number>();
   table.cells.forEach((c, i) => {
     for (let r = c.row; r < c.row + c.rowSpan; r++)
@@ -397,7 +414,7 @@ function tableXml(
       const i = at.get(`${r},${c}`);
       const cell = i === undefined ? undefined : table.cells[i];
       if (!cell) {
-        // 网格里没有格子的位置（编辑出错的文件）：补一个空格子。
+        // Positions in the grid lacking a cell (malformed/edited file): insert a blank placeholder cell.
         cells.push(
           `<w:tc><w:tcPr><w:tcW w:w="${widths[c]}" w:type="dxa"/></w:tcPr>${blankXml(size, !!page.paper)}</w:tc>`,
         );
@@ -408,7 +425,7 @@ function tableXml(
       const w = widths.slice(c, c + span).reduce((a, b) => a + b, 0);
       const first = cell.row === r;
       const cellLayout = block.cellLayout?.find((p) => p.row === cell.row && p.col === cell.col);
-      // schema 的顺序：tcW、gridSpan、vMerge、shd、tcMar、textDirection、vAlign。
+      // Schema order: tcW, gridSpan, vMerge, shd, tcMar, textDirection, vAlign.
       const tcPr =
         `<w:tcW w:w="${w}" w:type="dxa"/>` +
         (span > 1 ? `<w:gridSpan w:val="${span}"/>` : '') +
@@ -463,7 +480,7 @@ function tableXml(
             })
             .join('')
         : blankXml(size, !!page.paper);
-      // 窄格子的左右边距按格宽缩小（cellPadTwip），和量字号时用的一样。
+      // Left and right padding for narrow cells scaled down by cell width (cellPadTwip), matching the value used when measuring font size.
       const pad = cellPadTwip(w);
       const sourceMargins = sourceLines
         ? '<w:tcMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tcMar>'
@@ -492,13 +509,13 @@ function tableXml(
       : page.paper
         ? Math.round(metrics.heightAt(r, spaceScale))
         : 0;
-    // trHeight 是格内的最小高度；外画的 0.5 磅行边框仍占高度，不能每行再加一次。
+    // trHeight is the minimum height within a cell; outer drawn 0.5 pt row borders still take up height, so we must not add height for them on every row.
     if (rowHeight && !block.borderless) rowHeight = Math.max(1, rowHeight - 10);
     rows.push(
       `<w:tr>${rowHeight ? `<w:trPr><w:trHeight w:val="${rowHeight}" w:hRule="atLeast"/></w:trPr>` : ''}${cells.join('')}</w:tr>`,
     );
   }
-  // 原图里没有线、按列对齐认出来的表（D-471）不画边框。
+  // Borderless tables identified by column alignment without explicit lines in the original image (D-471) do not have borders drawn.
   const border = (side: string) =>
     block.borderless
       ? `<w:${side} w:val="nil"/>`
@@ -506,7 +523,7 @@ function tableXml(
   return (
     '<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/>' +
     (left ? `<w:tblInd w:w="${left}" w:type="dxa"/>` : '') +
-    // schema 的顺序：tblBorders 在 tblLayout 前面。
+    // Schema order: tblBorders must precede tblLayout.
     '<w:tblBorders>' +
     ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(border).join('') +
     `</w:tblBorders><w:tblLayout w:type="fixed"/>${cellMarginsXml()}</w:tblPr><w:tblGrid>` +
@@ -515,13 +532,13 @@ function tableXml(
   );
 }
 
-/** 列宽放不下时等比缩小，每列至少 200 twip。 */
+/** Proportionally shrink column widths if they exceed maxWidth, with each column being at least 200 twips. */
 function fitWidths(raw: readonly number[], maxWidth: number): number[] {
   const k = Math.min(1, maxWidth / (raw.reduce((a, b) => a + b, 0) || 1));
   return raw.map((w) => Math.max(200, Math.round(w * k)));
 }
 
-/** 无边框的排版表格（D-331、D-332）：rows 是每行每格里的 XML 片段；每格以段落结尾（Word 要求）。 */
+/** Borderless layout tables (D-331, D-332): rows are XML fragments for each cell in each row; each cell ends with a paragraph (required by Word). */
 function layoutTableXml(
   widths: readonly number[],
   rows: readonly (readonly string[])[],
@@ -579,7 +596,7 @@ function imageXml(
   );
 }
 
-/** 列表的编号定义（每个列表一个，编号从它自己的第一项开始）。 */
+/** List numbering definitions (one per list, starting numbering from its own first item). */
 function numberingXml(lists: readonly DocList[]): string {
   const abstracts = lists.map((list, i) => {
     const fmt = !list.ordered
@@ -627,8 +644,9 @@ function stylesXml(bodySize: number): string {
 }
 
 /**
- * 写 docx。images 按图片块的 src 给剪好的图片字节；没有的图片块跳过。
- * 默认样式的正文字号用第一页的；每个 run 都写自己那一页的字号（D-335）。
+ * Write docx. images provides cropped image bytes keyed by image block src; missing image blocks
+ * are skipped. The default body font size uses the first page's size; each run writes its own
+ * page's font size (D-335).
  */
 export function writeDocx(
   doc: DocDoc,
@@ -657,7 +675,7 @@ export function writeDocx(
         ),
       ]),
     ) as Record<'top' | 'right' | 'bottom' | 'left', number>;
-    // Word 强制保留表后的段落；来源内容贴到下边界时，要把这点不可见的行高留在空白页边距里。
+    // Word forces retention of the paragraph after a table; when source content adheres to the lower margin, this invisible line height must be preserved in the bottom page margin.
     const last = page?.blocks.filter((b) => !(b.kind === 'image' && b.background)).at(-1);
     const separators =
       last?.kind === 'table'
@@ -686,11 +704,11 @@ export function writeDocx(
     const CONTENT_H = PAGE_H - margins.top - margins.bottom;
     if (sections && p > 0)
       body.push(
-        // sectPr 是 pPr 的最后一个子元素（schema 的顺序）。
+        // sectPr must be the last child element of pPr (schema order).
         `<w:p><w:pPr><w:spacing w:line="1" w:lineRule="exact"/>${sectionXml(doc.pages[p - 1], true)}</w:pPr></w:p>`,
       );
     const pageStart = body.length;
-    // 每页的字按这一页的正文字号写（D-335：表单页和正文页的正文字号可能差很多）。
+    // Write the text of each page using that page's body font size (D-335: body font sizes may differ significantly between form pages and text pages).
     const bodySize = page.bodySize ?? docSize;
     let first = p > 0 && !sections;
     const pageBreak = () => {
@@ -700,22 +718,28 @@ export function writeDocx(
     };
     const twip = (px: number) => Math.round((px / page.width) * PAGE_W);
     const yTwip = (px: number) => (page.paper ? Math.round((px / page.height) * PAGE_H) : twip(px));
-    // 位置（D-463）：左缩进从 A4 的左页边距算起（原图的字更靠左时从最左的字算起），
-    // 段前距是原图里和上一块之间空着的高度；字和空白加起来在 Word 里比 A4 的内容区还高、只靠字又放得下一页时，
-    // 段前距按比例缩小，原件一页还是一页（字本身就超过一页的正文页不缩，段落之间照样空开）。
+    // Position (D-463): left indent is calculated from the A4 left margin (or from the leftmost
+    // character if characters in the original image are further left); paragraph-before spacing is
+    // the vacant height between this block and the previous one in the original image. When the
+    // combined height of text and whitespace exceeds the A4 content area in Word, but fits on a
+    // single page based on text alone, the paragraph-before spacing is scaled down proportionally
+    // so the original document remains a single page (text pages exceeding one page natively are
+    // not shrunk, but spacing between paragraphs is still preserved).
     const marginPx = page.paper
       ? (margins.top / PAGE_H) * page.height
       : (margins.top / PAGE_W) * page.width;
     const foreground = page.blocks.filter((b) => !(b.kind === 'image' && b.background));
     const leaves = leafBlocks({ blocks: foreground });
-    // 和页边距一样按字算（doc.ts）：贴着纸边的图不把所有字的缩进都往右推；比这更靠左的图缩进为 0。
+    // Like page margins, calculated based on text (doc.ts): images hugging the paper edge do not push the indent of all text to the right; images positioned further left than this have an indent of 0.
     const textLeaves = leaves.filter((b) => b.kind !== 'image');
     const base = Math.min(
       (margins.left / PAGE_W) * page.width,
       ...(textLeaves.length ? textLeaves : leaves).map((b) => b.box.x),
     );
-    // 左边对齐的块左边只差一点（认字框的左边总有几个像素的抖动）时对齐到同一个位置：
-    // 不然每段的缩进都差几磅，Word 里左边是锯齿。差不到 0.7 个字宽的归为一组，取这一组最左的。
+    // Align blocks with nearly identical left alignments (recognition bounding boxes always have a
+    // few pixels of jitter) to the same position, otherwise every paragraph's indent would differ
+    // by a few points, resulting in a jagged left edge in Word. Items within 0.7 character widths
+    // of difference are grouped together, taking the leftmost of the group.
     const emPx = (bodySize / (PAGE_W / 20)) * page.width;
     const snap = new Map<number, number>();
     let anchor = -Infinity;
@@ -740,12 +764,14 @@ export function writeDocx(
     };
     let fit = 1;
     let pictureScale = 1;
-    // 已知纸张尺寸的页需要把默认 Arial 行框的上/下伸留量算足；字高不是整行高度。
+    // Pages with known paper dimensions need to fully account for default Arial line box top/bottom overhangs; font height is not the full line height.
     const leading = page.paper ? 1.34 : LINE_HEIGHT;
     const blankHeight = Math.round(LINE_HEIGHT * bodySize * 20);
     /**
-     * 上一块：上边、下边（原图像素）和它在 Word 里占的高度（twip，连同后面补的空段落）。
-     * 段前距按上边到上边算（识别框的下边随 p、g 这些往下伸的字母变，上边稳一些）。
+     * Previous block: top, bottom (original pixels), and the height it occupies in Word (twips,
+     * including appended empty paragraphs). Paragraph-before spacing is calculated from top to
+     * top (the bottom of a recognition bounding box extends downward with letters like p and g,
+     * whereas the top is more stable).
      */
     interface Flow {
       top: number;
@@ -754,16 +780,20 @@ export function writeDocx(
     }
     const sizeOf = (b: DocParagraph) =>
       b.size ?? (b.heading ? bodySize * HEADING_SCALE[`Heading${b.heading}`]! : bodySize);
-    // 原图里只有一行的段落；它在 Word 里一行要多宽（导出字号量字宽，加余量和格子的内边距）。
+    // Paragraphs that span only a single line in the original image; required width for a single line in Word (calculated from export font size and measured word width, plus margins and cell padding).
     const oneLine = (b: DocParagraph) =>
       !/[\n\t]/.test(b.text) && twip(b.box.height) <= 1.5 * LINE_HEIGHT * sizeOf(b) * 20;
     const lineWidth = (b: DocParagraph, em = textEm(b.text)) =>
       Math.ceil(em * sizeOf(b) * 20 * WIDTH_SLACK + 2 * CELL_PAD);
     /**
-     * 最后一格只有原图里那几个字宽（贴着右边的页码「1/3」「Page 2 of 5」、标签「AUTRE TOTAL」）：
-     * Word 的 Arial 比原字宽，放不下就一个字一行地折。右边没有空白可借时，从前面各格没用到的宽度里借，
-     * 借到一行的放得下一行、别的（几行的、标题、居中的：往左借会挪动它们的位置，D-526）最长的词不断开；
-     * 前面的格子不缩到比它们自己的字还窄。
+     * The last cell spans only the width of those few characters in the original image (page
+     * numbers like "1/3", "Page 2 of 5", labels like "AUTRE TOTAL" pinned to the right): Word's
+     * Arial is wider than the original characters, so if it does not fit, it wraps character by
+     * character. When no blank space is available to borrow on the right, borrow from unused
+     * widths in preceding cells such that the longest word in single-line items fits on one line,
+     * while multi-line titles and centered items remain unbroken (borrowing to the left would
+     * shift their positions, D-526); preceding cells are not shrunk narrower than their own text
+     * width.
      */
     const lendToLast = (row: DocRow, widths: number[]) => {
       const last = row.cells.at(-1)!;
@@ -817,7 +847,7 @@ export function writeDocx(
       lendToLast(row, widths);
       return widths;
     };
-    // 一块在 Word 里大概多高：文字按原图里有几行 × 行高，表格、图片按原图里的高。
+    // Approximate height of a block in Word (twips): text height based on original line count multiplied by line height, tables and images based on original height.
     const heightOf = (block: DocBlock, maxWidth = CONTENT_W, from = base): number => {
       const h = yTwip(block.box.height);
       const left = block.kind === 'row' ? 0 : leftOf(block, from, maxWidth);
@@ -889,8 +919,10 @@ export function writeDocx(
       }
       return block.kind === 'image' ? h + (page.paper ? bodySize * 6 : 0) : h + LINE_HEIGHT * 20;
     };
-    // 段前距（twip）；在上一块上面、和它重叠（位置用不了，例如文字转 Word 的占位框）时没有，按 spaced 写。
-    // 一页（一格）的第一块离上边不到一行时不空（字的上边和页边距差一点）。
+    // Paragraph-before spacing (twips); absent when located on or overlapping the previous block
+    // (where position cannot be utilized, e.g., text-to-Word placeholder frames), written as
+    // spaced. The first block of a page (or cell) does not add spacing if it is less than one line
+    // away from the top (top of characters slightly offset from page margin).
     const beforeOf = (block: DocBlock, flow: Flow): number | undefined => {
       if (block.box.y < flow.bottom && !page.paper) return undefined;
       const v = (yTwip(block.box.y - flow.top) - flow.height) * fit;
@@ -902,9 +934,12 @@ export function writeDocx(
       flow.bottom = block.box.y + block.box.height;
       flow.height = heightOf(block, maxWidth, from);
     };
-    // 左缩进（twip）：居中、靠右的段落没有；一行的段落放得下才缩进（不让它折到下一行）。
-    // 在 Word 里顶格也一行放不下的段落反正要折行，缩进不让给剩下的空间：和同一左边的标题、短段落对齐
-    // （不然越宽的段落缩进越少，左边参差不齐，EU 样本 053、057）。
+    // Left indent (twips): zero for centered and right-aligned paragraphs; single-line paragraphs
+    // are indented only if they fit (preventing wrapping to the next line). Paragraphs that cannot
+    // fit on a single line even when flush-left at the margin will wrap anyway, so indentation is
+    // not sacrificed for remaining space: aligned with titles and short paragraphs sharing the same
+    // left edge (otherwise wider paragraphs would have smaller indents, causing a ragged left
+    // margin, EU samples 053, 057).
     let wrappedIndent = true;
     const leftOf = (block: DocLeaf, from: number, maxWidth: number): number => {
       if (block.kind === 'paragraph' && block.tab) return 0;
@@ -926,7 +961,7 @@ export function writeDocx(
       const v = wraps ? offset : Math.min(offset, Math.max(0, room));
       return v >= MIN_INDENT ? Math.round(v / 10) * 10 : 0;
     };
-    // 表格前面的空白：一个 1 磅的空段落带着段前距。
+    // Spacing before a table: a 1 pt empty paragraph with paragraph-before spacing.
     const spacerXml = (before: number | undefined) =>
       before !== undefined && before >= MIN_BEFORE
         ? `<w:p><w:pPr><w:spacing w:before="${before}" w:line="240" w:lineRule="auto"/>` +
@@ -936,7 +971,7 @@ export function writeDocx(
       before?: number;
       left: number;
     }
-    // 一个块的 XML；maxWidth 是能放的宽（twip）：整页的内容区，或者并排行的一格。
+    // XML for a block; maxWidth is the available width (twips): the full content area or a cell in a multi-column row.
     const leafXml = (
       block: DocLeaf,
       maxWidth: number,
@@ -947,8 +982,11 @@ export function writeDocx(
       switch (block.kind) {
         case 'paragraph':
           if (block.tab) {
-            // 表单的标签和值（D-332）：两列无边框的表，一行一对（制表位在标签比原图长时会跳到下一个制表位、把值挤到下一行）。
-            // 标签一列按原图里值的位置（最多六成），值一列占到能放的右边。
+            // Form labels and values (D-332): two-column borderless table, one pair per row (tab
+            // stops would jump to the next tab stop if a label is longer than in the original,
+            // pushing the value to the next line). The label column is sized based on the value's
+            // position in the original image (at most 60%), and the value column occupies the
+            // remaining available space to the right.
             const label = Math.round(Math.min(twip(block.tab), 0.6 * maxWidth));
             const widths = [label, Math.max(200, maxWidth - label)];
             const rows = splitRuns(block.runs ?? [{ text: block.text }], '\n').map((line) => {
@@ -1002,7 +1040,7 @@ export function writeDocx(
               Math.max(200, fontMaxWidth - left),
               fit,
             ),
-            // 两张表紧挨着时 Word 会把它们并成一张：后面补一个空段落。
+            // When two tables are adjacent, Word combines them into one: append an empty paragraph after.
             blankXml(1),
           ];
         case 'space':
@@ -1014,7 +1052,7 @@ export function writeDocx(
           if (!image) return [];
           const n = media.length + 1;
           const rid = `rIdImg${n}`;
-          // 剪下来的是 JPG；外来的 docx 读进来的图片（D-509）也可能是 PNG、GIF、BMP，按文件开头认。
+          // Extracted image format is JPG; images read from external docx files (D-509) might also be PNG, GIF, or BMP, identified via file header magic bytes.
           const ext = imageExt(image.bytes) ?? 'jpg';
           media.push({ name: `image${n}.${ext}`, rid, bytes: image.bytes });
           if (block.background)
@@ -1029,13 +1067,13 @@ export function writeDocx(
               ),
             ];
           const out = pageBreak() ? [paragraphXml('', {}, bodySize, { pageBreak: true })] : [];
-          // 大小按它在原图里占的宽度，放不下时等比缩小。
+          // Size based on the width occupied in the original image, scaled down proportionally if it does not fit.
           let w = (block.box.width / page.width) * PAGE_W;
           let h = (w * image.height) / Math.max(1, image.width);
           const k = Math.min(1, maxWidth / w, (CONTENT_H * 0.9) / h);
           w *= k * pictureScale;
           h *= k * pictureScale;
-          // schema 的顺序：spacing、ind，段落标记的 rPr 在最后。
+          // Schema order: spacing, ind; paragraph mark rPr comes last.
           const pPr =
             (page.paper
               ? `<w:spacing w:before="${before ?? 0}" w:after="0" w:line="240" w:lineRule="auto"/>`
@@ -1095,10 +1133,10 @@ export function writeDocx(
       };
       if (measure() > CONTENT_H - (page.paper ? Math.round(leading * bodySize * 20) : 0)) {
         if (page.paper) {
-          // 空白压到零、图缩到最小也放不进这一页时（正文本来就要续页），不压空白：段落之间照样空开，正常分页。
+          // When whitespace is compressed to zero and the image is shrunk to minimum size yet still fails to fit on the page (body text naturally requiring pagination), whitespace is not compressed: maintain normal paragraph spacing and normal pagination.
           fit = 0;
           pictureScale = leaves.some((b) => b.kind === 'image') ? 0.25 : 1;
-          // 折行的段落保留原来的缩进会多折几行：这样一页放不下时，缩进照旧让给剩下的空间（不多出一页）。
+          // Retaining original indentation on wrapping paragraphs causes extra line wraps: thus, when it does not fit on a page, surrender indentation to the remaining space (avoiding an extra page overflow).
           if (measure() > CONTENT_H - Math.round(leading * bodySize * 20)) wrappedIndent = false;
           const fits = measure() <= CONTENT_H - Math.round(leading * bodySize * 20);
           fit = 1;
@@ -1108,12 +1146,12 @@ export function writeDocx(
               hi = 1;
             for (let i = 0; i < 12; i++) {
               fit = (lo + hi) / 2;
-              // 字体替代和尾行折行留一行余量；只压来源空白，不缩正文或让文字跨到图上。
+              // Leave a one-line margin for font substitution and last-line wrapping; compress source whitespace only, without shrinking body text or letting text overlap images.
               if (measure() > CONTENT_H - Math.round(leading * bodySize * 20)) hi = fit;
               else lo = fit;
             }
             fit = lo;
-            // 段落正常行高加整图本身也可能超过源页；空白压到头后才等比缩图，正文不缩字。
+            // Normal paragraph line height plus the full image itself may exceed the source page; image is scaled proportionally only after source whitespace is compressed to the limit, without shrinking body text font size.
             if (
               measure() > CONTENT_H - Math.round(leading * bodySize * 20) &&
               leaves.some((b) => b.kind === 'image')
@@ -1121,7 +1159,7 @@ export function writeDocx(
               let low = 0.25,
                 high = 1;
               pictureScale = low;
-              // 正文本来就需要续页时，缩图不能解决溢出；保留原图尺寸继续正常分页。
+              // When body text naturally requires pagination, image scaling cannot resolve overflow; retain original image dimensions and proceed with normal pagination.
               const feasible = measure() <= CONTENT_H - Math.round(leading * bodySize * 20);
               for (let i = 0; feasible && i < 12; i++) {
                 pictureScale = (low + high) / 2;
@@ -1163,20 +1201,22 @@ export function writeDocx(
         );
         continue;
       }
-      // 并排行（D-331）：无边框的排版表格，一行，每格的宽按原图位置，放不下时等比缩小。
+      // Side-by-side layout (D-331): borderless layout table, single row, cell widths based on original image positions, scaled down proportionally if they do not fit.
       if (pageBreak()) body.push(paragraphXml('', {}, bodySize, { pageBreak: true }));
       body.push(spacerXml(before));
       const widths = fitWidths(
         block.cells.map((c) => twip(c.width)),
         CONTENT_W,
       );
-      // 页边距修复只扩展列宽，不顺带放大已经识别好的表格字体。
+      // Margin correction only expands column widths without enlarging already-recognized table fonts.
       const fontWidths = fitWidths(
         block.cells.map((c) => twip(c.width)),
         Math.min(CONTENT_W, PAGE_W * TABLE_FONT_PAGE_SHARE),
       );
-      // 最后一栏的原图宽只到文字的右边，不一定是可用空间的右边。
-      // 原图单行的左对齐段落、居中标题按导出字号量字宽、加内边距，借用右侧空白；前面的栏不动。
+      // The original image width of the last column extends only to the right edge of the text, not
+      // necessarily the right edge of available space. Single-line left-aligned paragraphs and
+      // centered titles in the original image have their word widths measured at export font size
+      // plus padding, borrowing right-side whitespace; preceding columns remain untouched.
       const last = block.cells.at(-1)!;
       const from = Math.min(...last.blocks.map((b) => b.box.x));
       let needed = widths.at(-1)!;
@@ -1186,11 +1226,11 @@ export function writeDocx(
         if (b.align && b.align !== 'left' && !centeredHeading) continue;
         const size =
           b.size ?? (b.heading ? bodySize * HEADING_SCALE[`Heading${b.heading}`]! : bodySize);
-        // 新增的居中标题只放宽可信的一行；不把原本多行的标题拉成一行，原有左对齐路径保持原样。
+        // Only widen trusted single lines for newly added centered headings; do not stretch originally multi-line headings into a single line, keeping existing left-aligned paths unchanged.
         if (twip(b.box.height) > (centeredHeading ? 1 : 1.5) * LINE_HEIGHT * size * 20) continue;
         const runs = b.runs ?? [{ text: b.text }];
         const textWidth = runs.reduce(
-          // textEm 默认去首尾空白；run 之间的空格也占宽，用两端的字保住它们。
+          // textEm removes leading and trailing whitespace by default; spaces between runs also occupy width, preserved using characters at both ends.
           (sum, r) => sum + (textEm(`|${r.text}|`) - 2 * textEm('|')) * (r.size ?? size) * 20,
           0,
         );
@@ -1203,8 +1243,10 @@ export function writeDocx(
       }
       const spare = Math.max(0, CONTENT_W - widths.reduce((a, b) => a + b, 0));
       widths[widths.length - 1]! += Math.min(spare, needed - widths.at(-1)!);
-      // 整行被缩小时，右侧一个不可断开的短标签也要留够字宽和内边距。
-      // 只从前一栏可折行的正文借最少的宽度，不扩大页面，也不压缩标题、表格或图片。
+      // When an entire row is shrunk, an unbreakable short label on the right must still retain
+      // adequate word width and padding. Borrow the minimum required width solely from preceding
+      // wrap-eligible body text, without enlarging the page or compressing titles, tables, or
+      // images.
       const labels = last.blocks.filter((b) => b.kind === 'paragraph');
       const previousCell = block.cells.at(-2);
       const prose = previousCell?.blocks.filter((b) => b.kind === 'paragraph') ?? [];
@@ -1243,21 +1285,23 @@ export function writeDocx(
         }
       }
       lendToLast(block, widths);
-      // 并排行在原图里的左边（发票右半边的标签、地址窗）：整行往右缩进，不都挪到左页边；
-      // 只用格子右边还空着的宽，格子的宽不变。
+      // Left side-by-side elements in the original image (labels and address windows on the right
+      // half of an invoice): indent the entire row to the right rather than shifting everything to
+      // the left page margin; utilize only the available blank width on the right of the cell,
+      // keeping cell widths unchanged.
       const shift = Math.min(
         twip((snap.get(block.box.x) ?? block.box.x) - base),
         CONTENT_W - widths.reduce((a, b) => a + b, 0),
       );
       const indent = shift >= MIN_INDENT ? Math.round(shift / 10) * 10 : 0;
-      // 格子里留一点边距，里面的表格、图片按格子的宽缩小；格子里的位置从这一格的左上角算。
+      // Leave a small margin inside cells; tables and images inside cells scale down to cell width; positions inside cells are calculated relative to the cell's top-left corner.
       const cells = block.cells.map((cell, i) => {
         const max = widths[i]! - 2 * CELL_PAD;
         return cellXml(cell.blocks, max, block.box.y, fontWidths[i]! - 2 * CELL_PAD);
       });
       body.push(layoutTableXml(widths, [cells], bodySize, indent), blankXml(1));
     }
-    // 只把锚点放进表格外已有的段落；不增加正文行，也不让竖排单元格把底图参与测高。
+    // Place anchors only into existing paragraphs outside tables; do not add body text lines or cause vertical table cells to contribute background images to height measurement.
     const drawings = page.blocks
       .filter((b) => b.kind === 'image' && b.background)
       .flatMap((b) => {

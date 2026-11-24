@@ -28,8 +28,9 @@ import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { useEditActions } from './actions';
 import { capabilitiesOf, type StyleKey, type TextField } from './capabilities';
 
-// 长按组件弹出的操作面板（D-052）：改文字、颜色、对齐、大小、位置、隐藏、删除。
-// 每个操作先校验并加入编辑草稿；「完成」时整份草稿生成一个可撤销版本（D-054、D-235）。
+// Action sheet popped up on long-pressing a component (D-052): modify text, color, alignment, size,
+// position, hide, delete. Each operation is first validated and added to the editing draft; upon
+// "Done", the entire draft generates an undoable version (D-054, D-235).
 
 const STYLE_VALUES = {
   tone: ['default', 'primary', 'secondary', 'tertiary', 'muted'],
@@ -37,7 +38,7 @@ const STYLE_VALUES = {
   size: ['small', 'medium', 'large'],
 } as const;
 
-/** 选「默认值」时清除该外观设置，而不是把默认值写进配置。 */
+/** Clears the style setting when "Default" is selected, rather than writing the default value into the configuration. */
 const DEFAULTS: Record<StyleKey, string> = { tone: 'default', align: 'start', size: 'medium' };
 
 const STYLE_TITLES: Record<StyleKey, StringKey> = {
@@ -140,8 +141,10 @@ function TextForm({
 }
 
 /**
- * 图片背景（D-258）：选、换、移除图片，调遮罩深浅，关掉。选的图片存成用户文件，配置里只写 ID。
- * prefix 区分组件的（edit-backdrop）和页面的（edit-page-backdrop）。
+ * Image background (D-258): select, change, or remove image, adjust mask darkness, or turn off.
+ * Selected image is stored as a user file, with only the ID written in the configuration. The
+ * prefix distinguishes component backdrops (`edit-backdrop`) from page backdrops
+ * (`edit-page-backdrop`).
  */
 function BackdropSection({
   title,
@@ -243,7 +246,7 @@ export function EditSheet({
 
   if (!component) return null;
   const id = component.id;
-  // 更新的 App 加的组件（D-254）只能移动和删除。
+  // Components added by updated apps (D-254) can only be moved and deleted.
   const known = isKnownComponent(component) ? component : null;
   const caps = known ? capabilitiesOf(known) : { text: [], style: [] };
   const update = (changes: BlockChanges): Op => ({
@@ -253,7 +256,7 @@ export function EditSheet({
     changes,
   });
 
-  /** 加入编辑草稿。改外观时面板保持打开，方便多试几种。 */
+  /** Add to the editing draft. Keep the action sheet open when modifying styles to make it easy to try out a few options. */
   function apply(ops: Op[], { keepOpen = false } = {}) {
     if (edit(ops) && !keepOpen) close();
   }
@@ -284,7 +287,7 @@ export function EditSheet({
     ]);
   }
 
-  /** 文件入口（D-257）：选的文件先复制进 App，配置里只写文件 ID。 */
+  /** File entry (D-257): selected files are first copied into the app, with only the file ID written in the configuration. */
   async function chooseFile() {
     const assetId = await chooseSlotFile(locale, label(id), (source) =>
       importSlotFile(source, files, repo),

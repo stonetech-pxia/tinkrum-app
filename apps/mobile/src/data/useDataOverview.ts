@@ -34,9 +34,11 @@ import type { RecordImport, StoredRecord } from '@/storage/types';
 import { useWorkspace, useWorkspaceContext } from '@/workspace/context';
 
 /**
- * 「设置 → 数据」和它的子页面共用的数据和操作（D-614 拆成几页前都在 data.tsx 里）：
- * 每张表的条数和导入批次、不在界面里的表、最近删除、填写记忆；导出 CSV、导出 App 设计、恢复和清空填写记忆等。
- * 由内核提供，AI 不能修改（底线 8）。
+ * Data and operations shared between "Settings -> Data" and its subpages (previously all in
+ * data.tsx before being split into several pages in D-614): row counts and import batches for
+ * each table, tables not in the UI, recently deleted entries, fill history; CSV export, app
+ * design export, restore and clearing fill history, etc. Provided by the core, cannot be modified
+ * by the AI (invariant 8).
  */
 export function useDataOverview() {
   const { repo, files, locale } = useWorkspaceContext();
@@ -52,11 +54,11 @@ export function useDataOverview() {
     { collection: Collection | null; id: string; count: number }[]
   >([]);
   const [deleted, setDeleted] = useState<StoredRecord[]>([]);
-  // 每张表从文件导入的批次（D-574），只留还有记录在的。
+  // Import batches for each table from files (D-574), keeping only those with remaining records.
   const [imports, setImports] = useState<Map<string, RecordImport[]>>(new Map());
   const [known, setKnown] = useState<Map<string, Collection>>(new Map());
   const [layouts, setLayouts] = useState(0);
-  // 新记录表单里点过的候选（D-394）：一个字段算一个。
+  // Candidates tapped in the new record form (D-394): one per field.
   const [picks, setPicks] = useState(0);
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export function useDataOverview() {
     void (async () => {
       const rows = await repo.countRecords();
       const deletedRows = await repo.listDeletedRecords();
-      // 已移出界面的数据表：从历史版本里找回它的结构（版本只追加、不删除）。
+      // Data tables removed from the UI: retrieve their structure from version history (versions are append-only, never deleted).
       const missing = new Set(
         [...rows.map((r) => r.collectionId), ...deletedRows.map((r) => r.collectionId)].filter(
           (id) => !config.data.tables.some((c) => c.id === id),
@@ -89,7 +91,7 @@ export function useDataOverview() {
             collection: found.get(r.collectionId) ?? null,
           })),
       );
-      // 超过保留期、但还没到下次启动清除的记录不再显示。
+      // Records exceeding the retention period but not yet cleared at the next startup are no longer displayed.
       const cutoff = Date.now() - RECORD_LIMITS.deletedRetentionDays * 24 * 60 * 60 * 1000;
       setDeleted(deletedRows.filter((r) => r.deletedAt! >= cutoff));
       setKnown(new Map([...found, ...config.data.tables.map((c) => [c.id, c] as const)]));
@@ -102,7 +104,7 @@ export function useDataOverview() {
   }, [repo, config, version]);
 
   async function exportCsv(collection: Collection) {
-    // 查找、汇总、上一条导出算出来的值（D-291）。
+    // Values computed by finding, summarizing, or previous exports (D-291).
     const { view, records } = await loadComputedRecords(
       (id) => repo.listRecords(id),
       config.data.tables,
@@ -111,7 +113,7 @@ export function useDataOverview() {
       calendarOf(config),
     );
     records.sort((a, b) => a.createdAt - b.createdAt);
-    // 引用字段导出被引用记录的标题（D-250）。
+    // Titles of referenced records exported by reference fields (D-250).
     const links = await loadLinkResolver(
       (id) => repo.listRecords(id),
       config.data.tables,
@@ -125,7 +127,7 @@ export function useDataOverview() {
     );
   }
 
-  /** 文件名里的日期（本地时间），导出几次不会互相覆盖。 */
+  /** Date in the filename (local time), ensuring multiple exports do not overwrite each other. */
 
   async function exportConfig() {
     const now = new Date();
@@ -182,14 +184,14 @@ export function useDataOverview() {
     );
   }
 
-  /** 表上的「自动读取附件」（D-397）：默认打开，不写；关掉才写 false。能在改动记录里撤销。 */
+  /** "Auto-read attachments" on the table (D-397): enabled by default, not written unless disabled (written as false). Can be undone in change history. */
   const setReadAttachments = (c: Collection, on: boolean) =>
     change(
       [{ op: 'updateData', table: c.id, changes: { readAttachments: on ? null : false } }],
       t(locale, on ? 'describeReadAttachmentsOn' : 'describeReadAttachmentsOff', { name: c.name }),
     );
 
-  /** 表上的「附件是」（D-421）：其他不写，只有通用规则。 */
+  /** "Attachment is" on the table (D-421): others are not written, only generic rules. */
   const setPrefillRules = (c: Collection, rules: Collection['prefillRules']) =>
     change(
       [{ op: 'updateData', table: c.id, changes: { prefillRules: rules ?? null } }],
@@ -222,7 +224,7 @@ export function useDataOverview() {
     ]);
   }
 
-  /** 删除一次导入（D-574）：先问；这一批还在的记录进「最近删除」30 天，之后改过的也一起。 */
+  /** Delete an import batch (D-574): prompt first; records from this batch that still exist go to "Recently deleted" for 30 days, along with any modified later. */
   function deleteImport(c: Collection, batch: RecordImport) {
     Alert.alert(
       t(locale, 'importDeleteBatch'),

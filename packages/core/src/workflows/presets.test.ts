@@ -63,7 +63,7 @@ describe('workflow presets', () => {
         expect(typesAlong(wf.steps, registry).every((t) => t !== null)).toBe(true);
         expect(preset.name[locale] && preset.description[locale]).toBeTruthy();
       }
-      // 声明的扩展包和步骤实际需要的一致。
+      // Declared packs match those actually required by the steps.
       const packs = new Set(
         preset.steps('en').flatMap((s) => registry.actions.get(s.action)?.pack ?? []),
       );
@@ -125,8 +125,9 @@ describe('inbox order for each kind of file (D-237)', () => {
     Array.from({ length: n }, (_, i) => ({ name: `f${i}`, mimeType, size: 1 }));
 
   it('puts the most common actions first for one photo, many photos, videos, PDFs and audio', () => {
-    // 一张照片常常是拍的纸质文件或表格：扫描、转 Excel 排在第二、第三（2026-10-29 真机：物业账单照片
-    // 推荐里没有转 Excel，要点「查看全部」才找到）。
+    // A photo is often a picture of a paper document or table: scan and convert to Excel are ranked
+    // second and third (2026-10-29 real device test: property bill photo recommendations lacked
+    // convert to Excel, requiring "View all" to find).
     expect(sharePresetOrder(files('image/jpeg', 1))).toEqual([
       'email-photos',
       'scan-document',

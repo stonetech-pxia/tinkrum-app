@@ -4,20 +4,23 @@ import { t } from '../messages';
 import { PAGE_PERIODS } from '../schema-primitives';
 import { type LookDefinitionOf, defineLook } from './define';
 
-// 时间范围（D-440，创始人 2026-11-05 定；记录块也跟着，D-561）：页面上的一排选项，用户点一个，同一页里 source.period 是 "page" 的图表和数字卡
-// 都按它画。选项由配置决定（Tink 能改），不是 Expensify 那十几种；custom 多一个「自定义」，点了选起止日期。
-// 选了什么只在页面画着的时候有，什么都不写（底线 15）；没有任何东西自己运行。
+// Time range (D-440, set by founder 2026-11-05; record blocks follow suit, D-561): a row of options
+// on the page; when the user taps one, chart and number cards on the same page with source.period
+// set to "page" render accordingly. Options are determined by config (modifiable by Tink), not the
+// dozen-plus Expensify ones; custom adds a "Custom" option which opens a date range picker upon
+// tapping. Selection exists only while rendering the page, nothing is stored (invariant 15);
+// nothing runs automatically.
 
 const shape = {
   show: z.strictObject({
-    /** 能选的时间段，按这个顺序排；第一个是默认的（除非写了 default）。 */
+    /** Selectable time periods, ordered accordingly; the first is the default (unless default is specified). */
     options: z
       .array(z.enum(PAGE_PERIODS))
       .min(1)
       .max(PAGE_PERIODS.length)
       .refine((list) => new Set(list).size === list.length, 'options must be different'),
     default: z.enum(PAGE_PERIODS).optional(),
-    /** 多一个「自定义」：用户自己选起止日期。 */
+    /** Adds a "Custom" option: user selects start and end dates themselves. */
     custom: z.literal(true).optional(),
   }),
 };

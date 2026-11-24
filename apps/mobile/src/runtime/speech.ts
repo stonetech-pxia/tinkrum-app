@@ -14,16 +14,17 @@ import {
 
 import type { MorphSpeechModule } from '../../modules/morph-speech';
 
-// 语音转文字的 App 一侧（D-150、D-151）：把原生模块 MorphSpeech 包成和平台无关的接口。
-// iOS 用系统识别，第一次用某种语言时可能要由系统下载识别模型；Android 用 whisper，模型是下载内容。
-// 文字只留在本机（D-036）。
+// What is still missing before recognition. The speech-to-text app side (D-150, D-151): wraps the
+// MorphSpeech native module into a platform-agnostic interface. iOS uses system recognition, where
+// downloading the recognition model may be required by the system on first use of a language;
+// Android uses whisper, with downloadable models. Text stays strictly on device (D-036).
 
-/** 识别前还缺什么。 */
+/** What is still missing before recognition. */
 export type SpeechNeed =
   | { kind: 'ready' }
-  /** iOS：系统要先下载这种语言的识别模型（苹果提供、所有 App 共用，大小系统不告诉我们）。 */
+  /** iOS: The system must first download the recognition model for this language (provided by Apple, shared across all apps; size is not reported by the system). */
   | { kind: 'systemDownload' }
-  /** Android：要先下载 whisper 模型（连同语音检测模型）。 */
+  /** Android: The whisper model (along with the voice activity detection model) must be downloaded first. */
   | { kind: 'pack'; packId: string }
   | { kind: 'unsupported' };
 
@@ -34,7 +35,7 @@ export type SpeechErrorCode =
   | 'unreadableAudio'
   | 'model'
   | 'cancelled'
-  /** 这台设备上系统识别用不了（iOS 模拟器：模型「已安装」但没有能用的音频格式）。 */
+  /** System recognition is unavailable on this device (iOS simulator: model is 'installed' but no usable audio format is available). */
   | 'unavailable'
   | 'failed';
 
@@ -59,18 +60,18 @@ const NATIVE_CODES: Record<string, SpeechErrorCode> = {
 
 export interface SpeechPacks {
   isInstalled(id: string): Promise<boolean>;
-  /** 已下载内容里一个文件的本机地址。 */
+  /** Local path of a file within the downloaded content. */
   uri(id: string, file: string): string;
 }
 
 export interface TranscribeRequest {
   timed?: boolean;
   language: SpeechLanguage;
-  /** Android 用哪个模型；iOS 不管。 */
+  /** Which model to use on Android; ignored on iOS. */
   model: SpeechModel;
   /** 0–1。 */
   onProgress?: (fraction: number) => void;
-  /** 运行页点了「取消」（每 0.3 秒看一次）。 */
+  /** User tapped 'Cancel' on the running page (checked every 0.3 seconds). */
   isCancelled?: () => boolean;
 }
 
@@ -83,7 +84,7 @@ export interface SpeechTranscript {
 export interface SpeechPlatform {
   readonly engine: 'system' | 'whisper';
   need(language: SpeechLanguage, model: SpeechModel): Promise<SpeechNeed>;
-  /** iOS：让系统下载识别模型（只能在用户确认后调用）。 */
+  /** iOS: Prompt the system to download the recognition model (can only be called after user confirmation). */
   prepare(language: SpeechLanguage, onProgress?: (fraction: number) => void): Promise<void>;
   transcribe(uri: string, request: TranscribeRequest): Promise<SpeechTranscript>;
 }
@@ -100,7 +101,7 @@ function asSpeechError(e: unknown): SpeechError {
   return new SpeechError((code && NATIVE_CODES[code]) || 'failed', message);
 }
 
-/** 没有原生模块（Expo Go、测试）时为 null。 */
+/** Null when native modules are unavailable (Expo Go, tests). */
 export function createSpeech(
   native: MorphSpeechModule | null,
   packs: SpeechPacks | null,

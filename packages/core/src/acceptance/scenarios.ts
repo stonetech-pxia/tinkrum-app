@@ -30,15 +30,18 @@ import {
   type AppView,
 } from './capabilities';
 
-// 验收场景（范围 D-374：打卡 / 习惯、日历、待办优先，记账是边界，再加文件进记录）。
-// 每项要求是用户真要的结果，同一需求的几种合理建法都要算过；都要写在同一张表上才算接起来。
-// ask 是用户发现缺这项时会说的一句话，实验台（lab.ts --acceptance）一次说一句。
+// Acceptance scenarios (scope D-374: check-in / habits, calendar, todos prioritized; expense
+// tracking is a boundary; plus files into records). Each requirement is an exact user-desired
+// outcome; several reasonable construction methods for the same requirement must all be evaluated;
+// they must all be written to the same table to be considered connected. `ask` is the sentence a
+// user would say upon noticing the item is missing, and the lab bench (`lab.ts --acceptance`)
+// evaluates one sentence at a time.
 
 export interface Requirement {
   id: string;
   cap: (v: AppView) => boolean;
   ask: Localized;
-  /** core 全过才算合格。 */
+  /** Must pass all core checks to be considered qualified. */
   core: boolean;
 }
 
@@ -57,25 +60,25 @@ const some = (v: AppView, test: (table: string) => boolean) => tableIds(v).some(
 
 const fieldsOf = (v: AppView, table: string): readonly Field[] => tableOf(v, table)?.fields ?? [];
 
-/** 用户写得进去一个标题：文字字段在写入口上有值。 */
+/** User can write a title: text field has a value on the write entry. */
 const hasTitleInput = (v: AppView, table: string) =>
   canAdd(v, table) &&
   fieldsOf(v, table).some(
     (f) => (f.type === 'text' || f.type === 'note') && entryWrites(v, table, f.id),
   );
 
-/** 记一条，日子有值。 */
+/** Log an entry, date has a value. */
 const loggable = (v: AppView, table: string) =>
   canAdd(v, table) && entryFills(v, table, dayField(v, table));
 
-/** 金额：写入口填得到。 */
+/** Amount: can be filled from the write entry. */
 const hasAmountInput = (v: AppView, table: string) =>
   canAdd(v, table) &&
   fieldsOf(v, table).some(
     (f) => (f.type === 'money' || f.type === 'number') && entryWrites(v, table, f.id),
   );
 
-/** 分类：单选或引用，写入口填得到。 */
+/** Category: single choice or reference, can be filled from the write entry. */
 const hasCategoryInput = (v: AppView, table: string) =>
   fieldsOf(v, table).some(
     (f) => (f.type === 'choice' || f.type === 'link') && entryWrites(v, table, f.id),
@@ -87,9 +90,9 @@ const calendars = (v: AppView, table?: string) =>
 const calendarDayFilled = (v: AppView, table: string) =>
   calendars(v, table).some((b) => entryFills(v, table, dayField(v, table, b.source.group?.by)));
 
-// ---- 打卡 ----
+// ---- Check-in ----
 
-/** 点大圆块就记（写的那张表）。 */
+/** Tap the large circle block to log (writes to that table). */
 const tapWrites = (v: AppView) =>
   v.writes.filter(
     (w) =>
@@ -106,7 +109,7 @@ const tapStreakTables = (v: AppView) =>
 
 const WEEK_PERIODS: readonly unknown[] = ['thisWeek', 'last7days'];
 
-/** 这周做到第几次、目标几次：数字块的 goal、按周的连续，或者每个习惯上显示的汇总和目标。 */
+/** Weekly progress count and target: number block goal, weekly streak, or summary and target displayed on each habit. */
 function weeklyProgress(v: AppView, table: string): boolean {
   const number = numberBlocks(v, table).some(
     (b) =>
@@ -147,9 +150,9 @@ const weeklyStreak = (v: AppView, table: string) =>
     (r) => r.field.aggregate === 'streak' && r.field.days?.unit === 'week',
   );
 
-// ---- 待办 ----
+// ---- Todo ----
 
-/** 把一条标成做完：打勾、或者每一条上的按钮改状态。 */
+/** Mark an entry as done: checkmark, or changing status via a button on each entry. */
 function markedDoneField(v: AppView, table: string): string | null {
   for (const w of v.writes) {
     if (w.tool.table !== table || !rowExists(v, w) || w.rowOf !== table) continue;
@@ -162,11 +165,11 @@ function markedDoneField(v: AppView, table: string): string | null {
   return null;
 }
 
-/** 标得了做完：改这一条的字段，或者新建一条完成记录。 */
+/** Can mark as done: modify fields of this entry, or create a new completion record. */
 const canMarkDone = (v: AppView, table: string) =>
   markedDoneField(v, table) !== null || completionCreates(v, table).length > 0;
 
-/** 列表能跟着完成记录变的字段：完成表上的汇总，或者最后完成时间读这个汇总的日程。 */
+/** Fields that can follow completion records: rollup on the completion table, or schedule reading this rollup for the last completion time. */
 function fieldsFollowingCompletions(v: AppView, table: string): string[] {
   const completions = new Set(completionCreates(v, table).map((w) => w.tool.table));
   const rollups = fieldsOf(v, table).filter((f) => f.type === 'rollup' && completions.has(f.table));
@@ -189,7 +192,7 @@ const hidesDone = (v: AppView, table: string) => {
   );
 };
 
-/** 分项目：引用另一张加得进去的表，或者按单选分组。 */
+/** Group by project: reference to another addable table, or grouped by single choice. */
 const inProjects = (v: AppView, table: string) =>
   fieldsOf(v, table).some(
     (f) =>
@@ -204,7 +207,7 @@ const inProjects = (v: AppView, table: string) =>
 const scheduleFields = (v: AppView, table: string) =>
   fieldsOf(v, table).filter((f) => f.type === 'schedule');
 
-/** 今天要做的放在前面：只列今天的，或者按日程排、分段（今天的在最前）。 */
+/** Today's tasks placed first: list today only, or sort by schedule, with sections (today's items first). */
 const todayView = (v: AppView, table: string) =>
   recordBlocks(v, table).some((b) => {
     const { filter, group } = b.source;
@@ -233,7 +236,7 @@ const doneOnNotificationFor = (v: AppView, table: string) =>
 const isTodoTable = (v: AppView, table: string) =>
   hasTitleInput(v, table) && scheduleFields(v, table).length > 0;
 
-// ---- 记账 ----
+// ---- Expense Tracking ----
 
 const isSum = (kind: string) => kind === 'sum';
 
@@ -267,14 +270,14 @@ const sumByMonth = (v: AppView, table: string) =>
       (r.field.filter ?? []).some((c) => c.op === 'inPeriod' && c.value === 'thisMonth'),
   );
 
-/** 两个分类字段是同一套：引用同一张表，或者单选至少有一个相同的选项。 */
+/** Two category fields belong to the same set: reference the same table, or share at least one identical single-choice option. */
 function sameCategories(a: Field, b: Field): boolean {
   if (a.type === 'link' && b.type === 'link') return a.table === b.table;
   if (a.type !== 'choice' || b.type !== 'choice') return false;
   return a.options.some((x) => b.options.some((y) => x.id === y.id || x.label === y.label));
 }
 
-/** 独立的目标表：另一张加得进去的表，每条选一个分类（和这张表同一套）、填一个金额。 */
+/** Independent target table: another addable table where each entry selects a category (same set as this table) and enters an amount. */
 function targetTable(v: AppView, table: string): boolean {
   const categories = fieldsOf(v, table).filter(
     (f) => (f.type === 'choice' || f.type === 'link') && entryWrites(v, table, f.id),
@@ -289,7 +292,7 @@ function targetTable(v: AppView, table: string): boolean {
   );
 }
 
-/** 每类目标：引用的分类表上有金额字段填得到（或汇总的分配表），独立的目标表，或者按类筛的数字块带目标。 */
+/** Per-category target: referenced category table has an amount field that can be filled (or rollup allocation table), independent target table, or category-filtered number block with target. */
 const hasTargets = (v: AppView, table: string) =>
   targetTable(v, table) ||
   fieldsOf(v, table).some(
@@ -299,7 +302,7 @@ const hasTargets = (v: AppView, table: string) =>
       fieldsOf(v, f.table).some(
         (g) =>
           ((g.type === 'money' || g.type === 'number') && entryFills(v, f.table, g.id)) ||
-          // 零基预算：目标是另一张分配表上汇总出来的。
+          // Zero-based budgeting: target is rolled up from another allocation table.
           (g.type === 'rollup' &&
             g.table !== table &&
             isSum(g.aggregate) &&
@@ -310,7 +313,7 @@ const hasTargets = (v: AppView, table: string) =>
     (b) => isSum(b.source.aggregate) && b.source.goal !== undefined && statInputsFilled(v, b),
   );
 
-/** 每类还剩多少：公式（目标 − 汇总）、数字块 minus、带目标的数字块、或者目标进度环。 */
+/** Remaining amount per category: formula (target − rollup), number block minus, number block with target, or target progress ring. */
 function remaining(v: AppView, table: string): boolean {
   const spentFields = rollupsOverAny(v, table);
   const formula = tablesOf(v.config).some((host) =>
@@ -344,7 +347,7 @@ function remaining(v: AppView, table: string): boolean {
   );
 }
 
-/** 汇总 over 这张表的字段（公式读它，自己可以不显示）。 */
+/** Rollups over any fields of this table (formula reads it, may not be displayed itself). */
 const rollupsOverAny = (v: AppView, table: string) =>
   tablesOf(v.config).flatMap((host) =>
     host.fields.flatMap((f) =>
@@ -354,11 +357,13 @@ const rollupsOverAny = (v: AppView, table: string) =>
     ),
   );
 
-// ---- 文件进记录 ----
+// ---- Files to Records ----
 
 /**
- * 文件进这张表，用户确认后存：快捷操作交给新记录表单（摆在摸得到的地方），或者表单、完整表单里问附件字段
- * （可以当场拍照、选文件）。只能从收件页面「存成记录」不算：没有入口。
+ * Files enter this table and are saved after user confirmation: quick action hands over to new
+ * record form (placed within reach), or form/full form prompts for attachment field (can take
+ * photo on the spot, select file). Saving as record solely from inbox "Save as record" does not
+ * count: no entry point.
  */
 function capturesFile(v: AppView, table: string): boolean {
   if (v.intakes.some((x) => x.table === table && x.placed && x.ok && x.files)) return true;
@@ -383,7 +388,7 @@ const hasFileField = (v: AppView, table: string) =>
 
 const FILE_TABLE = (v: AppView, table: string) => hasFileField(v, table) && capturesFile(v, table);
 
-// ---- 场景（12 个，语言轮换）----
+// ---- Scenarios (12 items, rotating languages) ----
 
 export const SCENARIOS: readonly Scenario[] = [
   {

@@ -16,7 +16,7 @@ const messagesOf = (config: unknown) => {
   return result.ok ? '' : result.issues.map((i) => i.message).join('\n');
 };
 
-/** 默认工作空间加上 PDF 工具包（v33 代码存下来的，迁移到 v34）。 */
+/** Default workspace with the PDF tool pack added (saved by v33 code, migrated to v34). */
 const withPdf = () => fromV33(v33Fixture('setup-pdf-zh'));
 
 const mutate = (fn: (c: WorkspaceConfig) => void, base = withPdf()) => {
@@ -30,7 +30,7 @@ const merge = (c: WorkspaceConfig) => c.tools.find((t) => t.id === 'pdf-merge') 
 describe('validateWorkspace', () => {
   it('accepts every v33 configuration once migrated (defaults, starters, templates, samples, eval setups)', () => {
     const names = readdirSync(join(__dirname, 'fixtures', 'v33'))
-      // coverage-*：只给读取器用的覆盖面配置，故意超出上限。
+      // coverage-*: Coverage configuration files intended solely for readers, intentionally exceeding limits.
       .filter((f) => f.endsWith('.json') && !f.startsWith('coverage-'))
       .map((f) => f.replace('.json', ''));
     expect(names.length).toBeGreaterThan(20);
@@ -390,9 +390,9 @@ describe('validateWorkspace', () => {
   });
 
   it('rejects broken data flow between steps', () => {
-    // 去掉「选择文件」后，第一步收文件，要由记录的附件字段交（D-442）：放在按钮上交不出。
+    // After removing "Select file", the first step receives files, which must be supplied via the record's attachment field (D-442): they cannot be passed from a button.
     expect(issuesOf(mutate((c) => merge(c).steps.splice(0, 1)))).toContain('needs-container');
-    // 输入动作只能是第一步。
+    // Input actions must be the first step.
     expect(
       issuesOf(
         mutate((c) => {
@@ -401,7 +401,7 @@ describe('validateWorkspace', () => {
         }),
       ),
     ).toContain('source');
-    // 合并得到 PDF，「存到相册」只接受图片。
+    // Merging produces a PDF; "Save to photo library" only accepts images.
     expect(
       issuesOf(
         mutate((c) =>
@@ -409,7 +409,7 @@ describe('validateWorkspace', () => {
         ),
       ),
     ).toContain('binding');
-    // 运行时询问的必须是这个动作的参数。
+    // Runtime prompts must target parameters of this action.
     expect(issuesOf(mutate((c) => (merge(c).steps[2]!.ask = ['nameTemplate'])))).toContain('ask');
   });
 });
@@ -432,7 +432,7 @@ describe('record quick actions', () => {
         kind: 'quickAction',
         name: '报销单',
         steps: [
-          // 动作目录的参数名仍是 collectionId（不是配置结构）。
+          // Action directory parameter name remains collectionId (not configuration structure).
           { id: 'read', action: 'in.records', params: { collectionId, period: 'thisMonth' } },
           {
             id: 'pdf',

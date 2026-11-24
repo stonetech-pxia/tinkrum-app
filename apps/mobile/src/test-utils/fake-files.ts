@@ -42,7 +42,7 @@ import {
   type TranscribeRequest,
 } from '../runtime/speech';
 
-// 测试用工具：内存文件平台和真实 PDF 生成。
+// Test utility: in-memory file platform and real PDF generation.
 
 export async function makePdf(pages: number): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -50,7 +50,7 @@ export async function makePdf(pages: number): Promise<Uint8Array> {
   return doc.save();
 }
 
-/** 一张真实的 60×40 JPEG（tool-pdf 的测试素材），假编码器在它后面补零到目标大小。 */
+/** A real 60x40 JPEG (test asset for tool-pdf), with the fake encoder padding zeros to the target size. */
 export const TINY_JPEG = Uint8Array.from(
   atob(
     '/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAPKADAAQAAAABAAAAKAAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgAKAA8AwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICBAICBAYEBAQGCAYGBgYICggICAgICgwKCgoKCgoMDAwMDAwMDA4ODg4ODhAQEBAQEhISEhISEhISEv/bAEMBAwMDBQQFCAQECBMNCw0TExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTE//dAAQABP/aAAwDAQACEQMRAD8A/H608O/7NdTaeHf9mvT7Tw7/ALNdRaeHf9mv3PE5z5nzOS8Q7anmFn4d6fLXU2fh3p8ten2nh3p8tdTZ+Heny14OJzrzP1vJeIdtTzCz8O/7NdTaeHf9mvT7Pw70+WuotPDv+zXgYnOfM/W8l4h21PMLTw7/ALNdFF4d+T7terWnh3/Zroo/Dvy/drwq+da7n6tlfEPubn//0Pm608O/7NdRaeHf9mvT7Tw7/s11Np4d/wBmvZxOdeZ/M+S8QbanmFp4d6fLXU2nh3p8ten2nh3/AGa6iz8O9PlrwcTnXmfreS8QbanmFp4d6fLXU2nh3p8ten2fh3p8tdTZ+Hf9mvAxOdeZ+t5LxBtqeYWnh3/Zroo/Dvyfdr1W08O/7NdFH4d+X7teFXznXc/Vsr4g9zc//9H1608O9PlrqbTw7/s1bs+1dTadq+MxOKqdz+B8lxtXTUp2nh3/AGa6m08O9Plq5aV1FpXg4nFVO5+t5LjaumpUtPDvT5a6iz8O9Plq5Z9a6i07V4GJxVTufreS42rpqVLTw70+Wuij8O/L92tKz7V0cf3BXhV8VUvufq2V42rybn//2Q==',
@@ -58,7 +58,7 @@ export const TINY_JPEG = Uint8Array.from(
   (c) => c.charCodeAt(0),
 );
 
-/** 一个真实的、纯灰色的 PNG（pdf-lib 可以嵌入）。 */
+/** A real, solid-gray PNG (embeddable by pdf-lib). */
 export function makePng(width: number, height: number): Uint8Array {
   const crcTable = Array.from({ length: 256 }, (_, n) => {
     let c = n;
@@ -86,7 +86,7 @@ export function makePng(width: number, height: number): Uint8Array {
   const hv = new DataView(header.buffer);
   hv.setUint32(0, width);
   hv.setUint32(4, height);
-  header.set([8, 0, 0, 0, 0], 8); // 8 位灰度
+  header.set([8, 0, 0, 0, 0], 8); // 8-bit grayscale
   const raw = new Uint8Array((width + 1) * height).fill(128);
   for (let y = 0; y < height; y++) raw[y * (width + 1)] = 0;
   const parts = [
@@ -104,20 +104,21 @@ export function makePng(width: number, height: number): Uint8Array {
   return png;
 }
 
-/** 内存中的“文件系统”。 */
+/** In-memory "file system". */
 /**
- * 桌面目录（D-357）的内存实现：和 FakeFiles 共用一个 disk，地址是 desk/<路径>（运行能直接读）。
- * 原件（picker://、content://、file:///group/）只能复制；移动只用于运行目录 runs/ 里的文件。
+ * In-memory implementation of the desk directory (D-357): shares a disk with FakeFiles, with
+ * paths under desk/<path> (directly readable at runtime). Originals (picker://, content://,
+ * file:///group/) can only be copied; moving is only for files in the runs/ runtime directory.
  */
 export class FakeDeskFs implements DeskFs {
   constructor(private readonly files: FakeFiles) {}
-  /** 每次移进来的原地址（测试检查原件没有被移走）。 */
+  /** Original path for each move (tests check that originals were not moved away). */
   moved: string[] = [];
   uri = (path: string) => `desk/${path}`;
   isRunFile = (uri: string) => uri.startsWith('runs/');
   pathOf = (uri: string) => (uri.startsWith('desk/') ? uri.slice('desk/'.length) : null);
   async copyIn(uri: string, path: string) {
-    // 用户文件的地址（fileUri）也能复制进来（记录的附件放到桌上，D-395）。
+    // User file URLs (fileUri) can also be copied in (record attachments placed on the desk, D-395).
     const bytes =
       this.files.disk.get(uri) ?? this.files.disk.get(uri.replace(/^file:\/\/\/fake\//, ''));
     if (!bytes) throw new Error(`missing ${uri}`);
@@ -167,44 +168,44 @@ export class FakeDeskFs implements DeskFs {
 
 export class FakeFiles implements FilePlatform {
   disk = new Map<string, Uint8Array>();
-  /** 文件房间的桌面目录（D-357）。 */
+  /** File room desk directory (D-357). */
   desk = new FakeDeskFs(this);
-  /** 办公文档转 PDF：默认像 Android，只能转 .docx（iOS 的测试换成全部格式）。 */
+  /** Office document to PDF conversion: defaults to Android behavior, converting only .docx (iOS tests switch to all formats). */
   documents: FakeDocuments = new FakeDocuments(this);
-  /** 系统文字识别和扫描：默认没有（像 Android / Expo Go），测试里换成 FakeVision。 */
+  /** System OCR and scanning: defaults to none (like Android / Expo Go), replaced with FakeVision in tests. */
   vision: VisionPlatform | null = null;
-  /** 系统翻译：默认没有（像 Expo Go），测试里换成 FakeTranslator。 */
+  /** System translation: defaults to none (like Expo Go), replaced with FakeTranslator in tests. */
   translator: TranslatePlatform | null = null;
-  /** 视频处理：默认有（像开发版），测试 Expo Go 时设为 null。 */
+  /** Video processing: available by default (like dev builds), set to null when testing Expo Go. */
   media: MediaPlatform | null = new FakeMedia(this);
-  /** 语音转文字：默认没有（像 Expo Go），测试里换成 FakeSpeech。 */
+  /** Speech to text: defaults to none (like Expo Go), replaced with FakeSpeech in tests. */
   speech: SpeechPlatform | null = null;
-  /** 系统朗读（D-270）：默认没有（像 Expo Go），测试里换成 FakeSpeaker。 */
+  /** System text-to-speech (D-270): defaults to none (like Expo Go), replaced with FakeSpeaker in tests. */
   speaker: SpeakPlatform | null = null;
-  /** 后台继续（D-160）：默认没有（像 Expo Go），测试里换成 FakeBackground。 */
+  /** Background continuation (D-160): defaults to none (like Expo Go), replaced with FakeBackground in tests. */
   background: BackgroundPlatform | null = null;
-  /** 下一次从相册选视频的结果。 */
+  /** Result of the next video selection from the photo library. */
   nextVideos: PickedFile[] | null = null;
-  /** 手机剩余空间（字节）；null 表示读不到。 */
+  /** Remaining phone storage space in bytes; null means unreadable. */
   freeBytes: number | null = 64 * 1024 * 1024 * 1024;
-  /** 被「移进」本次运行的文件（视频、音频不复制，D-142）。 */
+  /** Files "moved in" during this run (videos and audio are not copied, D-142). */
   adopted: string[] = [];
-  /** 下一次选文件（「文件」App）的结果。 */
+  /** Result of the next file pick ("Files" app). */
   nextPick: PickedFile[] | null = null;
-  /** 下一次从相册多选的结果。 */
+  /** Result of the next multi-selection from the photo library. */
   nextPhotos: PickedFile[] | null = null;
-  /** 依次拍到的照片；null 表示用户取消。 */
+  /** Photos captured in sequence; null indicates user cancellation. */
   camera: (PickedFile | null)[] = [];
   cameraAvailable = true;
   photosAllowed = true;
-  /** 最近一次选文件时请求的类型。 */
+  /** Types requested during the most recent file pick. */
   lastPickTypes: readonly string[] = [];
   shared: string[] = [];
   savedToPhotos: string[] = [];
   printed: string[] = [];
   clipboard = '';
   nextImage: PickedFile | null = null;
-  /** 每次选照片要求的最长边。 */
+  /** Longest side requested for each photo selection. */
   imageSides: (number | undefined)[] = [];
   async pickImage(maxSide?: number) {
     this.imageSides.push(maxSide);
@@ -221,11 +222,11 @@ export class FakeFiles implements FilePlatform {
     return this.nextVideos ? this.nextVideos.slice(0, max) : null;
   }
   async adoptIntoRun(uri: string, runId: string, fileName: string, keepSource = false) {
-    // 用户文件的地址（fileUri）也行：原地使用，不移动（D-442）。
+    // User file URLs (fileUri) are also supported: used in place without moving (D-442).
     const bytes = this.disk.get(uri) ?? this.disk.get(uri.replace('file:///fake/', ''));
     if (!bytes) throw new Error('permission denied');
     this.adopted.push(uri);
-    // 选择器的副本（picker://）和运行中的临时文件移进来；分享进来的原地使用。
+    // Picker copies (picker://) and temporary runtime files are moved in; shared files are used in place.
     if (!keepSource && (uri.startsWith('picker://') || uri.startsWith('runs/'))) {
       const dest = `runs/${runId}/${fileName}`;
       this.disk.delete(uri);
@@ -239,9 +240,9 @@ export class FakeFiles implements FilePlatform {
   freeDiskBytes() {
     return this.freeBytes;
   }
-  /** 假视频的信息（uri → 时长、宽高、有没有声音）。 */
+  /** Fake video metadata (uri -> duration, dimensions, has audio). */
   videos = new Map<string, MediaInfo>();
-  /** 放一个“用户可选择的”假视频；字节数就是它的大小（内容不重要）。 */
+  /** Provide a "user-selectable" fake video; byte count is its size (content does not matter). */
   offerVideo(
     name: string,
     opts: Partial<MediaInfo> & { size: number },
@@ -261,7 +262,7 @@ export class FakeFiles implements FilePlatform {
     this.videos.set(picked.uri, info);
     return { ...picked, durationMs: info.durationMs, width: info.width!, height: info.height! };
   }
-  /** 放一个「文件」里可选的假音频；字节数就是它的大小。 */
+  /** Provide a selectable fake audio file in "Files"; byte count is its size. */
   offerAudio(
     name: string,
     opts: Partial<MediaInfo> & { size: number },
@@ -287,7 +288,7 @@ export class FakeFiles implements FilePlatform {
     }
     return this.camera.shift() ?? null;
   }
-  /** 最近一次选文件是不是「原位置读、不复制进缓存」（整体恢复选压缩包，D-600）。 */
+  /** Whether the most recent file pick was "read in place without copying into cache" (full restore archive selection, D-600). */
   lastPickInPlace = false;
   async pickDocuments(types: readonly string[], _multiple?: boolean, inPlace = false) {
     this.lastPickTypes = types;
@@ -297,12 +298,12 @@ export class FakeFiles implements FilePlatform {
   fileUri(path: string) {
     return `file:///fake/${path}`;
   }
-  /** PDF 第一页缩略图（D-451）：测试里按路径放进来；真实平台在存进用户文件时生成。 */
+  /** PDF first-page thumbnails (D-451): populated by path in tests; generated by the real platform when stored into user files. */
   thumbnails_: Map<string, string> = new Map();
   thumbnailUri(path: string) {
     return this.thumbnails_.get(path) ?? null;
   }
-  /** 文件里的文字（D-455）：按路径存在内存里。 */
+  /** Text inside files (D-455): stored in memory by path. */
   texts: Map<string, string> = new Map();
   async saveAssetText(path: string, text: string) {
     this.texts.set(path, text);
@@ -324,7 +325,7 @@ export class FakeFiles implements FilePlatform {
       if (key.startsWith(`assets/${id}/`)) this.disk.delete(key);
   }
   async readBytes(path: string) {
-    // 真机上 readBytes 读的是「文档」目录里的相对路径；运行目录在缓存里、要用 readUri 读。
+    // On real devices, readBytes reads relative paths in the "Documents" directory; runtime directories are in cache and must be read with readUri.
     if (path.startsWith('runs/') || path.includes(':'))
       throw new Error(`not a document path: ${path}`);
     const bytes = this.disk.get(path);
@@ -339,7 +340,7 @@ export class FakeFiles implements FilePlatform {
   async share(path: string) {
     this.shared.push(path);
   }
-  /** 选择器给的文字文件：地址 → 内容；读完的副本记在 readPicked 里。 */
+  /** Text files provided by pickers: URL -> content; read copies are recorded in readPicked. */
   pickedTexts = new Map<string, string>();
   readPicked: string[] = [];
   async readPickedText(uri: string) {
@@ -348,12 +349,12 @@ export class FakeFiles implements FilePlatform {
     if (text === undefined) throw new Error('permission denied');
     return text;
   }
-  /** 导出的文字文件：文件名 → 内容。 */
+  /** Exported text files: filename -> content. */
   sharedTexts = new Map<string, string>();
   async shareText(fileName: string, text: string) {
     this.sharedTexts.set(fileName, text);
   }
-  /** 交给别的 AI App 的（D-611）：带了检查器，App 文件是附件。 */
+  /** Shared with other AI apps (D-611): includes validator, app files are attachments. */
   aiShares: { text: string; request: string; files: { name: string; text: string }[] }[] = [];
   async shareWithAi(input: {
     file?: { name: string; text: string };
@@ -361,7 +362,7 @@ export class FakeFiles implements FilePlatform {
     pointer: string;
   }) {
     this.aiShares.push({
-      // 分享的文字只是指一下 tinkrum-request.md，提示词本身在那个文件里。
+      // The shared text only points to tinkrum-request.md, while the prompt itself resides inside that file.
       text: input.pointer,
       request: input.prompt({ attached: input.file !== undefined, checker: true, docs: true }),
       files: [
@@ -373,7 +374,7 @@ export class FakeFiles implements FilePlatform {
     });
   }
   async copyToRun(uri: string, runId: string, fileName: string) {
-    // 用户文件的地址（fileUri）也能复制进来，例如「加上已有文件」（D-197）。
+    // User file URLs (fileUri) can also be copied in, e.g., "add existing files" (D-197).
     const bytes = this.disk.get(uri) ?? this.disk.get(uri.replace('file:///fake/', ''));
     if (!bytes) throw new Error('permission denied');
     const dest = `runs/${runId}/${fileName}`;
@@ -396,7 +397,7 @@ export class FakeFiles implements FilePlatform {
       .digest('hex');
   }
   async readUri(uri: string) {
-    // 用户文件的地址（fileUri）对应磁盘上的相对路径。
+    // User file URLs (fileUri) correspond to relative paths on disk.
     const bytes = this.disk.get(uri) ?? this.disk.get(uri.replace(/^file:\/\/\/fake\//, ''));
     if (!bytes) throw new Error('missing');
     return bytes;
@@ -424,26 +425,26 @@ export class FakeFiles implements FilePlatform {
   async saveRunFile(uri: string, assetId: string, name: string) {
     return this.writeBytes(assetId, name, await this.readUri(uri));
   }
-  /** 每次打开分享面板带了哪些文件。 */
+  /** Files attached during each share sheet opening. */
   shareSheets: string[][] = [];
-  /** 每次分享时用户看到的文件名（D-466）。 */
+  /** Filenames visible to the user during each share (D-466). */
   shareNames: (string | undefined)[][] = [];
   async shareUris(items: readonly { uri: string; name?: string }[]) {
     this.shareSheets.push(items.map((i) => i.uri));
     this.shareNames.push(items.map((i) => i.name));
     this.shared.push(...items.map((i) => i.uri));
   }
-  /** 下一次选文件夹时用户怎么做：选好、取消、选了写不进去的文件夹（写不进去对记住的文件夹也生效）。 */
+  /** User action for the next folder selection: pick, cancel, non-writable folder selected (non-writability also applies to remembered folders). */
   folderChoice: 'pick' | 'cancel' | 'notWritable' | 'saveFailed' = 'pick';
-  /** 用户在选择器里选的文件夹名。 */
+  /** Folder name selected by the user in the picker. */
   nextFolder = 'MorphOut';
-  /** 最后选过的文件夹（D-123）。 */
+  /** Last selected folder (D-123). */
   remembered: string | null = null;
-  /** 每个快捷操作记住的文件夹（D-196）：快捷操作 ID → 文件夹名。 */
+  /** Folder remembered by each quick action (D-196): quick action ID -> folder name. */
   rememberedBy = new Map<string, string>();
-  /** 打开了几次文件夹选择器。 */
+  /** Number of times the folder picker was opened. */
   folderPicks = 0;
-  /** 各文件夹里的文件：文件夹名 → 文件名 → 内容。 */
+  /** Files in each folder: folder name -> filename -> content. */
   folders = new Map<string, Map<string, Uint8Array>>();
   async saveToFolder(items: readonly FolderItem[], key: string, choose = false) {
     const kept = choose ? null : (this.rememberedBy.get(key) ?? this.remembered);
@@ -479,9 +480,9 @@ export class FakeFiles implements FilePlatform {
     }
     this.savedToPhotos.push(...uris);
   }
-  /** 用系统预览打开过的文件（D-238）。 */
+  /** Files opened via system preview (D-238). */
   previewed: { uri: string; mimeType: string }[] = [];
-  /** 为 true 时预览报「没有能打开它的 App」。 */
+  /** When true, preview reports "No app found to open this file". */
   previewFails = false;
   async previewFile(item: { uri: string; mimeType: string }) {
     if (this.previewFails) throw new RunError('noViewer');
@@ -496,11 +497,11 @@ export class FakeFiles implements FilePlatform {
   async readClipboardText() {
     return this.clipboard;
   }
-  /** 假图片的尺寸（uri → 宽高）。 */
+  /** Fake image dimensions (uri -> width and height). */
   imageSizes = new Map<string, { width: number; height: number }>();
-  /** 编码结果的最小字节数（模拟怎么压都压不下去的图片）。 */
+  /** Minimum byte count of encoded output (simulating images that cannot be compressed further). */
   minEncodedBytes = 200;
-  /** 每次编码的记录，便于断言。 */
+  /** Record of each encoding operation, for assertions. */
   encodes: {
     ops: ImageOps;
     format: ImageFormat;
@@ -511,8 +512,8 @@ export class FakeFiles implements FilePlatform {
   async imageSize(uri: string) {
     const size = this.imageSizes.get(uri);
     if (size) return size;
-    // 动作直接写出的图片（例如无损去掉定位）：按真实的小 JPEG / PNG 处理。
-    // 用户文件的地址（fileUri）对应磁盘上的相对路径。
+    // Images written directly by actions (e.g., lossless EXIF removal): processed as small real
+    // JPEGs/PNGs. User file URLs (fileUri) correspond to relative paths on disk.
     const bytes = this.disk.get(uri) ?? this.disk.get(uri.replace(/^file:\/\/\/fake\//, ''));
     if (bytes && ((bytes[0] === 0xff && bytes[1] === 0xd8) || bytes[0] === 0x89)) {
       return { width: 60, height: 40 };
@@ -520,12 +521,13 @@ export class FakeFiles implements FilePlatform {
     throw new Error('not an image');
   }
   /**
-   * 假的编码器：按像素数和质量估算体积（JPEG 约 0.05–0.5 字节 / 像素，PNG 1.5），
-   * 写出相应长度的字节，单调且可预测，足够测试「压到目标大小」的搜索。
+   * Fake encoder: estimates size based on pixel count and quality (JPEG approx. 0.05–0.5 bytes /
+   * pixel, PNG 1.5), writes bytes of corresponding length, monotonic and predictable, sufficient
+   * for testing the search of "compress to target size".
    */
-  /** 已经删掉的文件（测试里模拟运行中途被清理）。 */
+  /** Files already deleted (simulated cleanup mid-run in tests). */
   deleted = new Set<string>();
-  /** 每次重新编码用的源图（和 encodes 一一对应）。 */
+  /** Source images used for each re-encoding (one-to-one with encodes). */
   encodedFrom: string[] = [];
   async transformImage(
     uri: string,
@@ -534,7 +536,7 @@ export class FakeFiles implements FilePlatform {
     runId: string,
     relPath: string,
   ) {
-    // 和真机一样：文件已经被删掉时读不了。
+    // Same as real device: files cannot be read when already deleted.
     if (this.deleted.has(uri)) throw new Error('missing');
     let { width, height } = await this.imageSize(uri);
     if (ops.crop) ({ width, height } = ops.crop);
@@ -544,7 +546,7 @@ export class FakeFiles implements FilePlatform {
     height = Math.round(height);
     const perPixel = save.format === 'png' ? 1.5 : 0.05 + 0.45 * save.quality;
     const size = Math.max(this.minEncodedBytes, Math.round(width * height * perPixel));
-    // JPEG 用真实的小图开头（pdf-lib 能嵌入），PNG 用真实的灰色 PNG，后面补零到估算的大小。
+    // JPEG starts with a real small image (embeddable by pdf-lib), PNG uses a real gray PNG, padded with zeros to the estimated size.
     const head = save.format === 'png' ? makePng(4, 4) : TINY_JPEG;
     const bytes = new Uint8Array(Math.max(size, head.length));
     bytes.set(head);
@@ -555,7 +557,7 @@ export class FakeFiles implements FilePlatform {
     this.encodedFrom.push(uri);
     return { uri: dest, width, height, size: bytes.length };
   }
-  /** reducedJpeg 的每次调用：用的长边和源图（解码时就缩小，不经过 imageSize）。 */
+  /** Each call to reducedJpeg: long side and source image used (downscaled during decoding, bypassing imageSize). */
   reduced: { uri: string; maxSide: number }[] = [];
   async reducedJpeg(uri: string, maxSide: number, quality: number, runId: string, relPath: string) {
     this.reduced.push({ uri, maxSide });
@@ -569,7 +571,7 @@ export class FakeFiles implements FilePlatform {
       relPath,
     );
   }
-  /** 放一张“用户可选择的”假照片。 */
+  /** Offer a "user-selectable" fake photo. */
   offerImage(
     name: string,
     width: number,
@@ -577,13 +579,13 @@ export class FakeFiles implements FilePlatform {
     mimeType = 'image/jpeg',
     bytes?: Uint8Array,
   ): PickedFile {
-    // JPEG 用真实的小图（pdf-lib 要能嵌入），其他格式只需要占位字节。
+    // JPEG uses a real small image (required for pdf-lib embedding), other formats only need placeholder bytes.
     const fallback = mimeType === 'image/jpeg' ? TINY_JPEG : new Uint8Array([0, 1, 2, 3]);
     const picked = this.offer(name, bytes ?? fallback, mimeType);
     this.imageSizes.set(picked.uri, { width, height });
     return { ...picked, width, height };
   }
-  /** 合成过的画布和绘制步骤（拼图、打码、水印、相纸）。 */
+  /** Composed canvas and drawing steps (collage, redaction, watermark, photo paper). */
   composed: { canvas: { width: number; height: number; background: string }; ops: DrawOp[] }[] = [];
   async composeImage(
     canvas: { width: number; height: number; background: string },
@@ -599,13 +601,13 @@ export class FakeFiles implements FilePlatform {
     this.imageSizes.set(dest, { width: canvas.width, height: canvas.height });
     return { uri: dest, width: canvas.width, height: canvas.height, size: head.length };
   }
-  /** imagePixels 返回的像素（按 uri）；没有时返回一张白图。 */
+  /** Pixels returned by imagePixels (by uri); returns a white image when missing. */
   pixels = new Map<string, { width: number; height: number; data: Uint8Array }>();
   async imagePixels(uri: string) {
     if (!this.disk.has(uri)) throw new Error('missing');
     return this.pixels.get(uri) ?? { width: 2, height: 2, data: new Uint8Array(16).fill(255) };
   }
-  /** 生成过的 HTML（文字转 PDF、报表）。PDF 用 pdf-lib 生成一页真实的 PDF。 */
+  /** Generated HTML (text-to-PDF, reports). Generates a real PDF page using pdf-lib. */
   printedHtml: string[] = [];
   async htmlToPdf(
     html: string,
@@ -623,7 +625,7 @@ export class FakeFiles implements FilePlatform {
     return { uri: dest, size: bytes.length, pageCount: 1 };
   }
   enhanced: string[] = [];
-  /** 增强时转正的角度（下一次增强用，按顺序）；转了的话画布按转过之后的大小放大。 */
+  /** Correction angles during enhancement (for the next enhancement, in order); if rotated, canvas is scaled up to the post-rotation size. */
   enhanceSkews: number[] = [];
   async enhanceImage(uri: string, mode: string, runId: string, relPath: string) {
     if (!this.disk.has(uri)) throw new Error('missing');
@@ -643,20 +645,20 @@ export class FakeFiles implements FilePlatform {
   async saveSignature(png: Uint8Array, aspect: number) {
     this.signatures.unshift({ uri: `sig://${this.signatures.length}`, bytes: png, aspect });
   }
-  /** 画过的文字（断言用）。 */
+  /** Drawn texts (for assertions). */
   renderedTexts: string[] = [];
-  /** 用真实的 PNG 代替 Skia 画出的文字（每个字 10 像素宽）。 */
+  /** Use a real PNG instead of Skia-drawn text (10 pixels wide per character). */
   async renderText(text: string, style: { fontSize: number }) {
     this.renderedTexts.push(text);
     const width = [...text].length * Math.round(style.fontSize * 0.6);
     const height = Math.round(style.fontSize);
     return { bytes: makePng(width, height), width, height };
   }
-  /** 临时目录里还剩的文件。 */
+  /** Remaining files in the temp directory. */
   runFiles() {
     return [...this.disk.keys()].filter((k) => k.startsWith('runs/'));
   }
-  /** 放一个“别的 App 分享进来的”文件（iOS 的 App Group 共享目录）。 */
+  /** Offer a file "shared in by another App" (iOS App Group shared directory). */
   offerShared(
     name: string,
     bytes: Uint8Array,
@@ -669,7 +671,7 @@ export class FakeFiles implements FilePlatform {
   sharedFiles() {
     return [...this.disk.keys()].filter((k) => k.startsWith('file:///group/'));
   }
-  /** 放一个“用户可选择的”文件。 */
+  /** Offer a "user-selectable" file. */
   offer(name: string, bytes: Uint8Array, mimeType = 'application/pdf'): PickedFile {
     const uri = `picker://${name}`;
     this.disk.set(uri, bytes);
@@ -677,10 +679,11 @@ export class FakeFiles implements FilePlatform {
   }
 }
 
-/** 假的文档转 PDF（D-186）：每 1 KB 文档算一页，写出一个最小的 PDF 头。 */
+/** Fake document-to-PDF (D-186): counts every 1 KB of document as one page, writes a minimal PDF header. */
 /**
- * 假的 PDF 密码：内容以「%LOCK:密码」开头的是要密码才能打开的，「%RESTRICT」开头的是只限制了打印、复制。
- * 解锁后去掉这一行，加密码时加上这一行。
+ * Fake PDF passwords: content starting with `%LOCK:password` requires a password to open,
+ * `%RESTRICT` restricts only printing and copying. Upon unlocking, this line is removed; when
+ * adding a password, this line is added.
  */
 export class FakePdfPasswords implements PdfPasswordPlatform {
   constructor(private files: FakeFiles) {}
@@ -708,10 +711,10 @@ export class FakePdfPasswords implements PdfPasswordPlatform {
 
 export class FakeDocuments implements DocumentPlatform {
   extensions: readonly string[] = ['docx'];
-  /** 设成 null 模拟 Android（P-025）。 */
+  /** Set to null to simulate Android (P-025). */
   passwords: PdfPasswordPlatform | null;
   converted: { uri: string; ext: string; page: { width: number; height: number } }[] = [];
-  /** 下一次转换抛出的错误码。 */
+  /** Error code to be thrown by the next conversion. */
   failWith: string | null = null;
   constructor(private files: FakeFiles) {
     this.passwords = new FakePdfPasswords(files);
@@ -740,15 +743,16 @@ export class FakeDocuments implements DocumentPlatform {
 }
 
 /**
- * 假的视频处理（modules/morph-media）：按码率和时长算出输出大小，写出相应长度的字节。
- * oversize 让编码器超出码率（测试「超了再压一次」）。
+ * Fake video processing (modules/morph-media): calculates output size based on bitrate and
+ * duration, writes bytes of corresponding length. oversize causes the encoder to exceed the
+ * bitrate (testing "compress again when exceeding").
  */
 export class FakeMedia implements MediaPlatform {
   encodes: (VideoEncode & { uri: string })[] = [];
   trims: { uri: string; range: { startMs: number; endMs: number } }[] = [];
-  /** 输出比按码率算的大多少（1 = 正好）。 */
+  /** How much larger the output is compared to the bitrate calculation (1 = exact). */
   oversize = 1;
-  /** 下一次处理抛出的错误码（ERR_MEDIA_UNSUPPORTED 等）。 */
+  /** Error code thrown by the next processing (ERR_MEDIA_UNSUPPORTED, etc.). */
   failWith: string | null = null;
 
   constructor(private files: FakeFiles) {}
@@ -1035,7 +1039,7 @@ export class FakeMedia implements MediaPlatform {
     return out;
   }
   gifs: { uris: readonly string[]; settings: Record<string, number> }[] = [];
-  /** 假的 GIF：每帧 1 KB，尺寸按设置算（视频按 16:9，图片按正方形）。 */
+  /** Fake GIF: 1 KB per frame, dimensions calculated based on settings (16:9 for videos, square for images). */
   private async writeGif(
     frames: number,
     width: number,
@@ -1076,7 +1080,7 @@ export class FakeMedia implements MediaPlatform {
     this.gifs.push({ uris, settings });
     return this.writeGif(uris.length, settings.maxSide, settings.maxSide, runId, relPath, job);
   }
-  /** 波形：null 表示原生模块读不到。 */
+  /** Waveform: null indicates native module cannot read it. */
   peaks: number[] | null = [0.1, 0.8, 0.4, 1];
   async waveform(uri: string, buckets: number) {
     await this.probe(uri);
@@ -1086,12 +1090,12 @@ export class FakeMedia implements MediaPlatform {
   }
 }
 
-/** 假的语音转文字（modules/morph-speech）：按顺序返回文字，记下语言和模型。 */
+/** Fake speech-to-text (modules/morph-speech): returns text in order, recording language and model. */
 export class FakeSpeech implements SpeechPlatform {
   engine: 'system' | 'whisper' = 'whisper';
   calls: { uri: string; language: string; model: string }[] = [];
   texts: string[] = [];
-  /** need() 的结果；Android 默认要下载模型。 */
+  /** Result of need(); Android requires downloading models by default. */
   needs: SpeechNeed = { kind: 'ready' };
   prepared: string[] = [];
   error: SpeechErrorCode | null = null;
@@ -1123,14 +1127,16 @@ export class FakeSpeech implements SpeechPlatform {
 }
 
 /**
- * 假的系统朗读（modules/morph-tts）：每个字读 0.1 秒（除以语速），写一个同样大小的 24 kHz 单声道 WAV
- * 进本次运行的临时目录，并登记成能 probe 的音频（后面可以接 FakeMedia 的转格式）。
+ * Fake system speech synthesis (modules/morph-tts): reads each character in 0.1 seconds (divided
+ * by speech rate), writes a 24 kHz mono WAV of the same size into the current run's temp
+ * directory, and registers it as probeable audio (can be chained with FakeMedia format conversion
+ * later).
  */
 export class FakeSpeaker implements SpeakPlatform {
-  /** 各声音的状态；没写的是 installed。 */
+  /** Status of each voice; unlisted ones are installed. */
   statuses: Record<string, 'installed' | 'notDownloaded' | 'unsupported' | 'noEngine'> = {};
   calls: { segments: readonly string[]; voice: string; rate: number; relPath: string }[] = [];
-  /** 朗读时抛出的错误码。 */
+  /** Error code thrown during speech synthesis. */
   failWith: SpeakErrorCode | null = null;
   constructor(private files: FakeFiles) {}
   async voiceStatus(voice: string) {
@@ -1139,7 +1145,7 @@ export class FakeSpeaker implements SpeakPlatform {
   async synthesize(segments: readonly string[], request: SpeakRequest) {
     const { voice, rate, relPath } = request;
     this.calls.push({ segments, voice, rate, relPath });
-    // 像原生模块：每段之前看一次「停止」。
+    // Like native modules: checks for "stop" before each segment.
     for (let i = 0; i < segments.length; i++) {
       if (request.isCancelled?.())
         throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
@@ -1165,14 +1171,14 @@ export class FakeSpeaker implements SpeakPlatform {
   }
 }
 
-/** 假的后台继续（modules/morph-background）：按顺序记下每次调用。 */
+/** Fake background continuation (modules/morph-background): records each call in order. */
 export class FakeBackground implements BackgroundPlatform {
   continuesInBackground = true;
-  /** 通知权限：问的时候用户怎么答。 */
+  /** Notification permission: how the user responds when asked. */
   grantNotifications = true;
-  /** Morph 在不在前台。 */
+  /** Whether Morph is in the foreground. */
   foreground = true;
-  /** begin 的返回值（false：系统不让）。 */
+  /** Return value of begin (false: system disallows). */
   canBegin = true;
   calls: (
     | { kind: 'permission' }
@@ -1199,7 +1205,7 @@ export class FakeBackground implements BackgroundPlatform {
   }
 }
 
-/** 点在凸四边形里（顺时针的角）。 */
+/** Point inside a convex quadrilateral (clockwise corners). */
 function insideQuad(q: Quad, x: number, y: number): boolean {
   const pts = [q.tl, q.tr, q.br, q.bl];
   return pts.every((a, i) => {
@@ -1209,7 +1215,9 @@ function insideQuad(q: Quad, x: number, y: number): boolean {
 }
 
 /**
- * 找边给 pickPaper 的小灰度图（原图的 1/10，D-326）：draw 不给时按候选画，第一个候选里是纸（亮），外面是桌面（暗）。
+ * Small grayscale image for pickPaper border detection (1/10 of the original image, D-326): when
+ * draw is not provided, draws based on candidates; the first candidate contains paper (bright),
+ * outside is desk (dark).
  */
 export function paperGray(
   candidates: readonly Quad[],
@@ -1231,7 +1239,7 @@ export function paperGray(
   return { width, height, data };
 }
 
-/** 假的系统文字识别和扫描（iOS 的 Vision；Android 的 ML Kit 设 canFindPaper = false）：按顺序返回找到的角和识别的文字，拉正写一张真实的小 JPEG。 */
+/** Fake system text recognition and scanning (iOS Vision; Android ML Kit sets canFindPaper = false): returns found corners and recognized text in order, straightens and writes a real small JPEG. */
 export class FakeVision implements VisionPlatform {
   async adjustImage(
     uri: string,
@@ -1266,8 +1274,9 @@ export class FakeVision implements VisionPlatform {
   }
 
   /**
-   * 扫描展平（D-274）：默认没有（旧版 App）；enableFlatten 打开。flattenInstalled 是展平模型装好没有，
-   * flattenFails 里的页（输入的 uri）展平时出错。
+   * Scan flattening (D-274): none by default (older app versions); enabled by enableFlatten.
+   * flattenInstalled indicates whether the flattening model is installed, flattenFails causes
+   * flattening errors on specified pages (input uris).
    */
   flattenModel?: { pack: string };
   flatten?: VisionPlatform['flatten'];
@@ -1287,8 +1296,9 @@ export class FakeVision implements VisionPlatform {
   }
 
   /**
-   * 转 Word 的版面分析（D-328）：默认没有（旧版 App）；enableLayout 打开。layoutRegions 是每页的结果
-   * （按顺序，null 是模型没装），layoutFails 时版面分析出错。
+   * Layout analysis for Word conversion (D-328): none by default (older app versions); enabled by
+   * enableLayout. layoutRegions contains results per page (in order, null if model not
+   * installed), layoutFails causes layout analysis errors.
    */
   layoutModel?: { pack: string };
   detectLayout?: VisionPlatform['detectLayout'];
@@ -1303,19 +1313,19 @@ export class FakeVision implements VisionPlatform {
     };
   }
 
-  /** 证件照（D-252）：每次找脸的结果（按顺序；检测图的大小和脸框）。 */
+  /** ID photos (D-252): results of face detection each time (in order; detection image size and face bounding box). */
   faceResults: { width: number; height: number; faces: Box[] }[] = [];
   async detectFaces(uri: string) {
     this.calls.push({ method: 'detectFaces', uri });
     return this.faceResults.shift() ?? { width: 1, height: 1, faces: [] };
   }
-  /** 图像分类：每次的标签（按顺序）。 */
+  /** Image classification: labels for each run (in order). */
   labelResults: { id: string; confidence: number }[][] = [];
   async classifyImage(uri: string) {
     this.calls.push({ method: 'classifyImage', uri });
     return this.labelResults.shift() ?? [];
   }
-  /** iOS 的人像分割不用下载模型；改成 false 模拟 Android。 */
+  /** iOS person segmentation does not require downloading a model; change to false to simulate Android. */
   personSegmentation = true;
   async replaceBackground(uri: string, color: string, runId: string, relPath: string) {
     this.calls.push({ method: 'replaceBackground', uri, args: color });
@@ -1327,16 +1337,16 @@ export class FakeVision implements VisionPlatform {
   }
 
   calls: { method: string; uri: string; args?: unknown }[] = [];
-  /** 每次找边的候选（按顺序）：一个四边形是深色桌面上的一张纸，null 是没找到（D-327）。 */
+  /** Edge detection candidates per run (in order): a quadrilateral represents a piece of paper on a dark desk, null means not found (D-327). */
   found: (Quad | Quad[] | null)[] = [];
-  /** 找边给的小灰度图；不设时按候选画（见 paperGray）。 */
+  /** Small grayscale image provided for edge detection; if unset, draws based on candidates (see paperGray). */
   gray: ((size: { width: number; height: number }) => Uint8Array) | null = null;
   texts: string[] = [];
   documentCamera = true;
   canFindPaper = true;
-  /** 系统识别不了的语言（BCP 47 主语言），例如 Android 的 ML Kit 不认俄文。 */
+  /** Languages unsupported by system recognition (BCP 47 primary language), e.g., Android ML Kit does not recognize Russian. */
   unsupported = new Set<string>();
-  /** 下一次文档相机拍到的页面；null 表示用户取消。 */
+  /** Pages captured by the next document camera; null indicates user cancellation. */
   scanned: PickedFile[] | null = null;
 
   constructor(private files: FakeFiles) {}
@@ -1344,21 +1354,22 @@ export class FakeVision implements VisionPlatform {
   supportsLanguage(code: string) {
     return !this.unsupported.has(code.split('-')[0]!);
   }
-  /** 有文字识别模型的设备（D-269）：设成 { pack, languages } 时这些语言要先下载模型。 */
+  /** Devices with text recognition models (D-269): when set to { pack, languages }, these languages must download models first. */
   ocrModel?: { pack: string; languages: readonly string[] };
   async recognizeText(uri: string, languages: readonly string[]) {
     this.calls.push({ method: 'recognizeText', uri, args: languages });
     return this.texts.shift() ?? '';
   }
-  /** 每次按行识别的结果（按顺序）；没有时是一张 100×100、没有字的图。 */
+  /** Results of per-line recognition (in order); when empty, returns a 100×100 image without text. */
   layers: (RecognizedLayer | Error)[] = [];
-  /** 每次按行识别时有没有带上已经解码的像素（转 Excel 共用找线的像素，D-272）。 */
+  /** Whether decoded pixels were included during per-line recognition (shared with Excel conversion for line finding, D-272). */
   linePixels: (Pixels | undefined)[] = [];
   async recognizeLines(uri: string, languages: readonly string[], pixels?: Pixels) {
     this.calls.push({ method: 'recognizeLines', uri, args: languages });
     this.linePixels.push(pixels);
-    // 存记录面板里「像不像收据」的读取（D-477）读的是同一张图，真实的识别可以重复：只看队头，不取走，
-    // 留给后面表单里的那一次读。
+    // Reads whether "is it receipt-like" in the record panel (D-477) reads the same image; real
+    // recognition can be repeated: only looks at the queue head without removing it, leaving it for
+    // that subsequent read in the form.
     const hint = /\/receipt-like-/.test(uri);
     const next = (hint ? this.layers[0] : this.layers.shift()) ?? {
       width: 100,
@@ -1368,7 +1379,7 @@ export class FakeVision implements VisionPlatform {
     if (next instanceof Error) throw next;
     return next;
   }
-  /** 转 Excel 找线用的像素（按顺序）；没有时是一张 100×100 的白图。 */
+  /** Pixels used for line finding in Excel conversion (in order); when empty, returns a 100×100 white image. */
   tableImages: Pixels[] = [];
   async tablePixels(uri: string): Promise<Pixels> {
     this.calls.push({ method: 'tablePixels', uri });
@@ -1408,17 +1419,19 @@ export class FakeVision implements VisionPlatform {
 }
 
 /**
- * 假的系统翻译（D-170）：按文字猜语言（汉字 → zh，假名 → ja，其他字母 → en），译文是「[目标语言] 原文」。
- * android = true 时要下载的语言给出大小（ML Kit），否则不给（iOS 由系统弹窗）。
+ * Fake system translation (D-170): guesses language from text (Chinese characters → zh, kana →
+ * ja, other letters → en), translation format is "[target language] original text". When android
+ * = true, provides sizes for languages to download (ML Kit), otherwise not (iOS uses system
+ * prompt).
  */
 export class FakeTranslator implements TranslatePlatform {
   supported = true;
   calls: { method: string; args: unknown[] }[] = [];
-  /** 还没下载的语言。 */
+  /** Languages not yet downloaded. */
   missing = new Set<string>();
   unsupported = new Set<string>();
   android = false;
-  /** 下一次翻译抛出的错误码（cancelled：用户在 iOS 的下载弹窗里取消）。 */
+  /** Error code thrown by the next translation (cancelled: user cancelled in iOS download prompt). */
   failWith: string | null = null;
 
   async detectLanguages(texts: readonly string[]) {
@@ -1447,7 +1460,7 @@ export class FakeTranslator implements TranslatePlatform {
   get downloadBytes() {
     return this.android ? 30 * 1024 * 1024 : undefined;
   }
-  /** iOS：系统弹窗下载一对语言（Android 用 download）。 */
+  /** iOS: system prompt to download a language pair (Android uses download). */
   prepare = async (from: string, to: string) => {
     this.calls.push({ method: 'prepare', args: [from, to] });
     if (this.failWith) {
@@ -1458,7 +1471,7 @@ export class FakeTranslator implements TranslatePlatform {
     this.missing.delete(from);
     this.missing.delete(to);
   };
-  /** 下载过的语言（「设置 → 已下载内容」列出）。 */
+  /** Downloaded languages (listed in "Settings → Downloaded Content"). */
   downloaded = new Set<string>();
   download = async (language: string) => {
     this.calls.push({ method: 'download', args: [language] });

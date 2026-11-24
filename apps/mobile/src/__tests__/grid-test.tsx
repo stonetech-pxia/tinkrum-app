@@ -14,8 +14,10 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 打卡格（D-610）：习惯 × 最近 7 天。点空格新建（这个习惯、这一天，不弹撤销），点只有一条的格子删掉（进「最近删除」，
-// 弹撤销），两条的格子列出记录；没有 remove 的格子每点一下多记一条，长按列出。
+// Check-in grid (D-610): habit × last 7 days. Tap empty space to create new (this habit, this day,
+// no undo popup), tap single-entry cell to delete (moves to "Recently Deleted", triggers undo
+// popup), two-entry cells list records; cells without remove add a new entry on each tap, long
+// press lists them.
 
 const habits: Collection = {
   id: 'habits',
@@ -100,7 +102,7 @@ const at = Date.now();
 const put = (repo: MemoryWorkspaceRepo, id: string, collectionId: string, values: object) =>
   repo.insertRecord({ id, collectionId, values: { ...values }, createdAt: at, updatedAt: at });
 
-/** 今天往前 n 天（和格子一样按「设置 → 日期」算，测试里是默认的）。 */
+/** N days before today (calculated by "Settings -> Date" like grids, default in tests). */
 const day = (n: number) => {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -121,7 +123,7 @@ it('tapping an empty cell adds a check-in for that habit and that day, with no u
   await put(repo, 'run', 'habits', { name: '跑步' });
   await renderToolsApp(repo, undefined, { seed });
   expect(await screen.findByText('跑步')).toBeTruthy();
-  // 补三天前的。
+  // Backfill three days ago.
   await fireEvent.press(await cell('week', 'run', 3));
   expect(await screen.findByTestId('toast')).toHaveTextContent(/已在「打卡」添加一条/);
   const [added, ...more] = await repo.listRecords('checkins');
@@ -141,7 +143,7 @@ it('tapping a cell with one check-in moves it to the trash and offers undo, whic
   await renderToolsApp(repo, undefined, { seed });
   await fireEvent.press(await cell('week', 'run', 0));
   expect(await screen.findByTestId('toast')).toHaveTextContent(/已从「打卡」删除一条/);
-  // 和用户自己删一样进「最近删除」。
+  // Moves to "Recently Deleted" just like user deletion.
   expect((await repo.listDeletedRecords()).map((r) => r.id)).toEqual(['c1']);
   await waitFor(() =>
     expect(screen.getByTestId(`grid-week-cell-run-${day(0)}`)).toHaveProp(
@@ -168,9 +170,9 @@ it('a cell with two check-ins is never removed by a tap: it lists them', async (
   const two = await cell('week', 'run', 1);
   expect(two).toHaveTextContent('2');
   await fireEvent.press(two);
-  // 下面列出这一格的两条，标题是「习惯 · 那一天」。
+  // Lists the two items of this cell below, titled "Habit · That Day".
   expect(await screen.findByText(/^跑步 · /)).toBeTruthy();
-  // 行名一个，列出的两条各一个（标题是引用的习惯）。
+  // Row name plus one for each of the two listed items (title is referenced habit).
   expect(screen.getAllByText('跑步')).toHaveLength(3);
   expect(await repo.listRecords('checkins')).toHaveLength(2);
   expect(screen.queryByTestId('toast')).toBeNull();
@@ -186,7 +188,7 @@ it('without remove, every tap adds one more and the ring fills toward the goal; 
   const records = await repo.listRecords('water');
   expect(records).toHaveLength(3);
   expect(records.every((r) => r.values.kind === 'water')).toBe(true);
-  // 日期时间字段：今天那一列是现在（这一天里）。
+  // Date-time field: today's column is now (within that day).
   expect(records.every((r) => String(r.values.at).startsWith(day(0)))).toBe(true);
   expect(await cell('cups', 'water', 0)).toHaveTextContent('3');
   expect(screen.getByTestId(`grid-cups-ring-water-${day(0)}`)).toBeTruthy();

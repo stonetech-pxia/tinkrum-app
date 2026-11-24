@@ -11,17 +11,17 @@ import { NUMERIC_FIELD_TYPES, type LookDefinitionOf, defineLook } from './define
 const shape = {
   show: z.strictObject({
     title: boundedText(1, 60),
-    /** 文字里可以写 {count}（符合条件的有几条）和 {sum:字段}（这些记录某个数字字段的合计）。 */
+    /** Text can include {count} (number of matching records) and {sum:field} (sum of a numeric field for these records). */
     text: richText(400),
     icon: IconValueSchema.optional(),
-    /** 卡片里「做事」按钮的字（要有 tools）。 */
+    /** Label for the "action" button in the card (requires tools). */
     actionLabel: boundedText(1, 20).optional(),
-    /** 卡片里「打开」按钮的字（要有 opens）。 */
+    /** Label for the "open" button in the card (requires opens). */
     openLabel: boundedText(1, 20).optional(),
   }),
-  /** 卡片说的是哪些记录：这张表里符合 filter 的。 */
+  /** Records referred to by the card: records in this table matching the filter. */
   source: z.strictObject({ table: IdSchema, filter: filterSchema(5).optional() }),
-  /** 一个就地的一键记录工具，点「做事」按钮时做（和按钮块一样，会先问、能撤销）。 */
+  /** An inline one-tap record tool executed when tapping the "action" button (like button blocks, prompts first, supports undo). */
   tools: z.array(ToolUseSchema).min(1).max(1).optional(),
   opens: openTargetSchema('opens must be a page, a system entry, tool:<id> or app:<id>', [
     'tool',
@@ -30,9 +30,12 @@ const shape = {
 };
 
 /**
- * 提示卡（D-580）：一张和「提示」同样底色和字样的卡片，说的是一张表里符合条件的记录——文字里的 {count}、{sum:字段}
- * 在画的时候按本机的记录算出来（不存进配置），卡片里最多两个按钮：一个做一键记录（tools），一个打开页面（opens）。
- * 例如「本月订阅待确认：有 3 项，合计 ¥371」+「加入本月」「修改」。要只在有记录时才出现，配 showIf 的 filter（D-579）。
+ * Callout card (D-580): a card with the same background color and typography as "Tips",
+ * describing records in a table that match criteria—{count} and {sum:field} in the text are
+ * computed at render time from local records (not stored in config), with at most two buttons in
+ * the card: one for one-tap records (tools) and one to open a page (opens). For example,
+ * "Subscriptions pending confirmation this month: 3 items, total ¥371" + "Add to this month" +
+ * "Edit". Appears only when records exist by configuring a showIf filter (D-579).
  */
 export const calloutComponent: LookDefinitionOf<'callout', typeof shape> = defineLook({
   look: 'callout',

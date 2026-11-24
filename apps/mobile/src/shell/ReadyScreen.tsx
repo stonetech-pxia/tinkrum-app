@@ -21,10 +21,12 @@ import { NextCard } from './NextCard';
 import { Banner } from './Shell';
 
 /**
- * 「快捷操作做好了」（D-125）：AI 新做了一个快捷操作后打开。AI 不替用户运行（D-113），
- * 用户自己点「现在就用一次」；也说明以后在哪里找到它。
- * 功能类修改直接应用（D-191），AI 的说明和「接着改」也在这里。
- * 放到了手机桌面的（D-271）说明怎么用：iOS 长按 Morph 图标，Android 还有「添加到桌面」按钮（点了才弹系统框）。
+ * "Quick action is ready" (D-125): Opened after AI creates a new quick action. AI does not run it
+ * for the user (D-113); the user taps "Use once now" themselves; also explains where to find it
+ * in the future. Feature modifications take effect directly (D-191), and AI's explanation and
+ * "Modify next" are also here. Explains how to place it on the mobile home screen (D-271): on
+ * iOS, long-press the Morph icon; Android also has an "Add to Home screen" button (tapping it
+ * brings up the system prompt).
  */
 export function ReadyScreen({ workflow, notes = [] }: { workflow: Workflow; notes?: string[] }) {
   const { locale, registry } = useWorkspaceContext();
@@ -48,7 +50,7 @@ export function ReadyScreen({ workflow, notes = [] }: { workflow: Workflow; note
     <ScrollView
       testID="ready-screen"
       contentContainerStyle={{ padding: palette.pad, gap: palette.gap, paddingBottom: 48 }}>
-      {/* 直接应用的功能（D-191）：「已改好 · 撤销」在这里也看得到。 */}
+      {/* Directly applied features (D-191): "Modified successfully · Undo" can also be seen here. */}
       <Banner palette={palette} />
       <View style={styles.head}>
         <View style={[styles.badge, { backgroundColor: palette.secondary }]}>
@@ -82,7 +84,7 @@ export function ReadyScreen({ workflow, notes = [] }: { workflow: Workflow; note
         </Text>
       </Card>
       <HomeScreenCard workflow={workflow} palette={palette} />
-      {/* 要容器交值的（D-428）从这里跑不了：它们在记录页和列表上点。 */}
+      {/* Those that require containers to return values (D-428) cannot be run from here: they are tapped on the record page and list. */}
       {needsContainer ? null : (
         <Button
           palette={palette}

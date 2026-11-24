@@ -1,5 +1,7 @@
-// 英文文案。键名以这份为准：zh.ts、fr.ts 必须有完全相同的键（MessageTable），少一个、多一个都编译不过。
-// 新文案三份一起加，写完整的句子；带数量的再在下面的 enSingular / frSingular 各加单数写法。
+// English copy. Key names are authoritative: zh.ts and fr.ts must have the exact same keys
+// (MessageTable); adding or removing any key causes compilation failure. Add new copy to all three
+// files together with complete sentences; for items with counts, add singular forms to enSingular /
+// frSingular below.
 
 export const en = {
   exportAttachments: 'Attachment files',
@@ -36,7 +38,7 @@ export const en = {
   sharePhotoSummary: '{n} photos',
   loading: 'Loading…',
 
-  // 修改流程
+  // Modification workflow
   changeTitle: 'Change this app',
   changeHint: 'Describe what to change. You will see a preview before anything changes.',
   changePlaceholder: 'e.g. Bigger text and no shadows',
@@ -64,7 +66,7 @@ export const en = {
   undoSummary: 'Undo',
   undoneBanner: 'Back to how it was',
 
-  // 改动记录（D-112）
+  // Change history (D-112)
   historyTitle: 'Change history',
   current: 'Now',
   restoreThis: 'Restore this version',
@@ -80,7 +82,7 @@ export const en = {
   dateToday: 'Today {time}',
   dateYesterday: 'Yesterday {time}',
 
-  // 工具目录
+  // Tool catalog
   toolsTitle: 'Tools',
   install: 'Add',
   open: 'Open',
@@ -93,7 +95,7 @@ export const en = {
   uninstallTitle: 'Remove {name}?',
   removeCardSummary: 'Removed {name} from home',
   addCardSummary: 'Added {name} to home',
-  // 下载的工具（D-177）
+  // Downloaded tools (D-177)
   toolDownloadSize: 'Downloads {size}',
   toolDownloading: 'Downloading…',
   toolNeedsAppUpdate: 'Needs a newer version of this app',
@@ -110,7 +112,7 @@ export const en = {
   toolDeleteMessage: 'You can download it again from Tools later.',
   toolDeleteAdded: 'This tool is still added. Remove it in Tools first, then delete it here.',
 
-  // 设置
+  // Settings
   settingsTitle: 'Settings',
   thisApp: 'This app',
   general: 'General',
@@ -131,20 +133,20 @@ export const en = {
   aiEngineMock: 'Built-in rules (offline)',
   aiEngineByok: 'My own API key ({model})',
 
-  // AI 设置
+  // AI Settings
   aiSettingsTitle: 'Tink',
   aiModeQuestion: 'What powers Tink',
   aiModeMock: 'Built-in rules',
   aiModeMockNote: 'Offline and free. Understands a fixed set of phrases.',
   aiModeServer: 'Tinkrum server',
   aiModeServerNote: 'The model is called through a server.',
-  // 测试期服务器保存请求（D-240）：只在用 Tinkrum 服务器时显示。
+  // Server storage note during testing (D-240): displayed only when using the Tinkrum server.
   aiServerStoredNote:
     'During the beta, what you say to Tink and the app’s design are saved to improve Tinkrum. Files and entries are never sent.',
   aiModeByok: 'API key',
   aiModeByokNote:
     'Uses your own key to connect straight to Claude or a compatible service. Usage is billed to your account there.',
-  // 自带 key 的两种 provider（D-241）
+  // Two providers supporting BYOK (Bring Your Own Key) (D-241)
   byokProviderLabel: 'Provider',
   byokSentNote:
     'When you ask for a change, what you say and the app’s design go to {host}. Files and entries don’t.',
@@ -194,7 +196,7 @@ export const en = {
   about: 'About',
   aboutValue: 'Tinkrum prototype · AGPL-3.0 · schema v{schema} · version #{revision}',
 
-  // 页面组件
+  // Page components
   noFiles: 'Files you scan or save will show up here',
   filesAll: 'All',
   filesAllTitle: 'All files',
@@ -293,7 +295,7 @@ export const en = {
   updateTool: 'Update',
   updateSummary: 'Updated {name}',
 
-  // 运行页面
+  // Run page
   runTitle: 'Run',
   runCancel: 'Stop',
   runProgress: '{done} of {total}',
@@ -342,7 +344,7 @@ export const en = {
   packDeleteWithLanguages:
     'Its {count} languages are deleted too. You can download them again when needed.',
 
-  // 图片与链接
+  // Images and links
   imagePlaceholder: 'Tap to choose a photo',
   imageTitle: 'Picture',
   imageMissing: 'This picture is not on this device. Tap to choose another.',
@@ -412,7 +414,7 @@ export const en = {
   listToolAll: 'All {n} entries in this list',
   listToolFound: 'Only the {n} entries found',
 
-  // 用户数据
+  // User data
   noRecords: 'Nothing here yet',
   today: 'Today',
   yesterday: 'Yesterday',
@@ -661,7 +663,7 @@ export const en = {
   suggestionsNeedDownload: 'To suggest values from the attachments, a one-time download is needed.',
   suggestionsDownload: 'Suggest values',
 
-  // 直接编辑（长按一块、调整顺序）
+  // Direct edit (long-press a block, adjust order)
   editText: 'Edit text',
   editColor: 'Color',
   editAlign: 'Alignment',
@@ -709,7 +711,7 @@ export const en = {
     'The {count} parts inside it are deleted too. Cancel discards the whole edit; after saving you can still undo it.',
   deleteDataMessage:
     'Your entries are kept (Settings → Data). Cancel discards the whole edit; after saving you can still undo it.',
-  // AI 只改 App（D-113、D-124–D-130）
+  // AI only changes the app (D-113, D-124–D-130)
   readyTitle: 'Your quick action is ready',
   readyRunNow: 'Use it now',
   readyLater: 'Not now',
@@ -743,7 +745,7 @@ export const en = {
   habitNo: 'No thanks',
   habitMade: 'Added “{name}” to the home page',
 
-  // ---- 翻译（D-170–D-176）：错误说明拼进「不支持这个步骤：…」/「需要的内容没有下载好：…」 ----
+  // ---- Translation (D-170–D-176): Error descriptions interpolated into "Unsupported step: ..." / "Required content not downloaded: ..." ----
   translateNeedsFullApp: 'Translate (it works in the full Tinkrum app, not in this preview)',
   translateOsTooOld: 'Translate (needs iOS 18 or later)',
   translatePairUnsupported: 'translating {from} into {to} (this phone can’t do it)',
@@ -761,7 +763,7 @@ export const en = {
     'You will be asked to download it again the next time you translate this language.',
   translateNote:
     'Translated on this device — good for understanding the meaning. For official documents, use a professional translator.',
-  // ---- 视频、音频和压缩 PDF（D-140–D-148）。音频工具的文字请另起一块，方便合并。----
+  // ---- Video, audio, and PDF compression (D-140–D-148). Place text for audio tools in a separate section for easy merging. ----
   runPercent: '{done}%',
   runError_needsFullApp:
     'Videos and audio can only be processed in the full Tinkrum app, not in this preview.',
@@ -810,7 +812,7 @@ export const en = {
     'At {target}, “{name}” would be too blurry to watch. It needs at least {mb} MB, or trim it shorter first.',
   runError_interrupted:
     'Tinkrum went to the background, so this didn’t finish. Stay in Tinkrum and tap “Run again”.',
-  // 长任务切到后台也继续（D-160–D-162）：运行页的提示，Android 通知栏的进度和完成通知。
+  // Long-running tasks continue when switched to background (D-160–D-162): Run page prompts, Android notification bar progress and completion notifications.
   runCanLeave: 'You can switch to another app; Tinkrum keeps working in the background.',
   runStayInMorph: 'Stay in Tinkrum while this is being processed.',
   bgPreparing: 'Getting ready…',
@@ -837,7 +839,7 @@ export const en = {
   sharedVideos: '{n} videos',
   sharedAudio: '{n} audio files',
 
-  // AI 修改的草稿（D-190）
+  // AI modification draft (D-190)
   draftDropped:
     'The app changed since you left the draft; {n} steps no longer fit and were removed.',
   draftFirstStep:
@@ -867,8 +869,8 @@ export const en = {
   wantCardsChip: 'I want to save business cards',
   draftRenderFailed: 'The last change couldn’t be shown, so it was undone.',
 
-  // 功能和外观分开改（D-191）
-  // 工具检查补救后还有问题（AGENT_PLAN §3.6）：只提醒。
+  // Separate changes for features and look (D-191). Remaining issues after tool checks and
+  // remediation (AGENT_PLAN §3.6): warning only.
   planCheckParams:
     'A value or language you asked for may not have made it into the quick action. Check its settings before you use it.',
   planCheckTools:
@@ -934,11 +936,11 @@ export const en = {
   tableReadyRecord: 'Add an entry now',
   tableReadyWhere: 'Entries stay on this device. You can also see the table in Settings → Data.',
 
-  // 新手引导（D-149）
+  // Newcomer onboarding (D-149)
   guideSkip: 'Skip',
   guideNext: 'Next',
   guideStart: 'Start',
-  // 划屏介绍：每页一张图配一句话。
+  // Swipe introduction: one image and one sentence per page.
   guideIntro1: 'Turn paper documents into clean PDF, Word or Excel files.',
   guideIntro1Sub: 'Free, no ads. Files are processed only on your phone.',
   guideIntro2: 'Scan, open a file or just say it, and it goes into your own small apps.',
@@ -977,7 +979,7 @@ export const en = {
   guideTinkDone: 'All set! Whenever you want to change something, just tell me.',
   guideGotIt: 'Got it',
   guideLater: 'Later',
-  // 引导第 3 步：样板 App（D-260）。
+  // Onboarding step 3: Sample apps (D-260).
   guideSamplesTitle: 'Step 3',
   guideSamplesBody: 'You can also turn Tinkrum into an app of your own. Pick one to try.',
   sampleDraftInput: 'Use the “{name}” sample app',
@@ -987,21 +989,21 @@ export const en = {
   sampleReadyDismiss: 'Got it',
   sampleFailed: 'This sample app could not be added. Please try another one.',
   sampleContinuePrompt: 'Starting from {name}, change this: ',
-  // ---- 音频工具（D-150–D-156，音频会话）----
+  // ---- Audio tools (D-150–D-156, audio session) ----
   runError_audioTooSmall:
     'At {target}, “{name}” would be too hard to understand. It needs at least {mb} MB, or trim it shorter first.',
   runError_noAudio: '“{name}” has no sound.',
-  // ---- 格式转换的缺口（D-183–D-186）----
+  // ---- Format conversion gaps (D-183–D-186) ----
   runError_formatUnsupported:
     '“{name}” is a {format} file, which this phone can’t open. Convert it to MP4 on a computer first.',
-  // ---- 需求回收（D-189）----
+  // ---- Requirement backlog (D-189) ----
   needSend: 'Tell us you need this',
   needRetry: 'Not sent. Try again',
   needSent: 'Thanks, we got it. New tools come through updates and downloads.',
   needPrivacy: 'Only this sentence is sent to Tinkrum — no files, entries or settings.',
   needsSettingTitle: 'Offer to send requests Tink can’t do',
   needsSettingNote: 'Adds a button under the answer. The sentence is sent only if you tap it.',
-  // ---- 记一笔、附件和公式字段（D-187、D-188）----
+  // ---- Quick entry, attachment, and formula fields (D-187, D-188) ----
   attachmentMissing: 'The file was deleted',
   removeAttachment: 'Remove',
   attachmentAdd: 'Add photos or files',
@@ -1009,7 +1011,7 @@ export const en = {
   attachmentMoveUp: 'Move up',
   attachmentMoveDown: 'Move down',
   attachmentsFull: 'At most {n} files',
-  // ---- 附件的「…」和放回记录（D-395）----
+  // ---- Attachment menu ("...") and returning records (D-395) ----
   attachmentMore: 'More for “{name}”',
   deskBackTitle: 'Back to the entry',
   deskBackMessage: 'How should the file on the desk go into this entry?',
@@ -1031,7 +1033,7 @@ export const en = {
   speechDownloadFailed: 'the speech model for {lang}',
   speechNote:
     'Recognized on this device — words may be wrong, especially with noise or accents. Check it.',
-  // ---- 文字转语音（D-270）：错误说明拼进「不支持这个步骤：…」----
+  // ---- Text-to-speech (D-270): Error descriptions interpolated into "Unsupported step: ..." ----
   speakNoVoice:
     'reading {lang} aloud (this phone has no voice for it; add one in the phone’s settings — iPhone: Accessibility → Spoken Content → Voices; Android: Text-to-speech output)',
   speakNotDownloaded:
@@ -1056,22 +1058,22 @@ export const en = {
   recordDiscardTitle: 'Discard this recording?',
   recordDiscard: 'Discard',
   recordKeep: 'Keep recording',
-  // 按条件筛选（D-242）
+  // Filter by condition (D-242): None of the {count} files meet the conditions of "Keep only"
   runError_noneMatched: 'None of the {count} files meet the conditions of “Keep only some files”.',
-  // 分组后各出一份（D-243）
+  // Separate exports per group (D-243)
   groupUndated: 'No date',
 
-  // 命名用识别出的文字（D-244）
+  // Naming using recognized text (D-244)
   runError_needsRecognition:
     'This file name uses text recognized in the file, and this device can’t recognize text on its own. Use the full Tinkrum app, or remove that part of the name.',
-  // 统计按选项分组（D-248）
+  // Statistics grouped by option (D-248)
   statNoChoice: 'Not set',
-  // 图表（D-249）
+  // Chart (D-249)
   describeCallout: 'callout “{v0}”',
   describeChart: 'chart “{v0}”',
-  // D-254：更新的 App 加的组件，这个版本不认识，原样保留。
+  // D-254: Content from a newer version of the app not recognized by this version, preserved as-is.
   describeUnknownComponent: 'content from a newer version of this app',
-  // v34 修改说明（describe.ts）
+  // v34 modification description (describe.ts)
   v34descDeskAddAbove: 'Add {v0} above the preview on the desk',
   v34descDeskAddBelow: 'Add {v0} below the preview on the desk',
   v34descDeskRemove: 'Remove {v0} from the desk',
@@ -1115,7 +1117,7 @@ export const en = {
   periodRangeText: '{start} to {end}',
   compare_page: 'Previous: {value}',
   chartShare: '{value} ({percent})',
-  // 表和表之间引用（D-250）
+  // Inter-table references (D-250)
   linkDeleted: 'Deleted entry',
   linkNone: 'Not linked',
   linkChoose: 'Choose…',
@@ -1123,11 +1125,11 @@ export const en = {
   linkNew: 'Add a new one to “{name}”',
   linkClear: 'Remove link',
   linkEmptyTable: '“{name}” has no entries yet.',
-  // 提醒（D-251）
+  // Reminder (D-251): "{title}" ({when})
   describeAddReminder: 'Add reminder “{title}” ({when})',
   describeUpdateReminder: 'Change reminder “{title}”',
   describeRemoveReminder: 'Remove reminder “{title}”',
-  // 手机桌面（D-271）
+  // Home Screen (D-271)
   describeHomeScreenOn:
     'Put “{name}” on the phone’s home screen: long-press the Tinkrum icon to see it',
   describeHomeScreenOff: 'Take “{name}” off the phone’s home screen',
@@ -1204,12 +1206,12 @@ export const en = {
   reminderRemove: 'Remove',
   reminderOpenTitle: 'From your reminder',
   reminderOpenRun: 'Start',
-  // D-256：按钮、快捷入口打开的快捷操作（只摆出来，用户点「开始」才运行）。
+  // D-256: Quick action opened by a button or quick entry (only displayed; runs only when the user taps "Start").
   openQuickActionTitle: 'Quick action',
   openQuickActionMissing: 'This quick action is no longer in the app.',
   reminderOpenMissing: 'This reminder’s quick action is no longer in the app.',
   remindersRowHint: '{n} reminders',
-  // 样板 App（D-260）：放不下时不套用，说明原因。
+  // Sample app (D-260): Not applied when there is insufficient space; explains the reason.
   sampleTooManyTables:
     '“{name}” needs new data tables, but the app is close to the limit of 20. Remove tables you no longer use, then try again.',
   sampleTooManyPages:
@@ -1221,7 +1223,7 @@ export const en = {
   sampleHomeFull:
     '“{name}” needs a spot on the home page, but it is full. Remove something from the home page, then try again.',
 
-  // ==== 从界面代码里抽出来的文案（键名是「文件_英文开头_哈希」） ====
+  // // ==== Copy extracted from interface code (key format: "file_englishPrefix_hash") ====
   planner_This_request_can_t_be_handled_Try_desc_04270:
     'This request can’t be handled. Try describing how you want to change the app.',
   prompt_English_fafbe: 'English',
@@ -1647,7 +1649,7 @@ export const en = {
   _kind__Category_not_found_5faf2: 'Category not found',
   _id__This_quick_action_no_longer_exists_35f5a: 'This quick action no longer exists.',
 
-  // ==== 其他文案 ====
+  // // ==== Other copy ====
   retry: 'Retry',
   sharedFilesReceived: '{n} files received',
   workflowFromTool:
@@ -1680,7 +1682,7 @@ export const en = {
   describeUpdatedTool: 'Update the {tool} tool: adds {names}; your changes are kept',
   separatorList: ', ',
   separatorComma: ', ',
-  // 按顺序的聚合（D-284）
+  // Sequential aggregation (D-284)
   seqDays: '{n} days',
   seqWeeks: '{n} weeks',
   seqMonths: '{n} months',
@@ -1688,7 +1690,7 @@ export const en = {
   seqToday: 'Today',
   seqDaysAgo: '{n} days ago',
   seqAvgDays: '{n} days on average',
-  // 一天、一周从什么时候开始（D-286）
+  // When a day or week starts (D-286)
   describeDayStart: 'A day starts at {hour}:00',
   describeReadAttachmentsOn: '“{name}”: read attachments and suggest values in new entries',
   describeRecordRow: '“{name}”: change the buttons at the top of the entry page',
@@ -1726,7 +1728,7 @@ export const en = {
     'Two-week periods (for example pay periods) start on a week start. To set the first day of one, ask Tink.',
   separatorSemicolon: '; ',
 
-  // 扫描件转 Excel（D-272）
+  // Scan to Excel (D-272)
   runError_tableUnsupported:
     'This device can’t read tables in this language yet. Choose another language for “Convert to Excel”.',
   resultTablesMissing:
@@ -1751,7 +1753,7 @@ export const en = {
   tableEmpty: 'Nothing was recognized on this page.',
   tableReadOnly:
     'This page has more than {max} cells, so it can only be viewed here. To edit it, open the file in another app.',
-  // 扫描件转 Word（D-328）
+  // Scan to Word (D-328)
   runError_wordUnsupported:
     'This device can’t read documents in this language yet. Choose another language for “Convert to Word”.',
   wordFileName: 'Document {date}',
@@ -1767,7 +1769,7 @@ export const en = {
   wordHideKeyboard: 'Hide keyboard',
   wordDeleteTable: 'Delete table',
   wordEmpty: 'Nothing was recognized.',
-  // 日程（D-292–D-296）
+  // Schedule (D-292–D-296)
   scheduleDaily: 'Every day',
   scheduleWeekdays: 'Every {days}',
   scheduleTimesWeek: '{n} times a week',
@@ -1842,7 +1844,7 @@ export const en = {
   recordActionTooMany: 'At most {max} entries can change at once; this would change {n}.',
   recordActionGone: 'This entry was deleted.',
   recordUndoFailed: 'This entry has changed since: nothing was undone.',
-  // 勾上盖掉了原来有的值（D-617）：取消只会清空，所以这一次有撤销。
+  // Ticked. Replaced an existing value (D-617): Unchecking only clears, so this operation is undoable.
   recordCheckOverwrote: 'Ticked. It replaced a value that was already there.',
   recordCreateAllConfirm: 'This creates {n} entries in “{table}”.',
   recordCreateAllConfirmButton: 'Create',
@@ -1856,7 +1858,7 @@ export const en = {
   recordPickMax: 'At most {max} at a time.',
   recordPickEmpty: '“{table}” has no entries yet. Add some there first.',
   recordUndoBulkFailed: 'Some of these entries have changed since: nothing was undone.',
-  // 月历、显示格式、统计的目标和比较（D-305–D-308）
+  // Calendar, display format, statistic targets and comparisons (D-305–D-308)
   statPercent: '{value}%',
   calendarPrevWeek: 'Previous week',
   calendarNextWeek: 'Next week',
@@ -1891,7 +1893,7 @@ export const en = {
   calendarDayEmpty: 'No entries on this day.',
   elapsedRunning: 'Running for {time}',
   progressOfGoal: '{value} / {goal}',
-  // 打卡格（D-610）
+  // Check-in grid (D-610)
   gridCellLabel: '{row}, {column}: {n} entries',
   gridRange: '{from} – {to}',
   gridCellTitle: '{row} · {column}',
@@ -1928,7 +1930,7 @@ export const en = {
   boardMoved: 'Moved to “{column}”',
   boardColumnEmpty: 'Nothing in this column',
   boardCardHint: 'Tap to open or move to another column. Touch and hold to drag.',
-  // 桌面小组件（D-321–D-325）。
+  // Home Screen widget (D-321–D-325).
   widgetAdd: 'Add to Home Screen',
   widgetRemove: 'Remove from Home Screen',
   widgetUnsupportedTitle: 'This can’t go on the Home Screen yet',
@@ -1947,7 +1949,7 @@ export const en = {
     'This home screen can’t add a widget from Tinkrum. Touch and hold the home screen, choose Widgets and add Tinkrum.',
   widgetDone: 'Recorded {n} taps from the Home Screen widget',
   widgetSkipped: '{n} taps on the widget weren’t recorded because the page changed',
-  // 文件房间（D-357–D-360）。
+  // File desk workspace (D-357–D-360).
   deskPlace: 'Put on the desk',
   deskPlaceAbout: 'Edit tool by tool, see each change, undo any time',
   deskGone: 'This desk has been cleared.',
@@ -2000,7 +2002,7 @@ export const en = {
   deskStorageAbout:
     'Files you are editing in the room, with their versions (the last 20, at most 500 MB).',
   deskStale: 'Untouched for {n} days, you can clear it',
-  // 收件页面「存成记录」（D-392）。
+  // Inbox "Save as an entry" (D-392).
   shareRecord: 'Save as an entry',
   shareRecordAbout: 'Put the files in a table and fill in the rest yourself',
   shareRecordChoose: 'Choose',
@@ -2041,7 +2043,7 @@ export const en = {
     'Tink can’t see the file, only the fields of this table. The table is created first.',
   shareRecordTooMany: 'An entry holds at most {n} files: only the first {n} go in.',
   shareRecordNewTable: 'Add the table “{name}”',
-  // 表格文件的行导进表（D-574）：「设置 → 数据」，系统层。
+  // Importing table rows into a table (D-574): "Settings -> Data", system layer.
   importEntries: 'Import entries from a file',
   importTitle: 'Import entries',
   importIntro:
@@ -2130,10 +2132,10 @@ export const en = {
 };
 
 export type StringKey = keyof typeof en;
-/** 每种语言的文案表：键必须和英文完全一致。 */
+/** Message table for each language: keys must match English exactly. */
 export type MessageTable = Record<StringKey, string>;
 
-/** 单数写法（isSingular 为真时用），只放带数量的文案；哪个参数决定单复数见 messages.ts 的 PLURAL_COUNT_VARIABLE。 */
+/** Singular form (used when isSingular is true), contains only copy with quantities; see PLURAL_COUNT_VARIABLE in messages.ts for which parameter determines singular/plural. */
 export const enSingular = {
   formIssues: '{n} field needs attention; it is marked above.',
   bulkDeleteButton: 'Delete {n} entry',
@@ -2277,5 +2279,5 @@ export const enSingular = {
     'This backup was made on {date} and holds {n} entry (about {size}). Restoring replaces everything in Tinkrum now: all entries, files and the app design. You can undo it right after.',
 } satisfies Partial<MessageTable>;
 
-/** 单数表：键必须和 enSingular 完全一致。 */
+/** Singular table: keys must match enSingular exactly. */
 export type SingularTable = Record<keyof typeof enSingular, string>;

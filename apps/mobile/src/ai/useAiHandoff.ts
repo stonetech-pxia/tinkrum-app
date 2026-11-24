@@ -14,7 +14,7 @@ import { t } from '@/i18n';
 import { useWorkspaceContext } from '@/workspace/context';
 import { useAiReturn } from './return';
 
-/** 只有用户点分享才运行；App 和整份设置都清掉文件引用，记录不在配置中。 */
+/** Runs only when the user taps share; both apps and the full setup have their file references cleared, and records are not included in the config. */
 export function useAiHandoff() {
   const { store, files, locale } = useWorkspaceContext();
   return async (scope: HandoffScope, request?: string, appId?: string) => {

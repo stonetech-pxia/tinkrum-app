@@ -5,15 +5,16 @@ import { scheduleText, shortDate, type ScheduleRule } from './schedule';
 import { t } from './messages';
 import type { Field, Locale } from './schema';
 
-// 快速添加表单的 smartDate（D-344）：在本机认出文字里说的日期，换成要填的那个字段（日期、日期时间、日程）
-// 的表单输入。不经过 AI（D-113）。认出来但这种字段填不了的（日期字段遇到「每周一」）当作没认出来。
-// 日程字段连钟点一起填（D-346）。
+// smartDate for the quick add form (D-344): recognizes dates mentioned in text locally, converts
+// them into form inputs for the target field type (date, date-time, event). Bypasses AI (D-113).
+// Recognized dates that cannot be filled into such fields (e.g., "every Monday" for a date field)
+// are treated as unrecognized. Event fields fill time and date together (D-346).
 
 export interface SmartDate {
   phrase: DatePhrase;
-  /** 表单输入，交给 prepareRecordValues。 */
+  /** Form input, passed to prepareRecordValues. */
   input: unknown;
-  /** 给用户看的：会填成什么（明天、11月5日 15:00、每周一）。 */
+  /** Shown to the user: what it will be filled as (tomorrow, Nov 5 15:00, every Monday). */
   preview: string;
 }
 
@@ -23,10 +24,10 @@ function inputFor(value: DatePhraseValue, field: Field, today: number): unknown 
     case 'date':
       return value.kind === 'date' ? value.date : undefined;
     case 'datetime':
-      // 日期时间要有钟点：只说了日期时不填（用户自己选钟点）。
+      // Date-time must include time: left blank when only a date is mentioned (user selects time manually).
       return value.kind !== 'repeat' && value.time ? `${date} ${value.time}` : undefined;
     case 'schedule': {
-      // 钟点也带上（D-346）：「周五下午3点」→ 一次，周五 15:00；只说了钟点是今天。
+      // Time included as well (D-346): "Friday 3pm" -> once, Friday 15:00; only time mentioned defaults to today.
       const at = value.time ? { time: value.time } : {};
       if (value.kind === 'repeat') return { ...value.rule, ...at };
       return { repeat: 'once', date, ...at };
@@ -48,7 +49,7 @@ function previewOf(input: unknown, field: Field, today: number, locale: Locale):
   return text.length > 10 ? `${day} ${text.slice(11)}` : day;
 }
 
-/** 文字里能填进这个字段的日期说法；没有、或者填不了时 undefined。 */
+/** Date phrasing in text that can be filled into this field; undefined if none or unfillable. */
 export function smartDateOf(
   text: string,
   field: Field,

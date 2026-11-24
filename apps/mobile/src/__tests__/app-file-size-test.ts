@@ -12,7 +12,7 @@ import {
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { createWorkspaceStore } from '../workspace/store';
 
-// 导入一个大的 App 文件（D-554）：超过 30 步也能预览、确认，是一个版本，撤销一次回到导入前（底线 7）。
+// Import a large app file (D-554): preview and confirm even with more than 30 steps, forms a single version, undoing once reverts to before import (invariant 7).
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);

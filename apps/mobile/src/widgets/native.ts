@@ -1,7 +1,7 @@
 import MorphWidgets from '../../modules/morph-widgets';
 import type { WidgetPlatform } from './types';
 
-/** 本地模块 MorphWidgets（D-321）；Expo Go、Web 和测试里没有，返回 null（不写画面、不显示放到桌面的步骤）。 */
+/** Native module MorphWidgets (D-321); returns null in Expo Go, Web, and tests (omits rendering and instructions for placing on the home screen). */
 export const nativeWidgets: WidgetPlatform | null = MorphWidgets
   ? {
       setSnapshot: (json) => MorphWidgets!.setSnapshot(json),

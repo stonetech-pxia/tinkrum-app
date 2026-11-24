@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeQr, qrMatrix, qrToRgba } from './index';
 import { encodePng } from './png';
 
-/** 读回 PNG 的像素（只支持我们自己写的格式：RGBA、不滤波）。 */
+/** Read back PNG pixels (supports only our own custom format: RGBA, no filtering). */
 function readPng(png: Uint8Array) {
   const view = new DataView(png.buffer, png.byteOffset);
   let offset = 8;

@@ -4,47 +4,49 @@ import { ctx, receiptRules } from './doc-context';
 import { docAdds, orderPref } from './rules';
 import * as D from './rules-data';
 
-// 「记一笔」预填的候选（D-244 的扩展）：识别出的文字里哪一段像金额、哪一段像日期。规则为主，
-// 系统识别（iOS DataDetection / NSDataDetector，Android ML Kit 实体识别）只做辅助和补充：
-// 规则找到的，系统也找到就记一笔「对得上」；规则漏掉、系统找到的才作为补充加进来。
-// 候选只说「这里是金额 / 日期」，不说哪个是实付：挑选在 pick.ts 和 memory.ts 里做。
-// 文字只在本机处理，不发给 AI。
+// Pre-filled candidates for "log an expense" (D-244 extension): which text segment resembles an
+// amount or date. Rule-based first, system recognition (iOS DataDetection / NSDataDetector, Android
+// ML Kit entity recognition) serves only as auxiliary and supplementary: if rule finds it and
+// system finds it too, record as "matching"; only when rule misses and system finds is it added as
+// supplementary. Candidates only state "here is an amount/date", not which one is actually paid:
+// selection is done in pick.ts and memory.ts. Text is processed entirely on-device and never sent
+// to AI.
 
 export type CandidateKind = 'amount' | 'date';
 export type CandidateSource = 'rule' | 'system';
 
 export interface ValueCandidate {
   kind: CandidateKind;
-  /** 统一后的写法：金额 1234.56，日期 YYYY-MM-DD。 */
+  /** Unified format: amount 1234.56, date YYYY-MM-DD. */
   value: string;
-  /** 原文里的这一段。 */
+  /** This segment in the original text. */
   raw: string;
-  /** 第几行（从 0 开始，按 \n 分）。 */
+  /** Line number (0-indexed, split by \\n). */
   line: number;
-  /** 在这一行里的位置（UTF-16，和 JS 字符串一样）。 */
+  /** Position within this line (UTF-16, same as JS strings). */
   start: number;
   end: number;
   source: CandidateSource;
-  /** 规则的候选，系统识别在同一个位置也认出了同样的值。 */
+  /** Rule candidate, with system recognition also recognizing the same value at the same position. */
   confirmed?: boolean;
-  /** 数字里有识别错的字母（1O7.45、2026年S月），按常见的混淆改回数字才认出来。 */
+  /** Number contained misrecognized letters (1O7.45, 2026-S-month), recognized after correcting back to numbers based on common confusions. */
   repaired?: boolean;
-  /** 年在后的数字日期中，原文已能确定或用户可确认的日月顺序。 */
+  /** Day-month order in numeric dates with year at the end, determined from original text or confirmed by user. */
   dateOrder?: 'DMY' | 'MDY';
 }
 
-/** 系统识别的结果：在整段文字里的位置（UTF-16）和系统给的值；位置换成行由 systemCandidates 做。 */
+/** System recognition result: position in the full text (UTF-16) and value provided by system; systemCandidates converts positions to lines. */
 export interface SystemMatch {
   kind: CandidateKind;
   start: number;
   end: number;
-  /** 系统给的值：日期 YYYY-MM-DD；金额可以没有（ML Kit 的小数部分不可靠），这时按原文统一。 */
+  /** Value provided by system: date YYYY-MM-DD; amount may be absent (ML Kit decimal part unreliable), in which case unified according to original text. */
   value?: string;
 }
 
 export const splitLines = (text: string): string[] => text.split('\n');
 
-// ---- 日期 ----
+// ---- Date ----
 
 const MONTHS: Record<string, number> = {
   jan: 1,
@@ -98,7 +100,7 @@ const MONTH_NAMES = Object.keys(MONTHS)
   .join('|');
 
 const YMD = /(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?/g;
-// 年在后：两位或四位的年（05/03/26、05/03/2026）。前面不能是数字，后面不能还是数字。
+// Year at the end: two or four-digit year (05/03/26, 05/03/2026). Cannot be preceded by a digit, cannot be followed by a digit.
 const DMY = /(^|[^\d])(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})(?!\d)/g;
 // 12 mars 2026、1er avril 2026、5 March 2026
 const D_MONTH_Y = new RegExp(
@@ -114,22 +116,22 @@ const MONTH_D_Y = new RegExp(
 const fullYear = (y: string) => {
   if (y.length !== 2) return Number(y);
   const v = 2000 + Number(y);
-  // 两位年的世纪按「现在」选：2000+yy 比明年还晚就当 19yy（99 → 1999，不是 2099）。
+  // Century for two-digit years chosen based on "now": if 2000+yy is later than next year, treat as 19yy (99 -> 1999, not 2099).
   return receiptRules() && ctx.nowYear > 0 && v > ctx.nowYear + 1 ? v - 100 : v;
 };
 
-// 时间和日期粘在一起（23:16:4615/08/2022、20/10/202119:29）。
+// Time and date stuck together (23:16:4615/08/2022, 20/10/2021 19:29).
 const G1 =
   /(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[AaPp][Mm])?)(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})(?!\d)/g;
 const G2 = /(^|[^\d])(\d{1,2})[/.-](\d{1,2})[/.-](20\d{2})(?=\d{1,2}[:.]\d{2})/g;
-// 月份名写法（词用 \p{L}，查表时去重音；不用后行断言）：28-Oct-2021、3 de enero de 2024、15. März 2024、Oct28'21。
+// Month name formats (words using \\p{L}, accent-insensitive table lookup; without lookbehind): 28-Oct-2021, 3 de enero de 2024, 15. März 2024, Oct28'21.
 const W_D_MON_Y =
   /(^|[^\p{L}\p{N}])(\d{1,2})(?:st|nd|rd|th|er)?\.?(?:\s+de)?[\s.\-/]*(\p{L}{3,9})\.?(?:\s+de)?\s*([,'’°\-.]?)\s*(\d{4}|\d{2})(?:(?!\d)|(?=\d{1,2}:\d{2}))(?![:.]\d)/giu;
 const W_MON_D_Y =
   /(^|[^\p{L}\p{N}])(\p{L}{3,9})\.?\s*(\d{1,2})(?:st|nd|rd|th)?(?:\s*([,'’°.])\s*|(\s+))(\d{4}|\d{2})(?:(?!\d)|(?=\d{1,2}:\d{2}))(?![:.]\d)/giu;
 const W_CTIME =
   /(^|[^\p{L}\p{N}])(\p{L}{3,9})\.?\s+(\d{1,2})\s+\d{1,2}:\d{2}(?::\d{2})?\s+(\d{4})(?!\d)/giu;
-/** 两位年只在年前有分隔符、年后跟着时间或在行尾时才认；00 不认（MAY 4.00）。 */
+/** Two-digit year recognized only if preceded by a separator and followed by time or at the end of a line; 00 not recognized (MAY 4.00). */
 function yearOk(line: string, end: number, sepChar: string, year: string): boolean {
   if (year.length === 4) return true;
   if (year === '00') return false;
@@ -137,7 +139,7 @@ function yearOk(line: string, end: number, sepChar: string, year: string): boole
     sepChar !== '' || /^\s*\d{1,2}[:.]\d{2}/.test(line.slice(end)) || line.slice(end).trim() === ''
   );
 }
-// 两位年、- 或 . 分隔的假日期（日本地址编号、被字母数字夹住）。
+// Two-digit year, fake dates separated by - or . (Japanese address numbers, sandwiched between alphanumeric characters).
 const TIME_AFTER = /^\s*,?\s*\d{1,2}[:.]\d{2}/;
 const DATE_WORD_LEFT = /date|tarih|fecha|日付|日/i;
 const ADDR_CJK = /[都道府県市区町村丁目]/;
@@ -155,7 +157,7 @@ function fakeShortDate(line: string, at: number, raw: string): boolean {
   );
 }
 
-/** 一行里的日期。年在后、日月分不清时保留两种解释；语言只决定展示顺序。 */
+/** Dates in a line. Keep both interpretations when year is at the end and day/month is ambiguous; language determines display order only. */
 function datesInLine(
   line: string,
   locale: Locale,
@@ -202,7 +204,7 @@ function datesInLine(
     const raw = m[0].slice(m[1]!.length);
     const at = m.index + m[1]!.length;
     if (receiptRules() && fakeShortDate(line, at, raw)) continue;
-    // 两位年的日期，两个分隔符要一样（2/1.00、12-05/09 不是日期）。
+    // For two-digit year dates, the two separators must match (2/1.00, 12-05/09 are not dates).
     if (receiptRules() && m[4]!.length === 2) {
       const seps = /^\d{1,2}(\D)\d{1,2}(\D)/.exec(raw);
       if (seps && seps[1] !== seps[2]) continue;
@@ -236,11 +238,11 @@ function datesInLine(
     const month = monthOf(m[2]!);
     const raw = m[0].slice(m[1]!.length);
     if (!month || !yearOk(line, m.index + m[0].length, m[4] ?? '', m[6]!)) continue;
-    // 月和日连写、日和年只隔空格（Oct2 2020）多半是月份年份加噪点，不认；Oct28'21 有撇号，认。
+    // Month and day written together, day and year separated only by space (Oct2 2020) are mostly month/year with noise, not recognized; Oct28'21 has an apostrophe, recognized.
     if (m[5] && /^\d/.test(raw.slice(m[2]!.length))) continue;
     add(m.index + m[1]!.length, raw, validDate(fullYear(m[6]!), month, Number(m[3])));
   }
-  // SUN JUN 24 20:49:53 2018（ctime 写法：月 日 时间 年）
+  // SUN JUN 24 20:49:53 2018 (ctime format: month day time year)
   for (const m of receiptRules() ? line.matchAll(W_CTIME) : []) {
     const month = monthOf(m[2]!);
     const raw = m[0].slice(m[1]!.length);
@@ -250,27 +252,29 @@ function datesInLine(
   return found.sort((x, y) => x.start - y.start);
 }
 
-// ---- 金额 ----
+// ---- Amount ----
 
 const CURRENCY_BEFORE = /(?:[$€£¥￥]|rmb|cny|eur|usd|gbp|myr|us\$)\s*$/i;
-// 马币写成 RM33.90（D-549）：RM 只认大写、前面不连着字母，不然整段当成了编号。
+// Malaysian Ringgit written as RM33.90 (D-549): RM recognized only in uppercase, not connected to preceding letters, otherwise the whole segment is treated as a serial number.
 const RM_BEFORE = /(?:^|[^A-Za-z])RM\s?$/;
 const currencyBefore = (s: string) => CURRENCY_BEFORE.test(s) || RM_BEFORE.test(s);
 const CURRENCY_AFTER = /^\s*(?:[€$£¥￥元]|eur|euros?|rmb|cny|usd|gbp|myr)/i;
-// 数字（千位分隔可以是逗号、点、空格），后面可以有一位或两位小数。
+// Numbers (thousand separator can be comma, dot, space), optionally followed by one or two decimal places.
 const NUMBER = /-?\d{1,3}(?:[,.   ]\d{3})+(?:[.,]\d{1,2})?|-?\d+(?:[.,]\d{1,2})?/g;
-// 数量、重量、百分比、时间后面跟的东西：不是金额。
+// Things following quantities, weights, percentages, times: not amounts.
 const NOT_MONEY_AFTER = /^\s*(?:%|kg|g\b|ml|l\b|x\b|×|件|个|份|张|pcs|km|h\b|min|:\d)/i;
 
-/** 一行里像金额的数：有两位小数，或者紧挨着货币符号。日期、时间、百分比、数量不算。 */
+/** Numbers in a line resembling amounts: have two decimal places, or immediately follow a currency symbol. Dates, times, percentages, quantities do not count. */
 function amountsInLine(
   line: string,
   dates: readonly { start: number; end: number }[],
   locale: Locale,
 ): { start: number; end: number; raw: string; value: string }[] {
   const out: { start: number; end: number; raw: string; value: string }[] = [];
-  // 空格当千位分隔的数（3 620,84）：前面或后面紧挨货币符号，或这一排有三个以上的金额，
-  // 或者它能由全文别的金额加减得到，才整体取（否则「2 x 3 12,50」里的数量会连进来）。
+  // Numbers using spaces as thousand separators (3 620.84): taken as a whole only if immediately
+  // preceded or followed by a currency symbol, or if this row has more than three amounts, or if it
+  // can be derived by adding/subtracting other amounts in the text (otherwise quantity in "2 x 3
+  // 12.50" would get joined).
   const spaced: { start: number; end: number; raw: string; value: string }[] = [];
   const many = Math.max(ctx.rowMany, (line.match(/\d[.,]\d{2}(?!\d)/g) ?? []).length) >= 3;
   for (const m of receiptRules()
@@ -280,7 +284,7 @@ function amountsInLine(
     const end = start + m[2]!.length;
     if (dates.some((d) => start < d.end && end > d.start)) continue;
     const v = normalizeNumber(m[2]!.replace(/ /g, ''));
-    // 货币符号在后面（1 819,68 €；法语、德语票据用空格做千位分隔）。
+    // Currency symbol at the end (1 819.68 €; French and German receipts use spaces as thousand separators).
     const spacedHere = CURRENCY_AFTER.test(line.slice(end));
     if (!(currencyBefore(line.slice(0, start)) || many || spacedHere || docAdds(Number(v))))
       continue;
@@ -290,25 +294,27 @@ function amountsInLine(
     if (spaced.some((s) => m.index < s.end && m.index + m[0].length > s.start)) continue;
     let raw = m[0];
     let start = m.index;
-    // 千位分隔用空格时，正则可能把前面的数量也连进来（「2 120,00」）：只有前面紧挨货币符号或标签时才信。
+    // When spaces are used as thousand separators, regex might also capture the preceding quantity ("2 120.00"): trusted only when immediately preceded by a currency symbol or label.
     const end = start + raw.length;
     if (dates.some((d) => start < d.end && end > d.start)) continue;
     const before = line.slice(0, start);
     const after = line.slice(end);
     if (/[\d.,]$/.test(before) || /^[\d]/.test(after)) continue;
     if (NOT_MONEY_AFTER.test(after)) continue;
-    // 前面紧挨着字母或横线的是单号的一部分（INV-2026-0042、A12）。
+    // Preceded immediately by letters or hyphens as part of a reference/serial number (INV-2026-0042, A12).
     if (/[A-Za-z\-/#]$/.test(before) && !currencyBefore(before)) continue;
     const decimals = /[.,]\d{2}$/.test(raw);
     const currency = currencyBefore(before) || CURRENCY_AFTER.test(after);
     if (!decimals && !currency) continue;
-    // 英文、法文的四位以上整数金额会写千位分隔（1,234 / 1 234）：连着写又没有小数的（5256 €），
-    // 多半是小数点没认出来，不当金额。中文常常不写千位分隔，不受这条限制。
+    // Integer amounts of 4 or more digits in English/French use thousand separators (1,234 / 1
+    // 234): written continuously without decimals (5256 €) are likely unrecognized decimal points,
+    // not treated as amounts. Chinese often omits thousand separators and is not subject to this
+    // rule.
     if (locale !== 'zh' && !decimals && /^-?\d{4,}$/.test(raw)) continue;
     if (raw.startsWith('-')) {
-      // 「-2.00」是负数（优惠）；保留负号，挑选时会排除。
+      // "-2.00" is a negative number (discount); keep the negative sign, excluded during selection.
     } else if (/\s/.test(raw) && !currency) {
-      // 空格分隔又没有货币符号时，只取最后一段（「2 x 3 12,50」里的 12,50）。
+      // When space-separated without a currency symbol, take only the last segment (12.50 in "2 x 3 12.50").
       const last = raw.split(/\s/).pop()!;
       start = end - last.length;
       raw = last;
@@ -323,7 +329,7 @@ function amountsInLine(
   return out;
 }
 
-// 文字识别常把数字认成长得像的字母。只在「像金额或日期」的一段里改，一个字换一个字，位置不变。
+// OCR often mistakes numbers for resembling letters. Modified only within an "amount or date" segment, character by character, keeping positions unchanged.
 const LOOKALIKE: Record<string, string> = {
   O: '0',
   o: '0',
@@ -341,7 +347,7 @@ const MONEY_SHAPE = /^\d{1,3}(?:[,.]\d{3})*[.,]\d{2}$|^\d+[.,]\d{2}$/;
 const DATE_SHAPE =
   /^\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}$|^\d{1,2}[-/.]\d{1,2}[-/.](?:\d{4}|\d{2})$|^\d{4}年\d{1,2}月\d{1,2}$/;
 
-/** 改回数字后的这一行，和改过的位置；改完不像金额或日期的不改。 */
+/** This line after digit repair, and changed positions; lines not resembling amount or date after repair are unchanged. */
 export function repairDigits(line: string): { text: string; changed: boolean[] } {
   const chars = [...line];
   const changed = line.split('').map(() => false);
@@ -349,7 +355,7 @@ export function repairDigits(line: string): { text: string; changed: boolean[] }
     const run = m[0];
     const digits = run.replace(/[^\d]/g, '').length;
     if (digits < 2 || !/[OoDSslI|BZ]/.test(run)) continue;
-    // 前后紧挨着字母的是单词或单号（SOS、B12、Total），不改。
+    // Preceded or followed immediately by letters as words or codes (SOS, B12, Total), unchanged.
     const before = line[m.index - 1] ?? '';
     const after = line[m.index + run.length] ?? '';
     if (/[A-Za-z]/.test(before) || /[A-Za-z]/.test(after)) continue;
@@ -365,7 +371,7 @@ export function repairDigits(line: string): { text: string; changed: boolean[] }
   return { text: chars.join(''), changed };
 }
 
-/** 规则找出的全部金额和日期候选，按行、按位置排好。raw 是原文（没改过的）。 */
+/** All amount and date candidates found by rules, ordered by line and position. raw is original text (unmodified). */
 export function ruleCandidates(text: string, locale: Locale): ValueCandidate[] {
   const out: ValueCandidate[] = [];
   splitLines(text).forEach((original, index) => {
@@ -402,7 +408,7 @@ export function ruleCandidates(text: string, locale: Locale): ValueCandidate[] {
 export const sameValue = (kind: CandidateKind, a: string, b: string) =>
   kind === 'amount' ? Math.abs(Number(a) - Number(b)) < 0.005 : a === b;
 
-/** 系统识别的结果（整段文字里的位置）换成候选；一段跨了行的不要。 */
+/** Convert system recognition results (positions in full text) into candidates; skip those spanning across lines. */
 export function systemCandidates(text: string, matches: readonly SystemMatch[]): ValueCandidate[] {
   const lines = splitLines(text);
   const starts: number[] = [];
@@ -433,8 +439,10 @@ export function systemCandidates(text: string, matches: readonly SystemMatch[]):
 }
 
 /**
- * 规则为主、系统为辅：规则的候选都留下；系统在同一位置认出同样的值时，规则的候选记 confirmed；
- * 系统在规则没有候选的地方认出来的，作为补充加进来；同一位置值不一样时听规则的。
+ * Rule-based primary, system secondary: keep all rule-based candidates; when the system
+ * recognizes the same value at the same position, mark the rule candidate as confirmed; when the
+ * system recognizes a value where rules have no candidate, add it as a supplement; when values at
+ * the same position differ, follow the rules.
  */
 export function mergeCandidates(
   rules: readonly ValueCandidate[],

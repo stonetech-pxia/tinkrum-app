@@ -10,7 +10,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 每一笔单独选货币（D-429）：列表每行写自己的货币，合计按货币分开，不加在一起。
+// Select currency individually per entry (D-429): each row displays its own currency in the list, totals are separated by currency and not added together.
 
 const claims: Collection = {
   id: 'claims',

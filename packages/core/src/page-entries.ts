@@ -9,12 +9,16 @@ import {
   type WorkspaceConfig,
 } from './schema';
 
-// 新页面的入口：AI 新加了一个页面，整个 App 里却没有任何地方能打开它（导航栏、浮动入口、别的页面上的按钮或
-// 入口、提醒）时，应用后用户找不到这一页（创始人 2026-10-31：让 AI 做 Todoist 的页面时经常忘了加入口）。
-// 这时在首页最后补一个入口（只在 AI 和用户的修改 prepareOps 里补，样例和模板照写的来）。只看这次新加的页面：用户以后自己移除了入口，别的修改不会再把它加回来。
-// 工具包的页面（package）、给一条记录用的页面（of，从记录块打开）和工具箱（系统入口 tools 打开）不补。
+// Entry point for new pages: when the AI adds a new page but no place in the entire app can open it
+// (navigation bar, floating entry, buttons or entry points on other pages, reminders), the user
+// cannot find the page after applying (founder 2026-10-31: often forgot entry points when AI builds
+// a Todoist page). In such cases, append an entry point at the end of the home screen (only in AI
+// and user modification prepareOps; samples and templates follow their own definitions). Considers
+// only newly added pages: if the user removes the entry point later, other modifications will not
+// add it back. Package pages (package), single-record pages (of, opened from record blocks), and
+// the toolbox (system entry point tools) are excluded.
 
-/** 别的页面、导航和提醒里打开的所有目标。 */
+/** All targets opened across other pages, navigation, and reminders. */
 function openedTargets(config: WorkspaceConfig, except: string): Set<unknown> {
   const targets = new Set<unknown>([...config.nav.bar, ...config.nav.floating]);
   for (const app of config.nav.apps ?? []) for (const t of app.bar) targets.add(t);
@@ -26,7 +30,7 @@ function openedTargets(config: WorkspaceConfig, except: string): Set<unknown> {
   return targets;
 }
 
-/** 给 after 里新加的、打不开的页面在首页补入口；返回补了入口的页面标题。 */
+/** Adds home screen entry points for un-openable new pages added to after; returns the titles of pages for which entry points were added. */
 export function addMissingPageEntries(before: WorkspaceConfig, after: WorkspaceConfig): string[] {
   const home = after.containers.pages.find((p) => p.id === HOME_PAGE_ID);
   if (!home) return [];
@@ -37,7 +41,7 @@ export function addMissingPageEntries(before: WorkspaceConfig, after: WorkspaceC
     if (before.containers.pages.some((p) => p.id === page.id)) continue;
     const target = pageTarget(page.id);
     if (openedTargets(after, page.id).has(target)) continue;
-    // app 里的页面：放进这个 app 的底栏（Tink 之前）；底栏满了，放在它第一页的最后（D-485）。
+    // Pages inside an app: placed in this app's bottom bar (before Tink); if the bottom bar is full, placed at the end of its first page (D-485).
     const app = page.app !== undefined ? after.nav.apps?.find((a) => a.id === page.app) : undefined;
     if (page.app !== undefined) {
       if (!app) continue;

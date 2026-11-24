@@ -26,13 +26,13 @@ describe('createStarterWorkspace', () => {
       expect(config.packages.map((t) => t.id)).toEqual([...STARTER_TOOL_IDS]);
       expect(config.nav.bar).toEqual(['page:home', 'ai', 'settings']);
       const home = config.containers.pages.find((p) => p.id === 'home')!;
-      // 首页从空白开始，引导第 1 步加上文件入口（D-231）；不预装用户快捷操作。
+      // Home screen starts blank, step 1 of the guide adds the file entry point (D-231); does not preinstall user quick actions.
       expect(home.blocks).toEqual([]);
       expect(quickActionsOf(config).filter((w) => !w.package)).toEqual([]);
     },
   );
 
-  // D-487 只换了默认风格（theme）；其余仍然是 v33 的起始配置迁移过来的样子（底线 12）。
+  // D-487 only changes the default theme; everything else remains migrated from the v33 starter configuration (Invariant 12).
   it.each(['zh', 'en'] as const)(
     'is the v33 starter, migrated, except the D-487 theme (%s)',
     (locale) => {
@@ -46,7 +46,7 @@ describe('createStarterWorkspace', () => {
     },
   );
 
-  // D-487：默认风格在 Clay 的基础上：黏土卡片、淡淡的暖色渐变、浅底彩色图标；主色和字体不变。
+  // D-487: The default theme builds upon Clay: clay cards, subtle warm gradients, and light-themed colored icons; primary colors and fonts remain unchanged.
   it('uses the refined Clay theme by default', () => {
     const { theme } = createStarterWorkspace('en', registry);
     expect(theme).toMatchObject({
@@ -59,8 +59,9 @@ describe('createStarterWorkspace', () => {
     expect(validateWorkspace(createStarterWorkspace('en', registry), registry).ok).toBe(true);
   });
 
-  // D-487：首页先说产品是什么，再放四个内设的快捷操作宫格（扫成 PDF / Word / Excel、合并文件），
-  // 下面是主色的「打开文件」、工具箱入口、最近操作、最近文件。
+  // D-487: The home screen first explains the product, followed by four built-in quick action tiles
+  // (scan to PDF / Word / Excel, merge files), and below them the primary-colored "Open files"
+  // button, toolbox entry, recent operations, and recent files.
   it('puts a header, the four marquee quick actions and an Open files button on the home page', () => {
     const config = createStarterWorkspace('en', registry);
     const result = applyOps(config, homeFileEntryOps(config, 'en'), { registry, locale: 'en' });
@@ -79,14 +80,14 @@ describe('createStarterWorkspace', () => {
       { look: 'action', show: { shape: 'tile' }, tools: [{ tool: 'scan-table-excel' }] },
       { look: 'action', show: { shape: 'tile' }, tools: [{ tool: 'combine-documents' }] },
     ]);
-    // 每个宫格里的快捷操作都是内设的预设，不用添加就能点。
+    // Each quick action in every tile is a built-in preset, ready to be tapped without needing to be added first.
     for (const c of (home.blocks[1] as ComponentOf<'group'>).children) {
       const use = (c as ComponentOf<'action'>).tools[0]!;
       expect(
         'tool' in use && findWorkflowTarget(quickActionsOf(result.config), use.tool, 'en'),
       ).toBeTruthy();
     }
-    // D-552：四个宫格的图标各不相同（PDF、Word、Excel、合并），一眼能分开；图标取法和宫格渲染一样。
+    // D-552: The four tile icons are distinct (PDF, Word, Excel, merge) for quick visual differentiation; icon retrieval matches tile rendering.
     const icons = (home.blocks[1] as ComponentOf<'group'>).children.map((c) => {
       const use = (c as ComponentOf<'action'>).tools[0]!;
       const wf = findWorkflowTarget(
@@ -98,9 +99,9 @@ describe('createStarterWorkspace', () => {
     });
     expect(new Set(icons).size).toBe(4);
     expect(home.blocks[2]).toMatchObject({ look: 'picker', tools: [{ tool: '$pick.open' }] });
-    // 没写 shape：主色的整行按钮，不是只有图标的小块。
+    // Shape is unspecified: A full-width primary-colored button row, rather than a small icon-only block.
     expect((home.blocks[2] as ComponentOf<'picker'>).show).toBeUndefined();
-    // D-452：最后是最近操作（读运行记录）和最近的 3 个文件。
+    // D-452: Finally, recent operations (reading run logs) and the 3 most recent files.
     expect(home.blocks.slice(4)).toMatchObject([
       { look: 'library', show: { title: 'Recent actions' }, source: { recent: true } },
       { look: 'files', show: { title: 'Recent files' }, source: { table: '$files', limit: 3 } },

@@ -1,12 +1,14 @@
 import { VISION_ERRORS, type MorphVisionModule } from '../../modules/morph-vision';
 import type { ImageLabel } from './platform';
 
-// VisionPlatform.classifyImage 的 JS 部分（照片里是什么，没有文字的照片做推荐用，还没接进推荐）：
-// 给原生任务一个 taskId，signal 取消时马上结束 Promise 并通知原生停下；两个平台的结果统一整理一遍。
+// JS part of VisionPlatform.classifyImage (what is in the photo, used for recommendations on photos
+// without text, not yet wired into recommendations): assign a taskId to the native task,
+// immediately finish the Promise and notify native to stop when signal is cancelled; unify and tidy
+// results from both platforms.
 
-/** 默认最多几个标签。 */
+/** Default maximum number of tags. */
 export const CLASSIFY_MAX_RESULTS = 10;
-/** 默认只要不低于这个置信度的（ML Kit 自己默认 0.5，低一点留给推荐那边再定）。 */
+/** Default minimum confidence threshold (ML Kit defaults to 0.5; use a lower value to leave filtering to the recommendations module). */
 export const CLASSIFY_MIN_CONFIDENCE = 0.1;
 
 type NativeClassifier = Required<Pick<MorphVisionModule, 'classifyImage'>> &
@@ -16,7 +18,7 @@ let taskCounter = 0;
 
 const cancelledError = () => Object.assign(new Error('Cancelled'), { code: 'cancelled' });
 
-/** 去掉不是数字的，置信度限制在 0–1，同一个标签留最高的，从高到低，过滤门槛、截个数。 */
+/** Remove non-numeric tags, clamp confidence to 0-1, keep highest confidence for duplicate tags, sort descending by confidence, apply filter threshold and limit count. */
 export function tidyLabels(
   labels: readonly { id: string; confidence: number }[],
   maxResults: number,
@@ -63,7 +65,7 @@ export async function classifyImageWith(
     return tidyLabels(labels, maxResults, minConfidence);
   } finally {
     signal?.removeEventListener('abort', onAbort);
-    // 取消以后原生那边晚到的结果或错误没人再等。
+    // Ignore late-arriving results or errors from native side after cancellation.
     work.catch(() => undefined);
   }
 }

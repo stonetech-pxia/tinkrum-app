@@ -19,7 +19,7 @@ import {
 
 type Rgb = [number, number, number];
 
-/** 一页纸：底色由位置决定（模拟阴影、偏色的纸或屏幕）。 */
+/** A page: background color determined by position (simulating shadows, tinted paper, or screens). */
 function page(width: number, height: number, paper: (x: number, y: number) => Rgb): RgbaImage {
   const data = new Uint8Array(width * height * 4);
   for (let y = 0; y < height; y++) {
@@ -35,14 +35,14 @@ function page(width: number, height: number, paper: (x: number, y: number) => Rg
   return { width, height, data };
 }
 
-/** 把一个像素按比例压暗成「墨水」（墨水颜色乘上当地的纸色，和真实拍照一样受阴影影响）。 */
+/** Darken a pixel proportionally into "ink" (ink color multiplied by local paper color, affected by shadows just like a real photograph). */
 function ink(img: RgbaImage, x: number, y: number, color: Rgb = [20, 20, 20]) {
   if (x < 0 || y < 0 || x >= img.width || y >= img.height) return;
   const i = (Math.round(y) * img.width + Math.round(x)) * 4;
   for (let c = 0; c < 3; c++) img.data[i + c] = Math.round((img.data[i + c]! * color[c]!) / 255);
 }
 
-/** 画「文字行」：一行行断续的短横（像字），整体按 deg 度倾斜（y 向下，正数向右下斜）。 */
+/** Draw "text lines": rows of intermittent short dashes (resembling text), tilted at an angle of deg overall (y downward, positive values slant down-right). */
 function textLines(
   img: RgbaImage,
   {
@@ -62,7 +62,7 @@ function textLines(
   const t = Math.tan((deg * Math.PI) / 180);
   for (let line = top; line < img.height - 40; line += gap) {
     for (let x = margin; x < img.width - margin; x++) {
-      // 「字」宽 9 像素、间隔 4 像素，字高 8 像素。
+      // "Character" width 9 pixels, spacing 4 pixels, character height 8 pixels.
       if (x % 13 >= 9) continue;
       for (let h = 0; h < 8; h++) {
         if ((x + h) % 3 === 0) continue;
@@ -79,7 +79,7 @@ function lumaAt(norm: Float32Array, width: number, x: number, y: number) {
 
 describe('scan enhance: background', () => {
   it('flattens a shadow across the page so the paper is equally white everywhere', () => {
-    // 左边亮（235）、右边在阴影里（110），中间有字。
+    // Left side is bright (235), right side is in shadow (110), with text in the middle.
     const img = page(600, 800, (x) => {
       const v = Math.round(235 - (125 * x) / 599);
       return [v, v, v];
@@ -87,20 +87,22 @@ describe('scan enhance: background', () => {
     textLines(img);
     const bg = estimateBackground(img);
     const norm = normalizeByBackground(img, bg);
-    // 行与行之间的空白（纸）：左右两侧都应接近 1。
+    // Whitespace (paper) between text lines: both left and right sides should be close to 1.
     const left = lumaAt(norm, 600, 40, 36);
     const right = lumaAt(norm, 600, 560, 36);
     expect(left).toBeGreaterThan(0.9);
     expect(right).toBeGreaterThan(0.9);
     expect(Math.abs(left - right)).toBeLessThan(0.06);
-    // 阴影里的字仍然是暗的。
+    // Text in shadows remains dark.
     const darkInShadow = lumaAt(norm, 600, 552, 41);
     expect(darkInShadow).toBeLessThan(0.3);
   });
 
   it('removes a sharp shadow edge (book gutter, hand) right up to the edge, not in a wide gray band', () => {
-    // 左边 1/3 在很深的阴影里（120），右边是纸（230），交界是一条直线（实验里 2–4 号书页的左上角）。
-    // 分析图长边 800 时，交界两边 16 像素以外的纸都应该和别处一样白（误差 5% 以内）。
+    // Left 1/3 is in deep shadow (120), right side is paper (230), meeting at a straight line
+    // (top-left corner of book pages 2-4 in experiments). When analyzing an image with long side
+    // 800, paper more than 16 pixels away from the boundary on both sides should be as white as
+    // elsewhere (within 5% error).
     const img = page(600, 800, (x) => (x < 200 ? [120, 120, 120] : [230, 230, 230]));
     const norm = normalizeByBackground(img, estimateBackground(img));
     for (const d of [16, 24, 48]) {
@@ -119,7 +121,7 @@ describe('scan enhance: background', () => {
   });
 
   it('keeps the paper around a glare spot white (no dark halo)', () => {
-    // 纸色 170，下方有一块很亮的反光（圆心 (300, 600)，半径 120，亮到 252）。
+    // Paper color 170, with a very bright glare spot at the bottom (center (300, 600), radius 120, bright up to 252).
     const img = page(600, 800, (x, y) => {
       const d = Math.hypot(x - 300, y - 600);
       const v = d < 120 ? 252 : 170;
@@ -127,7 +129,7 @@ describe('scan enhance: background', () => {
     });
     textLines(img);
     const norm = normalizeByBackground(img, estimateBackground(img));
-    // 反光圈外面一点（离圈 30–60 像素）的纸，在两行字之间。
+    // Paper slightly outside the glare ring (30-60 pixels away from the ring), located between two lines of text.
     for (const [x, y] of [
       [300, 444],
       [140, 612],
@@ -138,7 +140,7 @@ describe('scan enhance: background', () => {
   });
 
   it('does not wash a large dark picture out to white', () => {
-    // 页中间有一大块深色图片（占页面约 1/4）。
+    // A large dark image in the middle of the page (occupying about 1/4 of the page).
     const img = page(600, 800, (x, y) =>
       x > 150 && x < 450 && y > 250 && y < 550 ? [50, 60, 70] : [220, 220, 215],
     );
@@ -167,7 +169,7 @@ describe('scan enhance: levels and color', () => {
     const { lo, hi } = levelsOf(norm);
     const leveled = leveledLuma(norm, lo, hi);
     expect(leveled[36 * 500 + 250]).toBe(1);
-    // 灰色墨水（纸色的 35%）拉伸后应该足够黑。
+    // Gray ink (35% of paper color) should be sufficiently black after stretching.
     expect(leveled[41 * 500 + 31]).toBeLessThan(0.2);
   });
 
@@ -196,7 +198,7 @@ describe('scan enhance: levels and color', () => {
 
 describe('scan enhance: tone near white (D-275)', () => {
   it('keeps paper pure white and ink unchanged', () => {
-    // 纸在白点稍上面（白点取纸色的 94%，纸约 1.06）：至少 253 / 255，比纸亮的地方 255。
+    // Paper slightly above the white point (white point set to 94% of paper color, paper approx 1.06): at least 253 / 255, compared to 255 for areas brighter than paper.
     expect(scanTone(1.064)).toBeGreaterThanOrEqual(0.99);
     expect(scanTone(1.12)).toBe(1);
     expect(scanTone(1.2)).toBe(1);
@@ -205,7 +207,7 @@ describe('scan enhance: tone near white (D-275)', () => {
   });
 
   it('does not cut faint text just under the paper to white', () => {
-    // 只比纸暗 4%（反光里的淡字）：一刀切时是 1（看不见），软膝后仍比纸暗。
+    // Only 4% darker than paper (faint text in glare): 1 during one-size-fits-all thresholding (invisible), but remains darker than paper after soft knee curve.
     const faint = 1.064 * 0.96;
     expect(scanTone(faint)).toBeLessThan(0.98);
     expect(scanTone(faint)).toBeLessThan(scanTone(1.064) - 0.01);
@@ -246,7 +248,7 @@ describe('scan enhance: deskew', () => {
 
   it('does not rotate when there are no text lines (a scattered pattern)', () => {
     const img = page(600, 600, () => [225, 225, 220]);
-    // 随机散点，没有成行的字。
+    // Random scattered points, no text lines.
     let seed = 7;
     const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
     for (let i = 0; i < 4000; i++) {
@@ -270,7 +272,7 @@ describe('scan enhance: black and white', () => {
     const width = 400;
     const height = 400;
     const luma = new Float32Array(width * height).fill(1);
-    // 左半边是很淡的字（0.6），右半边是正常的黑字（0.05）。
+    // Left half has very faint text (0.6), right half has normal black text (0.05).
     for (let y = 100; y < 300; y += 20) {
       for (let x = 20; x < 380; x++) {
         if (x % 10 >= 6) continue;
@@ -282,21 +284,21 @@ describe('scan enhance: black and white', () => {
       const o = (Math.floor(y / 2) * stats.width + Math.floor(x / 2)) * 4;
       return sauvolaThreshold(stats.data[o]! / 255, stats.data[o + 1]! / 255 / 2);
     };
-    expect(0.6).toBeLessThan(at(100, 102)); // 淡字 → 黑
-    expect(0.05).toBeLessThan(at(300, 102)); // 黑字 → 黑
-    expect(1).toBeGreaterThan(at(100, 50)); // 空白 → 白
-    expect(1).toBeGreaterThan(at(100, 112)); // 行间 → 白
+    expect(0.6).toBeLessThan(at(100, 102)); // Faint text → black
+    expect(0.05).toBeLessThan(at(300, 102)); // Black text → black
+    expect(1).toBeGreaterThan(at(100, 50)); // Blank area → white
+    expect(1).toBeGreaterThan(at(100, 112)); // Interline spacing → white
   });
 
   it('treats red and blue ink as dark for black and white, so colored text is kept', () => {
-    // 除过背景、拉伸后的颜色：红字、蓝字、白纸、浅灰的纸纹。
+    // Background-removed, stretched colors: red text, blue text, white paper, light gray paper texture.
     const normalized = Float32Array.from([1, 0.25, 0.25, 0.2, 0.3, 0.9, 1, 1, 1, 0.92, 0.9, 0.94]);
     const ink = leveledInk(normalized, 0, 1);
     expect(ink[0]).toBeLessThan(0.3);
     expect(ink[1]).toBeLessThan(0.3);
     expect(ink[2]).toBe(1);
     expect(ink[3]).toBeGreaterThan(0.85);
-    // 黑白模式的统计就是按这个算的：黑字和红字隔行，红字那一行的均值和黑字那一行差不多暗。
+    // Black-and-white mode statistics are calculated as follows: black text and red text alternate rows, and the mean of the red text row is nearly as dark as the black text row.
     const mixed = page(240, 240, () => [230, 230, 230]);
     textLines(mixed, { top: 40, gap: 48 });
     textLines(mixed, { top: 64, gap: 48, color: [220, 30, 30] });
@@ -313,11 +315,11 @@ describe('scan enhance: black and white', () => {
       const i = (y * 200 + x) * 4;
       img.data[i] = img.data[i + 1] = img.data[i + 2] = 0;
     };
-    // 一个「字」：20×30。
+    // A character: 20×30.
     for (let y = 30; y < 60; y++) for (let x = 20; x < 40; x++) black(x, y);
-    // 字旁边的句号（2×2，隔 3 像素）。
+    // Period next to the character (2×2, spaced 3 pixels).
     for (let y = 56; y < 58; y++) for (let x = 43; x < 45; x++) black(x, y);
-    // 远处孤立的噪点（2×2 和 1 个像素）。
+    // Distant isolated noise (2×2 and 1 pixel).
     for (let y = 10; y < 12; y++) for (let x = 150; x < 152; x++) black(x, y);
     black(120, 80);
     const removed = despeckle(img, { maxSide: 3, reach: 6 });
@@ -353,12 +355,12 @@ describe('scan enhance: text boxes on the enhanced page (D-267)', () => {
     const size = { width: 1000, height: 1400 };
     const canvas = rotatedSize(size, 3);
     const t = Math.tan((3 * Math.PI) / 180);
-    // 同一行上的三个词：越往右越低（向右下斜 3°）。
+    // Three words on the same line: lower further to the right (slanted down-right by 3°).
     const words = [100, 450, 800].map((x) => box(x, 600 + (x + 20 - 500) * t));
     const mapped = boxesToEnhanced(words, size, size, 3, canvas);
     const centers = mapped.map((b) => b.y + b.height / 2);
     expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(0.5);
-    // 页面中心还在画布中心。
+    // Page center is still at the canvas center.
     const [mid] = boxesToEnhanced([box(480, 695)], size, size, 3, canvas);
     expect(mid!.x + 20).toBeCloseTo(canvas.width / 2, 6);
     expect(mid!.y + 5).toBeCloseTo(canvas.height / 2, 6);

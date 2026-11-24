@@ -1,15 +1,17 @@
 import type { TextBox, TextPage } from './rows';
 
-// 从文档里找出可以点的字段名（D-444）：只看版面，不用词典，不看语言，也不用模型。结果只用来高亮，
-// 用户还能点原文的任何一行，所以规则判错不会卡住。量过的只有生成文档（side-session-notes/form-from-file/round4）。
-// 文字只在本机，不联网，也不发给 AI（底线 1、2）。
-// 不用后行断言（Hermes 的老版本不支持）。
+// Find clickable field names from the document (D-444): look only at layout, use no dictionary, no
+// language model, and no AI. Results are used for highlighting only; users can still tap any line
+// in the original text, so rule misjudgments will not block them. Only evaluated on generated
+// documents (side-session-notes/form-from-file/round4). Text remains strictly on-device, is not
+// networked, and is never sent to the AI (invariants 1, 2). Avoid lookbehind assertions (not
+// supported in older versions of Hermes).
 
 const clean = (s: string) => s.replace(/^[\s|·•*=\-–—#]+|[\s:：\-–—|·•*=#._]+$/g, '').trim();
-/** 比较字段名用的写法：不分大小写，首尾标点和多余空格不算。 */
+/** Formatting convention for comparing field names: case-insensitive, ignoring leading/trailing punctuation and extra whitespace. */
 export const fieldNameKey = (s: string) => clean(s).replace(/\s+/g, ' ').toLowerCase();
 
-/** 看起来是一个值（数字、金额、编号、邮箱、填空线、网址），不是字段名。 */
+/** Looks like a value (number, amount, ID, email, fill-in line, URL) rather than a field name. */
 export function looksLikeValue(s: string): boolean {
   const t = s.trim();
   return (
@@ -45,7 +47,7 @@ function rowsOf(lines: readonly TextBox[]): TextBox[][] {
 const top = (r: readonly TextBox[]) => Math.min(...r.map((l) => l.y));
 const bottom = (r: readonly TextBox[]) => Math.max(...r.map((l) => l.y + l.height));
 
-/** 按上下间距切块：间距明显大于最小间距（1.6 倍以上，且多出半个字高）就是新的一块。 */
+/** Split blocks by vertical spacing: a spacing significantly larger than the minimum spacing (more than 1.6x plus half a character height) marks a new block. */
 function blocks<T>(items: readonly T[], gap: (a: T, b: T) => number, height: number): T[][] {
   if (items.length === 0) return [];
   const gaps = items.slice(1).map((x, i) => gap(items[i]!, x));
@@ -59,14 +61,16 @@ function blocks<T>(items: readonly T[], gap: (a: T, b: T) => number, height: num
 }
 
 /**
- * 带冒号的一行里的字段名。第一个冒号左边整段都是字段名：字符不认识（OCR 错字、符号）也不切开，
- * 宁可让用户改名。冒号右边再找同一行的其他组（「A:1 B:2」）。
+ * Field names in a line with a colon. The entire segment to the left of the first colon is a
+ * field name: do not split even if characters are unrecognized (OCR typos, symbols), preferring
+ * to let the user rename it. Look for other groups on the same line to the right of the colon
+ * ("A:1 B:2").
  */
 function colonNames(text: string): string[] {
   const at = text.search(/[:：]/);
   if (at <= 0) return [];
   const first = text.slice(0, at);
-  // 一行开头就有两段隔得很远的字（「Name    Date: 12」）：左边那段不算这个字段名。
+  // Two widely separated text segments at the beginning of a line ("Name Date: 12"): the left segment is not considered part of this field name.
   const name = first
     .split(/\s{2,}/)
     .pop()!
@@ -85,7 +89,7 @@ function pageNames(page: TextPage): string[] {
   );
   const out = colons.flatMap((l) => colonNames(l.text));
   const used = new Set<TextBox>(colons);
-  // 冒号后面空着：值在紧贴的下面一行或同一排右边。
+  // Colon is followed by empty space: the value is on the immediately following line or to the right on the same row.
   const allRows = rowsOf(all);
   for (const c of colons) {
     if (!/[:：]\s*$/.test(c.text)) continue;
@@ -100,7 +104,7 @@ function pageNames(page: TextPage): string[] {
     const right = allRows.find((r) => r.includes(c))?.find((n) => n.x > c.x && !used.has(n));
     if (right) used.add(right);
   }
-  // 字段名后面接下划线（Label ______）。
+  // Field name followed by an underscore (Label ______).
   for (const l of all)
     if (!used.has(l) && !hasColon(l.text) && /\p{L}.*\s*[_-]{3,}\s*$/u.test(l.text)) {
       out.push(l.text);
@@ -121,13 +125,13 @@ function pageNames(page: TextPage): string[] {
     const n = first.length;
     const valueIn = (i: number) => b.slice(1).some((r) => looksLikeValue(r[i]!.text));
     const columns = Array.from({ length: n }, (_, i) => i);
-    // 同样大小的块出现不止一次：每块都是表头 + 值。
+    // Blocks of the same size appear more than once: each block is a header + value.
     if (parts.filter((x) => x.length >= 2 && x.length === b.length).length >= 2) return true;
-    // 三列以上，除非是「字段名 值 字段名 值」。
+    // Three or more columns, unless formatted as "field name value field name value".
     if (n >= 3 && !(n % 2 === 0 && columns.every((i) => valueIn(i) === (i % 2 === 1)))) return true;
     if (n === 2) {
       if (valueIn(0) && valueIn(1)) return true;
-      // 「字段名 值」的值种类混杂（日期、金额、文字）；表格的一列全是纯数字。
+      // Mixed value types for "field name value" pairs (date, amount, text); or an entire table column consists solely of pure numbers.
       if (
         !valueIn(0) &&
         b.length >= 3 &&
@@ -143,7 +147,7 @@ function pageNames(page: TextPage): string[] {
       const first = b[0]!;
       const second = b[1];
       const third = b[2];
-      // 换行的表头：第二排全是短字、比下面的值贴得更近。
+      // Wrapped header: the second row consists entirely of short words and is positioned closer to the values below it.
       const wrapped =
         second &&
         third &&
@@ -158,7 +162,7 @@ function pageNames(page: TextPage): string[] {
       b.forEach((r) => taken.add(r));
       continue;
     }
-    // 字段名 值：按格子序号投票，默认单数格是字段名。
+    // Field name value: vote by grid index, defaulting odd-numbered grid cells to field names.
     const votes = [0, 0];
     b.forEach((r) =>
       r.forEach((l, i) => {
@@ -171,7 +175,7 @@ function pageNames(page: TextPage): string[] {
       r.forEach((l, i) => {
         if (i % 2 !== labelAt || looksLikeValue(l.text)) return;
         let name = l.text.trim();
-        // 换行的字段名：紧贴在上面或下面、同一列、只有一格的行。
+        // Wrapped field name: a single-cell row immediately above or below, in the same column.
         const at = rows.indexOf(r);
         const up = rows[at - 1];
         const down = rows[at + 1];
@@ -196,7 +200,7 @@ function pageNames(page: TextPage): string[] {
     }
   }
 
-  // 单列的行：同一列按间距切块，数字投票决定值在最后还是最前，其余行合成字段名。
+  // Single-column rows: split blocks by spacing within the same column, use numerical voting to determine whether the value is at the end or the beginning, and merge remaining rows into field names.
   const singles = rows.filter((r) => r.length === 1 && !taken.has(r)).map((r) => r[0]!);
   const columns: TextBox[][] = [];
   for (const l of singles) {
@@ -209,7 +213,7 @@ function pageNames(page: TextPage): string[] {
     col.sort((a, b) => a.y - b.y);
     const groups = blocks(col, (a, b) => b.y - (a.y + a.height), height);
     if (groups.length <= 1 || groups.every((g) => g.length === 1)) {
-      // 间距都一样：单双行投票；没有数字证据时不猜。
+      // Spacing is uniform: use alternating row voting; do not guess in the absence of numerical evidence.
       const list = groups.flat();
       const votes = [0, 0];
       list.forEach((l, i) => {
@@ -241,7 +245,7 @@ function pageNames(page: TextPage): string[] {
   return out;
 }
 
-/** 文档里可以点的字段名（按出现的顺序，去重）。 */
+/** Clickable field names in the document (in order of appearance, deduplicated). */
 export function extractFieldNames(pages: readonly TextPage[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -256,14 +260,14 @@ export function extractFieldNames(pages: readonly TextPage[]): string[] {
   return out;
 }
 
-/** 原文的一排一排（按位置），给「看原文选」用；一排里左右分开的格子各算一段。 */
+/** Original rows (by position), used for "view original and select"; left and right separated cells in a row are counted as separate segments. */
 export function originalRows(pages: readonly TextPage[]): string[][] {
   return pages.flatMap((p) =>
     rowsOf(p.lines.filter((l) => l.text.trim())).map((r) => r.map((l) => l.text.trim())),
   );
 }
 
-/** 用户点的一段原文 → 字段名：有冒号时取冒号左边。 */
+/** A segment of original text tapped by the user -> field name: take the left side of the colon if a colon is present. */
 export function fieldNameFromText(text: string): string {
   const left = text.split(/[:：]/)[0] ?? text;
   return clean(left.replace(/[_-]{3,}\s*$/, ''));

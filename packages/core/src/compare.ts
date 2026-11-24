@@ -4,12 +4,15 @@ import { dayNumber } from './formula';
 import { t } from './messages';
 import type { Condition, Locale, Period } from './schema';
 
-// 统计的「和上一段时间比」（D-308）：统计的筛选里有一个 inPeriod 条件时，把它换成上一段，再算一次。
-// 按日历的时间段（本周、本月、今年……）比上一段的同期：本月到 29 号就比上个月 1–29 号，
-// 不然月中总是「比上月少一半」；今天比昨天一整天；最近 N 天比再往前的 N 天。一天和一周的开始按 D-286。
-// 昨天、上周、上月、去年和明天、下周、下月（D-559）是一整段，比它前面的一整段。
+// "Compare to previous period" statistics (D-308): when the filter has an inPeriod condition,
+// replace it with the previous period and recompute. Compare calendar periods (this week, this
+// month, this year, etc.) to the corresponding previous period: this month up to the 29th compares
+// to last month's 1-29, otherwise mid-month always looks like "50% less than last month"; today
+// compares to all of yesterday; last N days compares to the preceding N days. Day and week starts
+// follow D-286. Yesterday, last week, last month, last year and tomorrow, next week, next month
+// (D-559) are full periods comparing to the full period preceding them.
 
-/** 上一段同期的日期范围（含两端）。 */
+/** Date range of the corresponding previous period (inclusive). */
 export function previousPeriodRange(period: Period, now: Date, cal: Calendar): [string, string] {
   const today = todayNumber(now, cal);
   const [startText, endText] = periodRange(period, now, cal);
@@ -33,7 +36,7 @@ export function previousPeriodRange(period: Period, now: Date, cal: Calendar): [
     case 'thisTwoWeeks':
       return shift(14, toDate);
     case 'thisHalfMonth':
-      // 上半月比上个月的下半月（16 号起），下半月比这个月的上半月；都到同样的第几天为止，不超出那半个月。
+      // First half of the month compares to last month's second half (starting on the 16th), second half compares to this month's first half; both go up to the same day number, not exceeding that half-month.
       return d <= 15
         ? [ymd(y, m - 1, 16), ymd(y, m - 1, 15 + d)]
         : [`${dateOfDayNumber(today).slice(0, 7)}-01`, ymd(y, m, Math.min(15, d - 15))];
@@ -41,7 +44,7 @@ export function previousPeriodRange(period: Period, now: Date, cal: Calendar): [
       return [ymd(y, m - 1, 1), ymd(y, m - 1, d)];
     case 'thisYear':
       return [`${y - 1}-01-01`, ymd(y - 1, m, d)];
-    // 上月、下月、去年（D-559）是一整段，比它前面的一整段（上月比再前一个月，下月比本月）。
+    // Last month, next month, last year (D-559) are full periods, compared to the full period preceding them (last month compares to the month before, next month compares to this month).
     case 'lastMonth':
     case 'nextMonth': {
       const [sy, sm] = startText.split('-').map(Number) as [number, number];
@@ -50,14 +53,16 @@ export function previousPeriodRange(period: Period, now: Date, cal: Calendar): [
     case 'lastYear':
       return [`${y - 2}-01-01`, `${y - 2}-12-31`];
     default:
-      // 最近 N 天：再往前的 N 天。
+      // Last N days: the preceding N days.
       return shift(days, days);
   }
 }
 
 /**
- * 上一段的筛选：唯一一个 inPeriod 条件换成上一段同期（大于前一天、小于后一天），别的条件不动。
- * 没有或有不止一个 inPeriod 条件时没有可比的（check 会拦住这种配置）。
+ * Previous period filter: replaces the single inPeriod condition with the corresponding previous
+ * period (greater than the day before, less than the day after), leaving other conditions
+ * unchanged. If there are zero or multiple inPeriod conditions, there is nothing comparable
+ * (check catches such configurations).
  */
 export function previousFilter(
   filter: readonly Condition[] | undefined,
@@ -84,7 +89,7 @@ export function previousFilter(
   };
 }
 
-/** 变化：多了、少了还是一样，百分比取整；上一段是 0 时没有百分比。任何一边没有值时没有。 */
+/** Change: increase, decrease, or unchanged, percentage rounded; no percentage when the previous period is 0. None when either side has no value. */
 export function compareChange(
   current: number | null,
   previous: number | null,
@@ -98,9 +103,9 @@ export function compareChange(
   };
 }
 
-/** 上一段的说明和它的值：「上月同期：¥100.00」「再往前 30 天：12」。 */
+/** Previous period description and value: "Last month same period: ¥100.00", "30 days prior: 12". */
 export function previousLabel(period: Period, value: string, locale: Locale): string {
-  // 往后 N 天（D-537）的上一段也是再往前的 N 天。
+  // The previous period for next N days (D-537) is also the preceding N days.
   const days = /^(?:last|next)(\d+)days$/.exec(period);
   if (days) return t(locale, 'compare_lastDays', { n: Number(days[1]), value });
   return t(locale, `compare_${period as Exclude<Period, `${'last' | 'next'}${number}days`>}`, {
@@ -108,7 +113,7 @@ export function previousLabel(period: Period, value: string, locale: Locale): st
   });
 }
 
-/** 变化的文字：↑ 12%、↓ 5%、持平；上一段是 0 时只写「↑ 增加」。 */
+/** Change text: ↑ 12%, ↓ 5%, flat; when the previous period is 0, write only "↑ Increase". */
 export function changeLabel(
   change: ReturnType<typeof compareChange>,
   locale: Locale,

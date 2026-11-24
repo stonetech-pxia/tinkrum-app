@@ -16,8 +16,10 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 容器把数据交给工具（D-428）：记录页、列表、单条记录块上的按钮点了才运行，把值、这一条、列表选出的记录交给第一步。
-// 三种状态都走：没有数据、有数据、边界情况（空的和不对的电话、两个电话字段、删字段、删快捷操作、搜索、没有匹配）。
+// Containers hand data over to tools (D-428): buttons on record pages, lists, and individual record
+// blocks run only when tapped, passing values, the current entry, and selected records from a list
+// to the first step. Test all three states: empty data, existing data, edge cases (empty or invalid
+// phone number, two phone fields, deleting a field, deleting a quick action, search, no matches).
 
 const settle = () =>
   act(async () => {
@@ -29,7 +31,7 @@ const sample = (registry: Registry, extra: Op[] = []): WorkspaceConfig => {
   const base = createStarterWorkspace('en', registry);
   const ops = sampleOps('business-cards', base, 'en');
   if (!ops.ok) throw new Error(ops.message);
-  // 样板的导出在下面的浮动按钮上（创始人 2026-11-04 定）；这里测列表上方的按钮（as: "list"，D-428），能力还在。
+  // Sample export is on the floating button below (determined by founder 2026-11-04); this tests the button above the list (as: "list", D-428), ensuring the capability remains.
   const onList: Op = {
     op: 'updateContainer',
     page: 'contacts',
@@ -114,7 +116,7 @@ describe('with data: the entry page', () => {
     await fireEvent.changeText(screen.getByTestId('editor-phone'), '555 0100');
     await fireEvent.press(screen.getByTestId('record-action-record-call-phone'));
     await waitFor(() => expect(open).toHaveBeenCalledWith('tel:5550100'));
-    // 点按钮不保存：框里改的只交给这次运行。
+    // Tapping the button without saving: edits made in the input box are passed only to this run.
     expect((await repo.getRecord('c1'))!.values.phone).toBe('+33 6 12');
   });
 

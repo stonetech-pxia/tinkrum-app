@@ -11,14 +11,14 @@ const H = 700;
 
 const tablesOf = (page: TablePage) =>
   page.blocks.filter((b): b is TableBlock => b.kind === 'table');
-/** 行数和第一行有几格（列对齐到整页共用的列以后，cols 是共用列的个数，不是一行的格数）。 */
+/** Number of rows and number of cells in the first row (after column alignment to shared columns across the page, cols is the number of shared columns, not the cell count of a single row). */
 const shapeOf = (t: TableBlock) => [t.rows, t.cells.filter((c) => c.row === 0).length];
 const cellAt = (t: TableBlock, row: number, col: number) =>
   t.cells.find(
     (c) => c.row <= row && row < c.row + c.rowSpan && c.col <= col && col < c.col + c.colSpan,
   );
 
-/** 每格中间一行字（框 120×24），文字是「r行c列」。 */
+/** Cell middle line (box 120x24), text is "row r col c". */
 function cellTexts(
   xs: number[],
   ys: number[],
@@ -56,7 +56,7 @@ describe('table structure from ruled lines (D-272)', () => {
   const ys = [100, 160, 220, 280];
 
   it('leaves a text line lying wholly above the top rule outside the table (EU sample 024)', () => {
-    // 时刻表的表头横条上面紧挨着一行「01 02 04」（离顶线不到一个容差）：不是表里的字。
+    // Immediately above the timetable header bar is a line of "01 02 04" (less than one tolerance from the top line): not text from the table.
     const { lines, marks } = cellTexts(xs, ys);
     const above = fakeLine(
       '01 02 04 06',
@@ -73,7 +73,7 @@ describe('table structure from ruled lines (D-272)', () => {
   });
 
   it('keeps a framed paragraph (no inner rules) as one left-aligned cell, not one row per line (EU sample 038)', () => {
-    // Cerfa 表格上的提示框：四边一条细框，里面是一段两端对齐的正文，左右留的空一样宽。
+    // Cerfa form tooltip: a thin border on four sides, containing justified body text with equal left and right margins.
     const texts = [
       'When you use this specific form your doctor lets you be paid for your sick leave',
       'without the usual waiting days at the start, during which nothing is normally paid',
@@ -103,15 +103,15 @@ describe('table structure from ruled lines (D-272)', () => {
     expect(table!.cells).toHaveLength(12);
     for (let r = 0; r < 3; r++)
       for (let c = 0; c < 4; c++) expect(cellAt(table!, r, c)!.text).toBe(`r${r}c${c}`);
-    // 列宽是原图像素（每列 200）。
+    // Column width is original image pixels (200 per column).
     for (const w of page.colWidths) expect(Math.abs(w - 200)).toBeLessThan(6);
-    // 没有表外的文字。
+    // No text outside the table.
     expect(page.blocks.filter((b) => b.kind === 'text')).toHaveLength(0);
   });
 
   it('drops "==" text read from a ruled line instead of putting it in a cell (EU sample 020)', () => {
     const { lines, marks } = cellTexts(xs, ys);
-    // 识别把第一条行线（虚线）读成了一行「==m=」，框的中间正压在线上。
+    // OCR read the first row line (dashed) as a line of "==m=", with the box center directly on the line.
     const rule = fakeLine(
       '==m=',
       { x: 320, y: 151, width: 160, height: 18 },
@@ -121,9 +121,9 @@ describe('table structure from ruled lines (D-272)', () => {
     const [table] = tablesOf(page);
     expect(table!.rows).toBe(3);
     expect(table!.cells.some((c) => c.text.includes('='))).toBe(false);
-    // 也不排成表外的文字。
+    // Nor arranged as text outside the table.
     expect(page.blocks.filter((b) => b.kind === 'text')).toHaveLength(0);
-    // 格子里表示「无」的短横照旧是字。
+    // Short dash representing "none" in the cell remains a character.
     expect(isRuleText('-')).toBe(false);
     expect(isRuleText('—')).toBe(false);
     expect(isRuleText('主===主')).toBe(true);
@@ -140,7 +140,7 @@ describe('table structure from ruled lines (D-272)', () => {
   });
 
   it('finds merged cells where an edge has no line', () => {
-    // 第一行的第 2、3 列之间没有竖线；第 1 列的第 2、3 行之间没有横线。
+    // No vertical line between columns 2 and 3 of the first row; no horizontal line between rows 2 and 3 of the first column.
     const skip = (r: number, c: number) => (r === 0 && c === 2) || (r === 2 && c === 0);
     const { lines, marks } = cellTexts(
       xs,
@@ -164,7 +164,7 @@ describe('table structure from ruled lines (D-272)', () => {
     expect(cellAt(table!, 0, 2)).toBe(header);
     const tall = cellAt(table!, 1, 0)!;
     expect(tall).toMatchObject({ row: 1, col: 0, rowSpan: 2, colSpan: 1, text: 'tall' });
-    // 3 × 4 = 12 个位置，两个合并格各占 2 个。
+    // 3 x 4 = 12 positions, two merged cells occupy 2 each.
     expect(table!.cells).toHaveLength(10);
   });
 
@@ -181,7 +181,7 @@ describe('table structure from ruled lines (D-272)', () => {
     expect(table!.cols).toBe(4);
     for (let r = 0; r < 3; r++)
       for (let c = 0; c < 4; c++) expect(cellAt(table!, r, c)!.text).toBe(`r${r}c${c}`);
-    // 截图用的框在原图坐标里：格子 (2, 3) 的中心大致在转过以后的位置。
+    // Screenshot box in original image coordinates: the center of cell (2, 3) is roughly at the rotated position.
     const box = cellAt(table!, 2, 3)!.box!;
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
@@ -198,13 +198,13 @@ describe('table structure from ruled lines (D-272)', () => {
     const { lines, marks } = cellTexts(xs, ys);
     const page1 = { width: W, height: H };
     const extra: Rect[] = [
-      // 表格上面一行字，下面有一条划线。
+      // A line of text above the table, a rule below.
       ...glyphs(100, 40, 300),
       { x: 100, y: 62, width: 300, height: 2 },
-      // 表格下面一行字，中间有删除线。
+      // A line of text below the table, with strikethrough in the middle.
       ...glyphs(100, 400, 300),
       { x: 95, y: 407, width: 310, height: 2 },
-      // 表格里一格的字下面有一条划线（不碰到竖线）。
+      // A strikethrough below the text of a cell in the table (does not touch vertical lines).
       { x: 330, y: 204, width: 140, height: 2 },
     ];
     lines.push(fakeLine('underlined title', { x: 100, y: 38, width: 300, height: 22 }, page1));
@@ -216,7 +216,7 @@ describe('table structure from ruled lines (D-272)', () => {
     expect(tables[0]!.cols).toBe(4);
     const texts = page.blocks.filter((b) => b.kind === 'text').map((b) => b.text);
     expect(texts).toEqual(['underlined title', 'struck out']);
-    // 阅读顺序：上面的字、表格、下面的字。
+    // Reading order: text above, table, text below.
     expect(page.blocks.map((b) => b.kind)).toEqual(['text', 'table', 'text']);
   });
 
@@ -303,7 +303,7 @@ describe('tables with only horizontal lines (D-272)', () => {
       ...ys.map((y) => ({ x: 100, y, width: 802, height: 2 })),
       ...vx.map((x) => ({ x, y: 100, width: 2, height: 52 })),
     ];
-    // 表身的字偏左，按文字空隙分会分错；应该按表头的竖线分。
+    // Body text is left-aligned; splitting by text gaps will split incorrectly; should split by header vertical lines.
     const lines = [
       ...row(0, 114, ['Name', 'Qty', 'Price'], [225, 500, 775]),
       ...[1, 2, 3].flatMap((r) =>
@@ -355,13 +355,14 @@ describe('tables with only horizontal lines (D-272)', () => {
       [3, 2],
       [4, 3],
     ]);
-    // 两张表中间的标题是表外的文字。
+    // The title between the two tables is text outside the tables.
     expect(page.blocks.map((b) => b.kind)).toEqual(['table', 'text', 'table']);
   });
 
   it('keeps a three-line table apart from a ruled grid above it although the heading gap is under two grid rows', () => {
-    // 网格每行 50；中间的标题和留白只有 80（不到两行）。竖线画满了网格的三行才停：网格到这里就完了，
-    // 不是「只有表头有竖线、下面只有横线」的表。
+    // Grid rows are 50 high; the middle title and whitespace are only 80 (less than two rows).
+    // Vertical lines stop after covering the three rows of the grid: the grid ends here, not a
+    // table where "only the header has vertical lines and below has only horizontal lines".
     const xs = [100, 500, 900];
     const ys = [60, 110, 160, 210];
     const grid = cellTexts(xs, ys);
@@ -402,10 +403,10 @@ describe('tables with only horizontal lines (D-272)', () => {
   });
 });
 
-// 用真实扫描件调参时遇到的情况（D-272），每个都从照片里截出最小的合成情形。
+// Cases encountered when tuning parameters with real scans (D-272), each cropped from photos to the minimal composite case.
 describe('cases from real scans (D-272)', () => {
   const page1 = { width: W, height: H };
-  /** 一格里的一行字：识别框 + 像字的笔画。 */
+  /** A line of text in a cell: OCR box + stroke-like characters. */
   const word = (text: string, x: number, y: number, width = 120, chars = false) => ({
     line: fakeLine(text, { x, y, width, height: 20 }, page1, chars),
     marks: glyphs(x + 4, y + 3, width - 8, 14),
@@ -417,7 +418,7 @@ describe('cases from real scans (D-272)', () => {
     );
 
   it('keeps two ruled boxes of the same width apart when text sits between them', () => {
-    // 税务表：上面一张 2 列的表，中间一段文字，下面一张列不一样的表；左右两端对齐。
+    // Tax form: an upper 2-column table, a section of text in the middle, a lower table with different columns; left and right justified.
     const words = [
       word('nom', 120, 115),
       word('xia', 520, 115),
@@ -438,7 +439,7 @@ describe('cases from real scans (D-272)', () => {
   });
 
   it('does not join two boxes 10 pixels apart into one grid', () => {
-    // 工资单：上下挨着的框，列不一样；它们的边不能接成一条线。
+    // Payslip: vertically adjacent boxes with different columns; their borders must not connect into a single line.
     const words = [
       word('a1', 120, 115),
       word('a2', 520, 115),
@@ -470,14 +471,14 @@ describe('cases from real scans (D-272)', () => {
     ];
     const [table, ...others] = tablesOf(page(rects, words));
     expect(others).toHaveLength(0);
-    // 小表的每一格单独一格（外面的框不能把里面的字都拿走）。
+    // Each cell of the small table is independent (outer border must not absorb all inner text).
     for (let r = 0; r < 2; r++)
       for (let c = 0; c < 3; c++)
         expect(table!.cells.some((cell) => cell.text === `r${r}c${c}`)).toBe(true);
   });
 
   it('splits a body ruled only by columns into one row per line, ignoring bold labels', () => {
-    // 工资单、账单的表身：竖线到底，行之间没有线；项目名称是粗体（扫描时像一条粗横线）。
+    // Payslip and bill body: vertical lines go all the way down, no lines between rows; item names are bold (resembling a thick horizontal line during scanning).
     const xs = [100, 400, 650, 900];
     const words = [word('label', 120, 110), word('base', 420, 110), word('amount', 670, 110)];
     const bold: Rect[] = [];
@@ -497,8 +498,10 @@ describe('cases from real scans (D-272)', () => {
   });
 
   it('does not take an underlined bold title for a table (D-463)', () => {
-    // 处方的标题「ORDONNANCE DE LUNETTES」：粗体字的竖笔画连着下划线，字顶的横笔画连成一条，
-    // 扫描时像一排短竖线夹在两条横线中间。应该是一段字，不是一张每格一两个字母的表。
+    // Prescription title "ORDONNANCE DE LUNETTES": vertical strokes of bold text connect to the
+    // underline, top horizontal strokes of characters connect into a line, resembling a row of
+    // short verticals sandwiched between two horizontals during scanning. Should be a text block,
+    // not a table with one or two letters per cell.
     const rects: Rect[] = [
       { x: 300, y: 205, width: 400, height: 4 },
       { x: 300, y: 229, width: 400, height: 3 },
@@ -527,8 +530,10 @@ describe('cases from real scans (D-272)', () => {
   });
 
   it('keeps a form cell of several lines together when only one column has them', () => {
-    // 能耗诊断的表头框：左右两格各是几行地址、日期，中间没有横线；只有前两排左右都有字，
-    // 下面几排只有左边一列有续行。按排分行会把一格拆成好几行（D-333）。
+    // Energy diagnosis header box: left and right cells contain several lines of address and date
+    // respectively, with no horizontal line in the middle; only the top two rows have text on both
+    // sides, while the lower rows have continuation text only in the left column. Splitting by row
+    // would split a single cell into multiple rows (D-333).
     const words = [
       word('Logement F44', 120, 110, 200),
       word('Date 21/02', 420, 110, 200),
@@ -548,7 +553,7 @@ describe('cases from real scans (D-272)', () => {
   });
 
   it('keeps the step lists of a one-row box in their cells (EU sample 049)', () => {
-    // 说明书：一排三格，每格一个步骤号和几条要点，几格的行一样高，没有一列是数。
+    // Manual: a row of three cells, each with a step number and several bullet points, cells have equal row height, no column is numeric.
     const columns = [
       ['1', 'Ins Menü'],
       ['2', 'Datenspeicher', 'Proben-IDs', 'Methoden', 'Einstellungen'],
@@ -564,7 +569,7 @@ describe('cases from real scans (D-272)', () => {
   });
 
   it('still splits a body where some rows only have a section label', () => {
-    // 工资单：「URSSAF」「Retraite」这种小标题一排只有一格，其他排每列都有字。
+    // Payslip: subtitles like "URSSAF" and "Retraite" have only one cell per row, other rows have text in every column.
     const xs = [100, 400, 650, 900];
     const words = [word('label', 120, 110), word('base', 420, 110), word('amount', 670, 110)];
     const rows = ['URSSAF', 'item 1', 'item 2', 'Retraite', 'item 4'];
@@ -580,8 +585,10 @@ describe('cases from real scans (D-272)', () => {
   });
 
   it('does not split label rows by the lines of a cell spanning them (EU sample 057)', () => {
-    // 价目表：左边一格跨三排（上下没有横线），里面两行字；中间一排的标签有三行，右边一行说明。
-    // 左格的两行字不能让中间这一排按字的排分成几行。
+    // Price list: left cell spans three rows (no horizontal lines above/below), containing two
+    // lines of text; middle row label has three lines, right column has description. The two lines
+    // of text in the left cell must not cause the middle row to split into multiple rows based on
+    // text lines.
     const xs = [100, 330, 650, 900];
     const rects = gridRects(xs, [100, 160, 250, 310], {
       skipH: [
@@ -613,8 +620,10 @@ describe('cases from real scans (D-272)', () => {
   });
 
   it('keeps a boxed field of several lines whole beside label columns that span past it (EU sample 018)', () => {
-    // 文凭附录：「3.1」「3.2」两个编号在框外的列里（上下的横线只画在两个框上），左框四行字、右框两行字。
-    // 外面一个大框，里面两个小框；编号在小框左边。
+    // Diploma supplement: two numbers "3.1" and "3.2" in columns outside the boxes (top and bottom
+    // horizontal lines are drawn only on the two boxes), left box has four lines of text, right box
+    // has two lines. An outer large box containing two small boxes; numbers are to the left of the
+    // small boxes.
     const rects = [
       ...gridRects([60, 940], [60, 260]),
       ...gridRects([160, 600], [100, 210]),
@@ -636,7 +645,7 @@ describe('cases from real scans (D-272)', () => {
   });
 
   it('keeps column lines that start below an unruled header', () => {
-    // 物业账单的批次表：表头有底色、下面没有横线，表头里的竖线断了，只从表身开始。
+    // Property bill batch table: header has background color, no horizontal lines below, vertical lines in header are broken, starting only from the table body.
     const xs = [100, 300, 500, 700, 900];
     const words: ReturnType<typeof word>[] = [];
     for (const [r, y] of [110, 160, 190].entries())
@@ -659,7 +668,7 @@ describe('cases from real scans (D-272)', () => {
   });
 
   it('does not take letter stems stacked through a tight table’s row rules for column lines (EU sample 090)', () => {
-    // 化验单：一排 17 像素高，粗体字上下几乎碰到行线，同一列起头的字（「P-」）的竖笔画隔着行线连成了一条「竖线」。
+    // Lab report: 17 pixels per row height, bold text almost touches row lines top and bottom, vertical strokes of characters starting at the same column (e.g., "P-") connect across row lines into a "vertical line".
     const ys = Array.from({ length: 13 }, (_, r) => 100 + 17 * r);
     const lines: OcrBox[] = [];
     const marks: Rect[] = [];
@@ -670,7 +679,7 @@ describe('cases from real scans (D-272)', () => {
       lines.push(
         fakeLine(`${r} - ${r + 9}`, { x: 420, y: ys[r]! + 3, width: 60, height: 12 }, page1, true),
       );
-      // 每个字（空格除外）一道竖笔画，在字的中间。
+      // Each character (except spaces) has a vertical stroke in its middle.
       for (const [i, ch] of Array.from(text).entries())
         if (ch !== ' ')
           marks.push({
@@ -687,13 +696,13 @@ describe('cases from real scans (D-272)', () => {
   });
 
   it('does not take a framed blank with words just beside it for a one-cell table (EU sample 082)', () => {
-    // 句子里要填的一块底色，四边被找成线（一格的框）：紧挨在右边的「y」离它不到容差，以前被圈进一张 1×1 的表。
+    // A background-shaded fill area in a sentence, whose four sides were detected as lines (a cell box): the immediately adjacent "y" is within tolerance, previously enclosed in a 1x1 table.
     const words = [word('y', 475, 300, 12)];
     expect(tablesOf(page(gridRects([400, 472], [298, 326]), words))).toHaveLength(0);
   });
 
   it('keeps a title whole above a column line that starts below it', () => {
-    // 工资单的日历：标题横跨两列，竖线从第二行才开始。
+    // Payslip calendar: title spans two columns, vertical lines start only from the second row.
     const words = [
       word('CALENDRIER', 350, 115, 300, true),
       word('jour', 120, 165),
@@ -712,19 +721,19 @@ describe('dark header bands (D-501)', () => {
     line: fakeLine(text, { x, y, width, height: 20 }, page1),
     marks: glyphs(x + 4, y + 3, width - 8, 14),
   });
-  /** 竖线：x 处从 top 画到 bottom。 */
+  /** Vertical line: drawn from top to bottom at x. */
   const column = (x: number, top: number, bottom: number): Rect => ({
     x,
     y: top,
     width: 2,
     height: bottom - top,
   });
-  /** 深色底条里的白字：识别框在底条上，不画笔画（白字在二值化后就是底条上的空隙，比例很小）。 */
+  /** White text in dark background bar: OCR box is on the bar, no strokes drawn (white text becomes gaps on the dark bar after binarization, with a very small ratio). */
   const label = (text: string, x: number, y: number) =>
     fakeLine(text, { x, y, width: 100, height: 20 }, page1);
 
   it('reads a payslip table whose header is a dark band and whose column lines start below it', () => {
-    // 工资单：表头是一条深色底条（白字），列线从底条下面画到底，表身行之间没有线。
+    // Payslip: header is a dark background bar (white text), column lines extend from below the bar to the bottom, no lines between table body rows.
     const xs = [100, 400, 650, 900];
     const band = { x: 100, y: 100, width: 802, height: 40 };
     const words = [];
@@ -762,7 +771,7 @@ describe('dark header bands (D-501)', () => {
   });
 
   it('splits two tables joined by the lower table’s header band, each with its own columns', () => {
-    // 工资单的明细表下面接着汇总表：明细表的列线止于汇总表的表头底条，底条下面是另一套列。
+    // Payslip breakdown table followed by summary table: breakdown table column lines stop at the summary table header bar, below which is another set of columns.
     const upper = [100, 500, 900];
     const lower = [100, 300, 500, 700, 900];
     const words = [
@@ -787,7 +796,7 @@ describe('dark header bands (D-501)', () => {
     expect(tables.map((t) => t.cells.filter((c) => c.row === 0).length)).toEqual([2, 4]);
     expect(cellAt(tables[0]!, 0, 0)!.text).toBe('Elements');
     expect(cellAt(tables[0]!, 3, 0)!.text).toBe('label c');
-    // 两张表共用整页的列线：上面那张的第二列是共用的第 3 条列线起（第一格跨两列）。
+    // cellAt(tables[0]!, 3, 2)!.text is "3.00": upper table's second column starts from the shared 3rd column line (first cell spans two columns).
     expect(cellAt(tables[0]!, 3, 2)!.text).toBe('3.00');
     expect(tables[1]!.cells.filter((c) => c.row === 0).map((c) => c.text)).toEqual([
       'Heures',
@@ -804,7 +813,7 @@ describe('dark header bands (D-501)', () => {
   });
 
   it('keeps a table’s bottom line hidden in a tall text box and leaves that text out of the table', () => {
-    // 照片里弯的一行页脚：识别框很高，罩住了表格的底线；中间一条列线往下多出一截（接上了页脚的笔画）。
+    // Curved footer line in photo: OCR box is tall, covering the table bottom line; a middle column line extends downward (connecting to footer strokes).
     const xs = [100, 300, 500, 700, 900];
     const words = [0, 1, 2, 3].map((c) => word(`v${c}`, xs[c]! + 40, 255, 80));
     const footer = fakeLine('Keep this payslip', { x: 100, y: 290, width: 800, height: 40 }, page1);
@@ -830,12 +839,12 @@ describe('text just outside a table (D-501)', () => {
   });
 
   it('keeps a totals row printed just under the table’s last line, one value per column', () => {
-    // 发票：最后一条横线下面紧挨着「TOTAL: … 金额」，每段字都在一列里，是表的合计行。
+    // Invoice: immediately below the last horizontal line is "TOTAL: ... amount", each text segment in a column, forming the table's total row.
     const xs = [100, 300, 500, 700, 900];
     const words = [
       ...[0, 1, 2, 3].map((c) => word(`a${c}`, xs[c]! + 40, 210, 80)),
       ...[0, 1, 2, 3].map((c) => word(`b${c}`, xs[c]! + 40, 250, 80)),
-      // 中心在底线下面 6 像素（找表时的容差以内）。
+      // Center is 6 pixels below the bottom line (within table-detection tolerance).
       word('TOTAL:', 140, 276, 80),
       word('99.00', 740, 276, 80),
     ];
@@ -844,7 +853,7 @@ describe('text just outside a table (D-501)', () => {
       rects,
       words.map((w) => w.line),
     );
-    // 和改之前一样并进最后一行的格子里（没有横线隔开）；不能被拿出表、让整张表变稀被丢掉。
+    // Merged into the last row's cells as before (without horizontal line separation); must not be taken out of the table to avoid thinning and discarding the entire table.
     const [table] = tablesOf(page);
     const cells = table!.cells.map((c) => c.text).join('\n');
     expect(cells).toContain('TOTAL:');
@@ -864,7 +873,7 @@ describe('one grid for the whole page (D-272)', () => {
       [...rects, ...words.flatMap((w) => w.marks)],
       words.map((w) => w.line),
     );
-  /** 一张表每一格在整页共用列上的位置：[页上的第一列, 跨几列, 文字]。 */
+  /** Position of each cell in a table on the page-shared columns: [first column on page, column span, text]. */
   const placed = (t: TableBlock) => t.cells.map((c) => [t.col + c.col, c.colSpan, c.text]);
 
   it('lines up column lines a few pixels apart in two tables on one column', () => {
@@ -895,7 +904,7 @@ describe('one grid for the whole page (D-272)', () => {
   });
 
   it('spans the shared columns when one table’s columns are a subset of another’s', () => {
-    // 上面 2 列，下面 4 列，下面多出来的竖线把上面的每格分成跨 2 列；格子的内容和合并都不变。
+    // 2 columns above, 4 columns below; extra vertical lines below divide each upper cell into 2 column spans; cell contents and merges remain unchanged.
     const words = [
       word('left', 120, 115),
       word('right', 420, 115),
@@ -916,7 +925,7 @@ describe('one grid for the whole page (D-272)', () => {
   });
 
   it('starts a narrower table at its own column of the page grid', () => {
-    // 下面的表只占右半边：从第 2 列开始。表外的文字横跨整页的列。
+    // Lower table occupies only the right half: starting from column 2. Text outside the table spans the full page width.
     const words = [
       word('a', 120, 115),
       word('b', 420, 115),
@@ -942,7 +951,7 @@ describe('one grid for the whole page (D-272)', () => {
   });
 
   it('never folds two column lines of the same table into one', () => {
-    // 同一张表 100 和 110 两条线（容差 20 以内）各算一条；别的表的 104 并进 100。
+    // Lines 100 and 110 of the same table (within tolerance 20) are treated as one; line 104 of other tables merges into 100.
     const { pos, maps } = sharedColumns(
       [
         [100, 110, 300],
@@ -971,7 +980,7 @@ describe('horizontal alignment (D-272)', () => {
     );
 
   it('reads left, centred and right text from where it sits in the cell', () => {
-    // 每列 300 宽：靠左（离左边 8）、居中、靠右（离右边 8）。
+    // 300 width per column: left-aligned (8 from left), centered, right-aligned (8 from right).
     const words = [word('left', 108, 115), word('mid', 510, 115), word('right', 912, 115)];
     const [table] = tablesOf(page(gridRects([100, 400, 700, 1000 - 2], [100, 150]), words));
     expect(table!.cells.map((c) => [c.text, c.align])).toEqual([
@@ -983,7 +992,7 @@ describe('horizontal alignment (D-272)', () => {
 
   it('goes with most lines in a wrapped cell and skips lines that fill it', () => {
     const words = [
-      // 第一格：三排，两排居中、一排几乎占满。
+      // First cell: three rows, two centered, one nearly full.
       word('title one', 200, 110, 100),
       word('a line that fills the cell', 104, 132, 292),
       word('title two', 200, 154, 100),
@@ -994,7 +1003,7 @@ describe('horizontal alignment (D-272)', () => {
   });
 
   it('puts amounts on the right when the position does not tell', () => {
-    // 字占满了格子，看不出对齐：金额靠右，文字不写（常规）。
+    // Characters fill the cell, alignment not visible: amount right-aligned, text unwritten (standard).
     const words = [word('1 954,54', 104, 115, 192), word('Assurance', 304, 115, 192)];
     const [table] = tablesOf(page(gridRects([100, 300, 500], [100, 150]), words));
     expect(cellAt(table!, 0, 0)!.align).toBe('right');
@@ -1023,8 +1032,9 @@ describe('findTables', () => {
 });
 
 describe('tables without lines in Excel (D-506)', () => {
-  // 用户测试（2026-11-09）里的文字版发票：细横线太浅、找不到线，以前整页成了 A 列里几大格字。
-  // 转 Excel 和转 Word 一样认没有线的表（D-471、D-502、D-503 的规则）。
+  // Text-version invoice from user testing (2026-11-09): thin horizontal lines too faint, lines not
+  // found, previously the whole page became large text blocks in column A. Recognizes borderless
+  // tables similarly to Word export (rules of D-471, D-502, D-503).
   const rowsOf = (t: TableBlock) =>
     Array.from({ length: t.rows }, (_, r) =>
       t.cells
@@ -1064,8 +1074,8 @@ describe('tables without lines in Excel (D-506)', () => {
 });
 
 describe('rules-only tables: closing lines under the last rows (EU sample 003)', () => {
-  // 小票：分隔线之间按空隙分出三列的增值税表，最下面一段是居中的「Vielen Dank / Auf Wiedersehen」，
-  // 横跨了列的空隙。
+  // Receipt: three VAT columns separated by gaps between separators, bottom section is centered
+  // "Vielen Dank / Auf Wiedersehen", spanning column gaps.
   const xs = [60, 240, 600, 940].map((pos) => ({ pos, lined: false }));
   const ys = [100, 140, 165, 190, 230, 260, 300].map((pos, i) => ({
     pos,

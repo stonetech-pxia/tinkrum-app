@@ -7,12 +7,12 @@ const schema = z.strictObject({
   ...fieldBase,
   type: z.literal('duration'),
   default: z.number().int().min(0).max(1_000_000).optional(),
-  /** 范围（D-570），分钟数。 */
+  /** Range (D-570), in minutes. */
   min: z.number().int().min(0).max(1_000_000).optional(),
   max: z.number().int().min(0).max(1_000_000).optional(),
 });
 
-/** 最长约 1.9 年（分钟数）。 */
+/** Maximum approx. 1.9 years (in minutes). */
 const MAX_MINUTES = 1_000_000;
 
 const readMinutes = (_f: unknown, raw: unknown) =>
@@ -20,7 +20,7 @@ const readMinutes = (_f: unknown, raw: unknown) =>
     ? raw
     : undefined;
 
-/** 填写的时长：分钟数，或者「1:30」（几小时:几分，分钟要小于 60）。 */
+/** Filled duration: minutes, or "1:30" (hours:minutes, minutes must be under 60). */
 function minutesOf(input: unknown): number | undefined {
   if (typeof input === 'number') return input;
   if (typeof input !== 'string') return undefined;
@@ -35,8 +35,8 @@ function minutesOf(input: unknown): number | undefined {
 }
 
 /**
- * D-279：时长，存成分钟数（整数），显示成 h:mm（「1:30」）。统计和图表能求和、平均，
- * 公式里就是分钟数（D-280）。
+ * D-279: Duration, stored as minutes (integer), displayed as h:mm ("1:30"). Statistics and charts
+ * can sum and average it, and in formulas it acts as minutes (D-280).
  */
 export const durationField: FieldDefinitionOf<'duration', typeof schema> = defineField({
   type: 'duration',

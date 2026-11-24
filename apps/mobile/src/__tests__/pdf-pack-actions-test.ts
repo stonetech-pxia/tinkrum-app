@@ -16,8 +16,9 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeVision, TINY_JPEG, makePdf, makePng } from '../test-utils/fake-files';
 
-// 需要 PDF 预览包或本地界面的 PDF 动作：转图片、提取文字、签名、填表。
-// 扩展包页面（WebView + pdf.js）换成假的：渲染返回真实的小 JPEG，文字按页返回。
+// PDF actions requiring PDF preview pack or local interface: convert to images, extract text, sign,
+// fill forms. Extension pack page (WebView + pdf.js) replaced with fakes: rendering returns a real
+// small JPEG, text returns page by page.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -34,7 +35,7 @@ function toolWorkflow(id: string): Workflow {
   return quickActionsOf(result.config).find((w) => w.id === id)!;
 }
 
-/** 假的扩展包页面：记录每次调用和允许页面读取的文件。 */
+/** Fake extension pack page: records each call and the files permitted for page reading. */
 class FakePacks implements PackRuntime {
   calls: { page: PackPageId; method: string; args: Record<string, unknown>; files: string[] }[] =
     [];
@@ -159,7 +160,7 @@ describe('PDF actions that need the preview pack or a local screen', () => {
     expect(packs.calls).toHaveLength(1);
     expect(packs.calls[0]).toMatchObject({ page: 'pdfview', method: 'render' });
     expect(packs.calls[0]!.args).toMatchObject({ file: 'input', maxSide: 2000 });
-    // 页面只拿到这一个文件（复制进本次运行的临时文件），没有别的。
+    // Page receives only this single file (copied into the temporary files for this run), and no others.
     expect(packs.calls[0]!.files).toHaveLength(1);
   });
 
@@ -178,7 +179,7 @@ describe('PDF actions that need the preview pack or a local screen', () => {
       value: { type: 'text', text: 'Hello\n\nWorld', name: 'letter' },
     });
 
-    // 没有文字识别（Expo Go）时扫描件读不出文字。
+    // Scanned documents cannot have text read when OCR is unavailable (Expo Go).
     const scan = setup(toolWorkflow('pdf-text'));
     scan.packs.text = ['', ' '];
     scan.files.nextPick = [scan.files.offer('scan.pdf', await makePdf(2))];
@@ -189,7 +190,7 @@ describe('PDF actions that need the preview pack or a local screen', () => {
   });
 
   it('reads the pages that have no text layer (scans) with text recognition', async () => {
-    // 创始人 2026-10-31：图片版 PDF 提取文字时以为会用 OCR，结果没有。
+    // Founder 2026-10-31: Image-based PDF text extraction was expected to use OCR, but did not.
     const { files, packs, run } = setup(toolWorkflow('pdf-text'));
     const vision = new FakeVision(files);
     files.vision = vision;
@@ -200,7 +201,7 @@ describe('PDF actions that need the preview pack or a local screen', () => {
       status: 'succeeded',
       value: { type: 'text', text: 'Scanned one\n\nTyped\n\nScanned two', name: 'mixed' },
     });
-    // 只画没有文字的那几页。
+    // Only draw the pages without text.
     expect(packs.calls.find((c) => c.method === 'render')!.args).toMatchObject({ pages: [0, 2] });
     expect(vision.calls.filter((c) => c.method === 'recognizeText')).toHaveLength(2);
   });
@@ -253,7 +254,7 @@ describe('PDF actions that need the preview pack or a local screen', () => {
     expect(doc.getPageCount()).toBe(2);
     expect(hasImage(doc, 1)).toBe(true);
     expect(hasImage(doc, 0)).toBe(false);
-    // 画的图层和预览页一样大，路径照原样画（荧光笔的半透明颜色在标注里）。
+    // The drawn layer is the same size as the preview page, and paths are drawn as-is (highlighter translucent colors are preserved in annotations).
     expect(files.composed).toHaveLength(1);
     expect(files.composed[0]!.canvas).toMatchObject({ width: 60, height: 40 });
     expect(files.composed[0]!.ops).toEqual([expect.objectContaining({ kind: 'path' })]);
@@ -309,15 +310,15 @@ describe('PDF actions that need the preview pack or a local screen', () => {
     expect(opened[0]!.input).toMatchObject({ tool: 'erase' });
     expect(doc.getPageCount()).toBe(2);
     expect(hasImage(doc, 0)).toBe(true);
-    // 第一页换成了一张图；页面原来的文字不在了，第二页没有标注，原样。
+    // The first page is replaced with an image; the page's original text is gone, the second page has no annotations and remains unchanged.
     const value = (out as { value?: { items: { uri: string }[] } }).value!;
     const raw = Buffer.from(files.disk.get(value.items[0]!.uri)!).toString('latin1');
     expect(raw).not.toContain('SECRET');
-    // 擦除是涂白，打码按格子取原图的平均色：画了几个色块。
+    // Erasure is painting white, redaction takes the average color of the original image per grid cell: drawn as several color blocks.
     const rects = files.composed.at(-1)!.ops.filter((op) => op.kind === 'rect');
     expect(rects.length).toBeGreaterThan(1);
     expect(rects[0]).toMatchObject({ color: '#FFFFFF' });
-    // 更大的页面图重新渲染过（只渲染有擦除、打码的那一页）。
+    // Larger page image re-rendered (only rendering the page with erasures or redactions).
     expect(packs.calls.filter((c) => c.method === 'render').at(-1)!.args).toMatchObject({
       pages: [0],
       maxSide: 2400,
@@ -342,7 +343,7 @@ describe('PDF actions that need the preview pack or a local screen', () => {
       ['agree', 'checkbox'],
       ['country', 'dropdown'],
     ]);
-    // 拍平后表单字段没有了，内容画进了页面。
+    // After flattening, form fields are gone, and content is drawn into the page.
     expect(doc.getForm().getFields()).toHaveLength(0);
   });
 

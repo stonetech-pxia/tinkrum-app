@@ -7,7 +7,7 @@ import { t } from '@/i18n';
 import { Card, Pill, SectionLabel } from '@/renderer/ui';
 import { RowGroup } from '@/shell/RowGroup';
 
-/** 表上的「附件是」的选项（D-421）。 */
+/** Options for 'Attachment is' on a table (D-421). */
 const PREFILL_RULES = [
   { rules: undefined, label: 'prefillRulesGeneral' },
   { rules: 'receipt', label: 'prefillRulesReceipt' },
@@ -15,8 +15,9 @@ const PREFILL_RULES = [
 ] as const;
 
 /**
- * 「数据」里的一张表（D-614）：导出 CSV、从文件导入记录和导入过的批次（D-574）、选择删除，
- * 有文件字段时还有「自动读取附件」（D-397）和「附件是」（D-421）。系统层，AI 不能修改（底线 8）。
+ * A table in 'Data' (D-614): CSV export, record import from file and imported batches (D-574),
+ * selective deletion, plus 'Auto-read attachments' (D-397) and 'Attachment is' (D-421) when file
+ * fields are present. System layer, cannot be modified by AI (invariant 8).
  */
 export default function DataTableRoute() {
   const { tableId } = useLocalSearchParams<{ tableId: string }>();
@@ -107,7 +108,7 @@ export default function DataTableRoute() {
               trackColor={{ true: palette.primary }}
             />
           </View>
-          {/* 「附件是」只在会读附件时才有用（D-614）。 */}
+          {/* 'Attachment is' is only useful when attachments can be read (D-614). */}
           {c.readAttachments !== false ? (
             <View style={{ gap: 6 }}>
               <Text style={[palette.font('bodyMedium', 14), { color: palette.text }]}>

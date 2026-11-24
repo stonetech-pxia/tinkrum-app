@@ -6,7 +6,7 @@ import { OpListSchema } from './ops';
 import { apply, registry, workspace } from './test-helpers';
 import { issueLines } from './zod-issues';
 
-// 校验的问题文字发给模型修正（D10）：z.union 默认只说 Invalid input，要指到最接近的分支里具体哪里错。
+// Validation issue text sent to model for correction (D10): z.union by default only says Invalid input, need to point to the exact branch where it failed.
 
 const lines = (ops: unknown) => {
   const r = OpListSchema.safeParse(ops);

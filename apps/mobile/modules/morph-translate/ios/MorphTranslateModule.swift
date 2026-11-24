@@ -4,11 +4,14 @@ import SwiftUI
 import Translation
 import UIKit
 
-// 本机翻译（D-170）：只用 iOS 自带的 Translation 框架（iOS 18 起）和 NaturalLanguage（识别语言），
-// 全部在本机处理，文字不写日志。
-// - iOS 26 起，两种语言都已下载时直接创建 TranslationSession(installedSource:target:)，不需要界面；
-// - 其他情况（要下载语言、iOS 18–25）只能通过 SwiftUI 的 .translationTask 拿到会话：在当前页面上挂一个
-//   1×1、透明、不接收触摸的 SwiftUI 视图，系统需要下载时由它弹出下载确认，翻完就移除。
+// On-device translation (D-170): Uses only the native iOS Translation framework (iOS 18+) and
+// NaturalLanguage (for language recognition), processed entirely on-device without logging text.
+// - Starting from iOS 26, when both languages are already downloaded, directly creates
+// TranslationSession(installedSource:target:) without a UI;
+// - In other cases (languages need downloading, iOS 18-25), sessions can only be obtained via
+// SwiftUI's .translationTask: attaches an invisible, 1x1, non-touch-receiving SwiftUI view to the
+// current page, which prompts the user for download confirmation when needed and is removed after
+// translation completes.
 
 final class TranslateCancelledException: Exception, @unchecked Sendable {
   override var code: String { "ERR_TRANSLATE_CANCELLED" }
@@ -34,7 +37,7 @@ public class MorphTranslateModule: Module {
       return false
     }
 
-    // 每段文字的语言（BCP 47，例如 en、zh-Hans、ja）；太短、拿不准时返回 nil，由 App 按全文最多的语言处理。
+    // Language of each text segment (BCP 47, e.g., en, zh-Hans, ja); returns nil if too short or uncertain, letting the app handle it using the dominant language of the full text.
     AsyncFunction("detectLanguages") { (texts: [String]) -> [String?] in
       texts.map { text in
         let recognizer = NLLanguageRecognizer()
@@ -46,7 +49,7 @@ public class MorphTranslateModule: Module {
       }
     }
 
-    // 系统能翻译的语言（排查用；Android 没有对应的列表）。
+    // Languages supported by the system for translation (for debugging; Android has no corresponding list).
     AsyncFunction("supportedLanguages") { () async -> [String] in
       guard #available(iOS 18.0, *) else { return [] }
       return await LanguageAvailability().supportedLanguages.map { $0.maximalIdentifier }
@@ -95,7 +98,7 @@ public class MorphTranslateModule: Module {
       } catch let error as Exception {
         throw error
       } catch {
-        // 下载被取消（或没下完）时语言仍然没装好。
+        // Language is still not installed if the download was cancelled (or incomplete).
         if await LanguageAvailability().status(from: source, to: target) != .installed {
           throw TranslateCancelledException()
         }
@@ -109,7 +112,7 @@ public class MorphTranslateModule: Module {
       }
     }
 
-    // 提前下载这一对语言（系统弹下载确认并显示进度）：用户添加翻译、或翻译前确认下载时调用（D-170）。
+    // Pre-download the specified language pair (system prompts for download confirmation and displays progress): called when the user adds a translation or confirms a download before translating (D-170).
     AsyncFunction("prepare") { (from: String, to: String) async throws in
       guard #available(iOS 18.0, *) else { throw TranslateUnsupportedException("iOS < 18") }
       guard let (source, target) = await Self.resolve(from, to) else {
@@ -129,14 +132,16 @@ public class MorphTranslateModule: Module {
   }
 
   /**
-   系统支持的语言里找和 App 的代码对应的：主语言和文字（简体 / 繁体）相同；同一种语言有几个地区时
-   优先这种语言的默认地区（美国英语、巴西葡萄牙语）。列表顺序不可靠（模拟器上英语第一个是 en-IN）。
+   * Find a system-supported language matching the app's code: primary language and script
+   * (Simplified/Traditional) must match; when a language has multiple regions, prefer the default
+   * region for that language (US English, Brazilian Portuguese). List order is unreliable
+   * (English is first as en-IN on the simulator).
    */
   @available(iOS 18.0, *)
   private static func resolve(_ from: String, _ to: String) async -> (Locale.Language, Locale.Language)? {
     let supported = await LanguageAvailability().supportedLanguages
     func find(_ code: String) -> Locale.Language? {
-      // 先找默认地区（en → en-Latn-US，pt → pt-Latn-BR，zh-Hans → zh-Hans-CN），再找同语言同文字的。
+      // First look up the default region (en -> en-Latn-US, pt -> pt-Latn-BR, zh-Hans -> zh-Hans-CN), then search for matching language and script.
       let maximal = Locale.Language(identifier: code).maximalIdentifier
       let wanted = Locale.Language(identifier: maximal)
       if let exact = supported.first(where: { $0.maximalIdentifier == maximal }) { return exact }
@@ -145,13 +150,13 @@ public class MorphTranslateModule: Module {
         return full.languageCode == wanted.languageCode && full.script == wanted.script
       }
     }
-    // 列表是空的（拿不到）时直接交给系统判断。
+    // If the list is empty (unavailable), defer directly to system judgment.
     if supported.isEmpty { return (Locale.Language(identifier: from), Locale.Language(identifier: to)) }
     guard let source = find(from), let target = find(to) else { return nil }
     return (source, target)
   }
 
-  /** 挂一个看不见的 SwiftUI 视图拿到会话（需要下载时系统从这里弹窗），做完移除。 */
+  /** Attach an invisible SwiftUI view to obtain the session (system prompts from here if a download is required), and remove it when done. */
   @available(iOS 18.0, *)
   @MainActor
   private func withSession<T: Sendable>(
@@ -194,7 +199,7 @@ public class MorphTranslateModule: Module {
   }
 }
 
-/** 只恢复一次（视图消失和翻译完成可能都会来）。 */
+/** Resume only once (both view disappearance and translation completion might trigger it). */
 private final class Once<T>: @unchecked Sendable {
   private var continuation: CheckedContinuation<T, Error>?
   private let lock = NSLock()

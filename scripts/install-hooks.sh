@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(git rev-parse --show-toplevel)"
-# hooksPath 写进本 worktree，不改变其他会话的钩子。已有特殊 worktree 配置时不擅自搬动。
+# Write hooksPath into the current worktree without modifying hooks for other sessions. Do not move it automatically if a special worktree configuration already exists.
 if git config --local --get core.worktree >/dev/null 2>&1 ||
    [ "$(git config --local --get core.bare || true)" = true ]; then
   echo 'Existing core.worktree/core.bare configuration needs migration before enabling per-worktree hooks.' >&2

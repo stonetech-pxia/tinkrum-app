@@ -9,15 +9,14 @@ import { keepIncomingFiles } from '../storage/keep-files';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { nativeCopies, normalizeShare, useIncoming } from './incoming';
 
-// 接收别的 App 分享进来的文件（D-114）：iOS 是分享扩展 + App Group + 深链，Android 是 ACTION_SEND /
-// ACTION_SEND_MULTIPLE。原生部分来自 expo-share-intent；Expo Go 和测试里没有这个模块，什么也不做。
+// Key used by the share extension to store data: `<scheme>ShareKey`.
 
-/** 分享扩展存数据用的键：`<scheme>ShareKey`。 */
+/** Key used by share extension to store data: `<scheme>ShareKey`. */
 const SHARE_KEY = 'morphShareKey';
 
 export const isShareLink = (url: string) => url.includes('dataUrl=');
 
-/** 放在根布局里：收到文件就打开收件页面。不会自动运行任何工作流。 */
+/** Placed in root layout: opens inbox page upon receiving files. Does not automatically run any workflows. */
 export function useIncomingShare(files: Pick<FilePlatform, 'removeShared'>) {
   const url = useLinkingURL();
   const router = useRouter();
@@ -31,7 +30,7 @@ export function useIncomingShare(files: Pick<FilePlatform, 'removeShared'>) {
     const subscription = native.addListener('onChange', (event) => {
       const shared = normalizeShare(event.value);
       void native.clearShareIntent(SHARE_KEY);
-      // 上一批没处理完的文件不再需要，只留这一批。Android 的副本按原文件名存，同名的已经是这一批的了。
+      // Unprocessed files from the previous batch are no longer needed, keep only this batch. Android copies are stored with original filenames; duplicate names already belong to this batch.
       const copies = nativeCopies(event.value);
       const previous = (useIncoming.getState().share?.copies ?? []).filter(
         (uri) => !copies.includes(uri),
@@ -42,7 +41,7 @@ export function useIncomingShare(files: Pick<FilePlatform, 'removeShared'>) {
           previous,
         )
         .catch(() => undefined);
-      // 分享进来的文件存进文档库（D-455），再进收件页面。
+      // Save shared files into the document library (D-455) before entering the inbox page.
       void keepIncomingFiles(shared, workspace.files, workspace.repo).then((kept) => {
         bumpAssets();
         receive(kept, copies);
@@ -58,7 +57,7 @@ export function useIncomingShare(files: Pick<FilePlatform, 'removeShared'>) {
     if (Platform.OS === 'ios') {
       if (url && isShareLink(url)) native.getShareIntent(url);
     } else if (Platform.OS === 'android') {
-      // 冷启动时的分享在这里取；App 开着时原生模块收到新的 Intent 直接发 onChange。
+      // Shares during cold start are retrieved here; while the app is running, the native module directly emits onChange for new Intents.
       native.getShareIntent('');
     }
   }, [url]);

@@ -15,8 +15,9 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 统计和图表按引用字段分组（D-336）、统计相减（D-337）、新建并打开表单（D-338）。
-// 例子是零基预算：分类、分配、流水三张表；这些能力不只给预算用。
+// Statistics and charts grouped by reference field (D-336), subtraction of statistics (D-337),
+// creating and opening forms (D-338). Example is zero-based budget: categories, allocations, and
+// ledger tables; these capabilities are not just for budgets.
 
 const tables: Collection[] = [
   {
@@ -150,7 +151,7 @@ it('ready to assign is income minus everything assigned, every month so far', as
   await put(repo, 's3', 'ledger', { amount: 9, kind: 'out', date: today });
   await renderToolsApp(repo, undefined, { locale: 'zh', seed });
   expect((await screen.findByTestId('stat-value-ledger-待分配')).props.children).toBe(yuan(200));
-  // 每个分类一行（按添加的顺序），没选分类的另算一行；和上月同期比。
+  // One row per category (in order of addition), unassigned categories grouped separately; compared with the same period last month.
   expect(screen.getByTestId('stat-group-ledger-food').props.children).toBe(yuan(150));
   expect(screen.getByTestId('stat-group-ledger-rent').props.children).toBe(yuan(0));
   expect(screen.getByTestId('stat-group-ledger-none').props.children).toBe(yuan(9));
@@ -163,7 +164,7 @@ it('"assign" on a category opens the form with the category filled in; saving up
   await put(repo, 'pay', 'ledger', { amount: 500, kind: 'in' });
   await renderToolsApp(repo, undefined, { locale: 'zh', seed });
   await fireEvent.press(await screen.findByTestId('row-action-food'));
-  // 打开表单，不直接存：还没有分配的记录，也没有提示条。
+  // Open form without saving directly: no allocated records yet, and no prompt bar.
   expect(await screen.findByTestId('editor-save')).toBeTruthy();
   expect(await repo.listRecords('assigned')).toEqual([]);
   expect(screen.queryByTestId('toast')).toBeNull();

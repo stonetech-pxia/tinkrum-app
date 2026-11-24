@@ -31,7 +31,7 @@ describe('name templates', () => {
     const takenAt = new Date(2025, 0, 2, 3, 4, 5);
     expect(renderNameTemplate('收据-{date}-{seq}', { now, index: 3 })).toBe('收据-2026-10-22-03');
     expect(renderNameTemplate('{taken}_{taken:HHmm}', { now, takenAt })).toBe('2025-01-02_0304');
-    // 读不到拍摄日期时用当天。
+    // Fall back to current date when capture date cannot be read.
     expect(renderNameTemplate('{taken}', { now })).toBe('2026-10-22');
   });
 
@@ -40,8 +40,8 @@ describe('name templates', () => {
     expect(renderNameTemplate('{sourceName}', { now, sourceName: '' })).toBe('untitled');
   });
 
-  // 2026-11-09 用户测试：模板「../../a/b:*?|x {date}」存成「..-..-a-b----x 2026-11-09.pdf」，
-  // 点开头的名字在「文件」App 里是隐藏文件。
+  // Nov 9, 2026 user testing: template "../../a/b:*?|x {date}" saved as "..-..-a-b----x
+  // 2026-11-09.pdf"; names starting with a dot are hidden files in the Files app.
   it('never starts a name with a dot, and a run of bad characters becomes one dash', () => {
     expect(renderNameTemplate('../../a/b:*?|x {date}', { now })).toBe('a-b-x 2026-10-22');
     expect(renderNameTemplate('.hidden', { now })).toBe('hidden');

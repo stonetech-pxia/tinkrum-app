@@ -19,13 +19,16 @@ import { useRouter } from 'expo-router';
 import { useWorkspace } from '../workspace/context';
 
 /**
- * 打开一个导航目标：
- * - AI 修改是单独的页面；
- * - 导航栏里的页面和系统入口（工具、历史、设置）在外壳里切换显示；
- * - 不在导航栏里的页面、工具和改动记录推入一个带返回按钮的新页面；
- * - 快捷操作 tool:<id> 只打开摆出来（D-256）；
- * - app:<id> 进入那个 app；别的 app 的页面先切到它的 app（提醒、小组件、入口都从这里走，D-485）；
- *   在 app 里打开设置回到主页（系统页用主页的样子）。
+ * Opens a navigation target:
+ * - AI modifications are separate pages;
+ * - Navigation bar pages and system entries (tools, history, settings) switch display within the
+ * shell;
+ * - Pages not in the navigation bar, tools, and change history are pushed into a new page with a
+ * back button;
+ * - Quick action tool:<id> only opens displayed items (D-256);
+ * - app:<id> enters that app; pages of other apps first switch to their app (reminders, widgets,
+ * and entries all route through here, D-485); opening settings within an app returns to the home
+ * screen (system pages adopt the home screen appearance).
  */
 export function useNavigate(): (target: OpenTarget) => void {
   const router = useRouter();
@@ -42,7 +45,7 @@ export function useNavigate(): (target: OpenTarget) => void {
       if (router.canDismiss()) router.dismissAll();
       return;
     }
-    // 按钮、快捷入口打开的快捷操作（D-256）：只摆出来，用户点「开始」才运行（和提醒一样，P-043）。
+    // Quick actions opened via buttons or quick shortcuts (D-256): displayed only, runs only when the user taps "Start" (same as reminders, P-043).
     const workflowId = toolTargetId(target);
     if (workflowId !== null) {
       router.push({ pathname: '/reminder/[workflowId]', params: { workflowId, from: 'entry' } });
@@ -62,7 +65,7 @@ export function useNavigate(): (target: OpenTarget) => void {
       return;
     }
     const pageId = pageIdOf(navTarget);
-    // 另一个 app（或主页）的页面：先切过去；在它的底栏里就显示，不在就推入。
+    // Pages of another app (or home screen): switches over first; displayed if in its bottom bar, pushed if not.
     const owner = appOfTarget(config, navTarget);
     if (pageId !== null && owner !== undefined && owner !== appId) {
       if (appViewOf(config, owner).bar.includes(navTarget)) {
@@ -77,10 +80,10 @@ export function useNavigate(): (target: OpenTarget) => void {
       router.push({ pathname: '/page/[pageId]', params: { pageId } });
       return;
     }
-    // 设置在 app 的底栏里没有：回主页再显示（设置是系统页，用主页的样子）。
+    // Settings are absent from the app's bottom bar: returns to home screen to display (Settings is a system page, using the home screen layout).
     if (appId !== null && navTarget === 'settings') leaveApp();
     selectTab(navTarget);
-    // 从推入的页面打开外壳里的入口时，先回到外壳。
+    // When opening a shell entry from a pushed page, return to the shell first.
     if (router.canDismiss()) router.dismissAll();
   };
 }
@@ -91,7 +94,7 @@ export function targetIcon(target: NavTarget, config: WorkspaceConfig): IconValu
   return config.containers.pages.find((p) => p.id === pageId)?.icon ?? 'bookmark';
 }
 
-/** 导航栏的文字；内置的页面名字跟着界面语言显示（用户改过的不换）。 */
+/** Text for the navigation bar; built-in page names follow the UI language (user-modified names are preserved). */
 export function targetLabel(
   target: NavTarget,
   config: WorkspaceConfig,
@@ -101,20 +104,22 @@ export function targetLabel(
   return builtinText(navTargetLabel(target, config, locale), locale, registry);
 }
 
-/** 模态页关闭的动画时长（iOS 约 350 毫秒）。 */
+/** Animation duration for closing modal pages (approximately 350 ms on iOS). */
 const MODAL_CLOSE_MS = 400;
 
 /**
- * 从一个模态页（「快捷操作做好了」、快捷操作入口页）去运行页：先关掉这一页，关完再打开运行页。
- * 直接换成运行页时，两个模态同时在动画，运行页第一步弹出的照片 / 文件选择器被 iOS 悄悄丢掉，
- * 运行一直停在第 1 步（2026-11-06 模拟器上「现在就用一次」卡在「选照片」）。
+ * Transition from a modal page ("quick action created", quick action entry page) to the run page:
+ * closes this page first, then opens the run page upon closure. Directly switching to the run
+ * page causes two modals to animate simultaneously, causing iOS to quietly drop the photo/file
+ * picker popped up by the first step of the run page, leaving execution stuck at step 1
+ * (2026-11-06 simulator stuck at "Select photo" on "Use once now").
  */
 export function openRunAfterClosing(
   router: ReturnType<typeof useRouter>,
   workflowId: string,
 ): void {
   const run = { pathname: '/run/[workflowId]' as const, params: { workflowId } };
-  // 从通知直接打开、下面没有页面时，没有可关的，直接换。
+  // When opened directly from a notification with no underlying pages, there is nothing to dismiss, so perform a direct replacement.
   if (!router.canGoBack()) {
     router.replace(run);
     return;

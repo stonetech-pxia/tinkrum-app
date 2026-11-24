@@ -3,7 +3,7 @@ import { BUNDLED_PACKS, PACKS, PACK_HOST, PREFILL_MODEL_PACK, packFileUrl } from
 import { PackError, PackStore } from '../packs/store';
 import { MemoryPackFs, bundlePack, manifests, sha256, text } from '../test-utils/memory-packs';
 
-// 扩展包下载、校验和删除。
+// Extension pack download, verification, and deletion.
 
 describe('extension packs', () => {
   it('the real manifest is well formed', () => {
@@ -13,8 +13,10 @@ describe('extension packs', () => {
       for (const dep of pack.requires ?? []) expect(ids).toContain(dep);
       for (const file of pack.files) {
         expect(file.sha256).toMatch(/^[0-9a-f]{64}$/);
-        // 固定版本：jsDelivr 的地址里必须带 @版本号；放不进 jsDelivr 的大文件（语音模型）用 Hugging Face 固定提交的地址。
-        // 还没定托管地址的（展平模型，D-274）写相对路径，路径里带扩展包的 ID 和版本号。
+        // Pinned versions: jsDelivr URLs must include @version; large files that cannot fit in
+        // jsDelivr (voice models) use Hugging Face pinned commit URLs. Undetermined hosting
+        // addresses (flattening model, D-274) use relative paths containing the extension pack ID
+        // and version number.
         if (file.url.startsWith(PACK_HOST)) {
           expect(file.url).toBe(
             `${PACK_HOST}${pack.id}/${pack.version}/${file.url.split('/').pop()}`,
@@ -50,7 +52,7 @@ describe('extension packs', () => {
     );
     expect(packFileUrl(PACKS[0]!.files[0]!)).toBe(PACKS[0]!.files[0]!.url);
 
-    // 没配置地址：下载不了，不留下半个扩展包。
+    // Unconfigured address: Cannot download, leaves no partial extension pack.
     const unconfigured = new PackStore(fs, sha256, () => pack);
     await expect(unconfigured.install('dewarp')).rejects.toBeInstanceOf(PackError);
     expect(await unconfigured.isInstalled('dewarp')).toBe(false);
@@ -77,12 +79,12 @@ describe('extension packs', () => {
       () => 1000,
     );
     await store.install('ocr-eng');
-    // 写 ready.json 时被杀了进程：只写下了一半。
+    // Process killed while writing ready.json: Only half-written.
     const ocr = lookup.get('ocr')!;
     await fs.writeText(`ocr/${ocr.version}/ready.json`, '{"id":"ocr","byt');
     expect((await store.installed()).map((p) => p.id)).toEqual(['ocr-eng']);
     expect(await store.isInstalled('ocr')).toBe(false);
-    // 再装一次就好了：清单重写，算装好。
+    // Installing again succeeds: Manifest is rewritten, installation considered complete.
     await store.install('ocr');
     expect((await store.installed()).map((p) => p.id).sort()).toEqual(['ocr', 'ocr-eng']);
   });
@@ -100,7 +102,7 @@ describe('extension packs', () => {
     await store.install('ocr-eng', (p) =>
       progress.push(`${p.packId} ${p.doneBytes}/${p.totalBytes}`),
     );
-    // 两个文件并行下载，先完成哪个不一定（3 或 4 字节）。
+    // Two files downloaded in parallel, completion order is non-deterministic (3 or 4 bytes).
     expect(progress).toEqual([
       'ocr 0/7',
       expect.stringMatching(/^ocr [34]\/7$/),
@@ -113,7 +115,7 @@ describe('extension packs', () => {
     expect((await store.installed()).map((p) => p.id).sort()).toEqual(['ocr', 'ocr-eng']);
     expect(await store.readText('ocr', 'a.js')).toBe('aaa');
 
-    // 已安装就不再下载（离线可用）。
+    // Installed packages are not re-downloaded (available offline).
     fs.net.clear();
     await store.install('ocr-eng');
     expect(fs.downloads).toHaveLength(3);
@@ -189,7 +191,7 @@ describe('extension packs', () => {
     await Promise.all([store.install('ocr'), store.install('ocr', (p) => seen.push(p.doneBytes))]);
     expect(fs.downloads).toHaveLength(2);
     expect(await store.isInstalled('ocr')).toBe(true);
-    // 后来的那次也能看到进度，不是只等着。
+    // Subsequent run can also observe progress, rather than merely waiting.
     expect(seen.length).toBeGreaterThan(0);
   });
 
@@ -208,13 +210,13 @@ describe('extension packs', () => {
     ]);
   });
 
-  // D-510：处理文件常用的扩展包随 App 打包，算已安装；第一次用到时从 App 里复制，和下载一样校验。
+  // D-510: Frequently used file-processing extension packs are bundled with the app and considered pre-installed; copied from the app upon first use, verified just like downloads.
   describe('packs that come with the app (D-510)', () => {
     it('only the file tools are bundled, not the big optional downloads', () => {
       const ids = PACKS.map((p) => p.id);
       for (const id of [...BUNDLED_PACKS.ios, ...BUNDLED_PACKS.android]) expect(ids).toContain(id);
       expect(BUNDLED_PACKS.ios).toEqual(['ppocr', 'pdfview', 'dewarp', 'layout']);
-      // 拉正照片只有 Android 要（iOS 系统能找纸边）。
+      // Photo straightening is only needed on Android (iOS system can detect document edges).
       expect(BUNDLED_PACKS.android).toEqual([...BUNDLED_PACKS.ios, 'scan']);
       for (const id of [...BUNDLED_PACKS.ios, ...BUNDLED_PACKS.android]) {
         expect(id).not.toBe(PREFILL_MODEL_PACK);
@@ -245,10 +247,10 @@ describe('extension packs', () => {
       expect(await store.installed()).toEqual([
         { id: 'ocr', version: '7.0.0', bytes: 7, installedAt: 5, bundled: true },
       ]);
-      // 复制过一次就不再复制。
+      // Do not copy again once copied.
       expect(await store.isInstalled('ocr')).toBe(true);
       expect(fs.copies).toHaveLength(2);
-      // 没带的照旧要下载。
+      // Packs not bundled must still be downloaded.
       expect(await store.isInstalled('ocr-eng')).toBe(false);
     });
 
@@ -268,7 +270,7 @@ describe('extension packs', () => {
       expect(await store.isInstalled('ocr')).toBe(false);
       expect(fs.files.size).toBe(0);
       expect(await store.installed()).toEqual([]);
-      // 没经过用户确认不下载；用户点了下载才下载。
+      // Never download without user confirmation; download only after user taps download.
       expect(fs.downloads).toEqual([]);
       await store.install('ocr');
       expect(fs.downloads.sort()).toEqual(['https://cdn/a.js', 'https://cdn/b.js']);
@@ -282,7 +284,7 @@ describe('extension packs', () => {
       bundlePack(fs, old, (path) => (path === 'a.js' ? text('aaa') : text('bbbb')));
       expect(await new PackStore(fs, sha256, (id) => lookup.get(id)).isInstalled('ocr')).toBe(true);
 
-      // 下一个 App 版本的清单换了新版本（例如 R2 上的新模型），App 里带的还是旧的。
+      // The manifest for the next app version introduces a new version (e.g., new models on R2), while the app bundles an older version.
       const body = text('newer');
       fs.net.set('https://cdn/c.js', body);
       const newer = {

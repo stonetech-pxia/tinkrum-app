@@ -14,14 +14,15 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-// 音频（D-153、D-155，音频会话）：Media3 Transformer 只能写 MP4 一类的容器，WAV 和波形要自己解码。
-// 用系统的 MediaExtractor + MediaCodec 解成 16 位 PCM，一块一块地交出去，不把整个文件放进内存。
+// Audio (D-153, D-155, audio sessions): Media3 Transformer can only write containers like MP4; WAV
+// and waveforms must be decoded manually. Uses system MediaExtractor + MediaCodec to decode into
+// 16-bit PCM, handing it out chunk by chunk without loading the entire file into memory.
 
-/** 解码出来的一块：交错的 16 位样本。 */
+/** A decoded chunk: interleaved 16-bit samples. */
 class PcmChunk(val samples: ShortArray, val count: Int, val channels: Int, val sampleRate: Int, val ptsUs: Long)
 
 object AudioPcm {
-  /** 解码并按时间戳补齐静音；避免处理后声音提前。 */
+  /** Decode and pad silence according to timestamps; prevents processed audio from playing early. */
   fun visitTimeline(context: Context, uri: Uri, durationMs: Double, cancelled: () -> Boolean, sink: (PcmChunk) -> Unit) {
     var position = 0L
     var sourceRate = 0
@@ -54,8 +55,9 @@ object AudioPcm {
   private const val TIMEOUT_US = 10_000L
 
   /**
-   * 解码 [startUs, endUs) 这一段的声音（视频文件取它的音轨）。返回声音的总时长（微秒，读不到为 0）。
-   * isCancelled 为真时提前结束。
+   * Decode audio for the segment [startUs, endUs) (for video files, takes its audio track).
+   * Returns total duration of audio in microseconds (0 if unreadable). Ends early when
+   * isCancelled is true.
    */
   fun decode(
     context: Context,
@@ -137,7 +139,7 @@ object AudioPcm {
         val samples = toShorts(buffer, encoding)
         codec.releaseOutputBuffer(index, false)
         if (samples.isNotEmpty()) {
-          // 开头：seek 落在前一个关键帧，丢掉 startUs 之前的样本；结尾同理。
+          // Start: seek lands on the preceding keyframe, discarding samples before startUs; same logic applies to the end.
           val frames = samples.size / channels
           val frameUs = 1_000_000.0 / rate
           val first = if (info.presentationTimeUs < startUs) {
@@ -165,7 +167,7 @@ object AudioPcm {
     return ShortArray(shorts.remaining()) { shorts.get(it) }
   }
 
-  /** 交错的多声道 → channels 个声道：单声道取平均，双声道取前两个。 */
+  /** Interleaved multichannel -> channels channels: mono takes the average, stereo takes the first two. */
   fun remix(chunk: PcmChunk, channels: Int): ShortArray {
     if (chunk.channels == channels) return chunk.samples
     val frames = chunk.count / chunk.channels
@@ -181,7 +183,7 @@ object AudioPcm {
     }
   }
 
-  /** 写 WAV（16 位 PCM）：先写一个空的文件头，写完再填上大小。 */
+  /** WAV writer (16-bit PCM): writes an empty header first, fills in the size after writing is complete. */
   class WavWriter(private val file: File) {
     private val out = RandomAccessFile(file, "rw")
     private var bytes = 0L
@@ -218,7 +220,7 @@ object AudioPcm {
     }
   }
 
-  /** 波形：每一份时间里最大的音量，按最响的一份归一到 0–1。 */
+  /** Waveform: maximum volume in each time bucket, normalized to 0-1 relative to the loudest bucket. */
   fun waveform(context: Context, uri: Uri, buckets: Int, startUs: Long, endUs: Long): List<Double> {
     val peaks = DoubleArray(buckets)
     var spanUs = endUs - startUs
@@ -233,7 +235,7 @@ object AudioPcm {
       val bucket = (((pts - startUs).toDouble() / spanUs) * buckets).toInt().coerceIn(0, buckets - 1)
       peaks[bucket] = max(peaks[bucket], peak)
     }
-    // 解码出来的块比份数少时（很短的录音），空着的份用前一份补上。
+    // When decoded chunks are fewer than the buckets (very short recordings), empty buckets are filled with the preceding bucket.
     if (chunks.size < buckets) for (i in 1 until buckets) if (peaks[i] == 0.0) peaks[i] = peaks[i - 1]
     val loudest = peaks.maxOrNull() ?: 0.0
     return if (loudest > 0) peaks.map { it / loudest } else peaks.toList()

@@ -12,8 +12,10 @@ import { FakeFiles, FakeTranslator, FakeVision } from '../test-utils/fake-files'
 import { acceptNextAlert, renderToolsApp } from '../test-utils/render-app';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 
-// 翻译的界面旅程（D-170–D-173）：添加翻译工具 → 翻译文字（每次问目标语言）→ 结果页说明「适合看懂意思」；
-// 快捷操作页的「现成的」里有翻译预设，按场景分组；从截图翻译预设添加并运行。
+// Translation interface journey (D-170–D-173): add translation tool -> translate text (prompting
+// for target language each time) -> result page notice "suited for getting the gist"; quick actions
+// page "ready-made" section has translation presets grouped by scenario; add and run from
+// screenshot translation preset.
 
 function filesWithTranslator() {
   const files = new FakeFiles();
@@ -32,13 +34,13 @@ describe('translation journeys (UI)', () => {
     await fireEvent.press(screen.getByTestId('nav-tools'));
     await fireEvent.press(await screen.findByTestId('install-translate'));
     await fireEvent.press(await screen.findByTestId('open-translate'));
-    // 工具页说明：本机翻译、看懂意思、正式文件找专业翻译（D-172）。
+    // Tool page description: on-device translation, for getting the gist; use professional translation for formal documents (D-172).
     expect(await screen.findByText(/适合看懂意思；正式文件请找专业翻译/)).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('run-translate-typed'));
     await fireEvent.changeText(await screen.findByTestId('ask-text'), '早上好。\n\nGood morning.');
     await fireEvent.press(screen.getByTestId('prompt-ok'));
-    // 目标语言每次运行时问（D-072），默认是界面语言。
+    // Target language is queried each run (D-072), defaulting to the UI language.
     await fireEvent.press(await screen.findByTestId('ask-to-en'));
     await fireEvent.press(screen.getByTestId('prompt-ok'));
 
@@ -49,7 +51,7 @@ describe('translation journeys (UI)', () => {
       '本机翻译，适合看懂意思；正式文件请找专业翻译。',
     );
     await fireEvent.press(screen.getByTestId('result-copy'));
-    // 本来就是英文的一段原样保留。
+    // Keep a section of text that is already in English as-is.
     expect(files.clipboard).toBe('[en] 早上好。\n\nGood morning.');
   });
 
@@ -67,12 +69,12 @@ describe('translation journeys (UI)', () => {
     (files.vision as FakeVision).texts = ['Your parcel is at the front desk.'];
     files.nextPhotos = [files.offerImage('IMG_1.png', 1170, 2532, 'image/png')];
     await fireEvent.press(await screen.findByTestId('workflow-run-screenshot-translate'));
-    // 识别文字的语言每次问：默认英文，直接确定。
+    // Recognized text language is queried each time: defaults to English, directly confirm.
     await fireEvent.press(await screen.findByTestId('prompt-ok'));
     expect(await screen.findByTestId('result-text')).toHaveTextContent(
       '[zh-Hans] Your parcel is at the front desk.',
     );
-    // 最后一步「复制文字」已经复制好了。
+    // The final step "Copy text" has already completed the copying.
     expect(files.clipboard).toBe('[zh-Hans] Your parcel is at the front desk.');
   });
 
@@ -108,7 +110,7 @@ describe('translation journeys (UI)', () => {
     );
     expect(await screen.findByText('翻译语言：日文')).toBeTruthy();
     expect(screen.getByText('翻译语言：简体中文')).toBeTruthy();
-    // 没有别的下载内容时不显示「还没有下载过内容」和合计。
+    // When there is no other downloaded content, do not display "No content downloaded yet" and the total.
     expect(screen.queryByTestId('packs-empty')).toBeNull();
     expect(screen.queryByTestId('packs-total')).toBeNull();
 

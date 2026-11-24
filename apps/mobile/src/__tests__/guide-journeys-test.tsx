@@ -13,8 +13,9 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp, starterAfterGuide, openPick } from '../test-utils/render-app';
 
-// 新手引导（D-149、D-231）：划屏介绍 → 第 1 步加两个文件入口（直接生效）→ 第 2 步打开图片或文件
-// → 第 3 步样板 App（D-260，另见 sample-apps-test.tsx）。
+// Newbie guide (D-149, D-231): swipe intro -> step 1 add two file triggers (takes effect
+// immediately) -> step 2 open image or file -> step 3 sample app (D-260, see also
+// sample-apps-test.tsx).
 
 const TYPED = { timeout: 4000 };
 
@@ -60,7 +61,7 @@ describe('first-run guide', () => {
     expect(screen.queryByTestId('welcome-page-3')).toBeNull();
     expect(screen.getByTestId('welcome-art-scan')).toBeTruthy();
     expect(screen.getByTestId('welcome-page-0')).toHaveTextContent(/文件只在你的手机上处理/);
-    // D-592：第 2 页讲三个来源（含说一句）记进小 App、会提醒；第 3 页讲 Tink 加功能也换样子。
+    // D-592: Page 2 explains three sources (including saying a sentence) to record into a mini app, with reminders; Page 3 explains Tink adding features and changing appearance.
     expect(screen.getByTestId('welcome-page-1')).toHaveTextContent(
       /扫描、打开文件或说一句，都能记/,
     );
@@ -83,7 +84,7 @@ describe('first-run guide', () => {
     expect(await repo.getMeta('guide')).toBe('look');
   });
 
-  // D-592：介绍不讲以后还要下载什么（原 D-510 第一页的小字），下载时的提示自己会说大小和 Wi-Fi。
+  // D-592: Introduction does not mention what to download later (originally the small text on Page 1 in D-510); the download prompt states its size and Wi-Fi status.
   it.each(['en', 'zh', 'fr'] as const)(
     'the intro says nothing about later downloads (%s, D-592)',
     async (locale) => {
@@ -99,7 +100,7 @@ describe('first-run guide', () => {
 
   const filePicks = (store: Awaited<ReturnType<typeof startGuide>>['store']) =>
     allComponents(store.getState().config!.containers.pages.find((p) => p.id === 'home')!).filter(
-      // 两个入口：扫描（首页宫格里的内设「扫描成 PDF」，D-487）和打开文件。
+      // Two entry points: scanning (built-in "Scan to PDF" in the home grid, D-487) and opening a file.
       (c) =>
         c.look === 'picker' ||
         (c.look === 'action' && c.tools.some((u) => 'tool' in u && u.tool === 'scan-camera')),
@@ -110,7 +111,7 @@ describe('first-run guide', () => {
     await fireEvent.press(await screen.findByTestId('welcome-skip'));
     expect(await screen.findByTestId('guide-look')).toHaveTextContent(/空荡荡/);
     await fireEvent.press(await screen.findByTestId('guide-look-0'));
-    // 打完字停在 AI 页面，由用户自己发送（D-231）。
+    // After typing, stay on the AI page for the user to send manually (D-231).
     await waitFor(
       () => expect(screen.getByTestId('change-input').props.editable).toBe(true),
       TYPED,
@@ -118,7 +119,7 @@ describe('first-run guide', () => {
     expect(screen.getByTestId('change-input')).toHaveProp('value', LOOK_PROMPTS[0]!.zh);
     expect(filePicks(store)).toHaveLength(0);
     await fireEvent.press(screen.getByTestId('change-submit'));
-    // 直接生效，不进草稿；回到首页显示第 2 步。引导里的修改顶部不出「已改好 · 撤销」（D-239）。
+    // Takes effect immediately without entering draft mode; returns to the home page showing step 2. Guide modifications do not show "Applied · Undo" at the top (D-239).
     expect(await screen.findByTestId('guide-goal')).toHaveTextContent(
       /搭好了，以后你想改什么都可以和我说哦/,
     );
@@ -133,7 +134,7 @@ describe('first-run guide', () => {
     expect(await repo.getMeta('guide')).toBe('goal');
   });
 
-  // D-447：第一步是 Tink 说的一句话，不写「第 1 步」；首页右上角的 Tink 在动，点它和点气泡一样。
+  // D-447: Step 1 is a message spoken by Tink, without "Step 1" label; the Tink icon in the top right of the home page animates, tapping it behaves the same as tapping the bubble.
   it('step 1 is Tink speaking, not a numbered card; tapping the moving Tink opens the same sentence', async () => {
     await startGuide();
     await fireEvent.press(await screen.findByTestId('welcome-skip'));
@@ -154,7 +155,7 @@ describe('first-run guide', () => {
     expect(screen.queryByTestId('tink-lively')).toBeNull();
   });
 
-  // D-448：AI 页的发送按钮就是白色的 Tink，输入框左边不再有图标；忙的时候 Tink 动，旁边一句短话跟着规划的阶段。
+  // D-448: The send button on the AI page is the white Tink icon, with no icon to the left of the input box; while busy, Tink animates with a short phrase next to it matching the planner stage.
   it('the send button is Tink; while busy it moves and says what the planner is doing', async () => {
     jest.spyOn(Math, 'random').mockReturnValue(0);
     const { store } = await startGuide('goal');
@@ -180,7 +181,7 @@ describe('first-run guide', () => {
     expect(screen.getByTestId('tink-halo')).toBeTruthy();
   });
 
-  // D-228：内置规则不认法语。设置里选的是内置规则时，法语引导照旧发英文句子。
+  // D-228: Built-in rules do not recognize French. When built-in rules are selected in settings, the French guide continues to send English sentences.
   it('in French with the built-in rules, step 1 still adds both buttons', async () => {
     const repo = new MemoryWorkspaceRepo();
     await act(() => useGuide.getState().load(repo));
@@ -219,7 +220,7 @@ describe('first-run guide', () => {
     await waitFor(() => expect(filePicks(store)).toHaveLength(2));
     expect(store.getState().draft).toBeNull();
     expect(screen.queryByTestId('guide-look')).toBeNull();
-    // 顶部不出「已改好 · 撤销」（D-239）。
+    // Does not show "Applied · Undo" at the top (D-239).
     expect(store.getState().banner).toBeNull();
     expect(screen.queryByTestId('banner')).toBeNull();
     expect(await repo.getMeta('guide')).toBe('done');
@@ -243,7 +244,7 @@ describe('first-run guide', () => {
     expect(await repo.getMeta('guide')).toBe('done');
   });
 
-  // D-447：第 1、2 步的气泡浮在首页上（不在页面里排版），下面轻微虚化；第 2 步右下角是「我知道了」。
+  // D-447: Steps 1 and 2 bubbles float over the home page (not part of page layout) with a slight blur underneath; Step 2 has "Got it" at the bottom right.
   it('the bubbles float over a slightly blurred home page; step 2 has “got it”', async () => {
     await startGuide('goal');
     const overlay = await screen.findByTestId('guide-overlay');

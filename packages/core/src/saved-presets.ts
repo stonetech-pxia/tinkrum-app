@@ -4,33 +4,37 @@ import { clearFileRefs } from './file-refs';
 import type { Registry } from './registry';
 import type { WorkspaceConfig } from './schema';
 
-// 「设置 → 我的预设」（D-410）：把整个 App（表结构、页面、工具、风格）存成一份内核配置，以后换回来。
-// 不带记录（记录本来就不在配置里，底线 14），也不带指向用户文件的引用（底线 3、18）。
-// 预设存在本机数据库，不在 WorkspaceConfig 里：配置每次都发给云端 AI，预设不跟着发（底线 1、2）。
+// "Settings → My Presets" (D-410): Stores the entire app (table structure, pages, tools, styles) as
+// a kernel configuration so it can be restored later. Does not include records (records are not
+// part of configuration, invariant 14) or references to user files (invariants 3 and 18). Presets
+// are stored in the local database, not in WorkspaceConfig: configs are sent to the cloud AI every
+// time, but presets are not sent along (invariants 1 and 2).
 
 export const MAX_SAVED_PRESETS = 50;
 export const MAX_PRESET_NAME = 40;
 
 export const canSavePreset = (count: number): boolean => count < MAX_SAVED_PRESETS;
 
-/** 用户输入的名字整理后的样子；空的返回 null。按字符截断，不会切开 emoji。 */
+/** Formatted user-entered name; returns null if empty. Truncated by character without splitting emojis. */
 export function presetName(raw: string): string | null {
   const name = raw.trim().replace(/\s+/g, ' ');
   return name ? Array.from(name).slice(0, MAX_PRESET_NAME).join('') : null;
 }
 
-/** 保存：当前配置的一份副本，文件引用都清掉。 */
+/** Save: A copy of the current configuration with all file references cleared. */
 export const presetSnapshot = (config: WorkspaceConfig): WorkspaceConfig => clearFileRefs(config);
 
-/** 应用：存着的可能是旧版本的预设，先迁移、校验（底线 12），再清一次文件引用。 */
+/** Apply: Stored presets might be from older versions, so first migrate and validate them (invariant 12), then clear file references again. */
 export function preparePreset(raw: unknown, registry: Registry): PreparedChange {
   const prepared = prepareSnapshot(raw, registry);
   return prepared.ok ? { ...prepared, after: clearFileRefs(prepared.after) } : prepared;
 }
 
 /**
- * 导入文件时给预设起的名字：文件名去掉扩展名，整理、截到 40 个字符；空的用 fallback；
- * 和已有的重名（不分大小写）就在后面加序号「名字 2」，加了序号也不超过 40 个字符。
+ * Name given to a preset when importing a file: removes extension from file name, formats and
+ * truncates to 40 characters; uses fallback if empty; appends a sequence number like "name 2" if
+ * there is a case-insensitive name clash, ensuring the result with the sequence number does not
+ * exceed 40 characters.
  */
 export function importedPresetName(
   fileName: string,
@@ -50,15 +54,18 @@ export function importedPresetName(
 
 export type ImportedPreset =
   | { ok: true; name: string; config: WorkspaceConfig }
-  /** 文件本身读不了。 */
+  /** The file itself cannot be read. */
   | { ok: false; problem: AppConfigFileProblem }
-  /** 是 App 配置文件，但迁移或校验没过：issues 是具体原因（底线 18）。 */
+  /** Is an app config file, but migration or validation failed: issues list the specific reasons (invariant 18). */
   | { ok: false; problem: 'invalid'; issues: string[] };
 
 /**
- * 「我的预设 → 从文件导入」（门户下载的预设就是这样装进来的）：读文件、迁移到当前版本、校验、
- * 清掉文件引用（底线 3、12、18）。通过了返回要存的名字和配置；这里什么都不改，存进预设列表是调用的人的事，
- * 当前的 App 要等用户在列表里点「应用」才变。配置里本来就没有记录（底线 14）。
+ * "My Presets → Import from File" (presets downloaded from the portal are loaded this way): reads
+ * the file, migrates to the current version, validates, and clears file references (invariants 3,
+ * 12, and 18). Returns the name to store and the configuration if passed; nothing is modified
+ * here—saving it to the preset list is up to the caller, and the current app only changes when
+ * the user taps "Apply" in the list. The configuration contains no records by design (invariant
+ * 14).
  */
 export function importedPreset(
   text: string,

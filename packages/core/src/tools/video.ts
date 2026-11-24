@@ -15,9 +15,10 @@ import {
 import { speechLangFor } from './audio';
 import type { ActionDefinition } from '../workflow/contract';
 
-// 视频工具的清单（D-143、D-146）：压缩、转成 MP4、剪一段。编码在 App 的原生模块 morph-media 里
-// （iOS AVFoundation、Android Media3，D-141）；码率和分辨率的计算在 core/media.ts。
-// 编码默认 MP4（H.264 + AAC）；截帧、GIF、SRT 字幕等动作另有输出类型。
+// Video tool manifest (D-143, D-146): compression, conversion to MP4, and video trimming. Encoding
+// is handled in the app's native module morph-media (iOS AVFoundation, Android Media3, D-141);
+// bitrate and resolution calculations are in core/media.ts. Encoding defaults to MP4 (H.264 + AAC);
+// actions such as frame extraction, GIFs, and SRT subtitles have separate output types.
 
 export const VIDEO_TOOL_ID = 'video';
 export const VIDEO_PAGE_ID = 'tool-video';
@@ -318,7 +319,7 @@ export const VIDEO_ACTIONS: readonly ActionDefinition[] = [
         label: { en: '20 MB', zh: '20 MB', fr: '20 MB' },
         values: { by: 'size', maxMB: 20, quality: '720p' },
       },
-      // D-199：写上常见的限制，用户一看就知道选哪个（各平台的限制上线前再核对）。
+      // D-199: Document common limits so users immediately know which one to choose (platform limits to be verified before release).
       {
         id: '10mb',
         label: { en: '10 MB · Discord', zh: '10 MB · Discord', fr: '10 MB · Discord' },
@@ -355,7 +356,7 @@ export const VIDEO_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -388,7 +389,7 @@ export const VIDEO_ACTIONS: readonly ActionDefinition[] = [
     ],
     presets: [{ id: 'mp4', label: { en: 'MP4', zh: 'MP4', fr: 'MP4' }, values: { format: 'mp4' } }],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match: /^(?:转|转成|转换成|改成)\s*mp4(?:\s*格式)?$|^convert (?:it |them )?to mp4$/i,
@@ -397,7 +398,7 @@ export const VIDEO_ACTIONS: readonly ActionDefinition[] = [
     ],
   },
   {
-    // D-184：iOS 用系统 ImageIO 写 GIF，Android 用 morph-media 里自己写的编码器（GifEncoder.kt）。
+    // D-184: iOS uses system ImageIO to write GIFs, while Android uses a custom encoder written in morph-media (GifEncoder.kt).
     id: 'video.toGif',
     ai: '"Turn a video (clip) into a GIF" → in.videos, video.trim, then this.',
     label: { en: 'Video to GIF', zh: '视频转 GIF', fr: 'Vidéo en GIF' },
@@ -474,12 +475,12 @@ export const VIDEO_ACTIONS: readonly ActionDefinition[] = [
     fields: [],
     local: 'trimMedia',
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [{ match: /^(?:剪一段|剪视频|剪辑|截取一段)$|^trim(?: it| the video)?$/i }],
   },
 ];
 
-/** 单功能工作流（D-061）：工具页上每个一个运行卡片。 */
+/** Single-feature workflow (D-061): one run card for each on the tools page. */
 export function videoWorkflows(locale: Locale): Workflow[] {
   const wf = (id: string, name: [string, string], steps: Workflow['steps']): Workflow => ({
     id,
@@ -582,7 +583,7 @@ export function videoWorkflows(locale: Locale): Workflow[] {
       'video-convert',
       ['Convert to MP4', '转成 MP4'],
       [
-        // 每次问从相册还是从「文件」选：电脑上下载的 MKV、AVI 一般在「文件」里（D-185）。
+        // Prompts each time whether to select from the photo library or "Files": MKV and AVI files downloaded on a computer are typically located in "Files" (D-185).
         {
           id: 'pick',
           action: 'in.videos',

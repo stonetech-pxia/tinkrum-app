@@ -4,7 +4,7 @@ import { newAssetId } from '../../runtime/ids';
 import type { Kernel } from './kernel';
 import type { WorkspaceState } from './types';
 
-// 保存的预设（D-410）：只在本机数据库里，存、改名、删除都不产生版本，也不发给 AI。应用见 revisions.ts。
+// Saved presets (D-410): Stored only in local database; storing, renaming, or deleting does not generate versions, nor are they sent to AI. For application, see revisions.ts.
 
 export function createPresets({
   repo,
@@ -33,7 +33,7 @@ export function createPresets({
         config: presetSnapshot(config),
       };
       await repo.insertPreset(preset);
-      // 撤销删除会多放回一个，存之前先让那个撤销过期，总数不会超过上限。
+      // Undoing deletion puts back one more item; make that undo expire before storing so the total count never exceeds the limit.
       if (get().toast?.restorePreset) set({ toast: null });
       bump();
       return { kind: 'saved', preset };

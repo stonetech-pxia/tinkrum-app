@@ -5,8 +5,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { makePalette } from '../renderer/theme';
 import { RecordScreen } from '../run/local/RecordScreen';
 
-// 录音步骤的 autoStart（D-587）：录音页一打开就开始录，按钮是「停止并继续」，点一下就交给下一步；
-// 不写 autoStart 的录音还是点按钮开始、暂停、点「完成」。
+// autoStart for recording steps (D-587): recording starts as soon as the recording page opens,
+// button reads "Stop and continue", tapping it hands over to the next step; recordings without
+// autoStart still require tapping the button to start, pause, and tap "Finish".
 
 const frame = {
   frame: { x: 0, y: 0, width: 400, height: 800 },
@@ -31,10 +32,10 @@ async function open(autoStart: boolean) {
   return { onDone };
 }
 
-describe('录音步骤打开就开始录（D-587）', () => {
-  it('starts recording on its own, and one tap on 停止并继续 hands the recording on', async () => {
+describe('Recording step starts recording immediately upon opening (D-587)', () => {
+  it('starts recording on its own, and one tap on Stop and continue hands the recording on', async () => {
     const { onDone } = await open(true);
-    // 没有点任何东西，假的录音机就在走了。
+    // Without tapping anything, the mock recorder is already running.
     await waitFor(() => expect(screen.getByTestId('record-time')).not.toHaveTextContent('0:00'));
     expect(screen.queryByLabelText('开始录音')).toBeNull();
     expect(screen.queryByLabelText('暂停')).toBeNull();

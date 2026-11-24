@@ -3,7 +3,7 @@ import { deflateSync, Inflate, strFromU8, strToU8 } from 'fflate';
 import { MAX_APP_CONFIG_SIZE } from './config-file';
 import { SITE_URL } from './site';
 
-/** 结构放在 fragment：浏览器请求网站时不把它交给服务器。三端只用这一份编码。 */
+/** Structure is placed in the fragment: browser requests do not send it to the server. All three platforms use this single encoding format. */
 export const APP_LINK_BASE = `${SITE_URL}/open`;
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 const MAX_PAYLOAD = Math.ceil(((MAX_APP_CONFIG_SIZE + 1024) * 4) / 3);
@@ -24,7 +24,7 @@ function base64url(bytes: Uint8Array): string {
   return chunks.join('');
 }
 
-/** 只做传输编码；检查通过的文件才由检查器给出链接，接收方仍须重新校验。 */
+/** Performs transport encoding only; checked files receive links from the checker, and the receiver must still re-validate. */
 export function appLink(text: string): string {
   if (text.length > MAX_APP_CONFIG_SIZE) throw new Error('app file too large');
   const bytes = strToU8(text);
@@ -32,16 +32,16 @@ export function appLink(text: string): string {
   return `${APP_LINK_BASE}#a=${base64url(deflateSync(bytes))}`;
 }
 
-/** 聊天里一条超过这个长度的链接多半会被截断或点不开（单个 App 实测 1.2–3.5 KB，整套设置可到几十 KB）。 */
+/** Links exceeding this length in chat are likely to be truncated or fail to open (individual app measurements range from 1.2–3.5 KB, while full setups can reach tens of KB). */
 export const MAX_CHAT_LINK_LENGTH = 8000;
 
-/** 检查器给 AI 放进回答的链接：太长就不给，让 AI 只交 JSON 代码块（复制是退路）。 */
+/** Links provided by the checker for the AI to include in responses: omitted if too long, instructing the AI to provide only JSON code blocks (copying is the fallback). */
 export function chatAppLink(text: string): string | null {
   const link = appLink(text);
   return link.length <= MAX_CHAT_LINK_LENGTH ? link : null;
 }
 
-/** 不依赖 Node Buffer、浏览器 atob、TextDecoder；Hermes、Node 和网页同一条路。 */
+/** Does not depend on Node Buffer, browser atob, or TextDecoder; Hermes, Node, and web use the same path. */
 export function readAppLink(payload: string): string {
   if (
     !payload ||
@@ -71,7 +71,7 @@ export function readAppLink(payload: string): string {
     if (size > MAX_APP_CONFIG_SIZE) throw new Error('app file too large');
     chunks.push(chunk);
   });
-  // 每次只给少量压缩数据：超限时停止，不先解出整个压缩炸弹再检查。
+  // Feeds compressed data in small chunks: stops upon exceeding limits, avoiding decompressing an entire decompression bomb before checking.
   for (let i = 0; i < bytes.length; i += 64)
     inflate.push(bytes.subarray(i, i + 64), i + 64 >= bytes.length);
   const output = new Uint8Array(size);
@@ -83,7 +83,7 @@ export function readAppLink(payload: string): string {
   return strFromU8(output);
 }
 
-/** 原生意图需要在 router 丢掉 hash 之前，把已知导入地址改写为 /open?a=…；别的深链不动。 */
+/** Native intents need to rewrite known import addresses to /open?a=… before the router discards the hash; other deep links remain untouched. */
 export function appLinkPayload(path: string): string | null {
   try {
     const url = new URL(path, SITE_URL);

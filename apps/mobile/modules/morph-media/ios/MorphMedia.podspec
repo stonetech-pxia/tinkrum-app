@@ -1,5 +1,6 @@
-# 本地 Expo 模块（D-141）：在本机压缩、转格式、剪切视频和音频，取画面。
-# 用 Apple 系统框架（AVFoundation）；MP3 用 LAME 编码器（MorphLame，../lame，D-183）。
+# Local Expo module (D-141): Compresses, converts formats, cuts video and audio, and extracts frames
+# locally. Uses Apple system frameworks (AVFoundation); MP3 uses LAME encoder (MorphLame, ../lame,
+# D-183).
 
 Pod::Spec.new do |s|
   s.name           = 'MorphMedia'

@@ -21,8 +21,10 @@ import { FakeFiles, FakeVision, TINY_JPEG } from '../test-utils/fake-files';
 import { MemoryPackFs, sha256 } from '../test-utils/memory-packs';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 导入文件后新建表单（D-444）：文件里的字段名能点、规则给预设排序、本机模型只显示一行推荐。
-// 三种状态：没有模型（只有规则）、有模型（推荐）、边界（读不出文字、推荐的表已经有了、点到的是值）。
+// Create new form after importing file (D-444): field names in file are tappable, rules provide
+// preset sorting, on-device model shows only one recommendation line. Three states: no model (rules
+// only), has model (recommendations), edge cases (cannot read text, recommended table already
+// exists, tapped value).
 
 const mockAnswer = { current: 'insurance' };
 const mockGenerate = jest.fn(async () => mockAnswer.current);
@@ -91,8 +93,8 @@ async function setup(
   return { ...app, vision };
 }
 
-describe('新建表单页', () => {
-  it('没有模型：文件里的字段名能点，换行的合成一个；点了加字段，候选点了才填', async () => {
+describe('New Form Page', () => {
+  it('No model: Field names in the file are clickable, wrapped lines are merged; clicking Add Field populates only when a candidate is clicked', async () => {
     await setup(['ppocr']);
     expect(await screen.findByTestId('new-table-in-file')).toBeTruthy();
     expect(mockGenerate).not.toHaveBeenCalled();
@@ -103,19 +105,19 @@ describe('新建表单页', () => {
     expect(screen.queryByText('+ Date of')).toBeNull();
     await fireEvent.press(screen.getByText('+ Policy number'));
     expect(await screen.findByTestId('draft-field-3')).toBeTruthy();
-    // 加过的不再列出。
+    // Added ones are no longer listed.
     expect(screen.queryByText('+ Policy number')).toBeNull();
-    // 不自动填（D-394）。
+    // Do not auto-fill (D-394).
     expect(screen.getByTestId('draft-field-3').props.value).toBe('');
   });
 
-  it('有模型：只显示一行推荐，点了才换；AI 请求为零（底线 1、2）', async () => {
+  it('With model: Display only one recommendation row, click to cycle; zero AI requests (invariants 1, 2)', async () => {
     const fetchSpy = jest.spyOn(globalThis, 'fetch');
     const { store } = await setup(['ppocr', 'prefill-model']);
     expect(await screen.findByTestId('new-table-recommend')).toBeTruthy();
     expect(screen.getByText('This looks like “Insurance policies”')).toBeTruthy();
     expect(mockRelease).toHaveBeenCalled();
-    // 还没换。
+    // Not changed yet.
     expect(screen.getByTestId('new-table-name').props.value).toBe('My entries');
     await fireEvent.press(screen.getByTestId('new-table-use'));
     expect(screen.getByTestId('new-table-name').props.value).toBe('Insurance policies');
@@ -125,8 +127,8 @@ describe('新建表单页', () => {
     fetchSpy.mockRestore();
   });
 
-  // R16：推荐是读出的文字的派生值；本机模型还在想时用户自己选了类型，答案回来也不能把推荐弹回来。
-  it('模型还在想时用户自己选了类型：答案回来后推荐不再出现', async () => {
+  // R16: Recommendations are derived values of recognized text; if the user selects the type manually while the local model is still thinking, the recommendation must not pop back up when the answer returns.
+  it('User selects type while model is still thinking: Recommendation does not appear again after the answer returns', async () => {
     let answer!: (text: string) => void;
     mockGenerate.mockImplementationOnce(
       () =>
@@ -144,9 +146,10 @@ describe('新建表单页', () => {
     expect(screen.getByTestId('new-table-name').props.value).toBe('My entries');
   });
 
-  // 2026-11-09 用户测试：规则已经说「This looks like “Receipts”」，点「Use this」后
-  // 又冒出「下载本机模型来判断这是什么文件」。类型定了，这句就不再出现。
-  describe('模型没下载、可以下载', () => {
+  // 2026-11-09 user testing: The rule already said "This looks like "Receipts""; after tapping "Use
+  // this", it popped up "Download local model to determine what file this is". Once the type is
+  // set, this sentence should no longer appear.
+  describe('Model not downloaded, available for download', () => {
     beforeEach(() => {
       process.env.EXPO_PUBLIC_MORPH_PACKS_URL = 'https://packs.test';
     });
@@ -167,12 +170,12 @@ describe('新建表单页', () => {
       },
     ];
 
-    it('没有推荐时提议下载模型', async () => {
+    it('Propose downloading the model when there is no recommendation', async () => {
       await setup(['ppocr']);
       expect(await screen.findByTestId('new-table-model-need')).toBeTruthy();
     });
 
-    it('点了规则推荐的类型：不再提议下载模型', async () => {
+    it('Tapped rule-recommended type: Stop proposing model download', async () => {
       await setup(['ppocr'], undefined, receipt());
       expect(await screen.findByTestId('new-table-recommend')).toBeTruthy();
       expect(screen.queryByTestId('new-table-model-need')).toBeNull();
@@ -181,7 +184,7 @@ describe('新建表单页', () => {
       expect(screen.queryByTestId('new-table-model-need')).toBeNull();
     });
 
-    it('自己选了类型：不再提议下载模型', async () => {
+    it('Selected type manually: Stop proposing model download', async () => {
       await setup(['ppocr']);
       expect(await screen.findByTestId('new-table-model-need')).toBeTruthy();
       await fireEvent.press(screen.getByTestId('new-table-change-type'));
@@ -190,7 +193,7 @@ describe('新建表单页', () => {
     });
   });
 
-  it('文件里的字段名多：先显示前四个，「展开」看全部，「收起」回去', async () => {
+  it('Many field names in the file: Show first four initially, click "Expand" to view all, "Collapse" to return', async () => {
     const labels = ['Insurer', 'Policy number', 'Holder', 'Premium', 'Agent', 'Broker'];
     const lines = labels.map((name, i) => ({
       text: `${name}: value ${i}`,
@@ -210,13 +213,13 @@ describe('新建表单页', () => {
     expect(screen.queryAllByTestId(/^new-table-chip-\d+$/)).toHaveLength(4);
   });
 
-  it('文件里的字段名不超过四个：没有展开链接', async () => {
+  it('File field names do not exceed four: No expand link', async () => {
     await setup(['ppocr']);
     expect(await screen.findByTestId('new-table-in-file')).toBeTruthy();
     expect(screen.queryByTestId('new-table-in-file-toggle')).toBeNull();
   });
 
-  it('已经有带收据规则的表（样板「收据」）：有合计金额的文件推荐放进去，不建第二张（D-477）', async () => {
+  it('Table with receipt rules already exists (sample "Receipt"): Recommend placing files with total amounts into it instead of creating a second table (D-477)', async () => {
     const withReceipts = (locale: Locale, registry: Registry) => {
       const r = applyOps(
         createDefaultWorkspace(locale),
@@ -248,15 +251,15 @@ describe('新建表单页', () => {
         height: 20,
       }),
     );
-    // 没有本机模型：规则认出是收据。
+    // No local model: The rule recognizes it as a receipt.
     await setup(['ppocr'], withReceipts, [{ width: 600, height: 300, lines }]);
     expect(await screen.findByTestId('new-table-use-existing')).toBeTruthy();
     expect(screen.getByText('You already have “Receipts sample”. Put it there')).toBeTruthy();
     expect(screen.queryByTestId('new-table-recommend')).toBeNull();
   });
 
-  // 2026-11-09、11-10 用户测试：马币小票建成「收据」存成了美元（D-548）。
-  it('马币小票选「收据」：金额字段是 MYR；没有符号的小票照旧按界面语言', async () => {
+  // 2026-11-09, 11-10 user testing: Selecting "Receipt" for a Malaysian Ringgit receipt stored it as USD (D-548).
+  it('Malaysian Ringgit receipt selected as "Receipt": Amount field is MYR; receipts without symbols continue to use interface locale', async () => {
     const receipt = (texts: string[]): RecognizedLayer => ({
       width: 600,
       height: 300,
@@ -276,7 +279,7 @@ describe('新建表单页', () => {
     await waitFor(() => expect(money(store)).toEqual(['MYR']));
   });
 
-  it('没有货币符号的小票：金额字段按界面语言（英文是 USD）', async () => {
+  it('Receipts without currency symbols: Amount field follows interface locale (English defaults to USD)', async () => {
     const { store } = await setup(['ppocr'], undefined, [
       {
         width: 600,
@@ -303,7 +306,7 @@ describe('新建表单页', () => {
     );
   });
 
-  it('模型说都不是：没有推荐，字段名照样能点', async () => {
+  it('Model says neither: No recommendations, field names remain clickable', async () => {
     mockAnswer.current = 'none';
     await setup(['ppocr', 'prefill-model']);
     expect(await screen.findByTestId('new-table-in-file')).toBeTruthy();
@@ -312,7 +315,7 @@ describe('新建表单页', () => {
     expect(screen.queryByTestId('new-table-recommend')).toBeNull();
   });
 
-  it('规则排序：没有金额的文件，收据排到「其他」', async () => {
+  it('Rule sorting: Files without amounts place receipts under "Other"', async () => {
     await setup(['ppocr']);
     await screen.findByTestId('new-table-in-file');
     await fireEvent.press(screen.getByTestId('new-table-change-type'));
@@ -322,7 +325,7 @@ describe('新建表单页', () => {
     expect(screen.getByTestId('new-table-type-blank')).toBeTruthy();
   });
 
-  it('看原文选：两行合成一个字段；点到值时要用户起名，不把值写进配置（底线 14）', async () => {
+  it('Select from original view: Merge two lines into one field; require user naming when clicking a value, do not write values into config (invariant 14)', async () => {
     await setup(['ppocr']);
     await screen.findByTestId('new-table-in-file');
     await fireEvent.press(screen.getByTestId('new-table-original'));

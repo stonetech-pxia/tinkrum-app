@@ -6,13 +6,14 @@ import { COMPONENTS, type Component, type Locale, type WorkspaceConfig } from '.
 import { fromV33, registry, v33Fixture, workspace } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 每个登记的组件都要满足的事（新增组件时这里会自动检查它，见 docs/COMPONENTS.md）。
+// Requirements that every registered component must satisfy (automatically checked when adding a new component, see docs/COMPONENTS.md).
 
 const LOCALES: Locale[] = ['en', 'zh', 'fr'];
 
 /**
- * 外观 example 能引用的东西：数据表 expenses（记账模版的表，加一个勾选字段 paid 给清单的例子用）、
- * 已添加的工具包 pdf 和它的快捷操作。
+ * Things the example look can reference: the expenses data table (the expense tracking template
+ * table, with an added paid checkbox field for the list example), the added pdf pack and its
+ * quick action.
  */
 function fixture(locale: Locale): WorkspaceConfig {
   const config = workspace(locale, { withPdf: true });
@@ -33,7 +34,7 @@ function withExample(config: WorkspaceConfig, def: (typeof COMPONENTS)[number]):
   };
 }
 
-/** 文字属性在结构里的长度上限（可以不写的先拆掉 optional）。 */
+/** Upper length bound of text properties in the structure (remove optional first if omitted). */
 function maxLength(props: z.ZodObject, prop: string): number | null | undefined {
   const schema = props.shape[prop] as z.ZodType | undefined;
   if (!schema) return undefined;
@@ -64,7 +65,7 @@ describe.each(COMPONENTS.map((d) => [d.look, d] as const))('look %s', (_type, de
         prop: field.prop,
         max: field.max,
       });
-      // 入口的标题结构上可以不写（工具包的入口按工具包现取），长按编辑按种类列（entryEditableText）。
+      // Entry title can be omitted in the structure (tool pack entries take them dynamically), long-press editing lists by kind (entryEditableText).
       if (def.look === 'entry' && field.prop === 'title') continue;
       const shape = props.shape as Record<string, z.ZodType>;
       const optional = shape[field.prop] instanceof z.ZodOptional;

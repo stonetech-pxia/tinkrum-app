@@ -41,9 +41,10 @@ import {
 
 import { z } from 'zod';
 
-// 发给模型的提示词。系统提示词只依赖工具目录（内置的加上下载的），内容稳定，可以被缓存；
-// 每次请求变化的部分（当前配置、用户输入）放在用户消息里。
-// 只发送界面配置，不发送任何用户文件或文件名（§8：发给模型的内容尽量少）。
+// Prompt sent to the model. System prompts depend only on the tool catalog (built-in plus
+// downloaded), are stable in content, and can be cached; parts that change with each request
+// (current configuration, user input) are placed in user messages. Only interface configuration is
+// sent, without any user files or file names (§8: minimize content sent to the model).
 
 type JsonSchema = {
   type?: string;
@@ -57,7 +58,7 @@ type JsonSchema = {
   required?: string[];
 };
 
-/** 参数的可选值和范围，让模型照抄（例如 format: "jpeg"|"png"|"webp"）。 */
+/** Optional values and ranges for parameters, for the model to copy (e.g., format: "jpeg"|"png"|"webp"). */
 function describeValue(v: JsonSchema): string {
   if (v.enum) return v.enum.map((x) => JSON.stringify(x)).join('|');
   if (v.const !== undefined) return JSON.stringify(v.const);
@@ -84,7 +85,7 @@ function describeParams(schema: z.ZodType): string {
   }
 }
 
-/** 把说明切成句子（「e.g.」「i.e.」不算句号）。不用后行断言（App 在 Hermes 上生成提示词）。 */
+/** Split descriptions into sentences ("e.g." and "i.e." do not count as periods). Avoid lookbehind assertions (the app generates prompts on Hermes). */
 export function sentences(text: string): string[] {
   const out: string[] = [];
   const re = /[.!?](?=\s+[A-Z0-9“"(]|$)/g;
@@ -100,7 +101,7 @@ export function sentences(text: string): string[] {
   return out;
 }
 
-/** 参数的名字（给说明挑句子用）。 */
+/** Parameter names (used for picking sentences for descriptions). */
 function paramKeys(schema: z.ZodType): string[] {
   try {
     return Object.keys((z.toJSONSchema(schema) as JsonSchema).properties ?? {});
@@ -110,9 +111,11 @@ function paramKeys(schema: z.ZodType): string[] {
 }
 
 /**
- * 动作目录的一行：签名（输入 → 输出、参数和可选值）、说明的第一句和讲到参数的句子，再加「Use:」
- * （动作的 ai，评测证明模型需要的用法都写在这里）。说明里别的句子（数据留在本机、平台限制等给用户看的话）
- * 不发。写法在目录开头说明一次（CATALOG_LEGEND），每行不再重复。
+ * A single line for the tool catalog: signature (inputs → outputs, parameters and optional
+ * values), first sentence of description, sentence mentioning parameters, and "Use:" (action AI,
+ * evals prove model-required usages are written here). Other sentences in the description (data
+ * stays on device, platform limits, etc. meant for users) are omitted. Writing format is
+ * explained once at the start of the catalog (CATALOG_LEGEND) and not repeated per line.
  */
 function describeAction(a: ActionDefinition): string {
   const input = a.input.length === 0 ? 'start' : a.input.join('|');
@@ -133,8 +136,9 @@ function describeAction(a: ActionDefinition): string {
 const CATALOG_LEGEND = `Each action: id (input → output; start = an input action, same = the type it got) {parameters, ? = optional}: what it does. Use: the requests it answers and how to set it up. [local: X] = a step the user does by hand on the device (cropping, ordering, choosing pages, signing…): you only decide where it goes. [pack: X] = may need the X extension pack, which the app asks the user to download when the device has no built-in support.`;
 
 /**
- * 快捷操作预设的一行：ID、英文名，加步骤概要（步骤 ID:动作{可以在 params 里改的参数名}，
- * * 表示每次运行时问）。不写参数值：AI 用 addTool {tool: {preset, params?}} 添加，由 App 展开（D-259）。
+ * A single line for a quick action preset: ID, English name, plus step summary (step ID:
+ * action{parameter names modifiable in params}, * denotes asking on each run). Parameter values
+ * are omitted: AI adds via addTool {tool: {preset, params?}}, expanded by the app (D-259).
  */
 function describePreset(p: (typeof WORKFLOW_PRESETS)[number]): string {
   const steps = p
@@ -147,7 +151,7 @@ function describePreset(p: (typeof WORKFLOW_PRESETS)[number]): string {
   return `- ${p.id} “${p.name.en}”: ${steps}`;
 }
 
-/** 一种外观能挂的工具（登记表的 tools），写在说明行后面：出现方式、一键记录的种类、能引用的独立工具。 */
+/** Tools attachable to an appearance (registry tools), written after the description line: appearance mode, types of one-tap recording, and standalone tools that can be referenced. */
 function lookTools(d: (typeof COMPONENTS)[number]): string {
   const meta = d.tools;
   if (!meta) return '';
@@ -162,7 +166,7 @@ function lookTools(d: (typeof COMPONENTS)[number]): string {
   return ` [tools ≤${meta.max}: ${parts.join('; ')}]`;
 }
 
-/** 外观的分组：按读什么（登记表的 reads）。 */
+/** Appearance grouping: by what is read (registry reads). */
 const LOOK_GROUPS: readonly { reads: readonly string[]; title: string }[] = [
   {
     reads: ['none'],
@@ -179,7 +183,7 @@ const LOOK_GROUPS: readonly { reads: readonly string[]; title: string }[] = [
   },
 ];
 
-/** 外观列表：每种一行，来自 core 外观定义（components/<look>.ts）的 ai.doc 和 tools，按读什么分组。 */
+/** Appearance list: one line per type, from core appearance definitions (components/<look>.ts) ai.doc and tools, grouped by what is read. */
 function lookDocs(): string {
   const ordered = inDocOrder(COMPONENTS as readonly (typeof COMPONENTS)[number][], (d) => d.look);
   return LOOK_GROUPS.map(
@@ -191,7 +195,7 @@ function lookDocs(): string {
   ).join('\n');
 }
 
-/** 字段类型：存下来的一行、算出来的（只读）一行，来自 core 字段定义（fields/<type>.ts）的 ai.doc，用 · 隔开。 */
+/** Field types: one line for stored, one line for computed (read-only), from core field definitions (fields/<type>.ts) ai.doc, separated by ·. */
 function fieldDocs(access: 'write' | 'read'): string {
   return inDocOrder(FIELDS, (d) => d.type)
     .filter((d) => d.access === access)
@@ -199,7 +203,7 @@ function fieldDocs(access: 'write' | 'read'): string {
     .join(' · ');
 }
 
-/** 登记顺序，写了 ai.docAfter 的挪到那一项后面。 */
+/** Registration order: items specifying ai.docAfter are moved after that item. */
 function inDocOrder<D extends { ai: { docAfter?: string } }>(
   defs: readonly D[],
   name: (d: D) => string,
@@ -212,8 +216,8 @@ function inDocOrder<D extends { ai: { docAfter?: string } }>(
 }
 
 /**
- * 关系规则（v34 D-370，创始人 2026-10-30 同意）：配置检查执行，提示词里用 R1–R14 引用，
- * 和下面按编号的规则分开。
+ * Relation rules (v34 D-370, approved by the founder 2026-10-30): configuration check execution,
+ * referenced in prompts via R1-R14, separate from the numbered rules below.
  */
 const RELATION_RULES = [
   'Containers only read; they never write data.',
@@ -232,7 +236,7 @@ const RELATION_RULES = [
   'Data leaves the app (export, share, save to Files) only when the user taps it each time, never on a schedule or by itself.',
 ];
 
-/** 通用规则；外观的规则（ai.rule）和只关于一个动作的规则（动作的 aiRules）按编号插进来。 */
+/** General rules; appearance rules (ai.rule) and single-action rules (action aiRules) are inserted by number. */
 const GENERAL_RULES = `1. Change only what was asked, and do every part of it: a request often lists several changes (separated by commas or "and"); each one must appear in your ops. If some of it can't be done, do the parts that can and say in notes what wasn't done and why; never drop a part silently. Reject only when none of it can be done. A plan holds at most 30 ops: for something bigger, reply with a build plan (rule 53); when you are already doing one step of a plan, build the most important part and say in notes what to ask for next. (A goal described in the user's own words is different: see rule 22. Function and look parts of one request are split across turns: see rule 26.) Refer to pages, blocks, tables, fields, quick actions, reminders and steps by the ids in the current config. New ids: lowercase letters, digits and -, starting with a letter, not already used (quick actions and reminders share one set of ids).
 2. Only "settings" is protected: it must stay in the bottom bar or be a floating button, because the Settings page always contains the "AI" (change this app) and "History" (undo/restore) entries. "ai", "history" and "tools" may be removed from the bottom bar and floating buttons completely when the user asks; they stay reachable from Settings. If settings is left out of nav.bar, the system turns it into a floating button on its own. When the user asks to put something into a full bar (5 entries), take "history", "ai" or "tools" out to make room and say which in a note (it stays reachable from Settings). If the user asks to delete or hide Settings itself, reject with reason "protected". The app shows the "ai" entry and the AI page under the name "Tink": when the user says "Tink" they mean them, and in your notes and messages call it Tink, never "AI".
 3. Never delete user files (R9). A request to delete files is rejected with "deleteFiles". Removing an entry, a page or a tool (setPackage remove) is allowed; files are always kept.
@@ -303,8 +307,10 @@ const GENERAL_RULES = `1. Change only what was asked, and do every part of it: a
 79. Calendar cells can show a number with show.day {aggregate: "count"} or {aggregate: "sum", field: a numeric field with fixed currency}; shade follows its magnitude and show.color still wins the fill. show.span "week" draws one week of seven days starting on the Settings week start, with the selected day's entries below; default month stays unchanged. Multi-day entries → source.group {unit: "day", by: a date/datetime field, until: an end date/datetime field}: includes both ends, empty or earlier end means start only. No show.day sum with until (it would count the amount every day); count is allowed. Add here presets only the start. Picking a day and turning weeks never writes anything or changes the rest of the page.`;
 
 /**
- * 规则按用途分组，给按需加载（PromptRoute）用：core 每次都发（含办事拒绝 24、记录内容 17、
- * 功能 / 外观分两轮 26 等底线相关的规则），其余按路由挑。新规则要在这里登记，测试会查。
+ * Rules grouped by purpose for on-demand loading (PromptRoute): core is sent every time
+ * (including invariant-related rules like refusing actions 24, record content 17,
+ * function/appearance split in two rounds 26, etc.), others are selected by route. New rules must
+ * be registered here; tests will verify.
  */
 export const RULE_GROUPS = {
   core: [1, 2, 3, 4, 5, 6, 16, 17, 23, 24, 25, 26, 27, 51, 53, 57],
@@ -318,7 +324,7 @@ export const RULE_GROUPS = {
 } as const;
 export type RuleGroup = keyof typeof RULE_GROUPS;
 
-/** 省掉的规则在目录里的一句话名字。 */
+/** One-line names of omitted rules in the catalog. */
 const RULE_TITLES: Record<number, string> = {
   7: 'moving blocks',
   54: 'buttons on entry pages and lists that hand their data to a quick action',
@@ -400,9 +406,10 @@ function rules(registry: Registry, keep: (n: number) => boolean = () => true): s
 }
 
 /**
- * 按需加载：本机的路由（route.ts）按用户的话和上下文挑一种；拿不准就是 full。
- * 每种路由发哪些部分（## 标题）和哪些规则组；省掉的部分在最后列一个目录，模型需要时回 needMore，
- * 规划器换成完整的提示词再问一次。
+ * On-demand loading: local routes (route.ts) select one based on user utterance and context;
+ * default to full if unsure. Which parts (## headings) and rule groups are sent for each route;
+ * omitted parts list a catalog at the end, allowing the model to request `needMore` when needed
+ * so the planner switches to the full prompt and re-queries.
  */
 export type PromptRoute = 'full' | 'files' | 'records' | 'look' | 'style';
 export const PROMPT_ROUTES: readonly PromptRoute[] = ['full', 'files', 'records', 'look', 'style'];
@@ -443,7 +450,7 @@ const SECTION_SUMMARY: Record<PromptSection, string> = {
     'Built-in tool catalog: every quick-action step action with its parameters (photos, PDF, video, audio, scan, text recognition, translate, ZIP, QR, text, reports)',
 };
 
-/** 省掉的部分的目录：模型知道还有什么，需要时回 needMore。 */
+/** Catalog of omitted parts: lets the model know what else exists and request `needMore` when needed. */
 function omittedIndex(route: PromptRoute): string {
   const parts = ROUTE_PARTS[route];
   const sections = ALL_SECTIONS.filter((s) => !parts.sections.includes(s));
@@ -461,7 +468,7 @@ If the request needs any of them, or you are not sure, reply with exactly {"kind
 
 const promptCache = new WeakMap<Registry, { revision: number; texts: Map<PromptRoute, string> }>();
 
-/** 系统提示词；注册表加入或替换了下载的工具（registryRevision 变了）时重新生成。每种路由缓存一份。 */
+/** System prompt; regenerated when the registry adds or replaces downloaded tools (registryRevision changes). Cached per route type. */
 export function systemPromptFor(registry: Registry, route: PromptRoute = 'full'): string {
   const revision = registryRevision(registry);
   let cached = promptCache.get(registry);
@@ -477,7 +484,7 @@ export function systemPromptFor(registry: Registry, route: PromptRoute = 'full')
   return text;
 }
 
-/** 一种路由的提示词：完整提示词按「## 」标题切开，留下这种路由要的部分，规则只留它的组，最后加目录。 */
+/** Prompt for a given route: full prompt is split by "## " headings, keeping parts required by that route, filtering rules to its group, and appending the catalog at the end. */
 export function buildSystemPrompt(registry: Registry, route: PromptRoute = 'full'): string {
   if (route === 'full') return buildFullPrompt(registry);
   const parts = ROUTE_PARTS[route];
@@ -494,7 +501,7 @@ export function buildSystemPrompt(registry: Registry, route: PromptRoute = 'full
 function buildFullPrompt(registry: Registry, keepRule?: (n: number) => boolean): string {
   const tools = [...registry.tools.values()]
     .map((tool) => {
-      // 下载的数据工具没有自己的动作，只带几个组合已有动作的快捷操作（D-177）。
+      // Downloaded data tools have no actions of their own, only a few quick actions combining existing actions (D-177).
       if (tool.actions.length === 0) {
         const quick = tool
           .createWorkflows('en')
@@ -647,7 +654,7 @@ Core actions available to every quick action:
 ${coreActions}`;
 }
 
-/** 同一份草稿里之前说过的话（rule 27，D-207）：用户自己说的话和当时的回复，不含记录或文件内容。 */
+/** Dialogue history from the same draft (rule 27, D-207): what the user said and responses at the time, excluding record or file contents. */
 function describeEarlier(earlier: readonly PlanEarlier[] | undefined): string {
   if (!earlier?.length) return '';
   const lines = earlier.map(
@@ -657,8 +664,9 @@ function describeEarlier(earlier: readonly PlanEarlier[] | undefined): string {
 }
 
 /**
- * 工具清单（rule 53，D-414）：目标、没做完的项、最近几句。只有用户说的话、计划里的一句话和配置结构。
- * 总长不超过 SESSION_CHAR_LIMIT，超了先丢最旧的话，再丢最旧的项。
+ * Tool checklist (rule 53, D-414): goal, pending items, recent turns. Only user utterances, a
+ * sentence from the plan, and configuration structure. Total length must not exceed
+ * SESSION_CHAR_LIMIT; if exceeded, oldest utterances are dropped first, followed by oldest items.
  */
 function describeSession(session: PlanSession | undefined): string {
   if (!session) return '';
@@ -686,7 +694,7 @@ function describeSession(session: PlanSession | undefined): string {
   return body ? `\n\n<session>\n${body}\n</session>` : '';
 }
 
-/** 在一个 app 里打开的 Tink（rule 57）：看不到的东西占着的 ID（只有 ID）。 */
+/** Tink opened within an app (rule 57): IDs occupied by invisible items (IDs only). */
 export interface AppScope {
   appId: string;
   hidden: { pages: string[]; tables: string[]; tools: string[]; apps: string[] };
@@ -698,7 +706,7 @@ function describeScope(config: WorkspaceConfig, scope: AppScope | undefined): st
   return `\n\n<context>inside app "${scope.appId}" (“${app?.name ?? scope.appId}”): you can change only this app. Ids already used outside it (do not reuse): ${JSON.stringify(scope.hidden)}</context>`;
 }
 
-/** 用户从哪里打开 AI（rule 25）：只有配置里的 id 和名字，或文件的种类和个数；没有记录和文件名。 */
+/** Where the user opened the AI from (rule 25): only configuration IDs and names, or file types and counts; no records or file names. */
 function describeAbout(
   config: WorkspaceConfig,
   about: PlanAbout | undefined,
@@ -718,7 +726,7 @@ function describeAbout(
     return `\n\n<context>built-in screen: ${about.screen === 'tools' ? 'tools' : 'quick actions'}</context>`;
   }
   if (about.kind === 'desk') {
-    // 用户要加减按钮时得知道现在有哪些：默认工具栏不在配置里（D-359），这里只写这一种文件的。
+    // Users need to know current items when adding or removing buttons: default toolbar is not in configuration (D-359), only file-related items are listed here.
     const layout = resolveDeskLayout(config.containers.desk);
     const toolbar = registry
       ? deskToolbar(about.fileKind, layout.tools, registry, quickActionsOf(config), locale).map(
@@ -773,7 +781,7 @@ export function buildRepairMessage(issues: readonly string[]): string {
   return `That reply was rejected by the app's validator:\n${issues.map((i) => `- ${i}`).join('\n')}\nReply with a corrected plan for the same request, as one JSON object only.`;
 }
 
-/** 计划合法，但工具还不能用（工具检查，AGENT_PLAN §3.6）。 */
+/** Plan is valid, but the tool is not yet usable (tool check, AGENT_PLAN §3.6). */
 export function buildToolRepairMessage(issues: readonly string[]): string {
   return `That plan is valid, but what it builds can't be used yet (a fix that adds pages or blocks is a look change: when your ops are function changes, keep them as they are and put that fix in next instead of ops):\n${issues.map((i) => `- ${i}`).join('\n')}\nReply with the complete plan for the same request again, with these fixed: every op, not only the fixes, as one JSON object only. Do only what the user asked. If something really can't be done, leave it out and say so in notes.`;
 }

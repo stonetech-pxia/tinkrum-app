@@ -39,7 +39,7 @@ describe('layout store', () => {
   it('round-trips through app_meta and counts layouts', () => {
     const store = putLayout(putLayout({}, 'expenses', layout('a')), 'bills', layout('b'));
     expect(layoutCount(parseLayoutStore(serializeLayoutStore(store)))).toBe(2);
-    // 同一个版式再学一次：换掉，不重复。
+    // Learn the same layout again: replace it, do not duplicate.
     expect(layoutCount(putLayout(store, 'expenses', layout('a')))).toBe(2);
   });
 
@@ -72,7 +72,7 @@ describe('layout store', () => {
         JSON.stringify({ format: 'morph-prefill-memory', version: 99, tables: {} }),
       ),
     ).toBeNull();
-    // 别的 Tinkrum 文件（App 配置）也不当成预填记忆。
+    // Other Tinkrum files (app configs) are not treated as prefilled memory.
     expect(readLayoutStoreFile(appConfigFile(createDefaultWorkspace('en'), new Date()))).toBeNull();
   });
 });
@@ -88,7 +88,7 @@ describe('app config file', () => {
   });
 });
 
-describe('点过的候选：学过的标签', () => {
+describe('Clicked candidates: learned tags', () => {
   const pick = {
     label: 'startAt',
     relY: 0.2,
@@ -98,13 +98,13 @@ describe('点过的候选：学过的标签', () => {
     ],
   };
 
-  it('存进去、读出来一样；导出的文件能恢复', () => {
+  it('Stored and read are identical; exported files can be restored', () => {
     const store = putPick({}, 't', 'f', pick);
     expect(parsePickStore(serializePickStore(store))).toEqual(store);
     expect(readPickStoreFile(layoutStoreFile({}, new Date(0), store))).toEqual(store);
   });
 
-  it('第 2 版的文件（一个字段只有一个标签）还能读', () => {
+  it('Version 2 files (one tag per field) can still be read', () => {
     const old = JSON.stringify({
       format: LAYOUT_FILE_FORMAT,
       version: 2,
@@ -114,7 +114,7 @@ describe('点过的候选：学过的标签', () => {
     expect(readPickStoreFile(old)).toEqual({ t: { f: { label: 'Date', relY: 0.1 } } });
   });
 
-  it('坏的记忆丢掉', () => {
+  it('Discard bad memory', () => {
     const raw = JSON.stringify({ t: { f: { label: 'x', relY: 0.1, labels: [{ label: 1 }] } } });
     expect(parsePickStore(raw)).toEqual({});
   });

@@ -12,8 +12,9 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 字段类型登记表重构的基线（2026-10-27）：每种字段的输入控件和在列表里的显示。
-// 重构只换写法，显示的文字必须不变（只快照文字，不快照整棵树）。
+// Baseline for field type registry refactoring (2027-10-27): Input controls and list display for
+// each field type. Refactoring changes code structure only; displayed text must remain unchanged
+// (snapshot text only, not the entire tree).
 
 const FIELDS: Field[] = [
   { id: 't', name: 'Title', type: 'text' },
@@ -119,8 +120,9 @@ it.each(['zh', 'en', 'fr'] as const)('field inputs and list display in %s', asyn
 type Node = { type: string; props: Record<string, unknown>; children: (Node | string)[] | null };
 
 /**
- * 页面上每个组件、表单项和记录显示的文字（一行一个），代替整棵树的快照（架构清理，2026-10-27）：
- * 字段的输入控件和列表显示在这里锁住；样式和布局由组件、字段登记表的测试管。
+ * Text displayed for each component, form item, and record on the page (one per line), replacing
+ * whole-tree snapshots (architectural cleanup, 2027-10-27): field input controls and list
+ * displays are locked here; styles and layouts are managed by component and field registry tests.
  */
 function visibleText(tree: unknown): string {
   const lines: string[] = [];

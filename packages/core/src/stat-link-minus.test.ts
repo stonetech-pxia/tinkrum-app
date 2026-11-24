@@ -7,7 +7,7 @@ import type { Collection, NewComponent } from './schema';
 import { minusValue } from './stat-minus';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 
-// 统计和图表按引用字段分组（D-336）、统计相减（D-337）。例子是零基预算：分类、分配、流水三张表。
+// Statistics and charts grouped by reference field (D-336), stat minus (D-337). Example is zero-based budgeting: categories, allocations, and transactions three tables.
 
 const categories: Collection = {
   id: 'categories',
@@ -89,9 +89,9 @@ describe('grouping by a link field (D-336)', () => {
     ).toEqual([
       { optionId: 'food', label: 'Food', count: 2, value: 42.5 },
       { optionId: 'rent', label: 'Rent', count: 1, value: 900 },
-      // 没有记录的分类也列出来（和单选的选项一样）。
+      // Categories without records are also listed (same as single-select options).
       { optionId: 'fun', label: 'Fun', count: 0, value: 0 },
-      // 没选的、指向已删除记录的算「未选」。
+      // Unselected items and pointers to deleted records are counted as "None".
       { optionId: null, label: 'None', count: 2, value: 12 },
     ]);
   });
@@ -147,7 +147,7 @@ describe('stat minus another total (D-337)', () => {
       rec('assigned', { amount: -50 }),
     ];
     expect(minusValue(3000, allAssigned as never, assigned, records, ctx.now)).toBe(249.75);
-    // 被减的一方也能筛选（只减本月分配的）。
+    // The subtracted side can also be filtered (only subtract this month's allocations).
     expect(
       minusValue(
         3000,
@@ -157,7 +157,7 @@ describe('stat minus another total (D-337)', () => {
         ctx.now,
       ),
     ).toBe(2199.75);
-    // 计数相减：没有被减的记录时就是原来的数。
+    // Count subtraction: when there are no subtracted records, it remains the original number.
     expect(
       minusValue(4, { table: 'assigned', aggregate: 'count' } as never, assigned, [], ctx.now),
     ).toBe(4);

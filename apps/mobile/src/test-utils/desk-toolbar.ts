@@ -1,11 +1,11 @@
 import { fireEvent, within } from '@testing-library/react-native';
 import { screen } from 'expo-router/testing-library';
 
-// 桌面工具栏有几组时，下面只排选中的那一组：测试要先点上面的页签。
+// When the desk toolbar has multiple groups, only the selected group is laid out below: tests must tap the tab above first.
 
 const tabCount = () => screen.queryAllByTestId(/^desk-tab-\d+$/).length;
 
-/** 每一组里的工具（testID），按页签的顺序接起来。 */
+/** Tools (testID) within each group, concatenated in tab order. */
 export async function allDeskTools(): Promise<string[]> {
   const ids = () =>
     within(screen.getByTestId('desk-toolbar'))
@@ -22,7 +22,7 @@ export async function allDeskTools(): Promise<string[]> {
   return all;
 }
 
-/** 点到这个工具所在的页签，返回这个工具。 */
+/** Tap the tab containing this tool and return the tool. */
 export async function deskTool(testId: string) {
   await screen.findByTestId('desk-toolbar');
   const n = tabCount();

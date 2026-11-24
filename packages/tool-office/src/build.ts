@@ -22,15 +22,19 @@ import type {
   TablePage,
 } from './types';
 
-// 一页：线 → 表格区域 → 网格和合并单元格 → 文字行放进格子 → 表外的文字分段（D-272）。
-// 都在拉正后的坐标里算（x' = x + y·t，y' = y − x·t），存进 TablePage 前换回原图的坐标（截图核对用）。
+// Single page: lines -> table area -> grid and merged cells -> text lines placed into cells ->
+// non-table text segmented (D-272). Computed in rectified coordinates (x' = x + y*t, y' = y - x*t),
+// converted back to original image coordinates before storing in TablePage (for screenshot
+// verification).
 
 export interface BuildOptions {
-  /** 同一格（或同一段）里的几行接成文字；App 里用 D-268 的 layoutOcrLines 加上按语言整理。 */
+  /** Join lines in the same cell (or paragraph) into text; App uses layoutOcrLines from D-268 plus language-based formatting. */
   joinLines?: (lines: readonly OcrBox[]) => string;
   /**
-   * 每张表放进格子的识别行（传进来的对象）：转 Word 时没放进表的行照样排成正文（D-501）。
-   * chopped 是被列线从一个词中间切开的行数（D-502）：真的表里字不跨列线，跨了多半是网格认错了。
+   * Recognition lines placed into cells for each table (passed-in object): rows not placed into
+   * tables during Word export are still arranged as body text (D-501). chopped is the number of
+   * lines cut from the middle of a word by column lines (D-502): characters do not cross column
+   * lines in real tables; crossings usually indicate grid misrecognition.
    */
   onTable?: (
     table: TableBlock,
@@ -38,37 +42,41 @@ export interface BuildOptions {
     check: { chopped: number; ruled: boolean; framedText?: boolean },
   ) => void;
   /**
-   * 带线的表以外也认没有线的表（D-506：和转 Word 同一套规则，D-471、D-502、D-503），默认认。
-   * 转 Word 自己在去掉竖排、零星的字以后再认，不在这里认。
+   * Recognize borderless tables in addition to lined tables (D-506: same rule set as Word export,
+   * D-471, D-502, D-503), enabled by default. Word export performs its own recognition after
+   * removing vertical text and sporadic characters, not here.
    */
   textTables?: boolean;
   /**
-   * 转 Excel（D-520–D-522）：用版面分析的区域（图片区域剪成图片块、不当表格的网格里的字排成文字）、
-   * 表外的字按转 Word 的并排规则分栏、估每块字和每张表的字号和粗体。不给时表外的字照旧每段一行（转 Word 自己排）。
+   * Excel export (D-520-D-522): use layout analysis regions (image regions clipped into image
+   * blocks, text in non-table grids arranged as text), non-table text split into columns using
+   * Word export side-by-side rules, estimate font size and boldness for each text block and
+   * table. When omitted, non-table text defaults to one paragraph per line (handled by Word
+   * export).
    */
   arrange?: boolean;
-  /** 很浅的表格线也找（findLines 的 light）：只给转 Word，转 Excel 不变。 */
+  /** Detect very faint table lines (findLines light): passed only to Word export, Excel export unchanged. */
   lightRules?: boolean;
-  /** 共用外框、上下叠着的几张表分开（findTables 的 splitStacked）：只给转 Word。 */
+  /** Separate vertically stacked tables sharing an outer border (findTables splitStacked): passed only to Word export. */
   splitStacked?: boolean;
-  /** 横竖线画满、里面一个字也没有的网格，紧挨在上面的一排字是它的表头（转 Word 用，withHeaderAbove）。 */
+  /** Grids filled with horizontal/vertical lines but containing no characters use the text row immediately above as their header (for Word export, withHeaderAbove). */
   headerAbove?: boolean;
 }
 
 export interface PageInput {
-  /** 找线用的图（增强后的那张，没有增强过就是原图）。 */
+  /** Image used for line detection (enhanced version, or original if not enhanced). */
   image: RgbaImage;
-  /** 识别出的行，坐标和 image 一样。 */
+  /** Recognized lines, with coordinates matching image. */
   lines: readonly OcrBox[];
   name: string;
   source: string;
-  /** 版面分析的区域（arrange 时用；没有时只按位置排）。 */
+  /** Layout analysis regions (used when arrange is enabled; otherwise arranged by position only). */
   regions?: readonly LayoutRegion[];
-  /** 已知的倾斜角（度）；增强过的图已经拉正，给 0。不给时估一个。 */
+  /** Known tilt angle (degrees); enhanced images are already rectified, pass 0. Estimated when omitted. */
   skew?: number;
 }
 
-/** 网格的一条边界：lined 是有线的（没有线的是按文字空隙或文字行分出来的，两边不合并）。 */
+/** A grid boundary: lined indicates presence of lines (borderless boundaries split by text gaps or text lines do not merge across). */
 export interface Boundary {
   pos: number;
   lined: boolean;
@@ -77,45 +85,45 @@ export interface Boundary {
 export interface Grid {
   xs: Boundary[];
   ys: Boundary[];
-  /** 每个位置属于哪个格子（r * cols + c → cells 的下标）。 */
+  /** Cell ownership for each position (r * cols + c -> index in cells). */
   owner: Int32Array;
   cells: TableCell[];
-  /** 只是一个框着几行字的框，不是表（EU 样本 075）。 */
+  /** A box enclosing a few lines of text, not a table (EU sample 075). */
   framedText?: boolean;
 }
 
-/** 一个边上有线的长度不到一半就合并两边的格子。 */
+/** Merge adjacent cells if the line length on a shared side is less than half. */
 const MERGE_COVERAGE = 0.5;
-/** 至少这么多比例的文字行都在同一处空着，就是一条列分隔（只有横线的表）。 */
+/** Considered a column separator if at least this proportion of text lines are blank at the same location (tables with horizontal lines only). */
 const GAP_ROW_SHARE = 0.6;
-/** 列分隔的空隙至少是行高的这么多倍（比词和词之间的空格宽）。 */
+/** Column separator gap must be at least this many times the line height (wider than spaces between words). */
 const GAP_MIN_HEIGHTS = 0.6;
-/** 竖线盖住、没有横线的一段至少有这么多排字才按排分行。 */
+/** A region covered by vertical lines and lacking horizontal lines must have at least this many text rows to split by row. */
 const SPLIT_MIN_ROWS = 3;
-/** 一张表最多这么多格；更多的（方格纸）不当成表。 */
+/** Maximum number of cells per table; tables exceeding this (graph paper) are not treated as tables. */
 const MAX_TABLE_CELLS = 5000;
-/** 段落：上下间距不超过 1.2 倍行高的算同一段（和 D-268 一样）。 */
+/** Paragraph: vertical spacing not exceeding 1.2 times line height counts as the same paragraph (same as D-268). */
 const PARAGRAPH_GAP = 1.2;
 
-/** 各张表的列线相差不到长边的这么多（1%）就对齐成整页共用的同一条列线（比单张表里去重的 0.8% 稍宽）。 */
+/** Column lines of different tables differing by less than this fraction (1%) of the long side are aligned into a page-shared column line (slightly wider than 0.8% deduplication within a single table). */
 const SHARED_COLUMN_SHARE = 0.01;
-/** 没有表时，表外的文字从 A 列合并到 D 列。 */
+/** When no table exists, non-table text is merged from column A to D. */
 const TEXT_ONLY_COLS = 4;
-/** 对齐：文字两边的空白加起来不到一个行高时（字差不多占满格子）看不出对齐。 */
+/** Alignment: alignment is imperceptible when the combined margins on both sides of the text are less than one line height (text nearly fills the cell). */
 const ALIGN_MIN_SLACK = 1;
-/** 左右空白之差占两边空白之和的比例超过这么多算靠一边，不到算居中。 */
+/** Ratio of the difference between left and right whitespace to the sum of both sides' whitespace; exceeding this is considered aligned to one side, otherwise centered. */
 const ALIGN_SIDE_SHARE = 0.35;
 
-/** 认成线的粗体字：横线在一行字的框里（上下都离框边至少 20% 行高），大半截在框的左右范围里。 */
+/** Bold characters misidentified as lines: horizontal lines inside a line box (both top and bottom are at least 20% of the line height away from the box edges), with a large majority falling within the horizontal range of the box. */
 const STROKE_INSIDE = 0.2;
 const STROKE_SHARE = 0.7;
-/** 线和线算连在一起（和 lines.ts 的 TOUCH_SHARE 一样）：端点离另一条线不超过长边的 0.5%。 */
+/** Lines considered connected (same as TOUCH_SHARE in lines.ts): endpoints are no further than 0.5% of the long side from the other line. */
 const STROKE_TOUCH_SHARE = 0.005;
 const STROKE_MIN_JOINED = 3;
 const STROKE_RULE_SHARE = 0.3;
-/** 切口两边的字距比平常大这么多倍就是两段字之间的空隙，不是一个词的中间。 */
+/** Inter-word gap indicating a gap between two text segments rather than the middle of a word when the distance between both sides of a cut is larger than normal by this multiple. */
 const CHOP_GAP = 1.8;
-/** 没有线的表最外两条列线往外最多挪这么多个行高去对上别的表的列线（D-506，和 D-471 列间距的上限一样）。 */
+/** Maximum number of line heights outermost column lines of a table without lines can be shifted outward to align with column lines of other tables (D-506, same as the upper limit for column spacing in D-471). */
 const SNAP_REACH = 3;
 
 const median = (values: readonly number[]) => {
@@ -126,7 +134,7 @@ const median = (values: readonly number[]) => {
 const centerX = (b: Box) => b.x + b.width / 2;
 const centerY = (b: Box) => b.y + b.height / 2;
 
-/** 按竖直方向的重叠分成一排一排（和 D-268 的规则一样），每排从左到右。 */
+/** Grouped into rows by vertical overlap (same rule as D-268), with each row ordered from left to right. */
 function textRows<T extends Box>(lines: readonly T[]): T[][] {
   const sorted = [...lines].sort((a, b) => centerY(a) - centerY(b));
   const rows: T[][] = [];
@@ -146,10 +154,11 @@ function textRows<T extends Box>(lines: readonly T[]): T[][] {
   return rows;
 }
 
-/** 默认的接法：同一排用空格接，排和排之间换行。 */
+/** Default joining method: join items in the same row with spaces, and separate rows with newlines. */
 /**
- * 识别把一条虚线、双线读成的字：至少两个「=」「_」「-」这类记号，其余的字（夹进来的杂字）不超过一半；
- * 只有一两个「-」的不算（格子里表示「无」的短横）。
+ * Recognize text that reads a dashed or double line: at least two symbols like `=`, `_`, `-`,
+ * with miscellaneous characters making up no more than half; one or two `-` characters are
+ * excluded (short dashes in grid cells representing "none").
  */
 export function isRuleText(text: string): boolean {
   const chars = [...text.replace(/\s/g, '')];
@@ -167,7 +176,7 @@ function defaultJoin(lines: readonly OcrBox[]): string {
     .join('\n');
 }
 
-/** 去掉挨得很近的重复位置（双线、同一条线的两段）。 */
+/** Remove closely spaced duplicate positions (double lines, two segments of the same line). */
 function dedupe(values: readonly number[], tol: number): number[] {
   const out: number[] = [];
   for (const v of [...values].sort((a, b) => a - b)) {
@@ -177,7 +186,7 @@ function dedupe(values: readonly number[], tol: number): number[] {
   return out;
 }
 
-/** 有线的长度占 [a, b] 的比例（端点各缩进一点，交叉处不算）。 */
+/** Ratio of the line's length to [a, b] (endpoints slightly indented, intersections excluded). */
 function coverage(lines: readonly RuleLine[], pos: number, a: number, b: number, tol: number) {
   const spans: [number, number][] = [];
   for (const l of lines) {
@@ -189,7 +198,7 @@ function coverage(lines: readonly RuleLine[], pos: number, a: number, b: number,
   return length > 0 ? coveredLength(spans, a + shrink, b - shrink) / length : 0;
 }
 
-/** 只有横线的表：所有文字行在 x 方向的空白缝，至少 60% 的行都空着的地方是列分隔。 */
+/** Tables with horizontal lines only: whitespace gaps in the x-direction across all text lines; column separators are places where at least 60% of the lines are empty. */
 function gapColumns(lines: readonly OcrBox[], left: number, right: number, lineHeight: number) {
   const rows = textRows(lines);
   if (rows.length < 2) return [];
@@ -222,8 +231,9 @@ function gapColumns(lines: readonly OcrBox[], left: number, right: number, lineH
 }
 
 /**
- * 框里的字按字的空隙能分成几列，而且至少一半的排在两列以上有字（键值对、一排一项的清单）：
- * 这样才按排分成一行一格。
+ * Framed text that can be split into columns by word gaps, with at least half of the rows having
+ * text in more than two columns (key-value pairs, single-item-per-row lists): only then is it
+ * divided into rows and cells by row.
  */
 function alignedRows(lines: readonly OcrBox[], left: number, right: number, lineHeight: number) {
   const gaps = gapColumns(lines, left, right, lineHeight);
@@ -240,36 +250,36 @@ const indexOf = (bounds: readonly Boundary[], v: number) => {
   return i;
 };
 
-/** 只有四条边的框里至少这么多排字，才是框着一段文字的框（一行字的填写框、带底色的格子照旧当表）。 */
+/** A box with only four sides is considered to contain a block of text (single-line input boxes, colored grid cells are still treated as tables) only if it contains at least this many rows of text. */
 const FRAME_TEXT_ROWS = 3;
-/** 其中至少这么多排是一整行宽的字（折行的正文）。 */
+/** At least this many rows are full-width text (wrapped body text). */
 const FRAME_WIDE_ROWS = 2;
 
-/** 框里的字至少这么多排、至少这么多排是一整行宽的字（一个识别框占框宽的这么多），才算一段正文。 */
+/** A prose block is counted only if the box contains at least this many rows, and at least this many rows are full-width text (taking up this fraction of the box width). */
 const PROSE_MIN_ROWS = 2;
 const PROSE_WIDE_SHARE = 2 / 3;
 const PROSE_LINE_WIDTH = 0.6;
 
-/** 一排就是一个很宽的识别框（几栏、键值对的一排是隔开的几块）：有几排。 */
+/** Count of rows where a single row is a very wide OCR box (multiple columns, or key-value pairs split into separate blocks). */
 function wideRows(lines: readonly OcrBox[], width: number): number {
   return textRows(lines).filter(
     (row) => row.length === 1 && row[0]!.width >= PROSE_LINE_WIDTH * width,
   ).length;
 }
 
-/** 框里的字是正文：大多数排是一整行宽的字。 */
+/** Text in the box is prose: the majority of rows are full-width text. */
 function isProse(lines: readonly OcrBox[], width: number): boolean {
   const rows = textRows(lines).length;
   return rows >= PROSE_MIN_ROWS && wideRows(lines, width) >= PROSE_WIDE_SHARE * rows;
 }
 
-/** 一行字大半是数字（金额、日期、编号、百分比）。 */
+/** A line of text is predominantly numeric (amounts, dates, serial numbers, percentages). */
 function isNumber(text: string): boolean {
   const s = text.replace(/\s/g, '');
   return s.length > 0 && (s.match(/\d/g)?.length ?? 0) >= 0.5 * s.length;
 }
 
-/** 一张表的网格：横线定行，竖线定列（没有中间的竖线时按文字空隙分列），边上线不够的两格合并。 */
+/** Grid of a table: horizontal lines define rows, vertical lines define columns (or column spacing based on word gaps when intermediate vertical lines are missing), and two cells with insufficient boundary lines are merged. */
 function buildGrid(
   table: TableLines,
   lines: readonly OcrBox[],
@@ -279,14 +289,16 @@ function buildGrid(
   const { hs, vs, box } = table;
   const left = box.x;
   const right = box.x + box.width;
-  // 行。
+  // Rows.
   let ys: Boundary[] = dedupe(
     hs.map((h) => h.pos),
     tol,
   ).map((pos) => ({ pos, lined: true }));
   if (vs.length) {
-    // 按左右边框的竖线往上下伸（D-501）：中间的列线伸出去的一截常常是接上了表格外面字的笔画
-    // （工资单底下紧挨着的一行页脚），会把表外的字圈进来。没有边框的竖线时看所有的竖线。
+    // Extend vertical lines of left and right borders up and down (D-501): intermediate column line
+    // extensions often pick up strokes of text outside the table (such as a footer line immediately
+    // below a payslip), pulling external text into the frame. When vertical lines lack borders, all
+    // vertical lines are considered.
     const sides = vs.filter((v) => v.pos <= left + tol || v.pos >= right - tol);
     const ends = sides.length ? sides : vs;
     const top = Math.min(...ends.map((v) => v.from));
@@ -294,7 +306,7 @@ function buildGrid(
     if (top < ys[0]!.pos - tol) ys.unshift({ pos: top, lined: false });
     if (bottom > ys.at(-1)!.pos + tol) ys.push({ pos: bottom, lined: false });
   }
-  // 列。
+  // Columns.
   let xs: Boundary[] = dedupe(
     vs.map((v) => v.pos),
     tol,
@@ -302,19 +314,25 @@ function buildGrid(
   if (!xs.length || xs[0]!.pos > left + tol) xs.unshift({ pos: left, lined: false });
   if (xs.at(-1)!.pos < right - tol) xs.push({ pos: right, lined: false });
   const inner = vs.filter((v) => v.pos > xs[0]!.pos + tol && v.pos < xs.at(-1)!.pos - tol);
-  // 没有竖线盖住的行（只有横线的表，或者表头下面没有竖线的部分）：两边不合并，一格里有几排字就分成几行。
+  // Rows not covered by vertical lines (tables with horizontal lines only, or the unvertical-lined section below a header): do not merge sides, split into as many rows as there are text lines in a cell.
   const bandCovered = (a: number, b: number) =>
     inner.some((v) => Math.min(v.to, b) - Math.max(v.from, a) >= 0.5 * (b - a));
   const covered = ys.slice(0, -1).map((y, r) => bandCovered(y.pos, ys[r + 1]!.pos));
   const firstCovered = covered.indexOf(true);
   const lastCovered = covered.lastIndexOf(true);
-  // 四边有框、里面没有列线、字是一段一段的正文（Cerfa 表格上的提示框，EU 样本 038）：是框起来的一段话，
-  // 不按排分成一行一格（一行字一格，改一个字整段就乱了），也不按字的空隙分列。
+  // Four-sided frames with no internal column lines and text structured as prose paragraphs
+  // (tooltip boxes on Cerfa forms, EU sample 038): treated as a boxed paragraph rather than split
+  // into single-line grid cells (where editing one word breaks the whole paragraph), and not split
+  // into columns by word gaps.
   const framedProse =
     !inner.length && xs[0]!.lined && xs.at(-1)!.lined && isProse(lines, right - left);
-  // 只有四条边的框（里面没有一条线），框着折行的正文（至少两排是一整行宽的字），字也不是一排一排对成几列的
-  // （一封信：地址、称呼、几段正文，EU 样本 075）：这只是个框，不是表。照旧按排分好交出去，转 Word 不当表，
-  // 字放回正文（见 framedText）。只有短标签的框（病假单上没认出里面细线的「Krankenkasse」框，EU 样本 061）照旧。
+  // Four-sided frames (with no internal lines) containing wrapped body text (at least two rows of
+  // full-width text), where text is not aligned into columns row by row (a letter: address,
+  // salutation, paragraphs of body text, EU sample 075): this is just a frame, not a table.
+  // Exported by splitting into rows as usual, converted to Word without treating as a table, and
+  // text is returned to body prose (see framedText). Frames with only short labels (e.g.,
+  // "Krankenkasse" frame on sick leaves where fine internal lines were not recognized, EU sample
+  // 061) remain unchanged.
   const framedText =
     !framedProse &&
     !inner.length &&
@@ -328,14 +346,15 @@ function buildGrid(
     !framedProse && (firstCovered < 0 || r < firstCovered || r > lastCovered);
   const split: Boundary[] = [ys[0]!];
   const open: boolean[] = [];
-  // 按排分出来的行，竖线够不够长按分之前的那一段算（弯的线、断线在一小行里容易不够一半）。
+  // Rows split by row; whether vertical lines are long enough is evaluated based on the pre-split segment (curved lines or broken lines in short rows might otherwise fall short of half).
   const parentBand: ([number, number] | null)[] = [];
   for (let r = 0; r < ys.length - 1; r++) {
     const a = ys[r]!.pos;
     const b = ys[r + 1]!.pos;
     const inBand = lines.filter((l) => centerY(l) >= a && centerY(l) < b);
-    // 上下的横线在这一列没画（左边一大格跨好几排：电费单黄底的「QUOTA FISSA」，EU 样本 057）：
-    // 这一列的字属于跨排的大格，不按它分排。
+    // Upper and lower horizontal lines are not drawn in this column (a large left cell spanning
+    // multiple rows: yellow-backed "QUOTA FISSA" on electricity bills, EU sample 057): text in this
+    // column belongs to the multi-row spanning cell and is not used for row splitting.
     const spans = (c: number) =>
       [ys[r]!, ys[r + 1]!].some(
         (y) => y.lined && coverage(hs, y.pos, xs[c]!.pos, xs[c + 1]!.pos, tol) < MERGE_COVERAGE,
@@ -343,7 +362,7 @@ function buildGrid(
     const rows = textRows(
       isOpen(r) ? inBand : inBand.filter((l) => !spans(indexOf(xs, centerX(l)))),
     );
-    // 上下两排字中间的位置。
+    // Position between the upper and lower text rows.
     const between = (i: number) =>
       (Math.max(...rows[i - 1]!.map((l) => l.y + l.height)) +
         Math.min(...rows[i]!.map((l) => l.y))) /
@@ -356,12 +375,14 @@ function buildGrid(
         parentBand.push(null);
       }
     } else if (rows.length >= SPLIT_MIN_ROWS) {
-      // 竖线盖住、中间没有横线的一段（工资单、账单的表身）：一半以上有字的列里都有几排字，
-      // 而且至少一半的排在两列以上有字（一排一项），就按排分行。
-      // 只有个别列里有几排（一格里折行的字）、只有两排（折成两行的表头）、
-      // 多数排只有一列有字（表单一格里的几行地址，别的列空着，D-333）不分。
+      // Segments covered by vertical lines with no horizontal lines in between (payslips, bill
+      // bodies): split into rows if more than half of the text-containing columns have multiple
+      // text rows, and at least half of the rows have text in more than two columns (one item per
+      // row). Excluded: cases with text rows in only individual columns (wrapped text in a cell),
+      // only two rows (two-line table headers), or most rows having text in only a single column
+      // (multiline address in a single table cell with other columns empty, D-333).
       const rowsByCol = new Map<number, Set<number>>();
-      // 每列有几排、其中几排是数（金额、日期、编号）。
+      // Number of rows per column and how many of those rows are numbers (amounts, dates, serial numbers).
       const numbersByCol = new Map<number, number>();
       let wide = 0;
       for (const [i, row] of rows.entries()) {
@@ -376,11 +397,13 @@ function buildGrid(
         if (cols.size >= 2) wide++;
       }
       const multi = [...rowsByCol.values()].filter((g) => g.size >= 2).length;
-      // 有字的列按整段的字数（跨排的大格那一列也算，只是不按它分排）。
+      // Text-containing columns counted by total text length in the segment (including the multi-row spanning cell column, though it is not used for row splitting).
       const used = new Set(inBand.map((l) => indexOf(xs, centerX(l)))).size;
-      // 只有一排框的表（上下就两条横线）是一排一项的表身时总有一列是数（金额、数量、日期）。几格里都是字
-      // （说明书一格一步、几条要点，EU 样本 049）时，几格的行碰巧一样高也不是一排一项，分开就把一格里的
-      // 几行拆散了。
+      // Tables with only a single row of framing (just two horizontal lines at top and bottom)
+      // always have a column of numbers (amounts, quantities, dates) when acting as
+      // single-item-per-row bodies. When multiple cells contain text (instruction steps, bullet
+      // points, EU sample 049), cells with coincidentally identical row heights are not
+      // single-item-per-row; splitting them would break up the lines inside a single cell.
       const oneBox = ys.filter((y) => y.lined).length <= 2;
       const numbers = [...numbersByCol.entries()].some(
         ([c, n]) => n >= 2 && n >= rowsByCol.get(c)!.size / 2,
@@ -414,19 +437,20 @@ function buildGrid(
         x > l.x + l.height * 0.5 &&
         x < l.x + l.width - l.height * 0.5,
     );
-  // 合并：并查集，每个位置一个。
+  // Merging: disjoint-set data structure, one per position.
   const parent = Array.from({ length: rows * cols }, (_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      // 右边的边（竖线）。
-      // 没有竖线盖住的行只在一行字横跨这条边时合并（表头的大标题），否则按上下的竖线分列。
+      // Right border (vertical line). Rows not covered by vertical lines are merged only if a line
+      // of text spans across this boundary (major table title); otherwise, columns are split based
+      // on upper and lower vertical lines.
       if (c + 1 < cols && xs[c + 1]!.lined && (!open[r] || straddled(r, xs[c + 1]!.pos))) {
         const [top, bottom] = parentBand[r] ?? [ys[r]!.pos, ys[r + 1]!.pos];
         const cov = coverage(vs, xs[c + 1]!.pos, top, bottom, tol);
         if (cov < MERGE_COVERAGE) parent[find(r * cols + c)] = find(r * cols + c + 1);
       }
-      // 下边的边（横线）。
+      // Bottom border (horizontal line).
       if (r + 1 < rows && ys[r + 1]!.lined) {
         const cov = coverage(hs, ys[r + 1]!.pos, xs[c]!.pos, xs[c + 1]!.pos, tol);
         if (cov < MERGE_COVERAGE) parent[find(r * cols + c)] = find((r + 1) * cols + c);
@@ -465,7 +489,7 @@ function buildGrid(
     const r1 = Math.max(...rs);
     const c0 = Math.min(...cs);
     const c1 = Math.max(...cs);
-    // 合并出来不是长方形的：退回不合并。
+    // If the merged result is not rectangular: revert and do not merge.
     if ((r1 - r0 + 1) * (c1 - c0 + 1) === members.length) add(r0, c0, r1, c1);
     else
       for (const i of members) add(Math.floor(i / cols), i % cols, Math.floor(i / cols), i % cols);
@@ -479,16 +503,18 @@ function buildGrid(
   return { xs, ys, owner, cells: order.map((o) => o.cell), ...(framedText ? { framedText } : {}) };
 }
 
-/** 表格最上面至少这么多行、每行最多一格有字，才算表单的框（不是表的标题）。 */
+/** A form box requires at least this many rows at the top, with each row having text in at most one cell (not a table title). */
 const FORM_MIN_ROWS = 4;
-/** 去掉那几行以后，剩下的至少要有这么多行有两格以上有字，才是真的表。 */
+/** After removing those rows, the remainder must have at least this many rows with text in two or more cells to be a true table. */
 const FORM_BODY_ROWS = 2;
 
 /**
- * 表单的框和下面的表格连成了一张网格（D-520，F4）：最上面连着好几行，每一行最多一格有字
- * （一个框里标签一行、值一行，框和框之间空着），下面才是每行好几格都有字的表格。上面那几行不是表的行
- * （表的标题只有一两行），去掉它们，里面的字照表外的文字排；没有这样的几行（或者去掉以后剩下的不像表）时 null。
- * 合并格子跨着切口的位置不能切。
+ * Form box and table below merged into a single grid (D-520, F4): multiple top rows where each
+ * row has text in at most one cell (label on one line, value on another, gaps between boxes),
+ * followed below by a table where each row has multiple cells. The top rows are not table rows
+ * (table titles are only one or two rows), so they are removed and their text is arranged as text
+ * outside the table; returns null if no such rows exist (or if the remainder doesn't resemble a
+ * table). Merged cells cannot be cut across gaps.
  */
 function dropLeadingRows(
   grid: Grid,
@@ -511,7 +537,7 @@ function dropLeadingRows(
   const y = grid.ys[cut]!.pos;
   const kept = lines.filter((l) => centerY(l) >= y);
   const cells = grid.cells.filter((c) => c.row >= cut).map((c) => ({ ...c, row: c.row - cut }));
-  // 位置到格子的对应：行往上移，格子的下标按新的顺序。
+  // Mapping from position to cell: rows are shifted up, and cell indices follow the new order.
   const index = new Map<TableCell, number>(cells.map((c, i) => [c, i]));
   const old = grid.cells.filter((c) => c.row >= cut);
   const remap = new Map(old.map((c, i) => [grid.cells.indexOf(c), index.get(cells[i]!)!]));
@@ -524,9 +550,12 @@ function dropLeadingRows(
 }
 
 /**
- * 只有横线的表最下面几排各只有一行横跨各列的字（小票上表格下面居中的「Vielen Dank / Auf Wiedersehen」，
- * 下面再有一条分隔线，EU 样本 003）：是表下面的话，不是表的行；去掉这几排，字照表外的文字排。
- * 去掉以后至少两排、其中至少 FORM_BODY_ROWS 排有两格以上有字才去；不然 null。
+ * Tables with horizontal lines only: bottom few rows each contain only a single line of text
+ * spanning all columns ("Vielen Dank / Auf Wiedersehen" centered below the table on a receipt,
+ * followed by another separator line, EU sample 003): footer text rather than table rows; remove
+ * these rows and arrange text as outside the table. Applied only if at least two rows remain
+ * after removal, with at least FORM_BODY_ROWS of them containing text in two or more cells;
+ * otherwise returns null.
  */
 export function dropTrailingRows(
   grid: Grid,
@@ -536,7 +565,7 @@ export function dropTrailingRows(
   const cols = grid.xs.length - 1;
   if (cols < 2 || grid.xs.slice(1, -1).some((x) => x.lined)) return null;
   const rowLines = (r: number) => lines.filter((l) => indexOf(grid.ys, centerY(l)) === r);
-  // 这一排只有一行字，横跨了按空隙分出的列。
+  // This row contains only a single line of text spanning across columns split by gap.
   const spanning = (r: number) => {
     const own = rowLines(r);
     return (
@@ -575,9 +604,11 @@ export function dropTrailingRows(
 }
 
 /**
- * 这一行被有线的列线从一个词中间切开（D-502）：列线两边不是同一格，而且切口两边的字挨着
- * （不是空格、字距也不比平常大）。PP-OCR 把相邻两格认成一行时，列线落在两段字之间的空隙里，不算。
- * 没有每个字的位置时看不出来，不算。
+ * This line is cut across the middle of a word by a lined column separator (D-502): the two sides
+ * of the column line are not the same cell, and characters on both sides of the cut are adjacent
+ * (not a space, and word spacing is not wider than normal). PP-OCR misrecognizing adjacent cells
+ * as a single line is ignored when the column line falls in the gap between text segments. Not
+ * detectable and ignored when individual character positions are absent.
  */
 function chopsWord(line: OcrBox, grid: Grid): boolean {
   const chars = line.chars;
@@ -603,8 +634,9 @@ function chopsWord(line: OcrBox, grid: Grid): boolean {
 }
 
 /**
- * 一行文字放进格子：横跨了竖线（PP-OCR 把相邻两格认成了一行）而且有每个字的位置时，在竖线处切开。
- * 返回切开后的几段，每段按中心点放进一格。
+ * Place a line of text into cells: when text spans across a vertical line (PP-OCR recognized
+ * adjacent cells as a single line) and character positions are available, cut it at the vertical
+ * line. Returns the resulting pieces, each placed into a cell based on its center point.
  */
 function piecesOf(line: OcrBox, grid: Grid): { cell: number; piece: OcrBox }[] {
   const cols = grid.xs.length - 1;
@@ -614,7 +646,7 @@ function piecesOf(line: OcrBox, grid: Grid): { cell: number; piece: OcrBox }[] {
   const cuts: number[] = [];
   if (line.chars?.length) {
     for (let c = 1; c < cols; c++) {
-      // 只在竖线处切；按文字空隙分的列不切（空隙本来就在字和字之间）。
+      // Cut only at vertical lines; columns separated by text gaps are not cut (gaps are already between words).
       if (!grid.xs[c]!.lined) continue;
       const x = grid.xs[c]!.pos;
       if (x > line.x + margin && x < line.x + line.width - margin && cellAt(c - 1) !== cellAt(c))
@@ -650,11 +682,15 @@ function piecesOf(line: OcrBox, grid: Grid): { cell: number; piece: OcrBox }[] {
 }
 
 /**
- * 去掉落在文字行里面的「横线」：粗体、压扁的字一排连起来，按行扫描时像一条粗线（工资单的项目名称）。
- * 真的线在字的上下，不会在一行字的中间。
- * 竖线也一样（D-463）：加了下划线的粗体标题，字的竖笔画连着下划线，按列扫描时像一排短竖线，
- * 和字顶的横笔画、下划线交成一张「表」（每格一两个字母）。整条在一行字的框里（上下最多出框 20% 行高）的竖线是字的笔画；
- * 真的竖线是格子的边，比格子里的字高。
+ * Remove horizontal "lines" falling inside text lines: bold or flattened characters connected in
+ * a row resemble a thick line during row scanning (item names on payslips). Real lines appear
+ * above and the below text, never in the middle of a text line. Same for vertical lines (D-463):
+ * underlined bold titles have vertical strokes connected to the underline, resembling a short
+ * vertical line sequence during column scanning, intersecting with characters' top horizontal
+ * strokes and underlines to form a "table" (one or two letters per cell). Vertical lines fully
+ * enclosed within a text line box (extending at most 20% of line height outside the box) are
+ * character strokes; true vertical lines are cell borders and are taller than characters inside
+ * the cell.
  */
 function dropTextStrokes(page: PageLines, lines: readonly OcrBox[]): PageLines {
   const inText = (h: RuleLine) =>
@@ -672,9 +708,11 @@ function dropTextStrokes(page: PageLines, lines: readonly OcrBox[]): PageLines {
       );
     });
   const vertical = page.vertical.filter((v) => !inTextV(v));
-  // 至少三成页宽、连着至少三条竖线的横线是表格线（左右两边加中间至少一条列线），哪怕压在一行字的框里
-  // （D-501：照片里弯的一行页脚，识别框很高，罩住了表格的底线）。字的笔画、纸的折痕没有这么长，
-  // 上下两行字的竖笔画连起来的短竖线也常常碰到粗体字的横笔画。
+  // Horizontal lines spanning at least 30% of page width and connected to at least 3 vertical lines
+  // are table lines (left, right, and at least one middle column line), even if pressing into a
+  // text line box (D-501: curved footer line in photos with a high OCR box covering the table
+  // bottom). Character strokes and paper creases are not this long; short vertical lines formed by
+  // connected vertical strokes of two text lines often touch bold text horizontal strokes.
   const tol = Math.max(4, Math.max(page.width, page.height) * STROKE_TOUCH_SHARE);
   const joined = (h: RuleLine) =>
     h.to - h.from >= STROKE_RULE_SHARE * page.width &&
@@ -692,12 +730,14 @@ function dropTextStrokes(page: PageLines, lines: readonly OcrBox[]): PageLines {
   };
 }
 
-/** 金额一类的纯数字（可以带正负号、货币符号、千分位的空格或逗号、百分号）：判断不出对齐时靠右。 */
+/** Pure numbers representing amounts (may include signs, currency symbols, thousands separators with spaces or commas, percentages, and currency characters like yuan): right-aligned when alignment cannot be determined. */
 const AMOUNT = /^[-−+(]?\s?[$€£¥￥]?\s?\d[\d\s.,'’]*%?\s?[$€£¥￥元]?\)?$/;
 
 /**
- * 水平对齐：每排字看它离格子左右边的空白（left、right 是格子的左右边），多数排怎么放就是什么；
- * 字占满格子的排不算。都判断不出时，金额靠右，别的不写（Excel 的「常规」：文字靠左）。
+ * Horizontal alignment: evaluated per row based on whitespace on left and right relative to cell
+ * boundaries (left and right are cell margins); determined by how the majority of rows are
+ * positioned; rows where text fills the cell are ignored. When undetermined, amounts are
+ * right-aligned, others unassigned (Excel "General": left-aligned for text).
  */
 function alignOf(
   pieces: readonly OcrBox[],
@@ -707,8 +747,10 @@ function alignOf(
   text: string,
 ): CellAlign | undefined {
   const rows = textRows(pieces);
-  // 好几排左边对齐的字是左对齐的一段（框起来的正文左右留的空一样宽，每排看着都像居中，EU 样本 038）。
-  // 只看每排都是字的：一列一样宽的金额左边也对齐，但它们靠右。
+  // Left-aligned text block formed by multiple left-aligned rows (boxed prose has equal whitespace
+  // on both sides, making each row look centered, EU sample 038). Only rows containing text are
+  // considered: columns of equally wide amounts are also left-aligned, but they are right-aligned
+  // semantically.
   const lefts = rows.map((row) => Math.min(...row.map((p) => p.x)));
   if (
     rows.length > PROSE_MIN_ROWS &&
@@ -733,8 +775,10 @@ function alignOf(
 }
 
 /**
- * 整页共用的列线（D-272）：各张表的列边界从左到右排开，相差不到 tol 的并成一条（取平均）；
- * 同一张表的两条边界不并在一起（那样会少一列）。返回共用列线的位置，和每张表的每条边界对应第几条共用列线。
+ * Page-shared column lines (D-272): column boundaries of all tables arranged from left to right,
+ * merging those differing by less than tol (averaging them); boundaries of the same table are not
+ * merged together (to avoid losing a column). Returns shared column line positions, and mapping
+ * of each table's boundaries to the corresponding shared column line index.
  */
 export function sharedColumns(
   tables: readonly (readonly number[])[],
@@ -758,7 +802,7 @@ export function sharedColumns(
   return { pos: groups.map((g) => g.sum / g.members.length), maps };
 }
 
-/** 同一张图、同样的参数找过的线（转 Word 会对同一页组两次表：分不分开叠着的表）。 */
+/** Cache for lines found on the same image with the same parameters (converting to Word processes the same page twice for tables with overlapping/non-overlapping structures). */
 const linesCache = new WeakMap<RgbaImage, Map<string, PageLines>>();
 export function cachedLines(
   image: RgbaImage,
@@ -772,16 +816,19 @@ export function cachedLines(
   return found;
 }
 
-/** 空白网格至少要有这么多排、这么多列，才去找它上面的表头。 */
+/** Empty grid must have at least this many rows and columns before searching for a header above it. */
 const HEADER_GRID_MIN_ROWS = 3;
 const HEADER_GRID_MIN_COLS = 2;
-/** 表头那排字的底边离网格的上边不超过这么多个行高。 */
+/** Bottom edge of the header text row is no more than this many line heights away from the top edge of the grid. */
 const HEADER_GAP_LINES = 1.5;
 
 /**
- * 横竖线画满、里面没有字的网格（留着填的商品栏）：紧挨在上面、一列一个的那排字是表头。
- * 找到时在表头上面补一条横线、把竖线往上接到它，表头成为网格的第一排；
- * 表头的字至少落在一半的列里（至少两列），而且每段字都在一列里面（不跨列线）。
+ * Grids filled with horizontal/vertical lines but lacking text (merchandise columns waiting to be
+ * filled): the single-column text row immediately above is the header. When found, add a
+ * horizontal line above the header, extend vertical lines upward to meet it, making the header
+ * the first row of the grid; header text must fall within at least half of the columns (at least
+ * two columns), with each text segment contained within a single column (not spanning column
+ * lines).
  */
 function withHeaderAbove(
   table: TableLines,
@@ -794,7 +841,7 @@ function withHeaderAbove(
   const bottom = box.y + box.height;
   const cols = vs.length - 1;
   if (hs.length - 1 < HEADER_GRID_MIN_ROWS || cols < HEADER_GRID_MIN_COLS) return null;
-  // 每条竖线都从上到下画满（是一张规整的网格，不是框里的几条线）。
+  // Every vertical line is drawn fully from top to bottom (indicating a regular grid rather than isolated box lines).
   if (vs.some((v) => v.from > top + tol || v.to < bottom - tol)) return null;
   const near = lines.filter(
     (l) =>
@@ -804,7 +851,7 @@ function withHeaderAbove(
       l.y + l.height >= top - HEADER_GAP_LINES * lineHeight,
   );
   if (!near.length) return null;
-  // 只取最下面那一排（中心和最下面的一段差不到半个行高）。
+  // Take only the bottom-most row (center differs from the bottom-most segment by less than half a line height).
   const lowest = Math.max(...near.map(centerY));
   const row = near.filter((l) => lowest - centerY(l) <= 0.5 * lineHeight);
   const inner = vs.slice(1, -1).map((v) => v.pos);
@@ -832,7 +879,7 @@ function withHeaderAbove(
   };
 }
 
-/** 一页的 TablePage：找线、组表、填字、表外文字分段。 */
+/** TablePage for a single page: find lines, group tables, fill text, segment non-table text. */
 export function buildTablePage(input: PageInput, options: BuildOptions = {}): TablePage {
   const join = options.joinLines ?? defaultJoin;
   const { image } = input;
@@ -843,9 +890,9 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
   const t = Math.tan((page.skew * Math.PI) / 180);
   const tol = Math.max(4, Math.max(image.width, image.height) * 0.008);
   const arrange = options.arrange === true;
-  // 识别框换到拉正后的坐标（只移动中心，大小不变）。
+  // OCR boxes converted to deskewed coordinates (only centers moved, dimensions unchanged).
   let source = input.lines.filter((l) => l.text.trim());
-  // 图片区域（转 Excel，D-520）：里面的字是图的一部分，不参加组表、也不排成文字。
+  // Image region (Excel conversion, D-520): text inside is part of the image, excluded from table grouping and text layout.
   const found =
     arrange && input.regions?.length
       ? layoutRegions(input.regions, source, image, median(source.map((l) => l.height)) || 20)
@@ -860,7 +907,7 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
     return { ...l, x: cx + cy * t - l.width / 2, y: cy - cx * t - l.height / 2 };
   });
   const sourceOf = new Map(flat.map((l, i) => [l, source[i]!]));
-  // 拉正后的框 → 原图里包住它的框。
+  // Deskewed box -> surrounding box in the original image.
   const back = (b: Box): Box => {
     if (t === 0) return b;
     const corners = [
@@ -875,7 +922,7 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
     const y = Math.min(...ys);
     return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
   };
-  // 原图里的框 → 拉正后的位置（只移动中心，和识别框一样）。
+  // Box in original image -> deskewed position (only center moved, same as OCR boxes).
   const flatBox = (b: Box): Box => {
     const cx = centerX(b);
     const cy = centerY(b);
@@ -887,12 +934,12 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
     };
   };
   const lineHeight = median(flat.map((l) => l.height)) || 20;
-  // 估字号用的行高（D-521）：拍歪的页，长行的识别框比字高出 宽 × 斜率 一截，扣掉。
+  // Line height used for estimating font size (D-521): for skewed pages, OCR boxes of long lines exceed character height by width × slope, which is deducted.
   const tilt = Math.abs(t);
   const sizeHeight = (l: Box) => Math.max(0.6 * l.height, l.height - tilt * l.width);
   const baseHeight = median(flat.map(sizeHeight)) || lineHeight;
   const bodySize = bodySizeOf(baseHeight, image.width);
-  // 字的笔画粗细（粗体，D-521）：按原图里的位置量；只在转 Excel 时用。
+  // Character stroke thickness (bold, D-521): measured based on positions in the original image; used only during Excel conversion.
   const strokes = new Map<OcrBox, number>();
   const strokeOf = (l: OcrBox) => {
     if (!strokes.has(l)) strokes.set(l, strokeRatio(image, sourceOf.get(l) ?? back(l)));
@@ -906,7 +953,7 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
     xs: number[];
     lines: OcrBox[];
     chopped: number;
-    /** 每条行线、列线都是画出来的（不是按文字空隙分的）。 */
+    /** Each row and column line is drawn explicitly (rather than inferred from text gaps). */
     ruled: boolean;
     framedText?: boolean;
   }[] = [];
@@ -922,7 +969,7 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
   for (const found of foundTables) {
     let table = found;
     let { box } = table;
-    // 大半在图片区域里的「表」是图里的线（示意图、图表的网格）。
+    // "Tables" predominantly within image regions are lines within the image (diagrams, chart grids).
     if (
       figures.some((f) => {
         const ix = Math.min(box.x + box.width, f.x + f.width) - Math.max(box.x, f.x);
@@ -938,10 +985,10 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
         centerX(l) <= box.x + box.width + tol &&
         centerY(l) >= box.y - tol &&
         centerY(l) <= box.y + box.height + tol &&
-        // 挨着的另一张表（分开的上下、左右几张表共用一条边，EU 样本 090）框里的字是那张表的。
+        // An adjacent table (separate top/bottom or left/right tables sharing an edge, EU sample 090) belongs to that table.
         (within(l, box) || !foundTables.some((t) => t !== found && within(l, t.box))),
     );
-    // 空白表格的表头写在网格上面（发票模板的商品栏，EU 样本 001）：表头那一排算进表里。
+    // The header of a blank table is written above the grid (item columns in the invoice template, EU sample 001): the header row is included in the table.
     if (!members.length && options.headerAbove) {
       const headed = withHeaderAbove(
         table,
@@ -955,8 +1002,10 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
         members = headed.lines;
       }
     }
-    // 压在表里一条横线上、只有「=」「_」「-」这类记号的识别行是这条线（虚线、双线）本身（EU 样本 020）：
-    // 算表里的（不排成正文），但不占一排、不写进格子。
+    // A recognition line lying on a horizontal line in a table and consisting only of characters
+    // like '=', '_', or '-' represents the line itself (dashed or double line, EU sample 020):
+    // considered part of the table (not formatted as body text), but does not occupy a row or get
+    // written into a cell.
     const ruleText = new Set(
       members.filter(
         (l) =>
@@ -969,9 +1018,9 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
           ),
       ),
     );
-    // 里面没有字的不算表（例如表单里几条对齐的填空横线）。
+    // Items without text inside are not considered tables (e.g., several aligned fill-in lines in a form).
     if (members.length === ruleText.size) continue;
-    // 只有一排，字都不在格子里（句子里要填的一块底色四边像线，旁边的字落在容差里，EU 样本 082）：不是表。
+    // Only one row, with no text inside the cells (the background of a fill-in blank area has four edges looking like lines, and nearby text falls within the tolerance, EU sample 082): not a table.
     if (table.hs.length <= 2 && members.every((l) => ruleText.has(l) || !within(l, box))) continue;
     const built = buildGrid(
       table,
@@ -982,8 +1031,11 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
     if (!built) continue;
     let grid: Grid = built;
     const { framedText } = built;
-    // 中心在最外一条横线外面、又横跨了列线的字不是表里的（D-501：照片里弯的一行页脚压着表格的底线，
-    // 放进表里会在列线处切碎）。只落在一列里的照旧放进表（表格底线下面的合计行）。
+    // Text whose center is outside the outermost horizontal line and which spans across column
+    // lines is not part of the table (D-501: a curved page footer line in a photo overlapping the
+    // table bottom border; including it in the table would split it apart at the column lines).
+    // Text falling within a single column remains in the table as usual (e.g., total row below the
+    // table bottom border).
     const top = grid.ys[0]!;
     const bottom = grid.ys.at(-1)!;
     let inside = members.filter((l) => {
@@ -996,12 +1048,12 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
           x.pos > l.x + l.height * 0.5 &&
           x.pos < l.x + l.width - l.height * 0.5,
       );
-      // 整行都在最上面一条横线上面的字（表头横条上面紧挨着的一行说明）不是表里的。
+      // Text entirely above the top horizontal line (notes immediately above the table header stripe) is not part of the table.
       const above = top.lined && l.y + l.height <= top.pos;
       return !(out && across) && !above;
     });
     if (!inside.length) continue;
-    // 表单的框连着好几行（D-520）：上面的几行不是表的行，字留给表外的文字。
+    // A form box connected across multiple rows (D-520): the top rows are not table rows, and the text is left for non-table text.
     const trimmed = arrange ? dropLeadingRows(grid, inside) : null;
     if (trimmed) {
       grid = trimmed.grid;
@@ -1019,15 +1071,16 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
       for (const { cell, piece } of piecesOf(line, grid)) texts[cell]!.push(piece);
     }
     const chopped = inside.filter((l) => !ruleText.has(l) && chopsWord(l, grid)).length;
-    // 只有横线的表：至少两行有字、按文字空隙至少分出两列才算表（几条分隔线中间的正文分不出列）。
+    // Tables with only horizontal lines: at least two rows must have text, and at least two columns must be separated by text gaps to be considered a table (body text between multiple separator lines cannot be separated into columns).
     const rowsWithText = new Set(grid.cells.filter((_, i) => texts[i]!.length).map((c) => c.row));
     if (!table.vs.length && (rowsWithText.size < 2 || grid.xs.length < 3)) continue;
-    // 表里文字的字号（磅）：和正文差不多就不单独写。
+    // Font size of text inside a table (pt): if similar to body text, do not write separately.
     const tableSize = arrange
       ? tableSizeOf(median(inside.map(sizeHeight)), image.width, bodySize)
       : bodySize;
-    // 粗体按整行定：一格一格看笔画，短的数字常被误认成粗体、表头里也会漏一格；
-    // 一行里有字的格子过半看着粗，整行粗，否则整行都不粗（D-521）。
+    // Bold style is determined per row: inspecting strokes cell by cell often misidentifies short
+    // numbers as bold or misses a cell in the header; if more than half of the cells with text in a
+    // row look bold, the whole row is bold, otherwise the whole row is not bold (D-521).
     const thickCell = grid.cells.map(
       (_, i) =>
         arrange &&
@@ -1056,7 +1109,7 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
         box: back(flatCell),
       };
     });
-    // 表单的下划线、方框连成的大网格、列线把字从词中间切开的网格（D-502）：不当表，里面的字按位置排成文字（F4）。
+    // Form underlines, large grids connected by boxes, and grids where column lines cut text in the middle of a word (D-502): not treated as a table, and text inside is arranged into text lines by position (F4).
     if (
       arrange &&
       (isRuleGrid(
@@ -1078,8 +1131,10 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
       xs: grid.xs.map((x) => x.pos),
       lines: inside.map((l) => sourceOf.get(l)!),
       chopped,
-      // 外边的两条竖线可以不画（只有横线和内部列线的「开口」表格），表头写在第一条横线上面时最上边也没有线
-      // （EU 样本 031）：内部列线和第一条以下的横线都画了就算画满。
+      // The two outer vertical lines can be omitted ('open' tables with only horizontal lines and
+      // internal column lines), and when the header is written above the first horizontal line,
+      // there is no top line either (EU sample 031): if internal column lines and horizontal lines
+      // below the first one are drawn, it is considered fully ruled.
       ruled:
         grid.xs.length > 2 &&
         grid.xs.slice(1, -1).every((x) => x.lined) &&
@@ -1095,8 +1150,9 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
       },
     });
   }
-  // 没有线的表（D-506）：找线没找到的表（很浅的细线、只按空白对齐的列）用剩下的行按列对齐认，
-  // 和转 Word 一样先按局部的斜率拉平再分排。
+  // Tables without lines (D-506): tables where lines could not be found (very faint thin lines,
+  // columns aligned only by whitespace) are recognized using remaining rows aligned by column,
+  // flattening by local slope before splitting rows, similar to Word conversion.
   if (options.textTables !== false) {
     const rest = flat.filter((l) => !placed.has(l));
     const leveled = levelLines(rest, lineHeight, image.width / 2);
@@ -1108,9 +1164,12 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
       const textSize = tableSizeOf(median(members.map(sizeHeight)), image.width, bodySize);
       let x = found.box.x;
       const xs = [x, ...found.colWidths.map((w) => (x += w))];
-      // 整页共用一套列（D-272）：没有线的表的列线可以放在两列之间的空白里任何地方，最外两条可以往外挪
-      // （不超过 3 个行高，和 D-471 列和列隔开的上限一样）。那里有别的表的列线时对上它，
-      // 不然一张表的列线挨着另一张表的列线，整页多出一条窄列，把格子劈成两半（发票表下面的合计）。
+      // Shared columns across the entire page (D-272): column lines of borderless tables can be
+      // placed anywhere in the whitespace between two columns, and the outermost two can be shifted
+      // outward (up to 3 row heights, same as the upper limit for column separation in D-471).
+      // Align with other table column lines if present; otherwise, adjacent column lines from
+      // different tables create an extra narrow column on the page, splitting cells in half (totals
+      // below an invoice table).
       const others = tables.flatMap((tb) => tb.xs);
       const { bands } = found;
       const reach = SNAP_REACH * lineHeight;
@@ -1139,8 +1198,10 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
       });
     }
   }
-  // 转 Excel：表外的字和图片怎么排（D-520–D-522）。有左右范围的（分栏的文字、图片）也参加整页共用的列：
-  // 栏和栏之间的分界、图片的左右边都是列线；没有表时再加上所有内容的左右边，这样整页有宽度。
+  // Excel conversion: arrangement of text and images outside tables (D-520–D-522). Items with
+  // horizontal boundaries (columned text, images) also participate in page-wide shared columns:
+  // boundaries between columns and left/right edges of images serve as column lines; when no table
+  // is present, the left and right edges of all contents are added so the page has a width.
   const plan = arrange
     ? planRest({
         lines: flat.filter((l) => !placed.has(l)),
@@ -1160,7 +1221,7 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
   const extra = ranged.map((d) => [...d.range!]);
   if (!tables.length && ranged.length) {
     const all = (plan?.groups ?? []).flatMap((g) => g.drafts);
-    // 离已有的列线不到两个行高的那一边不加：标题比栏的边靠外一点，不为它多出一条很窄的列（文字横跨合并，照样放得下）。
+    // Do not add a side if it is less than two row heights away from an existing column line: a title extending slightly outside a column boundary does not generate a narrow column (text spans across and fits anyway).
     const edges = extra.flat();
     const far = (x: number) => edges.every((e) => Math.abs(e - x) >= 2 * lineHeight);
     extra.push(
@@ -1170,7 +1231,7 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
       ].filter(far),
     );
   }
-  // 整页共用的列：每张表的格子换成共用列上的位置，原来一格跨过几条共用列线就是 colSpan 几。
+  // Page-wide shared columns: replace each table cell's position with its position on the shared columns, and its colSpan equals how many shared column lines it spans across.
   const shared = sharedColumns(
     [...tables.map((tb) => tb.xs), ...extra],
     Math.max(tol, Math.max(image.width, image.height) * SHARED_COLUMN_SHARE),
@@ -1197,14 +1258,14 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
       ? shared.pos.slice(1).map((x, c) => Math.round(x - shared.pos[c]!))
       : Array.from({ length: TEXT_ONLY_COLS }, () => Math.round(image.width / TEXT_ONLY_COLS));
   if (plan) {
-    // 每一块占哪几列：它的左右范围在共用列里的位置。
+    // Which columns each block occupies: the positions of its left and right boundaries within the shared columns.
     const spans = new Map(
       ranged.map((d, k) => {
         const map = shared.maps[tables.length + k]!;
         return [d, { col: map[0]!, cols: map[1]! - map[0]! }] as const;
       }),
     );
-    // 没有表时看不出整页的左右，只有分栏、图片时才有（居中的标题）。
+    // When there are no tables, page-wide left and right bounds cannot be determined, only existing with columns or images (centered titles).
     const aligned = tables.length > 0 || ranged.length > 0;
     const entries: { y: number; blocks: Block[] }[] = [
       ...plan.groups.map((g) => ({
@@ -1254,7 +1315,7 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
       blocks: entries.sort((a, b) => a.y - b.y).flatMap((e) => e.blocks),
     };
   }
-  // 表外的文字：按排从上到下，间距超过 1.2 倍行高、或者中间隔着一张表的地方分段。
+  // Non-table text: ordered top-to-bottom by row, split into paragraphs where spacing exceeds 1.2x row height or a table lies in between.
   const rest = textRows(flat.filter((l) => !placed.has(l)));
   const paragraphs: OcrBox[][] = [];
   let prevBottom = -Infinity;
@@ -1281,7 +1342,7 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
         height: Math.max(...lines.map((l) => l.y + l.height)) - y,
       };
       const text = join(lines).trim();
-      // 表外的文字按整页共用列的左右边判断对齐（居中的标题）；没有表时看不出，不写。
+      // Non-table text alignment is determined by the left and right bounds of page-wide shared columns (centered titles); omitted if no tables are present and bounds cannot be determined.
       const align = tables.length
         ? alignOf(lines, shared.pos[0]!, shared.pos.at(-1)!, lineHeight, text)
         : undefined;
@@ -1305,6 +1366,6 @@ export function buildTablePage(input: PageInput, options: BuildOptions = {}): Ta
   };
 }
 
-/** 转 Excel 的一页（D-520–D-522）：和 buildTablePage 一样，加上图片区域、分栏的文字、字号（见 BuildOptions.arrange）。 */
+/** A page for Excel conversion (D-520–D-522): same as buildTablePage, with image regions, columned text, and font sizes added (see BuildOptions.arrange). */
 export const buildSheetPage = (input: PageInput, options: BuildOptions = {}): TablePage =>
   buildTablePage(input, { ...options, arrange: true });

@@ -6,8 +6,9 @@ import type { RenderEnv } from './components';
 import type { Palette } from './theme';
 import { Button } from './ui';
 
-// 一键记录工具（D-300）的两种按钮：页面上的按钮（button 的 tools[0]）和记录列表每一行右边的小按钮。
-// 草稿里（D-190）点了只提示应用之后才能用。
+// Two button types for one-tap record tool (D-300): page buttons (button's tools[0]) and small
+// buttons on the right of each record list row. In drafts (D-190), tapping only prompts to apply
+// before use.
 
 export function ActionButton({
   action,
@@ -42,7 +43,7 @@ export function ActionButton({
   );
 }
 
-/** 列表一行右边的按钮：至少 44 高，按下变淡；点了不会打开这条记录。 */
+/** Button on the right of a list row: at least 44 high, dims on press; tapping does not open this entry. */
 export function RowActionButton({
   action,
   record,

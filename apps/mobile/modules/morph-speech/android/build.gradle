@@ -1,5 +1,6 @@
-// 本地 Expo 模块的 Android 部分（D-151）：Android 系统不能识别音频文件，把 whisper.cpp（MIT）编进 App，
-// 模型（和语音检测模型）是第一次用时下载的下载内容。解码音频用系统的 MediaExtractor / MediaCodec。
+// Android portion of the local Expo module (D-151): Android systems cannot recognize audio files,
+// so whisper.cpp (MIT) is compiled into the app, and models (along with speech detection models)
+// are downloaded on first use. Audio decoding uses the system MediaExtractor / MediaCodec.
 plugins {
   id 'com.android.library'
   id 'expo-module-gradle-plugin'
@@ -23,12 +24,13 @@ android {
     cmake {
       path "src/main/cpp/CMakeLists.txt"
       version "3.22.1"
-      // CMake 下载的 whisper.cpp 源码里有 JS 和 package.json：构建目录放到 App 的 android/build 下，
-      // 免得 eslint、prettier、jest、Metro 扫到它（apps/mobile/android 本来就不进 git、不被扫描）。
+      // The whisper.cpp source code downloaded by CMake contains JS and package.json: the build
+      // directory is placed under android/build in the app to prevent eslint, prettier, jest, and
+      // Metro from scanning it (apps/mobile/android is already gitignored and unscanned).
       buildStagingDirectory "${rootProject.buildDir}/morph-speech-cxx"
     }
   }
-  // 带 SVE / SME 的 CPU 后端不用（见 morph_whisper.cpp 的 load_backends），不打包。
+  // CPU backends with SVE / SME are unused (see load_backends in morph_whisper.cpp) and are not packaged.
   packaging {
     jniLibs {
       excludes += ['**/libggml-cpu-android_armv9*.so']

@@ -11,11 +11,12 @@ import type { Palette } from '../../renderer/theme';
 import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 
-// 剪一段（TOOLS_DESIGN §4 trimMedia，D-143）：逐个选开始和结束。视频和音频共用起止拖动、微调、
-// 时间显示和「只播放这一段」；上半部分视频显示画面，音频显示图标；时间轴上视频是缩略图，音频是波形（D-155）。
-// 结果只在本次运行里使用。
+// Trim segment (TOOLS_DESIGN §4 trimMedia, D-143): select start and end points one by one. Videos
+// and audio share start/end dragging, fine-tuning, time display, and "Play this segment only"; top
+// half shows video frames, audio shows icons; timeline displays thumbnails for video and waveforms
+// for audio (D-155). Results are used solely for the current run.
 
-/** 至少留多长（毫秒）。 */
+/** Minimum allowed duration (milliseconds). */
 export const MIN_TRIM_MS = 1000;
 const NUDGE_MS = 1000;
 const THUMBS = 8;
@@ -28,7 +29,7 @@ export interface TrimRange {
   endMs: number;
 }
 
-/** 移动一边，另一边不动；保证在 0–duration 之间、至少留 MIN_TRIM_MS。 */
+/** Move one edge while the other stays fixed; ensures bounds remain between 0 and duration, maintaining at least MIN_TRIM_MS. */
 export function moveEdge(
   range: TrimRange,
   edge: 'start' | 'end',
@@ -44,12 +45,12 @@ export function moveEdge(
   return { ...range, endMs };
 }
 
-/** 跳到某个时间（毫秒）。 */
+/** Seek to a specific time (milliseconds). */
 export function seek(player: VideoPlayer, ms: number) {
   player.currentTime = ms / 1000;
 }
 
-/** 0:05、1:02:03（显示到十分之一秒时 0:05.4）。 */
+/** 0:05, 1:02:03 (displays tenths of a second as 0:05.4). */
 export function formatTime(ms: number, tenths = false, locale: Locale = 'en'): string {
   const total = Math.max(0, ms) / 1000;
   const h = Math.floor(total / 3600);
@@ -69,7 +70,7 @@ interface TrimState {
   ranges: TrimRange[];
   width: number;
   drag: { edge: 'start' | 'end'; from: number } | null;
-  /** 最近动过的一边：画面停在这一边。 */
+  /** Most recently moved edge: playback stays on this side. */
   edge: 'start' | 'end' | null;
 }
 
@@ -91,7 +92,7 @@ function reduce(state: TrimState, action: TrimAction, durations: number[]): Trim
       return { ...state, width: action.width };
     case 'grant': {
       if (!msPerPx) return state;
-      // 拖离手指近的那一边。
+      // Drag the edge closest to the finger.
       const ms = action.x * msPerPx;
       const edge = Math.abs(ms - range.startMs) <= Math.abs(ms - range.endMs) ? 'start' : 'end';
       return {
@@ -130,7 +131,7 @@ function reduce(state: TrimState, action: TrimAction, durations: number[]): Trim
   }
 }
 
-/** 上半部分：视频画面，音频是图标（波形以后由音频工具补上）；下面是「只播放这一段」。 */
+/** Top half: video frames, audio shown as icons (waveforms will be added later by the audio tool); bottom features "Play this segment only". */
 function Preview({
   item,
   player,
@@ -149,14 +150,14 @@ function Preview({
   const video = item.mimeType.startsWith('video/');
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
 
-  // 拖动时画面跟着跳到那一边。
+  // When dragging, the view jumps along to that side.
   useEffect(() => {
     if (edge === null) return;
     player.pause();
     seek(player, edge === 'start' ? range.startMs : range.endMs);
   }, [player, edge, range.startMs, range.endMs]);
 
-  // 「只播放这一段」：播到结束点停下。
+  // "Play only this segment": stops playing when reaching the end point.
   useEventListener(player, 'timeUpdate', ({ currentTime }) => {
     if (player.playing && currentTime * 1000 >= range.endMs) player.pause();
   });
@@ -195,14 +196,14 @@ function Preview({
   );
 }
 
-/** 时间轴的缩略图（只有视频）。expo-video 取不到时（Android 上的 HDR 视频）用 load。 */
+/** Timeline thumbnails (video only). Uses load when expo-video cannot retrieve them (such as HDR video on Android). */
 export function useThumbnails(
   player: VideoPlayer,
   item: RunItem,
   load: ((index: number, timesMs: number[]) => Promise<string[]>) | undefined,
   index: number,
 ): Thumb[] {
-  // 记下是哪个文件的缩略图：换文件时不用在 effect 里清空。
+  // Record which file these thumbnails belong to: avoids clearing them in an effect when switching files.
   const [thumbs, setThumbs] = useState<{ uri: string; list: Thumb[] } | null>(null);
   const duration = item.durationMs ?? 0;
   const video = item.mimeType.startsWith('video/');
@@ -232,13 +233,13 @@ export function useThumbnails(
   return thumbs?.uri === uri ? thumbs.list : [];
 }
 
-/** 音频的波形：界面打开后再读（Android 上长录音要解码很久）；undefined 表示还在读。 */
+/** Audio waveform: read after the interface opens (long recordings take a long time to decode on Android); undefined means still reading. */
 function useWaveform(
   load: ((index: number) => Promise<number[] | null>) | undefined,
   index: number,
   audio: boolean,
 ): number[] | null | undefined {
-  // 记下是第几个文件的波形：换文件时不用在 effect 里清空。
+  // Record which file this waveform belongs to: avoids clearing it in an effect when switching files.
   const [peaks, setPeaks] = useState<{ index: number; list: number[] | null } | null>(null);
   useEffect(() => {
     if (!audio || !load) return;
@@ -280,7 +281,7 @@ export function TrimScreen({
   const item = items[index]!;
   const range = ranges[index]!;
   const duration = durations[index]!;
-  // 换到下一个文件时换播放器（useVideoPlayer 随地址重建）。
+  // Switch player when switching to the next file (useVideoPlayer is recreated with the URI).
   const player = useVideoPlayer(item.uri, (p) => {
     p.timeUpdateEventInterval = 0.1;
   });
@@ -424,7 +425,7 @@ export function TrimScreen({
   );
 }
 
-/** 音频的波形：每根柱子是一小段时间里最大的音量（0–1）。 */
+/** Audio waveform: each bar represents the maximum volume over a short time interval (0-1). */
 function Waveform({ peaks, color }: { peaks: readonly number[]; color: string }) {
   return (
     <View testID="trim-waveform" style={styles.waveform}>
@@ -457,7 +458,7 @@ const styles = StyleSheet.create({
   waveform: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 1, paddingHorizontal: 2 },
   peak: { flex: 1, borderRadius: 1, opacity: 0.7 },
   controls: { paddingHorizontal: 16, paddingTop: 12, gap: 10 },
-  // 左右再缩进 24：把手离屏幕边 40，不落在 Android 的返回手势区（从边缘往里拖会关掉页面）。
+  // Inset an extra 24 on left and right: places handles 40 from the screen edge, keeping them out of Android's back gesture zone (dragging inward from the edge closes the page).
   timeline: { height: 52, borderRadius: 8, marginHorizontal: 24 },
   dim: { position: 'absolute', top: 0, bottom: 0, backgroundColor: '#00000055' },
   selection: { position: 'absolute', top: 0, bottom: 0, borderTopWidth: 3, borderBottomWidth: 3 },

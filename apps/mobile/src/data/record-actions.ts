@@ -38,13 +38,18 @@ import { openRow } from '../renderer/open-row';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { useRecordActions } from './records';
 
-// 一键记录操作（D-300–D-304）：用户点了按钮或列表里的行按钮才执行，直接写数据库（和表单一样不经过 AI、
-// 不生成版本）。提示条只说做了什么，不带撤销：只有删除弹撤销，记下的、改过的用户自己删掉或改回去（底线 11，D-385）。
-// 操作由 AI 配置，值在这里按当时的时间和记录算出来。
+// One-touch record operations (D-300–D-304): executed only when the user taps a button or a row
+// action in a list, writing directly to the database (like forms, bypassing AI and version
+// generation). The toast message only describes what was done without undo: only deletion shows an
+// undo toast, while recorded or modified entries are deleted or reverted by the user themselves
+// (invariant 11, D-385). The operation is configured by the AI, and values are computed here based
+// on the current time and record.
 
 /**
- * 点一下要把数字加出字段的范围（D-570）：说一句「什么都没改：「数量」不能大于 10。」，不打开表单（表单上看不出为什么）。
- * 有别的问题（必填空着、旧配置）时为 null，照旧打开这一条让用户自己改。
+ * Tapping would push the number out of the field's range (D-570): outputs "Nothing changed:
+ * "Quantity" cannot exceed 10.", without opening the form (since the reason wouldn't be apparent
+ * on the form). Returns null for other issues (missing required fields, old config), opening the
+ * entry as usual for the user to edit.
  */
 function rangeMessage(
   collection: Collection,
@@ -61,7 +66,7 @@ function rangeMessage(
   });
 }
 
-// 一次只执行一个：连点几下 +1 时一个接一个算，不会两次都从同一个旧值加。桌面小组件的点按也排在这里（D-323）。
+// Execute one at a time: when tapping +1 rapidly several times, calculations queue up sequentially so it never derives twice from the same old value. Widget taps are also queued here (D-323).
 let queue: Promise<unknown> = Promise.resolve();
 export function serial<T>(task: () => Promise<T>): Promise<T> {
   const next = queue.then(task, task);
@@ -87,8 +92,9 @@ export function useRecordActionRunner() {
     router.push({ pathname: '/record/[collectionId]', params: { collectionId, recordId } });
 
   /**
-   * 「这一条」（D-565）：工具读它的字段时（抄、从它的日期起算、加它的数字），在点的那一刻读出来、算好
-   * （公式、查找、汇总都有值）。已经不在了时没有。
+   * "This entry" (D-565): when a tool reads its fields (copying, calculating from its date,
+   * adding its numbers), they are read and computed at the exact moment of the tap (formulas,
+   * lookups, and rollups all have values). Returns nothing if the entry no longer exists.
    */
   async function entryOf(
     tool: RecordTool,
@@ -113,17 +119,18 @@ export function useRecordActionRunner() {
   async function create(
     tool: Extract<RecordTool, { do: 'create' }>,
     ctx: { rowId?: string | undefined; recordId?: string | undefined },
-    /** 打卡格（D-610）上 "$here" 算好的值：这一行、这一天、筛选里的等于条件。 */
+    /** Values computed for "$here" on check-in grid cells (D-610): for this row, this day, and equality conditions in filters. */
     here: Record<string, unknown> = {},
   ) {
     const collection = config?.data.tables.find((c) => c.id === tool.table);
     if (!collection) return;
     const now = new Date();
-    // 「这一条」：工具作用的那一条，没有时是记录页的那一条。
+    // "This entry": the entry acted upon by the tool, or the entry on the record page if none is specified.
     const entry = await entryOf(tool, ctx.rowId ?? ctx.recordId, now);
     const input = { ...createInput(collection, tool.values, { now, cal, ...ctx, entry }), ...here };
-    // D-338：打开新记录的表单，预设的值先填好，用户补完再保存（表单自己保存，不弹提示条）。
-    // Q6：按钮模式的「添加」（原 recordForm button）也预填预设值。
+    // D-338: Opens the new record form with preset values pre-filled; the user completes them
+    // before saving (the form saves itself without showing a toast). Q6: Button mode "Add"
+    // (formerly recordForm button) also pre-fills preset values.
     if (tool.ask !== undefined) return void openNew(collection.id, input);
     const result = await actions.add(collection, input);
     if (result.ok) {
@@ -131,7 +138,7 @@ export function useRecordActionRunner() {
     } else if ('full' in result) {
       Alert.alert(t(locale, 'tableFull'));
     } else {
-      // 存不进去（旧配置里必填字段没有值）：打开表单让用户补上。
+      // Fails to save (required fields in old config have no value): opens the form for the user to fill them in.
       openNew(collection.id);
     }
   }
@@ -169,8 +176,9 @@ export function useRecordActionRunner() {
       ),
     );
     if (!confirmed) return;
-    // 在一个事务里全改；每条都要求「现在还是算出这些改动时的样子」（确认的时候别处改过的不覆盖）。
-    // 失败或有记录变了：一条也不改（R09）。
+    // Modify everything within a single transaction; each entry requires "still looks like it did
+    // when these changes were computed" (preventing overwrites if modified elsewhere during
+    // confirmation). On failure or if any record changed: modifies zero entries (R09).
     const at = Date.now();
     let outcome: 'applied' | 'conflict';
     try {
@@ -197,8 +205,11 @@ export function useRecordActionRunner() {
   }
 
   /**
-   * 点一下改这一条的几处（D-566）：先按现在存的这一条算出全部改动，在一个事务里一起写（要求这一条还是读到的样子），
-   * 一处写不了就一处也不写。之后提示条上有「撤销」：放回这一条原来的样子、删掉新建的那条（都要求还是做完时的样子）。
+   * Modify several aspects of this entry at once (D-566): first computes all changes based on the
+   * currently stored entry, writes them together in a single transaction (requiring the entry to
+   * still match the read state), and writes nothing if any part fails. Afterwards, an "Undo"
+   * toast is shown: restores the entry to its original state and deletes any newly created
+   * entries (both requiring the state at completion).
    */
   async function tapMany(use: RecordToolUse, record: DataRecord) {
     const row = config?.data.tables.find((c) => c.id === record.collectionId);
@@ -216,7 +227,7 @@ export function useRecordActionRunner() {
       ? await entryOf(tools.find(toolReadsEntry)!, record.id, now)
       : undefined;
     const ctx = { now, cal, rowId: record.id, entry };
-    // 改这一条的几处按顺序合在一起（各改各的字段）。
+    // Combines multiple modifications to this entry in sequence (each modifying its respective fields).
     let input: Record<string, unknown> = {};
     let created: { collection: Collection; values: Record<string, unknown> } | undefined;
     for (const tool of tools) {
@@ -239,7 +250,7 @@ export function useRecordActionRunner() {
       if (!next) return;
       input = { ...input, ...next };
     }
-    // 几处要用的值都是空的、也没有新建：什么都不写，也没有可撤销的。
+    // If all target values are empty and no new entry was created: writes nothing and provides no undo.
     if (Object.keys(input).length === 0 && !created)
       return void showToast({ message: t(locale, 'recordActionNoValue') });
     const prepared = prepareRecordValues(row, input, stored.values, now, cal);
@@ -307,9 +318,13 @@ export function useRecordActionRunner() {
   }
 
   /**
-   * 清单的勾带 also（D-617）：勾上时勾选框和 also 的值、取消时勾选框和清空 also 的字段，按现在存的这一条算好，一次写进这一条
-   * （同一个事务，别处刚改过就不写，说一声）。不弹撤销：取消就把勾上写的全部清空、再勾一下又写回来（底线 11）；只有勾上盖掉了
-   * 原来有的、不一样的值时弹撤销（取消只会清空，放不回那个值），撤销放回这一条原来的样子。
+   * Checklist check with "also" (D-617): when checked, writes the checkbox and "also" values
+   * together; when unchecked, writes the checkbox and clears the "also" fields, computed against
+   * the currently stored entry and written in a single transaction (same transaction; aborts with
+   * a notice if modified elsewhere). No undo toast: unchecking clears all checked changes and
+   * checking again restores them (invariant 11); an undo toast is shown only when checking
+   * overwrites existing, differing values (unchecking only clears and cannot restore that value),
+   * with undo restoring the entry's original state.
    */
   async function check(use: RecordToolUse, record: DataRecord) {
     const row = config?.data.tables.find((c) => c.id === use.table);
@@ -365,9 +380,12 @@ export function useRecordActionRunner() {
   }
 
   /**
-   * 批量新建（D-567）：筛出来的每一条来源各新建一条（引擎一条一条算，配置里没有循环）。没有就说一声；超过 200 条说上限、
-   * 什么都不做；否则先问「将在 B 新建 N 条」，确认后在一个事务里全部建好。提示条上的「撤销」删掉这一批（每条都要求还是
-   * 建好时的样子，改过就一条也不删）。存不进去的那几条（旧配置里必填项没有值）跳过。
+   * Batch creation (D-567): creates a new entry for each source item matched by filters (computed
+   * one by one by the engine; no loops in config). Shows a message if empty; says limit reached
+   * and does nothing if exceeding 200 items; otherwise prompts "Will create N entries in B", and
+   * after confirmation builds all within a single transaction. The "Undo" toast deletes this
+   * batch (each entry must still match its post-creation state; if modified, deletes none). Skips
+   * items that cannot be saved (required fields missing in old config).
    */
   async function createAll(tool: Extract<RecordTool, { do: 'createAll' }>, label: string) {
     const target = config?.data.tables.find((c) => c.id === tool.table);
@@ -391,10 +409,14 @@ export function useRecordActionRunner() {
   }
 
   /**
-   * 勾选新建（D-616）：用户在列表下面的「添加」里勾的几条来源，各新建一条（带上这一段的值 here）。点的那一刻再读一次
-   * 这一段，已经连着的跳过（别处刚加过的不重复）。勾选页的按钮「添加 N 条到 B」就是先问的那一句（底线 11，创始人
-   * 2026-11-21「算，去掉第二次」），这里不再弹确认；之后和批量新建一样：最多 200 条、一个事务、提示条能撤回这一批。
-   * 建好了返回 true（勾选页面关掉）；取消、什么都没建返回 false。
+   * Picker creation (D-616): creates a new entry for each source item selected by the user under
+   * "Add" below the list (passing "here" values from this section). Re-reads this section at the
+   * moment of the tap, skipping already linked items (preventing duplicates if added elsewhere).
+   * The picker page button "Add N items to B" serves as the confirmation prompt (invariant 11,
+   * founder 2026-11-21 "compute, drop the second"), so no secondary confirmation prompt is shown
+   * here; thereafter behaves like batch creation: maximum 200 items, single transaction, toast
+   * allows undoing the batch. Returns true upon successful creation (closing the picker page);
+   * returns false on cancellation or if nothing was built.
    */
   async function pickCreate(
     tool: Extract<RecordTool, { do: 'createAll' }>,
@@ -431,8 +453,10 @@ export function useRecordActionRunner() {
   }
 
   /**
-   * 批量新建的后半段（D-567、D-616）：没有就说一声，超过上限说上限，先问，一个事务建好，提示条能撤回这一批。
-   * ask 为 false 只给勾选新建：用户刚在勾选页点了写明条数和表的按钮，那就是问过了。
+   * Second half of batch creation (D-567, D-616): shows a message if empty, states the limit if
+   * exceeded, prompts first, builds in a single transaction, and provides an undo toast for the
+   * batch. If ask is false, only supports picker creation: the user has just tapped the button
+   * specifying count and table on the picker page, which counts as asking.
    */
   async function createBatch(
     target: Collection,
@@ -501,8 +525,10 @@ export function useRecordActionRunner() {
   }
 
   /**
-   * 打卡格（D-610）：把格子里唯一的那一条移到「最近删除」，和用户自己删一样（软删除，30 天内能找回），
-   * 提示条上有撤销（底线 11：删除弹撤销）。只删工具那张表里的（关系规则 12）；已经不在了就说一声。
+   * Check-in grid (D-610): moves the single entry in the cell to "Recently deleted", behaving
+   * just like a manual deletion by the user (soft delete, recoverable within 30 days), with an
+   * undo toast (invariant 11: deletions show undo). Deletes only from the tool's table (relation
+   * rule 12); notifies if already missing.
    */
   async function removeOne(tool: Extract<RecordTool, { do: 'remove' }>, record: DataRecord) {
     const stored = await repo.getRecord(record.id);
@@ -522,14 +548,15 @@ export function useRecordActionRunner() {
   }
 
   return {
-    /** 清单上勾一下（as check，D-617）：带 also 的勾在这里一次写完；不带的仍由列表直接改那个勾选框。 */
+    /** Checklist check action (as check, D-617): checks with "also" are written here in a single operation; those without are handled directly by the list modifying the checkbox. */
     runCheck(use: RecordToolUse, record: DataRecord): Promise<void> {
       return serial(() => check(use, record));
     },
 
     /**
-     * 勾选新建（D-616）：勾选页面上点了「添加 N 条到 B」。use 是列表下面的「添加」（as addHere，pick: true），
-     * here 是这一段的值，sourceIds 按勾的顺序。
+     * Picker creation (D-616): tapping "Add N items to B" on the picker page. `use` is "Add"
+     * below the list (`as addHere`, `pick: true`), `here` contains values from this section, and
+     * `sourceIds` follow the selection order.
      */
     runPick(
       use: RecordToolUse,
@@ -544,8 +571,10 @@ export function useRecordActionRunner() {
     },
 
     /**
-     * 打卡格（D-610）上点一格：create 在这一格加一条（here 是格子算好的「这一行、这一天」），不弹撤销（再点一下就删掉，
-     * 底线 11）；remove 把格子里唯一的那一条移到「最近删除」，弹撤销。
+     * Tapping a cell on the check-in grid (D-610): `create` adds an entry in this cell (`here`
+     * holds the "this row, this day" values computed for the cell), with no undo toast (tapping
+     * again deletes it, invariant 11); `remove` moves the single entry in the cell to "Recently
+     * deleted", showing an undo toast.
      */
     runCell(
       use: RecordToolUse,
@@ -559,8 +588,9 @@ export function useRecordActionRunner() {
     },
 
     /**
-     * 块本身的工具（button 的 tools[0]）：不作用在某一条上。recordId 是记录页打开的那一条（"$record"，
-     * 和抄它的字段，D-342、D-565）。
+     * Block-level tools (`tools[0]` of a button): do not act on a specific entry. `recordId` is
+     * the entry opened on the record page (`"$record"`, used for copying its fields, D-342,
+     * D-565).
      */
     runButton(use: RecordToolUse, label: string, recordId?: string): Promise<void> {
       return serial(async () => {
@@ -572,9 +602,11 @@ export function useRecordActionRunner() {
     },
 
     /**
-     * 一条记录上的工具（button、tap、check、drag）。record 是列表上显示的那条（可能已经不在了，按 ID 重新读）；
-     * 写哪张表看工具自己的 table（关系规则 12）。group 是拖到的那一栏（"$group"）。
-     * message 换掉提示条上的「{label}：已记下」（看板移动卡片用，D-314）。
+     * Tools acting on a single record (button, tap, check, drag). `record` is the entry displayed
+     * in the list (re-read by ID if it may no longer exist); target table depends on the tool's
+     * own table setting (relation rule 12). `group` is the target column dropped into
+     * (`"$group"`). `message` overrides the default toast message "{label}: recorded" (used for
+     * Kanban card moving, D-314).
      */
     runRow(
       use: RecordToolUse | OpenUse,
@@ -588,7 +620,7 @@ export function useRecordActionRunner() {
         if (tool.do === 'create') return create(tool, { rowId: record.id });
         if (tool.do === 'setAll') return setAll(tool, use.label ?? '');
         if (tool.do === 'createAll') return void (await createAll(tool, use.label ?? ''));
-        // 删掉只在打卡格上（runCell），这里不会有（校验拦）。
+        // Deletion only applies to check-in grids (`runCell`), and cannot occur here (blocked by validation).
         if (tool.do === 'remove') return;
         const collection = config?.data.tables.find((c) => c.id === tool.table);
         if (!collection) return;
@@ -607,7 +639,7 @@ export function useRecordActionRunner() {
           entry: await entryOf(tool, record.id, now),
         });
         if (!input) return;
-        // 要用的值是空的（这一条的间隔、日期还没填，D-565）：什么都不写，照实说，不说「已记下」。
+        // Target values are empty (interval or date fields for this entry are not yet filled, D-565): writes nothing, reports factually, and omits "Recorded".
         if (Object.keys(input).length === 0)
           return void showToast({ message: t(locale, 'recordActionNoValue') });
         const prepared = prepareRecordValues(collection, input, stored.values, now, cal);

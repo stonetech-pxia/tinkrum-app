@@ -19,7 +19,7 @@ import { createMockAIProvider } from './mock';
 import { fixRequest } from './session';
 import type { Plan } from './types';
 
-// 每个用例对应 docs/MOCK_AI_PHRASES.md 中的一个句式 ID。
+// Each test case corresponds to a sentence pattern ID in docs/MOCK_AI_PHRASES.md.
 
 const ai = createMockAIProvider();
 const now = new Date(2026, 9, 22, 9, 0);
@@ -28,7 +28,7 @@ async function plan(input: string, config: WorkspaceConfig, locale: Locale = 'zh
   return ai.plan(input, { config, registry, locale });
 }
 
-/** 让 mock 生成计划，并通过与 App 相同的 prepareOps 流程得到修改后的配置。 */
+/** Have the mock generate a plan, and obtain the modified configuration via the same `prepareOps` pipeline used by the app. */
 async function change(input: string, config: WorkspaceConfig, locale: Locale = 'zh') {
   const p = await plan(input, config, locale);
   if (p.kind !== 'ops') throw new Error(`expected ops for “${input}”, got ${JSON.stringify(p)}`);
@@ -37,7 +37,7 @@ async function change(input: string, config: WorkspaceConfig, locale: Locale = '
   return { ...prepared, plan: p };
 }
 
-/** 先做功能、再点「接着改」那一条（D-191）：数据页面要两句话。 */
+/** Perform feature changes first, then select the "continue editing" option (D-191): data pages require two sentences. */
 async function changeThenNext(input: string, config: WorkspaceConfig, locale: Locale = 'zh') {
   const first = await change(input, config, locale);
   if (!first.plan.next) throw new Error(`expected a next request for “${input}”`);
@@ -49,7 +49,7 @@ const homeIds = (c: WorkspaceConfig) => home(c).blocks.map((x) => x.id);
 const mergeSteps = (c: WorkspaceConfig) =>
   quickActionsOf(c).find((w) => w.id === 'pdf-merge')!.steps;
 
-// PDF 不在最上面的首页，这样“放到最上面”是一次真实的修改。
+// PDF is not at the top of the home view, so moving it to the top is an actual modification.
 const pdfBelowFiles = () =>
   apply(workspace('zh', { withPdf: true }), [
     { op: 'moveContainer', page: 'home', block: 'card-pdf', toIndex: 3 },
@@ -72,16 +72,16 @@ describe('mock AI — journey A (home page)', () => {
     expect(lines).toContain('修改标题「我的工作台」：标题改为「文件工作台」');
   });
 
-  it('A2 “PDF 放第一个”', async () => {
+  it('A2 "PDF put first"', async () => {
     expect(homeIds((await change('PDF 放第一个', pdfBelowFiles())).after)[1]).toBe('card-pdf');
   });
 
-  it('A3 “导航只要首页、工具和设置”', async () => {
+  it('A3 "Navigation only home, tools, and settings"', async () => {
     const { after } = await change('导航只要首页、工具和设置', workspace());
     expect(after.nav.bar).toEqual(['page:home', 'tools', 'settings']);
   });
 
-  it('A4 “首页改成文件工作台”', async () => {
+  it('A4 "Home changed to file workspace"', async () => {
     expect(home((await change('首页改成文件工作台', workspace())).after).title).toBe('文件工作台');
   });
 
@@ -132,7 +132,7 @@ describe('mock AI — single changes', () => {
     expect(home((await change('显示欢迎卡片', hidden)).after).blocks[0]!.hidden).toBeUndefined();
   });
 
-  it('B4 “把最近文件放到 PDF 前面”', async () => {
+  it('B4 "Put recent files before PDF"', async () => {
     const { after } = await change('把最近文件放到 PDF 前面', workspace('zh', { withPdf: true }));
     expect(homeIds(after)).toEqual(['welcome', 'recent-files', 'card-pdf', 'catalog']);
   });
@@ -144,7 +144,7 @@ describe('mock AI — style', () => {
     expect(bigger.theme.fontScale).toBe(1.15);
     expect((await change('Bigger text', workspace('en'), 'en')).after.theme.fontScale).toBe(1.15);
     expect((await change('字小一点', workspace())).after.theme.fontScale).toBe(0.9);
-    // 已到上限时不再修改。
+    // Do not modify further when the upper limit is reached.
     const max = apply(workspace(), [{ op: 'setTheme', fontScale: 1.3 }]);
     expect(await plan('字体大一点', max)).toMatchObject({ kind: 'reject', reason: 'noChange' });
   });
@@ -193,12 +193,12 @@ describe('mock AI — style', () => {
     expect((await change('Switch to terminal style', workspace('en'), 'en')).after.theme).toEqual(
       THEME_PRESETS.terminal.theme,
     );
-    // 只改卡片、只改颜色的说法不受影响。
+    // Statements that only modify cards or colors remain unaffected.
     expect((await change('卡片改成新粗野风格', workspace())).after.theme.colors).toEqual({});
     expect((await change('主题换成绿色', workspace())).after.theme.cardStyle).toBe('shadow');
   });
 
-  // 法语界面的风格选择器也发这句话给内置规则（D-234）。
+  // The style selector for the French UI also sends this sentence to the built-in rules (D-234).
   it.each(
     THEME_PRESET_IDS.flatMap((id) => (['zh', 'en', 'fr'] as const).map((l) => [id, l] as const)),
   )(
@@ -209,7 +209,7 @@ describe('mock AI — style', () => {
     },
   );
 
-  // AI 页的两个预设标签：句子不经模型，直接套整套样板（收据、名片）。
+  // The two preset tags on the AI page: sentences bypass the model and directly apply a complete template (receipts, business cards).
   it.each(
     (['zh', 'en', 'fr'] as const).flatMap((l) =>
       (
@@ -312,7 +312,7 @@ describe('mock AI — data pages (structure only)', () => {
     ['新建笔记页面', 'zh', '笔记'],
     ['Create a to-do list', 'en', 'To-dos'],
   ] as const)('F1 “%s” builds the data table, then the page', async (input, locale, table) => {
-    // 数据表是功能，直接做；页面是外观，留作「接着改」的下一句（D-191）。
+    // Data tables are features and executed immediately; pages are appearance and left as the next sentence for "continue editing" (D-191).
     const first = await change(input, workspace(locale), locale);
     expect(first.after.data.tables.map((c) => c.name)).toEqual([table]);
     expect(first.after.containers.pages).toHaveLength(1);
@@ -400,7 +400,7 @@ describe('mock AI — attachments (D-263)', () => {
     expect(fields.filter((f) => f.type === 'file')).toHaveLength(1);
     expect(after.tools).toEqual(budget.tools);
     expect(lines.join('\n')).toMatch(locale === 'zh' ? /附件/ : /Attachments/);
-    // 已经有附件字段：不用改，说明在哪里放照片。
+    // An attachment field already exists: no need to change; explains where to put photos.
     expect(await plan(input, after, locale)).toMatchObject({ kind: 'reject', reason: 'noChange' });
   });
 });
@@ -430,7 +430,7 @@ describe('mock AI — images and icons', () => {
 });
 
 describe('mock AI — journey C (PDF tool)', () => {
-  it('C1 simplifies to pick + merge, saves automatically as 合并-日期', async () => {
+  it('C1 simplifies to pick + merge, saves automatically as merge-date', async () => {
     const { after, lines } = await change(
       '把 PDF 工具首页简化成上传和合并两个步骤，完成后自动按照‘合并-日期’命名',
       workspace('zh', { withPdf: true }),
@@ -441,19 +441,19 @@ describe('mock AI — journey C (PDF tool)', () => {
       'file.rename',
       'file.save',
     ]);
-    // 命名保留但不再询问。
+    // Preserve the naming but no longer prompt.
     expect(mergeSteps(after)[2]).toEqual({
       id: 'name',
       action: 'file.rename',
       params: { template: '合并-{date:YYYY-MM-DD}' },
     });
-    // 仍然是同一个工具实例。
+    // Still the same tool instance.
     expect(after.packages).toHaveLength(1);
     expect(quickActionsOf(after).filter((w) => w.id === 'pdf-merge')).toHaveLength(1);
     expect(lines.some((l) => l.includes('合并-2026-10-22'))).toBe(true);
   });
 
-  it('C2 “合并后的文件按日期命名” changes the naming only', async () => {
+  it('C2 "Merged files named by date" changes the naming only', async () => {
     const { after } = await change('合并后的文件按日期命名', workspace('zh', { withPdf: true }));
     expect(mergeSteps(after).map((s) => s.id)).toEqual(['select', 'merge', 'name', 'save']);
     expect(mergeSteps(after)[2]).toEqual({
@@ -540,7 +540,7 @@ describe('mock AI — guide step 1 (D-231)', () => {
   });
 });
 
-// D-265：界面上没有入口、用户也不太会这么说的句子，内置规则不再认（交给真实模型，评测照旧）。
+// D-265: Sentences with no UI entry point and unlikely to be uttered by users are no longer recognized by built-in rules (handled by the real model; evaluations remain unchanged).
 describe('mock AI — sentences removed in D-265', () => {
   it.each([
     ['图标改成浅色底', 'zh'],
@@ -583,7 +583,7 @@ describe('mock AI — record reports (W9)', () => {
   });
 });
 
-describe('把这些补上（D-418）', () => {
+describe('Fix these (D-418)', () => {
   async function step(config: WorkspaceConfig, input: string) {
     const plan = await ai.plan(input, { config, registry, locale: 'zh' });
     if (plan.kind !== 'ops') throw new Error(`${input}: ${plan.kind}`);
@@ -594,7 +594,7 @@ describe('把这些补上（D-418）', () => {
   const blockers = (config: WorkspaceConfig) =>
     checkTools(config, registry).issues.filter((i) => i.severity === 'blocker');
 
-  it('表没有地方看：在首页放上列表，问题消失', async () => {
+  it('Table has nowhere to view: put a list on the home screen, problem disappears', async () => {
     let config = createStarterWorkspace('zh', registry);
     config = await step(config, '新建一个记账页面');
     config = await step(config, '新建一个快捷操作：拍照，记到账目');
@@ -603,7 +603,7 @@ describe('把这些补上（D-418）', () => {
     expect(blockers(after)).toEqual([]);
   });
 
-  it('补不了的不猜：拒绝', async () => {
+  it('Cannot fill, do not guess: reject', async () => {
     const config = createStarterWorkspace('zh', registry);
     const plan = await ai.plan(
       fixRequest([{ severity: 'blocker', code: 'x', target: 'table:x', message: 'x' }]),
@@ -612,7 +612,7 @@ describe('把这些补上（D-418）', () => {
     expect(plan.kind).toBe('reject');
   });
 
-  it('「缺页面」的搭建计划：做完之后表没有地方看（模拟器上试按钮用）', async () => {
+  it('Setup plan with "missing page": table has nowhere to view after completion (for testing buttons in simulator)', async () => {
     const start = createStarterWorkspace('zh', registry);
     const plan = await ai.plan('搭建一个记账 App，缺页面', {
       config: start,
@@ -639,8 +639,8 @@ describe('把这些补上（D-418）', () => {
   });
 });
 
-describe('MX1：一个计划里功能和外观都有（D-419）', () => {
-  it('功能和外观分得开，两样都套得上', async () => {
+describe('MX1: Both features and appearance in a single plan (D-419)', () => {
+  it('Features and appearance are separable, both can be applied', async () => {
     const config = workspace();
     const result = await plan('做个月历（混合计划）', config);
     if (result.kind !== 'ops') throw new Error(result.kind);

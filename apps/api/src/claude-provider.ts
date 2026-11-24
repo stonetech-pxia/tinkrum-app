@@ -3,8 +3,9 @@ import { supportsServerFallback, type Completion } from '@morph/planner';
 
 import type { Relay } from './server';
 
-// 服务端的模型调用（官方 SDK）。提示词和对话由 App 给（D-193）；模型、输出上限和思考力度由服务器定。
-// API key 只在服务端进程中，从不离开服务器。
+// Server-side model calls (official SDK). Prompts and conversations provided by the app (D-193);
+// model, output limit, and thinking effort determined by the server. API key resides exclusively in
+// the server process and never leaves the server.
 
 export interface SdkRelayOptions {
   model: string;
@@ -12,7 +13,7 @@ export interface SdkRelayOptions {
   effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | undefined;
 }
 
-/** 只留 App 修正时要原样发回的内容块，字段也只留这些；/v1/complete 只接受这些。 */
+/** Keep only content blocks needed to be sent back verbatim during app corrections, and keep only these fields; `/v1/complete` accepts only these. */
 function replayable(block: Anthropic.Beta.BetaContentBlock): unknown[] {
   if (block.type === 'text') return [{ type: 'text', text: block.text }];
   if (block.type === 'thinking') {
@@ -29,7 +30,7 @@ function requestParams(
   return {
     model: options.model,
     max_tokens: options.maxTokens,
-    // 同一个 App 版本的系统提示词不变，标记缓存以降低重复请求的成本。
+    // System prompt for the same app version remains unchanged, marked for caching to reduce duplicate request costs.
     system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
     messages: messages as Anthropic.Beta.BetaMessageParam[],
     ...(options.effort ? { output_config: { effort: options.effort } } : {}),
@@ -67,9 +68,9 @@ export function createSdkRelay(client: Anthropic, options: SdkRelayOptions): Rel
 }
 
 export interface BatchTiming {
-  /** 多久没有新请求就把攒下的请求提交成一批。 */
+  /** Duration of no new requests before submitting accumulated requests as a batch. */
   idleMs?: number;
-  /** 查询批次状态的间隔。 */
+  /** Interval for querying batch status. */
   pollMs?: number;
   log?: (line: string) => void;
 }
@@ -81,8 +82,9 @@ interface Pending {
 }
 
 /**
- * 只给评测用：把同时到达的请求攒成一批，走批处理 API（半价，但要等几分钟到几小时）。
- * 批处理 API 不接受 fallbacks，所以这里不加拒答回退。
+ * For evaluation use only: accumulates concurrently arriving requests into a batch, using the
+ * Batch API (half price, but takes minutes to hours). Batch API does not accept fallbacks, so
+ * refusal fallbacks are omitted here.
  */
 export function createBatchRelay(
   client: Anthropic,
@@ -102,7 +104,7 @@ export function createBatchRelay(
         await new Promise((r) => setTimeout(r, pollMs));
         batch = await client.beta.messages.batches.retrieve(batch.id);
       }
-      // 结果的顺序不固定，按 custom_id 对回请求。
+      // Result order is not fixed, matches requests back by `custom_id`.
       for await (const item of await client.beta.messages.batches.results(batch.id)) {
         const p = pending[Number(item.custom_id)];
         if (!p) continue;
@@ -116,7 +118,7 @@ export function createBatchRelay(
             ),
           );
       }
-      // 已经有结果的请求，这里的 reject 不起作用。
+      // For requests that already have results, this `reject` has no effect.
       for (const p of pending) p.reject(new Error('批处理结果里没有这个请求'));
     } catch (e) {
       for (const p of pending) p.reject(e);

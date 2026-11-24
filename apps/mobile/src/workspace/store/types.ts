@@ -24,7 +24,7 @@ import type {
   WorkspaceRepo,
 } from '../../storage/types';
 
-// workspace store 对外的类型：状态、动作和它们的结果。动作的实现分在同目录的几个文件里（见 ../store.ts）。
+// Workspace store external types: state, actions, and their results. Action implementations are split across several files in the same directory (see ../store.ts).
 
 export interface WorkspaceDeps {
   repo: WorkspaceRepo;
@@ -32,9 +32,9 @@ export interface WorkspaceDeps {
   registry: Registry;
   locale: Locale;
   now: () => Date;
-  /** 第一次启动时的第一个版本。App 用预装了工具的 createStarterWorkspace（D-104）；不传时是空白工作空间。 */
+  /** First version on initial startup. The app uses createStarterWorkspace with preinstalled tools (D-104); if omitted, the workspace starts blank. */
   seed?: (locale: Locale, registry: Registry) => WorkspaceConfig;
-  /** 不在注册表里的工具叫什么（从下载的工具目录里查，D-177）；恢复历史版本缺工具时提示用。 */
+  /** Name for a tool not found in the registry (looked up from downloaded tool directory, D-177); used for prompts when restoring historical versions missing a tool. */
   toolName?: (toolId: string) => string | undefined;
 }
 
@@ -47,17 +47,17 @@ export interface Proposal {
   lines: string[];
   source: RevisionSource;
   summary: string;
-  /** 预览时展示的页面。 */
+  /** Page displayed during preview. */
   focusPageId: string;
-  /** 新建、但不在任何页面上的工作流：预览显示它的步骤，应用后打开工作流列表（D-109）。 */
+  /** A workflow that is newly created but not attached to any page: preview displays its steps, and applying it opens the workflow list (D-109). */
   focusWorkflowId?: string;
-  /** AI 新建的工作流的「在首页放一个入口」选项（D-109）；on 时 after 已包含首页的运行卡片。 */
+  /** "Put an entry on the home screen" option for AI-created workflows (D-109); when on, after already includes the home screen run card. */
   homeEntry?: { workflowIds: string[]; on: boolean };
-  /** AI 计划里的操作（不含首页入口），切换首页入口时据此重新计算。 */
+  /** Operations in the AI plan (excluding the home screen entry point); recalculated when toggling the home screen entry. */
   ops?: Op[];
-  /** AI 写给用户的说明：做不到的部分、补上的步骤为什么要加（D-110）。 */
+  /** Explanations written by the AI to the user: parts it could not do, and why added supplementary steps were needed (D-110). */
   notes?: string[];
-  /** 恢复的是哪个版本（撤销、恢复历史版本）；比它新的版本里做的，清单里不再算做了（D-414）。换预设没有这一项，全都不算。 */
+  /** The version restored to (undo, restoring a history version); changes made in newer versions are no longer counted in the changelist (D-414). Preset changes do not have this field, counting all changes. */
   restoredTo?: number;
 }
 
@@ -69,73 +69,75 @@ export type ProposeResult =
 export interface Banner {
   kind: 'applied' | 'rolledBack' | 'recovered' | 'conflict';
   message: string;
-  /** 撤销时恢复到的版本。 */
+  /** Version to restore to upon undo. */
   undoTo?: number;
-  /** 手指正按在「撤销」上：这时不到时间消失，否则这一下会落空。 */
+  /** Finger is currently held down on "Undo": prevents it from disappearing on timeout, otherwise this action would be lost. */
   held?: boolean;
 }
 
-/** 编辑模式的草稿（D-054）：操作先累积在这里，点「完成」时作为一个版本提交。 */
+/** Edit mode draft (D-054): operations accumulate here first and are committed as a single version when clicking "Done". */
 export interface EditDraft {
   pageId: string;
   mode: 'single' | 'page';
-  /** 已合并相邻同类操作。 */
+  /** Adjacent similar operations have been merged. */
   ops: Op[];
-  /** 应用 ops 后、已通过校验的配置；编辑模式下页面显示它。 */
+  /** Configuration after applying ops and passing validation; displayed on the page during edit mode. */
   config: WorkspaceConfig;
 }
 
 export type EditResult = { ok: true } | { ok: false; issues: string[] } | { ok: false; full: true };
 
-/** AI 修改草稿的一步（D-190）：用户说的一句话和 AI 给的修改。 */
+/** A step of AI modifications to the draft (D-190): what the user said and the modifications provided by the AI. */
 export interface DraftStep {
   input: string;
-  /** 已包含新快捷操作的首页入口。 */
+  /** Home screen entry point already including the new quick action. */
   ops: Op[];
   lines: string[];
   notes?: string[];
   changeRequestId: number;
-  /** 套用到这一步为止的配置。不存盘：启动或回到草稿时在最新版本上重新算（rebaseDraft）。 */
+  /** Configuration applied up to this step. Not persisted: recalculated on the latest version upon startup or returning to the draft (rebaseDraft). */
   config: WorkspaceConfig;
 }
 
-/** 草稿从哪里开始的：应用后据此带用户回去（从快捷操作或收件页面打开）。 */
+/** Where the draft originated from: used to take the user back after applying (opened from a quick action or inbox page). */
 export interface DraftOrigin {
   about?: PlanAbout;
-  /** 在哪个 app 里改的（D-485）：只能改这个 app；草稿跟着它，换到别处接着说也一样。没写是主页（整个工作区）。 */
+  /** App in which the modification was made (D-485): restricted to this app; the draft follows it, and continuing the conversation elsewhere behaves the same. Unspecified means the home (entire workspace). */
   appId?: string;
-  /** 新手引导第 3 步套用的样板（D-260）：应用后回到它的主页面，提示可以用 AI 接着改。 */
+  /** Sample preset applied in onboarding step 3 (D-260): returns to its main page after applying, prompting that AI can be used for further modifications. */
   sample?: { id: SampleApp; pageId: string };
 }
 
 /**
- * AI 修改的草稿（D-190）：AI 处理完直接进入草稿模式，App 显示改完后的样子，能看不能用；
- * 「修改」接着说、「退一步」撤掉最近一步、「应用」合成一个版本保存、「离开」回到正式的 App 但草稿保留。
- * 一次只有一份，存在本机（app_meta），重启也在。
+ * AI modification draft (D-190): after processing, the AI enters draft mode directly, and the app
+ * displays the modified result in view-only mode; "Modify" continues the conversation, "Step
+ * back" undoes the latest step, "Apply" combines changes into a saved version, and "Leave"
+ * returns to the official app while keeping the draft. Only one exists at a time, stored locally
+ * (app_meta) and preserved across restarts.
  */
 export interface Draft {
   steps: DraftStep[];
-  /** 聊天框里没变成一步的话和回复（D-207），跟草稿一起存盘。 */
+  /** Chat box messages and replies that did not become steps (D-207), stored together with the draft. */
   replies: DraftChatReply[];
   origin: DraftOrigin;
-  /** 正在草稿模式里；false = 离开了，草稿还在。 */
+  /** Whether currently in draft mode; false = left, but draft still exists. */
   open: boolean;
 }
 
-/** 草稿聊天框里没变成一步的一句话（D-207）：做不到、不合格、功能类已经直接生效（D-411）、退了一步。 */
+/** A message in the draft chat box that did not become a step (D-207): items such as unachievable requests, invalid requests, functional changes that took effect immediately (D-411), or stepped-back actions. */
 export interface DraftChatReply {
-  /** 说的时候草稿有几步：聊天框把它排在这一步后面；退一步退过它时一起去掉。 */
+  /** Number of steps in the draft when said: chat box orders it after this step; removed together when stepping back past it. */
   afterSteps: number;
   input: string;
   kind: 'rejected' | 'invalid' | 'functionApplied' | 'steppedBack' | 'needsDraft';
   message: string;
   examples: string[];
   reason?: RejectReason;
-  /** needsDraft：用户点「应用草稿并继续」时接着做的这一步（D-413）。只有配置结构。 */
+  /** needsDraft: the step to execute next when the user clicks "Apply draft and continue" (D-413). Contains only configuration structure. */
   waiting?: WaitingForDraft;
 }
 
-/** 这一步要用到草稿里的东西（D-413）：等用户点「应用草稿并继续」。 */
+/** This step requires items from the draft (D-413): waits for the user to click "Apply draft and continue". */
 export interface WaitingForDraft {
   input: string;
   plan: Extract<Plan, { kind: 'ops' }>;
@@ -146,19 +148,21 @@ export type BuildStepStatus = 'todo' | 'running' | 'done' | 'skipped' | 'failed'
 
 export interface BuildRunStep extends BuildStep {
   status: BuildStepStatus;
-  /** 前一步已经把这一步做了（模型回 noChange）：打勾，但说明不同。不算失败。 */
+  /** The previous step already performed this operation (model returned noChange): checked, but with a different explanation. Not counted as a failure. */
   already?: boolean;
-  /** 卡住的原因。 */
+  /** Reason for getting stuck. */
   reason?: string;
-  /** 卡住的原因是要用到草稿里的东西（D-413）：显示「应用草稿并继续」。 */
+  /** The reason for getting stuck is that it requires items from the draft (D-413): displays "Apply draft and continue". */
   needsDraft?: boolean;
-  /** 这一步做完功能后接着做的那句（next）：重试时从这里接着。 */
+  /** The follow-up utterance after this step completes its functionality (next): retry resumes from here. */
   current?: string;
 }
 
 /**
- * 正在搭的大工程（D-415）。review：等用户看计划；running：在做；failed：一步失败，等用户选；
- * paused：停下了（用户点的、App 进后台或重启），等用户点继续（底线 16）；finished：都做完了。存在本机，随 App 重启保留。
+ * A large project currently being built (D-415). review: waiting for user to review the plan;
+ * running: in progress; failed: a step failed, waiting for user selection; paused: stopped (by
+ * user, app entering background, or restart), waiting for user to continue (invariant 16);
+ * finished: all tasks completed. Stored locally, preserved across app restarts.
  */
 export interface BuildRun {
   summary: string;
@@ -168,24 +172,27 @@ export interface BuildRun {
 }
 
 export type DraftResult =
-  /** focusPageId：这一步改到的页面，进入草稿时显示它。 */
+  /** focusPageId: the page modified by this step, displayed when entering the draft. */
   | { kind: 'drafted'; step: DraftStep; focusPageId: string }
-  /** 草稿里说「撤销」：退了一步。没有草稿时说「撤销」：直接回到上一个版本。 */
+  /** Said "Undo" in the draft: stepped back by one step. Said "Undo" with no draft: returns directly to the previous version. */
   | { kind: 'steppedBack' }
   | { kind: 'restored' }
   | { kind: 'rejected'; message: string; examples: string[]; reason?: RejectReason }
   | { kind: 'invalid'; issues: string[] };
 
 /**
- * AI 修改页说的一句话（D-191）：功能类直接应用（applied），外观类进草稿；
- * 一个计划两样都有时功能直接应用，结果是外观进草稿的 drafted（D-419）。
- * 在草稿的聊天框里说功能类的话也直接应用，草稿接着开着（D-411）。
+ * A message produced by the AI modification page (D-191): functional changes are applied
+ * immediately (applied), while appearance changes enter the draft; when a plan contains both,
+ * functional changes apply immediately and the result is drafted due to appearance changes
+ * entering the draft (D-419). Saying functional phrases in the draft chat box also applies them
+ * immediately, keeping the draft open (D-411).
  */
 export type ChangeResult =
   | DraftResult
   /**
-   * focusPageId：改到的页面，回到 App 时显示它。lines：改了什么。
-   * lookNotDone：这个计划里的外观套不上，没做（D-419）；做成了的话结果是 drafted。
+   * focusPageId: the modified page, displayed when returning to the app. lines: summary of
+   * changes. lookNotDone: appearance changes in this plan could not be applied and were skipped
+   * (D-419); if successful, the result is drafted.
    */
   | {
       kind: 'applied';
@@ -194,31 +201,33 @@ export type ChangeResult =
       focusPageId: string;
       lookNotDone?: boolean;
     }
-  /** 这一步要用到草稿里的东西（D-413）：什么都没改，等用户点「应用草稿并继续」。 */
+  /** needsDraft: message: string; waiting: WaitingForDraft */
   | { kind: 'needsDraft'; message: string; waiting: WaitingForDraft }
-  /** 大工程（规则 53）：计划在 build 里，等用户看过点「开始」（D-415）。 */
+  /** Large project (rule 53): plan is in build, waiting for the user to review and click "Start" (D-415). */
   | { kind: 'build' };
 
-/** 应用之后（草稿或直接应用的功能）带用户去哪里要用的信息。 */
+/** Information on where to take the user after application (draft or directly applied functionality). */
 export interface Applied {
   addedWorkflowIds: string[];
   addedCollectionIds: string[];
-  /** 这次新放到手机桌面的快捷操作（D-271）：只有一个时打开它的「做好了」，说明怎么用。 */
+  /** Quick actions newly placed on the phone desktop this time (D-271): opens its "Done" view when there is only one, explaining how to use it. */
   homeScreenWorkflowIds: string[];
   origin: DraftOrigin;
-  /** AI 的说明（D-110），直接应用的功能在「做好了」页面上显示。 */
+  /** AI explanations (D-110), displayed on the "Done" page for directly applied features. */
   notes?: string[];
 }
 
 /**
- * 记录提示条。一个简单操作改不回来的才带撤销（底线 11，D-385、D-566）：删除（restoreRecordId、restorePreset）、
- * 点一下改几处和批量新建（undo）。
+ * Record toast notification. Only supports undo for actions that cannot be easily reverted by a
+ * simple operation (invariant 11, D-385, D-566): deletion (restoreRecordId, restorePreset),
+ * tapping to change multiple places, and bulk creation (undo).
  */
 export interface RecordToast {
   message: string;
   /**
-   * 撤销点一下改的几处（D-566）或批量新建的那些（D-567）：在一个事务里写回去，每条都要求还是做完时的样子，
-   * 这期间改过就一条也不动。
+   * undo: changes modified simultaneously by a tap (D-566) or bulk-created items (D-567): written
+   * back within a single transaction, with each entry required to remain in its post-completion
+   * state; modified during this period means none are changed.
    */
   undo?: {
     writes: RecordWrite[];
@@ -226,35 +235,35 @@ export interface RecordToast {
     failed: 'recordUndoFailed' | 'recordUndoBulkFailed';
   };
   restoreRecordId?: string;
-  /** 刚导入的一批（D-574）：撤销时这一批进「最近删除」。 */
+  /** undoImport: id: string; table: string */
   undoImport?: { id: string; table: string };
-  /** 刚从备份恢复（D-600）：撤销时换回恢复之前的数据；这条提示不再出现，那份旧数据就删掉。 */
+  /** undoRestore: true */
   undoRestore?: true;
-  /** 一起删的几条（D-547）：撤销时全部放回来。 */
+  /** restoreRecordIds: string[] */
   restoreRecordIds?: string[];
-  /** 删掉的预设（D-410）：预设是真删，撤销时把这份放回去。 */
+  /** restorePreset: SavedPreset */
   restorePreset?: SavedPreset;
-  /** 这张表还没有页面读：提示上有「接着改」，打开 AI 页改这张表。 */
+  /** continueTable: string */
   continueTable?: string;
-  /** 手指正按在提示的按钮上：这时不到时间消失。 */
+  /** Finger is currently held down on the notification button: prevents it from disappearing on timeout. */
   held?: boolean;
 }
 
 export type SavePresetResult =
   | { kind: 'saved'; preset: SavedPreset }
-  /** 名字是空的。 */
+  /** Name is empty. */
   | { kind: 'noName' }
-  /** 到上限了（MAX_SAVED_PRESETS）。 */
+  /** Reached maximum limit (MAX_SAVED_PRESETS). */
   | { kind: 'full' };
 
-/** 从文件导入预设的结果（D-485）。 */
+/** Result of importing a preset from a file (D-485). */
 export type ImportPresetResult =
   | { kind: 'saved'; preset: SavedPreset }
-  /** 到上限了（MAX_SAVED_PRESETS）。 */
+  /** Reached maximum limit (MAX_SAVED_PRESETS). */
   | { kind: 'full' }
-  /** 文件本身读不了（太大、不是 JSON、不是 App 配置、版本太新）。 */
+  /** refused: problem: AppConfigFileProblem */
   | { kind: 'refused'; problem: AppConfigFileProblem }
-  /** 是 App 配置，但迁移或校验没过：issues 是具体原因，什么都没存。 */
+  /** invalid: issues: string[] */
   | { kind: 'invalid'; issues: string[] };
 
 export interface WorkspaceState {
@@ -265,79 +274,74 @@ export interface WorkspaceState {
   proposal: Proposal | null;
   banner: Banner | null;
   busy: boolean;
-  /** AI 规划走到哪一步（D-448），AI 页在 Tink 旁边显示；不忙时是 null。 */
+  /** planProgress: PlanProgress | null */
   planProgress: PlanProgress | null;
-  /** 文件列表的刷新信号：工作流保存文件后递增。 */
+  /** assetsVersion: number */
   assetsVersion: number;
-  /** 显示过的版本渲染出错、不回退时加 1：出错边界按它重新挂载，再试一次。 */
+  /** renderAttempt: number */
   renderAttempt: number;
-  /** 外壳当前显示的导航项；版本变化时外壳会重新挂载，所以保存在这里。 */
+  /** tab: NavTarget | null */
   tab: NavTarget | null;
-  /** 现在在哪个 app 里（D-485）；null = 主页。只放内存，不写配置（底线 15）。 */
+  /** appId: string | null */
   appId: string | null;
-  /** 进入 App 的次数（每次加一）；离开 App 再回来时用它分辨是不是从桌面菜单、深链接直接打开的。 */
+  /** appEnters: number */
   appEnters: number;
-  /** 记录的刷新信号：增删改记录后递增（任何一张表）。读所有表的地方（提醒、桌面小组件、数据页）用它。 */
+  /** recordsVersion: number */
   recordsVersion: number;
   /**
-   * 按表的刷新信号（D-555）：写了哪张表，那张表加 1。读表的块只看自己读的那几张（tableVersion）。
-   * 没写过的表没有这一项（当 0）。
+   * tableVersions: Readonly<Record<string, number>>
    */
   tableVersions: Readonly<Record<string, number>>;
-  /** 不知道写了哪张表的写入（恢复、撤销删除、批量删除、导入等）加 1：所有表都算变了。 */
+  /** recordsAll: number */
   recordsAll: number;
-  /** 预设列表的刷新信号（D-410）。 */
+  /** presetsVersion: number */
   presetsVersion: number;
-  /** 记录操作后的提示（例如删除后可以撤销）。与版本提示条分开：记录不属于任何版本。 */
+  /** toast: RecordToast | null */
   toast: RecordToast | null;
-  /** 编辑模式（直接编辑，D-052–D-054）；为 null 时不在编辑模式。 */
+  /** editing: EditDraft | null */
   editing: EditDraft | null;
-  /** AI 修改的草稿（D-190）。 */
+  /** draft: Draft | null */
   draft: Draft | null;
-  /** 草稿的提示：重新套用时去掉了几步、草稿显示出错退了一步。 */
+  /** draftNotice: string | null */
   draftNotice: string | null;
   /**
-   * 「接着改」的预设（D-191）：上一次功能修改那句话里剩下的外观请求。只有一条，存在本机；
-   * 下一次功能修改换掉它，用掉或撤销时清掉。
+   * next: string | null
    */
   next: string | null;
-  /** AI 建议的下一步（D-355），存在本机：下一次修改给了新的就换掉，没给就去掉点过的那条；撤销时清掉。 */
+  /** suggest: string[] */
   suggest: string[];
 
   boot(): Promise<void>;
   /**
-   * planner 不传时用设置里选的 AI；风格选择器填的原句用内置规则（D-095）。
-   * about：从哪里打开的 AI 修改（一个快捷操作、分享进来的文件，D-124）。
+   * propose(input: string, planner?: AIProvider, about?: PlanAbout): Promise<Propose
    */
   propose(input: string, planner?: AIProvider, about?: PlanAbout): Promise<ProposeResult>;
   proposeRestore(revisionId: number): Promise<ProposeResult>;
-  /** 换成一个保存的预设（D-410）：和恢复历史版本一样先预览，确认才生效，能撤销。 */
+  /** proposePreset(presetId: string): Promise<ProposeResult>; */
   proposePreset(presetId: string, options?: { keepFiles?: boolean }): Promise<ProposeResult>;
-  /** 把当前的 App 存成预设（D-410）：不带记录和文件引用，不产生新版本。 */
+  /** savePreset(name: string): Promise<SavePresetResult>; */
   savePreset(name: string): Promise<SavePresetResult>;
   /**
-   * 把一份 App 配置文件的内容存成一个新预设（D-485）：名字取文件名，当前的 App 不变，
-   * 用户在列表里点「应用」才换。迁移、校验、清文件引用都在存之前做；不联网。
+   * importPreset(text: string, fileName: string): Promise<ImportPresetResult>;
    */
   importPreset(text: string, fileName: string): Promise<ImportPresetResult>;
-  /** 名字是空的时不改，返回 false。 */
+  /** renamePreset(presetId: string, name: string): Promise<boolean>; */
   renamePreset(presetId: string, name: string): Promise<boolean>;
-  /** 真删；提示条能撤销（底线 11）。 */
+  /** deletePreset(preset: SavedPreset): Promise<void>; */
   deletePreset(preset: SavedPreset): Promise<void>;
-  /** 提示条的撤销：把删掉的预设放回去。 */
+  /** restorePreset(preset: SavedPreset): Promise<void>; */
   restorePreset(preset: SavedPreset): Promise<void>;
   /**
-   * 来自界面按钮（安装、卸载等）的修改，同样经过校验和版本记录。
-   * fromAppFile：导入、恢复一个 App 文件，不受 30 步限制（D-554）。
+   * proposeOps(
    */
   proposeOps(
     ops: Op[],
     summary: string,
     options?: { fromAppFile?: boolean },
   ): Promise<ProposeResult>;
-  /** 预览里勾选 / 取消「在首页放一个入口」（D-109）。 */
+  /** setHomeEntry(on: boolean): void; */
   setHomeEntry(on: boolean): void;
-  /** quiet：渲染后顶部不出「已改好 · 撤销」（新手引导里的修改，D-239）。 */
+  /** confirm(options?: { quiet?: boolean }): Promise<boolean>; */
   confirm(options?: { quiet?: boolean }): Promise<boolean>;
   cancel(): Promise<void>;
   undo(): Promise<void>;
@@ -345,21 +349,21 @@ export interface WorkspaceState {
   reportRenderError(error: unknown): Promise<void>;
   dismissBanner(): void;
   selectTab(target: NavTarget): void;
-  /** 进入一个 app，先显示它底栏里的第一页；回到主页用 leaveApp。 */
+  /** enterApp(appId: string): void; */
   enterApp(appId: string): void;
-  /** 在外壳里显示一个页面：它在所属 app（或主页）的底栏里就切过去并返回 true；不在底栏里返回 false，什么都不改。 */
+  /** showInShell(config: WorkspaceConfig, target: NavTarget): boolean; */
   showInShell(config: WorkspaceConfig, target: NavTarget): boolean;
   leaveApp(): void;
   startEditing(pageId: string, mode?: EditDraft['mode']): void;
-  /** 把操作加入草稿：先校验，不通过时草稿不变。 */
+  /** editOps(ops: Op[]): EditResult; */
   editOps(ops: Op[]): EditResult;
-  /** 「完成」：草稿作为一个 source 为 user 的版本提交；没有实际变化时直接退出。 */
+  /** "Complete": Submits the draft as a version with source "user"; exits immediately if there are no actual changes. */
   finishEditing(summary: string): Promise<EditResult>;
-  /** 「取消」：放弃草稿。 */
+  /** "Cancel": Discards the draft. */
   cancelEditing(): void;
   /**
-   * 记录写过以后调用。tables：写的是哪几张表（确定知道时才传）；不传 = 不知道，所有表一起重来
-   * （宁可慢，不能旧，D-555）。
+   * Smth called after records are written. `tables`: Which tables were written (pass only when
+   * known); omitted = unknown, re-evaluate all tables together (prefer slow over stale, D-555).
    */
   bumpRecords(tables?: readonly string[]): void;
   showToast(toast: RecordToast): void;
@@ -369,48 +373,51 @@ export interface WorkspaceState {
   listRevisions(limit?: number, beforeId?: number): Promise<RevisionRecord[]>;
   bumpAssets(): void;
   /**
-   * AI 修改页的一句话（D-191）：功能类直接应用，外观类进草稿（没有草稿时新建一份）；
-   * planner 不传时用设置里选的 AI。
+   * A single sentence in the AI modification page (D-191): Feature changes take effect directly,
+   * look changes enter a draft (creating a new one if none exists); uses the AI selected in
+   * settings when `planner` is omitted.
    */
   change(input: string, planner?: AIProvider, origin?: DraftOrigin): Promise<ChangeResult>;
-  /** 草稿聊天框的一句话：外观接着改草稿，功能类直接生效（D-411）。 */
+  /** A single sentence in the draft chat box: Look changes continue modifying the draft, feature changes take effect immediately (D-411). */
   draftChange(input: string, about?: PlanAbout): Promise<ChangeResult>;
   /**
-   * 套用一个样板 App（D-260）：整套修改（表、快捷操作、页面、提醒）作为草稿的一步，不经过 AI、不发请求；
-   * 用户点「应用」时合成一个版本，可以撤销。放不下时不进草稿，返回原因。
+   * Applying a sample app (D-260): The entire set of modifications (tables, quick actions, pages,
+   * reminders) is applied as a single draft step without using the AI or sending requests; when
+   * the user taps "Apply", it combines into a version that can be undone. If it doesn't fit, it
+   * skips entering the draft and returns the reason.
    */
   draftSample(sample: SampleApp): Promise<DraftResult>;
   clearNext(): Promise<void>;
   clearSuggest(): Promise<void>;
-  /** 工具清单（D-414）。 */
+  /** Tool session list (D-414). */
   session: WorkSession;
-  /** 清空清单和记得的话；App 和记录不变。 */
+  /** Clears the session list and remembered notes; apps and records remain unchanged. */
   clearSession(): Promise<void>;
-  /** 用户点「应用草稿并继续」（D-413）：先确认草稿，再做等着的那一步，不再问模型。 */
+  /** User taps "Apply draft and continue" (D-413): Confirms the draft first, then executes the waiting step without prompting the model again. */
   continueWithDraft(waiting: WaitingForDraft): Promise<ChangeResult>;
-  /** 「把这些补上」（D-418）：把这个会话新增的问题发给 AI 一次。没有问题时返回 null，什么都不发。 */
+  /** "Fill these in" (D-418): Sends the new problems added in this session to the AI once. Returns null when there are no problems, sending nothing. */
   fixProblems(): Promise<ChangeResult | null>;
-  /** 大工程的计划和进度（D-415）。 */
+  /** Plan and progress for large engineering tasks (D-415). */
   build: BuildRun | null;
-  /** 从计划里删掉一步；删光了计划就没了。 */
+  /** Removes a step from the plan; the plan is removed when all steps are cleared. */
   removeBuildStep(stepId: string): Promise<void>;
-  /** 用户点「开始」：这一次点击连续做完（底线 16，D-416）。一步失败或停下时返回。 */
+  /** User taps "Start": Executes this sequence continuously in one go (invariant 16, D-416). Returns when a step fails or pauses. */
   startBuild(): Promise<void>;
-  /** 做完手上这一步就停（用户点的，或 App 进后台）。 */
+  /** Pauses as soon as the current step finishes (triggered by the user or when the app enters the background). */
   stopBuild(): Promise<void>;
-  /** 从没做完的步骤接着做。 */
+  /** Resumes execution from the unfinished step. */
   resumeBuild(): Promise<void>;
   skipBuildStep(): Promise<void>;
-  /** 卡在要用到草稿：先确认草稿，再重做这一步。 */
+  /** Blocked on needing a draft: Confirms the draft first, then re-runs this step. */
   applyDraftForBuild(): Promise<void>;
-  /** 收起计划。做好的留着，没做的留在清单里。 */
+  /** Collapses the plan. Completed steps are kept, remaining steps stay in the session list. */
   endBuild(): Promise<void>;
   stepBack(): Promise<void>;
   openDraft(): void;
   closeDraft(): void;
   applyDraft(): Promise<Applied | null>;
   deleteDraft(): Promise<void>;
-  /** 草稿显示出错：撤掉最近一步（只有一步时删掉草稿），回到能显示的样子。 */
+  /** Draft rendering failed: Rolls back the most recent step (deletes the draft if there was only one step), returning to a renderable state. */
   draftRenderFailed(error: unknown): Promise<void>;
   dismissDraftNotice(): void;
 }

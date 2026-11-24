@@ -8,8 +8,9 @@ import { CURRENT_SCHEMA_VERSION, type WorkspaceConfig } from './schema';
 import { createStarterWorkspace } from './starter';
 import { registry } from './test-helpers';
 
-// 一个大的 App 文件（D-554）：导入、恢复初始样子不受 AI 计划的 30 步限制，只受配置本身的上限管；
-// 还是一个版本、一条改动记录，整份校验（底线 7、18）。AI 的计划照旧最多 30 步。
+// A large app file (D-554): Import and factory reset are exempt from the AI plan's 30-step limit,
+// bounded only by config limits; still a single version and change history entry, with full
+// validation (invariants 7, 18). AI plans remain capped at 30 steps.
 
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 16) };
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
@@ -63,7 +64,7 @@ function apply(config: WorkspaceConfig, ops: Op[]): WorkspaceConfig {
   return r.after;
 }
 
-describe('大的 App 文件（D-554）', () => {
+describe('Large app file (D-554)', () => {
   it('imports an app with 12 tables, 15 pages and 20 tools as one change', () => {
     const before = createStarterWorkspace('en', registry);
     const plan = appFileOps(bigApp(), before);
@@ -117,7 +118,7 @@ describe('大的 App 文件（D-554）', () => {
     if (!plan.ok) throw new Error(plan.error);
     const ops = plan.ops.slice(0, MAX_OPS_PER_CHANGE + 1);
     expect(prepareOps(before, ops, ctx)).toMatchObject({ ok: false, stage: 'parse' });
-    // AI 不能借这一项绕过上限。
+    // AI cannot use this to bypass the step limit.
     expect(prepareOps(before, ops, { ...ctx, fromAI: true, fromAppFile: true })).toMatchObject({
       ok: false,
       stage: 'parse',

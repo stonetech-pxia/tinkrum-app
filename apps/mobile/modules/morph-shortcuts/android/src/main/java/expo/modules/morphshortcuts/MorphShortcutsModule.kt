@@ -12,10 +12,12 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.records.Field
 import expo.modules.kotlin.records.Record
 
-// 长按 Morph 图标的菜单和桌面上单独的图标（D-271）。快捷方式的 ID 是快捷操作的 ID；点了打开 App 的主界面，
-// intent 的 action 是 ACTION_OPEN、extra 里是 ID。冷启动时 JS 启动完用 takeLaunched 取，
-// App 开着时（singleTask，走 onNewIntent）发 onOpen。图标用 App 自己的图标；带 image 的项（D-606，
-// 用户的子 App）用 JS 画好的那张图：自适应图标的整张图（108dp 见方），桌面自己裁成它的形状。
+// Menu when long-pressing the Morph icon and standalone icons on the desktop (D-271). The shortcut
+// ID is the quick action ID; tapping it opens the main app interface with intent action ACTION_OPEN
+// and the ID in extras. On cold start, retrieved via takeLaunched after JS starts; while the app is
+// running (singleTask, via onNewIntent), triggers onOpen. Uses the app's own icon; items with an
+// image (D-606, user sub-apps) use the image drawn by JS: the full adaptive icon image (108dp
+// square), which the desktop crops to its shape.
 
 private const val ACTION_OPEN = "app.morph.mobile.OPEN_QUICK_ACTION"
 private const val EXTRA_ID = "morphQuickAction"
@@ -39,8 +41,10 @@ class MorphShortcutsModule : Module() {
     AsyncFunction("setItems") { items: List<ShortcutItemRecord>, disabledMessage: String ->
       val ctx = context
       val infos = items.map { shortcut(ctx, it) }
-      // 已经固定在桌面上的：还在菜单里的重新启用、跟着改名；不在的停用（App 不能替用户拿掉桌面上的图标）。
-      // 先启用再放进菜单：停用的快捷方式不能直接再做成动态的。
+      // Items already pinned to the desktop: re-enables those still in the menu and updates their
+      // names; disables those no longer present (the app cannot remove desktop icons on behalf of
+      // the user). Enables them first before adding them to the menu: disabled shortcuts cannot be
+      // made dynamic directly.
       val wanted = items.map { it.id }.toSet()
       val pinned = ShortcutManagerCompat.getShortcuts(ctx, ShortcutManagerCompat.FLAG_MATCH_PINNED)
       val keep = infos.filter { info -> pinned.any { it.id == info.id } }
@@ -53,7 +57,7 @@ class MorphShortcutsModule : Module() {
 
     Function("canPin") { ShortcutManagerCompat.isRequestPinShortcutSupported(context) }
 
-    // 系统弹确认框（有的桌面直接放上去），用户决定；这里只说请求有没有发出去。
+    // The system displays a confirmation dialog (some desktops place the icon directly), and the user decides; this only indicates whether the request was successfully sent.
     AsyncFunction("pin") { item: ShortcutItemRecord ->
       val ctx = context
       ShortcutManagerCompat.isRequestPinShortcutSupported(ctx) &&
@@ -63,7 +67,7 @@ class MorphShortcutsModule : Module() {
     Function("takeLaunched") {
       val intent = appContext.currentActivity?.intent ?: return@Function null
       val id = idOf(intent) ?: return@Function null
-      // 只用一次：重新加载 JS 或回到前台时不再开始一遍。
+      // Used only once: does not restart upon reloading JS or returning to the foreground.
       intent.action = Intent.ACTION_MAIN
       intent.removeExtra(EXTRA_ID)
       id
@@ -96,7 +100,7 @@ class MorphShortcutsModule : Module() {
       .build()
   }
 
-  /** 这一项自己的图；没有或读不出来时用 App 图标。 */
+  /** The item's own icon; uses the app icon if missing or unreadable. */
   private fun iconOf(ctx: Context, item: ShortcutItemRecord): IconCompat {
     val bitmap = item.image?.let {
       runCatching {

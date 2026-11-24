@@ -13,9 +13,12 @@ const schema = z.strictObject({
 });
 
 /**
- * D-289：上一条。同一张表里、同一组（within：一个单选或引用字段，不写就是整张表；和分组块不是一回事）、按日期
- * （date，默认第一个日期字段，再没有就是第一个日期时间字段、创建时间）排在这条之前、field 有值的
- * 那一条的 field。不存进记录、不能填；按 field 的类型显示，进公式算差值（两次加油之间的里程）。
+ * D-289: Previous entry. Within the same table and group (within: a single-select or reference
+ * field, defaults to the entire table; distinct from grouping blocks), ordered by date (date,
+ * defaulting to the first date field, failing that the first datetime field, then creation time)
+ * prior to this current entry, returning the field value of the entry where field has a value.
+ * Not stored in records, non-fillable; displayed according to field's type, computes differences
+ * in formulas (mileage between fill-ups).
  */
 export const previousField: FieldDefinitionOf<'previous', typeof schema> = defineField({
   type: 'previous',

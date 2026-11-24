@@ -1,6 +1,7 @@
-// 在无头 Chrome 里跑 App 的 pdfview 页面（apps/mobile/src/packs/pages/pdfview.ts，PDF.js），
-// 消息协议和手机上的 WebView 一样：页面要包文件、要授权的输入文件，结果按 id 回来。
-// 只放行这次给的那一个文件（和 App 一样），别的本地文件一律拒绝。
+// Runs the app's pdfview page (apps/mobile/src/packs/pages/pdfview.ts, PDF.js) in headless Chrome;
+// the message protocol is identical to the WebView on mobile: the page packages the file, specifies
+// authorized input files, and returns results by id. Only allows the single file provided this time
+// (matching the app), and rejects all other local files.
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
@@ -13,7 +14,7 @@ export interface PdfClient {
   close(): Promise<void>;
 }
 
-/** 不让进程为了等超时而不退出。 */
+/** Prevents the process from hanging on exit just to wait for a timeout. */
 function timeout(fn: () => void, ms: number) {
   (setTimeout(fn, ms) as unknown as { unref?: () => void }).unref?.();
 }
@@ -83,7 +84,7 @@ export async function pdfClient(): Promise<PdfClient> {
     await page.addInitScript({
       content: 'window.ReactNativeWebView={postMessage:function(s){window.nativePost(s)}};',
     });
-    // 页面不能联网：只放行页面本身。
+    // The page cannot access the network: only allows the page itself.
     await page.route(
       '**/*',
       (route: { request(): { url(): string }; continue(): void; abort(): void }) =>

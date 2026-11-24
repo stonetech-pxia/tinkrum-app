@@ -12,10 +12,12 @@ import {
 } from './attempts';
 import { RescueScreen, type RescueActions } from './RescueScreen';
 
-// 入口（index.ts）先挂这一层：连续 RESCUE_AFTER 次没能正常打开，先显示兜底页，主流程（app/ 下的路由和
-// 它们引用的一切）等用户点「照常打开」才加载。走到正常时由 _layout 调 markHealthy 清零。
+// Entry point (index.ts) hooks this layer first: if it fails to open normally for RESCUE_AFTER
+// consecutive times, it displays the rescue page first, and the main flow (routes under app/ and
+// everything they reference) is only loaded after the user taps "Open normally". When normal
+// operation is reached, _layout calls markHealthy to reset the counter.
 
-/** 让 App 停下来的 JS 错误记进计数文件（兜底页显示，用户自己决定要不要分享）。 */
+/** Record JS errors that cause the app to halt into a counter file (displayed on the rescue page; user decides whether to share). */
 export function recordFatalErrors(store: AttemptStore) {
   const utils = (
     globalThis as {
@@ -33,14 +35,15 @@ export function recordFatalErrors(store: AttemptStore) {
   });
 }
 
-/** 一个 JS 进程里的这次启动（index.ts 建一个）：React 重试渲染、开发版的 StrictMode 都不会把一次启动算成两次。 */
+/** This startup session within a JS process (created by index.ts): React retry renders and development StrictMode do not count a single startup as two. */
 export interface StartSession {
   start?: { counted: boolean } & Attempts;
 }
 
 /**
- * 渲染主流程时崩了（正式包里会直接闪退，开发版只显示红屏）：记下错误，当场换成兜底页。
- * 「照常打开」再渲染一次。
+ * Crashed while rendering the main flow (directly crashes in production builds, shows red screen
+ * in development): record the error, immediately replace with the rescue page. "Open normally"
+ * renders it again.
  */
 class CrashBoundary extends Component<
   {
@@ -79,7 +82,7 @@ export function RescueGate({
   actions: RescueActions;
   version?: string | null;
 }) {
-  // 被提醒按钮在后台拉起时不算一次启动（没有界面，也不会走到「正常」）；之后切到前台再算。
+  // Being awakened by a notification button in the background does not count as a startup (no UI, does not reach "normal"); counted only after switching to the foreground later.
   session.start ??=
     AppState.currentState === 'active'
       ? { counted: true, ...startAttempt(store) }

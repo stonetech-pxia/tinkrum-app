@@ -36,11 +36,11 @@ import {
   type ReminderAction,
 } from './platform';
 
-// NotificationPlatform 的实现：expo-notifications 的本地通知（D-251）。不取推送令牌、不连服务器。
+// NotificationPlatform implementation: local notifications via expo-notifications (D-251). Does not fetch push tokens or connect to servers.
 
 const CHANNEL = 'reminders';
 
-// App 开着时提醒也显示出来（横幅 + 通知中心），不响铃以外的打扰。
+// Displays reminders even when the App is open (banner + notification center), without intrusive ringing.
 setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -51,7 +51,7 @@ setNotificationHandler({
 });
 
 let channelReady: Promise<unknown> | null = null;
-/** Android 8 起通知要有频道：「提醒」一个，默认重要程度。 */
+/** Android 8+ requires notification channels: one for "Reminders" with default importance. */
 function ensureChannel(name: string) {
   if (Platform.OS !== 'android') return Promise.resolve();
   channelReady ??= setNotificationChannelAsync(CHANNEL, {
@@ -61,14 +61,16 @@ function ensureChannel(name: string) {
   return channelReady;
 }
 
-/** 稍后提醒的 ID 前缀（core 的 snoozeId）：重排时保留。 */
+/** ID prefix for snooze notifications (core's snoozeId): preserved during rescheduling. */
 const SNOOZE_PREFIX = 'snooze-';
 
 const categoryOf = (buttons: NotificationButtons) => `morph-${buttons}`;
 
 /**
- * 通知上的按钮（D-318）：完成、稍后提醒两种，按提醒的设置组成三个分类。按钮不把 App 打开到前台：
- * iOS 在后台拉起 App 处理，Android 由后台任务处理（App 没在运行时也行，见 background.ts）。
+ * Notification buttons (D-318): complete and snooze, grouped into three categories according to
+ * reminder settings. Buttons do not bring the App to the foreground: iOS launches the App in the
+ * background to process, while Android handles it via background tasks (even when the App is not
+ * running, see background.ts).
  */
 export async function setupReminderButtons(locale: Locale) {
   const done = {
@@ -86,7 +88,7 @@ export async function setupReminderButtons(locale: Locale) {
   await setNotificationCategoryAsync(categoryOf('doneSnooze'), [done, later]);
 }
 
-/** 通知里带的数据（Android 后台任务里有时是 JSON 文字）。 */
+/** Data attached to notifications (sometimes JSON text in Android background tasks). */
 function dataOf(response: NotificationResponse): Record<string, unknown> {
   const data = response.notification?.request?.content?.data as
     Record<string, unknown> | null | undefined;
@@ -106,7 +108,7 @@ const opensOf = (data: unknown): ReminderTarget | null => {
   return parsed.success ? parsed.data : null;
 };
 
-/** 按钮的点击 → ReminderAction；不是 Morph 的按钮时为 null。 */
+/** Button click -> ReminderAction; null if not a Morph button. */
 export function reminderActionOf(response: NotificationResponse): ReminderAction | null {
   const id = response.actionIdentifier;
   if (id !== DONE_ACTION && id !== SNOOZE_ACTION) return null;
@@ -137,7 +139,7 @@ function triggerOf(n: PlannedNotification): SchedulableNotificationTriggerInput 
     : n.trigger.kind === 'weekly'
       ? {
           type: SchedulableTriggerInputTypes.WEEKLY,
-          // core 里 1 = 周一 … 7 = 周日；expo-notifications 里 1 = 周日。
+          // In core, 1 = Monday ... 7 = Sunday; in expo-notifications, 1 = Sunday.
           weekday: (n.trigger.weekday % 7) + 1,
           hour: n.trigger.hour,
           minute: n.trigger.minute,
@@ -150,7 +152,7 @@ function triggerOf(n: PlannedNotification): SchedulableNotificationTriggerInput 
         };
 }
 
-/** 通知里记着排它时的全部设置：下次重排时一样就不动它（D-319）。 */
+/** All settings used when scheduling are stored in the notification: if identical during the next reschedule, it remains untouched (D-319). */
 const PLAN_KEY = 'morphPlan';
 const planOf = (n: PlannedNotification) =>
   JSON.stringify([n.title, n.body, n.trigger, n.opens, n.recordId ?? null, n.buttons ?? null]);
@@ -173,15 +175,16 @@ function schedule(n: PlannedNotification) {
 }
 
 export function expoReminders(channelName: string): NotificationPlatform {
-  /** 这次打开 App 问过了：拒绝过一次的，不再每次重排都弹。 */
+  /** Already asked during this App session: once rejected, does not pop up on every reschedule. */
   let asked = false;
   return {
     async permission() {
       const { status, canAskAgain, granted } = await getPermissionsAsync();
       if (status === 'granted') return 'granted';
       if (status !== 'denied') return 'undetermined';
-      // Android 13+ 从没问过时也报 denied，只有 canAskAgain 看得出还能问。
-      // granted 为真是用户在系统设置里关了通知，弹窗也不会出现。
+      // Android 13+ reports denied even when never asked; only canAskAgain indicates if it can
+      // still be asked. granted being true means the user disabled notifications in system
+      // settings, and dialogs will not appear.
       return canAskAgain && !granted && !asked ? 'undetermined' : 'denied';
     },
     async request() {
@@ -193,10 +196,14 @@ export function expoReminders(channelName: string): NotificationPlatform {
     },
     async replaceAll(planned) {
       await ensureChannel(channelName);
-      // Morph 只用 expo-notifications 排提醒（长任务的进度通知走 morph-background，不受影响）。
-      // 按通知 ID 做差（D-319）：只取消不再要的、只排新的或设置变了的（同一个 ID 再排就是替换）。每一条都要
-      // 过一次桥，App 在后台时随时会被挂起；这样中途停下，还要的提醒一条也不会少。先取消再排，免得新旧加起来
-      // 超过 iOS 的 64 条被系统丢掉。还在等的稍后提醒是用户点出来的，保留（D-318）。
+      // Morph uses expo-notifications exclusively to schedule reminders (long task progress
+      // notifications use morph-background and are unaffected). Diffs by notification ID (D-319):
+      // only cancels unneeded ones, and schedules new or modified ones (rescheduling the same ID
+      // replaces it). Each entry goes through a bridge, and the App can be suspended at any time in
+      // the background; this ensures no needed reminders are lost if interrupted midway. Cancels
+      // before scheduling to prevent exceeding iOS's 64-notification limit, which causes the system
+      // to drop them. Pending snooze notifications were triggered by the user and are preserved
+      // (D-318).
       const wanted = new Set(planned.map((n) => n.id));
       const existing = new Map<string, unknown>();
       for (const n of await getAllScheduledNotificationsAsync())
@@ -229,7 +236,7 @@ export function expoReminders(channelName: string): NotificationPlatform {
       });
     },
     onOpen(listener) {
-      // 从提醒冷启动：最后一次点的那条（按钮的点击由 onAction 处理）。
+      // Cold start from reminder: the last tapped notification (button clicks are handled by onAction).
       const last = getLastNotificationResponse();
       const lastOpens =
         last && isTap(last) ? opensOf(last.notification.request.content.data) : null;
@@ -245,7 +252,7 @@ export function expoReminders(channelName: string): NotificationPlatform {
       return () => sub.remove();
     },
     onAction(listener) {
-      // iOS 在后台拉起 App 时，点击可能比这里的监听先到：先看最后一次。
+      // When iOS launches the App in the background, clicks may arrive before listeners here: checks the last one first.
       const last = getLastNotificationResponse();
       const lastAction = last && reminderActionOf(last);
       if (lastAction) {

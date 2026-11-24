@@ -14,7 +14,7 @@ import {
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { createWorkspaceStore, type WorkspaceStore } from '../workspace/store';
 
-// 功能修改依赖草稿（D-413）：在草稿的样子上说的功能修改，操作在草稿上合法，但应用到正式版本时套不上。
+// Feature modification depends on drafts (D-413): feature modifications discussed on draft state are valid in draft, but cannot be applied to the formal version.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -115,7 +115,7 @@ async function makeStore(repo = new MemoryWorkspaceRepo(), calls: string[] = [])
   return store;
 }
 
-/** 表在正式版本里，页面和列表只在草稿里。 */
+/** Table is in the formal version, while pages and lists are only in the draft. */
 async function withDraftPage(store: WorkspaceStore) {
   expect(await store.getState().change('建书单表')).toMatchObject({ kind: 'applied' });
   expect(await store.getState().change('放一个书单页')).toMatchObject({ kind: 'drafted' });
@@ -128,8 +128,8 @@ const shelfList = (config: ReturnType<typeof draftConfig>) =>
     (c) => c.id === 'books-list',
   ) as { show: Record<string, unknown> };
 
-describe('删字段的善后操作改的块只在草稿里（D-413）', () => {
-  it('功能到正式版本，善后在正式版本上跳过，草稿里的块也清理，配置自洽（底线 18）', async () => {
+describe('The cleanup operation for deleting a field modifies blocks only in the draft (D-413).', () => {
+  it('Feature to official version: cleanup is skipped on the official version, blocks in the draft are also cleaned up, and config is self-consistent (invariant 18).', async () => {
     const store = await makeStore();
     await withDraftPage(store);
     const result = await store.getState().draftChange('删作者字段');
@@ -139,14 +139,14 @@ describe('删字段的善后操作改的块只在草稿里（D-413）', () => {
     const books = config!.data.tables.find((t) => t.id === 'books')!;
     expect(books.fields.map((f) => f.id)).toEqual(['title']);
     expect(config!.containers.pages.some((p) => p.id === 'shelf')).toBe(false);
-    // 草稿一步都没丢，块不再读被删的字段。
+    // Draft steps are completely preserved, blocks no longer read deleted fields.
     expect(draft!.steps).toHaveLength(2);
     expect(draftNotice).toBeNull();
     expect(shelfList(draftConfig(store)).show.subtitles).toBeUndefined();
     expect(validateWorkspace(draftConfig(store), registry).ok).toBe(true);
   });
 
-  it('重启后草稿还套得上，应用后也自洽', async () => {
+  it('The draft can still be applied after restart, and it is self-consistent after application.', async () => {
     const repo = new MemoryWorkspaceRepo();
     const store = await makeStore(repo);
     await withDraftPage(store);
@@ -161,7 +161,7 @@ describe('删字段的善后操作改的块只在草稿里（D-413）', () => {
     expect(validateWorkspace(again.getState().config!, registry).ok).toBe(true);
   });
 
-  it('草稿离开了（从 AI 修改页说的）也一样', async () => {
+  it('The same when leaving the draft (spoken from the AI modification page).', async () => {
     const store = await makeStore();
     await withDraftPage(store);
     store.getState().closeDraft();
@@ -171,8 +171,8 @@ describe('删字段的善后操作改的块只在草稿里（D-413）', () => {
   });
 });
 
-describe('提醒要打开只在草稿里的页面（D-413）', () => {
-  it('不改任何东西，告诉用户；点了才应用草稿再做这一步（底线 7、16）', async () => {
+describe('Reminder to open a page that exists only in the draft (D-413).', () => {
+  it('Tell the user without modifying anything; apply the draft and perform this step only upon clicking (invariants 7, 16).', async () => {
     const calls: string[] = [];
     const store = await makeStore(undefined, calls);
     await withDraftPage(store);
@@ -183,7 +183,7 @@ describe('提醒要打开只在草稿里的页面（D-413）', () => {
     expect(store.getState().head!.id).toBe(headId);
     expect(remindersOf(store.getState().config!)).toEqual([]);
     expect(store.getState().draft!.steps).toHaveLength(2);
-    // 聊天框里说一句，带着可以接着做的这一步。
+    // Say something in the chat box, carrying this step that can be continued.
     const reply = store.getState().draft!.replies.at(-1)!;
     expect(reply).toMatchObject({ kind: 'needsDraft', input: '每天提醒看书架' });
     expect(reply.waiting).toBeDefined();
@@ -191,7 +191,7 @@ describe('提醒要打开只在草稿里的页面（D-413）', () => {
     const before = calls.length;
     const continued = await store.getState().continueWithDraft(reply.waiting!);
     expect(continued).toMatchObject({ kind: 'applied' });
-    // 不用再问一次模型。
+    // No need to query the model again.
     expect(calls).toHaveLength(before);
     expect(store.getState().draft).toBeNull();
     const { config } = store.getState();
@@ -199,7 +199,7 @@ describe('提醒要打开只在草稿里的页面（D-413）', () => {
     expect(remindersOf(config!).map((r) => r.id)).toEqual(['read']);
   });
 
-  it('从 AI 修改页说的也走这里，重启后聊天框里的那句还能接着做', async () => {
+  it('Goes through here when spoken from the AI modification page, and the sentence in the chat box can continue to be processed after restart.', async () => {
     const repo = new MemoryWorkspaceRepo();
     const store = await makeStore(repo);
     await withDraftPage(store);
@@ -212,14 +212,14 @@ describe('提醒要打开只在草稿里的页面（D-413）', () => {
     expect(remindersOf(again.getState().config!).map((r) => r.id)).toEqual(['read']);
   });
 
-  it('没有草稿时还是不合格，不会出这个按钮', async () => {
+  it('Still invalid when there is no draft, this button will not appear.', async () => {
     const store = await makeStore();
     expect(await store.getState().change('每天提醒看书架')).toMatchObject({ kind: 'invalid' });
   });
 });
 
-// 功能和外观混在一个计划（D-419）：功能直接生效，外观不再问模型，直接进草稿；notes 不能说做了却没做。
-describe('一个计划里功能和外观都有（D-419）', () => {
+// Describe('both features and appearance in a single plan (D-419)', () => {
+describe('Both features and look are present in a single plan (D-419).', () => {
   const addBooks = {
     op: 'addData',
     table: { id: 'books', name: '书单', fields: [{ id: 'title', name: '书名', type: 'text' }] },
@@ -268,7 +268,7 @@ describe('一个计划里功能和外观都有（D-419）', () => {
   const hasBlock = (config: WorkspaceConfig, id: string) =>
     config.containers.pages.some((p) => allComponents(p).some((c) => c.id === id));
 
-  it('没有草稿：功能生效，外观新建一份草稿并打开，不再问模型，确认后都在', async () => {
+  it('No draft: feature takes effect, look creates a new draft and opens it, without querying the model again, and both are present after confirmation.', async () => {
     const repo = new MemoryWorkspaceRepo();
     const { store, calls } = await storeWith({ 书单: mixed({ notes: ['书单在首页'] }) }, repo);
     const headId = store.getState().head!.id;
@@ -277,7 +277,7 @@ describe('一个计划里功能和外观都有（D-419）', () => {
     expect(result).toMatchObject({ kind: 'drafted', focusPageId: 'home' });
     expect(calls).toEqual(['书单']);
 
-    // 功能已经生效，外观还没有（底线 7）。
+    // The feature has taken effect, but the look has not yet (invariant 7).
     const { config, draft, head, next } = store.getState();
     expect(head!.id).not.toBe(headId);
     expect(config!.data.tables.some((t) => t.id === 'books')).toBe(true);
@@ -287,15 +287,15 @@ describe('一个计划里功能和外观都有（D-419）', () => {
     expect(draft!.steps).toHaveLength(1);
     expect(hasBlock(draftConfig(store), 'books-home')).toBe(true);
     expect(validateWorkspace(draftConfig(store), registry).ok).toBe(true);
-    // 用户看得到功能已经生效，AI 的说明也跟着草稿这一步。
+    // The user can see that the feature has taken effect, and the AI's explanation follows this step of the draft.
     expect(draft!.steps[0]!.notes!.join('\n')).toContain('已经生效');
     expect(draft!.steps[0]!.notes).toContain('书单在首页');
 
-    // 清单看的是用户看到的样子（含草稿）：表有入口，这一句做好了。
+    // The list shows what the user sees (including drafts): the table has an entry point; this sentence is done.
     const item = store.getState().session.items.find((i) => i.text === '书单')!;
     expect(item.status).toBe('done');
 
-    // 重启后草稿还在。
+    // The draft is still there after restart.
     const { store: again } = await storeWith({}, repo);
     expect(again.getState().draft!.steps).toHaveLength(1);
 
@@ -306,7 +306,7 @@ describe('一个计划里功能和外观都有（D-419）', () => {
     expect(calls).toEqual(['书单']);
   });
 
-  it('模型同时给了 next：外观进草稿，next 照旧', async () => {
+  it('Model provides next simultaneously: look enters the draft, next remains as before.', async () => {
     const { store, calls } = await storeWith({ 书单: mixed({ next: '再换个绿色' }) });
     expect(await store.getState().change('书单')).toMatchObject({ kind: 'drafted' });
     expect(store.getState().next).toBe('再换个绿色');
@@ -314,7 +314,7 @@ describe('一个计划里功能和外观都有（D-419）', () => {
     expect(calls).toEqual(['书单']);
   });
 
-  it('已有草稿：先套到新版本上，外观接在后面', async () => {
+  it('Existing draft: first applied to the new version, with look following it.', async () => {
     const script: Record<string, Plan> = {
       影单: {
         kind: 'ops',
@@ -354,7 +354,7 @@ describe('一个计划里功能和外观都有（D-419）', () => {
     expect(hasBlock(config!, 'films-list')).toBe(false);
     expect(draft!.steps).toHaveLength(3);
     expect(draft!.open).toBe(true);
-    // 前面的步骤也在新版本上：应用草稿不会盖掉刚生效的表。
+    // The previous steps are also on the new version: applying the draft does not overwrite the newly effective table.
     expect(draft!.steps[0]!.config.data.tables.some((t) => t.id === 'films')).toBe(true);
 
     await store.getState().applyDraft();
@@ -365,7 +365,7 @@ describe('一个计划里功能和外观都有（D-419）', () => {
     expect(validateWorkspace(after, registry).ok).toBe(true);
   });
 
-  it('草稿离开了：也接在后面，草稿回到打开的状态', async () => {
+  it('Draft left: also followed after, and draft returns to the open state.', async () => {
     const { store } = await storeWith({ 书单二: mixed() });
     await store.getState().change('放一个书单页');
     store.getState().closeDraft();
@@ -375,7 +375,7 @@ describe('一个计划里功能和外观都有（D-419）', () => {
     expect(store.getState().draft!.open).toBe(true);
   });
 
-  // 整个计划合法，单独的外观套不上：快捷操作的首页入口占了块的 ID。
+  // The overall plan is valid, but the individual look cannot be applied: the home screen entry point of the quick action occupies the block ID.
   const clash: Plan = {
     kind: 'ops',
     ops: [
@@ -397,7 +397,7 @@ describe('一个计划里功能和外观都有（D-419）', () => {
     notes: ['标题放在首页了'],
   } as Plan;
 
-  it('外观套不上：功能照样生效，留一句接着改，告诉用户没做，不说做了', async () => {
+  it('Look cannot be applied: feature still takes effect, leaving a sentence for further modification, telling the user it was not done rather than saying it was done.', async () => {
     const { store, calls } = await storeWith({ 外观坏了: clash });
     const result = await store.getState().change('外观坏了');
     expect(result).toMatchObject({ kind: 'applied' });
@@ -405,7 +405,7 @@ describe('一个计划里功能和外观都有（D-419）', () => {
     const { config, draft, next, draftNotice } = store.getState();
     expect(quickActionsOf(config!).map((w) => w.id)).toEqual(expect.arrayContaining(['q1']));
     expect(draft).toBeNull();
-    // 接着改的一句话：说得出要做什么。
+    // A sentence for subsequent modification: able to state what to do.
     expect(next).toBeTruthy();
     expect(draftNotice).toBe('外观部分没做成，功能部分已经生效。可以点「接着改」再试一次。');
     if (result.kind !== 'applied') throw new Error('unreachable');
@@ -413,14 +413,14 @@ describe('一个计划里功能和外观都有（D-419）', () => {
     expect(store.getState().session.said.at(-1)!.reply).toContain('外观部分没做成');
   });
 
-  it('外观套不上时有 next：用模型给的 next', async () => {
+  it('Next is present when look cannot be applied: use the next provided by the model.', async () => {
     const { store } = await storeWith({ 外观坏了: { ...clash, next: '放个标题' } as Plan });
     await store.getState().change('外观坏了');
     expect(store.getState().next).toBe('放个标题');
     expect(store.getState().draftNotice).toBeTruthy();
   });
 
-  it('聊天框里外观套不上：回复里说没做，不说「外观还在草稿里」，草稿接着开着', async () => {
+  it('Look cannot be applied in the chat box: response says it was not done, without saying "look is still in the draft", and the draft remains open.', async () => {
     const { store } = await storeWith({ 外观坏了: clash });
     await withDraftPage(store);
     expect(await store.getState().draftChange('外观坏了')).toMatchObject({ kind: 'applied' });

@@ -1,8 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// D-454：页面上只有两条竖线：方块的边和方块外面的字贴着页面边距 palette.pad，方块里面的内容缩进 palette.inset。
-// 这些文件画的是浮在页面上或贴着页面边的东西：贴着页面边的左右距离只能来自 palette。
+// D-454: There are only two vertical lines on the page: block borders and text outside blocks align
+// with the page margin palette.pad, while content inside blocks is indented by palette.inset. These
+// files render elements that float on the page or adhere to page margins: left and right offsets
+// adhering to page margins must come exclusively from palette. Small buttons and small capsule
+// internal padding (e.g., paddingHorizontal: 12) and single-digit shape offsets (such as bubble
+// arrow tips) are excluded.
 
 const SRC = join(__dirname, '..');
 const FILES = [
@@ -20,8 +24,9 @@ const FILES = [
 ];
 
 /**
- * 写死的、贴着页面边的左右距离：left / right / marginHorizontal 写数字，或者自己算 pad - 2。
- * 小按钮、小胶囊自己里面的留白（paddingHorizontal: 12 这种）和一位数的形状偏移（气泡尖角）不算。
+ * Hardcoded left/right margins adhering to page margins: left / right / marginHorizontal assigned
+ * literal numbers, or calculated as pad - 2. Small buttons, small capsule internal paddings (like
+ * paddingHorizontal: 12), and single-digit shape offsets (bubble tips) are excluded.
  */
 const HARD_CODED = /\b(?:left|right|marginHorizontal): [1-9]\d\b|pad - 2/;
 

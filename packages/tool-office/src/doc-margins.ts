@@ -2,19 +2,22 @@ import { type ComposedPageState } from './doc-compose';
 import { type PreparePageState } from './doc-prepare';
 import { leafBlocks } from './doc-support';
 
-/** 用来源纸张和内容边界确定页边距。 */
+/** Determine page margins using source paper dimensions and content boundaries. */
 export function finishPageMargins(
   state: Pick<ComposedPageState, 'page'> & Pick<PreparePageState, 'paper' | 'image'>,
 ) {
   const { page, paper, image } = state;
 
-  // 左右页边距按字算：贴着纸边的图（满版的色带、页脚的花纹）会把边距压成 0，段落就从纸边排到纸边（EU 样本 036）。
-  // 页上只有图时按图算。上下照旧按所有的块算：页顶的标志、页底的图留在原来的位置。
+  // Left and right margins calculated based on text: images touching paper edges (full-bleed color
+  // bands, footer decorations) would compress margins to 0, causing paragraphs to span paper edge
+  // to edge (EU sample 036). Pages with only images are calculated based on images. Top and bottom
+  // margins continue to use all blocks: page headers and footers remain in their original
+  // positions.
   const content = leafBlocks(page);
   const texts = content.filter((b) => b.kind !== 'image');
   const across = texts.length ? texts : content;
   if (content.length && paper) {
-    // 横竖各用自己的比例（近似 A4 的照片按 A4 纸，两个比例只差一点点）。
+    // Horizontal and vertical scaling ratios (photos close to A4 use A4 paper proportions, with tiny differences between both ratios).
     const k = paper.width / image.width;
     const ky = paper.height / image.height;
     const max = Math.min(56.7, paper.width / 10, paper.height / 10);

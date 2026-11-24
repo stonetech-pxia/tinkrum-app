@@ -11,8 +11,9 @@ import { NextCard } from './NextCard';
 import { Banner } from './Shell';
 
 /**
- * 「数据表做好了」（D-191）：AI 新建了一张数据表（功能，直接生效）。现在就能记一笔试试；
- * 页面是外观，作为「接着改」放在这里，点了进草稿。
+ * "Table is ready" (D-191): AI created a new data table (feature, takes effect immediately). You
+ * can now try logging an entry; the page is the appearance, placed here as "Modify next", tapping
+ * it enters the draft.
  */
 export function TableReadyScreen({
   collection,
@@ -32,7 +33,7 @@ export function TableReadyScreen({
     <ScrollView
       testID="table-ready-screen"
       contentContainerStyle={{ padding: palette.pad, gap: palette.gap, paddingBottom: 48 }}>
-      {/* 直接应用的功能（D-191）：「已改好 · 撤销」在这里也看得到。 */}
+      {/* Directly applied features (D-191): "Modified successfully · Undo" can also be seen here. */}
       <Banner palette={palette} />
       <View style={styles.head}>
         <View style={[styles.badge, { backgroundColor: palette.secondary }]}>

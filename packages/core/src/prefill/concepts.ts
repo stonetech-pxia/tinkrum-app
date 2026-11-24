@@ -4,9 +4,11 @@ import { PRESET_TERM_GROUPS } from './preset-terms';
 import { norm } from './similarity';
 import { cardRules } from './doc-context';
 
-// 新记录表单的候选值（D-394）：字段是「什么」的小词典。字段名（中英法任一种）对上一个概念时，
-// 用这个概念三种语言的关键词和排除词给单据上的标签打分（测量里三语同义词和同语言一样好，
-// side-session-notes/prefill-ranking）；对不上时关键词只有字段自己的名字。不用向量模型。
+// Candidate values for new record forms (D-394): a micro-dictionary of what fields represent. When
+// a field name (in any of Chinese, English, or French) matches a concept, score entry tags using
+// that concept's three-language keywords and exclusion terms (three-language synonyms measure as
+// well as single-language; see side-session-notes/prefill-ranking); when no match, keywords fall
+// back to the field's own name. Does not use vector models.
 
 export type ConceptId =
   | 'amount'
@@ -29,24 +31,25 @@ export type ConceptId =
   | 'purpose'
   | 'category';
 
-/** 候选值的种类：字段要哪一种值。 */
+/** Value kinds for candidates: the type of value expected by the field. */
 export type ValueKind = 'money' | 'date' | 'phone' | 'email' | 'id' | 'text';
 
 export interface Concept {
-  /** 字段名能对上的写法（三种语言）。 */
+  /** Spellings (in three languages) that match the field name. */
   names: readonly string[];
-  /** 单据上的标签像这些词时加分。 */
+  /** Bonus points when entry tags resemble these words. */
   keywords: readonly string[];
-  /** 单据上的标签像这些词时减分（覆盖 ≥ 0.75 才算）。 */
+  /** Penalty points when entry tags resemble these words (applied when coverage >= 0.75). */
   exclude: readonly string[];
-  /** 文字字段要的值；不写时按字段类型。 */
+  /** Value required for text fields; falls back to field type when omitted. */
   kind?: ValueKind;
-  /** 没有标签时，第一页最上面三排的字可以当候选（商家、公司、标题，不含姓名）。 */
+  /** When no tags are present, text from the top three rows of the first page can serve as candidates (merchant, company, title, excluding personal names). */
   position?: boolean;
 }
 
-// 关键词和排除词照搬测量用的 config.json（金额、税额、日期、商家、公司、姓名、电话、邮箱、单号、
-// 出发地、目的地、分类），到期日、签订日期、地址、标题、事由是这次加的。
+// Keywords and exclusion terms copied verbatim from the config.json used in measurements (amount,
+// tax, date, merchant, company, name, phone, email, document number, origin, destination,
+// category); due date, signing date, address, title, and description were added in this iteration.
 export const CONCEPTS: Record<ConceptId, Concept> = {
   amount: {
     names: [
@@ -647,10 +650,12 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
 };
 
 /**
- * 预设表（D-392，templates/ 里的 JSON）的字段 ID → 概念。字段名有歧义的靠它：账单的「From」是出具方，
- * 不是出发地；合同的「到期日」和账单的一样是到期。合同的「名称」按名字认成标题。
+ * Hidden preset fields (D-444): when the name matches a set of spellings, use that set as
+ * keywords. Preset table fields (D-392, JSON files in templates/) mapped by field ID -> concept.
+ * Resolves ambiguous field names: "From" in bills refers to the issuer rather than the origin;
+ * contract "due date" acts like bill due dates; contract "name" is recognized as title.
  */
-// 隐藏预设的字段（D-444）：名字对上一组写法就用这组当关键词。
+// Hidden preset fields (D-444): when the name matches a set of spellings, use that set as keywords.
 const TERM_GROUPS = new Map(
   PRESET_TERM_GROUPS.flatMap((g) => g.names.map((n) => [norm(n), g] as const)),
 );
@@ -664,7 +669,7 @@ const PRESET_FIELDS: Record<string, ConceptId> = {
   party: 'company',
   reason: 'purpose',
 };
-/** 只在字段名也是预设表里的名字时才按 ID 认（用户自己建的同 ID 字段按名字认）。 */
+/** Recognize by ID only when the field name also matches a name in the preset table (user-created fields with the same ID are recognized by name). */
 const PRESET_NAMES: Record<string, readonly string[]> = {
   merchant: ['store', '商家', 'commerçant'],
   issuer: ['from', '出具方', 'émetteur'],
@@ -680,19 +685,19 @@ for (const [id, c] of Object.entries(CONCEPTS) as [ConceptId, Concept][]) {
   for (const n of c.names) if (!BY_NAME.has(norm(n))) BY_NAME.set(norm(n), id);
 }
 
-/** 认概念要看的字段属性：id、名字，文字字段还有 format（D-422）。 */
+/** Field properties inspected for concept recognition: ID, name, and format for text fields (D-422). */
 type ConceptField = Pick<Field, 'id' | 'name'> & { format?: TextFormat | undefined };
 
-/** 字段对上的概念；对不上时 null。 */
+/** Concept matched by the field; null if no match. */
 export function conceptOf(field: ConceptField): ConceptId | null {
-  // 写了 format 就按 format，字段名不算（D-422）；网址只在名片上有规则，别处当普通文字。
+  // When format is specified, follow the format and ignore the field name (D-422); websites follow rules only on business cards and are treated as ordinary text elsewhere.
   if (field.format === 'phone' || field.format === 'email') return field.format;
   if (field.format === 'url') return cardRules() ? 'website' : null;
   const name = norm(field.name);
   const preset = PRESET_NAMES[field.id];
   if (preset?.some((n) => norm(n) === name)) return PRESET_FIELDS[field.id]!;
   const c = BY_NAME.get(name) ?? TERM_GROUPS.get(name)?.concept ?? null;
-  // 职位、网址只在名片上认；别的文档里这些字段名对不上概念。
+  // Job titles and websites are recognized only on business cards; these field names do not match concepts in other documents.
   if ((c === 'website' || c === 'jobTitle') && !cardRules()) return null;
   return c;
 }
@@ -703,7 +708,7 @@ export interface FieldTerms {
   exclude: string[];
 }
 
-/** 给标签打分用的词：字段名 + 概念的三语关键词；排除词同样三语。 */
+/** Terms used for tag scoring: field name + concept three-language keywords; exclusion terms use the same three languages. */
 export function fieldTerms(field: ConceptField): FieldTerms {
   const concept = conceptOf(field);
   const c = concept ? CONCEPTS[concept] : null;

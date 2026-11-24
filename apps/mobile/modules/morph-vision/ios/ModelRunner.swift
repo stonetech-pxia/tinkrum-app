@@ -1,9 +1,10 @@
 import Foundation
 import onnxruntime_objc
 
-// 跑一个只有一个 float32 输入、一个 float32 输出的 ONNX 模型（D-274：扫描展平的 UVDoc 网格模型），
-// 和 Android 的 ModelRunner.kt 一样：输入、输出都走本次运行的临时文件（float32 小端），前后处理在 JS。
-// 模型按路径缓存（同一时间只留一个，换模型时释放旧的）。
+// Run an ONNX model with a single float32 input and a single float32 output (D-274: scan-flattened
+// UVDoc grid model), same as Android's ModelRunner.kt: inputs and outputs use temporary files for
+// the current run (float32 little-endian), with pre- and post-processing in JS. Models are cached
+// by path (only one kept at a time; old model released when changing models).
 final class ModelRunner {
   static let shared = ModelRunner()
 
@@ -12,7 +13,7 @@ final class ModelRunner {
   private var loaded: String?
   private var session: ORTSession?
 
-  /** 返回输出的形状；输出写成 float32 文件。 */
+  /** Returns output shape; writes output as a float32 file. */
   func run(model: String, input: URL, shape: [Int], output: URL) throws -> [Int] {
     lock.lock()
     defer { lock.unlock() }

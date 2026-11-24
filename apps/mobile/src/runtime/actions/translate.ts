@@ -12,13 +12,14 @@ import {
 import { t } from '../../i18n';
 import type { RunServices } from './helpers';
 
-// 翻译（D-170）：系统自带的本机翻译（iOS 的 Translation 框架，Android 的 ML Kit）。
-// 先把文字拆成段（core 的 splitForTranslation），按原文语言分组翻译，再按原来的分段拼回去。
-// 文字只在本机处理，不上传、不发给 AI（D-036）。
+// Translate (D-170): system built-in local translation (iOS Translation framework, Android ML Kit).
+// First split text into segments (core's splitForTranslation), group and translate by source
+// language, then stitch back according to original segments. Text is processed entirely locally,
+// never uploaded or sent to the AI (D-036).
 
 type Impl = ActionImpl<RunServices>;
 
-/** 一次交给系统翻译多少段：太多时进度很久不动，太少时调用次数多。 */
+/** Number of segments to send to the system translator at once: if too large, the progress bar stalls for a long time; if too small, too many calls are made. */
 const BATCH = 20;
 const MB = 1024 * 1024;
 
@@ -50,12 +51,12 @@ export const TRANSLATE_IMPLS: Record<string, Impl> = {
     const flat = pieces.flat(2);
     const detected = from === 'auto' ? await translator.detectLanguages(flat) : null;
     const groups = groupBySource(flat, detected, from, to);
-    // 已经是目标语言（中文材料翻成中文）：原样交给下一步。
+    // Already in the target language (e.g., translating Chinese content into Chinese): pass through to the next step as-is.
     if (groups.size === 0) return input;
 
-    // 先确认每一对语言都能翻；Android 要下载的语言一次问完（D-064、D-112：只说要下多少、之后能离线用）。
+    // First, ensure every language pair can be translated; for Android, ask for all required languages to be downloaded at once (D-064, D-112: only state how many to download and that they can be used offline afterwards).
     const missing = new Set<string>();
-    // iOS 不给缺哪种语言，由系统按一对语言下载。
+    // iOS does not report which language is missing; the system handles downloads per language pair.
     const systemPairs: string[] = [];
     for (const source of groups.keys()) {
       const status = await translator.status(source, to);
@@ -69,7 +70,7 @@ export const TRANSLATE_IMPLS: Record<string, Impl> = {
         else systemPairs.push(source);
       }
     }
-    // iOS：先说明系统要下载语言包（可能要几分钟），再让系统下载好，翻译中途不再停下来等下载。
+    // iOS: First explain that the system needs to download language packs (which may take a few minutes), then let the system download them; do not pause mid-translation to wait for downloads.
     if (systemPairs.length > 0 && translator.prepare) {
       const langs = names([...systemPairs, to]);
       const ok = await ctx.services.ui.confirm(
@@ -128,7 +129,7 @@ export const TRANSLATE_IMPLS: Record<string, Impl> = {
             to,
           );
         } catch (e) {
-          // iOS：用户在系统的下载弹窗里点了取消。
+          // iOS: The user tapped cancel in the system download dialog.
           if (codeOf(e) === 'cancelled') throw new RunCancelled();
           if (codeOf(e) === 'unsupported') {
             throw new RunError('unsupportedAction', {
@@ -150,7 +151,7 @@ export const TRANSLATE_IMPLS: Record<string, Impl> = {
 
     let k = 0;
     const translated = pieces.map((lines) => lines.map((parts) => parts.map(() => out[k++]!)));
-    // 译文只留在本机：结果页可以复制，后面的步骤可以存成文件或排成 PDF，绝不发给 AI。
+    // Translated text stays on-device: the result page allows copying, subsequent steps can save as files or generate PDFs, and it is never sent to the AI.
     return { type: 'text', text: joinTranslation(translated, to), name: input.name };
   },
 };

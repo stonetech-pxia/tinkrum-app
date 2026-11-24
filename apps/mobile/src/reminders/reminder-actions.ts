@@ -21,9 +21,11 @@ import type { RecordWrite, WorkspaceRepo } from '../storage/types';
 import type { NotificationPlatform, ReminderAction } from './platform';
 import { syncReminders } from './useReminders';
 
-// 提醒通知上的按钮（D-318）：「完成」对这条记录做提醒里配好的一键操作，「稍后提醒」过几分钟再提醒一次。
-// 用户点了才做；只写记录（和表单一样直接写数据库，不经过 AI、不生成版本），不运行快捷操作、不打开 AI。
-// App 可能是被系统在后台拉起来的，所以配置从数据库现读，不依赖界面。
+// Buttons on reminder notifications (D-318): "Done" executes the quick action configured in the
+// reminder for this record, "Snooze" reminds again in a few minutes. Executed only upon user tap;
+// writes records directly (like forms, directly to database, bypassing AI and version generation),
+// does not run quick actions or open AI. The app might be awakened in the background by the system,
+// so config is read live from the database without relying on the UI.
 
 export interface ReminderActionDeps {
   repo: WorkspaceRepo;
@@ -35,20 +37,20 @@ export interface ReminderActionDeps {
 export type ReminderActionResult =
   | { kind: 'done'; title: string }
   | { kind: 'snoozed' }
-  /** 记录还在，「完成」却存不进去（表满了、旧配置里必填字段没有值）：什么也没写，要告诉用户。 */
+  /** Record still exists, but "Done" failed to save (table full, required field in old config missing value): nothing written, user must be notified. */
   | { kind: 'notSaved' }
-  /** 已经处理过、提醒或记录不在了、没有可做的：什么也没写。 */
+  /** Already handled, reminder or record no longer exists, or nothing to do: nothing written. */
   | { kind: 'skipped' };
 
-/** 处理过的点击（同一次点击可能从两条路送到）；存在设备上，App 重启也不会再做一遍。 */
+/** Handled clicks (a single click might be delivered via two paths); stored on device so app restart won't re-execute. */
 const HANDLED_KEY = 'reminderActionsHandled';
 const HANDLED_KEEP = 30;
-/** 没写 snoozeMinutes 时（旧配置不会有，只是保险）。 */
+/** Fallback when snoozeMinutes is unspecified (won't happen in old config, insurance only). */
 const DEFAULT_SNOOZE = 10;
 
 let queue: Promise<unknown> = Promise.resolve();
 
-/** 一个接一个处理：连点两下「完成」也不会两次都从同一个旧值加。 */
+/** Process one after another: double-tapping "Done" will not add from the same old value twice. */
 export function handleReminderAction(
   action: ReminderAction,
   deps: ReminderActionDeps,
@@ -84,13 +86,15 @@ async function handle(
 ): Promise<ReminderActionResult> {
   const seen = await handled(repo);
   if (seen.includes(action.key)) return { kind: 'skipped' };
-  // 「这次点击处理过了」的标记：写记录的和记录在同一个事务里存（要么都存、要么都没存），所以写失败了这次点击还能再做
-  // （系统下次启动会再送一次最后一次点击），也不会记录写了、标记没写而再加一次（R06）。
+  // Marker for "this click has been handled": record writing and the marker are saved in the same
+  // transaction (either both saved or neither saved), so if writing fails this click can be
+  // executed again (the system will redeliver the latest click on next startup), avoiding the
+  // scenario where the record is written but the marker is not, causing a duplicate addition (R06).
   const mark = {
     key: HANDLED_KEY,
     value: JSON.stringify([...seen, action.key].slice(-HANDLED_KEEP)),
   };
-  // 通知到这里才收起来（Android 点了按钮通知不会自己收起来）：事情做成了、或者没有什么可做的。
+  // Notification is dismissed here (Android notification does not auto-dismiss when button is tapped): action succeeded or nothing left to do.
   const dismiss = () => platform.dismiss(action.notificationId).catch(() => undefined);
   const nothing = async (
     kind: 'skipped' | 'notSaved' = 'skipped',
@@ -100,7 +104,7 @@ async function handle(
     return { kind };
   };
 
-  // 读到写之间记录被别处改了（表单、小组件）就重新读一次再算，最多三次。
+  // If the record is modified elsewhere (form, widget) between read and write, re-read and recalculate, up to three times.
   for (let attempt = 0; attempt < 3; attempt++) {
     const config = await loadConfig(repo);
     const r = config
@@ -116,7 +120,7 @@ async function handle(
     if (action.button === 'snooze') {
       const minutes = r.snoozeMinutes ?? DEFAULT_SNOOZE;
       const buttons = reminderButtons(r);
-      // 同一条记录的稍后提醒用同一个 ID，再排一次是替换，所以排成了、标记没写上时再点也不会排出两条。
+      // Snoozed reminders for the same record share an ID, and rescheduling is a replacement, so if scheduled but the marker is not written, tapping again will not produce two reminders.
       await platform.snooze({
         id: snoozeId(r.id, record.id),
         reminderId: r.id,
@@ -134,7 +138,7 @@ async function handle(
 
     if (!r.done) return nothing();
     const cal = calendarOf(config);
-    // done 读这一条的字段（抄、从它的日期起算，D-565）：先算好这一条（公式、查找、汇总）。
+    // done reads fields of this entry (copied, calculated from its date, D-565): compute this entry first (formulas, lookup, aggregation).
     const computed = toolReadsEntry(r.done)
       ? (
           await loadComputedRecords(
@@ -154,7 +158,7 @@ async function handle(
       const count = counts.find((c) => c.collectionId === planned.collection.id)?.count ?? 0;
       if (count >= RECORD_LIMITS.perCollection) return nothing('notSaved');
       const prepared = prepareRecordValues(planned.collection, planned.input, null, at, cal);
-      // 存不进去（旧配置里必填字段没有值）：后台没法打开表单，什么也不写。
+      // Failed to save (required field in old config missing value): background cannot open form, writing nothing.
       if (!prepared.ok) return nothing('notSaved');
       write = {
         kind: 'insert',
@@ -179,18 +183,20 @@ async function handle(
     }
     if ((await repo.applyRecordWrites([write], mark)) === 'conflict') continue;
     await dismiss();
-    // 做完了：这条的稍后提醒不用了；记录变了，提醒重新排（D-316）。
+    // Completed: snoozed reminder for this item is no longer needed; record changed, reminder rescheduled (D-316).
     await platform.cancel(snoozeId(r.id, record.id)).catch(() => undefined);
     await syncReminders(platform, config, (id) => repo.listRecords(id), locale, at);
     return { kind: 'done', title };
   }
-  // 一直有别的写入插进来：不标记处理过，下次再送来时再做。
+  // Other writes kept intervening: do not mark as handled, execute again when redelivered next time.
   throw new Error('the entry kept changing while the reminder button was handled');
 }
 
 /**
- * 通知上的按钮从这里进（background.ts）：没做成（写不进去、出错）就立刻弹一条通知，
- * 不让用户以为记下了（体检 2.5）。抛错时这次点击没标记处理过，用户打开 App 再来一次不会重复。
+ * Notification button entry point (background.ts): if not successful (write failed, error)
+ * immediately pop up a notification so the user doesn't think it was recorded (Health Check 2.5).
+ * When throwing an error, this click is not marked handled, and tapping again after opening the
+ * app will not repeat.
  */
 export async function runReminderAction(
   action: ReminderAction,

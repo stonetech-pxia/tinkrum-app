@@ -1,30 +1,31 @@
-// 桌面目录（file-room DESIGN §3，D-357）：App 文档目录下的 desk/<deskId>/，不放缓存（系统会清缓存）。
-// 这里只管桌面目录里的文件；路径都是 desk/ 下的相对路径（iOS 更新 App 后文档目录的绝对地址会变）。
-// 原件（相册、「文件」、content://）和收件那一批的副本只复制、不移动；只有本次运行的临时文件可以移进来
-// （AGENTS.md「文件的归属」）。
+// Desk directory (file-room DESIGN §3, D-357): desk/<deskId>/ under app document directory,
+// excluding cache (system clears cache). Manages only files in the desk directory; paths are
+// relative to desk/ (iOS absolute paths of document directories change after app updates).
+// Originals (photo library, Files, content://) and inbox batch copies are only copied, never moved;
+// only temporary files from the current run can be moved in (AGENTS.md "File ownership").
 
 export interface DeskFs {
-  /** 桌面目录里一个相对路径现在的地址（显示、交给运行）。 */
+  /** Current URI for a relative path in the desk directory (for display, passing to runtime). */
   uri(path: string): string;
-  /** 是不是运行目录（cache/runs/）里的临时文件：属于这次运行，可以移进桌面。 */
+  /** Whether it is a temporary file in the run directory (cache/runs/): belongs to this run, can be moved into the desk. */
   isRunFile(uri: string): boolean;
-  /** uri 在桌面目录里时返回它的相对路径（工具原样交回的文件），否则 null。 */
+  /** Returns the relative path of the URI if it is in the desk directory (files returned verbatim by tools), otherwise null. */
   pathOf(uri: string): string | null;
-  /** 复制进桌面目录（原件、收件那一批的副本：不动它们），返回大小。 */
+  /** Copy into the workspace directory (originals and inbox batch copies are left untouched), and return the size. */
   copyIn(uri: string, path: string): Promise<number>;
-  /** 移进桌面目录（只用于运行目录里的临时文件），返回大小。 */
+  /** Move into the workspace directory (used only for temporary files in the runtime directory), and return the size. */
   moveIn(uri: string, path: string): Promise<number>;
   writeText(path: string, text: string): Promise<number>;
-  /** 写一个文件（编辑合上时生成的 xlsx / docx，D-366），返回大小。 */
+  /** Write a file (xlsx / docx generated when closing an edit, D-366), and return the size. */
   writeBytes(path: string, bytes: Uint8Array): Promise<number>;
-  /** 读不到时返回 null。 */
+  /** Return null if it cannot be read. */
   readText(path: string): Promise<string | null>;
-  /** 同一个桌面里改名（原生的 rename，不复制）；目标已经有一个就先删掉它。 */
+  /** Rename within the same workspace (using native rename without copying); if the target already exists, delete it first. */
   rename(from: string, to: string): Promise<void>;
-  /** 删掉几个文件；只删桌面目录里的，已经不在了不算错。 */
+  /** Delete specified files; only deletes files within the workspace directory, and missing files are not considered an error. */
   remove(paths: readonly string[]): Promise<void>;
-  /** 删掉整个桌面。 */
+  /** Delete the entire workspace. */
   removeDesk(deskId: string): Promise<void>;
-  /** 有哪些桌面（目录名）。 */
+  /** List available workspaces (directory names). */
   list(): Promise<string[]>;
 }

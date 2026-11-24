@@ -1,7 +1,10 @@
 import type { ConceptId } from './concepts';
 
-// 隐藏预设的字段（D-444）在文件上常见的写法：字段名是界面语言，文件可能是别的语言（法语保单配中文的「保险公司」）。
-// 字段名对上任何一个写法，就把整组当关键词；concept 决定要哪种值（编号、日期、公司、姓名）。先做英法西中。
+// Common spellings of hidden preset fields (D-444) on files: field names are in the interface
+// language, while files might be in another language (French policy paired with Chinese "Insurance
+// Company"). If the field name matches any spelling, the entire group is treated as keywords; the
+// concept determines the desired value type (number, date, company, name). Initially implemented
+// for English, French, Spanish, and Chinese.
 export interface PresetTermGroup {
   concept?: ConceptId;
   names: readonly string[];

@@ -24,7 +24,7 @@ describe('action contracts', () => {
     (_id, action) => {
       const json = z.toJSONSchema(action.params) as { properties?: Record<string, unknown> };
       const keys = Object.keys(json.properties ?? {}).sort();
-      // 密码（secret）不在参数结构里：每次运行时问，不保存（D-194）。
+      // Passwords (secret) are not in the parameter schema: prompted at runtime, never saved (D-194).
       const saved = action.fields.filter((f) => f.kind !== 'secret');
       expect(saved.map((f) => f.key).sort()).toEqual(keys);
       for (const preset of action.presets ?? []) {
@@ -50,7 +50,7 @@ describe('built-in tools', () => {
           locale,
         );
         const own = quickActionsOf(config).filter((w) => w.package === toolId);
-        // 报表工具没有自带的工作流（要先有数据表）。
+        // Report tools do not have built-in workflows (data tables must exist first).
         if (toolId !== 'print') expect(own.length).toBeGreaterThan(0);
         for (const wf of own) expect(workflowProblems(wf, registry)).toEqual([]);
       }
@@ -77,9 +77,9 @@ describe('types', () => {
   it('only offers actions whose types fit at the insertion point', () => {
     const steps = merge().steps;
     const ids = (i: number) => insertableActions(steps, i, registry).map((a) => a.id);
-    // 第一步已经是输入动作，前面不能再插。
+    // The first step is already an input action; nothing can be inserted before it.
     expect(ids(0)).toEqual([]);
-    // 选完 PDF 之后：不能插「存到相册」（只接受图片）。
+    // After selecting a PDF: cannot insert "Save to photo library" (only accepts images).
     expect(ids(1)).toContain('pdf.merge');
     expect(ids(1)).not.toContain('out.saveToPhotos');
     expect(ids(1)).not.toContain('in.photos');
@@ -139,11 +139,11 @@ describe('types', () => {
 
   it('every action except the ones that need a data table gets valid starting parameters', () => {
     for (const action of registry.actions.values()) {
-      // 读取记录、记一笔（D-187）要先选一张表。
+      // Reading records and logging an expense / entry (D-187) require selecting a data table first.
       if (action.fields.some((f) => f.kind === 'collection')) continue;
       expect(action.params.safeParse(initialParams(action)).success, action.id).toBe(true);
     }
-    // 读取记录要先选一张表：初始值让编辑页提示用户选。
+    // Reading records requires selecting a data table first: initial value prompts the user to select in the editor.
     expect(initialParams(registry.actions.get('in.records')!)).toMatchObject({ period: 'all' });
   });
 });
@@ -180,13 +180,13 @@ describe('a first step that takes what a container hands over (D-428)', () => {
     expect(registry.actionOwner.get('text.toDocx')).toBe('text');
     expect(toDocx!.input).toEqual(['text']);
     expect(toDocx!.output).toBe('files');
-    // 容器交一段文字，一步就出 Word；后面能接分享和存文件。
+    // Container passes text, single step outputs Word; can be followed by sharing and saving files.
     expect(workflowProblems(wf('text.toDocx'), registry)).toEqual([]);
     expect(handedInput(wf('text.toDocx').steps, registry)).toBe('text');
     expect(typesAlong(wf('text.toDocx', 'out.share').steps, registry)).toEqual(['files', 'files']);
-    // 自己输入文字也行。
+    // Manual text input is also supported.
     expect(workflowProblems(wf('in.text', 'text.toDocx', 'file.save'), registry)).toEqual([]);
-    // 和 text.toPdf 一样只收文字，不收图片。
+    // Like text.toPdf, accepts only text, not images.
     expect(workflowProblems(wf('in.photos', 'text.toDocx'), registry).map((p) => p.code)).toContain(
       'binding',
     );
@@ -196,13 +196,13 @@ describe('a first step that takes what a container hands over (D-428)', () => {
     expect(handedInput(wf('pdf.compress').steps, registry)).toBe('files');
     expect(handedInput(wf('image.resize').steps, registry)).toBe('files');
     expect(handedInput(wf('file.save').steps, registry)).toBe('files');
-    // 后面各步按第一步收的那种文件接：pdf 压缩完还是 pdf，能接分享。
+    // Subsequent steps receive the file type accepted by the first step: compressed PDF remains a PDF and can be shared.
     expect(handedValueType(wf('pdf.compress').steps, registry)).toBe('pdf');
     expect(handedValueType(wf('image.resize').steps, registry)).toBe('images');
     expect(handedValueType(wf('file.save').steps, registry)).toBe('files');
     expect(workflowProblems(wf('pdf.compress', 'out.share'), registry)).toEqual([]);
     expect(typesAlong(wf('pdf.compress', 'out.share').steps, registry)).toEqual(['pdf', 'pdf']);
-    // 类型接不上还是接不上：图片动作后面不能接只收 pdf 的。
+    // Type mismatches remain type mismatches: image actions cannot be followed by steps that only accept PDFs.
     expect(
       workflowProblems(wf('image.resize', 'pdf.compress'), registry).map((p) => p.code),
     ).toContain('binding');
@@ -231,7 +231,7 @@ describe('a first step that takes what a container hands over (D-428)', () => {
   });
 });
 
-// 2026-11-06 模拟器测试：桌上点「加页码」，起始页码默认 0、字号 6pt，第 2 页显示成「1 / 2」。
+// 2026-11-06 simulator test: tapping "Add page numbers" on desk, start page defaults to 0, font size 6pt, page 2 displays as "1 / 2".
 describe('initialParams for page numbers', () => {
   it('starts at page 1 with a readable size', () => {
     const params = initialParams(registry.actions.get('pdf.pageNumbers')!);
@@ -240,7 +240,7 @@ describe('initialParams for page numbers', () => {
   });
 });
 
-// 2026-11-06 模拟器测试：首页卡片写「不超过 0 MB」，其实 0 是不限大小；法语写「MB」，应该是 Mo。
+// 2026-11-06 simulator test: home screen card reads "under 0 MB", but 0 means unlimited size; French reads "MB", should be "Mo".
 describe('describeParams for sizes', () => {
   const action = registry.actions.get('pdf.fromImages')!;
   it('says no size limit for 0', () => {

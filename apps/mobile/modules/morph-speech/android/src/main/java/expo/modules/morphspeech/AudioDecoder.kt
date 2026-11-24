@@ -8,13 +8,14 @@ import android.media.MediaFormat
 import android.net.Uri
 import java.nio.ByteOrder
 
-// 用系统的 MediaExtractor + MediaCodec 把音频文件（m4a、mp3、wav、amr、ogg、flac…，视频文件里的声音也行）
-// 解码成 16 kHz 单声道 float，一块一块地交给 sink，不把整个文件放进内存。
+// Uses the system MediaExtractor + MediaCodec to decode audio files (m4a, mp3, wav, amr, ogg,
+// flac..., including sound tracks in video files) into 16 kHz mono float, feeding the sink block by
+// block without loading the entire file into memory.
 
 class UnreadableAudio(message: String) : Exception(message)
 
 class AudioDecoder(private val context: Context, private val uri: Uri) {
-  /** 时长（微秒）；文件里没写时为 0。 */
+  /** Duration (microseconds); 0 if not specified in the file. */
   var durationUs = 0L
     private set
 

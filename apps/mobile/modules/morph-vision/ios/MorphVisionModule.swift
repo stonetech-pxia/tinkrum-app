@@ -9,9 +9,10 @@ import UIKit
 import Vision
 import VisionKit
 
-// 文字识别和扫描（D-084）：只用 iOS 自带的 Vision / VisionKit / Core Image，全部在本机处理。
-// 坐标约定和 JS 一致：像素，原点在左上角（Vision 和 Core Image 的原点在左下角，在这里换算）。
-// 识别出的文字只返回给 App，不写日志。
+// Text recognition and scanning (D-084): uses only iOS built-in Vision / VisionKit / Core Image,
+// processed entirely on-device. Coordinate conventions match JS: pixels, origin at top-left (Vision
+// and Core Image origins are at bottom-left, converted here). Recognized text is returned only to
+// the app and is not logged.
 
 final class VisionFailedException: GenericException<String>, @unchecked Sendable {
   override var reason: String { "Vision failed: \(param)" }
@@ -29,7 +30,7 @@ final class DocumentCameraUnavailableException: Exception, @unchecked Sendable {
   override var reason: String { "The document camera is not available on this device" }
 }
 
-/** cancelClassify(taskId) 取消了（JS 按 error.code 认）。 */
+/** Cancelled via cancelClassify(taskId) (recognized by JS via error.code). */
 private func classifyCancelled() -> Exception {
   Exception(name: "VisionCancelled", description: "Cancelled", code: "ERR_VISION_CANCELLED")
 }
@@ -54,7 +55,7 @@ struct QuadRecord: Record {
 public class MorphVisionModule: Module {
   private lazy var ciContext = CIContext(options: [.useSoftwareRenderer: false])
   private var cameraDelegate: DocumentCameraDelegate?
-  /** 正在进行的图像分类，取消用（用 classifyLock 保护）。 */
+  /** Ongoing image classifications, used for cancellation (protected by classifyLock). */
   private var classifying: [String: VNRequest] = [:]
   private var cancelledClassify: Set<String> = []
   private let classifyLock = NSLock()
@@ -66,7 +67,7 @@ public class MorphVisionModule: Module {
       VNDocumentCameraViewController.isSupported
     }
 
-    // 有没有相机：没有相机时（模拟器）expo-image-picker 会抛出原生异常让 App 崩溃，所以先问一下。
+    // Camera availability check: When no camera is available (e.g. on simulator), expo-image-picker throws a native exception that crashes the app, so check beforehand.
     Function("isCameraAvailable") { () -> Bool in
       UIImagePickerController.isSourceTypeAvailable(.camera)
     }
@@ -87,8 +88,9 @@ public class MorphVisionModule: Module {
       return try self.removeBackground(uri, background: background, output: output)
     }
 
-    // 「记一笔」预填用的系统识别，只做规则的补充（D-244）：iOS 26 起 DataDetection 认日期和金额，
-    // 更早的系统用 NSDataDetector，只认日期。不需要下载，language 只是提示。
+    // System recognition for "log an expense" prefill, supplementing rules only (D-244): From iOS
+    // 26 onwards, DataDetection recognizes dates and amounts; earlier systems use NSDataDetector,
+    // recognizing dates only. No download required; language is just a hint.
     AsyncFunction("detectData") { (text: String, language: String, _: Bool) async -> [[String: Any]] in
       await Self.detectData(text, language: language)
     }
@@ -97,11 +99,12 @@ public class MorphVisionModule: Module {
       "ready"
     }
 
-    // iOS 的识别是系统自带的，不用下载。
+    // iOS recognition is built into the system and does not require downloading.
     AsyncFunction("downloadDataModel") { (_: String) in }
 
-    // 照片里是什么（没有文字的照片做推荐用，还没接进推荐）：Vision 自带的图像分类，不下载模型。
-    // 标签是 Vision 自己的英文标识，和 Android 的 ML Kit 不是一套词。
+    // What is in the photo (used for recommendations on photos without text, not yet integrated
+    // into recommendations): Built-in Vision image classification, no model download. Labels are
+    // Vision's own English identifiers, which differ from Android ML Kit's terminology.
     AsyncFunction("classifyImage") { (taskId: String, uri: URL, options: ClassifyOptions) -> [String: Any] in
       return try self.classifyImage(taskId, uri: uri, options: options)
     }
@@ -110,7 +113,7 @@ public class MorphVisionModule: Module {
       self.cancelClassify(taskId)
     }
 
-    // 证件照（D-252）：人脸框（像素，原点在左上角，已按 EXIF 摆正）和只保留人像、换成纯色背景。
+    // ID photo / portrait (D-252): Face bounding box (pixels, origin at top-left, adjusted for EXIF orientation) and retaining only the portrait with a solid color background replacement.
     AsyncFunction("detectFaces") { (uri: URL) -> [String: Any] in
       return try self.detectFaces(uri)
     }
@@ -123,12 +126,12 @@ public class MorphVisionModule: Module {
       return try self.adjustImage(uri, options: options, format: format, output: output)
     }
 
-    // iOS 能找纸张的四个角（Android 的 ML Kit 不能）。
+    // iOS can find the four corners of a paper document (Android ML Kit cannot).
     Function("canFindPaper") { () -> Bool in
       true
     }
 
-    // PDF 的文字层（D-455）：PDFKit 读出整份文字，没有文字层或要密码时是 nil。文字只返回给 App，不写日志。
+    // PDF text layer (D-455): PDFKit extracts the entire text; returns nil if there is no text layer or if a password is required. Text is returned only to the app and never written to logs.
     AsyncFunction("pdfText") { (uri: URL) -> String? in
       guard let doc = PDFDocument(url: uri), !doc.isLocked else { return nil }
       guard let text = doc.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty
@@ -136,8 +139,9 @@ public class MorphVisionModule: Module {
       return text
     }
 
-    // PDF 第一页的缩略图（D-451）：PDFKit 在本机画，白底，长边不超过 maxSide，存成 JPEG。
-    // 打不开（损坏、要密码）时抛出，App 显示 PDF 图标。
+    // Thumbnail of the first page of a PDF (D-451): Rendered natively by PDFKit on a white
+    // background, with the long side not exceeding maxSide, saved as JPEG. Throws an error if it
+    // cannot be opened (damaged, password required), causing the app to display a PDF icon.
     AsyncFunction("pdfThumbnail") { (uri: URL, output: URL, maxSide: Double) -> [String: Any] in
       guard let doc = PDFDocument(url: uri), !doc.isLocked, let page = doc.page(at: 0) else {
         throw VisionFailedException("PDF can't be opened")
@@ -166,13 +170,13 @@ public class MorphVisionModule: Module {
       return ["width": Int(size.width), "height": Int(size.height), "pageCount": doc.pageCount]
     }
 
-    // 某种语言（BCP 47）系统能不能识别；不能的话 App 退回文字识别包。
+    // Checks whether the system can recognize a given language (BCP 47); if not, the app falls back to the text recognition package.
     Function("supportsLanguage") { (code: String) -> Bool in
       let supported = (try? VNRecognizeTextRequest().supportedRecognitionLanguages()) ?? []
       return Self.match(code, in: supported) != nil
     }
 
-    // PP-OCRv6 的两个模型（D-269）：路径是扩展包里的文件；输入、输出都是本次运行的临时文件。
+    // The two PP-OCRv6 models (D-269): paths are files within the pack; inputs and outputs are temporary files for the current run.
     AsyncFunction("ocrLoad") { (det: URL, rec: URL) in
       try OcrRunner.shared.load(det: det.path, rec: rec.path)
     }
@@ -186,7 +190,7 @@ public class MorphVisionModule: Module {
       OcrRunner.shared.unload()
     }
 
-    // 扫描展平的 UVDoc 网格模型（D-274）：一个 float32 输入、一个 float32 输出，都走临时文件，返回输出的形状。
+    // Scan-flattened UVDoc grid model (D-274): one float32 input and one float32 output, both via temporary files, returning the output shape.
     AsyncFunction("modelRun") { (model: URL, input: URL, shape: [Int], output: URL) -> [Int] in
       try ModelRunner.shared.run(model: model.path, input: input, shape: shape, output: output)
     }
@@ -198,7 +202,7 @@ public class MorphVisionModule: Module {
       try VNRecognizeTextRequest().supportedRecognitionLanguages()
     }
 
-    // 识别文字：accurate 级别 + 语言纠错。languages 是 BCP 47 代码，按顺序优先。
+    // Recognize text: accurate level + language correction. languages are BCP 47 codes, prioritized in order.
     AsyncFunction("recognizeText") { (uri: URL, languages: [String]) -> [String: Any] in
       let image = try self.loadImage(uri)
       let request = VNRecognizeTextRequest()
@@ -209,7 +213,7 @@ public class MorphVisionModule: Module {
       for code in languages {
         if let found = Self.match(code, in: supported), !chosen.contains(found) { chosen.append(found) }
       }
-      // 第一种是用户选的语言，必须支持；后面的（英文）只是补充。
+      // The first language is user-selected and must be supported; subsequent ones (such as English) are merely supplementary.
       if Self.match(languages.first ?? "", in: supported) == nil { throw UnsupportedLanguageException(languages.joined(separator: ",")) }
       request.recognitionLanguages = chosen
       do {
@@ -221,7 +225,7 @@ public class MorphVisionModule: Module {
         guard let best = obs.topCandidates(1).first else { return nil }
         return TextLine(text: best.string, box: obs.boundingBox, confidence: best.confidence)
       }
-      // 每行的位置（D-195，可搜索 PDF 的文字层）：像素，原点在左上角（Vision 的框是 0–1、原点在左下角）。
+      // Line position (D-195, searchable PDF text layer): Pixels, origin at top-left (Vision bounding boxes use 0-1 range with origin at bottom-left).
       let size = image.extent.size
       let items = lines.map { line -> [String: Any] in
         [
@@ -242,8 +246,10 @@ public class MorphVisionModule: Module {
       ]
     }
 
-    // 找纸张的候选（D-327）：文档分割（专门找纸张）的四边形和矩形检测的几个四边形，加一张长边约 500 的灰度图。
-    // 选哪个由 App 的 pickPaper 决定，和 Android 的扫描包同一套判断（D-326）。
+    // Find document candidates (D-327): Quadrilaterals from document segmentation (specifically for
+    // finding paper) and several quadrilaterals from rectangle detection, plus a grayscale image
+    // with a long side of about 500. The app's pickPaper decides which one to select, using the
+    // same judgment logic as Android's scanning package (D-326).
     AsyncFunction("detectDocument") { (uri: URL) -> [String: Any] in
       let image = try self.loadImage(uri)
       let size = image.extent.size
@@ -270,7 +276,7 @@ public class MorphVisionModule: Module {
       ]
     }
 
-    // 按四个角拉正（Core Image 透视矫正），缩放到 width × height，存成 JPG。
+    // Straighten using the four corners (Core Image perspective correction), scale to width × height, and save as JPG.
     AsyncFunction("straighten") {
       (uri: URL, quad: QuadRecord, width: Int, height: Int, quality: Double, output: URL) -> [String: Any] in
       let image = try self.loadImage(uri)
@@ -298,8 +304,9 @@ public class MorphVisionModule: Module {
       return ["width": Int(w), "height": Int(ht), "size": Self.fileSize(output)]
     }
 
-    // 系统的文档相机（VisionKit）：实时找边、自动拍摄、多页，拍完已经拉正。
-    // 每页存成 JPG（长边不超过 maxSide）放在 directory 里；用户取消时返回 null。
+    // System document camera (VisionKit): Real-time edge detection, auto-capture, multi-page,
+    // straightened upon capture. Each page is saved as a JPG (long side not exceeding maxSide) in
+    // the directory; returns null if the user cancels.
     AsyncFunction("scanDocuments") { (directory: URL, maxSide: Int, quality: Double, promise: Promise) in
       guard VNDocumentCameraViewController.isSupported else {
         promise.reject(DocumentCameraUnavailableException())
@@ -310,7 +317,7 @@ public class MorphVisionModule: Module {
         return
       }
       let camera = VNDocumentCameraViewController()
-      // 完成后清掉 cameraDelegate，打破 self ↔ delegate 的引用环。
+      // Clear cameraDelegate upon completion to break the self ↔ delegate reference cycle.
       let delegate = DocumentCameraDelegate { result in
         camera.dismiss(animated: true)
         self.cameraDelegate = nil
@@ -320,7 +327,7 @@ public class MorphVisionModule: Module {
         case .failed(let error):
           promise.reject(VisionFailedException(error.localizedDescription))
         case .finished(let scan):
-          // 编码放到后台，不卡界面。
+          // Perform encoding in the background to avoid blocking the UI.
           DispatchQueue.global(qos: .userInitiated).async {
             do {
               promise.resolve(try self.savePages(scan, directory: directory, maxSide: maxSide, quality: quality))
@@ -383,7 +390,7 @@ public class MorphVisionModule: Module {
     do { try handler.perform([request]) } catch { throw VisionFailedException(error.localizedDescription) }
     let width = image.extent.width
     let height = image.extent.height
-    // Vision 的框是 0–1 的比例，原点在左下角：换成像素、原点在左上角。
+    // Vision bounding boxes use 0-1 proportions with origin at bottom-left: convert to pixels with origin at top-left.
     let faces: [[String: Double]] = (request.results ?? []).map { face in
       let box = face.boundingBox
       return [
@@ -397,8 +404,9 @@ public class MorphVisionModule: Module {
   }
 
   /**
-   * 人像分割（iOS 15 起，VNGeneratePersonSegmentationRequest，accurate）：人留下，其余换成纯色，输出 PNG。
-   * 遮罩比原图小，放大到原图大小再混合；发丝边缘是半透明的过渡。
+   * Portrait segmentation (iOS 15+, VNGeneratePersonSegmentationRequest, accurate): keep person,
+   * replace the rest with a solid color, output PNG. The mask is smaller than the original image;
+   * upscale to original size before blending; hair edges have a semi-transparent transition.
    */
   private func replacePersonBackground(_ uri: URL, color: String, output: URL) throws -> [String: Any] {
     guard color.range(of: "^#[0-9A-Fa-f]{6}$", options: .regularExpression) != nil,
@@ -440,8 +448,10 @@ public class MorphVisionModule: Module {
   }
 
   /**
-   * 位置是 UTF-16（和 JS 字符串一样）；日期按识别出的时区（没有时用本机时区）写成 YYYY-MM-DD，
-   * 金额给系统读出的数（JS 还会按原文再统一一遍）。文字不写日志。
+   * Positions are in UTF-16 (same as JS strings); dates are formatted as YYYY-MM-DD using the
+   * recognized time zone (falling back to local time zone if absent), and amounts are the numbers
+   * read by the system (JS normalizes them further against the original text). Text is not
+   * written to logs.
    */
   private static func detectData(_ text: String, language: String) async -> [[String: Any]] {
     #if canImport(DataDetection)
@@ -485,12 +495,14 @@ public class MorphVisionModule: Module {
     return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
   }
 
-  /** 分类用的图：长边 1024 足够（模型自己还会再缩小），原图 200 MP 也不用整张解码。 */
+  /** Image for classification: A long side of 1024 is sufficient (the model rescales it further); even a 200 MP original image does not need full decoding. */
   private static let classifyMaxSide = 1024
 
   /**
-   * 不写中间文件，缩小的图只在内存里。cancelClassify 取消 Vision 的请求并让这次以 ERR_VISION_CANCELLED 结束；
-   * 还没开始或已经结束的取消不起作用（JS 那边自己先结束 Promise）。
+   * Do not write intermediate files; resized images reside in memory only. cancelClassify cancels
+   * the Vision request and terminates this run with ERR_VISION_CANCELLED; cancellations for
+   * requests that haven't started or have already finished have no effect (JS resolves or rejects
+   * its promise earlier).
    */
   private func classifyImage(_ taskId: String, uri: URL, options: ClassifyOptions) throws -> [String: Any] {
     let request = VNClassifyImageRequest()
@@ -534,7 +546,7 @@ public class MorphVisionModule: Module {
     return cancelledClassify.contains(taskId)
   }
 
-  /** 按 EXIF 摆正，并在解码时就缩到长边 maxSide（ImageIO 的缩略图，不先解码整张原图）。 */
+  /** Adjust orientation according to EXIF and decode directly scaled down to maxSide on the long edge (ImageIO thumbnail, avoiding decoding the full original image first). */
   private func loadThumbnail(_ uri: URL, maxSide: Int) throws -> CGImage {
     let options = [
       kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -549,7 +561,7 @@ public class MorphVisionModule: Module {
     return image
   }
 
-  /** 给 pickPaper 的小灰度图（D-327）：长边 maxSide，每像素一个字节，第一行是图的顶上，base64。 */
+  /** Small grayscale image for pickPaper (D-327): long side maxSide, one byte per pixel, first row is the top of the image, base64-encoded. */
   private func grayThumbnail(_ image: CIImage, maxSide: Int) throws -> [String: Any] {
     let k = min(1, CGFloat(maxSide) / max(image.extent.width, image.extent.height))
     let w = max(1, Int((image.extent.width * k).rounded()))
@@ -568,11 +580,11 @@ public class MorphVisionModule: Module {
   }
 
   private func loadImage(_ uri: URL) throws -> CIImage {
-    // 按 EXIF 方向摆正，和 App 里看到的方向一致。
+    // Correct orientation according to EXIF direction, matching the direction seen in the app.
     guard let image = CIImage(contentsOf: uri, options: [.applyOrientationProperty: true]) else {
       throw UnreadableImageException()
     }
-    // 原点移到 (0, 0)。
+    // Move the origin to (0, 0).
     return image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
   }
 
@@ -617,7 +629,7 @@ public class MorphVisionModule: Module {
     (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
   }
 
-  /** 「vi」能匹配系统支持的「vi-VT」；「zh-Hans」完全匹配。 */
+  /** "vi" can match the system-supported "vi-VT"; "zh-Hans" matches exactly. */
   static func match(_ code: String, in supported: [String]) -> String? {
     if supported.contains(code) { return code }
     let prefix = code.split(separator: "-").first.map(String.init) ?? code
@@ -631,8 +643,10 @@ public class MorphVisionModule: Module {
   }
 
   /**
-   把识别出的一段段文字排成行：同一高度的几段（收据上的品名和价格）放在一行，用空格隔开；
-   行距明显变大时空一行（分段）。Vision 的坐标原点在左下角，y 越大越靠上。
+   * Arranging recognized text segments into lines: segments at the same vertical height (such as
+   * item names and prices on a receipt) are placed on the same line and separated by spaces;
+   * leave a blank line (paragraph break) when line spacing increases significantly. Vision
+   * coordinate origin is at the bottom-left, so larger y means higher up.
    */
   static func layout(_ lines: [TextLine]) -> String {
     let sorted = lines.sorted { $0.box.midY > $1.box.midY }

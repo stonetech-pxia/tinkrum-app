@@ -3,7 +3,7 @@ import { decodeOfficeXml, OfficeImportFailure, openPackage } from './ooxml';
 import { decodeEntities } from './xml';
 import { escapeXml } from './xlsx';
 
-// 原包只改正文、页眉页脚等文字，不把它转换成 DocDoc，避免丢掉信头、样式和表格。
+// The original package only corrects body text, headers, and footers, without converting it to DocDoc, to avoid losing letterheads, styles, and tables.
 interface TextPart {
   start: number;
   end: number;
@@ -25,7 +25,7 @@ export function fillWordXml(xml: string, fill: (text: string) => string): string
     parts = [];
   };
   const prefix = `(?:${prefixes.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`;
-  // 段落、换行、制表、域和图形都是边界，不能跨这些地方拼一个占位符。
+  // Paragraphs, line breaks, tabs, fields, and graphics are all boundaries; a placeholder cannot be spanned across these places.
   const tokens = new RegExp(
     `<(${prefix})t\\b[^>]*>([^<]*)<\\/\\1t>|<\\/?${prefix}(?:p|br|tab|cr|fldChar|instrText|drawing|pict)\\b[^>]*>`,
     'g',
@@ -53,7 +53,7 @@ export function fillWordXml(xml: string, fill: (text: string) => string): string
       offsets.push(n);
       n += p.text.length;
     }
-    // 倒着改，原来各片段的偏移不变；替换值里的花括号不会再被读一次。
+    // Modify in reverse order so that the offsets of the original fragments remain unchanged; curly braces in the replacement values will not be read again.
     for (const m of [...joined.matchAll(/\{[^{}]+\}/g)].reverse()) {
       const replacement = fill(m[0]);
       if (replacement === m[0]) continue;
@@ -85,7 +85,7 @@ export function fillWordXml(xml: string, fill: (text: string) => string): string
 }
 
 export function fillDocxTemplate(bytes: Uint8Array, fill: (text: string) => string): Uint8Array {
-  // openPackage 在解压之前检查压缩比、单部件和总大小；所有未修改部件原样保留。
+  // openPackage checks compression ratio, single parts, and total size before extraction; all unmodified parts are preserved as-is.
   const pkg = openPackage(bytes, () => true);
   if (!pkg.names.some((n) => n.toLowerCase() === 'word/document.xml'))
     throw new OfficeImportFailure('notOffice');

@@ -8,7 +8,7 @@ import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 数字卡读 style.size（D-589）：不写是原来的字号，small / large 按 0.85 / 1.2 缩放数字；不写的和以前完全一样。
+// Number cards read style.size (D-589): Unspecified uses default font size, small / large scales numbers by 0.85 / 1.2; unspecified is completely identical to before.
 
 const seed = (locale: Locale, registry: Registry) => {
   const number = (id: string, label: string, size?: 'small' | 'medium' | 'large') => ({
@@ -78,7 +78,7 @@ it('scales the number by style.size; without it the size is what it always was',
   expect(await screen.findByTestId('stat-value-tx-默认')).toBeTruthy();
   const base = fontSize('默认')!;
   expect(fontSize('中')).toBe(base);
-  // 默认的数字卡字号是 26 乘主题字号比例；小是 0.85 倍，大是 1.2 倍（取整）。
+  // Default number card font size is 26 multiplied by the theme font size ratio; small is 0.85x, large is 1.2x (rounded).
   expect(fontSize('小')).toBe(Math.round(26 * 0.85 * (base / 26)));
   expect(fontSize('大')).toBe(Math.round(26 * 1.2 * (base / 26)));
 });

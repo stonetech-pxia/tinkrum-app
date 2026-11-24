@@ -7,8 +7,10 @@ import type { QuickAction, WorkspaceConfig } from './schema';
 import { registry } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 快捷操作的步骤参数引用配置（CHAIN_AUDIT A3，创始人 2026-10-31）：动作目录里的参数声明自己引用一张表
-// （kind collection）或这张表的字段（kind fields），检查和删表、删字段时的清理对所有动作都一样。
+// Quick action step parameter reference configuration (CHAIN_AUDIT A3, founder 2026-10-31):
+// parameter declarations in the action catalog specify referencing a table (kind collection) or a
+// table's fields (kind fields); validation, table deletion, and field deletion cleanup are
+// identical across all actions.
 
 const ctx = (locale: 'zh' | 'en' | 'fr' = 'zh') => ({
   registry,

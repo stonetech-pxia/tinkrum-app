@@ -7,19 +7,22 @@ import { hasRecordCurrency } from './money-currency';
 import { expandCollection } from './related';
 import type { Collection, ComponentOf, WorkspaceConfig } from './schema';
 
-// 统计相减（D-337）：「这个合计 − 另一个合计」，另一个可以在别的表。例如待分配 = 收入 − 分配出去的钱、
-// 余额 = 收入 − 支出、净资产 = 资产 − 负债。只有计数和求和：平均、最小、最大相减没有意义。
-// 检查放在这里而不是数字块的定义里：要用到筛选条件的检查（conditions.ts），组件定义引用它会让加载绕圈。
+// Stat subtraction (D-337): "this total − another total", where the other can be in another table.
+// For example, to-be-allocated = income − allocated funds, balance = income − expenses, net worth =
+// assets − liabilities. Only counts and sums apply; subtraction for averages, minimums, and
+// maximums is meaningless. The check is placed here instead of the number block definition: checks
+// using filter conditions (conditions.ts) would cause circular loading if referenced by component
+// definitions.
 
 type NumberBlock = ComponentOf<'number'>;
 export type StatMinus = NonNullable<NumberBlock['source']['minus']>;
 
-/** 数字块 source.minus 的问题（文字发给 AI）。collection 是数字块自己的表（换过查找、汇总的）。 */
+/** Issues for number block source.minus (text sent to AI). collection is the number block's own table (after lookup/rollup replacement). */
 export function statMinusProblems(
   c: NumberBlock,
   collection: Collection,
   config: WorkspaceConfig,
-  /** 块所在页面给哪张表的一条记录用（D-342，page.of）。 */
+  /** Which table record the block's page is used for (D-342, page.of). */
   recordOf?: string,
 ): string[] {
   const { minus, aggregate, field, group, compare } = c.source;
@@ -55,7 +58,7 @@ export function statMinusProblems(
   return problems;
 }
 
-/** 减去 minus 之后的值。value 为空（没有可算的）时仍为空；records 是 minus 那张表算好的记录。 */
+/** Value after subtracting minus. Remains empty when value is empty (nothing to calculate); records are computed records of the minus table. */
 export function minusValue(
   value: number | null,
   minus: StatMinus,

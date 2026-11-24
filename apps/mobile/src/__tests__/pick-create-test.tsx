@@ -5,10 +5,14 @@ import { Alert } from 'react-native';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { openPicker, put } from '../test-utils/pick-fixtures';
 
-// 勾选新建（D-616，创始人 2026-11-21「开工」）：菜谱页上「菜谱用料」列表下面的「添加食材」打开勾选页面，勾几样食材，
-// 每样建一条用料，连着这个菜谱和那样食材；已经在这个菜谱里的显示「已添加」。「添加 N 条到…」这个按钮写明了条数和表，
-// 它就是先问的那一句（底线 11，创始人 2026-11-21「算，去掉第二次」），点了直接建，不再弹确认；建好了回到菜谱页，
-// 提示条能撤回这一批。只勾不点什么都不写（底线 15）。
+// Check-to-create (D-616, founder 2026-11-21 "Kickoff"): "Add ingredient" under the "Recipe
+// ingredients" list on the recipe page opens the selection page, where several ingredients are
+// checked, creating an entry for each, linking the recipe and that ingredient; those already in
+// this recipe display "Added". The "Add N items to..." button clearly states the count and table,
+// acting as the initial question (invariant 11, founder 2026-11-21 "Counts, remove the second
+// one"), tapping it creates directly without popping confirmation; upon completion, returns to the
+// recipe page, and the toast can undo this batch. Checking without tapping writes nothing
+// (invariant 15).
 
 async function withPantry() {
   const repo = new MemoryWorkspaceRepo();
@@ -22,7 +26,7 @@ async function withPantry() {
   ])
     await put(repo, id!, 'ingredients', { name });
   await put(repo, 'x1', 'recipe-items', { recipe: 'r1', ingredient: 'flour', amount: 200 });
-  // 别的菜谱用了鸡蛋：这个菜谱里还没有。
+  // Other recipes use eggs: not yet in this recipe.
   await put(repo, 'x2', 'recipe-items', { recipe: 'r2', ingredient: 'egg', amount: 2 });
   return repo;
 }
@@ -48,7 +52,7 @@ it('a new user with no ingredients is told to add some first, and nothing can be
 it('shows what this recipe already has; the button says how many and where, and creates them with no second question', async () => {
   const repo = await withPantry();
   const router = await openPicker(repo);
-  // 面粉已经在这个菜谱里：显示「已添加」，不能再勾。鸡蛋只在别的菜谱里，能勾。
+  // Flour is already in this recipe: displays "Added", cannot be checked again. Eggs are only in other recipes and can be checked.
   const flour = await screen.findByTestId('pick-row-flour');
   expect(flour).toHaveTextContent(/已添加/);
   expect(flour).toBeDisabled();
@@ -57,7 +61,7 @@ it('shows what this recipe already has; the button says how many and where, and 
   await fireEvent.press(screen.getByTestId('pick-row-salt'));
   await fireEvent.press(screen.getByTestId('pick-row-egg'));
   expect(screen.getByTestId('pick-records-add')).toHaveTextContent('添加 2 条到「菜谱用料」');
-  // 勾了还没点：什么都没写（底线 15）。
+  // Checked but not yet tapped: nothing is written (invariant 15).
   expect(await repo.listRecords('recipe-items')).toHaveLength(2);
   const alert = noAlert();
   await fireEvent.press(screen.getByTestId('pick-records-add'));
@@ -93,7 +97,7 @@ it('searches when there are many, and French uses entrée in the singular', asyn
   await openPicker(repo, 'fr');
   await fireEvent.changeText(await screen.findByTestId('pick-records-search'), 'sel');
   expect(screen.queryByTestId('pick-row-milk')).toBeNull();
-  // 「盐」的名字是中文，搜「sel」找不到：没有匹配的说一句。
+  // "Salt" name is in Chinese, searching for "sel" finds nothing: report when there is no match.
   expect(screen.getByTestId('pick-records-empty')).toHaveTextContent(
     'Aucune entrée ne correspond.',
   );

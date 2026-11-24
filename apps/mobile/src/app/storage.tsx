@@ -29,18 +29,19 @@ import { deleteUserFiles } from '@/storage/user-files';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
 
 /**
- * 「设置 → 存储空间」（D-264）：Morph 保存的全部用户文件、总大小，每个文件用在哪里（哪张表的哪条记录、
- * 哪个页面的哪个组件；只被旧版本用到的标出来）。可以删除单个文件，或者一键清理现在没有地方在用的。
- * 由内核提供，AI 不能修改，也看不到这里的文件名和内容。
+ * "Settings -> Storage" (D-264): all user files saved by Morph, total size, where each file is
+ * used (which table's record, which page's component; those used only by old versions are
+ * marked). Can delete individual files, or clean up unused ones with one tap. Provided by core,
+ * cannot be modified by AI, and AI cannot see filenames or contents here.
  */
 
 interface Loaded {
   assets: AssetRecord[];
   usage: Map<string, AssetUsage>;
-  /** 记录所在的表（当前的和只在旧版本里的）。 */
+  /** Tables where records reside (current ones and those only in old versions). */
   tables: Map<string, Collection>;
   records: Map<string, DataRecord>;
-  /** 带着中间格式的 Excel、Word（能放回桌上改，D-367）：中间格式和原图一共多大，算在这个文件上。 */
+  /** Excel and Word files with intermediate formats (can be put back on the desk for editing, D-367): total size of intermediate format and original image counted towards this file. */
   sources: Map<string, number>;
 }
 
@@ -54,11 +55,11 @@ const KIND: [string, StringKey][] = [
 const kindOf = (a: AssetRecord): StringKey =>
   KIND.find(([prefix]) => a.mimeType.startsWith(prefix))?.[1] ?? 'storageKindOther';
 
-/** 一键清理的范围：现在没有地方在用的（快捷操作存的结果除外，它们本来就是用户要留的文件）。 */
+/** Scope of one-tap cleanup: currently unused files (excluding quick action output results, which are files the user explicitly wants to keep). */
 const cleanable = (a: AssetRecord, usage: Map<string, AssetUsage>) =>
   a.source !== 'generated' && isUnused(usage.get(a.id));
 
-/** 现在的时间（毫秒）：只在点了以后的处理里用。 */
+/** Current time (milliseconds): used only in post-tap processing. */
 const nowMs = () => Date.now();
 
 export default function StorageRoute() {
@@ -104,7 +105,7 @@ export default function StorageRoute() {
   if (!loaded) return <View style={{ flex: 1, backgroundColor: palette.background }} />;
 
   const { assets, usage, tables, records, sources } = loaded;
-  /** 存储空间里的大小：带着中间格式时加上它和原图。 */
+  /** Size in storage: when intermediate format is present, add it along with the original image. */
   const sizeOf = (a: AssetRecord) => a.size + (sources.get(a.id) ?? 0);
   const total = assets.reduce((n, a) => n + sizeOf(a), 0);
   const unused = assets.filter((a) => cleanable(a, usage));
@@ -168,7 +169,7 @@ export default function StorageRoute() {
     );
   }
 
-  /** 放回桌上改（D-367）：复制一份进新桌面，这个文件不动。 */
+  /** Put back on desk for editing (D-367): copy into new desk, leave this file untouched. */
   async function putOnDesk(a: AssetRecord) {
     try {
       const desk = await placeAssetOnDesk(files, a, nowMs());
@@ -214,7 +215,7 @@ export default function StorageRoute() {
       contentContainerStyle={{ padding: palette.pad, gap: palette.gap - 4, paddingBottom: 48 }}>
       <PageTitle palette={palette}>{t(locale, 'storageTitle')}</PageTitle>
       <Text style={caption}>{t(locale, 'storageIntro')}</Text>
-      {/* 桌上的文件（D-357）：从这里回到房间，放久了提示清掉。 */}
+      {/* Files on the desk (D-357): return from here to the room, prompt to clear if left too long. */}
       <DeskList files={files} palette={palette} locale={locale} />
       {assets.length === 0 ? (
         <Card palette={palette}>

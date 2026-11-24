@@ -12,8 +12,10 @@ import { readTable } from '../data/records';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// R13（量过再决定）：同一屏上有几个读同一张表的组件时，读这张表的次数不随组件个数增加——
-// 首次显示一样，记录有写入（recordsVersion 变）之后重新读也一样。以后改了读取方式，这个性质不能丢。
+// R13 (measure and decide): when multiple components on the same screen read the same table, read
+// count does not increase with component count — same for initial display, and same for re-reads
+// after records are written (recordsVersion changes). If reading method changes later, this
+// property must be preserved.
 
 const table = {
   id: 'tasks',
@@ -101,11 +103,11 @@ describe('readTable', () => {
     const spy = jest.spyOn(repo, 'listRecords');
     const [a, b] = await Promise.all([readTable(repo, 1, 'tasks'), readTable(repo, 1, 'tasks')]);
     expect(spy).toHaveBeenCalledTimes(1);
-    // 每个组件拿到自己的数组。
+    // Each component receives its own array.
     expect(a).not.toBe(b);
     a.pop();
     expect(b).toHaveLength(1);
-    // 另一个版本：不共用。
+    // Alternative version: do not share.
     await Promise.all([readTable(repo, 1, 'tasks'), readTable(repo, 2, 'tasks')]);
     expect(spy).toHaveBeenCalledTimes(3);
   });

@@ -20,7 +20,7 @@ import { useWorkspaceContext, useAppTheme } from '../workspace/context';
 import { useGuide } from './store';
 import { WelcomeArt, type WelcomeArtKind } from './WelcomeArt';
 
-// 第一页不讲以后还会下载什么：下载时的提示自己会说大小、之后不联网也能用、建议连 Wi-Fi（D-592，原 D-510 的小字）。
+// First page does not mention what else will be downloaded: download prompt states its size, works offline afterward, and recommends connecting to Wi-Fi (D-592, small text from original D-510).
 const PAGES: { art: WelcomeArtKind; text: StringKey; sub?: StringKey }[] = [
   { art: 'scan', text: 'guideIntro1', sub: 'guideIntro1Sub' },
   { art: 'records', text: 'guideIntro2', sub: 'guideIntro2Sub' },
@@ -28,9 +28,11 @@ const PAGES: { art: WelcomeArtKind; text: StringKey; sub?: StringKey }[] = [
 ];
 
 /**
- * 划屏介绍（D-149）：三页，每页一张图配一句话（扫描纸质文件变成 PDF、Word、Excel，免费、只在本机处理；扫描、文件或说一句
- * 记进各自的小 App，到时间提醒；缺功能、想换样子都跟 Tink 说一句，D-592）；可以跳过。看完或跳过都进入首页的第 1 步，
- * 惊喜留给用户自己动手。
+ * Onboarding slider (D-149): three pages, each with an illustration and a single sentence (scan
+ * paper documents into PDF, Word, Excel, free, processed entirely on-device; record via scan,
+ * file, or voice into respective mini-apps with reminders; tell Tink a sentence for missing
+ * features or appearance changes, D-592); skippable. Finishing or skipping enters step 1 of the
+ * home screen, leaving the surprises for the user to discover.
  */
 export function WelcomeScreen() {
   const { locale } = useWorkspaceContext();
@@ -44,7 +46,7 @@ export function WelcomeScreen() {
   const [index, setIndex] = useState(0);
   const last = index === PAGES.length - 1;
 
-  // 关掉（看完、跳过或系统返回）后，下次需要时外壳才再推出来。
+  // After closing (finishing, skipping, or system back), the shell won't push it again the next time it's needed.
   useEffect(() => () => useGuide.setState({ introOpen: false }), []);
 
   function finish() {

@@ -20,10 +20,13 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.concurrent.thread
 
-// 文字转语音的 Android 实现（D-270）：系统的 TextToSpeech（多数手机是 Google「语音服务」），和 iOS 的 JS 接口相同。
-// 每段用 synthesizeToFile 写一个 WAV（中间文件放在输出文件旁边），全部读完后接成一个（Wav.join），
-// 中间文件成功、失败、取消都删掉。声音数据缺了不偷偷下载，报 ERR_TTS_NOT_DOWNLOADED，由用户在系统设置里下载。
-// 文字只交给系统朗读引擎，不写日志。
+// Android implementation of Text-to-Speech (D-270): System TextToSpeech (Google Voice Services on
+// most phones), sharing the same JS interface as iOS. Writes each segment to a WAV file via
+// synthesizeToFile (intermediate files placed alongside the output file), joins them via Wav.join
+// after reading all segments, and deletes intermediate files on success, failure, or cancellation.
+// Missing audio data is not downloaded automatically; throws ERR_TTS_NOT_DOWNLOADED for the user to
+// download in system settings. Text is passed exclusively to the system TTS engine and is never
+// logged.
 
 class TTSException(code: String, message: String) : CodedException(code, message, null)
 
@@ -41,13 +44,13 @@ class SynthesizeOptions : Record {
   @Field val output: String = ""
 }
 
-/** 朗读引擎连上的最长等待：没有引擎、引擎被停用时初始化回调可能一直不来。 */
+/** Maximum wait time for connecting to the TTS engine: initialization callback may never arrive if no engine exists or if the engine is disabled. */
 private const val INIT_TIMEOUT_SECONDS = 15L
 
-/** 一段最多等多久：引擎通常比实时快很多倍；卡住时（引擎崩了）不能让 Promise 一直不结束。 */
+/** Maximum wait time per segment: engines are typically much faster than real-time; prevents promises from hanging indefinitely when stalled (e.g., engine crash). */
 private fun segmentTimeoutSeconds(text: String) = 60L + text.length / 2
 
-/** 一次朗读：取消时停掉引擎，把正在等的那一段结束掉。 */
+/** A TTS job: stops the engine upon cancellation and terminates the currently waiting segment. */
 private class TTSJob {
   @Volatile var cancelled = false
   @Volatile var engine: TextToSpeech? = null
@@ -76,7 +79,7 @@ class MorphTTSModule : Module() {
         val engine = try {
           openEngine()
         } catch (e: Throwable) {
-          // 没有引擎、引擎被停用，或绑定时系统抛错：都当作没有朗读引擎，Promise 一定要结束。
+          // No engine, engine disabled, or system error during binding: all treated as having no TTS engine; ensures the Promise always terminates.
           promise.resolve("noEngine")
           return@thread
         }
@@ -100,7 +103,7 @@ class MorphTTSModule : Module() {
     }
 
     AsyncFunction("synthesize") { segments: List<String>, options: SynthesizeOptions, promise: Promise ->
-      // 先登记再开线程：JS 的取消轮询可能比线程先到。
+      // Register before starting the thread: JS cancellation polling might arrive before the thread starts.
       val job = TTSJob()
       jobs[options.taskId] = job
       thread(name = "morph-tts") {
@@ -130,7 +133,7 @@ class MorphTTSModule : Module() {
   private fun fileOf(uri: String): File =
     if (uri.startsWith("file://")) File(Uri.parse(uri).path!!) else File(uri)
 
-  /** 连上系统的朗读引擎（在后台线程等初始化回调）；连不上时抛 ERR_TTS_UNAVAILABLE。 */
+  /** Connect to the system TTS engine (waits for initialization callback on a background thread); throws ERR_TTS_UNAVAILABLE if connection fails. */
   private fun openEngine(): TextToSpeech {
     val ready = CompletableFuture<Int>()
     val engine = TextToSpeech(context) { status -> ready.complete(status) }
@@ -212,7 +215,7 @@ class MorphTTSModule : Module() {
         )
       }
 
-      // 只有符号、读不出声音的段，引擎可能不写文件：跳过它。
+      // Skip segments consisting solely of symbols or producing no audio, for which the engine might not write files.
       val written = parts.filter { it.exists() && it.length() > 0 }
       if (written.isEmpty()) throw failed("the engine wrote no audio")
       val info = Wav.join(written, output) { job.cancelled }

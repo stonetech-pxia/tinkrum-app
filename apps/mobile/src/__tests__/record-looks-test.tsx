@@ -14,7 +14,7 @@ import { StyleSheet } from 'react-native';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 新的记录外观：表格（D-539）、图片墙（D-540）；按值上色和警示色（D-541）。看只读，什么都不写（底线 15）。
+// New record appearance: table (D-539), image wall (D-540); value-based coloring and alert colors (D-541). Read-only view, writes nothing (invariant 15).
 
 const people: Collection = {
   id: 'people',
@@ -102,7 +102,7 @@ describe('table look (D-539)', () => {
         .height;
     await screen.findByTestId(`record-${ada.id}`);
     const fixed = heightOf(`record-${ada.id}`);
-    // 两边的行都带上边线：只有一边写了高度的话，每行差一条线，行多了左右对不齐。
+    // Borders on both sides of rows: if only one side specifies height, rows differ by one line, causing misaligned left and right sides with many rows.
     expect(fixed).toBeGreaterThan(0);
     expect(heightOf(`record-${ada.id}-cells`)).toBe(fixed);
   });
@@ -223,7 +223,7 @@ describe('colour by value and warning colour (D-541)', () => {
     const warn = colorOf(await screen.findByText('70')).color;
     const plain = colorOf(screen.getByText('30')).color;
     expect(warn).not.toBe(plain);
-    // 没有右侧字段时是标题。
+    // Acts as title when there are no right-hand fields.
     expect(colorOf(screen.getByText('Ada')).color).toBe(colorOf(screen.getByText('Bob')).color);
   });
 

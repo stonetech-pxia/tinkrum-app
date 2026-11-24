@@ -38,39 +38,44 @@ import {
 import { baseName, extOf, extOfMime, mimeOf } from '../runtime/actions/helpers';
 import type { FilePlatform, PickedFile } from '../runtime/platform';
 
-// 桌面的存储（file-room DESIGN §3、§11.1，D-357）：版本栈的逻辑在 @morph/core 的 desk/model.ts，
-// 这里按它算出来的结果复制、移动、删除文件，并把桌面写成 desk/<deskId>/desk.json。
-// 文件的归属（AGENTS.md）：放上桌时原件只复制；工具的结果是运行目录里的临时文件，直接移进来；
-// 中间格式（TableDoc / DocDoc）引用的图片放进 assets/，JSON 里写桌面里的相对路径，各版本共用一份。
+// Workspace storage (file-room DESIGN §3, §11.1, D-357): version stack logic is in @morph/core's
+// desk/model.ts, where files are copied, moved, and deleted based on its calculated results, and
+// workspaces are written as desk/<deskId>/desk.json. File ownership (AGENTS.md): originals are only
+// copied when placed on the desk; tool results are temporary files in the runtime directory and are
+// moved in directly; images referenced by intermediate formats (TableDoc / DocDoc) are placed in
+// assets/, with relative paths in the JSON, shared across versions.
 
 type Files = Pick<FilePlatform, 'desk' | 'readUri' | 'freeDiskBytes' | 'imageSize'>;
 
 const JSON_NAME = 'desk.json';
-/** 还没合上的一段编辑（防丢，§11.2）：每改一下写一次，合上时删掉。 */
+/** An ongoing editing session (for crash prevention, §11.2): written on every modification, deleted when closed. */
 const DRAFT_NAME = 'editing.json';
 
-/** 桌面里的相对路径 → desk/ 下的路径。 */
+/** Relative path in workspace -> path under desk/. */
 const inDesk = (desk: Pick<Desk, 'id'>, path: string) => `${desk.id}/${path}`;
 
-/** 扩展名只留字母和数字（做文件名用）。 */
+/** Keep only letters and numbers in file extensions (for use as filenames). */
 const cleanExt = (ext: string) => ext.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
 
 export function newDeskId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** 桌上一份文件现在的地址。 */
+/** Current URI of a file on the desk. */
 export const deskFileUri = (files: Files, desk: Desk, path: string) =>
   files.desk.uri(inDesk(desk, path));
 
-// 清单（desk.json）和还没合上的编辑（editing.json）不直接覆盖原文件（写到一半被打断，文件就截断了，这个桌面
-// 的版本入口就没了，R08）：先完整写到 <文件>.tmp、读回来核对，再把旧的改名成 <文件>.bak，最后把 .tmp 改名成正式文件。
-// 读的时候正式文件读不出来就退到 .tmp（写好了、还没换上），再退到 .bak（上一份好的）。
+// Manifests (desk.json) and ongoing edits (editing.json) are not overwritten directly (if
+// interrupted midway, the file gets truncated, destroying the version entry point for this
+// workspace, R08): first write completely to <file>.tmp, read back to verify, then rename the old
+// file to <file>.bak, and finally rename .tmp to the official file. When reading, if the official
+// file cannot be read, fall back to .tmp (fully written, not yet swapped), and then to .bak (the
+// last good copy).
 
 const tmpOf = (path: string) => `${path}.tmp`;
 const bakOf = (path: string) => `${path}.bak`;
 
-/** 读一个清单：正式文件、.tmp、.bak 里第一个 valid 的。 */
+/** Read a manifest: the first valid one among the official file, .tmp, and .bak. */
 async function readManifest(
   fs: Files['desk'],
   path: string,
@@ -83,7 +88,7 @@ async function readManifest(
   return null;
 }
 
-/** 写一个清单：写不全、读回来对不上就抛错，正式文件原样不动。 */
+/** Write a manifest: throw an error if incomplete or read-back verification fails, leaving the official file untouched. */
 async function writeManifest(
   fs: Files['desk'],
   path: string,
@@ -96,7 +101,7 @@ async function writeManifest(
     await fs.remove([tmp]);
     throw new Error(`desk manifest was not written completely: ${path}`);
   }
-  // 现在的正式文件是好的才留作 .bak；坏的直接换掉，不能把上一份好的 .bak 盖成坏的。
+  // Keep the current official file as .bak only if it is valid; replace bad ones directly without overwriting the last good .bak with a corrupted one.
   const current = await fs.readText(path);
   if (current !== null && valid(current)) {
     await fs.remove([bakOf(path)]);
@@ -134,7 +139,7 @@ export async function loadDesk(files: Files, deskId: string): Promise<Desk | nul
   return text === null ? null : parseDesk(text);
 }
 
-/** 所有桌面（存储页列出、提示清理）；读不出来的目录不算。 */
+/** All workspaces (listed on storage page, cleanup prompts); directories that cannot be read are excluded. */
 export async function listDesks(files: Files): Promise<Desk[]> {
   const out: Desk[] = [];
   for (const id of await files.desk.list()) {
@@ -152,7 +157,7 @@ export const deskSummary = (desk: Desk, now: number) => ({
   stale: isStaleDesk(desk, now),
 });
 
-/** 磁盘不够时不开始复制（大视频）。 */
+/** Do not start copying when disk space is insufficient (large videos). */
 function checkSpace(files: Files, bytes: number) {
   const free = files.freeDiskBytes();
   if (free !== null && bytes * 1.1 > free) {
@@ -163,8 +168,9 @@ function checkSpace(files: Files, bytes: number) {
 }
 
 /**
- * 放到桌上（收件页面的「放到桌上」）：每份复制一份工作副本，原件永远不动。
- * 收件那一批（分享扩展、选择器的副本）照旧由收件页面释放。外来的 docx / xlsx 读成中间格式（D-509）。
+ * Place on desk ("Place on desk" on the inbox page): create a working copy for each, originals
+ * are never touched. The inbox batch (shares, picker copies) is released by the inbox page as
+ * usual. External docx / xlsx are read into intermediate formats (D-509).
  */
 export async function placeOnDesk(
   files: Files,
@@ -179,7 +185,7 @@ export async function placeOnDesk(
   const placed: DeskFile[] = [];
   try {
     for (const [i, f] of picked.entries()) {
-      // 名字里没有扩展名（Android 别的 App 分享过来常这样）时按 MIME 补上：转 PDF 这类工具按扩展名认格式。
+      // If the name lacks an extension (common when shared from other Android apps), supply one based on MIME type: format-recognizing tools like PDF converters rely on extensions.
       const ext = cleanExt(extOf(f.name) || extOfMime(f.mimeType));
       const path = `v1-${i}.${ext}`;
       const size = await files.desk.copyIn(f.uri, `${deskId}/${path}`);
@@ -206,9 +212,11 @@ export async function placeOnDesk(
 }
 
 /**
- * 外来的 docx / xlsx（D-509）：从桌上的副本读出中间格式，桌上就是 Word / 表格编辑器（和转出来的一样）；
- * 图片写进 assets/。读不了的（加了密码、坏了、太大）照旧只是一个文件（能看、能转 PDF）。
- * 桌上的文件还是原件的副本，改了才重新生成。
+ * External docx / xlsx (D-509): read the intermediate format from the desk copy, making the desk
+ * function as a Word / spreadsheet editor (identical to exported ones); write images into
+ * assets/. Unreadable ones (password-protected, corrupted, too large) remain plain files
+ * (viewable, convertible to PDF). Desk files remain copies of the originals and are regenerated
+ * only when modified.
  */
 async function importedSource(
   files: Files,
@@ -244,7 +252,7 @@ async function importedSource(
   return { kind: result.kind, path: json, size, assets, imported: 'original' };
 }
 
-/** 运行交回的文件放进桌面：桌面里原有的直接用，运行目录里的移进来，别的复制。 */
+/** Adopt files returned from the runtime into the workspace: use existing workspace files directly, move runtime directory files in, and copy others. */
 async function adopt(
   files: Files,
   desk: Desk,
@@ -269,7 +277,7 @@ async function adopt(
   return { path, size };
 }
 
-/** 中间格式引用的图片：搬进 assets/，同一张只搬一次；JSON 里改成桌面里的相对路径。 */
+/** Images referenced by intermediate formats: move into assets/, moving each unique image only once; update JSON with relative paths inside the workspace. */
 async function adoptSource(
   files: Files,
   desk: Desk,
@@ -289,7 +297,7 @@ async function adoptSource(
   } catch {
     doc = null;
   }
-  // 读不出来的中间格式不要了：这一版只是一个普通的 xlsx / docx（能看、能转 PDF，不能改）。
+  // Discard unreadable intermediate formats: this version becomes a regular xlsx / docx (viewable, convertible to PDF, but uneditable).
   if (!doc) return undefined;
   const assets = new Map<string, DeskBlob>();
   const asset = async (uri: string) => {
@@ -309,7 +317,7 @@ async function adoptSource(
     if (page.source) page.source = await asset(page.source);
   }
   if (kind === 'table') {
-    // 转 Excel 剪下来的图片（D-520）。
+    // Images cropped during Excel conversion (D-520).
     for (const page of (doc as TableDoc).pages) {
       for (const block of page.blocks) {
         if (block.kind === 'image' && block.src) block.src = await asset(block.src);
@@ -337,13 +345,14 @@ async function adoptSource(
 
 export interface DeskCommit {
   desk: Desk;
-  /** 没有文件输出（识别文字、读二维码）时：结果只给用户看，桌上不变。 */
+  /** When there is no file output (text recognition, QR code reading): output is shown to the user only, workspace remains unchanged. */
   text?: string;
 }
 
 /**
- * 把一次运行（一个工具、一个快捷操作）的结果放回桌上，生成一个新版本（§3.1）。
- * selected 是交给这次运行的桌上文件的 ID。调用的人在这之后删掉运行目录（移进来的文件已经不在那里了）。
+ * Commit the results of a run (a tool or quick action) back to the workspace, generating a new
+ * version (§3.1). `selected` is the ID of the desk file passed to this run. The caller deletes
+ * the runtime directory afterward (moved-in files are no longer there).
  */
 export async function commitRun(
   files: Files,
@@ -361,7 +370,7 @@ export async function commitRun(
     const ext = cleanExt(item.ext);
     const blob = await adopt(files, desk, item.uri, `v${n}-${i}.${ext}`);
     const same = desk.versions.flatMap((v) => v.files).find((f) => f.path === blob.path);
-    // 工具原样交回的文件（例如快捷操作最后一步是分享）：还是桌上原来那一份。
+    // Files returned unchanged by the tool (e.g., if the final step of a quick action is sharing): remains the original desk file.
     if (same) {
       outputs.push(same);
       continue;
@@ -382,7 +391,7 @@ export async function commitRun(
   }
   const next = placeOutputs(currentFiles(desk), selected, outputs);
   if (!next) return { desk };
-  // 结果和桌上现在的一模一样（工具什么都没改）：不生成新版本。
+  // Results are identical to current desk contents (tool changed nothing): do not generate a new version.
   const before = currentFiles(desk);
   if (next.length === before.length && next.every((f, i) => f === before[i])) return { desk };
   const change = commitVersion(desk, next, by, now);
@@ -403,10 +412,10 @@ export async function redo(files: Files, desk: Desk, now: number): Promise<Desk>
   return next;
 }
 
-/** 清空桌面（用户点的）：整个目录删掉；已经存成用户文件的不受影响。 */
+/** Clear workspace (triggered by user): delete the entire directory; those already saved as user files are unaffected. */
 export const clearDesk = (files: Files, deskId: string) => files.desk.removeDesk(deskId);
 
-/** 读一份文件的中间格式，图片的相对路径换成现在的地址（显示用）。读不出来时返回 null。 */
+/** Load a file's intermediate format, replacing relative image paths with current URIs (for display). Returns null if unreadable. */
 export async function loadDeskSource(
   files: Files,
   desk: Desk,
@@ -439,8 +448,9 @@ export async function loadDeskSource(
 }
 
 /**
- * 交给工具时，桌上的 Word 带着它的中间格式（D-466，图片换成能读的地址）：文档转 PDF 按编辑页的版面排。
- * 读不出来的照常只交文件。
+ * When passing to tools, desk Word files carry their intermediate format (D-466, with images
+ * replaced by readable URIs): document-to-PDF conversion formats according to editor layout.
+ * Unreadable ones are passed as files as usual.
  */
 export async function deskPickedWithSources(
   files: Files,
@@ -451,7 +461,7 @@ export async function deskPickedWithSources(
   return Promise.all(
     picked.map(async (p, i) => {
       const file = list[i]!;
-      // 外来的 Word 没改过（D-509）：照原件转，不按编辑页的版面。
+      // Unmodified external Word documents (D-509): convert from the original without applying editor layout.
       if (file.source?.kind !== 'doc' || file.source.imported === 'original') return p;
       const source = await loadDeskSource(files, desk, file).catch(() => null);
       return source?.kind === 'doc' ? { ...p, docDoc: source.doc } : p;
@@ -459,7 +469,7 @@ export async function deskPickedWithSources(
   );
 }
 
-/** 桌上的文件交给运行时的样子（和分享进来的文件一样，D-115）。 */
+/** Format of desk files when passed to runtime (same as files shared in, D-115). */
 export function deskPicked(files: Files, desk: Desk, list: readonly DeskFile[]): PickedFile[] {
   return list.map((f) => ({
     uri: deskFileUri(files, desk, f.path),
@@ -472,8 +482,9 @@ export function deskPicked(files: Files, desk: Desk, list: readonly DeskFile[]):
 }
 
 /**
- * 结果页的「放到桌上」（D-366，代替原来的「查看和编辑」）：把这几份结果复制进一个新桌面，中间格式和图片一起。
- * 只复制、不移动：结果页还显示着它们（运行页关掉时运行目录才删）。
+ * "Place on desk" on result pages (D-366, replacing former "View and edit"): copy these results
+ * into a new workspace along with intermediate formats and images. Copy only, do not move: result
+ * pages still display them (runtime directory is deleted only when the runtime page closes).
  */
 export async function placeResultsOnDesk(
   files: Files,
@@ -513,10 +524,10 @@ export async function placeResultsOnDesk(
   }
 }
 
-/** 一份文件的中间格式（显示时图片是现在的地址，存回去时是桌面里的相对路径）。 */
+/** A file's intermediate format (images use current URIs when displayed, and relative workspace paths when saved back). */
 export type DeskSourceDoc = { kind: 'table'; doc: TableDoc } | { kind: 'doc'; doc: DocDoc };
 
-/** 中间格式里的图片路径换一遍（不改原来的）。 */
+/** Remap image paths in the intermediate format (without modifying the original). */
 export function mapSourcePaths(source: DeskSourceDoc, fn: (path: string) => string): DeskSourceDoc {
   if (source.kind === 'table') {
     return {
@@ -526,7 +537,7 @@ export function mapSourcePaths(source: DeskSourceDoc, fn: (path: string) => stri
         pages: source.doc.pages.map((p) => ({
           ...p,
           source: fn(p.source),
-          // 转 Excel 剪下来的图片（D-520）。
+          // Images cropped during Excel conversion (D-520).
           blocks: p.blocks.map((b) => (b.kind === 'image' && b.src ? { ...b, src: fn(b.src) } : b)),
         })),
       },
@@ -542,7 +553,7 @@ export function mapSourcePaths(source: DeskSourceDoc, fn: (path: string) => stri
   return { kind: 'doc', doc };
 }
 
-/** 中间格式用到的图片（原图截图的页面、剪下来的图片）。 */
+/** Images used by the intermediate format (source screenshot pages, cropped images). */
 export function sourcePaths(source: DeskSourceDoc): Set<string> {
   const out = new Set<string>();
   mapSourcePaths(source, (path) => {
@@ -552,14 +563,14 @@ export function sourcePaths(source: DeskSourceDoc): Set<string> {
   return out;
 }
 
-/** 显示用的地址换回桌面里的相对路径。 */
+/** Convert display URIs back to relative paths within the workspace. */
 const relativeSource = (files: Files, desk: Desk, source: DeskSourceDoc) =>
   mapSourcePaths(source, (path) => {
     const own = files.desk.pathOf(path);
     return own?.startsWith(`${desk.id}/`) ? own.slice(desk.id.length + 1) : path;
   });
 
-/** docx、xlsx 里嵌的图片（剪下来的那些）：按中间格式里写的路径读。 */
+/** Images embedded in docx or xlsx (those cropped): read according to paths specified in the intermediate format. */
 async function embeddedImages(
   files: Files,
   desk: Desk,
@@ -571,13 +582,13 @@ async function embeddedImages(
     try {
       const uri = deskFileUri(files, desk, block.src);
       const bytes = await files.readUri(uri);
-      // 量不出大小（外来的 docx 里的 GIF、BMP，D-509）时按它在文档里的大小定长宽比，图片照样写进去。
+      // When size cannot be determined (external docx with GIFs or BMPs, D-509), determine aspect ratio based on its size in the document, writing the image as usual.
       const size = await files
         .imageSize(uri)
         .catch(() => ({ width: block.box.width, height: block.box.height }));
       out.set(block.src, { bytes, ...size });
     } catch {
-      // 读不了的图片不写进文件。
+      // Unreadable images are not written to the file.
     }
   }
   return out;
@@ -598,9 +609,10 @@ const xlsxImages = (files: Files, desk: Desk, doc: TableDoc) =>
   );
 
 /**
- * 合上一段编辑（file-room §11.2，D-366）：改过的中间格式写成这一版的 JSON，按它生成一次 xlsx / docx，
- * 桌上这一份换成新的（新 ID），整段编辑是一个版本（撤销时一起退）。没有中间格式时不变。
- * 返回新的桌面和这份文件的新 ID。
+ * Close an editing session (file-room §11.2, D-366): write the modified intermediate format as
+ * this version's JSON, generate an xlsx / docx from it, replace the desk file with a new one (new
+ * ID), treating the entire edit session as a single version (reverted together on undo).
+ * Unchanged if no intermediate format exists. Returns the new workspace and the new file ID.
  */
 export async function commitEdit(
   files: Files,
@@ -613,7 +625,7 @@ export async function commitEdit(
   const file = list.find((f) => f.id === fileId);
   if (!file?.source) return { desk, fileId };
   const n = desk.nextN;
-  // 编辑时新剪的图（「用原图」，D-467）还不在桌面里：搬进 assets/，记进这份文件。
+  // Newly cropped images during editing ("Use original image", D-467) not yet in the workspace: move into assets/ and record in this file.
   const known = new Set(file.source.assets.map((a) => a.path));
   const added: DeskBlob[] = [];
   const relative = relativeSource(files, desk, edited);
@@ -653,7 +665,7 @@ export async function commitEdit(
       size: jsonSize,
       assets: [...file.source.assets, ...added].filter((a) => used.has(a.path)),
       ...(missing.length ? { pagesWithoutTables: missing } : {}),
-      // 外来的文件改过了：这一版是重新生成的（D-509）。
+      // External file has been modified: this version is regenerated (D-509).
       ...(file.source.imported ? { imported: 'rebuilt' as const } : {}),
     },
   };
@@ -667,8 +679,9 @@ export async function commitEdit(
   await saveDesk(files, sealed);
   await files.desk.remove(change.drop.map((p) => inDesk(desk, p)));
   await removeManifest(files.desk, inDesk(desk, DRAFT_NAME));
-  // 新剪的图搬走了（D-467）：编辑页接着用的文档换成桌面里的地址（2026-11-06：「完成」以后刚换的图变成灰块，
-  // 之后再改、再存都指向已经不在的临时文件）。
+  // Newly cropped images moved (D-467): update documents continuing to be used in the editor with
+  // workspace addresses (2026-11-06: newly changed images turn into gray blocks after "Finish", and
+  // subsequent modifications/saves point to missing temporary files).
   const doc = moved.size
     ? mapSourcePaths(source, (p) => (/^(file:|content:)/.test(p) ? p : deskFileUri(files, desk, p)))
         .doc
@@ -676,7 +689,7 @@ export async function commitEdit(
   return { desk: sealed, fileId: next.id, ...(doc ? { doc } : {}) };
 }
 
-/** 还没合上的编辑写进桌面（防丢）：App 被关掉时，下次打开房间先把它合成一个版本。 */
+/** Write unclosed edits into the workspace (for crash prevention): if the app is closed, merge them into a version the next time the room is opened. */
 export async function writeEditDraft(
   files: Files,
   desk: Desk,
@@ -695,7 +708,7 @@ export async function writeEditDraft(
 export const dropEditDraft = (files: Files, desk: Desk) =>
   removeManifest(files.desk, inDesk(desk, DRAFT_NAME));
 
-/** 打开房间时：上次没合上的编辑合成一个版本（撤销能退回去）。读不出来、文件已经不在桌上时丢掉。 */
+/** When opening a room: merge last unclosed edits into a version (revertible via undo). Discard if unreadable or file is no longer on the desk. */
 export async function recoverEditDraft(files: Files, desk: Desk, now: number): Promise<Desk> {
   const text = await readManifest(files.desk, inDesk(desk, DRAFT_NAME), isJson);
   if (text === null) return desk;

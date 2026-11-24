@@ -14,7 +14,7 @@ import { Alert } from 'react-native';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 一键记录操作（D-300–D-304）：习惯打卡、喝水 +1、上下班、旅行清单一键清空。
+// One-tap record operations (D-300–D-304): habit check-in, water +1, clock-in/out, travel checklist one-tap clearing.
 
 const checkins: Collection = {
   id: 'checkins',
@@ -116,7 +116,7 @@ const seed = (locale: Locale, registry: Registry) => {
   return result.config as never;
 };
 
-/** 系统弹窗：点名字为 label 的按钮，返回 spy 看弹了什么。 */
+/** System dialog: tap the button named label, return spy to inspect what was popped up. */
 function pressInAlert(label: string) {
   const spy = jest.spyOn(Alert, 'alert');
   spy.mockImplementation((_title, _message, buttons) => {
@@ -131,7 +131,7 @@ const at = Date.now();
 const put = (repo: MemoryWorkspaceRepo, id: string, collectionId: string, values: object) =>
   repo.insertRecord({ id, collectionId, values: { ...values }, createdAt: at, updatedAt: at });
 
-// 底线 11（创始人 2026-10-31）：只有删除弹撤销；一键记下的、改过的，用户自己删掉或改回去。
+// Invariant 11 (founder 2026-10-31): only deletion pops up undo; entries logged or modified with one tap are deleted or reverted by the user themselves.
 it('a new user: one tap logs a habit for today, with no undo', async () => {
   const repo = new MemoryWorkspaceRepo();
   await renderToolsApp(repo, undefined, { seed });
@@ -191,7 +191,7 @@ it('setAll asks first, changes only what differs, and shows no undo afterwards',
   expect(screen.queryByTestId('toast-undo')).toBeNull();
 });
 
-// R09：批量修改在一个事务里做完——要么全改、要么一条都不改；确认等待的时候记录被改过也不覆盖。
+// R09: batch modifications completed in a single transaction—either all change or none at all; records modified while waiting for confirmation are not overwritten.
 it('setAll: when the write fails, none of the entries is changed and it says so', async () => {
   const repo = new MemoryWorkspaceRepo();
   await put(repo, 'p1aaaaaa', 'packing', { item: '护照', packed: true });
@@ -210,7 +210,7 @@ it('setAll: an entry changed while the confirm box was open is not overwritten, 
   await put(repo, 'p2aaaaaa', 'packing', { item: '充电器', packed: true });
   await renderToolsApp(repo, undefined, { seed });
   jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
-    // 用户还没点「修改」，别处已经把这条改了。
+    // User hasn't tapped "Modify" yet, but another place has already updated this entry.
     void repo.updateRecord('p2aaaaaa', { item: '充电宝', packed: true }, Date.now());
     buttons?.find((b) => b.text === '修改')?.onPress?.();
   });
@@ -252,8 +252,9 @@ it('French', async () => {
 });
 
 describe('v34: tools on blocks', () => {
-  // 一张卡片列表（喝水）每条上两种工具：「清零」改这一条，「记一次」往另一张表（记录）新建一条、
-  // 引用这一条（关系规则 12：写到别的表时要有引用字段设成 "$row"）。
+  // A card list (water) with two tools per item: "Reset" modifies this entry, "Log once" creates a
+  // new entry in another table (records) referencing this entry (relation rule 12: writing to
+  // another table requires a reference field set to "$row").
   const logs: Collection = {
     id: 'logs',
     name: '记录',
@@ -326,7 +327,7 @@ describe('v34: tools on blocks', () => {
     await put(repo, 'w1aaaaaa', 'water', { day: '2026-10-29', glasses: 3 });
     await put(repo, 'w2aaaaaa', 'water', { day: '2026-10-30', glasses: 8 });
     await renderToolsApp(repo, undefined, { seed: cardsSeed });
-    // 3 杯那条只显示「记一次」（清零的条件不满足）：新的一条在记录表里、引用这一条，喝水表不变。
+    // The 3-cups item only shows "Log once" (reset condition not met): the new entry is in the records table and references this entry, while the water table remains unchanged.
     const log = await screen.findByTestId('row-action-w1aaaaaa');
     expect(log).toHaveTextContent('记一次');
     await fireEvent.press(log);
@@ -335,7 +336,7 @@ describe('v34: tools on blocks', () => {
       { cup: 'w1aaaaaa', day: localDate(new Date()) },
     ]);
     expect((await repo.getRecord('w1aaaaaa'))?.values).toEqual({ day: '2026-10-29', glasses: 3 });
-    // 8 杯那条显示「清零」：改的是这一条自己。
+    // The 8-cups item shows "Reset": modifies this entry itself.
     const reset = screen.getByTestId('row-action-w2aaaaaa');
     expect(reset).toHaveTextContent('清零');
     await fireEvent.press(reset);
@@ -348,7 +349,7 @@ describe('v34: tools on blocks', () => {
     const { router } = await renderToolsApp(repo, undefined, { seed: cardsSeed });
     await fireEvent.press(await screen.findByText('添加跑步'));
     await waitFor(() => expect(router.getPathname()).toBe('/record/checkins'));
-    // v33 打开的是空表单；v34 预设的习惯和日期先填好，用户补完再保存（没有直接存）。
+    // v33 opens an empty form; v34 presets the habit and date so the user completes them before saving (no direct save).
     expect(JSON.parse(router.getSearchParams().prefill as string)).toEqual({
       habit: 'run',
       day: localDate(new Date()),
@@ -356,7 +357,7 @@ describe('v34: tools on blocks', () => {
     expect(await repo.listRecords('checkins')).toEqual([]);
   });
 
-  // 底线 11（创始人 2026-10-31）：用户在表单里确认过、存下的，不弹撤销（新建到另一张表也一样）。
+  // Invariant 11 (founder 2026-10-31): entries confirmed and saved by the user in the form do not trigger an undo banner (same for creating into another table).
   it('saving the add form a button opened into another table shows no undo', async () => {
     const repo = new MemoryWorkspaceRepo();
     const { router } = await renderToolsApp(repo, undefined, { seed: cardsSeed });

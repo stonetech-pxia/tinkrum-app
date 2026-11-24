@@ -4,13 +4,17 @@ import { t } from '../messages';
 import { ToolUseSchema } from '../record-ops-schema';
 import { type LookDefinitionOf, defineLook } from './define';
 
-// 分开的浮动按钮（创始人 2026-11-04 定）：固定在页面下方（pin: "bottom"）。第一个工具是主按钮，点了就做；
-// 箭头展开其余的，一排有文字的圆按钮，点外面收起。每一项都是普通的工具引用或打开页面，只有点了才运行（底线 9、10、15、16）。
+// Separate floating buttons (set by founder 2026-11-04): fixed at the bottom of the page (pin:
+// "bottom"). The first tool is the primary button and executes on tap; tapping the arrow expands
+// the rest into a row of labeled circular buttons, which collapse when tapped outside. Each item is
+// a regular tool reference or page open, executed only upon tap (invariants 9, 10, 15, 16).
 
 const shape = {
   /**
-   * 第一个是主按钮，后面是展开的。一项是：{tool}（运行快捷操作）、{as: "list", tool}（把页面上列表现在选出的记录交给它）、
-   * {do: "create", table, …, label}（一键新建）或 {opens: <页面>, label}。label 是按钮上的字，快捷操作不写就用它的名字。
+   * The first is the primary button, followed by expanded ones. An item is: {tool} (run quick
+   * action), {as: "list", tool} (pass records currently selected in the page list to it), {do:
+   * "create", table, …, label} (one-tap creation), or {opens: <page>, label}. label is the button
+   * text; quick actions use their name if omitted.
    */
   tools: z.array(ToolUseSchema).min(1).max(5),
 };

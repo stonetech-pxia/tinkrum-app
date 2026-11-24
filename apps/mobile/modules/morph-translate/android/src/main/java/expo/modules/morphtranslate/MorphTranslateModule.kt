@@ -16,9 +16,12 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.util.concurrent.TimeUnit
 
-// 本机翻译的 Android 实现（D-170）：Google ML Kit 翻译 + 语言识别，和 iOS 的 JS 接口相同。
-// 翻译的语言模型（每种约 30 MB）不在 App 里：status 报出还没下载的语言，App 先问用户，再调 download。
-// ML Kit 只有一种中文（译文是简体），繁体中文报 unsupported。文字只返回给 App，不写日志。
+// Android implementation of on-device translation (D-170): Google ML Kit translation + language
+// recognition, sharing the same JS interface as iOS. Translation language models (approx. 30 MB
+// each) are not included in the app: status reports languages not yet downloaded, the app prompts
+// the user, and then calls download. ML Kit supports only one Chinese variant (Simplified Chinese
+// output); Traditional Chinese returns unsupported. Text is returned only to the app and is never
+// logged.
 
 class TranslateUnsupportedException(what: String) :
   CodedException("ERR_TRANSLATE_UNSUPPORTED", "Translation is not available for $what", null)
@@ -29,10 +32,10 @@ class TranslateDownloadException(cause: Throwable?) :
 class TranslateFailedException(cause: Throwable?) :
   CodedException("ERR_TRANSLATE_FAILED", "Translation failed: ${cause?.message}", cause)
 
-/** 每种语言模型的大小（ML Kit 文档：约 30 MB），只用来提示用户。 */
+/** Size of each language model (per ML Kit documentation: approx. 30 MB), used solely for user prompts. */
 private const val MODEL_BYTES = 30L * 1024 * 1024
 
-/** 一种语言最多下载多久：ML Kit 没有网络时会一直等，不会自己报错。 */
+/** Maximum download timeout per language: ML Kit waits indefinitely without reporting errors when there is no network. */
 private const val DOWNLOAD_TIMEOUT_MINUTES = 10L
 
 class MorphTranslateModule : Module() {
@@ -41,7 +44,7 @@ class MorphTranslateModule : Module() {
   private val context: Context
     get() = requireNotNull(appContext.reactContext) { "React Application Context is null" }
 
-  /** 现在有没有能上网的网络（没有时 ML Kit 的下载会一直等，所以先查）。 */
+  /** Check whether internet connectivity is currently available (ML Kit downloads would hang indefinitely without network, so check first). */
   private fun online(): Boolean {
     val manager = context.getSystemService(ConnectivityManager::class.java) ?: return true
     val caps = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
@@ -55,7 +58,7 @@ class MorphTranslateModule : Module() {
 
     Function("isSupported") { true }
 
-    // 每段文字的语言（BCP 47）；拿不准（und）时返回 null。
+    // Language of each text segment (BCP 47); returns null when uncertain (und).
     AsyncFunction("detectLanguages") { texts: List<String> ->
       val client = LanguageIdentification.getClient()
       try {
@@ -80,7 +83,7 @@ class MorphTranslateModule : Module() {
       else mapOf("status" to "download", "missing" to missing)
     }
 
-    // 下载一种语言的模型（不限 Wi-Fi：用户已经在 App 的提示里确认过，提示里建议用 Wi-Fi）。
+    // Download a language model (Wi-Fi restriction not enforced here: the user has already confirmed in the app prompt, which suggests using Wi-Fi).
     AsyncFunction("download") { language: String ->
       val code = mlkitLanguage(language) ?: throw TranslateUnsupportedException(language)
       if (!online()) throw TranslateDownloadException(null)
@@ -102,7 +105,7 @@ class MorphTranslateModule : Module() {
         TranslatorOptions.Builder().setSourceLanguage(source).setTargetLanguage(target).build()
       )
       try {
-        // 模型都已下载时不会联网；没下载时这里会失败（App 先调 status / download）。
+        // No network requests are made when models are already downloaded; fails if models are missing (the app calls status / download first).
         val have = downloaded()
         if (source !in have || target !in have) throw TranslateDownloadException(null)
         texts.map { Tasks.await(translator.translate(it)) }
@@ -115,7 +118,7 @@ class MorphTranslateModule : Module() {
       }
     }
 
-    // 设置里列出和删除已下载的语言（英文是 ML Kit 自带的，不列出）。
+    // List and delete downloaded languages in settings (English is built into ML Kit and is not listed).
     AsyncFunction("downloadedLanguages") {
       downloaded().filter { it != TranslateLanguage.ENGLISH }
         .map { if (it == TranslateLanguage.CHINESE) "zh-Hans" else it }
@@ -131,7 +134,7 @@ class MorphTranslateModule : Module() {
   private fun downloaded(): Set<String> =
     Tasks.await(models.getDownloadedModels(TranslateRemoteModel::class.java)).map { it.language }.toSet()
 
-  /** BCP 47 → ML Kit 的语言代码；ML Kit 只有简体中文。 */
+  /** BCP 47 -> ML Kit language code mapping; ML Kit supports only Simplified Chinese. */
   private fun mlkitLanguage(tag: String): String? {
     val lower = tag.lowercase()
     if (lower.startsWith("zh")) {

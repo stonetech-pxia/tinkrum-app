@@ -7,8 +7,9 @@ import { t } from '../../i18n';
 import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 
-// 裁剪框（TOOLS_DESIGN §4 crop）：逐张框选，拖框内移动，拖四角缩放；锁定比例时保持比例。
-// 坐标一律用原图像素，结果交回执行器按原图裁剪。
+// Crop box (TOOLS_DESIGN §4 crop): crop individually, drag inside to move, drag four corners to
+// scale; preserves aspect ratio when locked. Coordinates are always in original image pixels, and
+// the result is handed back to the executor to crop against the original image.
 
 const HANDLE = 28;
 
@@ -25,7 +26,7 @@ function initialRect(size: { width: number; height: number }, aspect: number | n
   };
 }
 
-/** 拖动某个角：对角固定；锁定比例时以宽度为准。 */
+/** Dragging a corner: the opposite corner remains fixed; width serves as the reference when aspect ratio is locked. */
 function resizeFrom(
   start: Rect,
   corner: Corner,
@@ -65,7 +66,7 @@ type CropAction =
   | { type: 'next' }
   | { type: 'reset' };
 
-/** 图片在区域里的显示位置和缩放。 */
+/** Display position and scaling of the image within the region. */
 function layoutOf(box: CropState['box'], size: { width: number; height: number }) {
   const scale = box.width ? Math.min(box.width / size.width, box.height / size.height) : 0;
   const shown = { width: size.width * scale, height: size.height * scale };
@@ -134,7 +135,7 @@ function reduce(
 export function CropScreen({ input, palette, locale, onDone, onCancel }: LocalScreenProps<'crop'>) {
   const { items, aspect, initial } = input;
   const sizes = items.map((it) => ({ width: it.width ?? 1, height: it.height ?? 1 }));
-  // 自动框脸给的框（D-252）；没有的照片居中。「重来」回到这个框。
+  // Default boxes provided by auto face cropping (D-252); photos without faces are centered. "Reset" returns to this box.
   const starts = sizes.map((size, i) => initial?.[i] ?? initialRect(size, aspect));
   const [state, dispatch] = useReducer(
     (s: CropState, a: CropAction) => reduce(s, a, sizes, aspect, starts),
@@ -151,7 +152,7 @@ export function CropScreen({ input, palette, locale, onDone, onCancel }: LocalSc
   const { scale, shown, offset } = layoutOf(state.box, sizes[index]!);
   const rect = rects[index]!;
 
-  // PanResponder 只创建一次；回调只发出动作，所有计算在 reduce 里完成。
+  // PanResponder is created only once; callbacks only emit actions, with all calculations performed inside the reducer.
   const [responder] = useState(() =>
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -203,13 +204,13 @@ export function CropScreen({ input, palette, locale, onDone, onCancel }: LocalSc
         {...responder.panHandlers}>
         {scale > 0 ? (
           <>
-            {/* 图片和遮罩都不接收触摸，坐标始终相对于裁剪区域。 */}
+            {/* Neither the image nor the mask receives touches; coordinates are always relative to the crop area. */}
             <View
               pointerEvents="none"
               style={[styles.abs, { left: offset.x, top: offset.y, ...shown }]}>
               <Image source={{ uri: item.uri }} style={shown} contentFit="fill" />
             </View>
-            {/* 框外变暗 */}
+            {/* Darken outside the box */}
             <View
               pointerEvents="none"
               style={[

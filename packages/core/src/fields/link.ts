@@ -10,8 +10,9 @@ const schema = z.strictObject({ ...fieldBase, type: z.literal('link'), table: Id
 const isRecordId = (v: unknown): v is string => typeof v === 'string' && FILE_ID.test(v);
 
 /**
- * D-250：引用另一张表（也可以是自己）的一条记录；值是那条记录的 ID，列表里显示它的标题字段。
- * 被引用的记录删掉了时显示「已删除的记录」；只能看有没有选，不能按它排序。
+ * D-250: References a record in another table (or the same table); value is the ID of that
+ * record, and its title field is displayed in lists. Displays "Deleted record" if the referenced
+ * record has been deleted; can only check whether one is selected, cannot be sorted by.
  */
 export const linkField: FieldDefinitionOf<'link', typeof schema> = defineField({
   type: 'link',
@@ -23,7 +24,7 @@ export const linkField: FieldDefinitionOf<'link', typeof schema> = defineField({
     links ? (links(f.table, v as string) ?? t(locale, 'linkDeleted')) : '',
   filter: { is: isText, emptyOnly: true },
   sort: false,
-  // D-250：引用的表要存在。
+  // D-250: The referenced table must exist.
   check: (f, { config, collection }) =>
     config.data.tables.some((c) => c.id === f.table)
       ? []

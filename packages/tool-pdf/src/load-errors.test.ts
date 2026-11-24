@@ -14,7 +14,7 @@ import {
 } from './index';
 import { brokenBytes, makeEncryptedPdf, readJpeg } from './test-helpers';
 
-// 每个读取 PDF 的函数都要把加密 / 损坏报告成 PdfError。
+// Each PDF reading function must report encryption / corruption as a PdfError.
 const operations: [string, (bytes: Uint8Array) => Promise<unknown>][] = [
   ['countPages', countPages],
   ['pageInfo', pageInfo],

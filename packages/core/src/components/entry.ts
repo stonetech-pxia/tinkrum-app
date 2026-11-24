@@ -15,15 +15,15 @@ import { ALL_STYLES, EntryLookSchema, type LookDefinitionOf, defineLook } from '
 const shape = {
   show: z
     .strictObject({
-      /** 原 shortcut ≤40、catalogLink ≤60：取大的；工具包的入口不写（按工具包现取，跟着语言变）。 */
+      /** Original shortcut ≤ 40, catalogLink ≤ 60: take the maximum; omitted for tool pack entry points (fetched dynamically from the tool pack, localized). */
       title: boundedText(1, 60).optional(),
       subtitle: boundedText(1, 80).optional(),
       icon: IconValueSchema.optional(),
-      /** 文件位还没选文件时显示的提示。 */
+      /** Prompt displayed when no file has been selected in a file slot. */
       hint: boundedText(1, 80).optional(),
-      /** 不写时是 row（D-230）。 */
+      /** Defaults to row when omitted (D-230). */
       shape: EntryLookSchema.optional(),
-      /** 标题用主色（原 catalogLink「添加工具」的样子，M7）。 */
+      /** Render title in accent color (original catalogLink "Add tool" style, M7). */
       accent: z.literal(true).optional(),
     })
     .optional(),
@@ -34,7 +34,7 @@ const shape = {
 
 type EntryKind = 'shortcut' | 'link' | 'package' | 'app' | 'file';
 
-/** 入口是哪一种（说明文字、编辑项按它分）：文件位、工具包的入口、「添加工具」那种主色入口、普通快捷入口。 */
+/** Type of entry point (differentiates description text and editable items): file slots, tool pack entry points, accent entry points like "Add tool", and regular shortcut entry points. */
 export function entryKind(c: {
   show?: { accent?: true | undefined } | undefined;
   opens: unknown;
@@ -47,9 +47,11 @@ export function entryKind(c: {
 }
 
 /**
- * 入口卡片（v34 合并 shortcut、catalogLink、toolCard、fileSlot）：图标 + 标题，点了打开 opens。
- * opens 是 package:<id> 时标题、图标、说明按工具包现取；是 {file} 时是一个文件位：AI 只写标题和提示，
- * 用户点空位自己选文件（照片或「文件」里的文件，复制一份存成用户文件，原件不动），之后点一下用系统预览打开。
+ * Entry card (v34 merged shortcut, catalogLink, toolCard, fileSlot): icon + title, opens on tap.
+ * When opens is package:<id>, title, icon, and description are fetched dynamically from the tool
+ * pack; when {file}, it represents a file slot: the AI only writes the title and hint, the user
+ * taps the empty slot to select a file (a photo or any file from "Files", copied into a user file
+ * while the original remains untouched), and subsequent taps open it using the system previewer.
  */
 export const entryComponent: LookDefinitionOf<'entry', typeof shape> = defineLook({
   look: 'entry',
@@ -72,7 +74,7 @@ export const entryComponent: LookDefinitionOf<'entry', typeof shape> = defineLoo
     return problems;
   },
   describe: (c, config, ctx) => {
-    // 打开 app 的入口：名字、图标不写时按 app 现取。
+    // App opening entry point: name and icon default to app values if omitted.
     const appId = appTargetId(c.opens as Parameters<typeof appTargetId>[0]);
     const title =
       c.show?.title ??
@@ -107,7 +109,7 @@ export const entryComponent: LookDefinitionOf<'entry', typeof shape> = defineLoo
   example: { show: { title: 'Tools', icon: 'apps' }, opens: 'tools' },
 });
 
-/** 长按编辑里这个入口能改的文字（工具包的入口没有，文件位多一个提示）。 */
+/** Text editable for this entry point in long-press edit (absent for tool pack entry points; file slots have an extra hint). */
 export function entryEditableText(c: {
   show?: { accent?: true | undefined } | undefined;
   opens: unknown;

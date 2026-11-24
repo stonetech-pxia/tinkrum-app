@@ -2,8 +2,10 @@ import { localize } from './localization';
 import { t } from './messages';
 import type { Locale, Localized, Theme } from './schema';
 
-// 内置风格预设（D-094）：每个都是一份完整的主题，AI 用 applyThemePreset 整套套用，之后还可以再微调。
-// 除了固定深色的终端和霓虹，都同时给了浅色和深色配色，跟随系统切换；全部通过对比度检查（测试覆盖）。
+// Built-in theme presets (D-094): each is a complete theme, applied as a set by the AI using
+// applyThemePreset, with further fine-tuning allowed afterwards. Except for fixed dark terminal and
+// neon, all include both light and dark color schemes, switching automatically with the system; all
+// pass contrast checks (covered by tests).
 
 export const THEME_PRESET_IDS = [
   'ios',
@@ -23,13 +25,15 @@ export type ThemePresetId = (typeof THEME_PRESET_IDS)[number];
 
 export interface ThemePreset {
   name: Localized;
-  /** 给模型看的一句话说明。 */
+  /** A one-sentence description for the model. */
   description: string;
-  /** 提示词规则 11 里用户怎么叫这个风格（英文，几种说法用 / 隔开）。 */
+  /** What the user calls this style in prompt rule 11 (English, multiple terms separated by slashes). */
   said: string;
   /**
-   * 内置规则认的叫法（小写比较）。只认整体风格；「卡片改成新粗野」之类只改卡片（mock 的 cardStyleRule）。
-   * 法语名字不用写：风格选择器的法语句子按 name.fr 认（D-234）。
+   * Recognized names by built-in rules (compared case-insensitively). Only recognizes overall
+   * styles; changes like "change cards to new brutalism" only modify cards (mock cardStyleRule).
+   * French names are not needed: French sentences in the style selector are recognized via
+   * name.fr (D-234).
    */
   aliases: readonly string[];
   theme: Theme;
@@ -399,7 +403,7 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   },
 };
 
-/** 结构相同即可（校验后对象的键顺序可能变）；值为 undefined 的键视为没有。 */
+/** Structural equality is sufficient (key order of validated objects may change); keys with undefined values are treated as absent. */
 function sameValue(a: unknown, b: unknown): boolean {
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return a === b;
   const keys = (o: object) =>
@@ -411,12 +415,12 @@ function sameValue(a: unknown, b: unknown): boolean {
   );
 }
 
-/** 当前主题仍和某个预设完全一致时返回它的 id（风格选择器用来标出当前风格）；微调过就不再算。 */
+/** Returns the preset id if the current theme remains completely identical to a preset (used by style selector to highlight current style); no longer considered a preset if fine-tuned. */
 export function presetOfTheme(theme: Theme): ThemePresetId | null {
   return THEME_PRESET_IDS.find((id) => sameValue(theme, THEME_PRESETS[id].theme)) ?? null;
 }
 
-/** 风格选择器填进输入框的一句话（D-095）；mock AI 能把它识别成对应的 applyThemePreset（测试覆盖全部预设）。 */
+/** A phrase inserted into the input box by the style selector (D-095); mock AI recognizes it as the corresponding applyThemePreset (tested across all presets). */
 export function presetRequest(id: ThemePresetId, locale: Locale): string {
   const name = localize(THEME_PRESETS[id].name, locale);
   return t(locale, 'presets_Switch_to_the_style_aedda', { v0: name });

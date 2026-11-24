@@ -5,14 +5,17 @@ import type { WorkspaceRepo } from '../storage/types';
 import type { PackStore } from './store';
 
 /**
- * 文件处理包一次问完（D-456）：第一次扫描完、第一次分享或打开文件后，一个框列出这台手机处理文件要用的扩展包
- * （文字识别模型、PDF 预览、页面展平、版面分析、没有文档相机时的拉正照片），一次下载。
- * 问过一次就记下来（用户点了下载或以后再说），不再问；以后在「设置 → 已下载内容」里下载。
- * 这一组随 App 打包（D-510），算已安装：只有 App 里没带（开发版）或清单换了新版本时才会问。
+ * File bundle offer all-at-once (D-456): after the first scan, share, or file open, a dialog
+ * lists the packs required for file processing on this phone (OCR model, PDF preview, page
+ * flattening, layout analysis, deskewing without doc camera), downloaded in a single batch. Once
+ * asked (user taps download or remind me later), it is never asked again; subsequently downloaded
+ * under "Settings → Downloaded Content". This group is bundled with the App (D-510) and
+ * considered installed: prompted only when missing from the App (dev build) or manifest version
+ * changes.
  */
 export const FILE_BUNDLE_ASKED = 'packs:file-bundle-asked';
 
-/** 这台手机处理文件要用、还没装的扩展包。 */
+/** Uninstalled packs needed for file processing on this phone. */
 export async function fileBundleMissing(files: FilePlatform, store: PackStore): Promise<string[]> {
   const v = files.vision;
   const wanted = [
@@ -26,7 +29,7 @@ export async function fileBundleMissing(files: FilePlatform, store: PackStore): 
   return wanted.filter((id) => !have.has(id));
 }
 
-/** 还没问过、而且有要下载的：返回要列出来的扩展包；否则空。只读，不写数据。 */
+/** Returns packs to list if not yet asked and downloads are needed; otherwise empty. Read-only, does not write data. */
 export async function fileBundleToOffer(
   repo: Pick<WorkspaceRepo, 'getMeta'>,
   files: FilePlatform,
@@ -37,8 +40,10 @@ export async function fileBundleToOffer(
 }
 
 /**
- * 运行时要扩展包（D-064、D-299）：只为必需的弹框；可选的（展平、版面、文字层、按文字取名）没装就直接跳过，
- * 不在每次运行时问（D-456，改 D-274 的每次问）。返回没下载的可选扩展包；null 表示必需的没下载（取消运行）。
+ * Ensures runtime packs are present (D-064, D-299): prompts only for required ones; optional ones
+ * (flattening, layout, text layer, naming by text) that are missing are skipped directly without
+ * prompting on every run (D-456, revising D-274's per-run prompts). Returns uninstalled optional
+ * packs; null indicates required packs were not downloaded (canceling execution).
  */
 export async function ensureRunPacks(
   store: PackStore,

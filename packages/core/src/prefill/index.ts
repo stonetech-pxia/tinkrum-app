@@ -1,4 +1,4 @@
-// 「记一笔」预填（D-244 的扩展，原型，还没接进记一笔）；新记录表单的候选值（D-394）。
+// "Log an expense" prefill (extension of D-244, prototype, not yet integrated into log an expense); candidate values for new record forms (D-394).
 export {
   mergeCandidates,
   ruleCandidates,

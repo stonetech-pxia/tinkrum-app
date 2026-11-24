@@ -9,8 +9,9 @@ import { fieldDefinition, type Collection, type Field } from './schema';
 import { registry } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// D-569：公式能读勾选框（勾了是 1，没勾是 0）和单选（选中的选项的 value，D-568）。没选、选的选项没有 value
-// 时和空着的数字一样：公式没有值。没有新语法：比较仍然只在 if 的第一项里。
+// D-569: Formulas can read checkboxes (checked is 1, unchecked is 0) and radio choices (selected
+// option's value, D-568). When unselected or selected option has no value, behaves like an empty
+// number: formula has no value. No new syntax: comparisons remain only in the first term of if.
 
 const NOW = new Date(2026, 10, 16, 12);
 

@@ -11,8 +11,10 @@ import { PackGate } from './PackGate';
 import { usePacks } from './PackHost';
 
 /**
- * 「设置 → 数据」里的本机模型（D-396）：只有用户在这里点了、在确认框里同意才下载，表单上不催，也不自动下载。
- * 没配置下载地址时不提示下载（D-274）；已经装好的照样能删。
+ * On-device model in "Settings → Data" (D-396): downloaded only when the user taps here and
+ * consents in the confirmation dialog; no prompting on forms, and no automatic downloads. If no
+ * download URL is configured, do not prompt for download (D-274); already installed models can
+ * still be deleted.
  */
 export function LocalModelCard({ palette, locale }: { palette: Palette; locale: Locale }) {
   const packs = usePacks();
@@ -31,7 +33,7 @@ export function LocalModelCard({ palette, locale }: { palette: Palette; locale: 
   }, [packs]);
 
   const fits = deviceFitsLocalModel();
-  // 内存明显不够的手机不推荐下载，也不提这件事（创始人 2026-11-02）；装过的还要能删。
+  // Phones with clearly insufficient memory are not recommended for download and the prompt is omitted (Founder, 2026-11-02); installed packs must still be deletable.
   if (!packs || (!ready && (!fits || !process.env.EXPO_PUBLIC_MORPH_PACKS_URL))) return null;
 
   const bytes = packById(PREFILL_MODEL_PACK)?.files.reduce((sum, f) => sum + f.size, 0) ?? 0;

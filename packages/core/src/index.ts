@@ -1,5 +1,6 @@
-// 固定内核的纯 TypeScript 部分：schema、修改操作、校验、迁移、mock AI。
-// 不得依赖 React Native 或任何平台 API，以便在测试和未来的服务端中复用。
+// Pure TypeScript part of the fixed core: schema, modification operations, validation, migrations,
+// mock AI. Must not depend on React Native or any platform API, so it can be reused in tests and
+// future server environments.
 
 export * from './ai/kinds';
 export * from './ai/mock';

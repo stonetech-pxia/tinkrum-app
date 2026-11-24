@@ -11,8 +11,10 @@ import type { Collection, Component, QuickAction, Reminder, WorkspaceConfig } fr
 import { registry } from './test-helpers';
 import { WORKFLOW_PRESETS, presetWorkflow } from './workflows/presets';
 
-// 工具检查：断言写「应该怎样」。用的例子都是两轮测试里真实发生过的（AGENT_PLAN §2、REPORT2）。
-// 配置直接拼，不过校验器：有些例子（目标表没有附件字段）校验器本来就拒绝，这里要看检查自己认不认得。
+// Tool checks: assertions written as 'expected behavior'. Examples reflect real incidents from two
+// rounds of testing (AGENT_PLAN §2, REPORT2). Configs are constructed directly, bypassing the
+// validator: some examples (target table lacking an attachment field) are normally rejected by the
+// validator, but here we test whether the checker recognizes them.
 
 const text = (id: string, required = false) =>
   ({
@@ -101,17 +103,17 @@ const check = (config: WorkspaceConfig) => checkTools(config, registry);
 const codes = (r: ToolCheckResult, severity?: 'blocker' | 'warning') =>
   r.issues.filter((i) => !severity || i.severity === severity).map((i) => i.code);
 const tool = (r: ToolCheckResult, id: string) => r.tools.find((t) => t.id === id)!;
-/** 一张能用的表：首页上有添加按钮和列表。 */
+/** A usable table: has an add button and a list on the home screen. */
 const usable = (id: string) => [addButton(`add-${id}`, id), list(`list-${id}`, id)];
 
 describe('tableIsShown', () => {
   const tables = [table('t', [text('title')])];
 
-  it('没有块读：看不到', () => {
+  it('no block read: not visible', () => {
     expect(tableIsShown(workspace({ tables, pages: [] }), 't', registry)).toBe(false);
   });
 
-  it('到得了的页面上有块读：看得到', () => {
+  it('block read exists on reachable page: visible', () => {
     const config = workspace({ tables, pages: [{ id: 'ledger', blocks: usable('t') }] });
     const shown = {
       ...config,
@@ -120,28 +122,28 @@ describe('tableIsShown', () => {
     expect(tableIsShown(shown, 't', registry)).toBe(true);
   });
 
-  it('块在打不开的页面上：还是看不到', () => {
+  it('block on unreachable page: still not visible', () => {
     const config = workspace({ tables, pages: [{ id: 'ledger', blocks: usable('t') }] });
     expect(tableIsShown(config, 't', registry)).toBe(false);
   });
 });
 
-describe('文件工具', () => {
+describe('file tools', () => {
   const chain = quick('send', [
     ['in.photos', { source: 'library', min: 1, max: 5 }],
     ['image.compress', { maxKB: 500, format: 'jpeg' }],
     ['out.share', {}],
   ]);
 
-  it('链通、参数齐、摆在页面上：能用，没有问题', () => {
+  it('linked, fully parameterized, placed on page: usable, no issues', () => {
     const r = check(workspace({ tools: [chain], home: [action('run', 'send')] }));
     expect(r.issues).toEqual([]);
     expect(tool(r, 'send')).toMatchObject({ kind: 'file', ok: true });
     expect(tool(r, 'send').checks).toMatchObject({ chain: true, params: true, entry: 'placed' });
   });
 
-  it('输入动作不在第一步：用不了', () => {
-    // 第一步收文件的快捷操作由记录的附件字段交文件（D-442）；输入动作只能放在第一步。
+  it('input action not in first step: unusable', () => {
+    // File collection quick action step passes files via record attachment field (D-442); input actions can only be placed in the first step.
     const wf = quick('bad', [
       ['image.compress', { maxKB: 500, format: 'jpeg' }],
       ['in.photos', { source: 'library', min: 1, max: 5 }],
@@ -151,7 +153,7 @@ describe('文件工具', () => {
     expect(tool(r, 'bad').ok).toBe(false);
   });
 
-  it('相邻步骤类型接不上：用不了', () => {
+  it('adjacent step types incompatible: unusable', () => {
     const wf = quick('bad', [
       ['in.videos', { source: 'library', min: 1, max: 1 }],
       ['image.compress', { maxKB: 500, format: 'jpeg' }],
@@ -159,7 +161,7 @@ describe('文件工具', () => {
     expect(codes(check(workspace({ tools: [wf] })), 'blocker')).toContain('step-binding');
   });
 
-  it('必填参数缺了：用不了', () => {
+  it('missing required parameters: unusable', () => {
     const wf = quick('bad', [
       ['in.photos', { source: 'library', min: 1, max: 5 }],
       ['image.compress', {}],
@@ -167,7 +169,7 @@ describe('文件工具', () => {
     expect(codes(check(workspace({ tools: [wf] })), 'blocker')).toContain('step-params');
   });
 
-  it('只在「设置 → 快捷操作」里：到得了，所以只提醒', () => {
+  it('only in Settings -> Quick Actions: reachable, so warns only', () => {
     const r = check(workspace({ tools: [chain] }));
     expect(codes(r)).toEqual(['no-entry']);
     expect(r.issues[0]!.severity).toBe('warning');
@@ -187,18 +189,18 @@ describe('文件工具', () => {
       {},
     ],
     ['手机桌面', {}, { phoneHomeScreen: ['send'] }],
-  ])('%s也算入口', (_name, parts, nav) => {
+  ])('%s also counts as an entry point', (_name, parts, nav) => {
     const config = workspace({ tools: [chain], ...parts });
     Object.assign(config.nav, nav);
     expect(codes(check(config))).toEqual([]);
   });
 
-  it('从预设添加的快捷操作在预设库里，不算没入口', () => {
+  it('quick actions added from presets reside in the preset library and are not considered missing entry points', () => {
     const r = check(workspace({ tools: [{ ...chain, preset: 'email-photos' }] }));
     expect(codes(r)).toEqual([]);
   });
 
-  it('入口在进不去的页面上不算', () => {
+  it('entry points on unreachable pages do not count', () => {
     const config = workspace({
       tools: [chain],
       pages: [{ id: 'lost', blocks: [action('run', 'send')] }],
@@ -207,8 +209,8 @@ describe('文件工具', () => {
   });
 });
 
-describe('记录工具：4 个问题', () => {
-  it('有添加、有列表：能用', () => {
+describe('record tools: 4 issues', () => {
+  it('has add and list: usable', () => {
     const r = check(
       workspace({ tables: [table('tasks', [text('title', true)])], home: usable('tasks') }),
     );
@@ -222,7 +224,7 @@ describe('记录工具：4 个问题', () => {
     });
   });
 
-  it('按钮写 A 表、统计读 B 表：两边都用不了，还提醒是同一个用途', () => {
+  it('button targets table A, stats read table B: both sides unusable, warns about mismatched purposes', () => {
     const fields = [text('title'), number('amount')];
     const r = check(
       workspace({
@@ -239,7 +241,7 @@ describe('记录工具：4 个问题', () => {
     );
   });
 
-  it('两张不相干的表各写各读，不报重复', () => {
+  it('two unrelated tables writing and reading independently do not trigger duplicate warnings', () => {
     const r = check(
       workspace({
         tables: [
@@ -252,7 +254,7 @@ describe('记录工具：4 个问题', () => {
     expect(codes(r)).not.toContain('duplicate-table');
   });
 
-  it('两张相近的表都有写有读（各自能用），不报重复', () => {
+  it('two similar tables both reading and writing (each usable) do not trigger duplicate warnings', () => {
     const fields = [text('title'), number('amount')];
     const r = check(
       workspace({
@@ -263,7 +265,7 @@ describe('记录工具：4 个问题', () => {
     expect(codes(r)).not.toContain('duplicate-table');
   });
 
-  it('表单漏必填字段：永远存不进去', () => {
+  it('form missing required fields: can never be saved', () => {
     const r = check(
       workspace({
         tables: [table('t', [text('title', true), text('amount', true)])],
@@ -279,7 +281,7 @@ describe('记录工具：4 个问题', () => {
     expect(tool(r, 't').checks).toMatchObject({ add: false });
   });
 
-  it('必填字段有默认值、有预设值，或者打开完整表单：不算漏', () => {
+  it('required fields with default values, preset values, or opening the full form: not considered missing', () => {
     const withDefault = { ...text('b', true), default: 'x' } as Collection['fields'][number];
     const choice = {
       id: 'kind',
@@ -297,19 +299,19 @@ describe('记录工具：4 个问题', () => {
     expect(codes(r, 'blocker')).toEqual([]);
   });
 
-  it('什么都不能添加：用不了', () => {
+  it('nothing can be added: unusable', () => {
     const r = check(workspace({ tables: [table('t', [text('title')])], home: [list('l', 't')] }));
     expect(codes(r, 'blocker')).toEqual(['add-missing']);
   });
 
-  it('「设置 → 数据」不算添加的入口（它只能导出、恢复），看不到记录的表也不能靠它', () => {
+  it('Settings -> Data is not an add entry point (it only supports export and restore), record tables cannot rely on it for visibility', () => {
     const r = check(
       workspace({ tables: [table('t', [text('title')])], home: [addButton('a', 't')] }),
     );
     expect(codes(r, 'blocker')).toEqual(['view-missing']);
   });
 
-  it('只有每一条上的「新建」：第一条加不进去', () => {
+  it('only \'new\' button on individual rows: first entry cannot be added', () => {
     const rowAdd = list('l', 't', {
       tools: [{ as: 'button', label: 'Add', do: 'create', table: 't', ask: 'all' }],
     });
@@ -317,7 +319,7 @@ describe('记录工具：4 个问题', () => {
     expect(codes(r, 'blocker')).toEqual(['add-needs-existing-row']);
   });
 
-  it('另一张表每一条上的新建（$row）算添加的入口；就地添加也算', () => {
+  it('\'new\' button on rows of another table ($row) counts as an add entry point; inline add also counts', () => {
     const habits = table('habits', [text('title')]);
     const checkins = table('checkins', [
       { id: 'habit', name: 'habit', type: 'link', table: 'habits' } as Collection['fields'][number],
@@ -342,7 +344,7 @@ describe('记录工具：4 个问题', () => {
     expect(codes(r, 'blocker')).toEqual([]);
   });
 
-  it('有附件字段的表没有添加入口时，收件页面「存成记录」能加，只提醒', () => {
+  it('tables with attachment fields lacking add entry points can add entries via inbox \'Save as record\', warns only', () => {
     const r = check(
       workspace({
         tables: [
@@ -358,7 +360,7 @@ describe('记录工具：4 个问题', () => {
     expect(codes(r)).toContain('add-only-from-inbox');
   });
 
-  it('藏起来的块不算', () => {
+  it('hidden blocks do not count', () => {
     const hidden = { ...(list('l', 't') as object), hidden: true } as unknown as Component;
     const r = check(
       workspace({ tables: [table('t', [text('title')])], home: [addButton('a', 't'), hidden] }),
@@ -366,7 +368,7 @@ describe('记录工具：4 个问题', () => {
     expect(codes(r, 'blocker')).toEqual(['view-missing']);
   });
 
-  it('页面没入口：页面和它上面的工具都用不了', () => {
+  it('page has no entry point: page and its tools are unusable', () => {
     const r = check(
       workspace({
         tables: [table('t', [text('title')])],
@@ -380,7 +382,7 @@ describe('记录工具：4 个问题', () => {
     ]);
   });
 
-  it('入口要从到得了的页面走到：只被另一个进不去的页面打开也不算', () => {
+  it('entry point must be reachable from a reachable page: opening solely via another unreachable page does not count', () => {
     const r = check(
       workspace({
         pages: [
@@ -392,7 +394,7 @@ describe('记录工具：4 个问题', () => {
     expect(r.issues.filter((i) => i.code === 'page-unreachable')).toHaveLength(2);
   });
 
-  it('页面有入口（首页的入口块、导航、记录块的 opens）：不报', () => {
+  it('page has entry point (home entry block, navigation, record block opens): no warning', () => {
     const config = workspace({
       tables: [table('t', [text('title')])],
       home: [entry('go', 'page:tasks'), addButton('a', 't')],
@@ -406,20 +408,20 @@ describe('记录工具：4 个问题', () => {
     expect(codes(check(config), 'blocker')).toEqual([]);
   });
 
-  it('工具包的页面在「设置 → 工具」里到得了，不报', () => {
+  it('tool pack pages are reachable in Settings -> Tools, no warning', () => {
     const config = workspace({ pages: [{ id: 'pdf', blocks: [action('r', 'x')] }] });
     config.containers.pages[1]!.package = 'pdf';
     expect(codes(check(config))).not.toContain('page-unreachable');
   });
 
-  it('什么都没在用的表只提醒：可能是用户不要了、数据留着（底线 5）', () => {
+  it('tables with nothing in use warn only: user may no longer want them while preserving data (invariant 5)', () => {
     const r = check(workspace({ tables: [table('old', [text('title')])] }));
     expect(codes(r)).toEqual(['table-unused']);
     expect(r.issues[0]!.severity).toBe('warning');
     expect(tool(r, 'old').ok).toBe(false);
   });
 
-  it('只靠引用字段显示的表（选项表）算看得到，但没人往里加还是用不了', () => {
+  it('tables visible only via reference fields (lookup tables) count as visible, but remain unusable if no one adds entries to them', () => {
     const r = check(
       workspace({
         tables: [
@@ -443,7 +445,7 @@ describe('记录工具：4 个问题', () => {
   });
 });
 
-describe('记录工具：提醒', () => {
+describe('record tools: warnings', () => {
   const plants = table('plants', [
     text('title'),
     {
@@ -464,7 +466,7 @@ describe('记录工具：提醒', () => {
   });
   const page = { id: 'plants-page', blocks: usable('plants') };
 
-  it('打开的页面读这张表：能用', () => {
+  it('opened page reads this table: usable', () => {
     const config = workspace({ tables: [plants], pages: [page], tools: [reminder({})] });
     config.nav.bar = [...config.nav.bar.slice(0, 4), 'page:plants-page'];
     const r = check(config);
@@ -472,7 +474,7 @@ describe('记录工具：提醒', () => {
     expect(tool(r, 'plants').checks).toMatchObject({ remind: true });
   });
 
-  it('打开的页面上没有相关内容：用不了', () => {
+  it('opened page lacks relevant content: unusable', () => {
     const r = check(
       workspace({
         tables: [plants],
@@ -495,7 +497,7 @@ describe('记录工具：提醒', () => {
     expect(tool(r, 'plants').checks).toMatchObject({ remind: false });
   });
 
-  it('打开首页时不算用不了（规则 35 让新表的提醒先开首页）：只提醒', () => {
+  it('opening home screen does not trigger unusable status (rule 35 allows new table warnings to defer to home screen): warns only', () => {
     const r = check(
       workspace({
         tables: [plants],
@@ -510,7 +512,7 @@ describe('记录工具：提醒', () => {
     expect(tool(r, 'plants').checks).not.toMatchObject({ remind: false });
   });
 
-  it('打开的页面读相关的表（引用过去的）：算对', () => {
+  it('opened page reads related table (forward reference): considered correct', () => {
     const logs = table('logs', [
       text('title'),
       { id: 'plant', name: 'plant', type: 'link', table: 'plants' } as Collection['fields'][number],
@@ -526,7 +528,7 @@ describe('记录工具：提醒', () => {
     expect(codes(r)).not.toContain('reminder-opens-unrelated');
   });
 
-  it('打开的页面只是通往那一页的入口：只提醒', () => {
+  it('opened page is merely an entry point leading to that page: warns only', () => {
     const r = check(
       workspace({
         tables: [plants],
@@ -539,7 +541,7 @@ describe('记录工具：提醒', () => {
     expect(codes(r, 'blocker')).toEqual([]);
   });
 
-  it('「完成」写一张表、「不再提醒」看另一张：点了完成还是响', () => {
+  it('\'done\' writes to table A, \'dismiss\' reads table B: clicking done still triggers warning', () => {
     const r = check(
       workspace({
         tables: [plants, table('logs', [text('title')])],
@@ -556,7 +558,7 @@ describe('记录工具：提醒', () => {
     expect(codes(r, 'blocker')).toContain('reminder-done-wrong-table');
   });
 
-  it('「完成」和「不再提醒」是同一张表：不报', () => {
+  it('\'done\' and \'dismiss\' target the same table: no warning', () => {
     const r = check(
       workspace({
         tables: [plants, table('logs', [text('title')])],
@@ -573,7 +575,7 @@ describe('记录工具：提醒', () => {
     expect(codes(r)).not.toContain('reminder-done-wrong-table');
   });
 
-  it('每天的提醒打开的页面什么都没有：只提醒', () => {
+  it('daily reminder opens page with no content: warns only', () => {
     const r = check(
       workspace({
         tools: [reminder({ when: { every: 'day', at: '09:00' }, opens: 'page:home' })],
@@ -583,7 +585,7 @@ describe('记录工具：提醒', () => {
   });
 });
 
-describe('文件进记录', () => {
+describe('file to record', () => {
   const scan = (target: string) =>
     quick('scan', [
       ['in.photos', { source: 'scanner', min: 1, max: 5 }],
@@ -594,7 +596,7 @@ describe('文件进记录', () => {
     { id: 'file', name: 'file', type: 'file' } as Collection['fields'][number],
   ]);
 
-  it('目标有附件字段、有入口、表能看：能用，算一个工具也算表的添加入口', () => {
+  it('target has attachment field, entry point, and visible table: usable, counts as both a tool and a table add entry point', () => {
     const r = check(
       workspace({
         tables: [receipts],
@@ -608,7 +610,7 @@ describe('文件进记录', () => {
     expect(tool(r, 'receipts').checks).toMatchObject({ add: true });
   });
 
-  it('目标没有附件字段：文件放不进去', () => {
+  it('target lacks attachment field: files cannot be stored', () => {
     const r = check(
       workspace({
         tables: [table('receipts', [text('title')])],
@@ -620,7 +622,7 @@ describe('文件进记录', () => {
     expect(tool(r, 'scan').ok).toBe(false);
   });
 
-  it('给文字时要文字字段，不要附件字段', () => {
+  it('text input requires text fields, not attachment fields', () => {
     const wf = quick('note', [
       ['in.text', { text: 'x' }],
       ['out.addRecord', { collectionId: 'notes' }],
@@ -643,13 +645,13 @@ describe('文件进记录', () => {
     expect(codes(bad, 'blocker')).toContain('record-no-place');
   });
 
-  it('目标表不存在：用不了', () => {
+  it('target table does not exist: unusable', () => {
     const r = check(workspace({ home: [action('run', 'scan')], tools: [scan('gone')] }));
     expect(codes(r, 'blocker')).toContain('step-table-missing');
     expect(tool(r, 'scan').checks).toMatchObject({ target: false });
   });
 
-  it('表没有任何块读：文件进去了看不到，这个工具也不算完整', () => {
+  it('table lacks any block reads: files stored are invisible, tool is incomplete', () => {
     const r = check(
       workspace({ tables: [receipts], home: [action('run', 'scan')], tools: [scan('receipts')] }),
     );
@@ -659,8 +661,8 @@ describe('文件进记录', () => {
   });
 });
 
-describe('字段', () => {
-  it('既不显示、表单也不问、也没被引用：提醒', () => {
+describe('fields', () => {
+  it('neither displayed, nor prompted in forms, nor referenced: warns', () => {
     const r = check(
       workspace({
         tables: [table('t', [text('title'), text('phone')])],
@@ -695,7 +697,7 @@ describe('字段', () => {
         }),
       ],
     ],
-  ])('%s：不算没用', (_name, blocks) => {
+  ])('%s: not counted as useless', (_name, blocks) => {
     const r = check(
       workspace({
         tables: [table('t', [text('title'), text('phone')])],
@@ -705,7 +707,7 @@ describe('字段', () => {
     expect(codes(r)).not.toContain('field-unused');
   });
 
-  it('被公式、汇总、查找引用的字段不算没用', () => {
+  it('fields referenced by formulas, rollups, or lookups are not considered unused', () => {
     const r = check(
       workspace({
         tables: [
@@ -759,7 +761,7 @@ describe('字段', () => {
     expect(r.issues.filter((i) => i.code === 'field-unused').map((i) => i.target)).toEqual([]);
   });
 
-  it('被日程字段当作「上次完成」的字段不算没用', () => {
+  it('fields used as \'last completed\' by schedule fields are not considered unused', () => {
     const r = check(
       workspace({
         tables: [
@@ -781,7 +783,7 @@ describe('字段', () => {
     expect(codes(r)).not.toContain('field-unused');
   });
 
-  it('计算值依赖的字段没有入口：提醒', () => {
+  it('fields required by computed values lack entry points: warns', () => {
     const tiles = {
       id: 't',
       look: 'tiles',
@@ -813,7 +815,7 @@ describe('字段', () => {
     );
   });
 
-  it('依赖的字段能在点开一条的编辑页里填：不提醒', () => {
+  it('dependent fields fillable in detail view edit page: no warning', () => {
     const r = check(
       workspace({
         tables: [
@@ -838,8 +840,8 @@ describe('字段', () => {
   });
 });
 
-describe('真实内容上没有误报（目标：样板和预设 blocker 为 0）', () => {
-  it.each(['en', 'zh', 'fr'] as const)('全部样板（%s）', (locale) => {
+describe('no false positives on real content (target: sample app and preset blockers = 0)', () => {
+  it.each(['en', 'zh', 'fr'] as const)('All presets (%s)', (locale) => {
     for (const sample of SAMPLE_APPS) {
       const base = createStarterWorkspace(locale, registry);
       const ops = sampleOps(sample, base, locale);
@@ -850,7 +852,7 @@ describe('真实内容上没有误报（目标：样板和预设 blocker 为 0�
     }
   });
 
-  it('全部预设', () => {
+  it('all presets', () => {
     for (const preset of WORKFLOW_PRESETS) {
       const config = createDefaultWorkspace('en');
       config.tools = [presetWorkflow(preset, 'en', preset.id)];
@@ -858,7 +860,7 @@ describe('真实内容上没有误报（目标：样板和预设 blocker 为 0�
     }
   });
 
-  it('只读，不改配置（底线 15）', () => {
+  it('read-only, config unmodified (invariant 15)', () => {
     const config = workspace({ tables: [table('t', [text('title')])], home: usable('t') });
     const before = JSON.stringify(config);
     check(config);
@@ -867,7 +869,7 @@ describe('真实内容上没有误报（目标：样板和预设 blocker 为 0�
   });
 });
 
-describe('用户说的数和词落到参数上', () => {
+describe('user-specified numbers and terms map to parameters', () => {
   const compress = (params: object, ask?: string[]) =>
     quick('c', [
       ['in.photos', { source: 'library', min: 1, max: 5 }],
@@ -886,8 +888,8 @@ describe('用户说的数和词落到参数上', () => {
   const run = (input: string, locale: 'en' | 'zh' | 'fr', after: WorkspaceConfig, before = empty) =>
     checkRequestParams(input, locale, before, after).map((i) => i.code);
 
-  describe('大小', () => {
-    it('「固定 2MB」只清了 ask、值还是旧的：要报', () => {
+  describe('Size', () => {
+    it('"Fixed 2MB" only cleared ask, value is still old: should report', () => {
       const before = with_(pdf(4));
       const after = with_(pdf(4));
       after.tools[0] = { ...(after.tools[0] as QuickAction) };
@@ -895,7 +897,7 @@ describe('用户说的数和词落到参数上', () => {
       expect(run('固定 2MB，不用每次问', 'zh', after, before)).toEqual(['param-size']);
     });
 
-    it('「固定 2MB」写进了 maxMB：不报', () => {
+    it('"Fixed 2MB" written into maxMB: do not report', () => {
       expect(run('固定 2MB，不用每次问', 'zh', with_(pdf(2)), with_(pdf(4)))).toEqual([]);
     });
 
@@ -913,7 +915,7 @@ describe('用户说的数和词落到参数上', () => {
       ],
       ['两个数只要对上一个', '500MB 的文件压到 2MB', pdf(2)],
       ['否定的不算', '不要 2MB，改成 5MB', pdf(5)],
-    ] as const)('%s：不报', (_name, input, wf) => {
+    ] as const)('%s: do not report', (_name, input, wf) => {
       const locale = /[一-龥]/.test(input)
         ? 'zh'
         : input.includes('Ko') || input.includes('Mo')
@@ -922,7 +924,7 @@ describe('用户说的数和词落到参数上', () => {
       expect(run(input, locale, with_(wf))).toEqual([]);
     });
 
-    it('说的是 500 KB、写成 300 KB：要报（三种语言）', () => {
+    it('Says 500 KB, written as 300 KB: should report (three languages)', () => {
       for (const [input, locale] of [
         ['压到 500KB', 'zh'],
         ['compress to 500 KB', 'en'],
@@ -931,7 +933,7 @@ describe('用户说的数和词落到参数上', () => {
         expect(run(input, locale, with_(compress({ maxKB: 300 })))).toEqual(['param-size']);
     });
 
-    it('新建的快捷操作要压到多大，却没有压缩这一步：要报', () => {
+    it('New quick action\'s target size, but missing compression step: should report', () => {
       const wf = quick('n', [
         ['in.photos', { source: 'library', min: 1, max: 5 }],
         ['out.share', {}],
@@ -939,7 +941,7 @@ describe('用户说的数和词落到参数上', () => {
       expect(run('压到 2MB 再分享', 'zh', with_(wf))).toEqual(['param-size']);
     });
 
-    it('不确定的都不报：没碰快捷操作、4K、2 mo（两个月）、已有的链只加了一步', () => {
+    it('Uncertain ones not reported: untouched quick action, 4K, 2 mo (two months), existing chain with only one step added', () => {
       expect(run('固定 2MB', 'zh', empty, empty)).toEqual([]);
       expect(run('compress to 4K', 'en', with_(compress({ maxKB: 300 })))).toEqual([]);
       expect(run('keep it for 2 mo', 'en', with_(compress({ maxKB: 300 })))).toEqual([]);
@@ -953,7 +955,7 @@ describe('用户说的数和词落到参数上', () => {
       expect(run('那个 2MB 的快捷操作加一步分享', 'zh', after, before)).toEqual([]);
     });
 
-    it('改别的快捷操作时，没动的快捷操作不算', () => {
+    it('When modifying other quick actions, untouched quick actions do not count', () => {
       const other = pdf(4);
       const before = with_(other);
       const after = with_(other, compress({ maxKB: 2048 }));
@@ -961,7 +963,7 @@ describe('用户说的数和词落到参数上', () => {
     });
   });
 
-  describe('目标语言', () => {
+  describe('Target language', () => {
     const translate = (to: string) =>
       quick('t', [
         ['in.text', { text: 'x' }],
@@ -976,7 +978,7 @@ describe('用户说的数和词落到参数上', () => {
       ['翻译成中文', 'zh', 'en'],
       ['traduire en français', 'fr', 'en'],
       ['翻译成日语', 'zh', 'ko'],
-    ] as const)('「%s」写错语言：要报', (input, locale, to) => {
+    ] as const)('"%s" written in the wrong language: should report', (input, locale, to) => {
       expect(run(input, locale, with_(translate(to)))).toEqual(['param-language']);
     });
 
@@ -989,16 +991,16 @@ describe('用户说的数和词落到参数上', () => {
       ['翻译成繁体中文', 'zh', 'zh-Hant'],
       ['把英文翻译成法语', 'zh', 'fr'],
       ['translate from French to English', 'en', 'en'],
-    ] as const)('「%s」→ %s %s：不报', (input, locale, to) => {
+    ] as const)('"%s" \u2192 %s %s: do not report', (input, locale, to) => {
       expect(run(input, locale, with_(translate(to)))).toEqual([]);
     });
 
-    it('没说目标语言的不报', () => {
+    it('Those without a target language are not reported', () => {
       expect(run('翻译这段英文', 'zh', with_(translate('zh-Hans')))).toEqual([]);
       expect(run('translate my English notes', 'en', with_(translate('fr')))).toEqual([]);
     });
 
-    it('新建的快捷操作没有翻译这一步：要报', () => {
+    it('New quick action missing translation step: should report', () => {
       const wf = quick('n', [
         ['in.text', { text: 'x' }],
         ['text.toPdf', { pageSize: 'a4', fontSize: 12 }],
@@ -1007,7 +1009,7 @@ describe('用户说的数和词落到参数上', () => {
     });
   });
 
-  describe('证件照底色', () => {
+  describe('ID photo background color', () => {
     const idPhoto = (background: string) =>
       quick('id', [
         ['in.photos', { source: 'library', min: 1, max: 1 }],
@@ -1018,7 +1020,7 @@ describe('用户说的数和词落到参数上', () => {
       ['换成蓝底', 'zh', 'white'],
       ['blue background', 'en', 'keep'],
       ['fond blanc', 'fr', 'blue'],
-    ] as const)('「%s」写错：要报', (input, locale, background) => {
+    ] as const)('"%s" written incorrectly: should report', (input, locale, background) => {
       expect(run(input, locale, with_(idPhoto(background)))).toEqual(['param-background']);
     });
 
@@ -1027,16 +1029,16 @@ describe('用户说的数和词落到参数上', () => {
       ['blue background', 'en', 'blue'],
       ['fond blanc', 'fr', 'white'],
       ['换成蓝底', 'zh', 'custom'],
-    ] as const)('「%s」→ %s %s：不报', (input, locale, background) => {
+    ] as const)('"%s" \u2192 %s %s: do not report', (input, locale, background) => {
       expect(run(input, locale, with_(idPhoto(background)))).toEqual([]);
     });
 
-    it('页面的「蓝色背景」和证件照没关系：不报', () => {
+    it('Page\'s "blue background" is unrelated to ID photos: do not report', () => {
       expect(run('蓝色背景', 'zh', with_(compress({ maxKB: 300 })))).toEqual([]);
     });
   });
 
-  describe('像素、倍速、页数、分辨率', () => {
+  describe('Pixels, playback speed, page count, resolution', () => {
     const resize = (params: object) =>
       quick('r', [
         ['in.photos', { source: 'library', min: 1, max: 5 }],
@@ -1063,7 +1065,7 @@ describe('用户说的数和词落到参数上', () => {
         ['video.compress', params],
       ]);
 
-    it('像素', () => {
+    it('Pixels', () => {
       const wrong = resize({ mode: 'longEdge', px: 1600 });
       expect(run('长边 1080 像素', 'zh', with_(wrong))).toEqual(['param-pixels']);
       expect(run('long edge 1080 px', 'en', with_(wrong))).toEqual(['param-pixels']);
@@ -1072,21 +1074,21 @@ describe('用户说的数和词落到参数上', () => {
       expect(
         run('resize to 1920x1080', 'en', with_(resize({ mode: 'longEdge', px: 1920 }))),
       ).toEqual([]);
-      // 按百分比缩放：说的像素没有落下来。
+      // Percent scaling: specified pixels were not applied.
       expect(run('1080 px', 'en', with_(resize({ mode: 'percent', percent: 50 })))).toEqual([
         'param-pixels',
       ]);
-      // 证件照的尺寸由规格定。
+      // ID photo dimensions are determined by specifications.
       const photo = quick('id', [
         ['in.photos', { source: 'library', min: 1, max: 1 }],
         ['image.idPhoto', { spec: 'us-passport', maxKB: 240 }],
       ]);
       expect(run('600×600 的证件照', 'zh', with_(photo))).toEqual([]);
-      // 打印尺寸不是像素。
+      // Print dimensions are not pixels.
       expect(run('10x15 cm', 'en', with_(wrong))).toEqual([]);
     });
 
-    it('倍速', () => {
+    it('Playback speed', () => {
       expect(run('两倍速', 'zh', with_(speed(1.5)))).toEqual(['param-speed']);
       expect(run('2x speed', 'en', with_(speed(1.5)))).toEqual(['param-speed']);
       expect(run('vitesse x2', 'fr', with_(speed(1.5)))).toEqual(['param-speed']);
@@ -1095,7 +1097,7 @@ describe('用户说的数和词落到参数上', () => {
       expect(run('两倍速', 'zh', with_(compress({ maxKB: 300 })))).toEqual([]);
     });
 
-    it('页数', () => {
+    it('Page count', () => {
       const every3 = split({ mode: 'every', n: 3 });
       expect(run('每 5 页拆一份', 'zh', with_(every3))).toEqual(['param-pages']);
       expect(run('split every 5 pages', 'en', with_(every3))).toEqual(['param-pages']);
@@ -1109,7 +1111,7 @@ describe('用户说的数和词落到参数上', () => {
       expect(run('第 1 页', 'zh', with_(select({ rule: 'first' })))).toEqual([]);
     });
 
-    it('分辨率', () => {
+    it('Resolution', () => {
       expect(run('压到 720p', 'zh', with_(video({ by: 'quality', quality: '1080p' })))).toEqual([
         'param-resolution',
       ]);
@@ -1123,14 +1125,14 @@ describe('用户说的数和词落到参数上', () => {
   });
 });
 
-describe('在 Hermes 上能跑', () => {
-  it('不用后行断言和 Unicode 属性类（同 route.ts）', () => {
+describe('Runs on Hermes', () => {
+  it('Avoid lookbehind assertions and Unicode property escapes (same as route.ts)', () => {
     const source = readFileSync(new URL('./tool-check.ts', import.meta.url), 'utf8');
     expect(source).not.toMatch(/\(\?<[!=]/);
     expect(source).not.toMatch(/\\p\{/);
   });
 
-  it('紧跟在别的数后面的不算一个数', () => {
+  it('Not considered a number if it immediately follows another number', () => {
     const before = workspace({});
     const pdf = quick('p', [
       ['in.photos', { source: 'library', min: 1, max: 5 }],
@@ -1146,7 +1148,7 @@ describe('在 Hermes 上能跑', () => {
     expect(codes('压到 1.2.3MB')).toEqual([]);
   });
 
-  it('名字里的标点不算：全角、中文、ASCII 都一样，是同一张表', () => {
+  it('Punctuation in names does not count: full-width, Chinese, and ASCII are all the same, it is the same table', () => {
     const config = workspace({
       tables: [table('a', [text('title')], '读书，笔记'), table('b', [text('x')], '读书 笔记！')],
       home: [addButton('add', 'a'), stat('total', 'b')],

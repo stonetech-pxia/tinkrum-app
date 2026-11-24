@@ -5,14 +5,19 @@ import { referenceProblems } from './reference-checks';
 import type { WorkspaceConfig } from './schema';
 import { validateWorkspace } from './validate';
 
-// app 里的 Tink 只能改这个 app（D-485，暂定规则）。检查的是「修改前后的配置」，不是逐个操作：
-// 删页面、删数据、装工具包都会连带改别处，按操作的目标 ID 判断会漏。做法：
-//   1. 这个 app 的东西（页面、表、快捷操作、nav.apps 里它自己那一项）剔掉以后，其余必须一字不差；
-//   2. 这个 app 自己的东西只能指向它自己的，或主页的表（其他 app 的东西拿掉以后配置仍然自洽）。
-// 修改里新加的、没写 app 的页面、表、快捷操作自动属于这个 app（模型常忘了写）。
-// 只在修改时查，不放进 validateWorkspace：规则以后收紧，已存的旧版本也要能打开（底线 12）。
+// New pages, tables, and quick actions added in this modification without an explicit app
+// assignment belong to this app. (D-485, provisional rule). Checked via "pre- and post-modification
+// configs" rather than individual operations: deleting pages, data, or installing toolboxes makes
+// cascading changes elsewhere, so relying on target IDs of individual operations would miss things.
+// Approach: 1. After stripping out this app's components (pages, tables, quick actions, its entry
+// in nav.apps), everything else must match character for character; 2. This app's items can only
+// reference its own items or home tables (maintaining workspace self-consistency after removing
+// other app items). Newly added pages, tables, and quick actions without an app property
+// automatically belong to this app (since models frequently omit it). Checked only during
+// modification; excluded from validateWorkspace to ensure tighter rules don't break opening
+// existing legacy versions (invariant 12).
 
-/** 这次修改新加的页面、表、快捷操作没写 app 的，归到这个 app。 */
+/** New pages, tables, and quick actions added in this modification without an explicit app assignment belong to this app. */
 export function tagNewForApp(before: WorkspaceConfig, after: WorkspaceConfig, appId: string): void {
   const had = {
     page: new Set(before.containers.pages.map((p) => p.id)),
@@ -34,13 +39,15 @@ export function tagNewForApp(before: WorkspaceConfig, after: WorkspaceConfig, ap
 }
 
 /**
- * 在这个 app 里说的话（D-485）：没写 app 的风格改这个 app 的风格（主页风格在 app 里本来就不能改），
- * 新加的页面、表、快捷操作没写 app 的属于这个 app。写进操作里，而不只是改结果：草稿重新套用时不带范围。
+ * Commands spoken within this app (D-485): Style changes without an app target modify this app's
+ * style (home styles cannot be modified inside apps anyway), and new unassigned pages, tables,
+ * and quick actions belong to this app. Recorded in operations rather than just inferred from
+ * results so draft reapplication preserves scope without context.
  */
 export function opsForApp(ops: readonly Op[], appId: string): Op[] {
   return ops.map((op): Op => {
     if (op.op === 'setTheme' && op.app === undefined) return { ...op, app: appId };
-    // 操作里新加的页面、快捷操作不会是工具包的（ops-schema 去掉了 package）。
+    // New pages and quick actions added within operations cannot belong to a toolbox (toolbox property removed from ops-schema).
     if (op.op === 'addContainer' && typeof op.page === 'object' && op.page.app === undefined)
       return { ...op, page: { ...op.page, app: appId } };
     if (op.op === 'addData' && typeof op.table === 'object' && op.table.app === undefined)
@@ -56,7 +63,7 @@ export function opsForApp(ops: readonly Op[], appId: string): Op[] {
   });
 }
 
-/** 剔掉这个 app 的东西。 */
+/** Strip out this app's components. */
 function withoutApp(config: WorkspaceConfig, appId: string): unknown {
   const nav = { ...config.nav };
   if (nav.apps) {
@@ -73,14 +80,14 @@ function withoutApp(config: WorkspaceConfig, appId: string): unknown {
     data: { ...config.data, tables: config.data.tables.filter((t) => t.app !== appId) },
     tools: config.tools.filter((t) => t.app !== appId),
   };
-  // 图标库是整个工作区一份（D-625）：app 里能加图标、改只有自己用的，别处用着的不能动。
+  // The icon library is workspace-wide (D-625): Apps can add icons and modify those exclusively used by themselves, but cannot alter icons in use elsewhere.
   const used = new Set(drawnIconUses(rest).map((u) => u.id));
   const { icons, ...others } = rest;
   const kept = Object.entries(icons ?? {}).filter(([id]) => used.has(id));
   return kept.length > 0 ? { ...others, icons: Object.fromEntries(kept) } : others;
 }
 
-/** 只留这个 app 和主页的东西（其他 app 的页面、表、快捷操作、app 本身拿掉）。 */
+/** Keep only components belonging to this app and home (removing other apps' pages, tables, quick actions, and apps themselves). */
 function onlyAppAndHome(config: WorkspaceConfig, appId: string): WorkspaceConfig {
   const mine = (owner: string | undefined) => owner === undefined || owner === appId;
   const nav = { ...config.nav };
@@ -105,7 +112,7 @@ const problemsOf = (config: WorkspaceConfig, registry: Registry): string[] => {
   ];
 };
 
-/** 超出范围的地方（没有时是空的）。每一条都是模型能照着改的话。 */
+/** Out-of-scope issues (empty if none). Each item is phrasing the model can follow to correct it. */
 export function scopeProblems(
   before: WorkspaceConfig,
   after: WorkspaceConfig,
@@ -129,8 +136,10 @@ export function scopeProblems(
 }
 
 /**
- * 发给模型的配置（在 app 里改时）：只有这个 app 的页面、表、快捷操作，加上主页的表（只能指向，不能改）；
- * 主页的页面、主页底栏、别的 app 看不到。模型改的还是完整配置（ops 在完整配置上执行并检查范围）。
+ * Configuration sent to the model (when modifying within an app): Contains only this app's pages,
+ * tables, quick actions, plus home tables (references only, read-only); home pages, home bottom
+ * bar, and other apps are hidden. The model still modifies the full configuration (operations
+ * execute and scope-check against the full config).
  */
 export function scopedViewForAI(config: WorkspaceConfig, appId: string): WorkspaceConfig {
   const mineOrHome = (owner: string | undefined) => owner === undefined || owner === appId;
@@ -147,7 +156,7 @@ export function scopedViewForAI(config: WorkspaceConfig, appId: string): Workspa
   };
 }
 
-/** 看不到的东西占着的 ID（只有 ID，没有内容）：新东西不能重名。 */
+/** IDs occupied by hidden components (IDs only, no content): New items cannot reuse these names. */
 export function hiddenIdsForAI(
   config: WorkspaceConfig,
   appId: string,

@@ -14,16 +14,16 @@ import {
 import type { MediaInfo, MediaOutput, MediaPlatform, VideoEncode } from '../platform';
 import { MB, displayName, extOf, fileItems, freshName, type RunServices } from './helpers';
 
-// 视频工具的动作实现（D-143）：码率和分辨率在 core/media.ts 里算，编码交给原生模块 morph-media。
-// 输出一律是 MP4（H.264 + AAC）。
+// Video tool action implementation (D-143): bitrate and resolution are computed in core/media.ts,
+// and encoding is delegated to the native module morph-media. Output is always MP4 (H.264 + AAC).
 
 type Impl = ActionImpl<RunServices>;
 type Ctx = Parameters<Impl>[2];
 
-/** 压完还超过目标时最多再压几次。 */
+/** Maximum number of additional compression passes if it still exceeds the target after compressing. */
 const MAX_RETRIES = 2;
 
-/** 剩余空间至少留这么多给系统。 */
+/** Keep at least this much free space reserved for the system. */
 const SPARE_BYTES = 200 * MB;
 
 function mediaOf(ctx: Ctx): MediaPlatform {
@@ -34,7 +34,7 @@ function mediaOf(ctx: Ctx): MediaPlatform {
 
 const PC_VIDEO_FORMATS = ['mkv', 'webm', 'avi', 'wmv', 'flv'];
 
-/** 原生模块的错误 → 给用户看的错误。 */
+/** Native module error -> user-facing error. */
 export function mediaError(e: unknown, item: RunItem): Error {
   if (e instanceof RunError || e instanceof RunCancelled) return e;
   const code = (e as { code?: string } | null)?.code;
@@ -42,7 +42,7 @@ export function mediaError(e: unknown, item: RunItem): Error {
     case 'ERR_MEDIA_CANCELLED':
       return new RunCancelled();
     case 'ERR_MEDIA_UNSUPPORTED':
-      // 电脑上常见、手机系统常常打不开的格式（iPhone 不认 MKV、WEBM、AVI，D-185）：说清是格式的问题。
+      // Formats common on desktop but frequently unsupported by mobile systems (iPhone does not recognize MKV, WEBM, AVI, D-185): clearly state that it is a format issue.
       return PC_VIDEO_FORMATS.includes(item.ext.toLowerCase())
         ? new RunError('formatUnsupported', {
             name: displayName(item),
@@ -58,7 +58,7 @@ export function mediaError(e: unknown, item: RunItem): Error {
   }
 }
 
-/** 剩余空间够不够写 bytes 这么大的文件（读不到剩余空间时放行）。 */
+/** Check whether there is enough free space to write a file of size bytes (pass through if free space cannot be queried). */
 export function checkSpace(ctx: Ctx, bytes: number): void {
   const free = ctx.services.files.freeDiskBytes();
   if (free === null || free - SPARE_BYTES >= bytes) return;
@@ -85,7 +85,7 @@ const sourceOf = (item: RunItem, info: MediaInfo): VideoSource => ({
   ...(info.videoBitrateKbps ? { videoKbps: info.videoBitrateKbps } : {}),
 });
 
-/** 计划 → 编码要求：短边不比原视频小时不缩放。 */
+/** Plan -> encoding requirements: do not upscale if the short side is not smaller than the original video. */
 function encodeOf(plan: VideoPlan, info: MediaInfo): VideoEncode {
   const original = info.width && info.height ? Math.min(info.width, info.height) : Infinity;
   return {
@@ -96,13 +96,13 @@ function encodeOf(plan: VideoPlan, info: MediaInfo): VideoEncode {
   };
 }
 
-/** 预计大小（字节）：检查空间用。 */
+/** Estimated size (bytes): used for space checks. */
 const estimate = (plan: VideoPlan, durationMs: number) =>
   ((plan.videoKbps + plan.audioKbps) * 1000 * (durationMs / 1000)) / 8;
 
 /**
- * 逐个处理视频，进度按全部视频合起来的百分比报。
- * work 返回新的临时文件，或 null（原样交给下一步）。
+ * Process videos one by one, reporting progress as a percentage of all videos combined. work
+ * returns a new temporary file, or null (pass through to the next step as-is).
  */
 async function eachVideo(
   input: Parameters<Impl>[0],
@@ -118,7 +118,7 @@ async function eachVideo(
   const out: RunItem[] = [];
   for (const [i, item] of items.entries()) {
     ctx.throwIfCancelled();
-    // 超了重压时原生进度会从 0 重新开始：显示的进度只增不减。
+    // Native progress can restart from 0 during heavy re-encoding: ensure displayed progress only increases.
     let shown = 0;
     const job = {
       progress: (f: number) => {
@@ -229,7 +229,7 @@ export const VIDEO_IMPLS: Record<string, Impl> = {
     }
     if (!musicInfo.hasAudio || !Number.isFinite(musicInfo.durationMs) || musicInfo.durationMs <= 0)
       throw new RunError('mediaUnsupported', { name: music.name });
-    // 保留原来的扩展名：iOS 的 AVURLAsset 按扩展名认格式，「.audio」打不开。
+    // Preserve original file extension: iOS AVURLAsset determines format by extension, and .audio cannot be opened.
     const stored = await ctx.services.files.adoptIntoRun(
       music.uri,
       ctx.services.runId,
@@ -332,7 +332,7 @@ export const VIDEO_IMPLS: Record<string, Impl> = {
     const settings = {
       videoKbps: plan.videoKbps,
       audioKbps: infos.some((i) => i.hasAudio) ? 128 : 0,
-      // 帧率跟第一段，但不超过普通转换的上限：慢动作（120/240 fps）放在第一段时不能整段都按 240 fps 输出。
+      // Match frame rate to the first segment, but do not exceed the upper limit for standard conversions: when slow motion (120/240 fps) is placed first, the entire output must not be forced to 240 fps.
       maxFps: Math.min(first.fps && first.fps > 0 ? first.fps : 30, plan.maxFps),
       width,
       height,
@@ -373,7 +373,7 @@ export const VIDEO_IMPLS: Record<string, Impl> = {
         ],
       };
     } catch (e) {
-      // 每一段都已经单独打开过（probe）：拼的时候失败，说不清是哪一段，不能都算到第一段头上。
+      // Each segment has already been individually probed: if concatenation fails, it is unclear which segment failed, so the failure cannot be blamed entirely on the first segment.
       if ((e as { code?: string } | null)?.code === 'ERR_MEDIA_UNSUPPORTED')
         throw new RunError('mergeUnsupported');
       throw mediaError(e, items[0]!);
@@ -411,7 +411,7 @@ export const VIDEO_IMPLS: Record<string, Impl> = {
         });
       }
       let result = await encode(first.plan);
-      // 硬件编码器会略超码率：超了就按超出的比例降一点再压。
+      // Hardware encoders slightly exceed target bitrate: if exceeded, reduce slightly based on the overflow ratio before re-encoding.
       let factor = 1;
       for (let retry = 0; result.size > target && retry < MAX_RETRIES; retry++) {
         factor *= (target / result.size) * 0.95;
@@ -447,7 +447,7 @@ export const VIDEO_IMPLS: Record<string, Impl> = {
 
   async 'video.trim'(input, _params, ctx) {
     const media = mediaOf(ctx);
-    // 剪切界面要知道时长和宽高（分享进来的文件选择器没给）。
+    // The cropping interface needs to know duration, width, and height (not provided by the file picker when sharing in).
     const items: RunItem[] = [];
     for (const item of fileItems(input)) {
       const info = await probe(media, item);
@@ -468,7 +468,7 @@ export const VIDEO_IMPLS: Record<string, Impl> = {
     return eachVideo({ type: 'video', items }, ctx, async (item, _media, job) => {
       const range = ranges[i++];
       if (!range) return null;
-      // 选了整段就不用剪。
+      // No trimming needed if the entire range is selected (startMs <= 0 and whole > 0 and endMs >= whole).
       const whole = item.durationMs ?? 0;
       if (range.startMs <= 0 && whole > 0 && range.endMs >= whole) return null;
       checkSpace(ctx, item.size * ((range.endMs - range.startMs) / Math.max(whole, 1)));

@@ -8,28 +8,35 @@ import { sideOfGutter, type PageGutter } from './word-gutter';
 
 import type { Box, OcrBox, RgbaImage, TableBlock, TableCell } from './types';
 
-// 扫描件转 Word（D-328）：一页的识别结果 + 版面分析的区域 → DocDoc（编辑页改它，docx 每次从它重新生成）。
-// 带线的表格和转 Excel 用同一套找线、组表（D-272）；其余的字按区域（没有区域的按位置聚成块）分段，
-// 段落按 D-268 的规则接行；字号看行高（字写得够长、整页字体一致时看字宽，D-463），粗体看笔画粗细，颜色看文字像素。
-// 上下重叠、左右分开的块放进并排行（D-331）。文字下面的下划线写成下划线（D-463）；删除线不画（只取字）。
+// Scan-to-Word (D-328): Page OCR results + layout analysis regions -> DocDoc (edited on the edit
+// page, docx regenerated from it each time). Lined tables and Excel conversion share the line
+// detection and table grouping logic (D-272); remaining text is segmented into paragraphs by region
+// (or position-clustered blocks if unregioned), lines are joined according to D-268 rules; font
+// size is derived from line height (or character width when text is sufficiently long and font is
+// uniform across the page, D-463), bold from stroke thickness, and color from text pixels.
+// Vertically overlapping and horizontally separated blocks are placed into parallel rows (D-331).
+// Underlines beneath text are written as underlines (D-463); strike-throughs are omitted (text
+// only).
 
-/** 段落的样式：字号（磅）、粗体、斜体、下划线、颜色（RRGGBB）、对齐；没有的用文档默认的。 */
+/** Paragraph style: font size (points), bold, italic, underline, color (RRGGBB), alignment; missing values fall back to document defaults. */
 export interface DocStyle {
   size?: number;
   bold?: boolean;
-  /** 编辑页里加的（D-465）；识别不出斜体。 */
+  /** Added in the edit page (D-465); italics cannot be recognized. */
   italic?: boolean;
-  /** 原图里字下面有一条和字一样长的线（D-463）。 */
+  /** A line matching the text length exists beneath the characters in the source image (D-463). */
   underline?: boolean;
   color?: string;
-  /** 来源色条跟随段落重排，不留在固定页底。 */
+  /** Source color bars reflow with paragraphs rather than staying fixed at the page bottom. */
   fill?: string;
   align?: 'left' | 'center' | 'right';
 }
 
 /**
- * 一段字里样式不同的一截（D-465，编辑页里选中几个字加粗、改字号）：写了的就是这一截的样子
- * （bold: false 是这一截不加粗，哪怕整段是粗体），没写的跟着整段。
+ * A stylized run within a text block (D-465, selecting characters in the edit page to bold or
+ * change font size): specified properties define this run's appearance (`bold: false` explicitly
+ * disables bold for this run even if the entire paragraph is bold), while unspecified properties
+ * inherit from the paragraph.
  */
 export interface DocRun {
   text: string;
@@ -42,103 +49,105 @@ export interface DocRun {
 export interface DocParagraph extends DocStyle {
   kind: 'paragraph';
   text: string;
-  /** 标题级别（1 或 2）；没有时是正文。 */
+  /** Heading level (1 or 2); defaults to body text when absent. */
   heading?: 1 | 2;
-  /** 和上一段之间原来空着（分段的空隙），写成段前间距。 */
+  /** Original spacing between paragraphs (paragraph gap), rendered as space-before. */
   spaced?: boolean;
-  /** 首行缩进（原图像素，D-330）：第一行比这一块其他行靠右多少。 */
+  /** First-line indent (source image pixels, D-330): offset of the first line relative to other lines in this block. */
   indent?: number;
   /**
-   * 表单里配好的标签和值（D-332）：text 每行是「标签\t值」，tab 是值相对标签左边的位置（原图像素），
-   * docx 里写成一个制表位。
+   * Configured form labels and values (D-332): each line in `text` is 'label\tvalue', `tab` is
+   * the value's position relative to the label's left edge (source pixels), rendered as a tab
+   * stop in docx.
    */
   tab?: number;
-  /** 样式不同的几截（D-465）：有时连起来就是 text。 */
+  /** Stylized runs (D-465): when concatenated, they form the text content. */
   runs?: DocRun[];
   box: Box;
 }
 
 export interface DocList extends DocStyle {
   kind: 'list';
-  /** 编号列表（1. 2、 (3) ①）；否则是项目符号。 */
+  /** Numbered list (1., 2., (3), ①); otherwise treated as bulleted. */
   ordered: boolean;
-  /** 编号的写法（Word 的 lvlText，%1 是编号）：「%1.」「%1、」「(%1)」「%1)」。 */
+  /** Numbering format (Word's lvlText, where %1 is the number): '%1.', '%1、', '(%1)', '%1)'. */
   format?: string;
-  /** 第一项的编号。 */
+  /** Starting number of the first item. */
   start?: number;
-  /** 每一项的文字（不含原来的编号和符号）。 */
+  /** Text of each item (excluding original numbers and symbols). */
   items: string[];
-  /** 每一项样式不同的几截（D-465），和 items 一一对应；没有的项整项跟着列表的样式。 */
+  /** Stylized runs for each item (D-465), corresponding 1:1 with items; items without runs inherit the list's overall style. */
   itemRuns?: (DocRun[] | null)[];
   spaced?: boolean;
   box: Box;
 }
 
-/** 带线的表格：和转 Excel 的 TableBlock 一样（col 从 0 起），colWidths 是这张表每列的宽（原图像素）。 */
+/** Lined table: same as TableBlock for Excel conversion (0-indexed columns), `colWidths` specifies column widths in source pixels. */
 export interface DocTable {
   kind: 'table';
-  /** 横向纸上转过 90 度的表格仍按来源方向写字，不把窄列中的词逐字折行。 */
+  /** Tables rotated 90 degrees on landscape pages retain source text orientation, preventing character-by-character wrapping of words in narrow columns. */
   direction?: 'tbRl';
-  /** 原图里没有线、按列对齐认出来的表（D-471）：画的时候不画边框。 */
+  /** Borderless tables recognized via column alignment in source image (D-471): rendered without borders. */
   borderless?: boolean;
   table: TableBlock;
   colWidths: number[];
-  /** 表里字的字号（磅，按表里文字的行高，D-335）；没有时用正文字号。写 docx 时随表的缩小一起缩小。 */
+  /** Font size of table text (points, based on table text line height, D-335); defaults to body font size when absent. Scales down proportionally with table shrinkage in docx. */
   size?: number;
-  /** 每格原来各行字的位置；只生成普通段落的缩进/段前距，编辑增删行后失效。 */
+  /** Original line positions in each cell; generates standard paragraph indentation/space-before only, becoming invalid after editing, adding, or deleting rows. */
   cellLayout?: {
     row: number;
     col: number;
-    /** 原生填色覆盖整格时，底色随单元格走，不只随字行走。 */
+    /** When native shading covers the entire cell, background color follows the cell rather than individual characters. */
     fill?: string;
     lines: (Box & { color?: string; fill?: string; tabs?: number[] })[];
   }[];
   box: Box;
 }
 
-/** 剪下来的图片：src 是剪好的 JPG（本次运行的文件）；还没剪时没有。 */
+/** Cropped image: `src` is the cropped JPG (current runtime file); absent before cropping. */
 export interface DocImage {
   kind: 'image';
   box: Box;
   src?: string;
-  /** 页面的纯装饰，不占文档流；旧版侧车也可能保留整个非正文绘图层。 */
+  /** Purely decorative page element, not participating in document flow; legacy sidebars may also retain non-text drawing layers. */
   background?: true;
 }
 
-/** 已转到底图的图片原来占据的空白；不是透明图片，也不含正文。 */
+/** Blank space originally occupied by an image converted to base background; not a transparent image and contains no text. */
 export interface DocSpace {
   kind: 'space';
   box: Box;
 }
 
-/** 能单独放的块；并排行的格子里只放这些（不再套并排行）。 */
+/** Independent block elements; only these are placed inside parallel row cells (no nested parallel rows). */
 export type DocLeaf = DocParagraph | DocList | DocTable | DocImage | DocSpace;
 
-/** 并排行的一格：width 是它在原图里的宽（像素，到下一格的左边为止），blocks 按阅读顺序。 */
+/** Parallel row cell: `width` is its width in source image pixels (up to the left edge of the next cell), `blocks` are in reading order. */
 export interface DocRowCell {
   width: number;
   blocks: DocLeaf[];
 }
 
 /**
- * 并排的一行（D-331）：上下范围重叠、左右分开的几块（左右两栏文字、并排的几张表、表单的左右两块），
- * docx 里写成一张无边框的排版表格的一行，每格里放各自的段落、表格。
+ * Parallel row (D-331): vertically overlapping, horizontally separated blocks (two-column text,
+ * side-by-side tables, form left/right sections), written as a borderless layout table row in
+ * docx containing respective paragraphs and tables in each cell.
  */
 export interface DocRow {
   kind: 'row';
-  /** 从左到右。 */
+  /** From left to right. */
   cells: DocRowCell[];
   box: Box;
 }
 
 export type DocBlock = DocLeaf | DocRow;
 
-/** 一页里所有能单独放的块（并排行展开成格子里的块），按顺序。 */
+/** All independent blocks on a page (with parallel rows expanded into cell blocks), in order. */
 export function leafBlocks(page: { blocks: readonly DocBlock[] }): DocLeaf[] {
   return page.blocks.flatMap((b) => (b.kind === 'row' ? b.cells.flatMap((c) => c.blocks) : [b]));
 }
 
-/** 一栏里还有并排字段时，临时用普通排版表格；文件里的块和编辑引用不变。 */
+/** Temporarily uses standard layout tables when a column contains nested parallel fields; underlying file blocks and edit references remain unchanged. */
 export function flowCellBlocks(blocks: readonly DocLeaf[], h: number): readonly DocBlock[] {
   const parallel = blocks.some((a, i) =>
     blocks.slice(i + 1).some((b) => {
@@ -157,18 +166,18 @@ export function flowCellBlocks(blocks: readonly DocLeaf[], h: number): readonly 
 }
 
 export interface DocPage {
-  /** 截原图核对用的那张图的 uri。 */
+  /** URI of the source image snippet used for verification. */
   source: string;
-  /** box 的坐标系（和找线、认字那张图一样）。 */
+  /** Coordinate system of the box (matches line-detection and OCR image). */
   width: number;
   height: number;
-  /** 这一页正文的字号（磅）：和它差不多的段落不单独写字号。 */
+  /** Body font size for this page (points): paragraphs close to this size omit explicit font size declarations. */
   bodySize: number;
-  /** 来源纸张的物理尺寸（磅）；没有时沿用旧版的纵向 A4。 */
+  /** Physical dimensions of the source paper (points); falls back to legacy portrait A4 when absent. */
   paper?: { width: number; height: number };
-  /** 从来源内容边界保留的页边距（磅）；旧文档没有时仍是 2 cm。 */
+  /** Page margins preserved from source content boundaries (points); defaults to 2 cm for legacy documents without margins. */
   margins?: { top: number; right: number; bottom: number; left: number };
-  /** 按阅读顺序。 */
+  /** In reading order. */
   blocks: DocBlock[];
 }
 
@@ -178,40 +187,42 @@ export interface DocDoc {
 }
 
 export interface DocPageInput {
-  /** 找线、量粗细和颜色用的图（增强后的那张，没有增强过就是原图）。 */
+  /** Image used for line detection, thickness measurement, and color analysis (enhanced version, or original if unenhanced). */
   image: RgbaImage;
-  /** 识别出的行，坐标和 image 一样。 */
+  /** Recognized lines, with coordinates matching image. */
   lines: readonly OcrBox[];
-  /** 版面分析的区域（模型没装时没有：只按位置分块，不认标题和图片）。 */
+  /** Layout analysis regions (absent when model is uninstalled: blocks segmented solely by position, ignoring headings and images). */
   regions?: readonly LayoutRegion[];
-  /** 原始数字 PDF 已验证的整图（像素坐标）；先隔离图中字和网格，再按普通图片参与排版。 */
+  /** Verified full-page image from native digital PDF (pixel coordinates); text and grids are isolated before participating in layout as a standard image. */
   nativeFigures?: readonly Box[];
-  /** 原生 PDF 里没有画进整图剪图的字（像素坐标）：和它重叠的识别行不归图，留作正文。 */
+  /** Text in native PDFs not rendered into full-page image crops (pixel coordinates): overlapping OCR lines are excluded from the image and retained as body text. */
   nativeText?: readonly Box[];
-  /** 同页接管原生整图前的排版；图外字号、样式沿用它，不让移走图内标签改变正文统计。 */
+  /** Layout prior to taking over native full-page images on the same page; retains font sizes and styles outside the image, preventing removal of intra-image labels from altering body text statistics. */
   prior?: DocPage;
   source: string;
-  /** PDF 渲染路径保留的物理尺寸；普通照片没有，不能凭像素猜票据的毫米数。 */
+  /** Physical dimensions preserved by PDF rendering path; absent for regular photos, preventing millimeter estimations of receipts based solely on pixels. */
   paper?: { width: number; height: number };
-  /** 已知的倾斜角（度），同 buildTablePage。 */
+  /** Known skew angle (degrees), same as `buildTablePage`. */
   skew?: number;
 }
 
 export interface DocBuildOptions extends BuildOptions {
-  /** 接回的碎片或数字范围续行怎么接；其余段落、密集页保留 joinLines，避免扩大改动。 */
+  /** Handling line continuations for reattached fragments or numeric ranges; other paragraphs and dense pages retain `joinLines` to minimize scope of changes. */
   joinParagraph?: (lines: readonly OcrBox[]) => string;
 }
 
-/** A4 的宽（磅）：整页宽度按 A4 换算字号。 */
+/** Width of A4 (points): full page width used to calculate font scaling relative to A4. */
 export const A4_WIDTH_PT = 595;
 
-/** 识别框的高度 → 字号：PP-OCR 的框比字高出一截（word-exp 的信件里 10 磅的正文框高约 11 磅）。 */
+/** Recognition box height -> font size: PP-OCR boxes exceed character height (e.g., 10 pt body text in word-exp letters yields ~11 pt boxes). */
 const BOX_TO_FONT = 0.9;
 
 /**
- * 正文字号限制在这个范围：照片里的纸不一定是 A4（书页窄，按 A4 换算字会偏大），
- * 其他段落按和正文行高的比例算字号。表单页（D-335）按原图比例，最小到 6 磅，一页原件尽量还是一页；
- * 正文页（一半以上的字在长行里：书页、条款页）不小于 9 磅，字太小不好读，多排几页没关系。
+ * Body font size constraints: source photos may not be A4 (narrow book pages scale up excessively
+ * when normalized to A4); other paragraphs calculate font size proportional to body line height.
+ * Form pages (D-335) follow source aspect ratios down to 6 pt to preserve single-page fidelity;
+ * prose pages (where >50% of text is in long lines, e.g., books, terms) enforce a minimum of 9 pt
+ * for readability, allowing multi-page flow.
  */
 const BODY_MIN = 9;
 
@@ -219,37 +230,40 @@ const FORM_MIN = 6;
 
 const BODY_MAX = 12;
 
-/** 一页有这么多行字以上是密集的页（表单、税表）：正文也不抬到 9 磅，不然一页变两页。 */
+/** Pages with at least this many lines are classified as dense pages (forms, tax sheets): body font is not boosted to 9 pt to prevent pagination expansion. */
 const DENSE_LINES = 90;
 
-/** 一页里至少这么多比例的字在长行（至少这么多比例的页宽）里，就是正文页（表单的标签、值、表格里的字都短）。 */
+/** Proportion of text in long lines (exceeding this width ratio) required to classify a page as a prose page (form labels, values, and table text are typically short). */
 const PROSE_SHARE = 0.5;
 
 const PROSE_LINE = 0.4;
 
-/** 字号和正文差不到这么多（比例）就当正文（中文的引号让识别框高出一截，差 20% 很常见）。 */
+/** Font sizes within this proportion of the body size are treated as body text (Chinese quotation marks inflate bounding box heights, making 20% variance common). */
 const BODY_SNAP = 0.25;
 
-/** 字母、数字少于这么多个的段落（「孩子。”」）行高不准，不单独算字号、不当标题（模型说是标题的除外）。 */
+/** Paragraphs with fewer letters or digits than this threshold (e.g., ["Child."]) have inaccurate line height, are not assigned a separate font size, and are not treated as headings (unless classified as headings by the model). */
 const SHORT_TEXT = 6;
 
-/** 比正文大这么多倍、不超过两行的段落是标题；大这么多倍是一级标题。 */
+/** Paragraphs exceeding body size by this multiplier and spanning no more than two lines are headings; exceeding this larger threshold makes it a level-1 heading. */
 const HEADING_RATIO = 1.3;
 
 const HEADING1_RATIO = 1.8;
 
 /**
- * 不当标题的段落（D-330）：引号开头的（对话），句号结尾而且字母数字超过 20 个的（一句话），
- * 或者字母数字超过 100 个的。版面模型和字号都可能把这些认成标题。
+ * Paragraphs excluded from being headings (D-330): starting with quotation marks (dialogue),
+ * ending with a period and having >20 alphanumeric characters (complete sentences), or exceeding
+ * 100 alphanumeric characters. Layout models and font sizes may otherwise misclassify these as
+ * headings.
  */
 const QUOTE_START = /^\s*[“"«「『‘'„]/;
 
 const SENTENCE_END = /[.。!！?？]\s*$/;
 
 /**
- * 只凭字大判断的标题（模型没说是标题）：以字母或数字开头，字母占不太少。
- * 扫描件里手写、打字机的字框高矮不齐，「Displays (8) 40 Floor (40)」「# Customers Attended 35」
- * 这种带符号、数字的行常被量成大字，不是标题。
+ * Headings determined solely by font size (not labeled by model): must start with an alphanumeric
+ * character and have a sufficient letter ratio. In scans, handwriting and typewriter boxes vary
+ * in height, frequently causing lines with symbols and numbers ('Displays (8) 40 Floor (40)', '#
+ * Customers Attended 35') to measure as large text without being headings.
  */
 const HEADING_MIN_LETTERS = 0.7;
 
@@ -264,31 +278,31 @@ const notHeading = (text: string) => {
   return QUOTE_START.test(text) || (SENTENCE_END.test(text) && n > 20) || n > 100;
 };
 
-/** 首行缩进（D-330）：至少 0.8 个行高，最多 4 个行高、这一块宽度的一半（再多是居中、靠右或另一栏的短行）。 */
+/** First-line indent (D-330): between 0.8 and 4 line heights, up to half the block width (larger values indicate centered, right-aligned, or multi-column short lines). */
 const INDENT_MIN = 0.8;
 
 const INDENT_MAX = 0.5;
 
 const INDENT_LINES = 4;
 
-/** 笔画比这一页的中位数粗这么多倍算粗体。 */
+/** Strokes thicker than the page median by this multiple are classified as bold. */
 export const BOLD_RATIO = 1.35;
 
-/** 文字像素的色度（最大、最小通道之差）超过这么多算有颜色。 */
+/** Text pixels with chromaticity (difference between max and min color channels) exceeding this threshold are considered colored. */
 const COLOR_CHROMA = 60;
 
-/** 段落：上下间距不超过 1.2 倍行高的算同一段（和 D-268 一样）。 */
+/** Paragraph: vertical spacing not exceeding 1.2 times line height counts as the same paragraph (same as D-268). */
 const PARAGRAPH_GAP = 1.2;
 
-/** 一行字的中线离整页中线不到页宽的这么多、左右都至少空着页宽的 15%（D-463）算居中。 */
+/** Lines whose centerline is within this fraction of the page width from the page centerline, with at least 15% page width margin on both sides (D-463), are centered. */
 const PAGE_CENTER = 0.06;
 
 const PAGE_CENTER_MARGIN = 0.15;
 
-/** 居中的行最宽占容器宽的这么多。 */
+/** Maximum width ratio of centered lines relative to container width. */
 const CENTER_MAX_SHARE = 0.85;
 
-/** 先确定容器，再判断对齐；页眉可额外按整页居中，栏内的字只看本栏。 */
+/** Determine container first, then evaluate alignment; headers may additionally center relative to the entire page, while column text considers only its column. */
 function alignmentIn(
   box: Box,
   h: number,
@@ -299,7 +313,7 @@ function alignmentIn(
 ): DocStyle['align'] {
   const leftGap = box.x - left;
   const rightGap = right - (box.x + box.width);
-  // 差不多和容器一样宽的行（左右各空一点）不算居中：两边的空白是噪声（EU 样本 021 接了填写处的整行）。
+  // Lines nearly as wide as the container (with minimal side margins) are not centered: side blank space is treated as noise (EU sample 021 capturing full fillable lines).
   const centered =
     (leftGap > 2 * h &&
       rightGap > 2 * h &&
@@ -316,14 +330,18 @@ function alignmentIn(
       : undefined;
 }
 
-/** 两行的中线相差不到这么多个行高（左边又不齐）算居中排的两行（D-463）。 */
+/** Two lines whose centerlines differ by fewer than this many line heights (with unaligned left edges) are treated as a centered two-line group (D-463). */
 const CENTER_PAIR = 0.2;
 
 /**
- * 按字宽估字号（D-463）：PP-OCR、Vision 的框高随字母的上下伸出部分变（「Docteur」和「Ophtalmologiste」一样大，框高差 30%），
- * 字宽稳得多。一行的字宽（像素）÷ 这行字在 Arial 里有多少个字号宽 ≈ 字号（像素）。只看至少 8 个字母数字的行；
- * 整页正文行的估计要一致（四分位差不超过中位数的 15%，同一种字体）才用，和行高估的差不超过 1/3（别的字体、认错的字），
- * 否则还是看行高。用字宽估的段落和正文差 8% 以上就单独写字号。
+ * Font size estimation via character width (D-463): PP-OCR and Vision box heights vary with
+ * ascenders/descenders ('Docteur' and 'Ophtalmologiste' are identical size yet differ by 30% in
+ * box height), whereas character width is much more stable. Line width in pixels / Arial
+ * character count width ratio ≈ font size in pixels. Restricted to lines with at least 8
+ * alphanumeric characters; page body estimates must be consistent (interquartile range <= 15% of
+ * median for the same font) and within 1/3 difference of line-height estimates (guarding against
+ * other fonts or OCR errors), otherwise line height is used. Paragraphs estimated via character
+ * width differing from body size by >8% receive explicit font size declarations.
  */
 const WIDTH_MIN_CHARS = 8;
 
@@ -333,8 +351,8 @@ const WIDTH_CLAMP = 4 / 3;
 
 const WIDTH_SNAP = 0.08;
 
-/** 列表项的开头（和 D-268 的 layoutOcrLines 一样）。 */
-// 「7.29」「3)5」「-7.29」这样后面紧跟数字的是数（金额、条形码下面的号码），不是编号、不是项目符号（D-471）。
+/** Start of a list item (same as `layoutOcrLines` in D-268). */
+// Entries followed immediately by digits like '7.29', '3)5', '-7.29' represent numbers (amounts, barcode numbers), not list numbers or bullets (D-471).
 const LIST_ITEM = /^\s*(?:[•·*▪●○◦■□]|[-–—](?!\d)|\d{1,3}[.、)）](?!\d)|[(（]\d{1,3}[)）]|[①-⑳])/;
 
 const ORDERED = /^\s*(?:(\d{1,3})([.、)）])(?!\d)|[(（](\d{1,3})[)）]|([①-⑳]))\s*/;
@@ -342,15 +360,17 @@ const ORDERED = /^\s*(?:(\d{1,3})([.、)）])(?!\d)|[(（](\d{1,3})[)）]|([①-
 const BULLET = /^\s*(?:[•·*▪●○◦■□]|[-–—](?!\d))\s*/;
 
 /**
- * 装饰：符号连着重复（「***」「--」）或者一行两头是同一种符号（「– Anmeldebestätigung –」「*** ATTO ***」），
- * 是标题、小票上的花边，不是列表的圆点。
+ * Decorative elements: repeated consecutive symbols ('***', '--') or lines bookended by matching
+ * symbols ('– Anmeldebestätigung –', '*** ATTO ***') are title/receipt borders, not list bullets.
  */
 const DECORATED =
   /^\s*(?:([*•·▪●○◦■□])\s*\1|[-–—]\s*[-–—])|^\s*(?:([*•·▪●○◦■□]).*\2|[-–—].*[-–—])\s*$/;
 
 /**
- * 行首的日期（「21. APR. 2006」「1. Januar 2024」「15. März」「3. 4. 2025」）：德、奥、北欧的写法，日后面也是一个点，
- * 不是编号（EU 样本 076 的日期章读成了从 21 开始的列表）。月份按德法意西葡英的名字和缩写认。
+ * Leading dates ('21. APR. 2006', '1. Januar 2024', '15. März', '3. 4. 2025'): German, Austrian,
+ * and Nordic formatting where the day is followed by a period, not a list number (EU sample 076
+ * date stamp misread as a list starting at 21). Months are recognized by full names and
+ * abbreviations in German, French, Italian, Spanish, Portuguese, and English.
  */
 const MONTHS =
   'jan|jän|feb|fév|fev|mär|mar|apr|avr|abr|mai|may|mag|jun|juin|giu|jul|juil|lug|aug|aoû|aou|ago|' +
@@ -362,8 +382,9 @@ const DATE_START = new RegExp(
 );
 
 /**
- * 括号里的编号后面什么都没有、或者又是一个括号里的代码（「(12) (13)」「(6)」「(22) (D.1)」）：表单的字段代码
- * （欧盟统一的行驶证，EU 样本 089），不是列表的编号。
+ * Parenthetical numbers followed by nothing or another parenthetical code ('(12) (13)', '(6)',
+ * '(22) (D.1)'): form field codes (EU standardized vehicle registration, EU sample 089), not list
+ * numbers.
  */
 const FIELD_CODE = /^\s*[(（]\d{1,3}[)）]\s*(?:[(（][\p{L}\p{N}.]{1,6}[)）]\s*)*$/u;
 
@@ -392,7 +413,7 @@ interface Row {
   text: string;
 }
 
-/** 按竖直方向的重叠分成一排一排（D-268），每排从左到右。 */
+/** Group lines into rows by vertical overlap (D-268), with each row ordered from left to right. */
 function rowsOf(lines: readonly OcrBox[]): Row[] {
   const sorted = [...lines].sort((a, b) => a.y + a.height / 2 - (b.y + b.height / 2));
   const groups: OcrBox[][] = [];
@@ -400,8 +421,10 @@ function rowsOf(lines: readonly OcrBox[]): Row[] {
     const first = groups.at(-1)?.[0];
     if (first) {
       const ov = Math.min(first.y + first.height, line.y + line.height) - Math.max(first.y, line.y);
-      // 大字下面居中的一行小字（标志字「flexPEDIA」下面的口号，EU 样本 091）：大字的框高出一截压到小字上，
-      // 但两行左右叠着，是上下两行，不是同一排。
+      // Centered line of small text below large text (slogan beneath the logo `"flexPEDIA"`, EU
+      // sample 091): the bounding box of the large text protrudes and overlaps the top of the small
+      // text, but the two lines overlap horizontally and thus form two separate rows rather than a
+      // single row.
       const stacked = groups
         .at(-1)!
         .some(
@@ -424,8 +447,10 @@ function rowsOf(lines: readonly OcrBox[]): Row[] {
 }
 
 /**
- * 没落进任何区域的行按位置聚成块：上下挨着（间距不超过 1.2 倍行高）而且左右有重叠的连在一起
- * （信头左边的地址和右边的日期分成两块）。
+ * Cluster lines that do not fall into any region by position: vertically adjacent lines (with a
+ * gap of no more than 1.2 times the line height) that also overlap horizontally are linked
+ * together (e.g., the address on the left of the letterhead and the date on the right are
+ * separated into two blocks).
  */
 export function clusterLines(lines: readonly OcrBox[], lineHeight: number): OcrBox[][] {
   const rows = rowsOf(lines).flatMap((r) => splitRow(r, lineHeight));
@@ -446,22 +471,26 @@ export function clusterLines(lines: readonly OcrBox[], lineHeight: number): OcrB
   return clusters.map((c) => c.rows.flatMap((r) => r.lines));
 }
 
-/** 标签列和内容列之间的空隙至少这么多个行高。 */
+/** The gap between the label column and the content column must be at least this many line heights. */
 const LABEL_GUTTER = 2;
 
-/** 标签列的宽（最右到最左）不超过整页文字宽的这么多。 */
+/** The width of the label column (from rightmost to leftmost) does not exceed this fraction of the total text width of the page. */
 const LABEL_COLUMN_SHARE = 0.3;
 
-/** 标签列、内容列至少各有这么多行；空隙处被盖住的行最多占这么多。 */
+/** The label column and content column must each have at least this many lines; lines covered by the gap take up at most this fraction. */
 const LABEL_MIN_LINES = 4;
 
 const LABEL_MAX_COVER = 0.25;
 
 /**
- * 表单左边一列窄的标签（「Step 3: Claim Dependent and Other Credits」）、右边一列内容，中间有一条竖着的空隙，
- * 中间偶尔有一行横跨整页的字。找到这样的空隙就把行分成三类：横跨的、左边标签的、右边内容的，
- * 各自再按位置聚块；不然上面那行横跨的字和标签、内容 x 都有重叠，把左右两列连成一块，顺序全乱。
- * 没有这样的空隙（正文、两栏的论文）时原样返回一类。
+ * A narrow column of labels on the left of a form (e.g., `"Step 3: Claim Dependent and Other
+ * Credits"`), a content column on the right, with a vertical gap in between, occasionally crossed
+ * by a line of text spanning the entire page. Finding such a gap splits the lines into three
+ * categories: spanning lines, left-side label lines, and right-side content lines, each clustered
+ * by position; otherwise, the spanning text line above would overlap in x with both the labels
+ * and content, merging the left and right columns into a single block and scrambling the order.
+ * If no such gap exists (such as in body text or two-column papers), return a single category
+ * as-is.
  */
 export function splitLabelColumn(
   lines: readonly OcrBox[],
@@ -471,8 +500,10 @@ export function splitLabelColumn(
   const left = Math.min(...lines.map((l) => l.x));
   const right = Math.max(...lines.map((l) => l.x + l.width));
   const span = right - left;
-  // 每个横坐标被多少行盖住；空隙是标签列右边连续的一段、被盖住的行很少（只有偶尔横跨的几行）。
-  // 只看整页文字左边 30% 以内：再往右的空隙是两栏正文的中缝。
+  // How many lines cover each x-coordinate; the gap is a continuous segment on the right of the
+  // label column where very few lines are covered (only occasional spanning lines). Look only
+  // within the left 30% of the entire page width: gaps further to the right represent the gutter
+  // between two columns of body text.
   const step = Math.max(1, Math.round(lineHeight / 4));
   let best: { a: number; b: number } | null = null;
   let start: number | null = null;
@@ -489,21 +520,21 @@ export function splitLabelColumn(
     }
   }
   if (!best) return null;
-  // 以空隙的中线为界：内容列的行左边常常比空隙的右沿差几个像素。
+  // Using the centerline of the gap as a boundary: the left side of lines in the content column is often a few pixels short of the right edge of the gap.
   const mid = (best.a + best.b) / 2;
-  // 标签是窄的几个字；整行很宽的字就算落在空隙左边也是正文。
+  // Labels consist of a few narrow words; a whole line of wide text is considered body text even if it falls to the left of the gap.
   const labels = lines.filter((l) => l.x + l.width <= mid && l.width <= LABEL_COLUMN_SHARE * span);
   const contents = lines.filter((l) => l.x >= mid);
   const across = lines.filter((l) => !labels.includes(l) && !contents.includes(l));
   if (labels.length < LABEL_MIN_LINES || contents.length < LABEL_MIN_LINES) return null;
-  // 左边一列只有编号（「3.」「4.」）的是带编号的条文，编号属于右边那一项，不是标签列（EU 样本 032）。
+  // If the left column consists solely of numbering (`"3."`, `"4."`), these are numbered clauses where the number belongs to the item on the right rather than forming a label column (EU sample 032).
   if (labels.every((l) => listStart(l.text) && !stripMarker(l.text))) return null;
   return { across, labels, contents };
 }
 
 type LabelSplit = NonNullable<ReturnType<typeof splitLabelColumn>>;
 
-/** 一批行聚成块；整页有标签列时，这批行里左边标签、右边内容、横跨的各自成块（标记 side）。 */
+/** Cluster a batch of lines; when the page has a label column, the left labels, right content, and spanning lines within this batch form separate blocks (marked with side). */
 function clustersOf(
   lines: readonly OcrBox[],
   lineHeight: number,
@@ -529,35 +560,37 @@ function clustersOf(
   ];
 }
 
-/** 两行短行之间至少空出这么多个行高（各自对着左边的一行字时这么多），是一行一行的。 */
+/** Two short lines must have at least this many line heights of space between them (or when each corresponds to a line of text on the left) to be treated as separate lines. */
 const SHORT_APART = 0.8;
 
 const SHORT_BESIDE = 0.5;
 
-/** 金额一类的字：数字占一半以上（「3.60」「19.90 EUR」「-12,5 %」）。 */
+/** Amount-like text: numbers make up more than half (e.g., `"3.60"`, `"19.90 EUR"`, `"-12,5 %"`). */
 const isAmount = (text: string) => {
   const t = text.replace(/\s/g, '');
   return t.length > 0 && (t.match(/\d/g)?.length ?? 0) * 2 >= t.length;
 };
 
-/** 短行后面至少空出这么多个行高（加上下一行的第一个词）才算放得下：栏和栏之间的空隙不算空着。 */
+/** A short line must have at least this many line heights of clear space following it (including the first word of the next line) to be considered fitting; gaps between columns are not counted as empty space. */
 const ROOM_GUTTER = 3;
 
-/** 一排里两块字隔得超过这么多个行高，分成左右两块（一行里词与词的空隙远小于一个行高）。 */
+/** If two blocks of text in a row are separated by more than this many line heights, split them into left and right blocks (as word-to-word gaps within a single line are far smaller than a line height). */
 const ROW_SPLIT = 1.6;
 
-/** 行首的编号和条文之间最多隔这么多个行高还算同一项。 */
+/** A numbering prefix at the start of a line and its clause are considered the same item if separated by at most this many line heights. */
 const MARKER_GAP = 6;
 
-/** 撑满的一行至少拆成这么多个词，词间空隙和中位数最多差这么多，才当成一行（不是几栏）。 */
+/** A fully stretched line must be split into at least this many words, with word gaps differing from the median by at most this amount, to be treated as a text line (rather than multiple columns). */
 const JUSTIFIED_MIN_WORDS = 3;
 
 const JUSTIFIED_GAP_SPREAD = 0.2;
 
 /**
- * 两端对齐、词少的一行（「dont   le   siège   est   fixé   à   (adresse   précise)」）词间空得很大，
- * 识别把每个词分成一块：每块只有一个词、空隙几乎一样大，是一行字，不是几栏（EU 样本 037）。
- * 几栏、信头左右两边的块里有好几个词，空隙也不会一样大。
+ * Justified single-word-per-block lines with large gaps between words (e.g., `"dont le siège est
+ * fixé à (adresse précise)"`), where OCR splits each word into a box: each block contains only a
+ * single word and gaps are nearly uniform, representing a single line of text rather than
+ * multiple columns (EU sample 037). Multiple columns and letterhead left/right blocks contain
+ * multiple words whose gaps will not be uniform.
  */
 function justifiedWords(pieces: readonly (readonly OcrBox[])[]): boolean {
   if (pieces.length < JUSTIFIED_MIN_WORDS) return false;
@@ -570,7 +603,7 @@ function justifiedWords(pieces: readonly (readonly OcrBox[])[]): boolean {
   return gaps.every((g) => Math.abs(g - mid) <= JUSTIFIED_GAP_SPREAD * mid);
 }
 
-/** 一格里至少这么多排、除了最后一排每排至少这么多个字、宽度和最宽的一排差不多，才是一段正文。 */
+/** A cell is considered a prose paragraph if it has at least this many rows, every row except the last has at least this many words, and its width is comparable to the widest row. */
 const CELL_PROSE_ROWS = 3;
 
 const CELL_PROSE_CHARS = 40;
@@ -578,7 +611,9 @@ const CELL_PROSE_CHARS = 40;
 const CELL_PROSE_WIDTH = 0.85;
 
 /**
- * 格子里的几排字是一段折行的正文（每排很长、除了最后一排都写到头），不是一排一项（地址、日期，D-333）。
+ * Several lines of text in a cell form a wrapped prose paragraph (each line is long and extends
+ * to the edge except for the last) rather than individual single-item rows (such as addresses or
+ * dates, D-333).
  */
 function proseRows(rows: readonly Row[]): boolean {
   if (rows.length < CELL_PROSE_ROWS) return false;
@@ -590,7 +625,7 @@ function proseRows(rows: readonly Row[]): boolean {
     );
 }
 
-/** 一排里隔得很远的几块分开（左右两栏、信头左右两边）。 */
+/** Split apart widely separated blocks within a single row (such as two columns or left/right letterhead sides). */
 function splitRow(row: Row, lineHeight: number): Row[] {
   const out: OcrBox[][] = [[row.lines[0]!]];
   for (const line of row.lines.slice(1)) {
@@ -599,8 +634,10 @@ function splitRow(row: Row, lineHeight: number): Row[] {
     else out.at(-1)!.push(line);
   }
   if (justifiedWords(out)) return [row];
-  // 行首单独的编号（「3.」隔一大段才是条文，EU 样本 032 的符合性声明）和后面的字是同一项：分开了编号自成一栏，
-  // 和条文并排时对不上行（「7.」排到了第 6 项的末行旁边）。
+  // An isolated number at the start of a line (e.g., `"3."` separated by a large gap from the
+  // clause, as in the declaration of conformity in EU sample 032) belongs to the same item as the
+  // following text: if split, the number forms its own column and fails to align with the clause
+  // when placed side-by-side (e.g., `"7."` aligned next to the last line of item 6).
   const [first, second] = out;
   if (
     first?.length === 1 &&
@@ -618,17 +655,19 @@ function splitRow(row: Row, lineHeight: number): Row[] {
 }
 
 /**
- * 下一行的第一个词接在上一行后面放不放得下（左对齐的正文右边本来就参差不齐：上一行没写到头，
- * 是因为下一个词放不下才折行；放得下却换了行，才是段落的结尾）。词宽按下一行平均每个字的宽估。
- * 中日文没有空格，第一个字就可以折行。
+ * Check whether the first word of the next line can fit after the previous line (the right side
+ * of left-aligned body text is naturally ragged: if the previous line did not reach the end, it
+ * wrapped because the next word could not fit; wrapping despite having enough space marks the end
+ * of a paragraph). Word width is estimated using the average character width of the next line.
+ * Chinese, Japanese, and Korean have no spaces, so wrapping can occur at the first character.
  */
 function fitsOnPrev(prev: Row, row: Row, right: number, typical: number): boolean {
-  // 很短的行（表单的标签一列）长短不一是常事，不是折行；只对够长的行用这个判断。
+  // Very short lines (such as form label columns) frequently vary in length and are not wraps; apply this check only to sufficiently long lines.
   if ([...prev.text].length <= LABEL_MAX) return true;
   return prev.box.x + prev.box.width + firstWordWidth(row) <= right + 0.3 * typical;
 }
 
-/** 一行的第一个词（连同前面的空格）大约多宽：按这一行平均每个字的宽估。中日文的第一个字就可以折行。 */
+/** Approximate width of the first word of a line (including preceding spaces): estimated using the average character width of that line. Chinese, Japanese, and Korean can wrap at the first character. */
 function firstWordWidth(row: Row): number {
   const text = row.text.trim();
   const first = /^[\u2e80-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/.test(text)
@@ -638,20 +677,23 @@ function firstWordWidth(row: Row): number {
   return (first.length + 1) * char;
 }
 
-/** 一块里的行分成段落：空隙大、是列表项、上一行没写到右边（不是折行）、或者有缩进的地方开始新的一段。 */
+/** Split lines within a block into paragraphs: start a new paragraph when there is a large gap, a list item, a previous line that does not reach the right margin (not a wrap), or an indentation. */
 export function paragraphsOf(
   lines: readonly OcrBox[],
   peers: readonly OcrBox[] = [],
-  /** 整页文字（含表格）的右边；不给时按 peers 和这一块算。 */
+  /** Right side of the page text (including tables); when not provided, calculated based on peers and this block. */
   textRight?: number,
 ): { rows: Row[]; spaced: boolean; list: boolean }[] {
   const rows = rowsOf(lines);
   if (!rows.length) return [];
   const typical = median(rows.map((r) => median(r.lines.map((l) => l.height)))) || 1;
   const left = Math.min(...rows.map((r) => r.box.x));
-  // 右边：行数多时用靠右的八成位置，一行特别长（网址、表格里漏进来的）不把右边撑出去。
-  // 块外的行（peers）说明这一栏有多宽：几行短行自成一块时，最宽的那行不是栏的右边。
-  // 和块同高、在块左右两边又在那一行横跨范围里有别的字，那一行横跨了别的栏，不算。
+  // Right edge: when line count is large, use the 80th percentile right-aligned position so that
+  // exceptionally long lines (URLs, stray table content) do not push the right boundary outward.
+  // Lines outside the block (peers) indicate the width of this column: when several short lines
+  // form their own block, the widest line is not the right edge of the column. Lines that match the
+  // block's height, lie on both its left and right sides, and contain other text within that line's
+  // span are cross-column spanning lines and are excluded.
   const top = Math.min(...rows.map((r) => r.box.y));
   const bottom = Math.max(...rows.map((r) => r.box.y + r.box.height));
   const own = Math.max(...rows.map((r) => r.box.x + r.box.width));
@@ -659,7 +701,7 @@ export function paragraphsOf(
     (q) => (q.x + q.width <= left || q.x >= own) && q.y < bottom && q.y + q.height > top,
   );
   const sameColumn = (p: OcrBox) => !beside.some((q) => q.x < p.x + p.width && q.x + q.width > p.x);
-  // 左对齐的：左边对齐、字差不多高、上下挨着（三个行高以内）的行。
+  // Left-aligned lines: lines that are left-aligned, have similar font heights, and are vertically adjacent (within three line heights).
   const column = peers.filter(
     (p) =>
       Math.abs(p.x - left) <= typical &&
@@ -673,7 +715,7 @@ export function paragraphsOf(
   ].sort((a, b) => a - b);
   const right =
     rights.length >= 5 ? rights[Math.floor((rights.length - 1) * 0.85)]! : rights.at(-1)!;
-  // 居中的：横跨块中线的行有多宽，居中的行就能排多宽。
+  // Centered lines: centered lines can be as wide as any line crossing the block's centerline.
   const middle = (left + own) / 2;
   const centeredWidth = Math.max(
     own - left,
@@ -681,8 +723,9 @@ export function paragraphsOf(
       .filter((p) => p.x <= middle && p.x + p.width >= middle && sameColumn(p))
       .map((p) => p.width),
   );
-  // 这一块的字右边能写到哪：块右边、上下三个行高以内最近的别的字（另一栏、另一块）的左边，
-  // 没有时是整页文字的右边。
+  // The right boundary where text in this block can extend: the right edge of the block, or the
+  // left edge of the nearest other text (in another column or block) within three line heights
+  // vertically, defaulting to the right edge of the page text if none exists.
   const roomRight = Math.min(
     textRight ?? Math.max(own, ...peers.map((p) => p.x + p.width)),
     ...peers
@@ -696,18 +739,20 @@ export function paragraphsOf(
     const list = marker && /[\p{L}\p{N}]/u.test(stripMarker(row.text));
     const rangeTail =
       prev !== undefined && /\d[-–—]\s*$/.test(prev.text) && /^\s*\d+\.\s*$/.test(row.text);
-    // 裸编号仍保留为独立标签；只有紧接数字范围的尾数可按折行接回，不能当新列表。
+    // Bare numbering is retained as an independent label; only a tail immediately following a number range can be appended as a wrap, and it cannot be treated as a new list.
     const bareLabel = marker && !list && !rangeTail;
     const gap = prev ? row.box.y - (prev.box.y + prev.box.height) : 0;
     const h = median(row.lines.map((l) => l.height));
     const prevH = prev ? median(prev.lines.map((l) => l.height)) : h;
-    // 居中排的几行（信头、处方的页眉，D-463）：中线对齐、左边不齐，是一行一行的，不是折行。
+    // Centered lines of text (letterheads, prescription headers, D-463): centerline-aligned and left-ragged, representing individual lines rather than wrapped text.
     const centerShift = prev
       ? Math.abs(prev.box.x + prev.box.width / 2 - (row.box.x + row.box.width / 2))
       : 0;
     const leftShift = prev ? Math.abs(prev.box.x - row.box.x) : 0;
-    // 左边只差一点、中线对得比左边准得多的两行也是居中排的（左对齐的行左边只有几像素的抖动）：
-    // 下一行的第一个词放得进居中能排的宽度却换了行，是一行一行排的，不是折行。
+    // Two lines with nearly matching left margins and much more precisely aligned centerlines are
+    // also treated as centered (left-aligned lines typically have only a few pixels of jitter on
+    // the left): if the first word of the next line fits within the allowable centered width yet a
+    // line break occurred, it is a sequence of individual lines rather than wrapped text.
     const centeredLines =
       prev !== undefined &&
       centerShift <= CENTER_PAIR * typical &&
@@ -717,8 +762,10 @@ export function paragraphsOf(
     const centeredPair =
       prev !== undefined &&
       ((centerShift <= CENTER_PAIR * typical && leftShift > 0.5 * typical) || centeredLines);
-    // 同一排左右各有「标签：值」是独立的信息行，不是上一段正文的折行。
-    // 只看组外、隔开一栏的字段；正文两栏恰好对齐、字段值自己的续行都不因此拆段。
+    // Rows containing `"label: value"` on both left and right sides are independent information
+    // lines, not wraps of the preceding prose paragraph. Consider only fields outside groups and
+    // separated by a column; two-column body text aligned by coincidence or continuation lines of
+    // field values are not split accordingly.
     const field = (text: string) => /^[^:：.!?。！？\n]{1,30}[:：]\s*\S/u.test(text.trim());
     const fieldRow =
       field(row.text) &&
@@ -732,16 +779,20 @@ export function paragraphsOf(
           field(p.text)
         );
       });
-    // 一叠短行（地址、信头、小票上的字段）：下一行的第一个词在上一行后面放得下（右边到下一块字、
-    // 或者整页的右边还空着一大段），却换了行，是一行一行写的，不是折行（EU 样本 023、025、029）。
+    // A stack of short lines (addresses, letterheads, receipt fields): a line break occurring even
+    // though the first word of the next line could fit after the previous line (with plenty of
+    // space remaining to the next text block or page right edge) indicates they were written as
+    // separate lines rather than wrapped text (EU samples 023, 025, 029).
     const roomy =
       prev !== undefined &&
       [...prev.text].length <= LABEL_MAX &&
       [...row.text].length <= LABEL_MAX &&
       prev.box.x + prev.box.width + firstWordWidth(row) + ROOM_GUTTER * typical < roomRight;
-    // 两行短行中间空出将近一个行高（地址后面隔一个空行的「email:」），或者空出半个行高、各自对着
-    // 左边隔得很远的不同的一行字（条款右边一列「○ ja ○ nein」，EU 样本 041、049）：一行一行写的，
-    // 不是折行。正文的折行之间只有一点行距。
+    // Two short lines separated by nearly a line height (e.g., an `"email:"` line separated by a
+    // blank line after an address), or separated by half a line height while each corresponds to a
+    // distantly separated line of text on the left (e.g., the right-hand column of clauses with `"○
+    // ja ○ nein"`, EU samples 041, 049): written as separate lines rather than wrapped text. Prose
+    // wraps have only minimal line spacing.
     const facing = (r: Row) =>
       peers.find(
         (p) =>
@@ -749,8 +800,10 @@ export function paragraphsOf(
           Math.min(p.y + p.height, r.box.y + r.box.height) - Math.max(p.y, r.box.y) >=
             0.5 * Math.min(p.height, r.box.height),
       );
-    // 小票、价目表的一项一行：两行短行右边隔得很远、同一排上各有自己的金额（EU 样本 003），
-    // 是一项一项的，不是折行（折行的第二行右边不会另有一个金额）。
+    // Receipt or price list items consisting of one line each: two short lines separated
+    // horizontally with each having its own amount on the same row (EU sample 003), representing
+    // separate items rather than a wrap (the second line of a wrap would not have a separate amount
+    // on the right).
     const priced = (r: Row) =>
       peers.find(
         (p) =>
@@ -775,18 +828,18 @@ export function paragraphsOf(
       !fieldRow &&
       !roomy &&
       !apart &&
-      // 以填写处结尾的行（「Name ……」）是一行一行的，不是折行。
+      // Lines ending with fill-in prompts (e.g., `"Name ……"`) are individual lines rather than wraps.
       !ENDS_WITH_FILL.test(prev.text) &&
       gap <= PARAGRAPH_GAP * typical &&
       (prev.box.x + prev.box.width >= right - 1.2 * typical ||
         !fitsOnPrev(prev, row, right, typical)) &&
       prev.box.width >= 0.6 * (right - left) &&
-      // 左边和块里最左的行差不多，或者和上一行左对齐（块并大了以后最左的行是别的段落的）。
+      // The left side is close to the leftmost line in the block, or left-aligned with the previous line (after block expansion, the leftmost line may belong to a different paragraph).
       (row.box.x <= left + typical || Math.abs(row.box.x - prev.box.x) <= 0.5 * typical) &&
       !list &&
       !bareLabel &&
       Math.abs(h - prevH) <= 0.3 * Math.max(h, prevH);
-    // 列表项下面接着的、有缩进的行（悬挂缩进）是这一项的折行。
+    // An indented line immediately following a list item (hanging indent) is a wrap of that item.
     const last = out.at(-1);
     const hanging =
       last?.list === true &&
@@ -804,7 +857,7 @@ export function paragraphsOf(
   return out;
 }
 
-/** 一行的笔画宽度（水平方向连续深色像素的中位数），和行高的比。没有深色像素时是 0。 */
+/** Stroke width of a line (median of contiguous dark pixels horizontally) as a ratio of the line height. Returns 0 when there are no dark pixels. */
 export function strokeRatio(image: RgbaImage, box: Box): number {
   const x0 = Math.max(0, Math.floor(box.x));
   const x1 = Math.min(image.width, Math.ceil(box.x + box.width));
@@ -836,12 +889,12 @@ export function strokeRatio(image: RgbaImage, box: Box): number {
     }
     if (run) runs.push(run);
   }
-  // 很长的一段是划线（下划线、删除线），不算笔画。
+  // Long continuous segments are ruled lines (underlines, strikethroughs) and are not counted as strokes.
   const strokes = runs.filter((r) => r < box.height * 0.6);
   return strokes.length ? median(strokes) / box.height : 0;
 }
 
-/** 文字像素的颜色（RRGGBB）；黑色、灰色时是 undefined。 */
+/** Color of text pixels (RRGGBB); returns undefined for black or gray. */
 export function textColor(image: RgbaImage, box: Box): string | undefined {
   const x0 = Math.max(0, Math.floor(box.x));
   const x1 = Math.min(image.width, Math.ceil(box.x + box.width));
@@ -859,7 +912,7 @@ export function textColor(image: RgbaImage, box: Box): string | undefined {
   const lo = sorted[Math.floor(sorted.length * 0.05)]!;
   const hi = sorted[Math.floor(sorted.length * 0.9)]!;
   if (hi - lo < 40) return undefined;
-  // 最深的那部分像素（笔画中间，不受背景混色影响）。
+  // The darkest subset of pixels (in the middle of strokes, unaffected by background blending).
   const cut = lo + (hi - lo) * 0.35;
   let r = 0;
   let g = 0;
@@ -885,32 +938,35 @@ export function textColor(image: RgbaImage, box: Box): string | undefined {
     .toUpperCase();
 }
 
-/** 图片区域剪下来时外面留的边（行高的倍数）：不能超过图和旁边文字的空隙（0.3 个行高），不然并排的图和字变成上下排。 */
+/** Padding to leave around image regions when cropping (as a multiple of line height): must not exceed the gap between the image and neighboring text (0.3 line heights), otherwise side-by-side images and text would be stacked vertically. */
 export const IMAGE_PAD = 0.15;
 
-/** 行数 × 列数到这么多，格子数又很少，才可能是版面网格。 */
+/** Product of line count and column count reaching this threshold, combined with very few cells, suggests a layout grid. */
 const LAYOUT_MIN_POSITIONS = 40;
 
-/** 格子数不到位置数的这个比例：版面网格（W-9 的上半页是 0.13–0.15；真的合并表一般 0.38 以上）。 */
+/** Cell count as a fraction of position count below this value indicates a layout grid (top half of W-9 is 0.13–0.15; true merged tables are generally above 0.38). */
 const LAYOUT_MAX_FILL = 0.25;
 
-/** 格子数不到这个比例、而且每格平均有这么多行字：格子里装的是整段话（W-4 是 0.29–0.35、每格 1.8 行），不是数据。 */
+/** Cell count below this ratio, where each cell averages this many lines of text, indicates that cells contain full paragraphs of text (W-4 is 0.29–0.35, 1.8 lines per cell) rather than data. */
 const LAYOUT_MAYBE_FILL = 0.4;
 
 const LAYOUT_LINES_PER_CELL = 1.5;
 
-/** 格子数到这么多才用「空格子比例」判断是不是真表格。 */
+/** Cell count must reach this threshold before using the empty cell ratio to determine if a grid is a true table. */
 const GRID_MIN_CELLS = 30;
 
-/** 有字的格子占不到这么多的大网格是表单的下划线、方框连出来的，不是表格。 */
+/** Large grids where filled cells account for less than this fraction are produced by underlines and checkboxes in forms, not true tables. */
 const GRID_MIN_FILLED = 0.35;
 
 /**
- * 表单的下划线、签字线、方框和字一起被连成了一张很大的网格（扫描的表单常见）：九成以上的格子是空的，
- * 有字的格子里的字还被竖线切碎。这样的不当表格，里面的字按位置排成普通的文字。
- * 版面网格（位置很多、格子很少，大块合并，格子里装整段话）也一样；
- * 但真的带边框的表单（订货单、工资单）也有大块合并，所以只在格子特别少、或者每格都是整段话时才判。
- * lineCount 是落在这张表里的识别行数。
+ * Form underlines, signature lines, boxes, and text fused into a massive grid (common in scanned
+ * forms): over 90% of cells are empty, and text inside non-empty cells is fragmented by vertical
+ * lines. Such structures are not valid tables, and their text is arranged positionally as
+ * ordinary text. The same applies to layout grids (many positions, few cells, large merged blocks
+ * containing full paragraphs of text); however, true bordered tables (order forms, payslips) also
+ * feature large merged blocks, so this check is applied only when cells are exceptionally few or
+ * every cell contains a full paragraph. lineCount is the number of recognized lines falling
+ * within this table.
  */
 export function isRuleGrid(table: TableBlock, lineCount = 0): boolean {
   const positions = table.rows * table.cols;
@@ -925,17 +981,21 @@ export function isRuleGrid(table: TableBlock, lineCount = 0): boolean {
   return filled < GRID_MIN_FILLED * table.cells.length;
 }
 
-/** 一排的编号格（表单左边的「Lfd. Nr.」列里的 1、2、3）：很短。 */
+/** Row number cells (such as the `"Lfd. Nr."` column 1, 2, 3 on the left of forms) are very short. */
 const ROW_NUMBER_CHARS = 4;
 
-/** 空白表格的表头最多这么多排。 */
+/** Maximum number of header rows in a blank table. */
 const HEADER_ROWS_MAX = 2;
 
 /**
- * 留给人填的空白表格（EU 样本 001、004、006）：横竖线画满，下面的排没有合并格（每排的格子在同样的列线上分开），
- * 字只在表头（一两排，格子可以横跨几列；下面至少两排空着，最多每排第一格有个编号），或者只在第一列（标签），
- * 右边空着的格子至少和标签一样宽（议程、奖状边框、试卷的答题线空着的列比有字的窄，见 isSparseColumnLayout）。
- * 这样的表不按「空格子太多」当成表单的画线丢掉。
+ * Blank tables designed for manual filling (EU samples 001, 004, 006): densely packed with
+ * horizontal and vertical lines, with unmerged cells in lower rows (cells in each row split along
+ * identical column lines), and text restricted to the header (one or two rows, where cells may
+ * span multiple columns; at least two rows below are empty, with at most a number in the first
+ * cell of each row) or limited to the first column (labels), where empty cells on the right are
+ * at least as wide as the label (unlike agendas, certificate borders, or test answer sheets where
+ * empty columns are narrower than text-containing ones, see `isSparseColumnLayout`). Such tables
+ * are not discarded as form line art due to having too many empty cells.
  */
 export function isBlankFormGrid(table: TableBlock): boolean {
   if (table.rows < 2) return false;
@@ -943,15 +1003,16 @@ export function isBlankFormGrid(table: TableBlock): boolean {
     table.cells.filter((c) => c.row === r).sort((a, b) => a.col - b.col),
   );
   const starts = (row: readonly TableCell[]) => row.map((c) => c.col).join(',');
-  /** 从第 from 排起每排的格子都在同样的列线上分开、不跨排。 */
+  /** Cells in each row starting from row from split along identical column lines without spanning multiple rows. */
   const regular = (from: number) =>
     rows[from]!.length >= 2 &&
     rows
       .slice(from)
       .every((row) => row.every((c) => c.rowSpan === 1) && starts(row) === starts(rows[from]!));
   const has = (c: TableCell) => c.text.trim() !== '';
-  // 表头一排（或两排：表头里的短横线把它分成了两排）有字、格子可以横跨几列，
-  // 下面至少两排一样的空格子（第一格可以是编号）。
+  // Header row (or two rows, if separated by a short horizontal dash in the header) containing text
+  // and cells spanning multiple columns, followed by at least two identical empty rows (where the
+  // first cell may be a sequence number).
   for (let k = 1; k <= HEADER_ROWS_MAX && k + 2 <= table.rows; k++) {
     const head = rows.slice(0, k).flat();
     if (head.some((c) => c.row + c.rowSpan > k) || !regular(k)) continue;
@@ -967,7 +1028,7 @@ export function isBlankFormGrid(table: TableBlock): boolean {
     )
       return true;
   }
-  // 第一列是标签，右边的格子空着、至少和标签一样宽。
+  // The first column contains labels, while right-hand cells are empty and at least as wide as the labels.
   if (!regular(0)) return false;
   const widthOf = (cells: readonly TableCell[]) =>
     cells.reduce((sum, c) => sum + (c.box?.width ?? 0), 0);
@@ -980,24 +1041,29 @@ export function isBlankFormGrid(table: TableBlock): boolean {
   );
 }
 
-/** 填写框里的标签最多这么多行。 */
+/** Maximum number of lines for a label inside a fillable box. */
 const FIELD_LABEL_LINES = 2;
 
-/** 填写框：标签的底不超过格子高的这么多（标签在上面，下面留着写）。 */
+/** Fillable box: label bottom does not exceed this fraction of cell height (label is positioned at the top, leaving room below for writing). */
 const FIELD_LABEL_SHARE = 0.5;
 
-/** 至少这么多个有标签的填写框连在一起，才拿出来当表。 */
+/** At least this many labeled fillable boxes connected together are required to treat them as a table. */
 const FIELD_MIN_BOXES = 2;
 
-/** 至少这么多列。 */
+/** At least this many columns. */
 const FIELD_MIN_COLS = 2;
 
 /**
- * 横线画满的申报表（波兰 PIT-37、德国的 Antrag，EU 样本 062）：一节一节的方框，每个框左上角一个短标签
- * （「10. Nazwisko」），下面空着给人写。整页的网格因为框的位置各排不同、空格子多，被当成表单的画线（isRuleGrid）
- * 整张不要了，框没了，没地方写。这里把这样的网格按整排切开（没有格子跨过的横线处），连着的几排里有字的格子
- * 都是填写框（字最多两行、贴着格子顶、下面至少留一行高的空）时，拿出来当一张表；别的排（说明文字、
- * 选项框的一节、节的标题条）照旧排成文字。返回的表从第 0 列起，colWidths 是它自己的列宽。
+ * Forms with fully drawn lines (Polish PIT-37, German Antrag, EU sample 062): sections of boxes,
+ * each box with a short tag at the top left (e.g., "10. Nazwisko"), leaving the rest empty for
+ * people to write in. Because the positions of the boxes in full-page grids vary across rows and
+ * contain many empty cells, they are treated as ruled grids (isRuleGrid) and dropped entirely,
+ * removing the boxes and leaving nowhere to write. Here, such grids are split row by row (at
+ * horizontal lines not crossed by any cell), and if multiple consecutive rows contain filled
+ * cells acting as input boxes (at most two lines of text, aligned to the top of the cell with at
+ * least one line height of empty space below), they are extracted as a table; other rows
+ * (explanatory text, option box sections, section title bars) are rendered as normal text. The
+ * returned table starts from column 0, and colWidths represents its own column widths.
  */
 export function fieldBoxTables(
   table: TableBlock,
@@ -1024,7 +1090,7 @@ export function fieldBoxTables(
       box.height - bottom >= lineHeight
     );
   };
-  // 整排切开的地方：没有格子从上面跨过来。
+  // Where the grid is split row by row: no cells cross from above.
   const cuts = [0];
   for (let r = 1; r < table.rows; r++)
     if (!table.cells.some((c) => c.row < r && r < c.row + c.rowSpan)) cuts.push(r);
@@ -1047,11 +1113,11 @@ export function fieldBoxTables(
   for (const group of groups) {
     let cells = group.flatMap((s) => s.cells);
     if (cells.filter((c) => c.text.trim()).length < FIELD_MIN_BOXES) continue;
-    // 左右两头整列空着的格子是外框里框旁边的空地（EU 样本 004 的地址框右边），不是填写框。
+    // Empty cells on both the far left and far right sides represent margins next to the inner and outer frames (e.g., the address box on the right of EU sample 004), not input fields.
     for (;;) {
       const first = Math.min(...cells.map((c) => c.col));
       const last = Math.max(...cells.map((c) => c.col + c.colSpan));
-      // 右边：最右一列起的格子都从同一条列线开始；左边反过来。这一条里的格子都空着才去掉。
+      // Right side: cells starting from the rightmost column all begin at the same column line; the left side is the opposite. Only remove this column if all cells within it are empty.
       const rightFrom = Math.max(
         ...cells.filter((c) => c.col + c.colSpan === last).map((c) => c.col),
       );
@@ -1071,12 +1137,13 @@ export function fieldBoxTables(
       cells = cells.filter((c) => !strip.includes(c));
     }
     const from = group[0]!.from;
-    // 只留这几排用到的列线。
+    // Keep only the column lines used by these rows.
     const edges = [...new Set(cells.flatMap((c) => [c.col, c.col + c.colSpan]))].sort(
       (a, b) => a - b,
     );
-    // 只有一列、上下叠着的框（处方上只有横线的「Patient/in」「Anschrift」，EU 样本 076）：多半只是填写的横线，
-    // 当成表反而丢了写字的地方，照旧排成文字。
+    // Single-column, vertically stacked boxes ("Patient/in", "Anschrift" with only horizontal lines
+    // on prescriptions, EU sample 076): mostly just writing lines; treating them as a table would
+    // lose the writing area, so they are rendered as text instead.
     if (edges.length - 1 < FIELD_MIN_COLS) continue;
     const at = (col: number) => edges.indexOf(col);
     const boxes = cells.map((c) => c.box!);
@@ -1111,14 +1178,14 @@ export function fieldBoxTables(
   return out;
 }
 
-/** 空着的格子至少这么多个行高宽，是留着填写的栏，不并进左边（foldEmptyColumns）。 */
+/** Empty cells whose width is at least this many line heights are reserved as input columns and are not folded into the left side (foldEmptyColumns). */
 const FILL_IN_LINES = 3;
 
-/** 小装饰网格不靠总格数放行：反复出现的两列数据才是表格证据，空列不能算。 */
-/** 横线至少盖住格子宽的这么多。 */
+/** Horizontal lines must cover at least this fraction of the cell width. */
+/** Horizontal lines must cover at least this fraction of the cell width. */
 const RULE_ACROSS_SHARE = 0.5;
 
-/** 从 y0 到 y1 之间（两行字之间的白缝）有没有一条横穿 x0–x1 的线：某一排像素过半是深色的。 */
+/** Check whether there is a line spanning x0–x1 horizontally between y0 and y1 (the white gap between two lines of text): more than half of the pixels in a given row are dark. */
 function ruleAcross(image: RgbaImage, x0: number, x1: number, y0: number, y1: number): boolean {
   const left = Math.max(0, Math.round(x0));
   const right = Math.min(image.width, Math.round(x1));
@@ -1146,7 +1213,7 @@ function isSparseColumnLayout(table: TableBlock): boolean {
   for (const cell of filled) counts.set(cell.row, (counts.get(cell.row) ?? 0) + 1);
   const paired = [...counts.values()].filter((n) => n >= 2).length;
   if (paired >= 2) return false;
-  // 签到表：表头一排每列都有字，下面至少两排整排空着，是留给人填的表，不是装饰。
+  // Attendance sheets: every column in the header row has text, and at least two rows below are entirely empty, indicating a form intended for manual entry rather than decoration.
   const rowsWith = new Set(filled.map((c) => c.row));
   const header = filled.filter((c) => c.row === filled[0]!.row);
   if (
@@ -1156,8 +1223,9 @@ function isSparseColumnLayout(table: TableBlock): boolean {
     table.rows - 1 >= 2
   )
     return false;
-  // 空白表单：标签都在同一列，右边整列空着、至少和标签列一样宽，是填写栏。
-  // 装饰网格（议程、试卷的答题线、奖状边框）空着的列比有字的列窄。
+  // Blank forms: all labels are in the same column, and the right side is entirely empty and at
+  // least as wide as the label column, indicating an input section. Decorative grids (agendas, exam
+  // answer lines, certificate borders) have empty columns that are narrower than the text columns.
   if (!paired && filled.every((c) => c.colSpan === 1 && c.col === filled[0]!.col)) {
     const widthOf = (col: number) =>
       Math.max(
@@ -1174,25 +1242,26 @@ function isSparseColumnLayout(table: TableBlock): boolean {
       if (blank && widthOf(label) > 0 && widthOf(col) >= widthOf(label)) return false;
     }
   }
-  // 整页共用的列会给一张合并表添上空格子。已有一排真实列关系时，先折掉这些
-  // 空列再看密度；不能把本来填得很满的合并表拆成散文，导致表单额外分页。
+  // Columns shared across the entire page add empty cells to a merged table. When true column
+  // relationships already exist in a row, fold these empty columns before checking density; do not
+  // split densely filled merged tables into prose, which would cause extra page breaks in forms.
   const folded = paired ? foldEmptyColumns(table) : table;
   const occupied = folded.cells.filter((c) => c.text.trim()).length;
   return occupied * 3 <= folded.cells.length * 2;
 }
 
-/** 至少这么多行、这么多比例的字被列线从词中间切开，就是网格认错了（D-502）。 */
+/** If at least this many lines and this proportion of text are cut through the middle of words by column lines, the grid detection is considered incorrect (D-502). */
 export const CHOP_MIN = 2;
 
 export const CHOP_SHARE = 0.3;
 
-/** 框的高是宽的这么多倍以上、至少两个字：竖排或旋转了的字。 */
+/** Box height is more than this multiple of its width and contains at least two characters: vertical or rotated text. */
 const VERTICAL_RATIO = 2;
 
 export const isVertical = (l: Box & { text: string }) =>
   l.height > VERTICAL_RATIO * l.width && l.text.replace(/\s/g, '').length >= 2;
 
-/** 竖排的行按位置合成块（挨得近的连在一起），每块外面留一点边，剪成图片。 */
+/** Group vertical lines into blocks by position (closely adjacent ones are connected), leave a small margin around each block, and crop them into images. */
 export function verticalBoxes(
   lines: readonly Box[],
   lineHeight: number,
@@ -1224,30 +1293,30 @@ export function verticalBoxes(
 }
 
 /**
- * 读起来像页码的字：「3」「- 3 -」「2/3」「Page 2 of 5」「Seite 2 von 3」「iv」「第 2 页」。
- * 页码区域里只丢这样的字，别的照正文留下。
+ * Text that reads like a page number: "3", "- 3 -", "2/3", "Page 2 of 5", "Seite 2 von 3", "iv",
+ * "Page 2". Only drop such strings in the page number area, leaving everything else as body text.
  */
 const PAGE_NUMBER =
   /^\s*[-–—]?\s*(?:(?:pages?|pg|p|seite|s|pagina|pag|página|pág|strona|str|sida|side|blz|bladzijde|folio|fol|стр|第)\.?\s*)?(?:\d{1,4}|(?=[ivxlc])c{0,3}(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))(?:\s*(?:\/|of|von|de|di|sur|su|z|av|van|из|共)\s*\d{1,4})?\s*页?\s*[-–—]?\s*$/i;
 
-/** 页边碎片（D-334）：不超过这么多个字（不算空格）。 */
+/** Margin stray artifacts (D-334): no more than this number of characters (excluding spaces). */
 const STRAY_CHARS = 3;
 
-/** 离别的字至少这么多个行高才算孤立。 */
+/** Considered isolated if separated from other text by at least this many line heights. */
 const STRAY_GAP = 3;
 
-/** 置信度低于这个，或者框比正文行高这么多倍（污点、签名），就不像字。 */
+/** If confidence is lower than this, or the box is higher than the body text line height by this multiple (smudges, signatures), it does not look like text. */
 const STRAY_SCORE = 0.7;
 
 const STRAY_TALL = 2;
 
-/** 贴着页边：离图的边不到长边的这么多（1%）。 */
+/** Touching the page margin: distance to the image edge is less than this fraction (1%) of the longer side. */
 const STRAY_EDGE = 0.01;
 
-/** 框里至少这么多的点不是白纸（深色、彩色的底）：字印在色条上。 */
+/** At least this fraction of points in the box are not white paper (dark or colored background): text printed on a colored stripe. */
 const STRAY_ON_FILL = 0.5;
 
-/** 框里不是白纸的点占多少（隔点取样）：白字印在色条上（表单抬头绿条上的「A1」）时大半是底色。 */
+/** Calculate the proportion of non-white points in the box (sampled at alternate points): white text printed on a colored stripe ("A1" on a form header green stripe) consists mostly of the background color. */
 function fillShare(line: OcrBox, image: RgbaImage): number {
   const x0 = Math.max(0, Math.floor(line.x));
   const y0 = Math.max(0, Math.floor(line.y));
@@ -1267,9 +1336,13 @@ function fillShare(line: OcrBox, image: RgbaImage): number {
 }
 
 /**
- * 页边碎片（D-334）：很短、孤立（离别的字至少 3 个行高），而且贴着页边、置信度低或者框比正文高得多的，
- * 是页边的污点、装订孔、签名认成的字（条款页顶上的「00」），不写进文件。认得准、和正文一样高的短字照样留下。
- * 不贴页边、只是高的短字印在色条上（白字，框里大半是底色）时是表单的代号（EU 样本 056 的「A1」），照样留下。
+ * Margin stray artifacts (D-334): very short, isolated (separated from other text by at least 3
+ * line heights), touching the page margin, with low confidence or a box much taller than the body
+ * text, are considered margin smudges, binding holes, or signatures misidentified as text (e.g.,
+ * "00" at the top of a terms page) and are not written to the file. Accurately recognized short
+ * text of normal body height is retained. Short text that is tall and does not touch margins,
+ * printed on a colored stripe (white text, box mostly background), represents form codes (e.g.,
+ * "A1" in EU sample 056) and is also retained.
  */
 function isStray(
   line: OcrBox,
@@ -1296,7 +1369,7 @@ function isStray(
   });
 }
 
-/** Arial 里 ASCII 字符的宽（千分之一字号，32–126）。 */
+/** Widths of ASCII characters in Arial (in units of 1/1000 of the font size, 32–126). */
 const ARIAL_WIDTHS = [
   278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556,
   556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667,
@@ -1306,7 +1379,9 @@ const ARIAL_WIDTHS = [
 ];
 
 /**
- * 一行字在 Arial 里有多少个字号宽（D-463）：带重音的字母按不带的算，中日韩的字和全角符号算 1，其他文字（西里尔、希腊）算 0.556。
+ * Number of font-size widths a line of text occupies in Arial (D-463): accented letters are
+ * treated as unaccented, CJK characters and full-width symbols count as 1, and other scripts
+ * (Cyrillic, Greek) count as 0.556.
  */
 export function textEm(text: string): number {
   let em = 0;
@@ -1320,7 +1395,7 @@ export function textEm(text: string): number {
   return em;
 }
 
-/** 按字宽估的字号（像素）；字太少时是 0。 */
+/** Estimated font size (in pixels) based on character width; returns 0 if there are too few characters. */
 function widthSizeOf(line: OcrBox): number {
   const n = line.text.match(/[\p{L}\p{N}]/gu)?.length ?? 0;
   const em = textEm(line.text);
@@ -1328,8 +1403,10 @@ function widthSizeOf(line: OcrBox): number {
 }
 
 /**
- * 字下面有没有下划线（D-463）：框的下部到框下面 0.3 个行高之间，有一排像素九成以上是深色的，
- * 而且这条线在字的左右两边（各出去 0.6 个行高）就没有了（更长的是分隔线、表格线，不是这行字的下划线）。
+ * Check whether text has an underline below it (D-463): between the lower part of the box and 0.3
+ * line heights below the box, a row of pixels is more than 90% dark, and this line disappears
+ * outside the left and right edges of the text (extending by 0.6 line heights on each side).
+ * Longer lines are dividers or table borders, not underlines for this line of text.
  */
 export function hasUnderline(image: RgbaImage, box: Box): boolean {
   const { data, width, height } = image;
@@ -1364,13 +1441,13 @@ export function hasUnderline(image: RgbaImage, box: Box): boolean {
   return false;
 }
 
-/** 按行高估字号（磅，取到半磅）。 */
+/** Estimated font size in points based on line height (rounded to the nearest half point). */
 export function fontSizeOf(lineHeightPx: number, pageWidthPx: number): number {
   const pt = (lineHeightPx * A4_WIDTH_PT * BOX_TO_FONT) / pageWidthPx;
   return Math.min(48, Math.max(6, Math.round(pt * 2) / 2));
 }
 
-/** 列表项的编号写法。 */
+/** Bullet list item numbering style. */
 function listMarker(text: string): { ordered: boolean; format?: string; start?: number } {
   const m = ORDERED.exec(text);
   if (!m) return { ordered: false };
@@ -1382,8 +1459,11 @@ function listMarker(text: string): { ordered: boolean; format?: string; start?: 
 const stripMarker = (text: string) => text.replace(ORDERED, '').replace(BULLET, '').trim();
 
 /**
- * 整列都空着的格子并进左边的格子（D-328）：转 Excel 时整页共用一套列线（D-272），一张表会多出只有别的表才有的列，
- * 在 Word 里就是一列空格子。只并没有跨行的格子；列线不变（格子用 colSpan 跨过去）。
+ * Fold cells that are empty across an entire column into the cell to the left (D-328): when
+ * exporting to Excel, a uniform set of column lines is shared across the page (D-272), causing a
+ * table to have extra columns present only in other tables, which appear as columns of empty
+ * cells in Word. Only cells without row spans are folded; column lines remain unchanged (cells
+ * span across using colSpan).
  */
 export function foldEmptyColumns(table: TableBlock, keepWidth = Infinity): TableBlock {
   let cells = table.cells;
@@ -1397,7 +1477,7 @@ export function foldEmptyColumns(table: TableBlock, keepWidth = Infinity): Table
     for (let r = 0; r < table.rows && ok; r++) {
       const empty = at(r, c);
       const left = at(r, c - 1);
-      // 这一行已经有一格横跨这条列线：不用并。
+      // This row already has a cell spanning across this column line: do not fold.
       if (empty && empty === left) continue;
       ok =
         !!empty &&
@@ -1409,7 +1489,7 @@ export function foldEmptyColumns(table: TableBlock, keepWidth = Infinity): Table
       if (ok) pairs.push({ left: left!, empty: empty! });
     }
     if (!ok || !pairs.length) continue;
-    // 填写栏：空格子都够宽（keepWidth，像素），留着给人填。
+    // Input fields: empty cells are wide enough (keepWidth, in pixels) to be reserved for user input.
     if (pairs.every((p) => (p.empty.box?.width ?? 0) >= keepWidth)) continue;
     const drop = new Set(pairs.map((p) => p.empty));
     const grow = new Map(pairs.map((p) => [p.left, p.empty.colSpan]));
@@ -1420,21 +1500,23 @@ export function foldEmptyColumns(table: TableBlock, keepWidth = Infinity): Table
   return cells === table.cells ? table : { ...table, cells };
 }
 
-/** 默认的接法（测试用）：一段里的行用空格接（中文之间不加）。 */
+/** Default joining method (for testing): lines in a paragraph are joined with spaces (no spaces between Chinese characters). */
 function defaultJoin(lines: readonly OcrBox[]): string {
   return rowsOf(lines)
     .map((r) => r.text)
     .join(' ');
 }
 
-/** A3 的长短边（磅）；比它还大一点的纸算作量错了的纸。 */
+/** A3 dimensions in points (short: 841.9, long: 1190.6); paper larger than this is considered incorrectly measured. */
 const A3_PT = { short: 841.9, long: 1190.6 };
 
 const A3_SLACK = 1.05;
 
 /**
- * 比 A3 还大的 PDF 页（扫描件按 1 像素 = 1 磅存成的 87 × 124 cm）不照抄成 Word 的纸：按原来的高宽比
- * 缩到 A4 宽（横向按 A4 长边），和没有纸张信息的照片一样。字号本来就按 A4 宽估，这样字和纸的比例才对。
+ * PDF pages larger than A3 (scans stored at 1 pixel = 1 point, e.g., 87 x 124 cm) are not mapped
+ * directly to Word page dimensions: they are scaled to A4 width based on their original aspect
+ * ratio (landscape uses A4 long side), just like photos without paper metadata. Font sizes are
+ * estimated based on A4 width so that the ratio of text to paper remains correct.
  */
 export function fitPaper(paper: { width: number; height: number }): {
   width: number;
@@ -1447,10 +1529,10 @@ export function fitPaper(paper: { width: number; height: number }): {
   return { width, height: Math.round(((width * paper.height) / paper.width) * 10) / 10 };
 }
 
-/** 补回的图和旁边的块左右重叠不超过窄的那个宽的这么多，仍算并排。 */
+/** Restored figures and adjacent blocks are still considered side-by-side if their horizontal overlap does not exceed this fraction of the narrower block's width. */
 const FIGURE_EDGE_OVERLAP = 0.05;
 
-/** 补回原生整图时保留文字与来源顺序；跨多个横带的页边图与这些横带共用一张排版表。 */
+/** Preserve text and source order when restoring native full-page figures; page-margin figures spanning multiple horizontal bands share a layout table with those bands. */
 export function insertWordFigures(page: DocPage, boxes: readonly Box[]): DocPage {
   const owned = (b: DocLeaf) => boxes.some((box) => lineShareIn(b.box, box) >= 0.8);
   const blocks = page.blocks.flatMap((b): DocBlock[] => {
@@ -1495,7 +1577,7 @@ export function insertWordFigures(page: DocPage, boxes: readonly Box[]): DocPage
         continue;
       }
     }
-    // 分栏里的图（只在某一栏里）放回那一栏、按上下位置插进去，不挪到整个分栏行的后面。
+    // Figures within a column (restricted to a specific column) are placed back into that column and inserted according to their vertical position, without moving them to the end of the multi-column row.
     const column = blocks.flatMap((b) => {
       if (b.kind !== 'row' || b.cells.length < 2) return [];
       const overlap =
@@ -1519,8 +1601,10 @@ export function insertWordFigures(page: DocPage, boxes: readonly Box[]): DocPage
     const index = blocks.findIndex((b) => {
       const overlap =
         Math.min(b.box.y + b.box.height, box.y + box.height) - Math.max(b.box.y, box.y);
-      // 并排行按格子里的块看（中间那张图可能落在行的范围里、两格之间）。剪图带一点留边，
-      // 相邻两张的框常互相压几个像素，这不算挡住，不能因此把一张图拿出这一排。
+      // Evaluate side-by-side rows based on the blocks inside the cells (the middle image might
+      // fall within the row's range and between two cells). Cropped images retain a small margin,
+      // and adjacent bounding boxes often overlap by a few pixels; this is not considered
+      // occlusion, and an image must not be removed from the row for this reason.
       return (
         overlap >= 0.3 * Math.min(b.box.height, box.height) &&
         leafBlocks({ blocks: [b] }).every((x) => {
@@ -1558,15 +1642,18 @@ export function insertWordFigures(page: DocPage, boxes: readonly Box[]): DocPage
   return { ...page, blocks };
 }
 
-/** 比这更竖长（高/宽）的照片不是一页纸（小票、长条截图）：不设纸，按旧版连续排在 A4 上、自然分页。 */
+/** Photos more portrait-oriented (height/width ratio) than this are not treated as a single page (receipts, long screenshots): no page size is set, and they are laid out continuously on A4 using the old style with natural page breaks. */
 const PAGE_LIKE_RATIO = 1.6;
 
-/** 照片的高宽比和 A4 差不到这么多时直接用 A4。 */
+/** Use A4 directly when the photo's aspect ratio differs from A4 by less than this amount. */
 const A4_ASPECT_SNAP = 0.03;
 
 /**
- * 没有物理尺寸的照片按 A4 宽估纸（横向按 A4 长边），纸的高宽比跟照片一样：横竖同一个比例，不压扁。
- * 比一页纸还竖长的（小票）不设纸，按旧版连续排在 A4 上、自然分页，不做成一张又窄又长的怪纸。
+ * Photos without physical dimensions estimate paper size based on A4 width (landscape uses A4
+ * long side), with the paper aspect ratio matching the photo: maintaining the same proportions in
+ * both dimensions without squishing. Photos more portrait-oriented than a single page (receipts)
+ * have no page size set and are laid out continuously on A4 with natural page breaks using the
+ * old style, avoiding awkward narrow and long pages.
  */
 function photoPaper(image: { width: number; height: number }) {
   if (image.width > image.height)
@@ -1578,8 +1665,10 @@ function photoPaper(image: { width: number; height: number }) {
 }
 
 /**
- * 列表项的折行被版面模型分到了另一块（EU 样本 026、027）：紧接在列表下面、左边和项目的字对齐（比记号靠右）、
- * 不比列表宽、字号样式一样的一段，接回最后一项。
+ * Join line-wrapped list items that were split into another block by the layout model (EU samples
+ * 026, 027): a paragraph immediately following a list, aligned with the list items on the left
+ * (indented further right than the bullet), no wider than the list, and sharing the same font
+ * size and style, is joined back to the last item.
  */
 export function joinListContinuations(blocks: readonly DocBlock[], lineHeight: number): DocBlock[] {
   const out: DocBlock[] = [];
@@ -1630,9 +1719,12 @@ export function joinListContinuations(blocks: readonly DocBlock[], lineHeight: n
 }
 
 /**
- * 版面模型常把一段话从中间切开（行距和段距差不多的正文，每个「段」只有一两行）。上下紧挨着（间距不超过一个行高）、
- * 左边对齐、宽度重叠的两个正文区域并成一个，分段交给折行的判断（右边放不放得下下一个词）。
- * 左右两栏的区域左边不齐，不会并。
+ * Layout models often split a sentence in the middle (body text with similar line spacing and
+ * paragraph spacing, where each "paragraph" is only one or two lines). Two vertically adjacent
+ * body regions (gap not exceeding one line height) that are left-aligned and overlap in width are
+ * merged into one, deferring segmentation decisions to line-wrapping logic (whether the next word
+ * fits on the right). Regions in left and right columns have unaligned left edges and are not
+ * merged.
  */
 export function mergeTextRegions<T extends { kind: string; box: Box }>(
   regions: readonly T[],
@@ -1659,21 +1751,22 @@ export function mergeTextRegions<T extends { kind: string; box: Box }>(
   return out;
 }
 
-/** 一块字（区域或按位置聚成的块）；pairs 是配好的表单标签和值（D-332）。 */
+/** A text block (a region or a cluster grouped by position); pairs contains matched form labels and values (D-332). */
 interface Group {
   lines: OcrBox[];
   title: 0 | 1 | 2;
   box: Box;
   pairs?: [OcrBox[], OcrBox[]][];
-  /** 分出来的标签列、内容列：标签列和内容列之间不再按冒号标签配对（两列的行不是一行对一行）。 */
+  /** Separated label column and content column: label and content columns are no longer paired by colons (rows in the two columns do not correspond one-to-one). */
   side?: 'label' | 'content';
-  /** 原来的模型区域；没有时是未归属的行。仅构建时使用，不写入文件。 */
+  /** Original model region; unassigned lines are used when absent. Used only during construction, not written to file. */
   region?: Box;
 }
 
 /**
- * 模型区域是归属提示，不是段落边界。只接回未归属的碎片或嵌套区域切开的折行；
- * 并列区域、标题、表单列和真正的段距/缩进仍保留，整行只会进入一个组。
+ * Model regions are ownership hints, not paragraph boundaries. Only reattach unassigned fragments
+ * or line wraps split by nested regions; parallel regions, headings, form columns, and true
+ * paragraph spacing/indentation are preserved, and each full line enters at most one group.
  */
 function reconcileTextGroups(
   groups: readonly Group[],
@@ -1682,7 +1775,7 @@ function reconcileTextGroups(
   compatible: (a: readonly OcrBox[], b: readonly OcrBox[]) => boolean,
 ): Group[] {
   const contains = (a: Box, b: Box) =>
-    // 模型框的边有几像素抖动；只容许不到三分之一行高的近似嵌套，不放宽行归属门槛。
+    // Model bounding box coordinates have a few pixels of jitter; permit only approximate nesting of less than one-third of a line height without relaxing line ownership thresholds.
     a.x <= b.x + 0.3 * h &&
     a.y <= b.y + 0.3 * h &&
     a.x + a.width >= b.x + b.width - 0.3 * h &&
@@ -1715,7 +1808,7 @@ function reconcileTextGroups(
           b.lines,
           lines.filter((l) => !b.lines.includes(l)),
         )[0]!;
-        // 看真正相邻的两个段落片段，不能借同一区域里别的长段落当作元数据的折行证据。
+        // Inspect truly adjacent paragraph fragments; do not borrow line-wrap evidence from other long paragraphs in the same region.
         if (
           !range &&
           (tail.rows.length + head.rows.length < 3 || Math.max(a.box.width, b.box.width) < 8 * h)
@@ -1728,7 +1821,7 @@ function reconcileTextGroups(
           )
         )
           continue;
-        // 同栏中间还有别的行，不能越过去接。
+        // Do not cross over other intervening lines in the same column.
         if (
           peers.some(
             (l) =>
@@ -1769,18 +1862,21 @@ function reconcileTextGroups(
   }
 }
 
-/** 配对的几行里最高的行不超过最矮的这么多倍。 */
+/** The tallest line among paired lines does not exceed the shortest line by more than this multiple. */
 const PAIR_HEIGHT_RATIO = 1.6;
 
-/** 标签：冒号结尾，或者在一列左对齐、不超过这么多个字的短文字（D-332）。 */
+/** Labels: short text ending with a colon, or left-aligned in a column with no more than this number of characters (D-332). */
 const LABEL_MAX = 30;
 
 const LABEL_COLON = /[:：]\s*$/;
 
 /**
- * 表单的标签和值（D-332）：一块（标签）的连续几行和右边另一块（值）的连续几行一行对一行（上下重叠、值在标签右边），
- * 标签都是冒号结尾，或者有两对以上、标签左对齐、不超过 30 个字、每行单独成段（不是折行的正文）时，
- * 这几行配成一块；两块里没配上的行（上面、下面）各自另成一块。
+ * Form labels and values (D-332): consecutive lines of one block (label) and consecutive lines of
+ * another block on the right (value) correspond line-by-line (vertically overlapping, value to
+ * the right of the label), where labels end in colons, or there are more than two pairs with
+ * left-aligned labels of no more than 30 characters forming standalone paragraphs (not wrapped
+ * body text), these lines are paired together; unmatched lines above and below in both blocks
+ * form separate blocks.
  */
 function pairForms(
   groups: readonly Group[],
@@ -1793,10 +1889,10 @@ function pairForms(
     for (const left of out) {
       for (const right of out) {
         if (left === right || left.title || right.title || left.pairs || right.pairs) continue;
-        // 整页两栏：左栏的标签不和右栏的字配对。
+        // Full-page two-column layout: labels in the left column are not paired with text in the right column.
         if (gutter && sideOfGutter(left.box, gutter) !== sideOfGutter(right.box, gutter)) continue;
         const found = pairRows(left.lines, right.lines, lineHeight);
-        // 标签列和内容列：只有每一行都配上了才配（W-4 的「Step 3:」只配上第一行，其余几行留着，把两列搅乱）。
+        // Label and content columns: pairing occurs only if every row is matched ("Step 3:" in W-4 matches only the first row, leaving the rest and scrambling the two columns).
         const partial = left.side === 'label' && right.side === 'content' && found?.length !== 1;
         if (found && !partial) {
           next = [...out.filter((g) => g !== left && g !== right), ...found];
@@ -1824,14 +1920,14 @@ function pairRows(
       const ov = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
       return ov >= 0.5 * Math.min(a.height, b.height) && b.x > a.x + a.width;
     });
-  // 第一段连续配上的行。
+  // The first segment of consecutively matched lines.
   const a = labels.findIndex((_, i) => matchOf(i) >= 0);
   if (a < 0) return null;
   const c = matchOf(a);
   let n = 1;
   while (a + n < labels.length && matchOf(a + n) === c + n) n++;
   const pairedLabels = labels.slice(a, a + n);
-  // 行高差得很远的（标志、大标题和小字）不是一列标签：配成一对会按中位行高写字号，大标题缩成小字。
+  // Lines with vastly different heights (logos, major headings, and small text) do not form a single label column: pairing them would result in font sizes calculated from the median line height, shrinking major headings into small text.
   const heightOf = (r: Row) => median(r.lines.map((l) => l.height));
   const heights = pairedLabels.map(heightOf);
   if (n >= 2 && Math.max(...heights) >= PAIR_HEIGHT_RATIO * Math.min(...heights)) return null;
@@ -1859,7 +1955,7 @@ function pairRows(
   ];
 }
 
-/** 一块字的行跨在中缝两边（同一个模型区域、同一排聚成了一块）：左栏、右栏、横跨的各自聚块。 */
+/** Lines of a text block spanning across both sides of a gutter (within the same model region and clustered together in the same row): cluster blocks separately for the left column, right column, and spanning elements. */
 function splitAtGutter(group: Group, gutter: PageGutter, lineHeight: number): Group[] {
   const sides = [-1, 0, 1].map((s) => group.lines.filter((l) => sideOfGutter(l, gutter) === s));
   if (sides.filter((s) => s.length).length < 2) return [group];
@@ -1872,8 +1968,10 @@ function splitAtGutter(group: Group, gutter: PageGutter, lineHeight: number): Gr
 }
 
 /**
- * 有整页中缝时（findPageGutter）：中缝上面、下面横跨的块照常排，两栏各自排好放进一个两格的并排行
- * （格子里的块按顺序；格子里还有并排的字段时，写 docx 时由 flowCellBlocks 再排）。
+ * When a full-page gutter exists (findPageGutter): blocks above, below, and spanning the gutter
+ * are laid out normally, while the two columns are laid out individually and placed into a
+ * two-cell side-by-side row (blocks inside cells follow reading order; if cells contain nested
+ * side-by-side fields, they are further laid out by flowCellBlocks when writing docx).
  */
 function arrangeColumns(
   units: readonly Unit[],
@@ -1882,7 +1980,7 @@ function arrangeColumns(
   options: { dense?: boolean; onColumns?: (row: DocRow) => void },
 ): DocBlock[] {
   if (!gutter) return arrangeUnits(units, lineHeight, options);
-  // 整个在两栏并排那一段上面（页眉左边的页码）、下面的块，和横跨的块一起照常排。
+  // Blocks entirely above (e.g., page numbers to the left of the header) or below the side-by-side column section are laid out normally along with the spanning blocks.
   const above = units.filter((u) =>
     sideOfGutter(u.box, gutter) < 0
       ? u.box.y + u.box.height / 2 < gutter.top
@@ -1915,22 +2013,28 @@ function arrangeColumns(
   ];
 }
 
-/** 一块（区域、表格、图片）和它排好的块。 */
+/** A block (region, table, or image) along with its laid-out blocks. */
 interface Unit {
   box: Box;
   blocks: DocLeaf[];
 }
 
-/** 上下范围重叠超过矮的那块高度的这么多，算并排（D-331）。 */
+/** Vertical extent overlap exceeding this fraction of the shorter block's height counts as side-by-side (D-331). */
 const SIDE_OVERLAP = 0.5;
 
 /**
- * 块排成文件里的顺序（D-331）：上下范围明显重叠的块连成一带，一带一带从上到下；
- * 一带里左右能分成几栏（左右不重叠，并排的表格之间常常只隔一个行高）的写成并排行，每格里按阅读顺序；分不开的按阅读顺序排。
+ * Arrange blocks into document order (D-331): blocks with significantly overlapping vertical
+ * ranges are connected into horizontal bands, ordered from top to bottom; within a band, items
+ * divisible into columns horizontally (non-overlapping horizontally, with side-by-side tables
+ * often separated by only a line height) are written as side-by-side rows, with each cell
+ * following reading order; indivisible items are ordered strictly by reading order.
  */
 /**
- * 上下紧挨着的两个并排行，列数一样、每一列的左边和宽度都差不多（双栏正文，左栏里有标题、小节，
- * 把右栏的段落切到了不同的带里），合并成一个并排行：每一栏的块接在一起，读起来是先读完左栏再读右栏。
+ * Two vertically adjacent side-by-side rows with the same number of columns and similar left
+ * coordinate and width for each column (e.g., a two-column body text where titles and subsections
+ * in the left column cut the right column's paragraphs into different bands) are merged into a
+ * single side-by-side row: blocks in each column are joined together so that reading goes down
+ * the left column first, then the right column.
  */
 const COLUMN_SAME = 1.5;
 
@@ -1995,7 +2099,7 @@ export function arrangeUnits(
       }),
     );
     if (!parallel) return [unit];
-    // 同一个模型文字区里也可能有并排的抬头/选项。框边轻微膨胀不能把整带串成一列。
+    // Side-by-side headers/options may also appear within the same model text area. Slight bounding box expansion must not chain the entire band into a single column.
     return unit.blocks.map((block) => ({
       box: {
         ...block.box,
@@ -2012,8 +2116,9 @@ export function arrangeUnits(
 }
 
 /**
- * 答案一列：每块不超过这么多个字（「○ ja ○ nein」、金额、日期）、这么多个行高，上下至少一半对着左边的一块；
- * 右格不到左格的这么宽。
+ * Answer column: each block does not exceed this many characters ("○ ja ○ nein", amounts, dates)
+ * or this many line heights, with its vertical span overlapping at least half of the
+ * corresponding left block; the right box is narrower than this fraction of the left box.
  */
 const ANSWER_MAX_CHARS = 30;
 
@@ -2024,10 +2129,14 @@ const ANSWER_OVERLAP = 0.5;
 const ANSWER_WIDTH_SHARE = 0.5;
 
 /**
- * 条款旁边一列短的答案（委托书每条后面的「○ ja ○ nein」，EU 样本 041）：一个区域里的几段条款和右边的几个答案
- * 排成了一个两格的并排行，Word 里左边换了字体折行不一样，右边的答案一个个错开，对不上条款。
- * 右格都是短的一块一块、每块对着左格的一块时，按答案拆成几行：每行是一个答案和它对着的那段条款
- * （连同上面没有答案的几段）。右格是正文的（两栏正文）不拆。
+ * Short answer column alongside clauses (such as "○ ja ○ nein" after each clause in authorization
+ * forms, EU sample 041): multiple paragraphs of clauses in a region and several answers on the
+ * right form a two-column side-by-side row. Because Word changes fonts and line wrapping
+ * differently on the left, the answers on the right get misaligned and fail to match the clauses.
+ * When the right column consists of short individual blocks, each corresponding to a block on the
+ * left, split them into rows by answer: each row contains an answer and its corresponding clause
+ * segment (along with any preceding clause segments lacking an answer). Do not split if the right
+ * column is main body text (e.g., two-column body).
  */
 function splitAnswerRows(blocks: readonly DocBlock[], lineHeight: number): DocBlock[] {
   return blocks.flatMap((block): DocBlock[] => {
@@ -2048,7 +2157,7 @@ function splitAnswerRows(blocks: readonly DocBlock[], lineHeight: number): DocBl
       return [block];
     const overlap = (a: Box, b: Box) =>
       Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
-    // 每个答案对着的那段条款（重叠最多的）。
+    // The clause segment corresponding to each answer (the one with the maximum overlap).
     const owners = answers.map((a) => {
       let best = -1;
       for (const [k, c] of clauses.entries())
@@ -2059,7 +2168,7 @@ function splitAnswerRows(blocks: readonly DocBlock[], lineHeight: number): DocBl
           best = k;
       return best;
     });
-    // 每个答案都要对着一段，而且顺序一致、不共用一段。
+    // Each answer must correspond to a clause, with consistent ordering and no shared clauses.
     if (owners.some((k, i) => k < 0 || (i > 0 && k <= owners[i - 1]!))) return [block];
     return answers.map((a, i): DocRow => {
       const from = i ? owners[i - 1]! + 1 : 0;
@@ -2078,8 +2187,10 @@ function splitAnswerRows(blocks: readonly DocBlock[], lineHeight: number): DocBl
 }
 
 /**
- * 有长正文作证的双栏保持到跨栏内容或明显空隙为止，不因某一带缺少另一栏而退回整页宽。
- * 短标签、并排字段没有这个证据，仍走原来的局部并排行。只复用 DocRow，不增加文件格式。
+ * Two-column layout supported by long prose is preserved until cross-column content or a clear
+ * gap is reached, without reverting to full-page width just because one band lacks another
+ * column. Short labels and side-by-side fields lack this evidence and continue using the original
+ * local side-by-side arrangement. Reuses DocRow only, without adding new file formats.
  */
 function retainProseColumns(
   blocks: readonly DocBlock[],
@@ -2126,7 +2237,7 @@ function retainProseColumns(
         )
           break;
         const next = b.cells.map(extent);
-        // 两栏之间必须仍有空白；真正横跨中缝的块结束这一段双栏。
+        // There must still be whitespace between the two columns; blocks that genuinely span across the gutter terminate this two-column segment.
         if (next[0]!.x + next[0]!.width + h * 0.3 > next[1]!.x) break;
         next.forEach((e, k) => {
           edges[k] = unionBox([edges[k]!, e]);
@@ -2135,7 +2246,7 @@ function retainProseColumns(
         end = j + 1;
       } else {
         if (columnOf(b) < 0) break;
-        // 孤立尾行只能紧跟已经证实的栏；更远的页脚不靠连续短行无限延长作用域。
+        // Isolated trailing lines can only follow already verified columns; more distant footers must not extend the scope indefinitely via consecutive short lines.
         if (b.box.y <= rowBottom + COLUMN_SAME * h) end = j + 1;
       }
       bottom = Math.max(bottom, b.box.y + b.box.height);
@@ -2219,13 +2330,13 @@ function arrangeBands(units: readonly Unit[], lineHeight: number): DocBlock[] {
     });
 }
 
-/** 按左右范围分栏：和前一栏左右不重叠、隔开至少 gap 的另起一栏。 */
+/** Split columns by horizontal extent: columns that do not overlap horizontally with the previous column and are separated by at least the gap start a new column. */
 function columnsOf(units: readonly Unit[], gap: number): Unit[][] {
   const cols: Unit[][] = [];
   let end = -Infinity;
   for (const u of [...units].sort((a, b) => a.box.x - b.box.x)) {
     const right = u.box.x + u.box.width;
-    // 整图的留边可能占掉白色栏缝；两张仍不重叠的图不能因此变成上下排列。
+    // Image margins may occupy white column gutters; two non-overlapping images must not be vertically stacked because of this.
     const pictureGap =
       u.blocks.length > 0 &&
       u.blocks.every((b) => b.kind === 'image') &&

@@ -14,26 +14,30 @@ import { handedInput } from './workflow/check';
 import type { DataRecord } from './data';
 import type { RunValue } from './workflow/engine';
 
-// 记录页顶部的一排按钮（D-428，取代 D-423 写死的那排）：data.tables[].recordRow 说有哪些，这里按现在的值算出
-// 哪些能用。纯函数：看的时候只读，点了才运行（底线 10、15）。和表是什么无关，只看配置、动作和字段的 format。
+// A row of buttons at the top of the record page (D-428, replacing the hardcoded row in D-423):
+// data.tables[].recordRow defines which ones exist, and current values determine which are usable.
+// Pure function: read-only when viewing, runs only upon tap (invariants 10, 15). Independent of
+// table type, based solely on config, actions, and field formats.
 
 export interface RecordRowButton {
   key: string;
   workflow: Workflow;
-  /** 交这个字段的值。不写：交这一条记录。 */
+  /** Pass the value of this field. Omitted: pass this record. */
   field?: Field;
-  /** 字段的值（收文字的快捷操作）。 */
+  /** Field value (quick action receiving text). */
   text?: string;
-  /** 附件字段里第一步收的文件（收文件的快捷操作，D-442）：只有文件 ID，复制在运行时。 */
+  /** Files received in the first step within an attachment field (file-receiving quick action, D-442): contains file IDs only, copied at runtime. */
   files?: { fileType: HandedFiles['fileType']; assetIds: string[] };
-  /** 同一个快捷操作出现了不止一次（两个电话字段）：按钮上要写字段名才分得清。 */
+  /** The same quick action appears more than once (two phone fields): button must display the field name to distinguish them. */
   showField: boolean;
 }
 
 /**
- * 值是空的、对不上（fieldLink）、记录用不了这个动作（做不出 vCard）的按钮不出现。
- * assets：这条记录附件的文件元数据（App 按文件 ID 读来）；收文件的按钮要靠它认出哪些附件第一步收，
- * 没读到（还在读、文件已经没了）的不交，也就没有按钮。
+ * Buttons whose values are empty, mismatched (fieldLink), or where the record cannot use the
+ * action (cannot generate vCard) do not appear. assets: file metadata for this record's
+ * attachments (read by App via file ID); file-receiving buttons rely on it to recognize which
+ * attachments were received in step 1. If not read (still loading, file gone), they are not
+ * passed, so the button does not appear.
  */
 export function recordRowButtons(
   table: Collection,
@@ -90,7 +94,7 @@ export function recordRowButtons(
   return buttons;
 }
 
-/** 这个字段的值能不能当这种链接打开：只由 fieldLink 判断（D-422）。 */
+/** Whether this field's value can be opened as this type of link: determined solely by fieldLink (D-422). */
 function linkFits(
   field: Field,
   value: string,
@@ -100,7 +104,7 @@ function linkFits(
   return link?.kind === opens;
 }
 
-/** 按钮交给第一步的值。record：这一条，值已经是框里现在的（还没保存的修改也算）。 */
+/** Passes the value to the first step. record: the current record, values are already current box values (including unsaved edits). */
 export function recordRowValue(
   button: RecordRowButton,
   table: Collection,
@@ -114,7 +118,7 @@ export function recordRowValue(
   return recordsValue(table, [record]);
 }
 
-/** 一条或几条记录作为工具的输入：单条记录块、列表都走这里（底线 17：交的就是看到的这些）。 */
+/** One or more records as tool input: single record blocks and lists all use this (invariant 17: passes precisely what is seen). */
 export const recordsValue = (table: Collection, records: DataRecord[]): RunValue => ({
   type: 'records',
   collectionId: table.id,
@@ -123,12 +127,15 @@ export const recordsValue = (table: Collection, records: DataRecord[]): RunValue
 });
 
 /**
- * 留在记录页上跑、不打开运行页面的情况（D-428）：一个值或一条记录、最后一步把它交给 App 外面（拨号、分享面板）。
- * 这时没有结果可看。别的（很多条、结果留在 App 里）打开运行页面，能看进度和结果。
- * 这和「结果写回来源」无关：Tinkrum 没有把结果写回来源字段的运行方式，两种都是外部运行（结果离开、不回到来源）。
+ * Cases that run inline on the record page without opening the run page (D-428): a value or
+ * record, with the final step handed off outside the app (phone dialer, share sheet). No results
+ * to view in these cases. Others (many records, results staying in Tinkrum) open the run page to
+ * view progress and results. This is separate from "write results back to source": Tinkrum has no
+ * execution mode writing results back to source fields; both are external execution (results
+ * leave, do not return to source).
  */
 export function runsInline(workflow: Workflow, value: RunValue | HandedFiles): boolean {
-  // 文件要先复制进这次运行的临时目录，可能很大：一律打开运行页面，能看进度和结果。
+  // Files must be copied into the temporary run directory first and may be large: always open the run page to view progress and results.
   if (value.type === 'attachments') return false;
   const small = value.type === 'text' || (value.type === 'records' && value.records.length === 1);
   return small && /^out\./.test(workflow.steps[workflow.steps.length - 1]?.action ?? '');

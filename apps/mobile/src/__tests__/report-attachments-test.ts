@@ -14,8 +14,10 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, makePdf, TINY_JPEG } from '../test-utils/fake-files';
 
-// D-425 报表带附件、D-427 记录生成 Excel：真的走 startRun，排版换成假的，合并、写 xlsx 用真的库。
-// 三种状态：新用户（记录没有附件）、有数据、边界（文件没了、HEIC、200 个附件、很大的图、没有标题、坏的 PDF）。
+// Report attachments (D-425) and record-to-Excel (D-427): actually run `startRun`, mock the layout,
+// and use the real library for merging and writing `.xlsx`. Three states: new user (records lack
+// attachments), with data, and edge cases (missing file, HEIC, 200 attachments, very large image,
+// missing title, corrupted PDF).
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -143,7 +145,7 @@ describe('print.records with attachments (D-425)', () => {
     await s.addRecord('r1', { note: '午饭', amount: 30, receipt: ['a', 'b'] });
     await s.addRecord('r2', { note: '<出租车>', amount: 50, receipt: ['c'] });
     const { pages, item } = await output(s, await s.run());
-    // 假的排版：一份 HTML 一页。报表 1 页 + 附件 1 份。
+    // Mock layout: one HTML page per report page. 1 report page + 1 attachment.
     expect(pages).toBe(2);
     expect(item.pageCount).toBe(2);
     expect(s.files.printedHtml).toHaveLength(2);
@@ -155,7 +157,7 @@ describe('print.records with attachments (D-425)', () => {
     expect(lunch).toBeGreaterThan(-1);
     expect(taxi).toBeGreaterThan(lunch);
     expect(attachments).toContain('第 2 个附件，共 2 个');
-    // 文件名、文件 ID 不写在报表上。
+    // File names and file IDs are not written on the report.
     expect(attachments).not.toContain('a.jpg');
   });
 
@@ -179,7 +181,7 @@ describe('print.records with attachments (D-425)', () => {
     await s.addPhoto('b');
     await s.addRecord('r1', { note: '合同', receipt: ['a', 'p', 'b'] });
     const { pages } = await output(s, await s.run());
-    // 报表 1 + 照片和图注 1 + PDF 3 + 后面的照片 1。
+    // Report 1 + photos and captions 1 + PDFs 3 + subsequent photos 1.
     expect(pages).toBe(6);
     expect(s.files.printedHtml[0]).toContain('PDF 附件：接下来的 3 页');
     expect(s.files.printedHtml[0]).toContain('<h2>合同</h2>');
@@ -188,7 +190,7 @@ describe('print.records with attachments (D-425)', () => {
   it('a missing or unreadable attachment is skipped and said on the report', async () => {
     const s = setup();
     await s.addPhoto('good');
-    // 数据库里有、磁盘上没有；数据库里也没有；坏的 PDF；不是照片也不是 PDF。
+    // Present in database but missing on disk; missing from database; corrupted PDF; neither photo nor PDF.
     await s.addPhoto('gone');
     s.files.disk.delete('assets/gone/gone.jpg');
     await s.addFile('bad', 'bad.pdf', 'application/pdf', new Uint8Array([1, 2, 3]));

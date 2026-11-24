@@ -58,7 +58,7 @@ export function isQuickActionKind(value: unknown): value is QuickActionKind {
   return QUICK_ACTION_KINDS.includes(value as QuickActionKind);
 }
 
-/** inferQuickActionKind 认识的第一步；新的输入动作要先在这里归类（测试会查）。 */
+/** First-step actions recognized by inferQuickActionKind; new input actions must be categorized here first (checked by tests). */
 export const CATEGORIZED_INPUTS = [
   'in.photos',
   'in.videos',
@@ -69,7 +69,7 @@ export const CATEGORIZED_INPUTS = [
   'in.records',
 ] as const;
 
-/** 按实际输入分类；扫描纸张属于文档。 */
+/** Categorize by actual input; scanning paper belongs to documents. */
 export function inferQuickActionKind(workflow: Pick<Workflow, 'steps'>): QuickActionKind {
   const first = workflow.steps[0];
   switch (first?.action) {
@@ -101,7 +101,7 @@ export function presetKinds(preset: WorkflowPreset): readonly QuickActionKind[] 
     : [inferQuickActionKind({ steps: preset.steps('en') })];
 }
 
-/** 预设输入类型没改时保留跨分类；改过输入后按实际类型分类。 */
+/** Preserve cross-category classification when preset input type is unchanged; reclassify by actual type after input is modified. */
 export function workflowKinds(workflow: Workflow): readonly QuickActionKind[] {
   const kind = inferQuickActionKind(workflow);
   const preset = WORKFLOW_PRESETS.find((p) => p.id === workflow.preset);

@@ -9,8 +9,10 @@ import { planNotifications, RECORD_OCCURRENCES } from './reminders';
 import type { Collection, Reminder, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// 每月几号的提醒（D-577）：「每月 1 号提醒我确认订阅」。系统没有按月重复的通知，所以一次排好接下来的几次，
-// 记录一变、打开 App 就重排（useReminders.ts）；什么都不在后台运行（底线 16）。可以带 unless（D-563）。
+// Monthly reminders on specific dates (D-577): "Remind me to confirm my subscription on the 1st of
+// every month". Since the system lacks monthly recurring notifications, schedule upcoming
+// occurrences in advance; whenever records change or the app opens, reschedule (useReminders.ts);
+// nothing runs in the background (invariant 16). Supports unless clauses (D-563).
 
 const logs: Collection = {
   id: 'logs',
@@ -20,7 +22,7 @@ const logs: Collection = {
     { id: 'on', name: 'On', type: 'date' },
   ],
 };
-// 2026-11-16 是星期一，12:00。
+// 2026-11-16 is Monday, 12:00.
 const now = new Date(2026, 10, 16, 12, 0);
 const ctx = { registry, locale: 'en' as const, now };
 

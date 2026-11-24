@@ -7,8 +7,9 @@ import { SignScreen } from '../run/local/SignScreen';
 import { FakeFiles } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 
-// 2026-11-09 PDF 用户复测：签名时手快连点两下「下一步」，第二下点到了同一个位置上「放置签名」的「完成」，
-// 放置这一步被跳过，签名落在默认位置。
+// 2026-11-09 PDF user retest: rapid double-tap on "Next" during signing resulted in the second tap
+// hitting "Finish" to "Place signature" at the exact same position, skipping the placement step and
+// placing the signature at the default position.
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -43,12 +44,12 @@ it('a second quick tap right after choosing the signature does not skip placing 
   const now = jest.spyOn(Date, 'now').mockReturnValue(10_000);
   const { onDone } = await open();
   await fireEvent.press(await screen.findByTestId('signature-saved'));
-  // 「放置签名」刚出来，第二下点在同一个位置（顶栏右边）：不算。
+  // "Place signature" just appeared, second tap at the same position (top right header): ignored.
   now.mockReturnValue(10_200);
   await fireEvent.press(screen.getByTestId('local-done'));
   expect(onDone).not.toHaveBeenCalled();
   expect(screen.getByText('Place signature')).toBeTruthy();
-  // 过一会儿再点「完成」照常。
+  // Tapping "Finish" again a moment later works normally.
   now.mockReturnValue(12_000);
   await act(async () => {
     await fireEvent.press(screen.getByTestId('local-done'));

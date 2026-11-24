@@ -12,8 +12,11 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 创始人 2026-11-21「做前三个」：清单的勾顺带记下完成日期（D-617）、数字块显示最新一条（D-618）、公式里空着的数算 0（D-619）。
-// 勾和取消都不弹撤销：取消就把勾上写的全部清空（底线 11）；只有勾上盖掉了原来有的日期时弹撤销（取消放不回那个日期）。
+// Founder 2026-11-21 "do the first three": task checklist ticks also record completion dates
+// (D-617), numeric blocks display the latest entry (D-618), and blank numbers in formulas evaluate
+// to 0 (D-619). Ticking and unticking never trigger an undo banner: unticking clears everything
+// written by the tick (invariant 11); an undo banner appears only when a tick overwrites an
+// existing date (since unticking cannot restore that previous date).
 
 const tasks: Collection = {
   id: 'tasks',
@@ -121,7 +124,7 @@ async function open(fill: (repo: MemoryWorkspaceRepo) => Promise<void> = async (
 }
 
 const today = () => localDate(new Date());
-// 等写完（几次异步）再看库里的值。
+// Wait for writes to complete (several asynchronous steps) before checking values in the database.
 const settle = async () => {
   for (let i = 0; i < 5; i++)
     await act(async () => {

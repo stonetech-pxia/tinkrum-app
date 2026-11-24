@@ -64,15 +64,15 @@ function apply(ops: Op[], base = config) {
   return r.after;
 }
 
-describe('工具清单：存和读', () => {
-  it('旧版 App 没有、存坏了都是空的（底线 12）', () => {
+describe('Tool list: store and read', () => {
+  it('Missing in old app or corrupted storage both result in empty (invariant 12)', () => {
     expect(parseSession(null)).toEqual(emptySession());
     expect(parseSession('')).toEqual(emptySession());
     expect(parseSession('{oops')).toEqual(emptySession());
     expect(parseSession('{"items":"x"}')).toEqual(emptySession());
   });
 
-  it('存了再读一样', () => {
+  it('Read after store is identical', () => {
     const s = recordTurn(emptySession(), {
       input: '建表',
       reply: '好',
@@ -83,8 +83,8 @@ describe('工具清单：存和读', () => {
   });
 });
 
-describe('工具清单：谁说了算', () => {
-  it('没有相关 blocker 才算做好', () => {
+describe('Tool list: who decides', () => {
+  it('Considered done only when there are no related blockers', () => {
     const before = config;
     const after = apply([tableOp, pageOps[1]!]);
     const bad = toolVerdict(before, after, registry);
@@ -109,7 +109,7 @@ describe('工具清单：谁说了算', () => {
     ).toMatchObject({ status: 'done' });
   });
 
-  it('后面还有一步要做页面时不算 blocker；做完整体检查时要算', () => {
+  it('Not a blocker when a page step comes later; must be counted during overall check', () => {
     const after = apply([tableOp, pageOps[1]!]);
     const later = toolVerdict(config, after, registry, { later: true });
     expect(later.blockers).toEqual([]);
@@ -126,7 +126,7 @@ describe('工具清单：谁说了算', () => {
     expect(checked.items[0]!.reason).toContain('书单');
   });
 
-  it('没做好的后来补上了就算做好，模型不用说', () => {
+  it('If something unfinished is later completed, it counts as done without the model needing to say so', () => {
     const after = apply([tableOp, pageOps[1]!]);
     const s = recordTurn(emptySession(), {
       input: '建书单',
@@ -144,13 +144,13 @@ describe('工具清单：谁说了算', () => {
     expect(again.items[0]!.reason).toBeUndefined();
   });
 
-  it('没做的话不进清单，但记得说过', () => {
+  it('If not done, it does not enter the list, but we remember it was said', () => {
     const s = recordTurn(emptySession(), { input: '写封信', reply: '不替你写', done: false });
     expect(s.items).toEqual([]);
     expect(s.said).toEqual([{ input: '写封信', done: false, reply: '不替你写' }]);
   });
 
-  it('点了清单里的一项再说一次：还是那一项，不多一项', () => {
+  it('Click an item in the list and talk about it again: still that same item, not an extra one', () => {
     let s = recordTurn(emptySession(), {
       input: '建表',
       reply: '',
@@ -165,8 +165,8 @@ describe('工具清单：谁说了算', () => {
   });
 });
 
-describe('工具清单：上限', () => {
-  it('最多 12 项，先丢做完的；没做的留着', () => {
+describe('Tool list: upper limit', () => {
+  it('At most 12 items, drop completed ones first; keep unfinished ones', () => {
     let s = startBuildItems(
       emptySession(),
       '目标',
@@ -185,15 +185,15 @@ describe('工具清单：上限', () => {
   });
 });
 
-describe('工具清单：撤销和草稿', () => {
-  it('草稿退一步：那句话不算说过，那一项不再算做了', () => {
+describe('Tool list: undo and draft', () => {
+  it('Draft step back: that utterance no longer counts as said, and that item no longer counts as done', () => {
     let s = recordTurn(emptySession(), { input: 'a', reply: '', done: true, kind: 'look', cr: 7 });
     s = dropDrafted(s, [7]);
     expect(s.said).toEqual([]);
     expect(s.items[0]!.status).toBe('skipped');
   });
 
-  it('草稿应用后再撤销：告诉模型这句撤销了', () => {
+  it('Draft applied and then undone: tell the model this utterance was undone', () => {
     let s = recordTurn(emptySession(), { input: 'a', reply: '', done: true, kind: 'look', cr: 7 });
     s = commitDrafted(s, [7], 40);
     expect(s.said[0]).toMatchObject({ rev: 40 });
@@ -203,12 +203,12 @@ describe('工具清单：撤销和草稿', () => {
   });
 });
 
-describe('发给模型的样子', () => {
-  it('空的不发', () => {
+describe('Appearance sent to the model', () => {
+  it('Do not send empty ones', () => {
     expect(planSession(emptySession())).toBeUndefined();
   });
 
-  it('只有没做完的项和最近的话；正在做的这一句不再列一遍', () => {
+  it('Only unfinished items and recent utterances; the current utterance being processed is not listed again', () => {
     let s = startBuildItems(emptySession(), '记账 App', [
       { id: 'a', kind: 'record', request: '建表' },
       { id: 'b', kind: 'look', request: '换颜色' },
@@ -225,8 +225,8 @@ describe('发给模型的样子', () => {
   });
 });
 
-describe('这一句是哪一种工具', () => {
-  it('按操作判断', () => {
+describe('Which tool type this utterance belongs to', () => {
+  it('Determine based on operations', () => {
     expect(workKindOfOps([tableOp])).toBe('record');
     expect(workKindOfOps(pageOps)).toBe('look');
     expect(workKindOfOps([{ op: 'setPackage', package: 'image', do: 'add' } as Op])).toBe('file');
@@ -254,8 +254,8 @@ describe('这一句是哪一种工具', () => {
   });
 });
 
-describe('内置规则的大工程说法（模拟器才走得到）', () => {
-  it('说大工程回计划，步骤都是内置规则做得到的话；小改不出计划', async () => {
+describe('Built-in rules major engineering message (only reachable in simulator)', () => {
+  it('Saying major engineering returns to plan, with steps that can be handled by built-in rules; small changes do not produce a plan', async () => {
     const mock = createMockAIProvider();
     const plan = await mock.plan('搭建一个记账 App', { config, registry, locale: 'zh' });
     expect(plan.kind).toBe('build');
@@ -267,7 +267,7 @@ describe('内置规则的大工程说法（模拟器才走得到）', () => {
     expect((await mock.plan('主题换成绿色', { config, registry, locale: 'zh' })).kind).toBe('ops');
   });
 
-  it('英文和法语界面也走得到，法语界面的标题是法语', async () => {
+  it('Reachable in English and French interfaces as well; French interface title is in French', async () => {
     const mock = createMockAIProvider();
     const plan = await mock.plan('Build a budget app', { config, registry, locale: 'fr' });
     expect(plan).toMatchObject({ kind: 'build', summary: 'Une app de budget prête à servir' });
@@ -278,7 +278,7 @@ describe('内置规则的大工程说法（模拟器才走得到）', () => {
     }
   });
 
-  it('带失败记号的一步第一次抛错，重试就好', async () => {
+  it('A step marked with a failure token throws an error the first time, retry fixes it', async () => {
     const mock = createMockAIProvider();
     const plan = await mock.plan('搭建一个记账 App，有一步会失败', {
       config,
@@ -292,33 +292,33 @@ describe('内置规则的大工程说法（模拟器才走得到）', () => {
   });
 });
 
-describe('这个会话新增的问题（把这些补上）', () => {
+describe('New issues introduced in this session (patch these up)', () => {
   const addButton = pageOps[1]!;
   const listBlock = pageOps[0]!;
-  // 有添加按钮、没有地方看：books 用不了。
+  // Has an add button but nowhere to view it: books cannot be used.
   const broken = apply([tableOp, addButton]);
   const fixed = apply([listBlock], broken);
   const worked = (s = markSessionStart(emptySession(), config, registry)) =>
     recordTurn(s, { input: '加书单', reply: '加了', done: true, kind: 'record' });
 
-  it('前提：有问题的配置确实有 blocker，补好的没有', () => {
+  it('Prerequisite: problematic config actually has blockers, fixed ones do not', () => {
     expect(checkTools(broken, registry).issues.filter((i) => i.severity === 'blocker')).not.toEqual(
       [],
     );
     expect(checkTools(fixed, registry).issues.filter((i) => i.severity === 'blocker')).toEqual([]);
   });
 
-  it('没有问题：什么都不算', () => {
+  it('No issues: nothing counts', () => {
     expect(sessionProblems(worked(), config, registry)).toEqual([]);
   });
 
-  it('这个会话弄出来的问题要算，补完就没了', () => {
+  it('Issues created in this session must count, disappear once fixed', () => {
     const left = sessionProblems(worked(), broken, registry);
     expect(left.map((i) => `${i.code}|${i.target}`)).toEqual(['view-missing|table:books']);
     expect(sessionProblems(worked(), fixed, registry)).toEqual([]);
   });
 
-  it('起点已有的问题不算，起点之后新多出来的才算', () => {
+  it('Pre-existing issues from the start do not count, only new ones arising after the start count', () => {
     const s = worked(markSessionStart(emptySession(), broken, registry));
     expect(sessionProblems(s, broken, registry)).toEqual([]);
     const more = apply(
@@ -343,7 +343,7 @@ describe('这个会话新增的问题（把这些补上）', () => {
     expect(sessionProblems(s, more, registry).map((i) => i.target)).toEqual(['table:films']);
   });
 
-  it('会话里没有条目，或者做过的都撤销了：不算', () => {
+  it('No entries in session, or all done ones were undone: does not count', () => {
     const start = markSessionStart(emptySession(), config, registry);
     expect(sessionProblems(start, broken, registry)).toEqual([]);
     const undone = markUndone(
@@ -353,11 +353,11 @@ describe('这个会话新增的问题（把这些补上）', () => {
     expect(sessionProblems(undone, broken, registry)).toEqual([]);
   });
 
-  it('later：页面在下一句，新表暂时没有入口不算', () => {
+  it('later: page is in the next utterance, new table temporarily without entry point does not count', () => {
     expect(sessionProblems(worked(), broken, registry, { later: true })).toEqual([]);
   });
 
-  it('起点只在会话开始时记一次；清空之后重新记；旧版 App 存的会话没有起点也补上', () => {
+  it('Start point is recorded only once at session start; re-recorded after clearing; sessions stored by older apps without a start point also get it patched', () => {
     const s = worked(markSessionStart(emptySession(), config, registry));
     expect(markSessionStart(s, broken, registry)).toBe(s);
     expect(markSessionStart(emptySession(), broken, registry).startIssues).toEqual([
@@ -369,13 +369,13 @@ describe('这个会话新增的问题（把这些补上）', () => {
     ]);
   });
 
-  it('起点随 App 重启保留，不发给模型', () => {
+  it('Start point is preserved across app restarts and not sent to the model', () => {
     const s = worked(markSessionStart(emptySession(), broken, registry));
     expect(parseSession(JSON.stringify(s)).startIssues).toEqual(['view-missing|table:books']);
     expect(JSON.stringify(planSession(s))).not.toContain('view-missing');
   });
 
-  it('发给模型的是英文的问题清单，一次最多 10 条', () => {
+  it('What is sent to the model is an English issue list, at most 10 items at a time', () => {
     const issue = (n: number) => ({
       severity: 'blocker' as const,
       code: 'view-missing',

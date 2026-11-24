@@ -1,5 +1,7 @@
-// 用 App 里真正的转换动作 OCR_IMPLS['ocr.toWord'] 转一页：PDF 的页面图、原始绘图都走 App 的 pdfview 页面，
-// 文件读写、剪图在 Node 里照 App 的服务做（canvaskit）。识别由调用方给（记录好的或现场识别）。
+// Convert a single page using the app's real conversion action OCR_IMPLS['ocr.toWord']: page images
+// and raw drawings for PDFs use the app's pdfview page, while file reads/writes and image cropping
+// are done in Node following the app's service implementation (canvaskit). Recognition is provided
+// by the caller (pre-recorded or on-the-fly).
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import { dirname, resolve } from 'node:path';
@@ -8,7 +10,7 @@ import { readDocx, type Converted } from './checks';
 import { CK, decode, pixelsOf, type Pixels } from './ocr';
 import type { PdfClient } from './pdfjs';
 
-// App 的代码在 Node 里跑：expo-localization 换成一个替身（语言由参数给定）。
+// Run app code in Node: replace expo-localization with a proxy (language is given by parameter).
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === 'expo-localization') {
@@ -27,7 +29,7 @@ export interface RenderedPage {
   paper?: { width: number; height: number };
 }
 
-/** PDF 画成页面图，和 App 的 pdf.toImages 一样（长边 2000、JPEG 0.88）。 */
+/** Render PDF into page images, matching the app's pdf.toImages (long edge 2000, JPEG 0.88). */
 export function renderPdf(client: PdfClient, pdf: string, pages?: number[]) {
   return client.call<RenderedPage[]>(
     'render',
@@ -42,8 +44,9 @@ export interface Recognizer {
 }
 
 /**
- * 转一页。image 是页面图（PDF 渲染出的或照片）；有 pdf 时带上 pdfSource / pageSize，和 App 里 PDF 转 Word 一样。
- * 结果写进 dir：page.jpg、out.docx、doc.json。
+ * Convert a single page. image is the page image (rendered from PDF or a photo); when pdf is
+ * present, include pdfSource / pageSize, matching PDF-to-Word in the app. Results are written to
+ * dir: page.jpg, out.docx, doc.json.
  */
 export async function convertPage(opts: {
   client: PdfClient;

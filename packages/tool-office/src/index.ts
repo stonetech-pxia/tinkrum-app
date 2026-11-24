@@ -1,5 +1,6 @@
-// 扫描件转 Office 文件：找线、组表、填字、TableDoc 的编辑、写 xlsx（D-272）；
-// 版面分析的前后处理、DocDoc 和它的编辑、写 docx（D-328）；读外来的 docx / xlsx（D-509）。纯 TS，在 Node 里测。
+// Scan-to-Office: line detection, table grouping, text filling, TableDoc editing, XLSX writing
+// (D-272); layout analysis preprocessing/postprocessing, DocDoc and its editing, DOCX writing
+// (D-328); reading external DOCX/XLSX files (D-509). Pure TypeScript, tested in Node.
 
 export * from './build';
 export * from './doc';

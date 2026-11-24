@@ -9,7 +9,7 @@ import {
   type LabelVector,
 } from './text-classify';
 
-// 识别结果照着手机上的样子写：换行、两栏挤成一行、金额和单号、识别错的字。
+// Match the OCR result format to the mobile display: line breaks, two columns squeezed into one, amounts and receipt numbers, and misrecognized characters.
 const RECEIPT_ZH = `禾田便利店
 矿泉水 2.50
 饭团 6.80
@@ -31,15 +31,15 @@ describe('textReadability', () => {
     expect(textReadability('   \n  ')).toBe('blank');
     expect(textReadability(' . \n — ')).toBe('blank');
     expect(textReadability('■ ▯ ~~ |')).toBe('blank');
-    // 整段都识别成「?」也没有一个字。
+    // When the entire text is recognized as `?` without a single character.
     expect(textReadability('??? ?? ?')).toBe('blank');
   });
 
   it('calls stray marks and confusable fragments garbled', () => {
     expect(textReadability('lI1 |:; 0O0 ~~ ■■ ▯▯ ..')).toBe('garbled');
-    // 能读的字太少：只有两个字母。
+    // Too few readable characters: only two letters.
     expect(textReadability('?? ?? ab')).toBe('garbled');
-    // 能读的字够多，但只占一小部分。
+    // Enough readable characters, but they make up only a small fraction.
     expect(textReadability('#@! %%^ &&* ((( ))) [[[ ]]] ~~~ word ok')).toBe('garbled');
   });
 
@@ -60,7 +60,7 @@ describe('textReadability', () => {
   });
 
   it('keeps text with some misread characters readable', () => {
-    // 一部分字被识别成「?」：还看得出是收据，要交给后面判断，不能在这里拒掉。
+    // Some characters are recognized as `?`: still looks like a receipt, so it should be passed along for downstream judgment and not rejected here.
     expect(
       textReadability('Caf? des Lilas 2 caf?s 7,40 € Croissant 2,60 € Total pay? 10,00 €'),
     ).toBe('readable');
@@ -178,7 +178,7 @@ describe('guessFacets', () => {
     );
     const result = await guessFacets(RECEIPT_ZH, embed, labels, thresholds);
     expect(result.kind).toMatchObject({ status: 'label', id: 'receipt' });
-    // 主题最高 0.8 没到 0.9：不给。
+    // The topic score peaks at 0.8 which is below 0.9: do not return it.
     expect(result.topic).toEqual({ status: 'unknown', reason: 'lowScore' });
     expect(embed.mock.calls.map(([, facet]) => facet)).toEqual(['kind', 'topic']);
   });

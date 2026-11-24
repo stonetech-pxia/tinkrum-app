@@ -3,12 +3,17 @@ import { checkAnswer, keepForModel, squash } from './check';
 import { categoryAnswers, categoryRequest } from './category';
 import { conceptOf, type ConceptId } from './concepts';
 
-// 本机模型给候选（D-396、D-401）：Qwen3.5-2B，只问代码拿不准的字段，一个字段问一次。文字生成由外面注入
-// （App 里是 llama.rn，电脑上打分用 llama-server），这里只有提示词、语法和读回答。
-// 模型的回答要一个一个过核对（check.ts），编不出文字里没有的值；结果只进候选，用户点了才填（D-394）。
-// 提示词、语法、参数和测量时一样（side-session-notes/prefill-model/per-field/sibr/pf9.ts），改了要重新打分。
+// Single text generation. prompt is already the complete prompt; preceding identical sections are
+// cached and reused by the implementation. On-device model candidate generation (D-396, D-401):
+// Qwen3.5-2B, querying only uncertain fields identified by code, once per field. Text generation is
+// injected externally (llama.rn in-app, llama-server for desktop benchmarking), keeping only
+// prompts, grammars, and response reading here. Model responses must pass verification one by one
+// (check.ts), ensuring no generation of values absent from the text; results enter candidates only,
+// filled only upon user tap (D-394). Prompts, grammars, parameters, and benchmarks match previous
+// measurements (side-session-notes/prefill-model/per-field/sibr/pf9.ts); re-benchmarking is
+// required if modified.
 
-/** 一次文字生成。prompt 已经是完整的提示；前面相同的部分由实现复用缓存。 */
+/** A text generation request. prompt is already the complete prompt; preceding identical sections are cached and reused by the implementation. */
 export interface ModelRequest {
   prompt: string;
   grammar: string;
@@ -18,20 +23,20 @@ export interface ModelRequest {
   stop: readonly string[];
 }
 
-/** 加载好的模型。用完由引擎调 release（成功、失败、取消都调）。 */
+/** A loaded model session. The engine calls release upon completion (called on success, failure, or cancellation). */
 export interface ModelSession {
-  /** signal 取消时实现应该尽快停；引擎不等它，所以停不下来也不会卡住表单。 */
+  /** generate(request: ModelRequest, signal: AbortSignal): Promise<string>; implementation should stop as soon as signal aborts; the engine does not wait for it, so non-stopping tasks will not hang the form. */
   generate(request: ModelRequest, signal: AbortSignal): Promise<string>;
   release(): Promise<void>;
 }
 
-/** 加载模型；没装、内存不够时给 null。引擎用完就释放，不常驻。 */
+/** Load model; returns null if uninstalled or low memory. Released by the engine when done, not resident in memory. */
 export type OpenModel = (signal: AbortSignal) => Promise<ModelSession | null>;
 
 export const MODEL_LIMITS = {
-  /** 给模型的文字最多多少个字：上下文 4096 token，留出提示词、问题和回答；中文约一字一个 token。 */
+  /** Maximum character count for text sent to the model: 4096 token context, reserving space for prompts, questions, and responses; Chinese is approximately one character per token. */
   textChars: 3000,
-  /** 加载模型、问一个字段、整张单据的时间上限（超过就停，留着已经有的候选）。 */
+  /** Time limit for loading the model, asking about a single field, or processing an entire document (stops if exceeded, keeping existing candidates). */
   openMs: 60_000,
   callMs: 30_000,
   totalMs: 120_000,
@@ -45,7 +50,7 @@ const SYSTEM =
   'Use only what is written in the text: no guessing, no outside knowledge. ' +
   'A value next to a label for something else is not this field. Output only the value.';
 
-// 认得出的字段加一句提示；用户自建的字段只靠字段名。
+// Add a hint for recognized fields; user-created fields rely solely on their field name.
 const HINTS: Partial<Record<ConceptId, string>> = {
   jobTitle: 'the job title of the person on the card; not the company',
   amount:
@@ -62,7 +67,7 @@ const HINTS: Partial<Record<ConceptId, string>> = {
   category: 'only when the text names it',
 };
 
-/** 这个字段问模型的那句话。 */
+/** The prompt sentence used to ask the model about this field. */
 export function fieldQuestion(f: Field): string {
   const kind = f.type === 'money' || f.type === 'number' ? 'amount' : f.type;
   const concept = conceptOf(f);
@@ -76,11 +81,11 @@ export function fieldQuestion(f: Field): string {
   return `Field "${f.name}" (${kind})${hint ? `: ${hint}` : ''}. ${how} List up to 3 different values from the text that could be this field, most likely first, separated by " | ". Answer null only if the text shows none.`;
 }
 
-/** 最多 3 个候选，用「 | 」隔开；或者 null。 */
+/** At most 3 candidates separated by " | "; or null. */
 export const MODEL_GRAMMAR =
   'root ::= "null" | item (" | " item)? (" | " item)?\nitem ::= [^\\n<|]+';
 
-/** 单据是哪种语言（只看文字，界面语言和单据语言常常不一样）：有中文是 zh，有法语的字样是 fr，否则 en。 */
+/** Language of the document (determined purely from text; UI language and document language often differ): 'zh' if Chinese characters are present, 'fr' if French phrasing is present, otherwise 'en'. */
 export function documentLanguage(rows: readonly string[]): 'zh' | 'fr' | 'en' {
   const text = rows.join('\n');
   if (/[㐀-鿿]/.test(text)) return 'zh';
@@ -88,7 +93,7 @@ export function documentLanguage(rows: readonly string[]): 'zh' | 'fr' | 'en' {
   return 'en';
 }
 
-/** 文字太长时去掉中间的排：店名在开头，合计在结尾。 */
+/** Remove the middle rows when text is too long: store name at the beginning, total at the end. */
 export function fitText(rows: readonly string[], limit: number): string[] {
   const size = (list: readonly string[]) => list.reduce((n, r) => n + r.length + 1, 0);
   if (size(rows) <= limit) return [...rows];
@@ -96,7 +101,7 @@ export function fitText(rows: readonly string[], limit: number): string[] {
     const out: string[] = [];
     let used = 0;
     for (const row of list) {
-      // 一排就超过的（PDF 里没有换行的长文）切开。
+      // Split rows that exceed the budget (long text in PDFs without line breaks).
       const piece = row.slice(0, Math.max(0, budget - used - 1));
       if (piece) out.push(piece);
       used += piece.length + 1;
@@ -109,7 +114,7 @@ export function fitText(rows: readonly string[], limit: number): string[] {
   return [...head, ...tail];
 }
 
-/** 这张单据问每个字段时相同的那段（系统提示 + 文字；字段自己的排只有问它时才有）；模型加载一次，相同的前缀只读一遍。 */
+/** The shared prefix when querying each field of a document (system prompt + text; a field's own rows are only included when querying it); the model is loaded once, and the identical prefix is read only once. */
 function documentPrefix(f: Field, rows: readonly string[], limits: ModelLimits): string {
   const kept = fitText(
     rows.filter((r) => keepForModel(r, f)),
@@ -121,13 +126,13 @@ function documentPrefix(f: Field, rows: readonly string[], limits: ModelLimits):
   );
 }
 
-/** 问一个字段的完整请求。手写 ChatML：空的 think 块等于关掉 thinking，llama.rn 的 jinja 路径不加助手开头。 */
+/** Complete request to query a single field. Hand-written ChatML: empty think block disables thinking, llama.rn jinja path omits assistant prefix. */
 export function modelRequest(
   f: Field,
   rows: readonly string[],
   limits: ModelLimits = MODEL_LIMITS,
 ): ModelRequest {
-  // 分类字段（单选）问的是「选哪个选项」，不是抄文字里的值（D-405）。
+  // For choice fields (single select), the question asks "which option to select", not copying values from the text (D-405).
   if (f.type === 'choice') return categoryRequest(f, rows, limits.textChars);
   return {
     prompt:
@@ -141,7 +146,7 @@ export function modelRequest(
   };
 }
 
-/** 模型的回答 → 核对过的值（表单的写法，去重，最多 3 个）。 */
+/** Model answers -> validated values (form formatting, deduplicated, max 3). */
 export function modelAnswers(
   f: Field,
   answer: string,

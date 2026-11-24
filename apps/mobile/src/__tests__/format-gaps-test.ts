@@ -14,8 +14,9 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeMedia } from '../test-utils/fake-files';
 
-// 格式转换的缺口（D-183–D-186）：MP3、动图 GIF、从「文件」选照片和视频、Word / Excel / PPT 转 PDF，
-// 以及手机打不开电脑格式视频时的说法。原生模块换成 test-utils 里的假实现。
+// Format conversion gaps (D-183-D-186): MP3, animated GIF, selecting photos and videos from
+// "Files", Word/Excel/PPT to PDF, and messages when phones cannot open computer format videos.
+// Native modules replaced with mock implementations in test-utils.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const MB = 1024 * 1024;
@@ -57,7 +58,7 @@ function setup(
         now: () => new Date(2026, 9, 24),
         newId: () => `id${++ids}`,
         ui,
-        // 只回答这一步问到的参数。
+        // Answer only the parameters requested in this step.
         askParams: async (request: AskRequest) => ({
           ...request.params,
           ...Object.fromEntries(
@@ -93,7 +94,7 @@ describe('MP3 (D-183)', () => {
       ['mp3', 'audio/mpeg'],
       ['mp3', 'audio/mpeg'],
     ]);
-    // 128 kbps 的 AAC → 192 kbps 的 MP3；64 kbps 的单声道录音 → 128 kbps，仍是单声道。
+    // 128 kbps AAC -> 192 kbps MP3; 64 kbps mono recording -> 128 kbps, still mono.
     expect(media.audioEncodes).toMatchObject([
       { format: 'mp3', bitrateKbps: 192, channels: 2, sampleRate: 44100 },
       { format: 'mp3', bitrateKbps: 128, channels: 1, sampleRate: 44100 },
@@ -128,14 +129,14 @@ describe('animated GIFs (D-184)', () => {
     files.nextVideos = [files.offerVideo('cat.mov', { size: 50 * MB, durationMs: 60_000 })];
     const [gif] = itemsOf(await run(), 'images');
     expect(gif).toMatchObject({ name: 'cat', ext: 'gif', mimeType: 'image/gif', width: 320 });
-    // 剪出来 6 秒，每秒 12 帧。
+    // Trimmed to 6 seconds, 12 frames per second.
     expect(media.gifs[0]!.settings).toEqual({ width: 320, fps: 12 });
     expect(gif!.size).toBe(72 * 1024);
   });
 
   it('says when a video is too long for a GIF', async () => {
     const workflow = structuredClone(toolWorkflow('video', 'video-gif'));
-    workflow.steps.splice(1, 1); // 去掉「剪一段」
+    workflow.steps.splice(1, 1); // Remove "Trim segment"
     const { files, run } = setup(workflow);
     files.nextVideos = [files.offerVideo('long.mov', { size: 50 * MB, durationMs: 45_000 })];
     expect(failure(await run())).toEqual({

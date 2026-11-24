@@ -36,7 +36,7 @@ export { ROLLUP_AGGREGATES } from './rollup';
 export { SCHEDULE_LAST_DONE_TYPES } from './schedule';
 export { cleanTags, MAX_RECORD_TAGS, MAX_TAG_LENGTH, tagKey } from './tags';
 
-/** 全部字段类型。新类型加在最后（顺序就是配置 JSON Schema 里的顺序）。 */
+/** All field types. New types are added at the end (the order matches the config JSON Schema). */
 export const FIELDS = [
   textField,
   noteField,
@@ -72,7 +72,7 @@ export type Field = z.infer<typeof FieldSchema>;
 export type FieldType = Field['type'];
 export type FieldOf<T extends FieldType> = Extract<Field, { type: T }>;
 
-/** 登记表里的一份定义，回调的参数统一成 Field（按类型取出来以后用）。 */
+/** A definition in the registry table, unifying callback parameters as Field (retrieved by type for use). */
 export interface FieldDefinition {
   type: FieldType;
   label: [string, string];
@@ -119,12 +119,12 @@ const BY_TYPE = new Map<string, FieldDefinition>(
   FIELDS.map((d) => [d.type, d as unknown as FieldDefinition]),
 );
 
-/** 这种字段的定义。 */
+/** The definition for this field type. */
 export function fieldDefinition(type: FieldType): FieldDefinition {
   return BY_TYPE.get(type)!;
 }
 
-/** 统计和图表能求和、平均的字段类型。 */
+/** Field types whose statistics and charts can sum and average. */
 export const NUMERIC_FIELD_TYPES: readonly string[] = FIELDS.filter((d) => d.numeric).map(
   (d) => d.type,
 );

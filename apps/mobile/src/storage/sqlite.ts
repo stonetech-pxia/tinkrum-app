@@ -17,7 +17,7 @@ import {
 } from './types';
 import { sameValues } from './record-values';
 
-// SQLite 实现。数据库结构用 PRAGMA user_version 管理，每个元素是一次升级。
+// SQLite implementation. Database schema is managed via PRAGMA user_version, with each element representing a migration step.
 
 export const DB_MIGRATIONS: string[] = [
   `CREATE TABLE workspace_head (
@@ -70,7 +70,7 @@ export const DB_MIGRATIONS: string[] = [
      started_at INTEGER NOT NULL,
      finished_at INTEGER
    );`,
-  // 用户记录：在配置之外，不随版本恢复（docs/DATA_DESIGN.md）。
+  // User records: outside of configuration, not restored with version rollbacks (docs/DATA_DESIGN.md).
   `CREATE TABLE records (
      id TEXT PRIMARY KEY,
      collection_id TEXT NOT NULL,
@@ -80,12 +80,12 @@ export const DB_MIGRATIONS: string[] = [
      deleted_at INTEGER
    );
    CREATE INDEX records_by_collection ON records (collection_id, deleted_at, created_at);`,
-  // 设备上的小设置：使用习惯的统计等（D-127），不随版本恢复。
+  // Device-local metadata: usage statistics and similar items (D-127), not restored with version rollbacks.
   `CREATE TABLE app_meta (
      key TEXT PRIMARY KEY,
      value TEXT NOT NULL
    );`,
-  // 保存的预设（D-410）：不在配置里，不随版本恢复，也不发给 AI。
+  // Saved presets (D-410): not part of configuration, not restored with version rollbacks, and never sent to the AI.
   `CREATE TABLE saved_presets (
      id TEXT PRIMARY KEY,
      name TEXT NOT NULL,
@@ -93,9 +93,12 @@ export const DB_MIGRATIONS: string[] = [
      config_json TEXT NOT NULL,
      created_at INTEGER NOT NULL
    );`,
-  // 从表格文件导入的一批批记录（D-574）：哪一批、什么时候、进了哪张表、几条、文件叫什么（只给用户看），
-  // 以及每一批有哪些记录。只加两张新表，records 和别的表的已有行一行都不动。
-  // record_id 不用外键：清空回收站、永久删除一张表时 records 里的行会真删，这里留下的对不上的行在计数时自然不算。
+  // Batches of records imported from spreadsheet files (D-574): batch ID, timestamp, target table
+  // name, count, file name (displayed to users only), and record IDs in each batch. Only two new
+  // tables are added; existing rows in records and other tables remain completely untouched.
+  // record_id does not use a foreign key: clearing the trash or permanently deleting a table
+  // deletes the corresponding rows in records, and orphaned rows left here are naturally excluded
+  // from counts.
   `CREATE TABLE record_imports (
      id TEXT PRIMARY KEY,
      collection_id TEXT NOT NULL,
@@ -111,7 +114,7 @@ export const DB_MIGRATIONS: string[] = [
    );`,
 ];
 
-/** applyRecordWrites 里某条要求「现在还是这份」的不是了：让事务回滚。 */
+/** Trigger a transaction rollback when a write in applyRecordWrites expected "still be this version" but no longer matches. */
 class BatchConflict extends Error {}
 
 interface RecordRow {
@@ -131,7 +134,7 @@ function toStoredRecord(row: RecordRow): StoredRecord {
       values = parsed as Record<string, unknown>;
     }
   } catch {
-    // 损坏的记录显示为空，而不是让页面崩溃。
+    // Corrupted records display as empty rather than crashing the page.
   }
   return {
     id: row.id,
@@ -169,7 +172,7 @@ function toRevision(row: RevisionRow): RevisionRecord {
   try {
     config = JSON.parse(row.config_json);
   } catch {
-    config = null; // 损坏的快照交给 prepareSnapshot 拒绝
+    config = null; // Corrupted snapshots are rejected by prepareSnapshot
   }
   return {
     id: row.id,
@@ -195,7 +198,7 @@ function toPreset(row: PresetRow): SavedPreset {
   try {
     config = JSON.parse(row.config_json);
   } catch {
-    config = null; // 损坏的预设交给 preparePreset 拒绝
+    config = null; // Corrupted presets are rejected by preparePreset
   }
   return {
     id: row.id,
@@ -221,12 +224,12 @@ interface ChangeRequestRow {
 export class SQLiteWorkspaceRepo implements WorkspaceRepo {
   constructor(private readonly db: SQLiteDatabase) {}
 
-  /** 整体导出（D-600）：把整个数据库存成一份一致的拷贝（VACUUM INTO，WAL 里没写回的也在内）。dest 是本机路径，文件必须还不存在。 */
+  /** Full export (D-600): save the entire database as a consistent copy (VACUUM INTO, including unwritten WAL data). dest is a local path; the file must not exist yet. */
   async snapshotTo(dest: string): Promise<void> {
     await this.db.runAsync('VACUUM INTO ?', dest);
   }
 
-  /** 整体导出（D-600）写进说明里的：数据库版本、当前配置版本、记录条数（不含已删除的）。 */
+  /** Metadata included in the full export (D-600) description: database version, current configuration version, and record count (excluding deleted ones). */
   async backupInfo(): Promise<{
     userVersion: number;
     schemaVersion: number | null;
@@ -246,7 +249,7 @@ export class SQLiteWorkspaceRepo implements WorkspaceRepo {
     };
   }
 
-  /** 关掉数据库（恢复换数据目录之前）。 */
+  /** Close the database (prior to data directory restore/switch). */
   async close(): Promise<void> {
     await this.db.closeAsync();
   }
@@ -394,7 +397,7 @@ export class SQLiteWorkspaceRepo implements WorkspaceRepo {
   }
 
   async deleteAsset(id: string) {
-    // 授权引用了 assets（外键），先删授权。
+    // Grants referencing assets (foreign keys) are deleted first.
     await this.db.withExclusiveTransactionAsync(async (txn) => {
       await txn.runAsync('DELETE FROM asset_grants WHERE asset_id = ?', id);
       await txn.runAsync(
@@ -555,7 +558,7 @@ export class SQLiteWorkspaceRepo implements WorkspaceRepo {
               range.from,
             )
           : await this.db.getAllAsync<RecordRow>(
-              // 字段 ID 只有小写字母、数字和 -，放进 JSON 路径时加引号。
+              // Field IDs contain only lowercase letters, numbers, and hyphens; wrap in quotes when inserting into JSON paths.
               `${base} AND json_extract(values_json, ?) >= ? AND json_extract(values_json, ?) < ?`,
               collectionId,
               `$."${range.by}"`,

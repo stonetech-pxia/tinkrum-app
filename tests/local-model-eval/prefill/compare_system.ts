@@ -1,7 +1,10 @@
-// 比较系统识别和规则的候选（模拟器探针的输出）：每份 ocr.txt，真值的日期 / 金额在不在候选里（召回），
-// 同一位置两边统一后的写法是否一致，系统补上了规则漏掉的几个。不挑选，只看候选。
-// 用法（仓库根目录）：npx tsx tests/local-model-eval/prefill/compare_system.ts <探针输出.jsonl>
-// 输入每行：{"id":"receipts-zh-001-clean","matches":[{"kind":"date","start":12,"end":22,"value":"2026-01-16"}, …]}
+// Compare system recognition and rule candidates (simulator probe output): For each ocr.txt, check
+// whether ground-truth dates/amounts are in the candidates (recall), whether normalized text
+// formatting matches between both sides at the same position, and whether the system supplemented
+// rules with missed items. Do not select, only inspect candidates. Usage (repository root): npx tsx
+// tests/local-model-eval/prefill/compare_system.ts <probe-output.jsonl> Input per line:
+// `{"id":"receipts-zh-001-clean","matches":[{"kind":"date","start":12,"end":22,"value":"2026-01-16"},
+// ...]}`
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

@@ -61,46 +61,50 @@ import { presetById } from './workflows/presets';
 
 export * from './ops-schema';
 
-// 语义化修改操作的执行（§7D，v34 一共 14 个，结构在 ops-schema.ts）。applyOps 是纯函数，不修改输入；
-// 只负责执行和引用检查，完整合法性由 validateWorkspace 判定。删除时的连带清理（D-371）在这里做，
-// 并写成 ApplyNote 在预览里告诉用户。
+// Execution of semantic modification operations (§7D, 14 total in v34, structures defined in
+// ops-schema.ts). applyOps is a pure function that does not mutate the input; it handles execution
+// and reference checks only, while full validity is determined by validateWorkspace. Cascading
+// cleanup on deletion (D-371) is performed here and recorded as ApplyNotes to inform the user in
+// the preview.
 
-/** apply 过程中系统自动做出的调整，需要在预览中告知用户。 */
+/** Adjustments automatically made by the system during the apply process, which need to be communicated to the user in the preview. */
 export type ApplyNote =
   | { kind: 'movedToFloating'; target: NavTarget }
-  /** 移除页面时，打开它的按钮、入口跟着移除。 */
+  /** When a page is removed, buttons and entry points opening it are also removed. */
   | { kind: 'removedLinks'; pageId: string; count: number }
-  /** 移出表时，读它的块（列表、表单、数字、图表，减它的合计的数字）跟着移除。 */
+  /** When a table is removed, blocks reading it (lists, forms, numbers, charts, and associated summary numbers) are removed as well. */
   | { kind: 'removedDataComponents'; table: string; count: number }
-  /** 移除快捷操作时，运行它的块（action）跟着移除。 */
+  /** When a quick action is removed, blocks running it (actions) are also removed. */
   | { kind: 'removedRunners'; tool: string; count: number }
-  /** 打开这个快捷操作的按钮、入口（D-256），以及文件房间工具栏上的这一项。 */
+  /** Buttons and entry points opening this quick action (D-256), as well as this item on the file room toolbar. */
   | { kind: 'removedWorkflowLinks'; tool: string; count: number }
-  /** 提醒要打开的快捷操作 / 页面、要看的表或字段被移除了，提醒跟着移除（D-251）。 */
+  /** If the quick action/page to be opened, table, or field required by a reminder is removed, the reminder is also removed (D-251). */
   | { kind: 'removedReminders'; titles: string[] }
   /**
-   * 删字段、删表时，用到它的就地一键记录工具（D-304）：按钮移除，记录块上的工具去掉；
-   * 勾的工具没了清单退成列表，拖动的工具没了看板只能看。
+   * When deleting a field or table, local one-tap record tools using it (D-304) are cleaned up:
+   * buttons are removed, tools on record blocks are stripped, checklist tools fall back to lists
+   * when check tools are removed, and boards become view-only when drag tools are removed.
    */
   | { kind: 'removedRecordActions'; count: number }
-  /** 移出表时，给它的一条记录用的页面（page.of，D-342）跟着移除。 */
+  /** When a table is removed, its dedicated record page (page.of, D-342) is also removed. */
   | { kind: 'removedRecordPages'; titles: string[] }
-  /** 块上的设置（列表能换的字段、单条记录显示的字段、按表显示的条件）指向删掉的东西，跟着去掉（D-424）。 */
+  /** Block settings (fields selectable in lists, fields displayed in single records, filter conditions by table) referencing deleted items are cleared (D-424). */
   | { kind: 'clearedBlockRefs'; count: number }
   /**
-   * 删表、删字段时快捷操作里用到它的步骤（CHAIN_AUDIT A3）：steps 是去掉的步骤、trimmed 是只拿掉了这个字段的
-   * 步骤（动作 ID）；removed：剩下的步骤用不了，整个快捷操作跟着移除。
+   * When deleting tables or fields, steps in quick actions referencing them (CHAIN_AUDIT A3):
+   * steps are removed steps, trimmed are steps with only this field removed (action ID); removed:
+   * remaining steps cannot function, so the entire quick action is removed.
    */
   | { kind: 'prunedSteps'; name: string; steps: string[]; trimmed: string[]; removed: boolean }
-  /** 新加的记录块所属的表没有添加的地方，在它上方补了一个「添加」按钮（D-310）。 */
+  /** If the table belonging to a newly added record block has no location to add records, an "Add" button is added above it (D-310). */
   | { kind: 'addedEntryForm'; table: string }
   | { kind: 'addedPageEntry'; page: string }
-  /** 移除 app（D-485）：它的表归到主页（记录保留）；打开它的按钮、入口跟着移除。 */
+  /** Removing an app (D-485): its tables are moved to the home page (records preserved); buttons and entry points opening it are removed. */
   | { kind: 'removedApp'; tables: string[]; links: boolean }
-  /** 工具包升级到当前版本，新增了这些快捷操作。 */
+  /** Tool package upgraded to the current version, adding these quick actions. */
   | { kind: 'updatedTool'; package: string; tools: string[] };
 
-/** 字段类型只能在这些类型之间互相转换，已有的值仍然能读出来（字段定义的 convertGroup）。 */
+/** Field types can only be converted between these compatible types, and existing values remain readable (field definition convertGroup). */
 export const COMPATIBLE_FIELD_TYPES: readonly (readonly string[])[] = [
   ...new Set(FIELDS.flatMap((d) => (d.convertGroup ? [d.convertGroup] : []))),
 ].map((group) => FIELDS.filter((d) => d.convertGroup === group).map((d) => d.type));
@@ -110,7 +114,7 @@ export type ApplyResult =
 
 export interface ApplyContext {
   registry: Registry;
-  /** 添加工具包时，工具包页面和快捷操作使用的语言。 */
+  /** Language used by the tool package pages and quick actions when adding a tool package. */
   locale: Locale;
 }
 
@@ -118,7 +122,7 @@ class OpError extends Error {}
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
-/** 合并补丁：null 去掉这个键，undefined 不动。 */
+/** Merge patch: null removes the key, undefined leaves it untouched. */
 function merge(target: Record<string, unknown>, changes: Record<string, unknown>) {
   for (const [key, value] of Object.entries(changes)) {
     if (value === null) delete target[key];
@@ -127,14 +131,14 @@ function merge(target: Record<string, unknown>, changes: Record<string, unknown>
   return target;
 }
 
-/** changes 里只能有这些键。 */
+/** Changes can only contain these keys. */
 function onlyKeys(changes: object, allowed: readonly string[], what: string): void {
   const extra = Object.keys(changes).filter((k) => !allowed.includes(k));
   if (extra.length > 0)
     throw new OpError(`${what} can change ${allowed.join(', ')}; not ${extra.join(', ')}`);
 }
 
-// ---- 容器：页面和块 ----
+// ---- Containers: pages and blocks ----
 
 function getPage(config: WorkspaceConfig, id: string): Page {
   const page = config.containers.pages.find((p) => p.id === id);
@@ -146,11 +150,11 @@ interface Located {
   list: Component[];
   index: number;
   block: Component;
-  /** 所在的分组；顶层是 null。 */
+  /** Parent container; top level is null. */
   parent: Component | null;
 }
 
-/** 在一串块（连同分组里的两层）里查找。 */
+/** Search within a list of blocks (including two levels deep inside groups). */
 function findIn(list: Component[], id: string, parent: Component | null = null): Located | null {
   const index = list.findIndex((c) => c.id === id);
   if (index >= 0) return { list, index, block: list[index]!, parent };
@@ -169,7 +173,7 @@ function getBlock(page: Page, id: string): Located {
   return found;
 }
 
-/** 要改的块：这个版本不认识的块（D-254）只能移动和删除。 */
+/** Target block to modify: blocks unrecognized by this version (D-254) can only be moved or deleted. */
 function known(block: Component): KnownComponent {
   if (!isKnownComponent(block)) {
     throw new OpError(
@@ -182,8 +186,9 @@ function known(block: Component): KnownComponent {
 const isGroup = (c: Component) => isKnownComponent(c) && c.look === 'group';
 
 /**
- * 块要放入的列表：页面顶层，或某个分组的子块。分组最多两层（Q3）：里面那层不能再放分组，
- * 放着分组的分组只能在页面顶层。
+ * List where the block should be placed: top level of the page or child blocks of a group. Groups
+ * support at most two levels (Q3): the inner level cannot contain further groups, and groups
+ * containing groups can only reside at the top level of the page.
  */
 function targetList(page: Page, parentId: string | undefined, moving: Component): Component[] {
   if (parentId === undefined) return page.blocks;
@@ -204,18 +209,18 @@ function targetList(page: Page, parentId: string | undefined, moving: Component)
   return childrenOf(parent);
 }
 
-/** 文件房间预览上下的块（D-358）。 */
+/** Blocks above and below the file room preview (D-358). */
 function deskBlocks(config: WorkspaceConfig): Component[] {
   const desk = config.containers.desk;
   return [...(desk?.above ?? []), ...(desk?.below ?? [])] as Component[];
 }
 
-/** 配置里所有的块：每个页面（连同分组里的），加上文件房间预览上下的。 */
+/** All blocks in the configuration: every page (including those inside groups), plus those above and below the file room preview. */
 function everyBlock(config: WorkspaceConfig): Component[] {
   return [...config.containers.pages.flatMap(allComponents), ...deskBlocks(config)];
 }
 
-/** 从所有页面（包括分组内）和文件房间预览上下删除满足条件的块，返回删除的数量。 */
+/** Delete blocks matching the predicate from all pages (including inside groups) and above/below the file room preview, returning the count of deleted blocks. */
 function removeEverywhere(config: WorkspaceConfig, pred: (c: Component) => boolean): number {
   let count = 0;
   const prune = (list: Component[]): Component[] =>
@@ -240,13 +245,13 @@ function removeEverywhere(config: WorkspaceConfig, pred: (c: Component) => boole
   return count;
 }
 
-/** 第一个非 header 块的位置；“放到最上面”时放在页面标题之后。 */
+/** Position of the first non-header block; placed after the page title when "place at the very top" is requested. */
 export function topIndex(page: Page): number {
   const i = page.blocks.findIndex((c) => !isKnownComponent(c) || c.look !== 'header');
   return i < 0 ? page.blocks.length : i;
 }
 
-/** 首页上放工具包入口的位置：最后一个工具包入口之后；没有时放在「添加工具」入口之前，再没有就放在标题之后。 */
+/** Position for tool package entry points on the home page: after the last tool package entry point; if none, before the "Add tool" entry point, and otherwise after the title. */
 function packageEntryIndex(home: Page): number {
   const isEntry = (c: Component, kind: string) =>
     isKnownComponent(c) &&
@@ -261,7 +266,7 @@ function packageEntryIndex(home: Page): number {
   return catalog >= 0 ? catalog : topIndex(home);
 }
 
-/** 某个页面上的工具宫格（look packages）已经显示这个工具包（D-181）：添加时不用再往首页放入口。 */
+/** The tool grid (look packages) on a page already displays this tool package (D-181): no need to add an entry point to the home page again when adding. */
 export function shownInToolGrid(
   config: WorkspaceConfig,
   packageId: string,
@@ -277,7 +282,7 @@ export function shownInToolGrid(
   );
 }
 
-/** 受保护元素不在导航栏也不在浮动入口时，自动改为浮动入口（§5.1）。 */
+/** When a protected element is neither in the navigation bar nor in a floating entry point, automatically convert it to a floating entry point (§5.1). */
 function keepProtectedReachable(config: WorkspaceConfig, notes: ApplyNote[]): void {
   for (const target of PROTECTED_TARGETS) {
     if (!config.nav.bar.includes(target) && !config.nav.floating.includes(target)) {
@@ -287,14 +292,14 @@ function keepProtectedReachable(config: WorkspaceConfig, notes: ApplyNote[]): vo
   }
 }
 
-/** 导航栏和浮动入口里去掉这个页面；导航栏空了就放回首页。 */
+/** Remove this page from the navigation bar and floating entry points; if the navigation bar becomes empty, restore it to the home page. */
 function removeFromNav(config: WorkspaceConfig, target: NavTarget): void {
   config.nav.bar = config.nav.bar.filter((t) => t !== target);
   config.nav.floating = config.nav.floating.filter((t) => t !== target);
   if (config.nav.bar.length === 0) config.nav.bar = [pageTarget(HOME_PAGE_ID)];
 }
 
-/** 每个 app 的底栏里去掉这个页面；底栏空了就只剩 Tink（D-485）。 */
+/** Remove this page from each app's bottom bar; if the bottom bar becomes empty, leave only Tink (D-485). */
 function removeFromAppBars(config: WorkspaceConfig, target: NavTarget): void {
   for (const app of config.nav.apps ?? []) {
     app.bar = app.bar.filter((t) => t !== target);
@@ -319,7 +324,7 @@ function addApp(config: WorkspaceConfig, op: OpOf<'addContainer'>): void {
     name: spec.name,
     ...(spec.icon !== undefined ? { icon: spec.icon } : {}),
     bar: [...new Set<AppBarTarget>(spec.bar ?? ['ai'])],
-    // 新 app 的风格从主页复制一份（导入的 App 文件自带风格），之后各改各的，不继承。
+    // The new app's style is cloned from the home page (imported App files carry their own style), after which they are edited independently without inheritance.
     theme: clone(spec.theme ?? config.theme),
   };
   (config.nav.apps ??= []).push(app);
@@ -335,8 +340,9 @@ function updateApp(config: WorkspaceConfig, op: OpOf<'updateContainer'>): void {
 }
 
 /**
- * 移除一个 app：它的页面、快捷操作一起移除（复用移除页面、移除快捷操作的清理），打开它的入口跟着移除；
- * 它的表和记录一条不动，只是归到主页（底线 5）。
+ * Remove an app: its pages and quick actions are removed together (reusing page and quick action
+ * removal cleanup), and entry points opening it are removed; its tables and records remain
+ * completely untouched, simply reassigned to the home page (Invariant 5).
  */
 function removeApp(config: WorkspaceConfig, id: string, notes: ApplyNote[]): void {
   const app = getApp(config, id);
@@ -352,7 +358,7 @@ function removeApp(config: WorkspaceConfig, id: string, notes: ApplyNote[]): voi
   for (const table of moved) delete table.app;
   config.nav.apps = config.nav.apps!.filter((a) => a.id !== app.id);
   if (config.nav.apps.length === 0) delete config.nav.apps;
-  // 桌面菜单里的这个 App 一起拿掉（底线 18）。
+  // Remove this App from the desktop menu as well (Invariant 18).
   const homeScreen = config.nav.phoneHomeScreen?.filter((x) => x !== target);
   if (homeScreen && homeScreen.length > 0) config.nav.phoneHomeScreen = homeScreen;
   else delete config.nav.phoneHomeScreen;
@@ -360,7 +366,7 @@ function removeApp(config: WorkspaceConfig, id: string, notes: ApplyNote[]): voi
     notes.push({ kind: 'removedApp', tables: moved.map((t) => t.name), links });
 }
 
-// ---- 工具 ----
+// ---- Tools ----
 
 function getTool(config: WorkspaceConfig, id: string): Tool {
   const tool = config.tools.find((t) => t.id === id);
@@ -382,8 +388,10 @@ function getStepIndex(wf: QuickAction, stepId: string): number {
 }
 
 /**
- * 快捷操作移除后，用到它的地方跟着清掉：运行它的块（action）、打开它的按钮和入口（D-256）、文件房间工具栏上的这一项。
- * 同 ID 的内设快捷操作还在时（移除的是预设的副本）这些块仍然有效，不移除。手机桌面菜单里的总是拿掉。
+ * After a quick action is removed, places using it are cleaned up: blocks running it (actions),
+ * buttons and entry points opening it (D-256), and this item on the file room toolbar. If a
+ * built-in quick action with the same ID still exists (when removing a preset copy), these blocks
+ * remain valid and are not removed. Always removed from the mobile desktop menu.
  */
 function removeQuickActionUses(
   config: WorkspaceConfig,
@@ -395,7 +403,7 @@ function removeQuickActionUses(
   else delete config.nav.phoneHomeScreen;
   const gone = ids.filter((id) => !presetById(id));
   if (gone.length === 0) return counts;
-  // 记录页顶部的按钮（D-428，底线 18）。
+  // Buttons at the top of the record page (D-428, Invariant 18).
   for (const table of config.data.tables) {
     const row = table.recordRow?.filter((item) => {
       if (!gone.includes(item.tool)) return true;
@@ -405,7 +413,7 @@ function removeQuickActionUses(
     if (row && row.length > 0) table.recordRow = row;
     else delete table.recordRow;
   }
-  // 列表上方、单条记录块上的按钮（D-428）：块留着，按钮去掉。
+  // Buttons above lists and on single record blocks (D-428): blocks are kept, buttons are removed.
   for (const c of everyBlock(config)) {
     if (!isKnownComponent(c) || c.look === 'action') continue;
     const block = c as { tools?: ToolUse[] };
@@ -432,7 +440,7 @@ function removeQuickActionUses(
     if (ran) counts.get(ran)!.runners++;
     const opened = ran ? undefined : opens(c);
     if (opened) counts.get(opened)!.links++;
-    // 分开的浮动按钮一项都不剩时块也移除（底线 18）。
+    // Remove the block as well when no floating action buttons are left (invariant 18).
     const emptyDial = isKnownComponent(c) && c.look === 'dial' && !c.tools?.length;
     return ran !== undefined || opened !== undefined || emptyDial;
   });
@@ -457,7 +465,7 @@ function removeQuickActionUses(
   return counts;
 }
 
-// ---- 数据 ----
+// ---- Data ----
 
 function getTable(config: WorkspaceConfig, id: string): Collection {
   const table = config.data.tables.find((c) => c.id === id);
@@ -471,7 +479,7 @@ function getFieldIndex(table: Collection, id: string): number {
   return index;
 }
 
-/** 被删掉的表（field 不写）或字段。 */
+/** Deleted table (fields omitted) or field. */
 interface Gone {
   table: string;
   field?: string;
@@ -480,9 +488,9 @@ interface Gone {
 const hasKey = (o: object | undefined, key: string) =>
   o !== undefined && Object.prototype.hasOwnProperty.call(o, key);
 
-/** 就地的一键记录工具用到了被删掉的表或字段。 */
+/** A standalone one-tap record tool references a deleted table or field. */
 function recordToolUses(use: RecordTool, gone: Gone): boolean {
-  // 批量新建（D-567）：来源表、它的筛选和值里读来源的字段也算。
+  // Batch creation (D-567): source table, its filters, and value expressions reading source fields are also included.
   if (use.do === 'createAll' && use.from === gone.table) {
     const id = gone.field;
     if (
@@ -507,7 +515,7 @@ function recordToolUses(use: RecordTool, gone: Gone): boolean {
       return use.field === id || (use.filter ?? []).some((c) => c.field === id);
     case 'createAll':
       return hasKey(use.values, id);
-    // 移到「最近删除」（D-610）不用字段；表删了上面已经算。
+    // Moving to "Recently Deleted" (D-610) does not use fields; table deletion is already accounted for above.
     case 'remove':
       return false;
     default:
@@ -516,8 +524,9 @@ function recordToolUses(use: RecordTool, gone: Gone): boolean {
 }
 
 /**
- * 块（读 table 这张表）上的一个工具用到了被删掉的表或字段：工具自己的，或者 when 里的条件（读这一条），
- * 或者值里读「这一条」（entry 这张表，D-565）的字段：抄的字段、日期的起点和加数。
+ * A tool on a block (reading table) references a deleted table or field: the tool's own
+ * configuration, condition in `when` (reading this entry), or values reading fields of "this
+ * entry" (entry table, D-565) including copied fields, date start, and addend.
  */
 function toolUses(use: ToolUse, table: string | null, gone: Gone, entry = table): boolean {
   if (
@@ -527,7 +536,7 @@ function toolUses(use: ToolUse, table: string | null, gone: Gone, entry = table)
   )
     return true;
   if (!isRecordToolUse(use)) return false;
-  // 点一下的几处（D-566）每一处都看。
+  // Check every one-tap action (D-566).
   return tapWrites(use, table ?? use.table).some(
     (tool) =>
       (gone.field !== undefined &&
@@ -538,12 +547,14 @@ function toolUses(use: ToolUse, table: string | null, gone: Gone, entry = table)
 }
 
 /**
- * 删字段、删表后，用到它的就地一键记录工具（D-304）：按钮跟着移除；记录块上的工具去掉（块留着），
- * 勾的工具没了清单退成列表，拖动的工具没了看板变成只能看。添加表单不动：它问的字段由校验器指出来，
- * 让 AI 一起改（和 v33 一样）。
+ * After deleting a field or table, handle referencing standalone one-tap record tools (D-304):
+ * remove the button; strip the tool from record blocks (leaving the block); if checked tools are
+ * gone, downgrade checklists to regular lists; if dragged tools are gone, convert kanban boards
+ * to view-only. Entry forms are left untouched: validator points out missing fields for AI to fix
+ * together (same as v33).
  */
 function pruneRecordTools(config: WorkspaceConfig, gone: Gone, notes: ApplyNote[]): void {
-  // 按钮在记录页上时，「这一条」是页面的那一条（D-565）。
+  // When a button is on a record page, "this entry" refers to that page's entry (D-565).
   const pageOf = new Map<Component, string>();
   for (const page of config.containers.pages)
     if (page.of !== undefined) for (const c of allComponents(page)) pageOf.set(c, page.of);
@@ -567,8 +578,9 @@ function pruneRecordTools(config: WorkspaceConfig, gone: Gone, notes: ApplyNote[
 }
 
 /**
- * 分开的浮动按钮跟着清理（底线 18）：页面上不再有能选的列表时，交列表记录的那一项去掉；打开的页面没了那一项也去掉；
- * 一项都不剩时块也移除。其余的项留着。
+ * Clean up standalone floating action buttons (invariant 18): remove the item handing over list
+ * records when no selectable list remains on the page; remove the item if its target page is
+ * gone; remove the block entirely when zero items remain. Keep the remaining items.
  */
 function pruneDials(config: WorkspaceConfig, notes: ApplyNote[]): void {
   let count = 0;
@@ -595,8 +607,10 @@ function pruneDials(config: WorkspaceConfig, notes: ApplyNote[]): void {
 }
 
 /**
- * 页面上没有时间范围块了（删了、或者页面本来就没有），跟着它的图表、数字卡和记录块（D-561）的 source.period 去掉，
- * 回到自己配置里的范围（底线 18，D-440）。隐藏的时间范围块还算有（校验也这么看）。
+ * When there are no time range blocks left on a page (deleted or originally absent), strip
+ * `source.period` from its charts, metric cards, and record blocks (D-561), reverting to the
+ * block's own configured range (invariant 18, D-440). Hidden time range blocks are still
+ * considered present (validators treat them as such).
  */
 function prunePagePeriod(config: WorkspaceConfig): number {
   let count = 0;
@@ -614,8 +628,9 @@ function prunePagePeriod(config: WorkspaceConfig): number {
 }
 
 /**
- * 页面上没有一排选项了（删了、或者页面本来就没有），跟着它的块的 source.choice 去掉，回到自己的筛选（底线 18，D-573）。
- * 隐藏的那一排还算有（校验也这么看）。
+ * When there is no choice bar left on a page (deleted or originally absent), strip
+ * `source.choice` from its blocks, reverting to their own filters (invariant 18, D-573). Hidden
+ * choice bars are still considered present (validators treat them as such).
  */
 function prunePageChoice(config: WorkspaceConfig): number {
   let count = 0;
@@ -633,8 +648,10 @@ function prunePageChoice(config: WorkspaceConfig): number {
 }
 
 /**
- * 一排选项跟着它的单选字段（底线 18，D-573）：字段删了，这一排去掉（跟着它的块随后由 prunePageChoice 清理）；
- * 选项删了，这一排列出的选项和默认的那一项里去掉它（一个都不剩时回到显示全部选项）。
+ * Clean up choice bars associated with a single-choice field (invariant 18, D-573): if the field
+ * is deleted, remove the choice bar (its blocks will subsequently be cleaned up by
+ * `prunePageChoice`); if an option is deleted, remove it from the choice bar's listed options and
+ * default selection (reverting to show all options if none remain).
  */
 function pruneChoiceRows(config: WorkspaceConfig, gone: Gone, notes: ApplyNote[]): void {
   const rows = (c: Component) =>
@@ -662,7 +679,7 @@ function pruneChoiceRows(config: WorkspaceConfig, gone: Gone, notes: ApplyNote[]
   }
 }
 
-/** 删字段后，记录页顶部交这个字段的按钮跟着去掉（底线 18，D-428）。 */
+/** After deleting a field, remove buttons at the top of record pages that submit to this field (invariant 18, D-428). */
 function pruneRecordRow(table: Collection, field: string, notes: ApplyNote[]): void {
   const row = table.recordRow?.filter((item) => item.field !== field);
   if (!table.recordRow || !row || row.length === table.recordRow.length) return;
@@ -672,8 +689,10 @@ function pruneRecordRow(table: Collection, field: string, notes: ApplyNote[]): v
 }
 
 /**
- * 删字段后记录表单的分段跟着改（D-570，底线 18）：从段里拿掉，段空了就去掉；看它的条件去掉（段从此一直显示，
- * 里面的字段和值都在）。分段一段都不剩时去掉 form。
+ * After deleting a field, adjust entry form sections (D-570, invariant 18): remove the field from
+ * sections, and remove empty sections; remove visibility conditions referencing it (the section
+ * will always be displayed henceforth, keeping all other fields and values). Remove the form
+ * entirely if zero sections remain.
  */
 function pruneEntryForm(table: Collection, field: string): void {
   if (!table.form) return;
@@ -689,7 +708,9 @@ function pruneEntryForm(table: Collection, field: string): void {
 }
 
 /**
- * 删字段后，列表能换的字段、表格的列、单条记录显示的字段跟着去掉（底线 18，D-424）。单条记录一个字段都不剩时块也移除。
+ * After deleting a field, remove it from list swappable fields, table columns, and single-record
+ * display fields (invariant 18, D-424). Remove the block entirely when zero fields remain for a
+ * single record.
  */
 function pruneBrowseFields(
   config: WorkspaceConfig,
@@ -721,14 +742,14 @@ function pruneBrowseFields(
         };
       }
     ).show;
-    // 表格的列（D-539）：最后一列也去掉时回到副标题和右侧字段。
+    // Table columns (D-539): revert to subtitle and right-side fields when the last column is also removed.
     if (show?.columns?.includes(gone.field)) {
       count++;
       const left = without(show.columns);
       if (left.length > 0) show.columns = left;
       else delete show.columns;
     }
-    // 警示色的条件读这个字段（D-541）：整个去掉（只去一条会让更多条变成警示色）。
+    // Highlight condition reads this field (D-541): remove it entirely (removing only a single rule would cause more rows to trigger highlight).
     if (show?.highlight?.some((x) => x.field === gone.field)) {
       count++;
       delete show.highlight;
@@ -762,7 +783,7 @@ function pruneBrowseFields(
   if (count > 0) notes.push({ kind: 'clearedBlockRefs', count });
 }
 
-/** 删表后，别的块上「按这张表显示」的条件去掉（底线 18，D-424）：块留着，一直显示。 */
+/** After deleting a table, remove "show for this table" conditions on other blocks (invariant 18, D-424): keep the block and always display it. */
 function pruneShowIf(config: WorkspaceConfig, table: string, notes: ApplyNote[]): void {
   let count = 0;
   for (const c of everyBlock(config)) {
@@ -773,12 +794,13 @@ function pruneShowIf(config: WorkspaceConfig, table: string, notes: ApplyNote[])
   if (count > 0) notes.push({ kind: 'clearedBlockRefs', count });
 }
 
-/** 这几种聚合读 source.field；别的（计数、按日子算）不读，校验器不要求它。 */
+/** These aggregate types read `source.field`; others (count, date-based) do not, and validators do not require it. */
 const READS_FIELD = ['sum', 'avg', 'min', 'max', 'latest'];
 
 /**
- * 删字段后，数字块、图表、minus 上不读字段的聚合写着的 field 跟着去掉（底线 18）。
- * 要读它的聚合（求和等）不动：校验器会指出来，和以前一样。
+ * After deleting a field, remove `field` declarations from metric blocks, charts, and minuses
+ * that do not require an underlying field (invariant 18). Aggregates requiring a field (such as
+ * sum) are left untouched: validators will flag them as before.
  */
 function pruneAggregateFields(config: WorkspaceConfig, gone: Required<Gone>): void {
   const prune = (source: { table: string; aggregate: string; field?: string | undefined }) => {
@@ -797,7 +819,7 @@ function pruneAggregateFields(config: WorkspaceConfig, gone: Required<Gone>): vo
   }
 }
 
-// ---- 每个操作 ----
+// ---- Each operation ----
 
 function addData(config: WorkspaceConfig, op: OpOf<'addData'>): void {
   if (typeof op.table !== 'string') {
@@ -847,7 +869,7 @@ function updateData(config: WorkspaceConfig, op: OpOf<'updateData'>): void {
         `field ${old.id} cannot change from ${old.type} to ${String(newType)}; add a new field instead`,
       );
     }
-    // 换类型时只保留通用属性，类型专属的属性由 changes 提供（例如 money 的 currency）。
+    // Preserve only common properties when changing types; type-specific properties are provided by `changes` (e.g., currency for money).
     next = {
       id: old.id,
       name: old.name,
@@ -857,22 +879,25 @@ function updateData(config: WorkspaceConfig, op: OpOf<'updateData'>): void {
   } else {
     next = { ...old };
   }
-  // 多选改回单选（D-607）：记录里可能存着几个选项，单选只认一个，拒绝（底线 5、12）；要一个的加新字段。
+  // Reverting multi-select to single-select (D-607): records might store multiple options while single-select accepts only one, so reject (invariants 5, 12); require a new field if multiple values are needed.
   if (old.type === 'choice' && old.multiple && changes.multiple === null)
     throw new OpError(
       `field ${old.id} ${MULTIPLE_CHOICE_NOT_ONE} and entries may already have several; it can't go back to one option; add a new choice field instead`,
     );
-  // 合法性（例如选项 ID 唯一、默认值存在）由 validateWorkspace 检查。
+  // Validity checks (such as unique option IDs or existence of default values) are performed by `validateWorkspace`.
   table.fields[index] = merge(next, changes) as never;
-  // 删掉的选项从页面上的一排选项里去掉（D-573）。
+  // Remove deleted options from page choice bars (D-573).
   pruneChoiceRows(config, { table: table.id }, []);
 }
 
 /**
- * 删表、删字段后，快捷操作里用到它的步骤（参数按动作目录的声明引用表和字段，workflow/refs.ts）：引用这张表的
- * 步骤去掉；只列出了这个字段的，从列表里拿掉这个字段（拿掉后参数不合法就去掉这一步）。剩下的步骤用不了
- * （空了、第一步不是输入动作、类型接不上）时整个快捷操作跟着移除，和读这张表的块一样；工具包带来的快捷操作
- * 不能移除，这时拒绝。
+ * After deleting tables or fields, handle quick action steps referencing them (with parameters
+ * referencing tables and fields per action directory declarations in workflow/refs.ts): remove
+ * steps referencing this table; for steps listing only this field, strip the field from the list
+ * (and remove the step if its parameters become invalid). If the remaining steps are unusable
+ * (empty, first step is not an input action, or type mismatch), remove the entire quick action
+ * just like blocks reading this table; quick action packs cannot be removed, so reject in that
+ * case.
  */
 function pruneSteps(
   config: WorkspaceConfig,
@@ -883,7 +908,7 @@ function pruneSteps(
   const removedIds: string[] = [];
   for (const wf of config.tools) {
     if (wf.kind !== 'quickAction') continue;
-    // 删字段时，把值存进这张表的步骤（记一笔）如果没了放值的字段，也算用到了它。
+    // When deleting a field, steps that store values into this table (log an expense) are also considered to reference it if they lack their value-storing field.
     const table = config.data.tables.find((c) => c.id === gone.table);
     const refs = stepRefs(wf, registry)
       .filter(
@@ -917,7 +942,7 @@ function pruneSteps(
       return { ...step, params };
     });
     const left = steps.filter((_, i) => !dropped.has(i));
-    // 去掉输入步骤后不能变成要容器交值的快捷操作（D-428）：它原来自己选输入，没有地方放。
+    // After removing input steps, the quick action cannot become a container input-providing action (D-428): it originally selected its own input and has nowhere to source it from.
     const works =
       left.length > 0 &&
       workflowProblems({ ...wf, steps: left }, registry).length === 0 &&
@@ -954,13 +979,13 @@ function removeData(
 ): void {
   const table = getTable(config, op.table);
   if (op.field !== undefined) {
-    // D-429：货币字段没了，每一笔都会显示成金额字段的默认货币，那是错的数，所以拒绝（底线 18）。
+    // D-429: if a currency field is removed, every entry would fall back to the amount field's default currency, yielding incorrect figures, so reject (invariant 18).
     const usedBy = table.fields.find((f) => f.type === 'money' && f.currencyField === op.field);
     if (usedBy)
       throw new OpError(
         `field ${op.field} holds the currency of ${usedBy.id}; set currencyField of ${usedBy.id} to null first`,
       );
-    // 从结构里去掉字段：记录里的旧值保留，恢复旧版本时会回来。
+    // Remove the field from the schema: old values in records are preserved and restored when rolling back to an older version.
     table.fields.splice(getFieldIndex(table, op.field), 1);
     pruneRecordTools(config, { table: op.table, field: op.field }, notes);
     pruneRecordRow(table, op.field, notes);
@@ -972,7 +997,7 @@ function removeData(
     pruneDials(config, notes);
     return;
   }
-  // D-250：别的表还引用它时不能移除，先移除那些引用字段（避免引用字段指向不存在的表）。
+  // D-250: cannot remove a table while other tables still reference it; remove those reference fields first (preventing reference fields from pointing to non-existent tables).
   const linking = config.data.tables.flatMap((c) =>
     c.id === op.table
       ? []
@@ -985,14 +1010,14 @@ function removeData(
       `table ${op.table} is linked from ${linking.join(', ')}; remove those fields (and the blocks that show them) first`,
     );
   }
-  // D-342：给这张表的一条记录用的页面一起移除（创始人 2026-10-30 定的方案 B），和移除页面一样清理打开它的地方。
+  // D-342: remove pages dedicated to entries of this table (Plan B decided by founder on 2026-10-30), cleaning up references to them just like page removal.
   const recordPages = config.containers.pages.filter((p) => p.of === op.table);
   for (const p of recordPages) removePage(config, p.id, notes);
   if (recordPages.length > 0)
     notes.push({ kind: 'removedRecordPages', titles: recordPages.map((p) => p.title) });
-  // 把数据表移出界面：记录保留，可在「设置 → 数据」里导出或由用户永久删除。
+  // Move data table out of the UI: records are preserved and can be exported in Settings -> Data or permanently deleted by the user.
   config.data.tables = config.data.tables.filter((c) => c.id !== op.table);
-  // 减去这张表合计的数字（D-337）也一起移除：只留前一半会显示错的数。
+  // Remove associated sum totals (D-337): leaving only the first half would display incorrect figures.
   const count = removeEverywhere(
     config,
     (c) =>
@@ -1076,7 +1101,7 @@ function updateBlock(block: KnownComponent, changes: BlockChanges): void {
   else if (changes.showIf !== undefined) block.showIf = changes.showIf;
   if (changes.pin === null) delete block.pin;
   else if (changes.pin !== undefined) block.pin = changes.pin;
-  // show、source 只合并（null 去掉一项），外观不能通过这个操作改变；合法性由 validateWorkspace 检查。
+  // Merge `show` and `source` only (null strips an item); appearance cannot be modified via this operation. Validity is checked by `validateWorkspace`.
   for (const key of ['show', 'source'] as const) {
     const patch = changes[key];
     if (patch === undefined) continue;
@@ -1111,10 +1136,10 @@ function updateContainer(
     }
     if (bar !== undefined) keepProtectedReachable(config, notes);
     if (phoneHomeScreen !== undefined) {
-      // 放到手机桌面（长按 Morph 图标的菜单，D-271）：工具包自带的快捷操作也可以。
+      // Add to phone home screen (long-press Morph icon menu, D-271): tool pack built-in quick actions are also supported.
       const ids = [...new Set(phoneHomeScreen)];
       for (const id of ids) {
-        // app:<id>（D-485）：点了进那个 App。
+        // app:<id> (D-485): tap to navigate into that App.
         if (id.startsWith('app:')) getApp(config, id.slice('app:'.length));
         else getQuickAction(config, id);
       }
@@ -1124,11 +1149,11 @@ function updateContainer(
     return;
   }
   if (op.desk !== undefined) {
-    // 房间布局（D-358，Q7）：预览上下的块用 addContainer / removeContainer {desk}。
+    // Room layout (D-358, Q7): preview blocks above/below using `addContainer` / `removeContainer {desk}`.
     onlyKeys(op.desk, DESK_CHANGES, 'the file room');
     const { tools, ...layout } = op.desk;
     const next = merge({ ...config.containers.desk }, layout);
-    // 工具栏按文件种类合并（规则 52）：给了的种类整个换，null 回到默认，没写的不动；写法不对的交给校验器。
+    // Merge toolbars by file type (Rule 52): replace provided types entirely, null restores defaults, omitted ones remain unchanged; invalid syntax is left to validators.
     if (tools === null) delete next.tools;
     else if (typeof tools === 'object') {
       const kinds = merge({ ...(next.tools as object) }, tools as Record<string, unknown>);
@@ -1166,7 +1191,7 @@ function removePage(config: WorkspaceConfig, pageId: string, notes: ApplyNote[])
   removeFromAppBars(config, target);
   const count = removeEverywhere(config, (c) => componentTarget(c) === target);
   if (count > 0) notes.push({ kind: 'removedLinks', pageId, count });
-  // D-342：点一条打开这一页的记录块、行上打开这一页的按钮改回打开编辑页。
+  // D-342: record blocks that tap to open this page or row buttons opening this page are reverted to opening the edit page.
   for (const c of everyBlock(config)) {
     if (!isKnownComponent(c)) continue;
     const block = c as { opens?: unknown; tools?: ToolUse[] };
@@ -1224,7 +1249,7 @@ function addTool(config: WorkspaceConfig, op: OpOf<'addTool'>): void {
   if (config.tools.some((t) => t.id === tool.id))
     throw new OpError(`tool ${tool.id} already exists`);
   if (tool.kind === 'reminder') {
-    // 按记录排的提醒另算，不占 20 个的名额（D-316）。
+    // Per-record reminders are tracked separately and do not count toward the 20-item limit (D-316).
     const perRecord = isRecordReminder(tool);
     const max = perRecord ? MAX_RECORD_REMINDERS : MAX_REMINDERS;
     const same = config.tools.filter(
@@ -1242,12 +1267,12 @@ function addTool(config: WorkspaceConfig, op: OpOf<'addTool'>): void {
   addQuickActions(config, [tool]);
 }
 
-/** 快捷操作排在提醒前面（和迁移出来的顺序一样：先 workflows，后 reminders）。 */
+/** Quick actions are listed before reminders (matching migrated order: workflows first, then reminders). */
 function addQuickActions(config: WorkspaceConfig, list: readonly QuickAction[]): void {
   config.tools.splice(quickActionsOf(config).length, 0, ...list);
 }
 
-/** 整体替换步骤（快捷操作编辑页保存、恢复预设）。AI 看到的是占位符（D-065）：同一步原样写回占位符表示保留原来的文字。 */
+/** Replace steps globally (saving quick action edit page, restoring presets). AI sees placeholders (D-065): writing back the exact same placeholder indicates keeping original text. */
 function replaceSteps(wf: QuickAction, steps: unknown): WorkflowStep[] {
   if (!Array.isArray(steps) || steps.length === 0)
     throw new OpError(`steps of ${wf.id} must be a list of at least one step`);
@@ -1277,7 +1302,7 @@ function updateTool(config: WorkspaceConfig, op: OpOf<'updateTool'>): void {
     if (changes.params !== undefined) {
       if (typeof changes.params !== 'object' || changes.params === null)
         throw new OpError(`params of step ${op.step} must be an object`);
-      // AI 看到的是占位符（D-065）：原样写回占位符表示不改这个参数。
+      // AI sees placeholders (D-065): writing back the exact same placeholder indicates leaving this parameter unchanged.
       const params = Object.entries(changes.params).filter(([, v]) => v !== REDACTED_TEXT);
       step.params = { ...step.params, ...Object.fromEntries(params) };
     }
@@ -1300,7 +1325,7 @@ function updateTool(config: WorkspaceConfig, op: OpOf<'updateTool'>): void {
   }
   for (const key of ['id', 'kind', 'package', 'preset'])
     if (key in changes) throw new OpError(`a reminder's ${key} cannot change`);
-  // 合并进提醒；null 去掉可选的键。合法性由 validateWorkspace 检查。
+  // Merge into reminder; null strips optional keys. Validity is checked by `validateWorkspace`.
   const next = merge({ ...tool }, changes) as unknown as Reminder;
   config.tools = config.tools.map((t) => (t.id === tool.id ? next : t));
 }
@@ -1331,9 +1356,9 @@ function moveTool(config: WorkspaceConfig, op: OpOf<'moveTool'>): void {
 }
 
 function setTheme(config: WorkspaceConfig, op: OpOf<'setTheme'>): void {
-  // 不写 app 改主页的风格；写了改这个 app 自己的风格（D-485）。
+  // If `app` is undefined, modify home theme; otherwise modify that app's own theme (D-485).
   const holder: { theme: Theme } = op.app === undefined ? config : getApp(config, op.app);
-  // 图标库（D-625）：整个工作区一份，写没写 app 都一样；空了就不存。
+  // Icon library (D-625): shared across the entire workspace regardless of whether `app` is specified; omitted if empty.
   if (op.icons) {
     const icons = { ...config.icons };
     for (const [id, icon] of Object.entries(op.icons)) {
@@ -1365,7 +1390,7 @@ function setTheme(config: WorkspaceConfig, op: OpOf<'setTheme'>): void {
   for (const [key, value] of Object.entries(tokens)) {
     if (value !== undefined) (holder.theme as Record<string, unknown>)[key] = value;
   }
-  // 自定义卡片（D-624）：null 去掉；只换 cardStyle 时也去掉，选了哪种样式就是哪种样式。
+  // Custom cards (D-624): null removes it; also strip it when changing `cardStyle` alone so the chosen style takes effect.
   if (card) holder.theme.card = card;
   else if (card === null || op.cardStyle !== undefined) delete holder.theme.card;
   const setColors = (target: ThemeColors, changes: typeof colors) => {
@@ -1398,7 +1423,7 @@ function addPackage(config: WorkspaceConfig, id: string, ctx: ApplyContext): voi
   config.packages.push({ id: def.id, version: def.version, page: page.id });
   if (shownInToolGrid(config, def.id, [...ctx.registry.tools.keys()])) return;
   const home = getPage(config, HOME_PAGE_ID);
-  // 和 v33 的 toolCard 一样：标题、图标按工具包现取，默认是大块。
+  // Same as v33 toolCard: title and icon fetched from the tool pack, defaulting to a large block.
   home.blocks.splice(packageEntryIndex(home), 0, {
     id: `card-${def.id}`,
     look: 'entry',
@@ -1410,7 +1435,7 @@ function addPackage(config: WorkspaceConfig, id: string, ctx: ApplyContext): voi
 function removePackage(config: WorkspaceConfig, id: string): void {
   const installed = config.packages.find((t) => t.id === id);
   if (!installed) throw new OpError(`tool ${id} is not added`);
-  // 只移除入口、页面和快捷操作、提醒；用户文件不在配置中，不受影响（§7G）。
+  // Remove entry points, pages, quick actions, and reminders only; user files are not in config and remain unaffected (§7G).
   const target = pageTarget(installed.page);
   config.packages = config.packages.filter((t) => t.id !== id);
   config.containers.pages = config.containers.pages.filter((p) => p.package !== id);
@@ -1443,7 +1468,7 @@ function updatePackage(
     .createWorkflows(ctx.locale)
     .filter((wf) => !config.tools.some((w) => w.id === wf.id));
   addQuickActions(config, added);
-  // 新入口放在文件列表之前（没有文件列表时放在最后）。
+  // Place new entry points before the file list (or at the end if no file list exists).
   const files = page.blocks.findIndex((c) => isKnownComponent(c) && c.look === 'files');
   let at = files >= 0 ? files : page.blocks.length;
   for (const wf of added) {
@@ -1510,8 +1535,11 @@ export function applyOps(
 }
 
 /**
- * 原来好好的提醒，因为这批修改移除了它要打开的快捷操作 / 页面、要看的表或字段而失效：跟着移除并在说明里写出来
- * （移除快捷操作、页面、表、字段，移除工具包都会这样）。这批修改里新加或改过的提醒不动，有问题由校验器拒绝。
+ * Reminders that were previously valid but became broken because this batch of modifications
+ * removed their targeted quick action/page, table, or field: remove them and document it in notes
+ * (removing quick actions, pages, tables, fields, or tool packs will trigger this). Reminders
+ * added or modified in this batch are untouched; any issues with them are rejected by the
+ * validator.
  */
 function pruneReminders(before: WorkspaceConfig, after: WorkspaceConfig, notes: ApplyNote[]) {
   const removed: string[] = [];

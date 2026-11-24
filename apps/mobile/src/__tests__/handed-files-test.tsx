@@ -17,9 +17,11 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 记录里的附件交给工具（D-442）：附件字段、列表、单条记录块上的按钮，点了才把里面第一步收的文件的副本交给它。
-// 三种状态都走：没有数据、有数据、边界情况（混着类型、文件已经不在了、太大、太多、视频不复制）。
-// 原件（用户文件）一个都不动；副本在运行目录里，结束后一个不剩。
+// Attachments in records are handed over to tools (D-442): buttons on attachment fields, lists, and
+// individual record blocks only pass a copy of the file received by the first step when tapped.
+// Test all three states: empty data, existing data, edge cases (mixed types, missing file, too
+// large, too many, video not copied). Original user files are never touched; copies reside in the
+// run directory and none remain after completion.
 
 const docs: Collection = {
   id: 'docs',
@@ -78,7 +80,7 @@ const settle = () =>
     await Promise.resolve();
   });
 
-/** 放一个用户文件：磁盘上有，记录里也有。 */
+/** Place a user file: exists on disk and in records. */
 async function put(repo: MemoryWorkspaceRepo, files: FakeFiles, a: ReturnType<typeof asset>) {
   await repo.addAsset(a);
   files.disk.set(a.path, new TextEncoder().encode(`bytes of ${a.name}`));
@@ -110,7 +112,7 @@ async function start(
   return { repo, files };
 }
 
-/** 往首页最前面放一个块（测试里的块不走类型检查，配置检查会查）。 */
+/** Place a block at the very beginning of the home page (blocks in tests bypass type checking, but config validation checks them). */
 const addBlock = (block: object): Op =>
   ({ op: 'addContainer', page: 'home', index: 0, block }) as unknown as Op;
 
@@ -162,7 +164,7 @@ describe('with data: the entry page', () => {
   it('shows a button for each tool that takes some of the attachments, not for the others', async () => {
     await start([{ id: 'r1', values: { title: 'A', scan: ['a1'] } }], [jpg], [], entry('r1'));
     expect(await screen.findByTestId('record-action-share-all-scan')).toBeTruthy();
-    // 只有一张图片：只收 PDF 的工具没有可交的。
+    // Only one image: tools that accept PDF only have nothing to hand over.
     expect(screen.queryByTestId('record-action-pdf-only-scan')).toBeNull();
   });
 
@@ -186,11 +188,11 @@ describe('with data: the entry page', () => {
     const before = originals(files);
     await fireEvent.press(await screen.findByTestId('record-action-share-all-scan'));
     await waitFor(() => expect(files.shared.length).toBeGreaterThan(0));
-    // 分享出去的是运行目录里的副本，不是用户文件。
+    // Shared files originate from the run directory rather than being user files.
     expect(files.shared.every((uri) => uri.startsWith('runs/'))).toBe(true);
     expect(files.shared.map((u) => u.split('/').pop()).sort()).toEqual(['photo.jpg', 'scan.pdf']);
     expect(originals(files)).toEqual(before);
-    // 离开运行页面后，副本一个不剩。
+    // After leaving the run page, no copies remain.
     await act(() => router.back());
     await settle();
     await waitFor(() => expect(files.runFiles()).toEqual([]));
@@ -204,7 +206,7 @@ describe('with data: the entry page', () => {
       [],
       entry('r1'),
     );
-    // share-all 收任何文件：四个都交。
+    // share-all accepts any file: passes all four.
     await fireEvent.press(await screen.findByTestId('record-action-share-all-scan'));
     await waitFor(() => expect(files.shared).toHaveLength(4));
   });
@@ -260,7 +262,7 @@ describe('edge cases', () => {
       [],
       entry('r1'),
     );
-    // 第二个文件在记录里、磁盘上却没有（读不了）：第一个已经复制的也要删。
+    // Second file exists in records but not on disk (unreadable): already-copied first file must also be deleted.
     await repo.addAsset(pdf);
     await act(() => router.push(entry('r1')));
     await settle();
@@ -280,7 +282,7 @@ describe('edge cases', () => {
     );
     await fireEvent.press(await screen.findByTestId('record-action-share-all-scan'));
     await waitFor(() => expect(files.shared).toHaveLength(1));
-    // 原地使用：没有复制进运行目录，分享的就是用户文件的地址。
+    // In-place usage: not copied into the run directory, shared using the user file's URI directly.
     expect(files.shared[0]).toBe('file:///fake/assets/a5/clip.mp4');
     expect(files.adopted).toEqual(['file:///fake/assets/a5/clip.mp4']);
     await act(() => router.back());

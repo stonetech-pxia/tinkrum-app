@@ -7,7 +7,7 @@ function overlaps(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
-/** 每张输入图片在所有段里覆盖的源行数之和应等于原高度。 */
+/** The sum of source rows covered by each input image across all segments should equal the original height. */
 function sourceRows(segments: StitchSegment[], sizes: Size[]): number[] {
   const rows = sizes.map(() => 0);
   for (const seg of segments) {
@@ -58,14 +58,14 @@ describe('layoutStitch', () => {
       const last = seg.placements.at(-1)!;
       expect(last.y + last.height).toBe(seg.height);
     }
-    // 长图缩到宽 500 后高 25000：第一段放不下，另起一段切开
+    // Long image scaled down to width 500 results in height 25000: the first segment cannot fit, start a new segment and cut
     const cut = segments.flatMap((s) => s.placements).filter((p) => p.index === 1);
     expect(cut.length).toBe(2);
     expect(cut.map((p) => p.height)).toEqual([16384, 25000 - 16384]);
     expect(cut[0]).toMatchObject({ y: 0, srcY: 0 });
     expect(cut[1]!.srcY).toBe(cut[0]!.srcHeight);
     expect(sourceRows(segments, sizes)).toEqual([400, 50_000, 400]);
-    // 第三张接在切开的最后一段后面
+    // The third image follows the last segment of the split
     expect(segments.at(-1)!.placements.map((p) => p.index)).toEqual([1, 2]);
   });
 
@@ -127,7 +127,7 @@ describe('layoutGrid', () => {
       paddingPx: 0,
       outputWidth: 1000,
     });
-    // 单元格 496 宽，剩余 1px 落在两侧
+    // Cell width is 496, with the remaining 1px distributed evenly on both sides
     expect(grid.cells[0]).toEqual({ x: 0, y: 0, width: 496, height: 661 });
     expect(grid.height).toBe(3 * 661 + 2 * 7);
     for (const [i, a] of grid.cells.entries()) {
@@ -182,7 +182,7 @@ describe('layoutWatermark', () => {
     for (const [i, a] of tile.rects.entries()) {
       for (const b of tile.rects.slice(i + 1)) expect(overlaps(a, b)).toBe(false);
     }
-    // 图上任何一点附近都有水印
+    // There is a watermark near any point on the image
     const centers = tile.rects.map((r) => [r.x + r.width / 2, r.y + r.height / 2] as const);
     for (let x = 0; x <= 4000; x += 250) {
       for (let y = 0; y <= 3000; y += 250) {
@@ -211,7 +211,7 @@ describe('layoutWatermark', () => {
       const nearest = Math.min(...centers.map(([cx, cy]) => Math.hypot(cx - x, cy - y)));
       expect(nearest).toBeLessThan(500);
     }
-    // 只保留与图片有交集的水印
+    // Keep only watermarks that intersect with the image
     for (const [cx, cy] of centers) {
       expect(cx).toBeGreaterThan(-500);
       expect(cx).toBeLessThan(4500);

@@ -3,11 +3,13 @@ import { hiddenFormFields } from './data';
 import { conditionProblems } from './conditions';
 import { fieldDefinition, type Collection, type Condition } from './schema';
 
-// 记录表单怎么排（D-570，创始人 2026-11-16 决定 ①）：表上的 form 只有分段和条件显示，字段上有提示（hint）和
-// 范围（min / max）。保存、删除、附件、候选值和记录页别的部分仍归内核，记录页不变成自由页面。
+// Entry form layout (D-570, Founder decision 2026-11-16 ①): forms on tables support only sections
+// and conditional visibility, with field-level hints and ranges (min/max). Saving, deletion,
+// attachments, candidate values, and other parts of the record page remain core responsibilities,
+// and record pages do not become freeform pages.
 
 export interface ShownSection {
-  /** 段在 form.sections 里的位置；排在最后、没写进任何一段的那些字段是 null。 */
+  /** Position of the section in form.sections; fields placed at the end without belonging to any section are null. */
   index: number | null;
   title?: string;
   fields: string[];
@@ -15,8 +17,9 @@ export interface ShownSection {
 }
 
 /**
- * 表单的全部段：配置里的段按顺序（只留表里还有的字段），然后是没写进任何一段的字段（按表里的顺序，没有标题）。
- * 加了字段一定排得进来，不需要把每个字段都列出来。
+ * All sections of the form: configured sections in order (retaining only fields still present in
+ * the table), followed by unassigned fields (in table order, without a header). Newly added
+ * fields are guaranteed to fit in without requiring every field to be explicitly listed.
  */
 export function formSections(collection: Collection): ShownSection[] {
   const ids = new Set(collection.fields.map((f) => f.id));
@@ -39,8 +42,9 @@ export function formSections(collection: Collection): ShownSection[] {
 }
 
 /**
- * 表单里现在的值（输入框里的文字、勾选……）宽容地换成存的值：写不进去的当作没有。条件显示按它判断，
- * 用户一边填一边变。
+ * Current values in the form (text in input boxes, checkboxes, etc.) leniently converted to
+ * stored values: unparsable values are treated as absent. Evaluated for conditional display,
+ * changing dynamically as the user types.
  */
 function formStoredValues(
   collection: Collection,
@@ -57,7 +61,7 @@ function formStoredValues(
   return out;
 }
 
-/** 按表单里现在的值，这时显示的段（条件不成立的段不画）。 */
+/** Currently displayed sections based on the form's current values (sections with unmet conditions are not rendered). */
 export function visibleFormSections(
   collection: Collection,
   formValues: Record<string, unknown>,
@@ -69,8 +73,10 @@ export function visibleFormSections(
 }
 
 /**
- * 表单要交去保存的值：藏着的段里的字段不交（存着的值不动，新记录用默认值），用户在它藏起来之前改的也不算。
- * 这样藏着的字段不会因为看不见的错误挡住保存（底线 5：不清空任何值）。
+ * Values to be submitted for saving from the form: fields in hidden sections are not submitted
+ * (stored values remain untouched, new records use defaults), and user edits made before fields
+ * were hidden are discarded. This prevents hidden fields from blocking saves due to invisible
+ * errors (Invariant 5: never clear any values).
  */
 export function formInput(
   collection: Collection,
@@ -84,7 +90,9 @@ export function formInput(
 }
 
 /**
- * 表单里改了值以后还留着的错误（D-572）：改了的字段，它的错误去掉（改对了没有，下一次保存再查）；别的字段的照旧。
+ * Errors remaining in the form after a value change (D-572): errors for the modified field are
+ * cleared (no errors if corrected, rechecked upon next save); errors for other fields remain
+ * unchanged.
  */
 export function issuesLeft<I extends { fieldId: string }>(
   issues: readonly I[],
@@ -97,7 +105,7 @@ export function issuesLeft<I extends { fieldId: string }>(
   return left.length === issues.length ? (issues as I[]) : left;
 }
 
-/** 表单分段的检查（validate.ts）：字段在表里、每个字段只在一段里；条件只看这一条自己填的字段，不看本段的字段。 */
+/** Validation of form sections (validate.ts): fields must exist in the table, each field can belong to only one section, and conditions may only reference the record's own fields rather than other fields in the same section. */
 export function entryFormProblems(collection: Collection): string[] {
   const sections = collection.form?.sections ?? [];
   const problems: string[] = [];

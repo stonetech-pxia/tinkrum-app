@@ -21,17 +21,19 @@ import {
 
 import type { WidgetOpRef } from './types';
 
-// 小组件上能点的工具（D-323）：按钮上的「新建一条」和 tiles 每一块的点一下（新建、设值、勾选、加减）。
-// 筛出来一起改（setAll）要先确认，「打开表单」要看界面，这两种在小组件上点了打开 App。
-// 同一份算法既用来预先算「点了以后」的画面（在内存里的记录上），也用来真正执行（App 取走队列时）。
+// Tools executable on widgets (D-321): "Create entry" on buttons and individual tile taps (create,
+// set value, check, increment/decrement). Filtered batch changes (setAll) require confirmation, and
+// "Open form" requires the UI; both open the app when tapped on a widget. The same algorithm is
+// used both to precalculate post-tap rendering states (on in-memory records) and to execute them
+// (when the app claims the queue).
 
-/** 记录按表分好（只读）。 */
+/** Records grouped by table (read-only). */
 export type RecordsByTable = ReadonlyMap<string, readonly DataRecord[]>;
 
-/** 小组件上能直接执行的一键记录工具：直接存的新建、设值、勾选、加减。 */
+/** One-tap record tools directly executable on widgets: direct creation, set value, check, and increment/decrement. */
 type WidgetTool = Exclude<RecordTool, { do: 'setAll' | 'createAll' | 'remove' }>;
 
-/** 工具定义的指纹：页面改过（工具换了）以后，之前点的不再执行。 */
+/** Tool definition fingerprint: if the page is modified (tool changed), previously tapped actions are no longer executed. */
 export function actionHash(action: ToolUse): string {
   const text = JSON.stringify(action);
   let h = 5381;
@@ -48,8 +50,10 @@ export function findComponent(config: WorkspaceConfig, id: string): Component | 
 }
 
 /**
- * 能在小组件上直接执行的工具（打开表单的新建要用户填，setAll 要确认，「打开」要看界面）。读「这一条」字段的
- * （抄、从它的日期起算、加它的数字，D-565）也打开 App：小组件那边只有存着的值，没有算好的。
+ * Tools directly executable on widgets (form creation requires user input, setAll requires
+ * confirmation, "open" requires the UI). Reading fields from "this entry" (copying, calculating
+ * from its date, adding its number—D-565) also opens the app: widgets only store values, not
+ * computed results.
  */
 function widgetTool(use: ToolUse | undefined): WidgetTool | undefined {
   if (!use || !isRecordToolUse(use)) return undefined;
@@ -57,25 +61,25 @@ function widgetTool(use: ToolUse | undefined): WidgetTool | undefined {
   if (
     tool.do === 'setAll' ||
     tool.do === 'createAll' ||
-    // 删掉（D-610）只在打卡格上，要弹撤销：小组件上没有。
+    // Deletion (D-610) is restricted to tile grids and triggers undo; not supported on widgets.
     tool.do === 'remove' ||
     (tool.do === 'create' && tool.ask !== undefined)
   )
     return undefined;
   if (toolReadsEntry(tool)) return undefined;
-  // 点一下改几处（D-566）之后要出撤销提示条，小组件上没有：打开 App。
+  // Tapping once to make multiple changes (D-566) requires an undo banner, which widgets do not support: opens the app instead.
   if (tapAlsoOf(use).length > 0) return undefined;
   return tool;
 }
 
-/** 按钮的工具能不能在小组件上直接执行：能的话返回它（带出现方式，算指纹用）。 */
+/** Whether a button tool can be directly executed on a widget: returns it if supported (including appearance mode, used for fingerprinting). */
 export function widgetButtonAction(c: Component): RecordToolUse | null {
   if (!isKnownComponent(c) || c.look !== 'button') return null;
   const use = c.tools?.[0];
   return use && widgetTool(use) && isRecordToolUse(use) ? use : null;
 }
 
-/** 一条上的工具（tap）能不能在小组件上直接执行。 */
+/** Whether a row tool (tap) can be directly executed on a widget. */
 export function widgetRowAction(use: ToolUse | undefined): RecordToolUse | undefined {
   return use && widgetTool(use) && isRecordToolUse(use) ? use : undefined;
 }
@@ -93,8 +97,10 @@ export type PlannedWrite =
     };
 
 /**
- * 一次点按要写什么。null：不执行（组件删了、操作改了、记录不在了、表满了、值存不进去）。
- * records 是存着的记录（不是算好的）；时间用点的时间：「今天」是点的那天（D-323）。
+ * Determines what write operation to perform for a tap. Returns null if not executable (component
+ * deleted, action modified, record missing, table full, value un-storable). records contains
+ * stored records (not computed ones); timestamps use tap time: "today" is the day of the tap
+ * (D-323).
  */
 export function planWidgetOp(
   config: WorkspaceConfig,
@@ -122,13 +128,13 @@ export function planWidgetOp(
     return tool?.do === 'create' ? insert(tool) : null;
   }
   if (c.look !== 'tiles') return null;
-  // 按点的时候显示的那个工具：hash 对得上的那个（条件可能已经变了，例如上班后显示「下班」）。
+  // Evaluates against the tool displayed at the time of the tap: the one with a matching hash (conditions may have changed, e.g., displaying "Clock out" after clocking in).
   const tool = widgetTool((c.tools ?? []).find((u) => actionHash(u) === ref.hash));
   if (!tool) return null;
   const listed = records.get(c.source.table)?.find((r) => r.id === ref.record);
   if (!listed) return null;
   if (tool.do === 'create') return insert(tool, listed.id);
-  // 改的是工具自己的表里的这一条（关系规则 12）。
+  // Modifies an entry in the tool's own table (relation rule 12).
   const collection = config.data.tables.find((x) => x.id === tool.table);
   const stored = collection && records.get(collection.id)?.find((r) => r.id === ref.record);
   if (!collection || !stored) return null;
@@ -140,7 +146,7 @@ export function planWidgetOp(
     : null;
 }
 
-/** 在内存里的记录上执行（预先算「点了以后」的画面用）。 */
+/** Executes against in-memory records (used to precalculate post-tap views). */
 export function applyInMemory(
   records: RecordsByTable,
   write: PlannedWrite,

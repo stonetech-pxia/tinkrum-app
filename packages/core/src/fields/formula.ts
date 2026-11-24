@@ -6,7 +6,7 @@ import { MAX_FORMULA_LENGTH, formulaType, parseFormula } from '../formula';
 import type { Collection } from '../schema';
 import { IdSchema, boundedText, type Locale } from '../schema-primitives';
 import { defineField, isNumber, numberWithUnit, type FieldDefinitionOf } from './define';
-// 只在检查时用（运行时才取），不会在加载时互相引用。
+// Used only during checks (retrieved at runtime), avoiding circular references during loading.
 import { fieldDefinition } from './index';
 
 const schema = z.strictObject({
@@ -21,8 +21,10 @@ const schema = z.strictObject({
     .regex(/^[A-Z]{3}$/, 'currency must be an ISO code like CNY')
     .optional(),
   /**
-   * 空着的数算 0（D-619）：不写时照旧，用到的字段有一个空着公式就没有值。只管数（数字、金额、评分、时长、勾选框、
-   * 单选的值、别的公式、查找和汇总来的数）；日期、时间空着照旧没有值，除以 0 照旧没有值。
+   * Treat empty numbers as 0 (D-619): when omitted, works as before, and formulas have no value
+   * if any referenced field is empty. Applies only to numbers (numbers, amounts, ratings,
+   * durations, checkboxes, single-select values, other formulas, numeric lookups and rollups);
+   * empty dates and times still have no value, and division by zero still has no value.
    */
   empty: z.literal('zero').optional(),
 });
@@ -31,9 +33,11 @@ const show = (f: z.infer<typeof schema>, n: number, locale: Locale) =>
   f.currency ? formatMoney(n, f.currency, locale) : numberWithUnit(n, f, locale);
 
 /**
- * D-188：公式，由同一张表的数字、金额、评分、日期字段算出来（四则运算、if、days），不存进记录、不能填。
- * 引用的字段都在这张表里、能用在公式里（定义的 formula），结果是数字（D-247）。
- * D-280 起也能用时间类字段和 min / max / round / abs；D-281 起能引用别的公式，但不能绕回自己。
+ * D-188: Formulas, calculated from number, amount, rating, and date fields in the same table
+ * (arithmetic operations, if, days), not stored in records, non-fillable. Referenced fields must
+ * be in this table and usable in formulas (defined formula), and the result must be a number
+ * (D-247). Starting from D-280, time fields and min / max / round / abs can also be used;
+ * starting from D-281, other formulas can be referenced without creating circular loops.
  */
 export const formulaField: FieldDefinitionOf<'formula', typeof schema> = defineField({
   type: 'formula',
@@ -48,7 +52,7 @@ export const formulaField: FieldDefinitionOf<'formula', typeof schema> = defineF
   numeric: true,
   inForm: false,
   filter: { is: isNumber, compare: 'number' },
-  // 查找、汇总、上一条（D-287–D-289）按它们显示的那种字段算。
+  // Lookups, rollups, and previous values (D-287-D-289) are calculated based on the type of field they display.
   check: (f, { collection, view }) =>
     [
       ...formulaProblems(f.id, f.expression, view),
@@ -57,7 +61,7 @@ export const formulaField: FieldDefinitionOf<'formula', typeof schema> = defineF
             'empty "zero" only changes number fields that are empty, and this formula reads none; leave it out',
           ]
         : []),
-      // D-429：结果标着一种货币，读的金额却每条不一样。
+      // D-429: Result indicates a currency, but the read amounts vary per entry.
       ...(f.currency === undefined
         ? []
         : [...f.expression.matchAll(/\{([^}]+)\}/g)]
@@ -80,7 +84,7 @@ export const formulaField: FieldDefinitionOf<'formula', typeof schema> = defineF
   },
 });
 
-/** 公式读不读数（D-619 的 empty "zero" 只管数）：引用的字段里有一个在公式里是数。 */
+/** Whether a formula reads numbers (D-619 empty "zero" only applies to numbers): at least one referenced field is numeric in the formula. */
 function readsNumber(expression: string, collection: Collection): boolean {
   const parsed = parseFormula(expression);
   if (!parsed.ok) return true;
@@ -107,7 +111,7 @@ function formulaProblems(fieldId: string, expression: string, collection: Collec
         `formula uses ${id}, which is not a number, money, rating, duration, checkbox, choice, date, time, datetime or formula field`,
       );
     else {
-      // D-569：单选要有选项带 value 才能算。
+      // D-569: Single-selects must have options with values to be calculable.
       const ref = fields.find((f) => f.id === id)!;
       const missing = fieldDefinition(ref.type).formulaProblem?.(ref);
       if (missing) problems.push(`formula uses ${id}, ${missing}`);
@@ -128,7 +132,7 @@ function formulaProblems(fieldId: string, expression: string, collection: Collec
   return [];
 }
 
-/** D-281：从这个公式出发沿着引用的公式走，能回到自己时返回那一圈（字段 ID），否则 null。 */
+/** D-281: Starting from this formula and following referenced formulas, returns the loop (field IDs) if it can return to itself, otherwise null. */
 function formulaLoop(start: string, collection: Collection): string[] | null {
   const refsOf = (id: string): string[] => {
     const f = collection.fields.find((x) => x.id === id);

@@ -18,9 +18,11 @@ export const formatSize = (bytes: number, locale: Locale = 'en') => formatFileSi
 const extOf = (name: string) => /\.([A-Za-z0-9]{1,5})$/.exec(name)?.[1]?.toUpperCase() ?? '';
 
 /**
- * 文件列表（look files，读系统表 $files）：展示工作空间里的用户文件（与配置版本无关）。
- * D-451：每行是缩略图（图片用原图，PDF 用存进来时画好的第一页）、文件名、「类型 · 日期」；
- * 点一行用系统预览打开，标题右边「全部」打开全部文件页面（D-453）。只读，不生成缩略图（底线 15）。
+ * File list (look files, reads system table $files): displays user files in the workspace
+ * (independent of config version). D-451: each row consists of a thumbnail (original for images,
+ * pre-rendered first page for PDFs), file name, and "type · date"; tapping a row opens it with
+ * the system preview, and "All" on the right of the title opens the all-files page (D-453).
+ * Read-only, no thumbnail generation (invariant 15).
  */
 export function FileList({ block, env }: { block: BlockOf<'files'>; env: RenderEnv }) {
   const { repo, files } = useWorkspaceContext();
@@ -34,7 +36,7 @@ export function FileList({ block, env }: { block: BlockOf<'files'>; env: RenderE
 
   useEffect(() => {
     let alive = true;
-    // 筛选、排序、条数都按 source（core 的 readFiles）；迁移来的文件列表筛掉了界面用的照片（D-051）。
+    // Filtering, sorting, and count all follow source (core's readFiles); migrated file lists filter out UI photos (D-051).
     void repo.listAssets().then((all) => {
       if (alive) setAssets(readFiles(source, all, new Date(), cal));
     });
@@ -89,8 +91,10 @@ export function FileList({ block, env }: { block: BlockOf<'files'>; env: RenderE
 }
 
 /**
- * 打开一个用户文件：进文件预览页（D-457），和收到文件一样。文件在 App 的文档目录里，不在选择器的缓存目录，
- * 离开预览页时释放这一批不会动它（removePickedCopies 只删缓存里的）。
+ * Opens a user file: enters the file preview page (D-457), same as receiving a file. The file
+ * resides in the app's document directory rather than the picker's cache directory; leaving the
+ * preview page releases this batch without affecting them (removePickedCopies only deletes cache
+ * copies).
  */
 export function openAsset(
   files: ReturnType<typeof useWorkspaceContext>['files'],
@@ -98,7 +102,7 @@ export function openAsset(
   a: AssetRecord,
 ) {
   useIncoming.getState().receive(
-    // 带着文件 ID（D-455）：预览页「编辑」时把存在旁边的中间格式一起放上桌（D-470）。
+    // Carries file ID (D-455): places the intermediate format stored alongside it onto the desk when editing in the preview page (D-470).
     [
       {
         uri: files.fileUri(a.path),
@@ -114,7 +118,7 @@ export function openAsset(
   router.push('/share');
 }
 
-/** 一行文件：缩略图、文件名、「类型 · 日期」（首页的最近文件和全部文件页面共用）。 */
+/** A single file row: thumbnail, file name, and "type · date" (shared between home screen recent files and all-files pages). */
 export function FileRow({
   asset,
   first,
@@ -130,12 +134,12 @@ export function FileRow({
   first: boolean;
   palette: Palette;
   locale: Locale;
-  /** 搜索时文件里匹配的那一段文字（D-455）。 */
+  /** The snippet of text matching the search within the file (D-455). */
   snippet?: string | undefined;
   disabled?: boolean;
   onPress?: (() => void) | undefined;
   onLongPress?: (() => void) | undefined;
-  /** 行右边的东西（全部文件页面的选择框，D-472）。 */
+  /** Trailing element on the right of the row (selection checkbox on the all-files page, D-472). */
   trailing?: ReactNode;
 }) {
   const date = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(
@@ -173,7 +177,7 @@ export function FileRow({
   );
 }
 
-/** 缩略图：图片用原图，PDF 用第一页（D-451），别的用图标。 */
+/** Thumbnail: original for images, first page for PDFs (D-451), and icons for others. */
 function Thumb({ asset, palette }: { asset: AssetRecord; palette: Palette }) {
   const { files } = useWorkspaceContext();
   const uri = asset.mimeType.startsWith('image/')
@@ -214,7 +218,7 @@ function Thumb({ asset, palette }: { asset: AssetRecord; palette: Palette }) {
 
 const styles = StyleSheet.create({
   block: { gap: 8 },
-  // 标题在方块外面：贴着页面边距，和卡片的边对齐（D-454）。
+  // Title outside the box: aligned with page margins and card edges (D-454).
   head: { flexDirection: 'row', justifyContent: 'space-between' },
   card: { paddingVertical: 4, gap: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },

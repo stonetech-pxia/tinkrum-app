@@ -78,10 +78,10 @@ import { WidgetProvider } from '@/widgets/context';
 import { nativeWidgets } from '@/widgets/native';
 import { WidgetBridge } from '@/widgets/useWidgets';
 
-// 扩展包（D-064、D-510）：App 里唯一的 PackStore，见 expo-pack-fs.ts。
+// Extension packs (D-064, D-510): the single PackStore in the app, see expo-pack-fs.ts.
 const packs = { store: expoPackStore, bridge: new PackBridge(expoBridgeFiles(expoPackStore)) };
 const registry = createRegistry(BUILTIN_TOOLS);
-// 从服务器下载的工具（D-177、D-178）：目录地址不是秘密；开发版另外信任仓库里的开发公钥。
+// Tools downloaded from the server (D-177, D-178): directory URL is not a secret; development builds additionally trust the development public key in the repository.
 const toolsUrl = process.env.EXPO_PUBLIC_MORPH_TOOLS_URL;
 const toolDownloads = createToolDownloads({
   store: new ToolDownloadStore(expoToolFs, expoSha256, {
@@ -91,11 +91,11 @@ const toolDownloads = createToolDownloads({
   registry,
   configured: Boolean(toolsUrl),
 });
-/** 启动时目录超过一天没拉就拉一次（停用名单靠它生效，D-178）。 */
+/** Fetch the catalog on startup if it hasn't been fetched for over a day (powers the blocklist, D-178). */
 const CATALOG_DAY_MS = 24 * 60 * 60 * 1000;
-// AI 来源由「设置 → AI」决定：内置规则、Morph 服务器（需配置地址，见 README）或用户自带 key。
+// AI source determined by 'Settings -> AI': built-in rules, Morph server (requires address config, see README), or user's own key.
 const apiUrl = process.env.EXPO_PUBLIC_MORPH_API_URL;
-// 平台和版本随需求（D-189）和测试期保存的请求（D-240）发给服务器。
+// Platform and version sent to the server per requirements (D-189) and request persistence during testing (D-240).
 const appInfo = {
   ...(Platform.OS === 'ios' || Platform.OS === 'android' ? { platform: Platform.OS } : {}),
   ...(Constants.expoConfig?.version ? { appVersion: Constants.expoConfig.version } : {}),
@@ -103,7 +103,7 @@ const appInfo = {
 const aiSettings = createAISettingsStore({
   secrets: secureSecretStore,
   serverAvailable: Boolean(apiUrl),
-  // 需求回收（D-189）：配置了服务器地址时，AI 做不到的那句话可以由用户点一下发过去。
+  // Requirement recovery (D-189): when a server address is configured, phrases the AI cannot handle can be sent by the user with a tap.
   needs: apiUrl
     ? createNeedSender({
         baseUrl: apiUrl,
@@ -141,7 +141,7 @@ function RootStack() {
   const config = useWorkspace((s) => s.config);
   const actions = useMemo(() => rescueActions(locale), [locale]);
   useStopBuildInBackground();
-  // 读工作空间出错：兜底页（体检 6.6），「照常打开」再读一次。
+  // Error reading workspace: fallback page (health check 6.6), 'Open as usual' to read again.
   if (status === 'error')
     return (
       <RescueScreen
@@ -163,33 +163,33 @@ function RootStack() {
 function ThemedStack() {
   const { locale } = useWorkspaceContext();
   const theme = useAppTheme();
-  // 别的 App 分享进来的文件 → 收件页面（D-114）。
+  // Files shared from other apps -> inbox page (D-114).
   useIncomingShare(expoFilePlatform);
-  // 提醒：配置或记录变了就重排；点提醒只打开页面或快捷操作（D-251）。
+  // Reminders: re-schedule on config or record changes; tapping a reminder opens a page or quick action (D-251).
   useReminderSync(reminders);
   useReminderOpen(reminders);
   useReminderActionFeedback(onReminderAction);
   const palette = usePalette(theme);
   const closable = { presentation: 'modal', ...closeButtonOption(palette) } as const;
-  // 画出来的图标（D-625）：正式版本和草稿里的都放进去，草稿开着时推入的页面画正式版本也有。
+  // Drawn icons (D-625): includes both official version and draft icons; pushed pages also render official version icons when a draft is open.
   const savedIcons = useWorkspace((s) => s.config?.icons);
   const shownIcons = useWorkspace((s) => shownConfig(s)?.icons);
   const icons = useMemo(() => ({ ...savedIcons, ...shownIcons }), [savedIcons, shownIcons]);
   return (
     <DrawnIconsProvider icons={icons}>
       <StatusBar style={palette.dark ? 'light' : 'dark'} />
-      {/* 手机桌面（D-271）：长按 Morph 图标的菜单跟着配置变；从菜单或桌面图标打开时直接开始那个快捷操作。 */}
+      {/* Home Screen (D-271): long-press menu on the Morph icon updates with config changes; opening from the menu or home screen icon directly triggers that quick action. */}
       <HomeScreenBridge platform={nativeHomeScreen} />
-      {/* 桌面小组件（D-321–D-323）：取走小组件上点了的操作，配置或记录变了就重算画面。 */}
+      {/* Home screen widgets (D-321-D-323): retrieves triggered operations from widgets and re-renders when config or records change. */}
       <WidgetBridge platform={nativeWidgets} />
       <Stack screenOptions={stackScreenOptions(palette)}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        {/* AI 修改页不显示标题（D-231），左上角只有「关闭」。 */}
+        {/* AI modification page shows no title (D-231), top-left only has 'Close'. */}
         <Stack.Screen name="change" options={{ ...closable, title: '' }} />
         <Stack.Screen name="page/[pageId]" />
         <Stack.Screen name="ai-settings" options={{ title: t(locale, 'aiSettingsTitle') }} />
         <Stack.Screen name="data" options={{ title: t(locale, 'dataTitle') }} />
-        {/* 数据的子页面（D-614）；一张表的标题是表名，在页面里设。 */}
+        {/* Data subpage (D-614); a table's title is the table name, set within the page. */}
         <Stack.Screen name="data-table/[tableId]" options={{ title: '' }} />
         <Stack.Screen name="data-backup" options={{ title: t(locale, 'backupTitle') }} />
         <Stack.Screen name="data-deleted" options={{ title: t(locale, 'recentlyDeleted') }} />
@@ -203,7 +203,7 @@ function ThemedStack() {
         <Stack.Screen name="packs" options={{ title: t(locale, 'packsTitle') }} />
         <Stack.Screen name="presets" options={{ title: t(locale, 'presetsTitle') }} />
         <Stack.Screen name="open" options={{ ...closable, title: t(locale, 'appLinkTitle') }} />
-        {/* 标题在页面里（放在导航栏时也要），这里不再写一遍。 */}
+        {/* Title is in the page (even when in the navigation bar), not duplicated here. */}
         <Stack.Screen name="history" options={{ title: '' }} />
         <Stack.Screen name="tools" options={{ title: '' }} />
         <Stack.Screen name="reminders" options={{ title: t(locale, 'remindersTitle') }} />
@@ -221,11 +221,17 @@ function ThemedStack() {
         <Stack.Screen name="new-table" options={closable} />
         <Stack.Screen name="run/[workflowId]" options={closable} />
         <Stack.Screen name="share" options={closable} />
-        {/* 多个文件里点开一个看（D-457）：和收件页面一样是弹出页。普通页面会盖住根视图上隐藏的 WebView，PDF 预览
-            用的扩展包页面跟着被挂起，一直转圈（真机上发现）。 */}
+        {/*
+         * Viewing one of multiple files (D-457): a modal popup like the inbox page. Regular pages
+         * cover the hidden WebView on the root view, causing the PDF preview extension pack page
+         * to hang and keep spinning (observed on real devices).
+         */}
         <Stack.Screen name="file-preview" options={closable} />
-        {/* 文件房间（D-360）：全屏，自己画顶栏。不用 fullScreenModal：iOS 会把底下的视图拿出窗口，
-            根视图上的扩展包页面（隐藏的 WebView）跟着被挂起，PDF 预览一直装载。 */}
+        {/*
+         * File desk (D-360): full screen, draws its own top bar. Do not use fullScreenModal: iOS
+         * moves the underlying view out of the window, causing the root view's extension pack
+         * page (hidden WebView) to hang and keep the PDF preview loading.
+         */}
         <Stack.Screen
           name="desk/[deskId]"
           options={{ presentation: 'transparentModal', headerShown: false }}
@@ -242,33 +248,34 @@ function ThemedStack() {
           options={{ presentation: 'transparentModal', headerShown: false, gestureEnabled: false }}
         />
       </Stack>
-      {/* 草稿模式的聊天框只放一个（D-190）：外壳每改一步会重新挂载，推入的页面也要用它。 */}
+      {/* Only keep one chat box in draft mode (D-190): the shell remounts on every step change, and pushed pages must also use it. */}
       <DraftChatSheet />
     </DrawnIconsProvider>
   );
 }
 
-/** 一个正在用的工作空间：store、数据库、建它时的语言。 */
+/** An active workspace: store, database, and the locale it was created with. */
 interface Runtime {
   store: WorkspaceStore;
   repo: SQLiteWorkspaceRepo;
-  /** 这个工作空间是按哪种语言建的；设置里改了语言就按新的重建。 */
+  /** The locale this workspace was created with; rebuilding it when the language changes in settings. */
   locale: Locale;
 }
 
 /**
- * 打开数据库、建工作空间并读出来（启动、整体恢复和撤销之后都走这里）。
- * strict：读不出来（进入错误状态）、或者没有读到 expectHeadId 那个版本（读不懂、退回了旧版本）就抛错，
- * 不把读不对的数据当成功（整体恢复，D-600）。
+ * Open the database, create the workspace, and read it (used on startup, full restore, and undo).
+ * strict: throws an error if it cannot be read (enters error state) or if it fails to read the
+ * expected expectHeadId version (unreadable or rolled back to old version), preventing incorrect
+ * data from being treated as success (full restore, D-600).
  */
 async function bootRuntime(strict?: { strict: true; expectHeadId?: number }): Promise<Runtime> {
   const repo = await openRepo();
   try {
-    // 设置里选的语言（没选就跟随系统）：先读出来，工作空间按它建。
+    // Language selected in settings (follows system if none selected): read first so the workspace is created accordingly.
     const saved = parseLanguage(await repo.getMeta(LANGUAGE_META_KEY).catch(() => null));
     useLanguage.getState().set(saved);
     const bootLocale = resolveLocale(saved);
-    // 先把本机下载过的工具注册进来，用到它们的配置才校验得过。
+    // Register locally downloaded tools first so their configuration passes validation.
     await toolDownloads.getState().load();
     const created = createWorkspaceStore({
       repo,
@@ -293,12 +300,12 @@ async function bootRuntime(strict?: { strict: true; expectHeadId?: number }): Pr
     }
     await useGuide.getState().load(repo);
     void toolDownloads.getState().refresh(CATALOG_DAY_MS);
-    // 已经删掉的快捷操作不再记着文件夹（D-196）。
+    // Deleted quick actions no longer remember their folder (D-196).
     const booted = created.getState().config;
     if (booted) expoFilePlatform.forgetFolders(quickActionsOf(booted).map((w) => w.id));
     return { store: created, repo, locale: bootLocale };
   } catch (e) {
-    // 没读好：关掉刚打开的，免得留着一个指向错地方的数据库。
+    // Failed to read: close the newly opened one to avoid keeping a database pointing to the wrong place.
     await closeRepo().catch(() => undefined);
     throw e;
   }
@@ -308,10 +315,10 @@ export default function RootLayout() {
   const [runtime, setRuntime] = useState<Runtime | null>(null);
   const locale = resolveLocale(useLanguage((s) => s.preference));
   const [error, setError] = useState<string | null>(null);
-  // 启动出错后在兜底页点了「照常打开」：再启动一次。
+  // Clicked 'Open as usual' on the fallback page after startup error: start again.
   const [bootTry, setBootTry] = useState(0);
   const actions = useMemo(() => rescueActions(locale), [locale]);
-  // 默认风格 Clay 的字体（Sora 标题、Karla 正文）。加载失败时退回系统字体，不阻塞启动。
+  // Default Clay style fonts (Sora for headings, Karla for body). Falls back to system fonts on load failure without blocking startup.
   const [fontsLoaded, fontError] = useFonts({
     [CLAY_FONTS.heading]: Sora_700Bold,
     [CLAY_FONTS.title]: Sora_600SemiBold,
@@ -319,7 +326,7 @@ export default function RootLayout() {
     Karla_400Regular_Italic,
     [CLAY_FONTS.bodyMedium]: Karla_500Medium,
     [CLAY_FONTS.bodyBold]: Karla_700Bold,
-    // Inter（D-591）：选了 font: "inter" 的主题用。
+    // Inter (D-591): used by themes with font: "inter".
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -330,21 +337,21 @@ export default function RootLayout() {
     (async () => {
       await aiSettings.getState().load();
       const booted = await bootRuntime();
-      // 上次运行没来得及删除的临时文件（D-063）。
+      // Temporary files left over from the previous run that weren't deleted in time (D-063).
       await expoFilePlatform.removeAllRuns().catch(() => undefined);
-      // 上次在 App 里选了文件、没有处理完就退出时，选择器留在缓存里的副本。
+      // Copies left in cache by the file picker when exiting without finishing processing during the previous session.
       await expoFilePlatform.removeStalePickerCopies().catch(() => undefined);
       setRuntime(booted);
     })().catch((e) => setError(String(e)));
   }, [bootTry]);
 
-  // 上次交给别的 AI App 后留下的「等结果」标记（只读文件，不写）：Android 在用户离开时把进程杀掉也不丢。
+  // The "waiting for result" flag left behind after handing over to another AI app last time (read-only file, no write): preserved even if Android kills the process when the user leaves.
   useEffect(() => {
     if (Platform.OS === 'web') return;
     attachReturnStore(expoReturnStore);
   }, []);
 
-  // 主页正常显示了一会儿：这次启动算成功，启动兜底从零数起（体检 6.6）。
+  // Main page displayed normally for a moment: startup considered successful, reset startup fallback counter (health check 6.6).
   const ready = Boolean(runtime) && (fontsLoaded || Boolean(fontError));
   useEffect(() => {
     if (!ready) return;
@@ -352,8 +359,10 @@ export default function RootLayout() {
     return () => clearTimeout(timer);
   }, [ready]);
 
-  // 整体恢复和撤销（D-600）：换数据目录前关掉数据库并卸下界面（不让任何界面碰关掉的数据库），换完后重开、
-  // 重建工作空间，读回来才算成功；读不回来就抛错，由备份流程换回旧数据再来一遍。
+  // Full restore and undo (D-600): close the database and unmount the UI before changing data
+  // directories (preventing any UI from touching the closed database), reopen and recreate the
+  // workspace after the switch, and read back successfully to confirm; throws an error on read
+  // failure so the backup process can revert to old data and retry.
   const rebuilt = useRef<Runtime | null>(null);
   const [homeSignal, setHomeSignal] = useState(0);
   useEffect(() => {
@@ -370,7 +379,7 @@ export default function RootLayout() {
           setError(null);
           setRuntime(next);
         } catch (e) {
-          // 界面这时是卸下的：连换回旧数据也读不回来时，至少显示出了什么错，而不是一直转圈。
+          // UI is unmounted at this point: when even reverting to old data fails to read, at least show what error occurred rather than infinite spinning.
           setError(String(e));
           throw e;
         }
@@ -378,7 +387,7 @@ export default function RootLayout() {
       notify(kind) {
         const next = rebuilt.current;
         if (!next) return;
-        // 回到主页（界面换了新数据重新挂上之后）：恢复之前打开的页面在新数据里不一定还在。
+        // Return to home (after UI mounts with new data): previously opened pages may no longer exist in the new data.
         setHomeSignal((n) => n + 1);
         const message = {
           restored: 'backupRestored',
@@ -389,7 +398,7 @@ export default function RootLayout() {
           message: t(next.locale, message[kind]),
           ...(kind === 'restored' ? { undoRestore: true } : {}),
         });
-        // 恢复提示不再出现（到时间、关掉、被别的提示换掉）：恢复之前的数据不再能撤销，删掉。
+        // Restore prompt no longer appears (timed out, closed, or replaced by another prompt): pre-restore data can no longer be undone, delete it.
         if (kind === 'restored') {
           const off = next.store.subscribe((state) => {
             if (state.toast?.undoRestore) return;
@@ -408,13 +417,13 @@ export default function RootLayout() {
         if (router.canDismiss()) router.dismissAll();
         router.replace('/');
       } catch {
-        // 导航器还没挂好：留在原来的页面。
+        // Navigator not yet mounted: stay on the current page.
       }
     }, 0);
     return () => clearTimeout(timer);
   }, [homeSignal]);
 
-  // 设置里改了语言：同一个数据库，按新语言重建工作空间（store 里的文案、校验提示都带着语言）。
+  // Language changed in settings: rebuild the workspace on the same database using the new language (store copy and validation messages carry the new language).
   const builtLocale = runtime?.locale;
   useEffect(() => {
     if (!runtime || builtLocale === locale) return;

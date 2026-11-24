@@ -1,7 +1,9 @@
 import Foundation
 
-// App 写进 App Group 的小组件画面（D-321–D-323）。格式见 apps/mobile/src/widgets/types.ts，两边要一起改。
-// 文字、数字都由 App 按当时的语言算好；这里只按时间选一份、按还没执行的点按选「点了以后」的那份。
+// Widget views written by the app into the App Group (D-321–D-323). See
+// `apps/mobile/src/widgets/types.ts` for the format; both sides must be updated together. Texts and
+// numbers are computed by the app for the current language; this only selects a view by time and
+// selects the "after tap" version for unexecuted taps.
 
 let appGroup = "group.dev.stonetech.tinkrum"
 
@@ -44,11 +46,11 @@ struct SnapshotState: Decodable {
   let from: Double
   let until: Double
   let views: [String: ItemView]
-  /** after[操作][k-1]：同一个操作连点 k 次以后每个组件的画面。 */
+  /** `after[op][k-1]`: The view of each widget after the same operation is tapped `k` times consecutively. */
   let after: [String: [[String: ItemView]]]
 }
 
-/** 一个组件的画面：kind 是 stat、button、list 或 message（不支持、已经删掉）。 */
+/** A widget view: `kind` is `stat`, `button`, `list`, or `message` (unsupported or deleted). */
 struct ItemView: Decodable {
   let kind: String
   let title: String
@@ -74,7 +76,7 @@ struct ItemRow: Decodable {
   let full: Bool?
 }
 
-/** 点了、App 还没执行的操作（queue/ 里一个文件一个）。 */
+/** An operation that was tapped but not yet executed by the app (one file per operation in `queue/`). */
 struct QueuedOp: Codable {
   let op: String
   let component: String
@@ -106,7 +108,7 @@ enum SharedFiles {
     }.sorted { $0.at < $1.at }
   }
 
-  /** 每次点按一个文件，写完再改名，App 读不到写了一半的。 */
+  /** Enqueues a widget tap operation: writes to a file and then renames it so the app never reads a half-written file. */
   static func enqueue(_ op: QueuedOp) throws {
     guard let queue = dir?.appendingPathComponent("queue", isDirectory: true) else { return }
     try FileManager.default.createDirectory(at: queue, withIntermediateDirectories: true)
@@ -117,7 +119,7 @@ enum SharedFiles {
   }
 }
 
-/** 这个组件现在该画哪一份；stale：点过的操作算不出来（混着点了几种、点得太多、跨了天），显示提示。 */
+/** Determines which view this widget should render now; `stale`: Tapped operations cannot be resolved (mixed operations, too many taps, or day crossed), displays a prompt. */
 func resolveView(_ snap: WidgetSnapshot, item: String, at date: Date, queued: [QueuedOp]) -> (
   ItemView?, Bool
 ) {

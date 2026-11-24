@@ -8,8 +8,10 @@ import { useWidgetPlacement } from './placed';
 import { onRecordPage, widgetName, widgetSupported } from './snapshot';
 
 /**
- * 长按组件的「放到桌面」（D-325）：用户自己点才放，AI 不能放。Android 弹系统的确认框（桌面支持时）；
- * iOS 不能替用户放，加进「编辑小组件」的列表，并说明在桌面上怎么加。不支持的组件说明能放哪几种。
+ * Long-press widget "Add to Desktop" (D-325): placed only on user tap; AI cannot place it.
+ * Android shows system confirmation dialog (if supported by launcher); iOS cannot place it for
+ * the user, adds it to the "Edit Widget" list, and explains how to add it on the desktop.
+ * Unsupported widgets explain which types can be placed.
  */
 export function usePlaceWidget() {
   const { locale, registry } = useWorkspaceContext();
@@ -26,7 +28,7 @@ export function usePlaceWidget() {
       Alert.alert(t(locale, 'widgetUnsupportedTitle'), t(locale, 'widgetUnsupportedHelp'));
       return;
     }
-    // D-342：这一页跟着某一条记录打开，桌面上不知道显示哪一条。
+    // D-342: This page opens tied to a specific record, but the desktop doesn't know which record to display.
     if (config && onRecordPage(component, config)) {
       Alert.alert(t(locale, 'widgetUnsupportedTitle'), t(locale, 'widgetRecordPageHelp'));
       return;

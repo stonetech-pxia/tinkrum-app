@@ -4,7 +4,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 分组里还能放一层分组（Q3，D-369）：一张卡片上面两个数字并排，下面一个按钮。
+// Nesting another group inside a group (Q3, D-369): two numbers side by side on a card, with a button below.
 
 const seed = (locale: Locale, registry: Registry) => {
   const result = applyOps(
@@ -86,7 +86,7 @@ it('draws a group inside a group: both numbers side by side, the button below, h
     });
   await renderToolsApp(repo, undefined, { seed });
   expect(await screen.findByTestId('component-outer')).toBeTruthy();
-  // 里面那层分组的两个块都画出来了，各自算自己的数。
+  // Both blocks of the inner group rendered, each calculating its own count.
   expect(await screen.findByTestId('stat-value-water-次数')).toHaveTextContent('2');
   expect(screen.getByTestId('stat-value-water-一共')).toHaveTextContent('8');
   expect(screen.getByTestId('component-inner')).toBeTruthy();

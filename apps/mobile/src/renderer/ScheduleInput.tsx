@@ -21,9 +21,12 @@ import { useCalendar, useWorkspace } from '../workspace/context';
 import type { RenderEnv } from './components';
 import type { Palette } from './theme';
 
-// 日程（D-296）：先选一种重复方式，再按这种方式填几个数字或点几个日子；下面一行用一句话写出现在的规则。
-// 所有按钮至少 44 高，方便点。值是 core 的规则（readSchedule 校验），不设时是空。
-// D-340：「一次」放在最前面，选今天、明天、下周、不定日期，或者在框里写日期（也认「下周五」这类说法，D-344）。
+// Schedule (D-296): first select a repetition mode, then fill in numbers or select days according
+// to that mode; the row below displays the current rule in a single sentence. All buttons are at
+// least 44 high for ease of tapping. The value is a core rule (validated by readSchedule),
+// defaulting to empty when not set. D-340: "Once" is placed first, allowing selection of today,
+// tomorrow, next week, an indefinite date, or typing a date in the box (also supports natural
+// phrases like "next Friday", D-344).
 
 type Repeat = ScheduleRule['repeat'];
 
@@ -64,7 +67,7 @@ export function ScheduleInput({
   testID: string;
 }) {
   const cal = useCalendar();
-  // 「上次完成」那个字段的名字（D-293）：每 N 天、每周 N 次从它算起。
+  // Name of the "Last done" field (D-293): calculations for every N days or N times per week start from this field.
   const lastDone = useWorkspace((s) =>
     field.lastDone === undefined
       ? undefined
@@ -72,7 +75,7 @@ export function ScheduleInput({
           .find((c) => c.fields.includes(field))
           ?.fields.find((f) => f.id === field.lastDone)?.name,
   );
-  // 新记录还没动过时显示默认的规则（保存时 core 也套用它）；选「不重复」后值是空字符串。
+  // Displays the default rule when a new entry has not been modified yet (also applied by core upon saving); value becomes an empty string after selecting "Do not repeat".
   const rule =
     value === undefined ? field.default && readSchedule(field.default) : readSchedule(value);
   const today = dateOfDayNumber(todayNumber(new Date(), cal));
@@ -84,7 +87,7 @@ export function ScheduleInput({
     const { perDay: _, ...rest } = next;
     onChange(perDay ? { ...rest, perDay } : rest);
   };
-  // 换一种方式时，从今天推一个合理的起点。
+  // Derives a reasonable starting point from today when switching repetition modes.
   const start = (repeat: Repeat): ScheduleRule => {
     switch (repeat) {
       case 'once':
@@ -134,7 +137,7 @@ export function ScheduleInput({
   const caption = (text: string) => (
     <Text style={[palette.font('bodyBold', 13), { color: palette.muted }]}>{text}</Text>
   );
-  /** − 数字 + ，在 min 到 max 之间。 */
+  /** − Number +, constrained between min and max. */
   const stepper = (
     key: string,
     n: number,
@@ -222,7 +225,7 @@ export function ScheduleInput({
             {order.map((day) =>
               chip(`day-${day}`, weekdayName(day, locale), rule.days.includes(day), () => {
                 const days = toggle(rule.days, day);
-                // 至少留一天。
+                // Keep at least one day.
                 if (days.length > 0) set({ ...rule, days });
               }),
             )}
@@ -345,7 +348,8 @@ export function ScheduleInput({
 }
 
 /**
- * 几点（D-346）：写 8:05、08:05、8：05；离开输入框时整理成 HH:mm，清空就是不设，认不出来就恢复原来的。
+ * Time input (D-346): supports formats like 8:05, 08:05, 8:05; formats to HH:mm upon leaving the
+ * input box, clears if empty, or restores the original value if unrecognized.
  */
 function TimeBox({
   time,
@@ -395,8 +399,9 @@ function TimeBox({
 }
 
 /**
- * 「一次」的日期框：写 YYYY-MM-DD，或者「明天」「下周五」「Nov 5」这类说法（本机识别，D-344）；
- * 离开输入框时换成日期，认不出来就恢复原来的。
+ * "Once" date box: supports YYYY-MM-DD or phrases like "tomorrow", "next Friday", "Nov 5"
+ * (recognized locally, D-344); converts to a date upon leaving the input box, or restores the
+ * original value if unrecognized.
  */
 function OnceDateBox({
   date,
@@ -415,7 +420,7 @@ function OnceDateBox({
 }) {
   const cal = useCalendar();
   const [text, setText] = useState(date ?? '');
-  // 外面换了日期（点了今天、明天）时框里跟着换。
+  // Updates the input box when the outer date changes (e.g., tapping today or tomorrow).
   const [shownFor, setShownFor] = useState(date);
   if (date !== shownFor) {
     setShownFor(date);
@@ -424,7 +429,7 @@ function OnceDateBox({
   const commit = () => {
     const typed = text.trim();
     if (typed === '') return onDate(undefined);
-    // 规则自己校验日期是不是真的（2 月 30 日不行）。
+    // The rule validates dates internally to ensure they are real (e.g., February 30 is invalid).
     const exact = readSchedule({ repeat: 'once', date: typed });
     if (exact?.repeat === 'once' && exact.date) return onDate(exact.date);
     const found = findDatePhrase(typed, today, cal)?.value;

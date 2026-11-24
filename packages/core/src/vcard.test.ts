@@ -4,8 +4,9 @@ import { fieldLink } from './field-link';
 import type { Field } from './schema';
 import { contactCodeValues, parseContactCode, recordsToVCard, recordToVCard } from './vcard';
 
-// 名片的两种文字（D-423）：导出的 vCard 别的 App 读得懂，转义、折行都对；值里的换行造不出新的属性；
-// 扫到的文字只出字段的值，乱的文字什么都不出。
+// Business card text formats (D-423): exported vCard is readable by other apps, with correct
+// escaping and folding; newlines in values do not create new attributes; scanned text only extracts
+// field values, messy text extracts nothing.
 
 const FIELDS: Field[] = [
   { id: 'name', name: '姓名', type: 'text' },
@@ -27,7 +28,7 @@ const EN_FIELDS: Field[] = [
 ];
 
 const lines = (text: string | null) => text!.split('\r\n');
-/** 按 vCard 规则接回折过的行。 */
+/** Reassemble folded lines according to vCard rules. */
 const unfold = (text: string | null) => text!.replace(/\r\n[ \t]/g, '').split('\r\n');
 
 describe('record to vCard', () => {
@@ -91,7 +92,7 @@ describe('record to vCard', () => {
     expect(all.filter((l) => l === 'END:VCARD')).toHaveLength(1);
     expect(all.filter((l) => l === 'BEGIN:VCARD')).toHaveLength(1);
     expect(all[2]).toBe('FN:Eve\\nTEL:+1 900 555\\nEND:VCARD\\nBEGIN:VCARD');
-    // 读回来还是一个人的名字，没有多出电话。
+    // Read back as a single person's name with no extra phone numbers.
     const back = parseContactCode(text)!;
     expect(back.phones).toEqual([]);
     expect(back.urls).toEqual([]);
@@ -293,8 +294,8 @@ describe('reading a code', () => {
   });
 });
 
-describe('记录 → vCard 的分号', () => {
-  it('值里的分号要转义，否则公司名会被拆成两段（RFC 2426）', () => {
+describe('Record → vCard semicolons', () => {
+  it('Semicolons in values must be escaped, otherwise company names will be split into two parts (RFC 2426)', () => {
     const fields = [{ id: 'company', name: 'Company', type: 'text' }] as Field[];
     const card = recordToVCard(fields, { company: 'Acme; Sons' })!;
     expect(card).toContain('ORG:Acme\\; Sons');

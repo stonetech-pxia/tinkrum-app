@@ -26,7 +26,7 @@ describe('data templates', () => {
       );
       expect(issuesOf(config)).toEqual([]);
       expect(config.data.tables).toHaveLength(1);
-      // 默认导航栏已满（5 项），所以入口是首页上的快捷入口。
+      // Default navigation bar is full (5 items), so the entry point is the quick entry on the home page.
       expect(config.containers.pages[0]!.blocks.at(-1)).toMatchObject({ look: 'entry' });
     }
   });
@@ -82,7 +82,7 @@ describe('data table ops', () => {
       ok: false,
       error: 'field note cannot change from text to date; add a new field instead',
     });
-    // number → money 需要提供币种，否则校验不通过。
+    // number → money requires specifying a currency, otherwise validation fails.
     const withNumber = apply(budget(), [
       {
         op: 'addData',

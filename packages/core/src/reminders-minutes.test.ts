@@ -8,7 +8,7 @@ import { MAX_DATE_NOTIFICATIONS, planNotifications } from './reminders';
 import type { Collection, Locale, Reminder, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// 日期时间前几分钟提醒（D-562）：预约前 30 分钟。只是本机通知，什么都不写，什么都不带出 App（底线 10、16）。
+// Reminders minutes before date-time (D-562): 30 minutes before an appointment. Local notification only, writes nothing, exports nothing out of the app (invariants 10, 16).
 
 const visits: Collection = {
   id: 'visits',
@@ -78,9 +78,9 @@ describe('a reminder some minutes before a date and time (D-562)', () => {
     const c = config(soon(30));
     const planned = plan(c, [
       visit('a', '2026-11-16T15:00'),
-      visit('b', '2026-11-16T12:20'), // 11:50，已经过了
+      visit('b', '2026-11-16T12:20'), // 11:50, already passed
       visit('c'),
-      visit('d', '2026-11-17T00:10'), // 前一天 23:40
+      visit('d', '2026-11-17T00:10'), // Previous day 23:40
     ]);
     expect(planned.map((n) => [n.id, n.trigger])).toEqual([
       ['soon-a', { kind: 'date', at: new Date(2026, 10, 16, 14, 30).getTime() }],

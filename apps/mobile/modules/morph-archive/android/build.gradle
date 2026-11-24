@@ -1,4 +1,4 @@
-// 本地 Expo 模块的 Android 部分（D-600）：整体导出和恢复用的 zip 读写，只用 java.util.zip 里的 Deflater、Inflater、CRC32。
+// Android portion of local Expo modules (D-600): ZIP read/write for bulk export and restore, using exclusively Deflater, Inflater, and CRC32 from java.util.zip.
 plugins {
   id 'com.android.library'
   id 'expo-module-gradle-plugin'

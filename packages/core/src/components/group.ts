@@ -5,7 +5,7 @@ import { boundedText } from '../schema-base';
 import { type LookDefinitionOf, defineLook, lookSchema } from './define';
 import { LeafComponentSchema } from './leaves';
 
-/** 分组最多容纳的子块数。 */
+/** Maximum number of child blocks allowed in a group. */
 export const GROUP_MAX_CHILDREN = 12;
 
 const show = z.strictObject({
@@ -13,19 +13,20 @@ const show = z.strictObject({
   layout: z.enum(['stack', 'row', 'grid']),
   columns: z.union([z.literal(2), z.literal(3)]).optional(),
   /**
-   * 可以收起（D-578）：标题变成一个能点的头，点一下收起或展开；值是一开始的样子。只是看的方式，
-   * 收起的状态不存（底线 15）。要有标题，没有标题就没东西可点。
+   * Collapsible (D-578): title becomes a tappable header that collapses or expands on tap; value
+   * represents the initial state. Visual-only, collapse state is not persisted (invariant 15).
+   * Requires a title; no title means nothing is tappable.
    */
   fold: z.enum(['open', 'closed']).optional(),
 });
 
-/** 分组里面的那层分组（Q3：允许再多一层，里面那层不能再放分组）。 */
+/** Inner group level inside a group (Q3: allows one more level; nested groups cannot contain further groups). */
 export const InnerGroupSchema = lookSchema('group', {
   show,
   children: z.array(LeafComponentSchema).max(GROUP_MAX_CHILDREN),
 });
 
-/** 分组的子块：可以放进分组的块，或者一层分组。 */
+/** Group child blocks: blocks that can be placed inside groups, or a nested group level. */
 export const GroupChildSchema = z.discriminatedUnion('look', [
   ...LeafComponentSchema.options,
   InnerGroupSchema,
@@ -33,7 +34,7 @@ export const GroupChildSchema = z.discriminatedUnion('look', [
 
 const shape = { show, children: z.array(GroupChildSchema).max(GROUP_MAX_CHILDREN) };
 
-/** 分组：把若干块排成竖排、横排或网格（摆放式嵌套，D-369 Q3）。分组里还能放一层分组。 */
+/** Group: arranges blocks in a vertical, horizontal, or grid layout (layout nesting, D-369 Q3). Groups can contain one nested group level. */
 export const groupComponent: LookDefinitionOf<'group', typeof shape> = defineLook({
   look: 'group',
   shape,

@@ -2,7 +2,7 @@ import { createDefaultWorkspace } from '@morph/core';
 
 import { INTER_FONTS, makePalette } from '../renderer/theme';
 
-// Inter 字体（D-591）：数字和大标题（display）用中等粗细，不是粗体；每个角色一个静态字体，不叠 fontWeight。
+// Inter font (D-591): medium weight for numbers and display headers, not bold; each role has a static font without stacking fontWeight.
 
 const theme = (font: 'clay' | 'inter') => ({ ...createDefaultWorkspace('zh').theme, font });
 

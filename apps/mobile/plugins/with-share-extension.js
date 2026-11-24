@@ -1,8 +1,12 @@
-// iOS 分享扩展的两处调整（D-114、D-118），在 expo-share-intent 生成扩展之后执行：
-// 1. 显示名：expo-share-intent 用 iosShareExtensionName 同时做 Xcode target 名和显示名，但 target 不能和
-//    主 App 同名（「Morph」），所以 target 叫 MorphShare，这里把分享面板里显示的名字改回「Morph」。
-// 2. 控制器：换成我们自己的 ShareViewController.swift（按顺序逐个复制，全部复制完才跳回主 App；
-//    expo-share-intent 9.0.0 的控制器并行处理多个附件，处理完最后一个序号就跳转，前面的文件可能还没复制完）。
+// Two adjustments for the iOS share extension (D-114, D-118), executed after expo-share-intent
+// generates the extension:
+// 1. Display name: expo-share-intent uses iosShareExtensionName for both the Xcode target name and
+// display name, but the target cannot share the same name as the main app ("Morph"), so the target
+// is named MorphShare, and this changes the display name in the share sheet back to "Morph".
+// 2. Controller: replaced with our own ShareViewController.swift (copies attachments sequentially
+// and jumps back to the main app only after all are finished; expo-share-intent 9.0.0's controller
+// processes multiple attachments in parallel and jumps as soon as the last index finishes, meaning
+// earlier files might not be fully copied yet).
 const fs = require('node:fs');
 const path = require('node:path');
 const { withFinalizedMod } = require('expo/config-plugins');

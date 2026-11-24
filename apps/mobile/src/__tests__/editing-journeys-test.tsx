@@ -26,13 +26,14 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore, type WorkspaceStore } from '../workspace/store';
 
-// 直接编辑（D-052–D-054）：长按组件或点「编辑」进入编辑模式，修改文字、颜色、隐藏、删除、顺序。
-// 每个操作都先经过校验进入草稿，点「完成」时合成一个 source 为 user 的版本，提示条上可以撤销；
-// 点「取消」全部放弃；预览里长按无效。
+// Direct editing (D-052–D-054): long press a component or tap "Edit" to enter edit mode, modify
+// text, color, hide, delete, reorder. Each operation first goes through validation into a draft,
+// upon tapping "Done" merges into a version with source as user, undoable on the banner; tapping
+// "Cancel" discards all; long press is invalid in preview.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
-// 单组件编辑的工具栏量到位置后才显示；替身直接给一个位置（真机上由原生回调）。
+// Single-component editing toolbar displays only after measuring position; mock directly provides a position (handled by native callback on real device).
 beforeEach(() => {
   jest
     .requireActual('@react-native/jest-preset/jest/MockNativeMethods')
@@ -87,14 +88,14 @@ const order = (store: WorkspaceStore) =>
     c.look === 'group' ? `${c.id}[${c.children.map((x) => x.id).join(',')}]` : c.id,
   );
 
-/** 用 store 直接准备页面，等新版本渲染出来。 */
+/** Prepare page directly using store, wait for new version to render. */
 async function commit(store: WorkspaceStore, ops: Op[], summary: string) {
   expect((await store.getState().proposeOps(ops, summary)).kind).toBe('preview');
   await store.getState().confirm();
   expect(await screen.findByText(`已改好：${summary}`)).toBeTruthy();
 }
 
-/** 保留的整页编辑入口：打开编辑模式和组件操作面板。 */
+/** Retained full-page edit entry point: opens edit mode and component action panel. */
 async function longPress(testID: string) {
   const id = testID.replace('component-', '');
   await fireEvent.press(await screen.findByTestId('page-edit'));
@@ -103,13 +104,13 @@ async function longPress(testID: string) {
   expect(screen.getByTestId('arrange-bar')).toBeTruthy();
 }
 
-/** 编辑模式里点组件打开它的操作面板。 */
+/** Tap a component in edit mode to open its action panel. */
 async function tapInEditor(id: string) {
   await fireEvent.press(await screen.findByTestId(`arrange-edit-${id}`));
   expect(await screen.findByTestId('edit-sheet')).toBeTruthy();
 }
 
-/** 「完成」：草稿保存为一个版本。 */
+/** "Done": draft saves as a version. */
 async function done(store: WorkspaceStore, summary: string) {
   await fireEvent.press(screen.getByTestId('arrange-done'));
   expect(await screen.findByText(`已改好：${summary}`)).toBeTruthy();
@@ -121,7 +122,7 @@ const draftHome = (store: WorkspaceStore) => store.getState().editing!.config.co
 const draftHomeOrHome = (store: WorkspaceStore) =>
   store.getState().editing?.config.containers.pages[0] ?? home(store);
 
-/** 撤销最近一次修改（提示条上的「撤销」）。 */
+/** Undo the most recent modification ("Undo" on the banner). */
 async function undo(store: WorkspaceStore) {
   await fireEvent.press(await screen.findByText('撤销'));
   expect(store.getState().head).toMatchObject({ source: 'restore', summary: '撤销' });
@@ -134,7 +135,7 @@ function pressInNextAlert(label: string) {
 }
 
 describe('editing the page directly', () => {
-  // 整页编辑入口继续关闭（D-235）；这里单独打开它，保留旧视图的回归测试。
+  // Full-page edit entry point remains closed (D-235); opened individually here, preserving regression tests for the old view.
   beforeAll(() => {
     directEditEntry.pageButton = true;
   });
@@ -158,13 +159,13 @@ describe('editing the page directly', () => {
       title: '家庭账本',
     });
 
-    // 外观：面板保持打开，可以连续试。
+    // Look: panel remains open, allowing continuous testing.
     await tapInEditor('catalog');
     await fireEvent.press(screen.getByTestId('edit-tone-primary'));
     expect(screen.getByTestId('edit-tone-primary')).toBeSelected();
     await fireEvent.press(screen.getByTestId('edit-close'));
 
-    // 还没保存：没有新版本。
+    // Not saved yet: no new version.
     expect(store.getState().head!.id).toBe(headId);
     expect((home(store).blocks[0]! as { show: object }).show).toMatchObject({
       title: '我的工作台',
@@ -177,7 +178,7 @@ describe('editing the page directly', () => {
     expect(await screen.findByTestId('component-welcome')).toBeTruthy();
     expect(await repo.getChangeRequest(1)).toMatchObject({ status: 'committed' });
 
-    // 一次撤销回到编辑之前。
+    // Single undo returns to before editing.
     await undo(store);
     expect(await screen.findByText('我的工作台')).toBeTruthy();
     expect((home(store).blocks[1]! as KnownComponent).style).toBeUndefined();
@@ -225,7 +226,7 @@ describe('editing the page directly', () => {
     await done(store, '编辑「首页」（1 处修改）');
     expect(screen.queryByTestId('component-catalog')).toBeNull();
 
-    // 「编辑」开关进入编辑模式，重新显示。
+    // "Edit" toggle enters edit mode and redisplays.
     await fireEvent.press(screen.getByTestId('page-edit'));
     await tapInEditor('catalog');
     await fireEvent.press(screen.getByTestId('edit-hide'));
@@ -246,7 +247,7 @@ describe('editing the page directly', () => {
     expect(screen.queryByTestId('arrange-recent-files')).toBeNull();
     expect(store.getState().head!.id).toBe(headId);
 
-    // 取消编辑：确认后放弃草稿，什么都没改。
+    // Cancel editing: discard draft after confirmation, nothing modified.
     pressInNextAlert('放弃');
     await fireEvent.press(screen.getByTestId('arrange-cancel'));
     expect(await screen.findByTestId('component-recent-files')).toBeTruthy();
@@ -285,7 +286,7 @@ describe('editing the page directly', () => {
     await fireEvent.press(screen.getByTestId('page-edit'));
     expect(await screen.findByTestId('arrange-bar')).toBeTruthy();
     expect(screen.getByTestId('arrange-up-welcome')).toBeDisabled();
-    // 编辑模式下导航栏和浮动按钮隐藏，不会切走丢掉草稿。
+    // Navigation bar and floating buttons are hidden in edit mode, preventing navigation away and loss of draft.
     expect(screen.queryByTestId('nav-ai')).toBeNull();
     expect(screen.queryByTestId('page-edit')).toBeNull();
 
@@ -302,7 +303,7 @@ describe('editing the page directly', () => {
     await step('arrange-up-catalog', ['welcome', 'catalog', 'row[go]', 'recent-files']);
     await step('arrange-down-go', ['welcome', 'catalog', 'row[]', 'go', 'recent-files']);
     expect(store.getState().head!.id).toBe(headId);
-    // 连续移动同一个组件只算一处修改。
+    // Moving the same component consecutively counts as a single modification.
     await done(store, '编辑「首页」（2 处修改）');
     expect(store.getState().head!.id).toBe(headId + 1);
     expect(order(store)).toEqual(['welcome', 'catalog', 'row[]', 'go', 'recent-files']);
@@ -489,7 +490,7 @@ describe('single-component editing', () => {
     await fireEvent.press(screen.getByTestId('edit-save'));
     expect(screen.getByTestId('single-toolbar-welcome')).toBeTruthy();
     expect(store.getState().head!.id).toBe(before);
-    // 换一个组件时沿用同一份草稿。
+    // Reuse the same draft when switching to another component.
     await fireEvent(screen.getByTestId('component-catalog'), 'longPress');
     expect(screen.getByTestId('single-toolbar-catalog')).toBeTruthy();
     expect(screen.queryByTestId('single-toolbar-welcome')).toBeNull();
@@ -549,7 +550,7 @@ describe('single-component editing', () => {
     await fireEvent.press(await screen.findByTestId('single-edit-welcome'));
     await fireEvent.press(screen.getByTestId('edit-hide'));
     expect(screen.queryByTestId('component-welcome')).toBeNull();
-    // 组件不在页面上了，工具栏固定在可见区域顶部；还能打开面板把它显示回来。
+    // Component is no longer on the page, toolbar is fixed at the top of the visible area; panel can still be opened to display it back.
     await fireEvent.press(screen.getByTestId('single-edit-welcome'));
     expect(screen.getByTestId('edit-hide')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('edit-close'));
@@ -568,7 +569,7 @@ async function gestureAct(callback: () => void) {
 
 describe('single-component gesture sessions', () => {
   beforeEach(() => {
-    // 真实原生测量返回窗口坐标；替身也保留各组件不同的位置和尺寸。
+    // Real native measurement returns window coordinates; mock also preserves different positions and sizes for each component.
     const methods = jest.requireActual('@react-native/jest-preset/jest/MockNativeMethods').default;
     methods.measureInWindow.mockImplementation(function (
       this: { props: { testID?: string } },
@@ -656,7 +657,7 @@ describe('single-component gesture sessions', () => {
     await gestureAct(() => gesture.end());
     expect(draftHome(store).blocks.map((c) => c.id)).toEqual(['right', 'left']);
     expect(screen.getByTestId('single-toolbar-left')).toBeTruthy();
-    // 重排使宫格的 React 行变化，新的 detector 仍然能继续拖。
+    // Rearrangement changes the grid's React rows, and the new detector can still continue dragging.
     const again = createGestureController('single-drag-left');
     await gestureAct(() => {
       again.begin({ absoluteX: 240, absoluteY: 150 });
@@ -695,8 +696,10 @@ describe('single-component gesture sessions', () => {
     await fireEvent.press(screen.getByTestId('single-done-welcome'));
   });
 
-  // D-613：页面滚过以后按住不动；进入编辑时顶栏、底栏收起，页面变高、内容放得下，原生滚动回到顶部。
-  // 这不是拖动：松手时组件留在原处（手机上曾被挪到上面两格）。
+  // D-613: holding down without moving after page is scrolled; upon entering edit mode, top and
+  // bottom bars collapse, page becomes taller, content fits, and native scroll returns to top. This
+  // is not a drag: component remains in place upon release (previously moved up two cells on
+  // phone).
   it('a still press on a scrolled page does not move the block when the page stops scrolling', async () => {
     const { store } = await renderApp();
     const scroll = screen.getByTestId('editable-scroll');
@@ -742,7 +745,7 @@ describe('single-component gesture sessions', () => {
     await gestureAct(() => gesture.cancel());
     expect(store.getState().editing!.ops).toEqual([]);
     expect(screen.queryByTestId('single-drop-line')).toBeNull();
-    // 已选中后再次按住即可拖，不需要重新开草稿。
+    // Dragging is possible by holding down again once selected, without reopening the draft.
     await gestureAct(() => {
       gesture.begin({ absoluteX: 100, absoluteY: 140 });
       gesture.activate({ absoluteX: 100, absoluteY: 140 });

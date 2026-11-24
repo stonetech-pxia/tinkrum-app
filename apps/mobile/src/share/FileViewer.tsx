@@ -10,9 +10,10 @@ import { t } from '../i18n';
 import type { Palette } from '../renderer/theme';
 import { ZoomImage } from './ZoomImage';
 
-// 收件页面的照片和视频全屏看（D-238）：左右滑动翻看这一批里的照片和视频，只在本机显示。
-// 照片可以双指缩放（D-277）；结果页的缩略图也用它打开。
-// 视频只给正在看的那一页建播放器，系统自带的播放控件，不自动播放。
+// Fullscreen viewer for photos and videos on the inbox page (D-238): swipe left and right to browse
+// photos and videos in the batch, displayed locally only. Photos support pinch-to-zoom (D-277);
+// thumbnails on the results page also open using this. Videos build a player only for the currently
+// viewed page using native playback controls, without autoplay.
 
 export interface ViewerItem {
   uri: string;
@@ -24,7 +25,7 @@ function VideoPage({ uri }: { uri: string }) {
   return <VideoView player={player} style={styles.flex} contentFit="contain" nativeControls />;
 }
 
-/** 收件页面上那一个视频（D-238）：页面上直接显示，点了才播放。 */
+/** That video on the inbox page (D-238): displayed directly on the page, plays only when tapped. */
 export function InlineVideo({ uri, height }: { uri: string; height: number }) {
   const player = useVideoPlayer(uri);
   return (
@@ -54,17 +55,17 @@ export function FileViewer({
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const [index, setIndex] = useState(start);
-  // 放大看图时不翻页（单指拖动用来看局部）。
+  // Do not change pages while zoomed in to view an image (single-finger drag is used to inspect local details).
   const [zoomed, setZoomed] = useState(false);
   return (
     <FullScreenModal animationType="fade" onClose={onClose}>
-      {/* Android 的 Modal 是另一个窗口，手势要自己的根视图。 */}
+      {/* Android Modal is a separate window, so gestures require their own root view. */}
       <GestureHandlerRootView style={styles.flex}>
         <View
           testID="share-viewer"
           style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
           <View style={styles.bar}>
-            {/* 「关闭」和收件页面的一样放在左上角。 */}
+            {/* 'Close' is placed in the top-left corner, same as the inbox page. */}
             <Pressable testID="share-viewer-close" onPress={onClose} hitSlop={10}>
               <Text style={[palette.font('bodyBold', 16), styles.white]}>{t(locale, 'close')}</Text>
             </Pressable>

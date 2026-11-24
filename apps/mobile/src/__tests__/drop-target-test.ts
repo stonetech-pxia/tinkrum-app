@@ -70,7 +70,7 @@ describe('single-component drop geometry', () => {
       ],
     };
     expect(findDropTarget(full, 'a', boxes, { x: 50, y: 160 })!.slot.parentId).toBeUndefined();
-    // 分组不可拖进另一个分组，也不可拖进自己。
+    // A group cannot be dragged into another group, nor into itself.
     expect(findDropTarget(p, 'g', boxes, { x: 50, y: 180 })!.slot.parentId).toBeUndefined();
   });
 });

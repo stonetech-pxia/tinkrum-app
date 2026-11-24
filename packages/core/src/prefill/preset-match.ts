@@ -4,9 +4,12 @@ import { bounded, free } from './engine';
 import { fitText, MODEL_LIMITS, type ModelRequest, type OpenModel } from './model';
 import type { TextPage } from './rows';
 
-// 导入文件后新建表单：哪些预设靠前（D-444）。规则先排序：没有金额的文件，要金额的预设排到后面（不隐藏，
-// 文字识别可能漏掉金额）；能确定的信号（护照机读码、IBAN）排到最前。本机 2B 只从没有被排后的预设里选一个，
-// 结果只是推荐，用户点了才用（底线 D-396）。文字和结果都不联网、不发给云端 AI（底线 1、2）。
+// Create a form after importing a file: which presets come first (D-444). Rules are sorted first:
+// files without amounts have presets that require amounts placed later (not hidden, optical
+// character recognition might miss amounts); deterministic signals (passport MRZ, IBAN) are placed
+// first. The on-device 2B model only chooses from presets that are not demoted; the result is
+// merely a recommendation, applied only when the user taps it (invariant D-396). Neither text nor
+// results go online or are sent to cloud AI (invariants 1, 2).
 
 const DESCRIPTIONS: Record<NewTablePreset, string> = {
   bank: 'bank account statement with transactions and balance',
@@ -34,7 +37,7 @@ const DESCRIPTIONS: Record<NewTablePreset, string> = {
 };
 export const NEW_TABLE_PRESETS = Object.keys(DESCRIPTIONS) as NewTablePreset[];
 
-/** 这些预设的文件上一定有金额。 */
+/** Files for these presets must have an amount. */
 const NEEDS_MONEY: readonly NewTablePreset[] = [
   'bank',
   'bill',
@@ -45,7 +48,7 @@ const NEEDS_MONEY: readonly NewTablePreset[] = [
   'tax',
 ];
 
-/** 带合计和金额时并进「购物凭证」的金额类别（D-476、D-480）：不给模型选，列表里照旧能选。 */
+/** Merged into the amount category of "shopping vouchers" when totals and amounts are present (D-476, D-480): not selectable by the model, but still selectable in the list. */
 const FOLDED: readonly NewTablePreset[] = [
   'bank',
   'bill',
@@ -56,18 +59,18 @@ const FOLDED: readonly NewTablePreset[] = [
 ];
 
 export interface PresetRanking {
-  /** 靠前的预设（确定的信号在最前）。 */
+  /** Presets placed earlier (deterministic signals first). */
   likely: NewTablePreset[];
-  /** 排到后面的：规则看到文件里缺它们一定有的东西。 */
+  /** Demoted: rules see that the file lacks items they are guaranteed to have. */
   unlikely: NewTablePreset[];
-  /** 有金额时并进购物凭证的（不给模型选）。 */
+  /** Merged into shopping vouchers when an amount is present (not selectable by the model). */
   folded: NewTablePreset[];
 }
 
 const textOf = (pages: readonly TextPage[]) =>
   pages.flatMap((p) => p.lines.map((l) => l.text)).join('\n');
 
-/** 文字里有金额吗：带货币符号或代码的数，或「数.两位小数」。 */
+/** Does the text contain an amount: numbers with currency symbols or codes, or "number.two decimal places". */
 function hasMoney(text: string): boolean {
   if (
     /(?:[$€£¥￥₹]|\b(?:usd|eur|gbp|cny|rmb|chf|cad|aud|inr)\b)\s?\d|\d\s?(?:[$€£¥￥₹元]|(?:usd|eur|gbp|cny|rmb|chf|cad|aud|inr)\b)/i.test(
@@ -78,7 +81,7 @@ function hasMoney(text: string): boolean {
   return /(?:^|\s)\d{1,3}(?:[ .,]\d{3})*[.,]\d{2}(?:\s|$)/m.test(text);
 }
 
-/** 规则给预设排序。没读到文字时不排后任何预设。 */
+/** Rules sort presets. No presets are demoted when no text is read. */
 export function rankPresets(pages: readonly TextPage[]): PresetRanking {
   const text = textOf(pages);
   if (!text.trim()) return { likely: [...NEW_TABLE_PRESETS], unlikely: [], folded: [] };
@@ -104,18 +107,20 @@ const ruleMoney = (text: string) =>
       ruleCandidates(row, 'en').some((c) => c.kind === 'amount' && /[.,]\d{2}\b/.test(c.raw)),
     );
 
-/** 小票上的「合计」「找零」「付款方式」「税」这几类词（英法西中日）。 */
+/** Words on receipts such as "total", "change", "payment method", "tax" (English, French, Spanish, Chinese, Japanese). */
 const TOTAL_WORDS =
   /\b(?:sub-?total|total|montant|importe|totale?)\b|amount due|[àa] payer|合计|合計|总计|總計|小計|小计|应付|實付|实付|税込/i;
 const PAY_WORDS =
   /\b(?:invoice|facture|bill|loan|payslip|salary|salaire|net pay|statement|relev[eé]|iban|imp[oô]ts?|taxe|impuestos?|mortgage|expense|due date|cash|change|visa|mastercard|card|debit|credit|tax|vat|tva|iva|carte|esp[eè]ces|monnaie|efectivo|cambio|tarjeta|receipt|ticket|re[cç]u)\b|找零|找钱|现金|現金|微信|支付宝|支付寶|刷卡|税|稅|小票|小票|收据|收據|账单|賬單|发票|發票|贷款|报销|工资|薪资|对账单|銀行|银行|請求書|レシート|領収|お釣り|クレジット/i;
-/** 保单、合同不是金额类别，有自己的模板：看到就不用规则推荐（D-480）。 */
+/** Insurance policies and contracts are not amount categories and have their own templates: skipped by rule recommendations when seen (D-480). */
 const NOT_RECEIPT = /\b(?:policy|agreement|contract)\b|合同/i;
 
 /**
- * 没有本机模型时，很明显的小票也要推荐「购物凭证」（D-444 的规则部分）：
- * 要同时有「合计」类的词、金额，和付款方式 / 税 / 小票字样（或至少两行带两位小数的价格）。
- * 拿不准就给 null，宁可不推荐，不乱推荐。
+ * When there is no on-device model, very obvious receipts should still be recommended as
+ * "shopping vouchers" (the rule part of D-444): must simultaneously have words in the "total"
+ * category, an amount, and payment method / tax / receipt keywords (or at least two lines of
+ * prices with two decimal places). Return null if unsure; better not to recommend than to
+ * recommend incorrectly.
  */
 export function rulePreset(pages: readonly TextPage[]): NewTablePreset | null {
   const text = textOf(pages);
@@ -125,7 +130,7 @@ export function rulePreset(pages: readonly TextPage[]): NewTablePreset | null {
   return PAY_WORDS.test(text) || prices >= 3 ? 'purchase' : null;
 }
 
-/** 问模型的请求：文件文字 + 目录，只答一个 ID（第三轮冻结的提示词 P3，目录按 ranking 取）。 */
+/** Request to the model: file text + catalog, answering with only an ID (third-round frozen prompt P3, catalog ordered by ranking). */
 export function presetMatchRequest(
   pages: readonly TextPage[],
   ids: readonly NewTablePreset[],
@@ -150,7 +155,7 @@ export function presetMatchRequest(
   };
 }
 
-/** 模型的回答 → 预设；none、不认识的、不在目录里的都是 null。 */
+/** Model response -> preset; none, unrecognized items, and items not in the catalog all yield null. */
 export function presetAnswer(
   answer: string,
   ids: readonly NewTablePreset[],
@@ -160,8 +165,9 @@ export function presetAnswer(
 }
 
 /**
- * 本机模型推荐一个预设。没装、内存不够、加载失败、超时、取消：一律安静地给 null，
- * 用户照样能从规则排好的列表里选，或者点字段名。
+ * On-device model recommends a preset. If uninstalled, insufficient memory, loading failure,
+ * timeout, or cancellation: quietly returns null, allowing the user to still select from the
+ * rule-sorted list or tap the field name.
  */
 export async function recommendPreset(
   open: OpenModel,

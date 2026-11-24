@@ -5,8 +5,9 @@ import { t } from '@/i18n';
 import { Card, Pill } from '@/renderer/ui';
 
 /**
- * 「数据 → 不在界面里的数据」（D-038、D-041，D-614 起单独一页）：从界面上拿掉的表还有记录。
- * 能导出，能永久删除（先问）。系统层，AI 不能修改（底线 8）。
+ * 'Data -> Unused Data' (D-038, D-041, separate page since D-614): tables removed from the UI
+ * that still contain records. Exportable, permanently deletable (with confirmation). System
+ * layer, cannot be modified by AI (invariant 8).
  */
 export default function DataUnusedRoute() {
   const data = useDataOverview();

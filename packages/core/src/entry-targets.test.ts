@@ -7,8 +7,9 @@ import { apply, registry, workspace } from './test-helpers';
 import { validateWorkspace } from './validate';
 import { findWorkflowTarget, presetById, presetWorkflow } from './workflows/presets';
 
-// D-256：按钮和入口可以打开一个快捷操作 tool:<id>（配置里的，或内设的预设 ID；v33 是 workflow:<id>）。
-// 只打开，用户点「开始」才运行；快捷操作被移除时，打开它的按钮跟着移除（和页面一样）。
+// D-256: Buttons and entry points can open a quick action tool:<id> (configured or built-in preset
+// ID; v33 used workflow:<id>). Opens only; execution requires the user to tap "Start". When a quick
+// action is removed, the button opening it is removed accordingly (just like pages).
 
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 9, 27) };
 
@@ -40,7 +41,7 @@ describe('buttons and entries that open a quick action (D-256)', () => {
       issues: ['component open on page home opens missing quick action nope'],
     });
     expect(add(config, shortcut('tool:Bad Id')).ok).toBe(false);
-    // v33 的写法不再认。
+    // v33 syntax is no longer recognized.
     expect(add(config, button('workflow:my-photos')).ok).toBe(false);
   });
 

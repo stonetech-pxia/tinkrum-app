@@ -10,8 +10,8 @@ import { readRecords, sourceTableIds, type SourceContext } from './source';
 import { registry, workspace } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 打卡格（D-610）：行 × 时间列，每格是这一行这一天的记录；点空格新建（$here），点只有一条的格子删掉（带撤销）。
-// 2026-11-20 是周五。
+// Check-in grid (D-610): rows × time columns, each cell is the record for that row and day; tap
+// empty cell to create ($here), tap single-record cell to delete (with undo). 2026-11-20 is Friday.
 const now = new Date(2026, 10, 20, 9, 30);
 const ctx = { registry, locale: 'en' as const, now };
 
@@ -117,7 +117,7 @@ const habitRecords = [
 describe('grid look: validation (D-610)', () => {
   it('a week of check-ins by habit with add and remove taps is valid; taps need no label', () => {
     expect(issues(grid())).toEqual([]);
-    // 按单选分行也行。
+    // Splitting rows by radio choice is also supported.
     expect(
       issues({
         ...grid({}, { group: { by: 'mood' } }),
@@ -198,7 +198,7 @@ describe('grid look: validation (D-610)', () => {
     expect(issues(ring('note')).join()).toMatch(
       /goal note must be a number or a number field of habits/,
     );
-    // show.trailing 是数字字段时每格是它的合计；文字不行。
+    // When show.trailing is a number field, each cell displays its sum; text is not supported.
     expect(issues(grid({ show: { title: 'habit', trailing: 'glasses' } }))).toEqual([]);
     expect(issues(grid({ show: { title: 'habit', trailing: 'note' } })).join()).toMatch(/summed/);
   });
@@ -225,7 +225,7 @@ describe('grid look: validation (D-610)', () => {
     ] as never;
     const r = prepare([grid()], required);
     expect(r.ok ? [] : r.issues).toEqual([]);
-    // 别的必填字段还是要有值。
+    // Other required fields must still have values.
     const note = prepare([grid()], [
       { op: 'updateData', table: 'check-ins', field: 'note', changes: { required: true } },
     ] as never);
@@ -390,7 +390,7 @@ describe('grid look: reading (D-610)', () => {
     rec('check-ins', 'c2', { habit: 'run', date: '2026-11-18', glasses: 2 }),
     rec('check-ins', 'c3', { habit: 'run', date: '2026-11-18', glasses: 3 }),
     rec('check-ins', 'c4', { habit: 'read', date: '2026-11-19' }),
-    // 七天以外的、没有习惯的、旧习惯的：不在这一页的格子里。
+    // Beyond 7 days, lacking habit, or old habits: excluded from cells on this page.
     rec('check-ins', 'c5', { habit: 'read', date: '2026-11-01' }),
     rec('check-ins', 'c6', { date: '2026-11-20' }),
     rec('check-ins', 'c7', { habit: 'old', date: '2026-11-20', mood: 'good' }),
@@ -583,7 +583,7 @@ describe('grid look: what a tap does (D-610)', () => {
         cal,
       ),
     ).toEqual({ habit: 'run', date: '2026-11-20', mood: 'good' });
-    // 一周的一列：这一周是今天，以前的周是它的第一天。
+    // A column representing a week: current week is today, past weeks use their first day.
     const weeks = gridColumns({ unit: 'week', last: 2 }, now, cal, 'en');
     expect(gridHereValues(view, [], read, { value: 'run' }, weeks[0]!, now, cal).date).toBe(
       '2026-11-09',

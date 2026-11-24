@@ -1,29 +1,27 @@
-// 富文本（D-044）：文字和提示框支持 Markdown 的一个小子集。
-// 只解析成数据结构，由渲染器映射为原生文字样式；不支持 HTML、图片或任何可执行内容。
+// Rich text (D-044): Text and tooltips support a small subset of Markdown. Parsed into a data
+// structure only, mapped to native text styles by the renderer; HTML, images, or any executable
+// content are not supported.
 //
-//   **粗体**  *斜体*  [链接文字](https://example.com)  [邮件](mailto:a@b.com)
-//   - 项目列表（也可用 •）
-//   1. 编号列表
-//   空行分段；\* \[ 等反斜杠转义
+//   **bold**  *italic*  [link text](https://example.com)  [email](mailto:a@b.com)   - bullet lists (bullet • also supported)   1. numbered lists   blank lines separate paragraphs; \\* \\[ and other backslash escapes
 
 export interface Span {
   text: string;
   bold?: true;
   italic?: true;
-  /** 只允许 https: 和 mailto:（见 isSafeLink）。 */
+  /** Only https: and mailto: are allowed (see isSafeLink). */
   url?: string;
 }
 
 export type Block =
   { type: 'paragraph'; spans: Span[] } | { type: 'list'; ordered: boolean; items: Span[][] };
 
-/** 链接只能是 https 网址或邮件地址。 */
+/** Links can only be https URLs or email addresses. */
 export function isSafeLink(url: string): boolean {
   if (url.length > 500 || /\s/.test(url)) return false;
   return /^https:\/\/[^/?#]+\.[^/?#]+/i.test(url) || /^mailto:[^@]+@[^@]+\.[^@]+$/i.test(url);
 }
 
-/** 链接显示给用户确认时用的目标（域名或邮件地址）。 */
+/** The target displayed to the user for confirmation when a link is tapped (domain name or email address). */
 export function linkTarget(url: string): string {
   if (/^mailto:/i.test(url)) return url.slice('mailto:'.length);
   const host = url.replace(/^https?:\/\//i, '').split(/[/?#]/)[0]!;
@@ -118,14 +116,14 @@ export function parseRichText(source: string): Block[] {
   return blocks;
 }
 
-/** 文字里写了但不安全、因此不会变成链接的网址（供校验器报告）。 */
+/** URLs present in the text that are unsafe and therefore will not become links (reported by the validator). */
 export function unsafeLinks(source: string): string[] {
   return [...source.matchAll(/\[[^\]\n]+\]\(([^)\s]+)\)/g)]
     .map((m) => m[1]!)
     .filter((url) => !isSafeLink(url));
 }
 
-/** 去掉格式记号后的纯文字（用于修改说明等）。 */
+/** Plain text with formatting markers removed (used for change descriptions, etc.). */
 export function plainText(source: string): string {
   return parseRichText(source)
     .map((b) =>
@@ -136,9 +134,9 @@ export function plainText(source: string): string {
     .join(' ');
 }
 
-// ---- emoji 图标 ----
+// ---- emoji icons ----
 
-/** 能显示为图标的 emoji 码位范围（不依赖正则的 Unicode 属性，Hermes 上也可用）。 */
+/** Unicode code point ranges for emojis that can be rendered as icons (does not depend on regex Unicode properties, works on Hermes too). */
 const PICTOGRAPHIC: [number, number][] = [
   [0x1f000, 0x1faff],
   [0x2600, 0x27bf],
@@ -157,7 +155,7 @@ const PICTOGRAPHIC: [number, number][] = [
 const JOINERS = new Set([0x200d, 0xfe0f, 0x20e3]);
 const inRanges = (cp: number) => PICTOGRAPHIC.some(([a, b]) => cp >= a && cp <= b);
 
-/** 单个 emoji（可以带肤色、组合符号，例如 👨‍👩‍👧、1️⃣、🇨🇳）。 */
+/** Single emoji (may include skin tones and combining characters, e.g., 👨👩👧, 1️⃣, 🇨🇳). */
 export function isEmoji(s: string): boolean {
   const cps = [...s].map((c) => c.codePointAt(0)!);
   if (cps.length === 0 || cps.length > 10) return false;

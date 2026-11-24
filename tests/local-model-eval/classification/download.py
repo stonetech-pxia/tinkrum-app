@@ -1,4 +1,4 @@
-"""按固定 revision 下载分类候选并核对权重哈希。"""
+"""Download classification candidates and verify weight hashes according to a fixed revision."""
 from __future__ import annotations
 
 import argparse

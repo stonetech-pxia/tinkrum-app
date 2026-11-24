@@ -17,7 +17,7 @@ export * from './scan';
 export * from './translate';
 export * from './video';
 
-/** 随 App 发布的内置工具目录。工具代码不随历史版本恢复（§7E）。 */
+/** Directory of built-in tools distributed with the app. Tool code is not restored across historical versions (§7E). */
 export const BUILTIN_TOOLS: readonly ToolDefinition[] = [
   pdfTool,
   imageTool,

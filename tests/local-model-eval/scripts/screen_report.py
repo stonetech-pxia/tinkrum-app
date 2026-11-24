@@ -1,4 +1,4 @@
-"""把干净小票的资格筛查结果输出为 Markdown 表格。"""
+"""Output qualification screening results for clean receipts as a Markdown table."""
 from __future__ import annotations
 
 import statistics
@@ -7,7 +7,7 @@ from pathlib import Path
 from score import load_results, score_rows
 
 ROOT=Path(__file__).resolve().parents[1]
-print("| 模型 | 模式/提示词 | 样本 | 金额 | 日期 | 编造 | JSON 合法 | 中位耗时 | 生成速度 | 峰值工作集 |")
+print("| Model | Mode/Prompt | Samples | Amount | Date | Hallucination | Valid JSON | Median Time | Gen Speed | Peak RSS |")
 print("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
 for path in sorted((ROOT/"results").glob("*-cpu-*.jsonl")):
     if "pilot" in path.name or "summary" in path.name: continue

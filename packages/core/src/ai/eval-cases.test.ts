@@ -7,7 +7,7 @@ import { EVAL_CASES, buildSetup, runEvalCase, type EvalSetup } from './eval-case
 import { createMockAIProvider } from './mock';
 import type { AIProvider, Plan, WorkKind } from './types';
 
-// 评测的 setup 用 v34 的操作重写过（v34 第三阶段）：和 v33 代码存下来的配置迁移后一模一样。
+// Evaluation setup rewritten using v34 operations (v34 phase 3): identical after migration to config saved by v33 code.
 describe('eval setups are the same as the v33 ones', () => {
   const setups: EvalSetup[] = [
     'default',
@@ -36,7 +36,7 @@ describe('eval setups are the same as the v33 ones', () => {
   });
 });
 
-// mock AI 必须通过评测集中所有标记为 mock 的用例；改写用例（P*）留给真实模型。
+// Mock AI must pass all evaluation cases marked as mock; rewriting test cases (`P*`) is reserved for real models.
 describe('eval cases on the mock AI', () => {
   const ai = createMockAIProvider();
   const now = new Date(2026, 9, 22, 9, 0);
@@ -54,7 +54,7 @@ describe('eval cases on the mock AI', () => {
         locale: c.locale,
         ...(c.about ? { about: c.about } : {}),
       });
-      // 不要求通过，但不能产出不合法的修改。
+      // Does not require passing, but must not produce invalid modifications.
       if (plan.kind === 'ops') {
         expect(prepareOps(config, plan.ops, { registry, locale: c.locale, now }).ok).toBe(true);
       }
@@ -62,7 +62,7 @@ describe('eval cases on the mock AI', () => {
   });
 });
 
-// W10 的两种理解（D-083 补充，创始人 2026-10-27 本地会话确认）：压图片，或者拉正后做成 PDF。
+// Two interpretations of W10 (D-083 supplement, confirmed in local session by founder on 2026-10-27): compress images, or straighten and convert to PDF.
 describe('W10 accepts both readings', () => {
   const w10 = EVAL_CASES.find((c) => c.id === 'W10')!;
   const check = (steps: [string, Record<string, unknown>][]) => {
@@ -123,7 +123,7 @@ describe('W10 accepts both readings', () => {
   });
 });
 
-// 新流程（D-415、D-407）跟上评测：一句话多个工具回搭建计划也算对，点名的东西不存在就建。
+// Align new workflow (D-415, D-407) with evaluations: multiple tools in a single sentence returning a build plan is also considered correct, and non-existent named items are created.
 describe('allowBuild', () => {
   const now = new Date(2026, 10, 3);
   const caseOf = (id: string) => EVAL_CASES.find((c) => c.id === id)!;
@@ -137,12 +137,12 @@ describe('allowBuild', () => {
   const judge = async (id: string, plan: Plan) =>
     (await runEvalCase(caseOf(id), replies(plan), registry, now)).outcome;
 
-  it.each(['TD17', 'TD17-en', 'FX6'])('%s：合法的搭建计划算通过', async (id) => {
+  it.each(['TD17', 'TD17-en', 'FX6'])('%s: valid build plan counts as passing', async (id) => {
     const plan = build([step('data', 'record'), step('look', 'look')]);
     expect(await judge(id, plan)).toEqual({ pass: true });
   });
 
-  it('没标 allowBuild 的用例回 build 还是失败', async () => {
+  it('Cases without `allowBuild` returning build still fail', async () => {
     const plan = build([step('data', 'record'), step('look', 'look')]);
     expect(await judge('RE1', plan)).toMatchObject({ pass: false });
   });
@@ -153,21 +153,21 @@ describe('allowBuild', () => {
     ['request 是空的', build([{ ...step('data', 'record'), request: '  ' }, step('look', 'look')])],
     ['没有做数据的那一步', build([step('a', 'look'), step('b', 'look')])],
     ['外观排在数据前面', build([step('look', 'look'), step('data', 'record')])],
-  ])('不合法的计划不算：%s', async (_why, plan) => {
+  ])('Invalid plans do not count: %s', async (_why, plan) => {
     expect(await judge('TD17', plan)).toMatchObject({ pass: false });
   });
 
-  it('allowBuild 的用例回 ops 时断言照旧', async () => {
+  it('Cases with `allowBuild` returning ops maintain existing assertions', async () => {
     expect(await judge('FX6', { kind: 'ops', ops: [] })).toMatchObject({ pass: false });
   });
 
-  it('拒绝还是失败', async () => {
+  it('Rejections still fail', async () => {
     const plan: Plan = { kind: 'reject', reason: 'unknown', message: 'no', examples: [] };
     expect(await judge('FX6', plan)).toMatchObject({ pass: false });
   });
 });
 
-describe('RE3：拍照记到不存在的表（点名的东西不存在且用途清楚就建，D-407）', () => {
+describe('RE3: Photo logging to a non-existent table (create if named item does not exist and purpose is clear, D-407)', () => {
   const now = new Date(2026, 10, 3);
   const c = EVAL_CASES.find((x) => x.id === 'RE3')!;
   const judge = async (plan: Plan) =>
@@ -198,26 +198,26 @@ describe('RE3：拍照记到不存在的表（点名的东西不存在且用途�
       },
     }) as Op;
 
-  it('建了新表和记到它的快捷操作：通过', async () => {
+  it('Created new table and quick action logging to it: passed', async () => {
     const outcome = await judge({ kind: 'ops', ops: [newTable, quickAction('photos')] });
     expect(outcome).toEqual({ pass: true });
   });
 
-  it('拒绝不再算对', async () => {
+  it('Rejections no longer count as correct', async () => {
     const plan: Plan = { kind: 'reject', reason: 'unknown', message: '没有', examples: [] };
     expect(await judge(plan)).toMatchObject({ pass: false });
   });
 
-  it('只建表、没有快捷操作：不算', async () => {
+  it('Table creation only without quick action: does not count', async () => {
     expect(await judge({ kind: 'ops', ops: [newTable] })).toMatchObject({ pass: false });
   });
 
-  it('记到已有的账目：不算，用户说的是另一张表', async () => {
+  it('Logging to existing expenses: does not count, user referred to another table', async () => {
     const outcome = await judge({ kind: 'ops', ops: [newTable, quickAction('expenses')] });
     expect(outcome).toMatchObject({ pass: false });
   });
 
-  it('内置规则不猜，照旧拒绝', async () => {
+  it('Built-in rules do not guess, reject as before', async () => {
     const config = buildSetup(c.setup, c.locale, registry);
     const plan = await createMockAIProvider().plan(c.input, {
       config,
@@ -229,7 +229,7 @@ describe('RE3：拍照记到不存在的表（点名的东西不存在且用途�
   });
 });
 
-describe('混合计划（D-419）：功能和外观都应用后再检查', () => {
+describe('Mixed plans (D-419): check after applying both features and appearance', () => {
   const now = new Date(2026, 10, 3);
   const c = EVAL_CASES.find((x) => x.id === 'FL1')!;
   const judge = async (plan: Plan) =>
@@ -247,24 +247,24 @@ describe('混合计划（D-419）：功能和外观都应用后再检查', () =>
     },
   };
 
-  it('混合计划不算失败：两样都做对了就通过（要求 next 的用例也不用 next）', async () => {
+  it('Mixed plans do not count as failure: pass if both are done correctly (cases requiring `next` do not need `next`)', async () => {
     const green: Op = { op: 'setTheme', primaryColor: '#2F9E44' };
     expect(await judge({ kind: 'ops', ops: [visaAction, green] })).toEqual({ pass: true });
   });
 
-  it('混合计划外观做错了还是失败', async () => {
+  it('Mixed plans with incorrect appearance still fail', async () => {
     const red: Op = { op: 'setTheme', primaryColor: '#E03131' };
     expect(await judge({ kind: 'ops', ops: [visaAction, red] })).toMatchObject({ pass: false });
   });
 
-  it('只有功能、没有 next：外观没做，还是失败', async () => {
+  it('Features only without `next`: appearance was not done, still fails', async () => {
     expect(await judge({ kind: 'ops', ops: [visaAction] })).toEqual({
       pass: false,
       reason: 'expected next with the look part',
     });
   });
 
-  it('外观单独套不上：失败（用户实际得不到）', async () => {
+  it('Appearance cannot be applied standalone: failure (user cannot actually obtain it)', async () => {
     const clash: Op = {
       op: 'addContainer',
       page: 'nowhere',

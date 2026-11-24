@@ -9,15 +9,16 @@ import {
 import type { NeedSender } from '../ai/settings';
 import { t } from '../i18n';
 
-// 「Morph 服务器」模式（D-193）：和「自带 key」一样在手机上写提示词、校验和修正，
-// 只是模型调用经过 Morph 服务器转发（服务器加 key）。手机端不持有任何 API key。
-// 计划仍由 store 用 PlanSchema 和 prepareOps 重新校验。
+// "Morph Server" mode (D-193): prompts, validation, and correction are performed on the phone just
+// like "bring your own key", except model calls are proxied through the Morph server (which adds
+// the key). The mobile client holds no API keys. Plans are re-validated by the store using
+// PlanSchema and prepareOps.
 
 export interface RemoteAIOptions {
   baseUrl: string;
-  /** 打包进 App 的客户端令牌（D-132）；登录鉴权上线前的临时防护，不是秘密。 */
+  /** Client token bundled into the app (D-132); temporary protection before login auth goes live, not a secret. */
   clientToken?: string | undefined;
-  /** 用于服务器按设备限额。 */
+  /** Used for server-side rate limiting per device. */
   deviceId?: () => Promise<string | null>;
   platform?: 'ios' | 'android';
   appVersion?: string;
@@ -61,8 +62,10 @@ export function createRemoteAIProvider(
 }
 
 /**
- * 需求回收（D-189）：用户在 AI 做不到时点「把这个需求告诉我们」，把那一句话发到 /v1/needs。
- * 只发这句话、语言、拒绝原因、用的是哪种 AI、平台和版本；不发配置、文件和记录。设备 id 只用于服务器限次数，不保存。
+ * Need collection (D-189): when AI cannot fulfill a request, user taps "Tell us about this need",
+ * sending that single sentence, language, refusal reason, AI type, platform, and version to
+ * /v1/needs. Sends only the sentence, config, files, and records are not sent. Device ID is used
+ * only for server rate limiting and is not stored.
  */
 export function createNeedSender(options: RemoteAIOptions): NeedSender {
   const fetchImpl = options.fetchImpl ?? fetch;

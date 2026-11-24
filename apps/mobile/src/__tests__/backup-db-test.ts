@@ -5,8 +5,9 @@ import path from 'node:path';
 import { sqliteRepo } from '../test-utils/node-sqlite';
 import { DB_MIGRATIONS } from '../storage/sqlite';
 
-// 整体导出里的数据库（D-600）：真的 SQLite 文件、WAL 模式。VACUUM INTO 得到一份一致的拷贝：WAL 里还没写回主文件的
-// 记录也在，user_version 带着，打开就能用，不需要 -wal / -shm。
+// Database in full export (D-600): real SQLite file, WAL mode. VACUUM INTO produces a consistent
+// copy: includes records in WAL not yet written back to the main file, preserves user_version,
+// ready to use immediately upon opening without needing -wal / -shm.
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { DatabaseSync } = require('node:sqlite') as {
@@ -35,7 +36,7 @@ describe('database snapshot for the backup', () => {
         updatedAt: i,
       });
     }
-    // 真的在 WAL 模式、还有没写回主文件的东西：这时只拷主文件会丢。
+    // Actually in WAL mode with unwritten content in the main file: copying only the main file here would cause data loss.
     expect(fs.existsSync(`${live}-wal`)).toBe(true);
     expect(fs.statSync(`${live}-wal`).size).toBeGreaterThan(0);
 

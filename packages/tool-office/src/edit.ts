@@ -1,16 +1,19 @@
 import type { Block, TableBlock, TableCell, TableDoc, TablePage, TableScope } from './types';
 
-// 编辑页对 TableDoc 的修改（D-272）：改格子、插入和删除行列（合并区域跟着动）、切换识别范围。
-// 一页的列是各张表共用的，所以插入和删除列是对整页的：这一列经过的每张表都跟着变。
-// 每个操作都返回新的 TableDoc（不改原来的），撤销和重做只是在几份之间切换，最多记 100 步。
+// TableDoc modifications in the edit page (D-272): modifying cells, inserting and deleting
+// rows/columns (with merged regions updating accordingly), toggling recognition scope. Column
+// layout is shared across all tables on a page, so inserting and deleting columns applies to the
+// entire page: every table passing through that column updates accordingly. Each operation returns
+// a new TableDoc (leaving the original unchanged), and undo/redo simply switches among instances,
+// retaining up to 100 steps.
 
-/** 一张表在 TableDoc 里的位置。 */
+/** Position of a table within a TableDoc. */
 export interface TableRef {
   page: number;
   block: number;
 }
 
-/** 每个位置属于哪个格子（r * cols + c → cells 的下标）。 */
+/** Cell ownership for each position (r * cols + c -> index in cells). */
 export function cellOwners(table: TableBlock): Int32Array {
   const owner = new Int32Array(table.rows * table.cols).fill(-1);
   table.cells.forEach((cell, i) => {
@@ -37,8 +40,10 @@ function updateTable(doc: TableDoc, at: TableRef, fn: (t: TableBlock) => TableBl
 }
 
 /**
- * 改一格的文字。原来写明了写成什么（外来的 xlsx 里的数字、日期，D-509）的格子改了字以后不再照原来的值写：
- * 和扫描件的格子一样按字猜（纯数字写成数字），不然存出来还是改之前的数。
+ * Modify cell text. Cells with explicitly specified text formats (numbers and dates from external
+ * xlsx files, D-509) will no longer be written using their original values after text
+ * modification: like scanned cells, text is guessed (pure numbers written as numbers), otherwise
+ * the saved output would revert to the pre-modification number.
  */
 export function setCellText(doc: TableDoc, at: TableRef, cell: number, text: string): TableDoc {
   return updateTable(doc, at, (t) =>
@@ -56,8 +61,8 @@ export function setCellText(doc: TableDoc, at: TableRef, cell: number, text: str
 }
 
 /**
- * 在第 at 行（0 到 rows）的位置插入一行。横跨插入位置的合并格子跟着变高；
- * 其余位置是新的空格子。
+ * Insert a row at row index at (0 to rows). Merged cells spanning the insertion point increase in
+ * height; other positions receive new blank cells.
  */
 export function insertRow(doc: TableDoc, at: TableRef, row: number): TableDoc {
   return updateTable(doc, at, (t) => {
@@ -78,7 +83,7 @@ export function insertRow(doc: TableDoc, at: TableRef, row: number): TableDoc {
   });
 }
 
-/** 删除一行（至少留一行）。只占这一行的格子删掉，跨过它的合并格子变矮。 */
+/** Delete a row (at least one row must remain). Cells belonging only to this row are deleted, and spanning merged cells become shorter. */
 export function deleteRow(doc: TableDoc, at: TableRef, row: number): TableDoc {
   return updateTable(doc, at, (t) => {
     if (t.rows <= 1 || row < 0 || row >= t.rows) return t;
@@ -93,7 +98,7 @@ export function deleteRow(doc: TableDoc, at: TableRef, row: number): TableDoc {
   });
 }
 
-/** 表内第 col 列（0 到 cols）的位置插入一列：横跨它的合并格子变宽，其余行是新的空格子。 */
+/** Insert a column at index col (from 0 to cols): spanning merged cells become wider, and other rows get new empty cells. */
 function insertTableColumn(t: TableBlock, col: number): TableBlock {
   const covered = new Set<number>();
   const cells = t.cells.map((c) => {
@@ -110,7 +115,7 @@ function insertTableColumn(t: TableBlock, col: number): TableBlock {
   return { ...t, cols: t.cols + 1, cells: sortCells(cells) };
 }
 
-/** 删除表内的第 col 列：只占这一列的格子删掉，跨过它的合并格子变窄。 */
+/** Delete column at index col: cells belonging solely to this column are deleted, and spanning merged cells become narrower. */
 function deleteTableColumn(t: TableBlock, col: number): TableBlock {
   const cells: TableCell[] = [];
   for (const c of t.cells) {
@@ -127,15 +132,17 @@ function updatePage(doc: TableDoc, page: number, next: TablePage): TableDoc {
 }
 
 /**
- * 在这一页的第 col 列（0 到列数）的位置插入一列，宽度和左边一列一样。
- * 这个位置在一张表里面或者边上时，这张表多一列；在表的左边时，整张表右移一列。
+ * Insert a column at index col (0 to column count) on this page, with the same width as the
+ * column to its left. If this position is inside or on the edge of a table, that table gets one
+ * extra column; if it is to the left of a table, the entire table shifts right by one column.
  */
 export function insertColumn(doc: TableDoc, page: number, col: number): TableDoc {
   const p = doc.pages[page];
   if (!p || col < 0 || col > p.colWidths.length) return doc;
   const blocks = p.blocks.map((b): Block => {
-    // 文字、图片有列范围时（D-520、D-522）：从这个位置起的右移，只有横跨这个位置的变宽一列
-    // （并排的两块交界处插入一列，不让两块都变宽、盖住同一列）。
+    // When text or images have a column range (D-520, D-522): shifting right from this position
+    // widens only the column spanning this position (inserting a column at the boundary between two
+    // side-by-side blocks, preventing both blocks from widening and covering the same column).
     if (b.kind !== 'table') {
       if (b.col === undefined) return b;
       if (col <= b.col) return { ...b, col: b.col + 1 };
@@ -151,7 +158,7 @@ export function insertColumn(doc: TableDoc, page: number, col: number): TableDoc
   return updatePage(doc, page, { ...p, colWidths, blocks });
 }
 
-/** 能不能删这一页的第 col 列：至少留一列，经过它的表也都至少留一列（表格不能整张删）。 */
+/** Whether column col on this page can be deleted: at least one column must remain, and tables intersecting it must also retain at least one column (tables cannot be deleted entirely). */
 export function canDeleteColumn(page: TablePage, col: number): boolean {
   if (page.colWidths.length <= 1 || col < 0 || col >= page.colWidths.length) return false;
   return page.blocks.every((b) => {
@@ -161,7 +168,7 @@ export function canDeleteColumn(page: TablePage, col: number): boolean {
   });
 }
 
-/** 删除这一页的第 col 列。 */
+/** Delete column col on this page. */
 export function deleteColumn(doc: TableDoc, page: number, col: number): TableDoc {
   const p = doc.pages[page];
   if (!p || !canDeleteColumn(p, col)) return doc;
@@ -180,7 +187,7 @@ export function deleteColumn(doc: TableDoc, page: number, col: number): TableDoc
   return updatePage(doc, page, { ...p, colWidths, blocks });
 }
 
-/** 改一段表外的文字。 */
+/** Modify a text block outside of tables. */
 export function setTextBlock(doc: TableDoc, page: number, block: number, text: string): TableDoc {
   const b = doc.pages[page]?.blocks[block];
   if (!b || b.kind !== 'text' || b.text === text) return doc;
@@ -192,7 +199,7 @@ export function setTextBlock(doc: TableDoc, page: number, block: number, text: s
   };
 }
 
-/** 删掉一段表外的文字（认进来的页眉、页码这类）。表格不能整张删。 */
+/** Delete a text block outside of tables (such as recognized headers or page numbers). Tables cannot be deleted entirely. */
 export function deleteTextBlock(doc: TableDoc, page: number, block: number): TableDoc {
   if (doc.pages[page]?.blocks[block]?.kind !== 'text') return doc;
   return {
@@ -203,7 +210,7 @@ export function deleteTextBlock(doc: TableDoc, page: number, block: number): Tab
   };
 }
 
-/** 删掉一张图片（D-520）。 */
+/** Delete an image block (D-520). */
 export function deleteImageBlock(doc: TableDoc, page: number, block: number): TableDoc {
   if (doc.pages[page]?.blocks[block]?.kind !== 'image') return doc;
   return {
@@ -214,12 +221,12 @@ export function deleteImageBlock(doc: TableDoc, page: number, block: number): Ta
   };
 }
 
-/** 切换识别范围（只影响写 xlsx 时写不写表外的文字）。 */
+/** Toggle recognition scope (only affects whether out-of-table text is written when exporting to XLSX). */
 export function setScope(doc: TableDoc, scope: TableScope): TableDoc {
   return doc.scope === scope ? doc : { ...doc, scope };
 }
 
-/** 撤销和重做：只在内存里（转 Excel 的 TableDoc、转 Word 的 DocDoc 共用）。 */
+/** Undo and redo: in-memory only (shared by TableDoc for Excel and DocDoc for Word). */
 export interface History<T> {
   past: readonly T[];
   present: T;
@@ -236,7 +243,7 @@ export const startHistory = <T>(doc: T): History<T> => ({
   future: [],
 });
 
-/** 记下一次修改（没变时不记）。 */
+/** Record a modification (skipped if unchanged). */
 export function pushHistory<T>(h: History<T>, next: T): History<T> {
   if (next === h.present) return h;
   return { past: [...h.past, h.present].slice(-HISTORY_LIMIT), present: next, future: [] };
@@ -256,7 +263,7 @@ export function redo<T>(h: History<T>): History<T> {
     : h;
 }
 
-/** 一页的格子总数（编辑页超过 2000 格只读）。 */
+/** Total cell count of a page (read-only if editing page exceeds 2000 cells). */
 export const pageCellCount = (doc: TableDoc, page: number) =>
   (doc.pages[page]?.blocks ?? []).reduce(
     (n, b) => n + (b.kind === 'table' ? b.rows * b.cols : 0),
@@ -266,9 +273,10 @@ export const pageCellCount = (doc: TableDoc, page: number) =>
 export const EDITABLE_CELLS = 2000;
 
 /**
- * TableDoc 的 JSON 读回来时检查一下大概的形状（文件是自己写的，只防坏文件）。
- * 版本 2 的文件（还没有图片块、文字的列范围、字号，D-520–D-522）升成 3：新字段都是可有可无的，
- * 老文件里一个字段都不用改，所以升级就是改版本号（不变量 12）。
+ * Check the approximate shape of TableDoc when loading from JSON (files are self-authored,
+ * protects against corrupted files only). Version 2 files (lacking image blocks, text column
+ * ranges, and font sizes, D-520-D-522) are upgraded to 3: new fields are optional, so old files
+ * require no field modifications, making the upgrade purely a version number bump (invariant 12).
  */
 export function parseTableDoc(json: string): TableDoc | null {
   try {

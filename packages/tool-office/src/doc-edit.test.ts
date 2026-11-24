@@ -87,9 +87,9 @@ describe('DocDoc edits', () => {
     const b = setBlockText(doc, { page: 0, block: 1 }, 'a\n\n b \nc');
     expect(b.pages[0]!.blocks[1]).toMatchObject({ items: ['a', 'b', 'c'] });
     expect(blockText(b.pages[0]!.blocks[1]!)).toBe('a\nb\nc');
-    // 没变时返回同一个对象（撤销记录不多一步）。
+    // Return the same object when unchanged (avoids an extra step in undo history).
     expect(setBlockText(doc, { page: 0, block: 0 }, 'Title')).toBe(doc);
-    // 表格、图片没有编辑框里的文字。
+    // Tables and images do not contain editable text box contents.
     expect(setBlockText(doc, { page: 0, block: 2 }, 'z')).toBe(doc);
   });
 
@@ -128,7 +128,7 @@ describe('DocDoc edits', () => {
   });
 
   it('reads back its own JSON and rejects anything else', () => {
-    // 旧版本只升版本号，内容和（没有的）纸张都原样保留。
+    // Older versions only increment the version number, preserving content and (non-existent) paper layouts as is.
     expect(parseDocDoc(JSON.stringify(doc))).toEqual({ ...doc, version: 5 });
     expect(parseDocDoc('{"version":6,"pages":[]}')).toBeNull();
     expect(parseDocDoc('{"version":1,"pages":[{}]}')).toBeNull();
@@ -144,7 +144,7 @@ describe('DocDoc edits', () => {
       expect(reopened.pages.map((p) => p.paper)).toEqual(legacy.pages.map((p) => p.paper));
       expect(documentXml(reopened)).toBe(documentXml(legacy));
     }
-    // 占位框的文档分段靠段前距：重新打开后不能丢。
+    // Placeholder box documents use space-before for paragraph spacing: must not be lost upon reopening.
     expect(documentXml(parseDocDoc(JSON.stringify(text))!)).toContain(
       '<w:spacing w:before="160"/>',
     );
@@ -202,13 +202,13 @@ describe('DocDoc edits', () => {
     const edited = setBlockText(rowDoc, left, 'gauche');
     expect(blockAt(edited, left)).toMatchObject({ text: 'gauche' });
     expect(blockAt(rowDoc, left)).toMatchObject({ text: 'left' });
-    // 里面的表交给转 Excel 的编辑页，改完换回这一格。
+    // Internal tables are delegated to the Excel-conversion editing page, returning to this cell after editing.
     const at = { page: 0, block: 0, cell: 1, item: 0 };
     const tdoc = tableDocOf(rowDoc, at, 'Sheet')!;
     const back = setTableFrom(rowDoc, at, setCellText(tdoc, { page: 0, block: 0 }, 0, 'z'));
     const inner = blockAt(back, at);
     expect(inner?.kind === 'table' && inner.table.cells[0]!.text).toBe('z');
-    // 删掉一格里的块；所有格子都空了就删掉整行。
+    // Delete a block inside a cell; if all cells are empty, delete the entire row.
     let d = deleteBlock(rowDoc, at);
     expect(blockAt(d, at)).toMatchObject({ text: 'r' });
     d = deleteBlock(deleteBlock(d, at), left);
@@ -216,7 +216,7 @@ describe('DocDoc edits', () => {
   });
 });
 
-describe('文档里的表格就地改（file-room R2，D-366）', () => {
+describe('In-place editing of tables in documents (file-room R2, D-366)', () => {
   const at = { page: 0, block: 2 };
   const table = (d: DocDoc) => {
     const b = blockAt(d, at);
@@ -224,7 +224,7 @@ describe('文档里的表格就地改（file-room R2，D-366）', () => {
     return b;
   };
 
-  it('改格子、插入行和列，表格块直接变，别的块不动', () => {
+  it('Edit cells, insert rows and columns; table blocks update directly while other blocks remain unchanged', () => {
     let next = editDocTable(doc, at, (t) => setCellText(t, { page: 0, block: 0 }, 1, 'z'));
     expect(table(next).table.cells.map((c) => c.text)).toEqual(['x', 'z']);
     next = editDocTable(next, at, (t) => insertRow(t, { page: 0, block: 0 }, 1));
@@ -235,7 +235,7 @@ describe('文档里的表格就地改（file-room R2，D-366）', () => {
     expect(next.pages[0]!.blocks[0]).toBe(doc.pages[0]!.blocks[0]);
   });
 
-  it('没变时还是原来那份（撤销历史不多记一步）；不是表格时不变', () => {
+  it('Return the original object when unchanged (no extra undo history entry recorded); do nothing if not a table', () => {
     expect(editDocTable(doc, at, (t) => t)).toBe(doc);
     expect(
       editDocTable(doc, { page: 0, block: 0 }, (t) => insertRow(t, { page: 0, block: 0 }, 0)),
@@ -244,7 +244,7 @@ describe('文档里的表格就地改（file-room R2，D-366）', () => {
 });
 
 describe('swapping text for the original (D-467, D-468)', () => {
-  // 三星真机：签名被认成了三行字，旁边是剪好的印章。
+  // Samsung physical device: signature was recognized as three lines of text, alongside a cropped seal.
   const line = (y: number) => ({ x: 600, y, width: 200, height: 40 });
   const doc: DocDoc = {
     version: 1,

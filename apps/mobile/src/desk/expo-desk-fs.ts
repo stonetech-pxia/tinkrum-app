@@ -2,13 +2,13 @@ import { Directory, File, Paths } from 'expo-file-system';
 
 import type { DeskFs } from './fs';
 
-// DeskFs 的 Expo 实现：App 文档目录下的 desk/（file-room DESIGN §3 建议的位置，D-357）。
+// Expo implementation of DeskFs: desk/ under app document directory (file-room DESIGN §3 suggested location, D-357).
 
 const ROOT = 'desk';
 
 const rootDir = () => new Directory(Paths.document, ROOT);
 
-/** 桌面目录里的一个文件；目录按需创建。 */
+/** A file in the desk directory; directories are created on demand. */
 function fileAt(path: string, create = false): File {
   const parts = path.split('/').filter((p) => p && p !== '.' && p !== '..');
   if (parts.length === 0) throw new Error('empty desk path');
@@ -22,7 +22,7 @@ function fileAt(path: string, create = false): File {
 async function writeBytes(path: string, bytes: Uint8Array): Promise<number> {
   const dest = fileAt(path, true);
   if (!dest.exists) dest.create();
-  // write 是异步的（release-build-gotchas）：一定要等它写完。
+  // write is asynchronous (release-build-gotchas): must await its completion.
   await dest.write(bytes);
   return bytes.length;
 }
@@ -49,7 +49,7 @@ export const expoDeskFs: DeskFs = {
 
   async moveIn(uri, path) {
     const source = new File(uri);
-    // 移动之前读大小：移动后新地址的 File 对象读到的可能还是 0。
+    // Read size before moving: File objects at the new path after move may still read as 0.
     const size = source.size;
     const dest = fileAt(path, true);
     if (dest.exists) dest.delete();
@@ -75,7 +75,7 @@ export const expoDeskFs: DeskFs = {
     const source = fileAt(from);
     const dest = fileAt(to, true);
     if (dest.exists) dest.delete();
-    // move 在两个平台都是异步的：等它做完。
+    // move is asynchronous on both platforms: wait for it to complete.
     await source.move(dest);
   },
 
@@ -85,7 +85,7 @@ export const expoDeskFs: DeskFs = {
         const file = fileAt(path);
         if (file.exists) file.delete();
       } catch {
-        // 删不掉的留着：清空桌面时和整个目录一起删。
+        // Leave unmovable files: delete along with the entire directory when clearing the desk.
       }
     }
   },

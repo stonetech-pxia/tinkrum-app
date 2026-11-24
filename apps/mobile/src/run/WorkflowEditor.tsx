@@ -38,8 +38,10 @@ import { useWorkspace } from '../workspace/context';
 import { ParamForm, visibleFields } from './ParamForm';
 import { confirmDelete, useWorkflowChange } from './workflow-change';
 
-// 工作流编辑页（D-082）：改名字和参数、哪些参数每次运行时问、加 / 删 / 移动步骤。
-// 改动先放在草稿里，点「保存」生成一个版本（可撤销）；只能插入类型接得上的动作，接不上的步骤会标出来。
+// Workflow editor page (D-082): edit name and parameters, select which parameters to ask for at
+// each runtime, add/remove/move steps. Changes are kept in a draft first, clicking "Save" generates
+// a version (undoable); only actions with compatible input/output types can be inserted,
+// incompatible steps will be highlighted.
 
 interface Draft {
   name: string;
@@ -64,13 +66,13 @@ export function WorkflowEditor({
   const change = useWorkflowChange();
   const saved: Draft = { name: workflow.name, steps: workflow.steps };
   const [draft, setDraft] = useState<Draft>(saved);
-  // 工作流在别处被改了（提示条上的「撤销」、AI）：草稿没有未保存的改动时跟着更新。
+  // Workflow was modified elsewhere (undo banner, AI): updates accordingly when the draft has no unsaved changes.
   const [base, setBase] = useState<Draft>(saved);
   if (!same(base, saved)) {
     setBase(saved);
     if (same(draft, base)) setDraft(saved);
   }
-  // 插入步骤的选择框：在第几步之前插入。
+  // Step insertion selector: insert before which step.
   const [inserting, setInserting] = useState<number | null>(null);
   const dirty = !same(draft, saved);
   const candidate: Workflow = { ...workflow, name: draft.name, steps: draft.steps };
@@ -94,9 +96,9 @@ export function WorkflowEditor({
   );
   const preset = workflow.preset ? presetById(workflow.preset) : undefined;
   const needsContainer = handedInput(saved.steps, registry) !== null;
-  // 手机桌面（D-271）：v34 记在 nav.phoneHomeScreen。
+  // Phone home screen (D-271): recorded in nav.phoneHomeScreen in v34.
   const onPhoneHome = (config.nav.phoneHomeScreen ?? []).includes(workflow.id);
-  // 内设的快捷操作不在配置里（D-236）：保存、放到首页时才存进去，用预设 ID。
+  // Built-in quick actions are not in the config (D-236): stored only upon saving or placing on the home screen, using preset IDs.
   const stored = quickActionsOf(config).some((w) => w.id === workflow.id);
   const addIfBuiltIn = (): Op[] => (stored ? [] : [{ op: 'addTool', tool: workflow }]);
   const caption = [palette.font('body', 13), { color: palette.muted }];
@@ -153,7 +155,7 @@ export function WorkflowEditor({
     if (ok) router.replace({ pathname: '/workflow/[id]', params: { id } });
   }
 
-  // 「新」步骤的参数：前面最近一个「读取记录」步骤的数据表（报表选字段用）。
+  // Parameters for "new" steps: data table of the nearest preceding "read record" step (used for report field selection).
   const collectionBefore = (i: number) => {
     for (let j = i - 1; j >= 0; j--) {
       const s = draft.steps[j]!;
@@ -398,7 +400,7 @@ export function WorkflowEditor({
               }
             />
           )}
-          {/* 手机桌面（D-271）：长按 Morph 图标的菜单最多 4 个，满了先拿掉一个。要容器交值的不能放（D-428）。 */}
+          {/* Phone home screen (D-271): long-press Morph icon menu has a maximum of 4 items, remove one first if full. Container-valued values cannot be placed (D-428). */}
           {needsContainer ? null : (
             <Pill
               palette={palette}

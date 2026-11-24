@@ -6,9 +6,15 @@ import type { ToolDefinition } from '../registry';
 import type { Locale, Workflow } from '../schema';
 import type { ActionDefinition } from '../workflow/contract';
 
-// 扫描工具的清单（T5）：找边和透视矫正在 iOS 上用系统的 Vision / Core Image（D-086），
-// 其他平台用扫描包（WebView + OpenCV.js + jscanify）；拍照扫描用系统文档相机（iOS 的 VisionKit、Android 的 ML Kit）；四个角由用户在本地调整（找边在背景杂乱或纸张出画时会出错）；
-// 系统文档相机拍的页面已经拉正，直接放行；展平（D-274，默认打开）对两种页面都做，要下载展平模型。增强用 Skia（D-266：去阴影、纠偏、自动彩色或灰度、黑白用局部阈值），不需要扩展包。
+// Scan tool manifest (T5): Edge detection and perspective correction use the system Vision / Core
+// Image on iOS (D-086), and the scanning package (WebView + OpenCV.js + jscanify) on other
+// platforms; capture scanning uses the system document camera (VisionKit on iOS, ML Kit on
+// Android); the four corners are adjusted locally by the user (edge detection can fail when the
+// background is cluttered or the paper extends past the frame); pages captured by the system
+// document camera are already straightened and passed through directly; flattening (D-274, enabled
+// by default) is performed on both page types and requires downloading the flattening model.
+// Enhancement uses Skia (D-266: shadow removal, deskewing, auto color/grayscale, or black-and-white
+// using local thresholding) without requiring an extension pack.
 
 export const SCAN_TOOL_ID = 'scan';
 export const SCAN_PAGE_ID = 'tool-scan';
@@ -30,7 +36,7 @@ export const SCAN_ACTIONS: readonly ActionDefinition[] = [
     },
     input: ['images'],
     output: 'images',
-    // D-274：展平默认打开（不写 = 打开），旧配置不用迁移。
+    // D-274: Flattening is enabled by default (omitted = enabled); old configurations do not require migration.
     params: z.strictObject({ flatten: z.boolean().optional() }),
     fields: [
       {
@@ -47,7 +53,7 @@ export const SCAN_ACTIONS: readonly ActionDefinition[] = [
     local: 'corners',
     pack: 'scan',
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [{ match: /^(?:扫描|找边|拉正)$|^(?:scan|straighten)$/i }],
   },
   {
@@ -81,7 +87,7 @@ export const SCAN_ACTIONS: readonly ActionDefinition[] = [
 const toPdf = {
   id: 'pdf',
   action: 'pdf.fromImages',
-  // 文字层（D-195）：扫描的 PDF 能搜索、能复制文字，文档库也能按里面的字搜（D-455）。
+  // Text layer (D-195): Scanned PDFs are searchable and text-copyable, and the document library can also search by the text inside them (D-455).
   params: {
     pageSize: 'a4',
     orientation: 'auto',
@@ -92,7 +98,7 @@ const toPdf = {
   },
 };
 
-/** 单功能工作流（D-061）。 */
+/** Single-function workflow (D-061). */
 export function scanWorkflows(locale: Locale): Workflow[] {
   const wf = (id: string, name: [string, string], steps: Workflow['steps']): Workflow => ({
     id,
@@ -106,7 +112,7 @@ export function scanWorkflows(locale: Locale): Workflow[] {
     action: 'file.rename',
     params: { template: t(locale, 'scan_Scan_5b295') },
   };
-  // 扫描的文件都留在 App 的文档库（D-450）：最后存到 Tinkrum 的文件里，首页「最近文件」能看到。
+  // Scanned files remain in the app's document library (D-450): finally saved to Tinkrum files, visible in "Recent files" on the Home Screen.
   const keep = { id: 'keep', action: 'file.save', params: {} };
   return [
     wf(

@@ -27,13 +27,16 @@ import { useToolDownloads } from '../tool-download/context';
 import { toolRevoked } from '../tool-download/state';
 import { useWorkspace } from '../workspace/context';
 
-/** 打开工具页时，目录超过这么久没拉就再拉一次。 */
+/** When opening the tools page, if the catalog hasn't been fetched for longer than this duration, fetch it again. */
 const CATALOG_MAX_AGE_MS = 10 * 60 * 1000;
 
 /**
- * 工具目录（§3 旅程 B）：安装、打开、移除首页入口、卸载。所有操作都生成新版本，可撤销。
- * 只有移除先确认（会一起移除这个工具的快捷操作）；其他操作直接应用，提示条上可撤销（D-105）。
- * 目录里可以下载的工具（D-177）排在内置工具后面：点「添加」先下载、检查，再和内置工具一样添加。
+ * Tool catalog (§3 Journey B): install, open, remove home screen entry, uninstall. All operations
+ * generate a new version and are undoable. Only remove requires confirmation (which also removes
+ * the quick actions associated with this tool); other operations apply immediately and are
+ * undoable via the toast bar (D-105). Downloadable tools in the catalog (D-177) are listed after
+ * built-in tools: tapping "Add" first downloads and inspects, then adds them just like built-in
+ * tools.
  */
 export function ToolsView({ env }: { env: RenderEnv }) {
   const { config, palette, locale, registry } = env;
@@ -46,21 +49,21 @@ export function ToolsView({ env }: { env: RenderEnv }) {
   const busy = useToolDownloads((s) => s.busy);
   const refresh = useToolDownloads((s) => s.refresh);
   const download = useToolDownloads((s) => s.download);
-  // 下载后注册表在原地变了；订阅这一项，下载完就重新渲染。
+  // The registry changes in place after downloading; subscribe to this item so it re-renders upon download completion.
   const downloads = useToolDownloads((s) => s);
 
   useEffect(() => {
     void refresh(CATALOG_MAX_AGE_MS);
   }, [refresh]);
 
-  /** 目录里这个工具可以下载的最新版本（停用的、App 能力不够的不算）。 */
+  /** The latest downloadable version of this tool in the catalog (excluding disabled ones and those incompatible with App capabilities). */
   const offered = (id: string): CatalogEntry | undefined => {
     const entry = catalog?.tools.find((e) => e.id === id);
     if (!entry || entry.hostApi > HOST_API || isRevoked(catalog, entry.id, entry.version)) return;
     return entry;
   };
 
-  /** 下载并检查一个工具；失败时说明原因，返回 false。 */
+  /** Downloads and inspects a tool; explains the reason on failure and returns false. */
   async function fetchTool(entry: CatalogEntry): Promise<boolean> {
     try {
       await download(entry);
@@ -75,7 +78,7 @@ export function ToolsView({ env }: { env: RenderEnv }) {
     }
   }
 
-  /** askTitle：要先确认的操作（只有移除工具）用这个标题。 */
+  /** askTitle: The title to use for operations requiring prior confirmation (tool removal only). */
   async function change(ops: Op[], summary: string, askTitle?: string) {
     if (env.locked) return env.locked();
     const result = await proposeOps(ops, summary);
@@ -115,7 +118,7 @@ export function ToolsView({ env }: { env: RenderEnv }) {
         );
         const name = localize(tool.name, locale);
         const entry = tool.origin === 'download' ? offered(tool.id) : undefined;
-        // 目录里有比本机更新的版本：先下载，再和内置工具一样「更新」。
+        // A newer version than the local one exists in the catalog: download first, then "update" just like built-in tools.
         const newer = entry && compareVersions(entry.version, tool.version) > 0 ? entry : undefined;
         const revoked = tool.origin === 'download' && toolRevoked(downloads, tool.id);
         const button = (label: string, onPress: () => void, testID: string, danger = false) => (

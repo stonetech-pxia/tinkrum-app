@@ -39,40 +39,43 @@ import { dateFieldOf } from '../sequence';
 import { checkTools, type ToolCheckResult } from '../tool-check';
 import { stepRefs } from '../workflow/refs';
 
-// 个人记录能力表（AGENT_PLAN §3.2，创始人 2026-11-03：App 能实现的个人记录功能是有限的，所以能做出稳定的验收）。
-// 每个能力是一个纯函数谓词，只看配置，不绑定表名、字段 ID：任何建法满足都算。
-// 只算用户摸得到的：藏起来的块、进不去的页面、关掉的提醒都不算。
-// 完整性守护在 capabilities.test.ts：登记表和 schema 多一种东西，这里少一个能力，测试就失败。
+// A block touchable by the user (AGENT_PLAN §3.2, founder 2026-11-03: The personal record features
+// achievable by the app are limited, enabling stable acceptance testing). Each capability is a pure
+// function predicate checking only config, independent of table names or field IDs: any
+// construction satisfying it counts. Only counts what the user can touch: hidden blocks,
+// inaccessible pages, and disabled reminders are excluded. Integrity guard in
+// `capabilities.test.ts`: if registry and schema add an item while capabilities list drops one, the
+// test fails.
 
-/** 用户摸得到的一个块。 */
+/** A block touchable by the user. */
 export interface PlacedBlock {
   page: Page;
   block: KnownComponent;
 }
 
-/** 用户摸得到的一个写入口。 */
+/** A write trigger touchable by the user. */
 export interface PlacedWrite {
   tool: RecordTool;
-  /** 出现方式；self 是块本身被点（按钮），done 是通知上的「完成」。 */
+  /** Appearance mode; `self` is the block itself being tapped (button), `done` is "Complete" on notifications. */
   as: ToolUseAs | 'self' | 'done';
-  /** 工具作用在哪张表的一条上（$row）；没有就是不用先有记录。 */
+  /** Which record row the tool acts upon (`$row`); absent means no pre-existing record is required. */
   rowOf?: string;
   block?: PlacedBlock;
   reminder?: Reminder;
   when: boolean;
 }
 
-/** 把文件或文字交给新记录表单的快捷操作（out.addRecord）。 */
+/** Quick action passing files or text to a new record form (`out.addRecord`). */
 export interface FileIntake {
   action: QuickAction;
   table: string;
-  /** 摆在页面、手机桌面等地方；不只在「设置 → 快捷操作」里。 */
+  /** Placed on pages, mobile home screen, etc.; not only in "Settings -> Quick Actions". */
   placed: boolean;
-  /** 链通、参数齐、表里有放文件的字段。 */
+  /** Linked, parameters complete, table contains a file-holding field. */
   ok: boolean;
-  /** 第一步是拍照或扫描。 */
+  /** The first step is taking a photo or scanning. */
   camera: boolean;
-  /** 传进来的是文件（不是文字）。 */
+  /** Input data consists of files (rather than text). */
   files: boolean;
 }
 
@@ -103,7 +106,7 @@ type RecordBlock = Extract<KnownComponent, { look: RecordLook }>;
 type NumberBlock = Extract<KnownComponent, { look: 'number' }>;
 type ChartBlock = Extract<KnownComponent, { look: 'chart' }>;
 
-/** 配置 → 用户摸得到的东西。页面进不进得去用工具检查的结论，不再算一遍。 */
+/** Config -> Things touchable by the user. Whether pages are accessible is determined by tool checks without recalculating. */
 export function viewOf(config: WorkspaceConfig, registry: Registry): AppView {
   const health = checkTools(config, registry);
   const lost = new Set(
@@ -158,7 +161,7 @@ export function viewOf(config: WorkspaceConfig, registry: Registry): AppView {
   return { config, registry, health, pages, blocks, writes, reminders, intakes };
 }
 
-// ---- 读配置的小函数（场景的谓词也用）----
+// ---- Helper functions for reading config (also used by scenario predicates) ----
 
 export const tableOf = (v: AppView, id: string): Collection | undefined =>
   tablesOf(v.config).find((t) => t.id === id);
@@ -203,14 +206,14 @@ const presetsOf = (w: PlacedWrite): string[] => {
   return Object.keys((values as RecordToolValues | undefined) ?? {});
 };
 
-/** 这次新建会不会问这个字段（用户自己填）。 */
+/** Whether this new entry creation will prompt for this field (filled by the user). */
 function asksField(w: PlacedWrite, field: string): boolean {
   if (w.tool.do !== 'create') return false;
   const { ask, smartDate } = w.tool;
   return ask === 'all' || (Array.isArray(ask) && ask.includes(field)) || smartDate?.to === field;
 }
 
-/** 这次新建有没有给这个字段值（问的或预设的）。 */
+/** Whether this new entry creation provides a value for this field (prompted or preset). */
 export const createCovers = (w: PlacedWrite, field: string): boolean =>
   asksField(w, field) || presetsOf(w).includes(field);
 
@@ -219,7 +222,7 @@ const isComputed = (f: Field) => fieldDefinition(f.type).inForm === false;
 const hasDefault = (f: Field) =>
   ('default' in f && f.default !== undefined) || fieldDefinition(f.type).emptyNew !== undefined;
 
-/** 这次新建存得进去：必填的字段都有值。 */
+/** New creation can be saved: all required fields have values. */
 function createSaves(w: PlacedWrite, table: Collection): boolean {
   return table.fields.every(
     (f) =>
@@ -236,8 +239,9 @@ export const createsOn = (v: AppView, table: string): PlacedWrite[] =>
   v.writes.filter((w) => w.tool.do === 'create' && w.tool.table === table);
 
 /**
- * 这张表从一条记录都没有开始，用户加得进去：表单、按钮、就地添加、快捷操作，或者别的表每一条上的按钮
- * （那张表自己要加得进去）。每一条上的「复制一条」开不了头。
+ * The table starts with zero records, and the user can add entries: via forms, buttons, inline
+ * adding, quick actions, or buttons on each row of another table (where that table itself allows
+ * adding). "Copy a row" on each row cannot be the starting point.
  */
 export function canAdd(v: AppView, table: string, seen: ReadonlySet<string> = new Set()): boolean {
   if (seen.has(table)) return false;
@@ -252,7 +256,7 @@ export function canAdd(v: AppView, table: string, seen: ReadonlySet<string> = ne
   );
 }
 
-/** 写入口（新建时问的、预设的，或者每一条上的工具）写得到这个字段。不算默认值，不算打开编辑页。 */
+/** Write entry (asked during creation, preset, or per-row tool) can write to this field. Excludes default values and opening the edit page. */
 export function entryWrites(v: AppView, table: string, field: string): boolean {
   if (v.intakes.some((x) => x.table === table && x.ok)) return true;
   return v.writes.some(
@@ -266,12 +270,12 @@ export function entryWrites(v: AppView, table: string, field: string): boolean {
   );
 }
 
-/** 用户在写入口能自己选这个字段（表单问）。 */
+/** The user can select this field themselves at the write entry (form prompt). */
 export const entryAsks = (v: AppView, table: string, field: string): boolean =>
   v.intakes.some((x) => x.table === table && x.ok) ||
   createsOn(v, table).some((w) => asksField(w, field));
 
-/** 新记录这个字段有值：系统字段、算出来的、有默认值的，或者写入口写得到。 */
+/** The new record has a value for this field: system field, computed, has default value, or writable by a write entry. */
 export function entryFills(v: AppView, table: string, field: string): boolean {
   if (isSystemField(field)) return true;
   const f = fieldIn(tableOf(v, table), field);
@@ -279,16 +283,16 @@ export function entryFills(v: AppView, table: string, field: string): boolean {
   return isComputed(f) || hasDefault(f) || entryWrites(v, table, field);
 }
 
-/** 这张表按日子算时用哪个字段（不写时 dateFieldOf 的默认）。 */
+/** Which field to use when calculating by date for this table (defaults to dateFieldOf when not specified). */
 export function dayField(v: AppView, table: string, date?: string): string {
   const t = tableOf(v, table);
   return t ? dateFieldOf(t, date) : 'createdAt';
 }
 
-/** 条件要字段有值才可能成立（isEmpty、isNot 空着也成立）。 */
+/** A condition requires the field to have a value to possibly hold (isEmpty and isNot also hold when empty). */
 const needsValue = (c: Condition) => c.op !== 'isEmpty' && c.op !== 'isNot';
 
-/** 这个统计或图表依赖的字段（值、日子、筛选、分组），在写入口都有值：统计不会永远是空的。 */
+/** Fields depended on by this statistic or chart (value, date, filter, grouping) all have values at the write entry: the statistic will not be permanently empty. */
 export function statInputsFilled(v: AppView, block: NumberBlock | ChartBlock): boolean {
   const { table, field, filter, group, days, aggregate } = block.source;
   const needed = new Set<string>();
@@ -301,7 +305,7 @@ export function statInputsFilled(v: AppView, block: NumberBlock | ChartBlock): b
   return [...needed].every((id) => entryFills(v, table, id));
 }
 
-/** 新记录一存下就有这个字段：默认值，或者新建时问的、预设的。不算之后每一条上的工具。 */
+/** The new record has this field as soon as it is saved: default value, or asked during creation, or preset. Excludes subsequent per-row tools. */
 export function createFills(v: AppView, table: string, field: string): boolean {
   const f = fieldIn(tableOf(v, table), field);
   if (!f) return false;
@@ -312,7 +316,7 @@ export function createFills(v: AppView, table: string, field: string): boolean {
   );
 }
 
-/** 这个字段显示出来了：列表的槽位、数字或图表读的值。 */
+/** This field is displayed: list slots, number, or chart read values. */
 export function displayed(v: AppView, table: string, field: string): boolean {
   const shownInRecords = recordBlocks(v, table).some(({ show }) =>
     [show.title, ...(show.subtitles ?? []), show.trailing, show.color].includes(field),
@@ -328,7 +332,7 @@ export interface PlacedRollup {
   field: Extract<Field, { type: 'rollup' }>;
 }
 
-/** 汇总 over 这张表、而且显示出来了的字段。 */
+/** Rollups over this table and whose fields are displayed. */
 export const rollupsOver = (v: AppView, table: string): PlacedRollup[] =>
   tablesOf(v.config).flatMap((host) =>
     host.fields.flatMap((field) =>
@@ -338,7 +342,7 @@ export const rollupsOver = (v: AppView, table: string): PlacedRollup[] =>
     ),
   );
 
-/** 汇总依赖的字段在写入口都有值。 */
+/** Fields depended on by rollups have values at the write entry. */
 export function rollupInputsFilled(v: AppView, { field }: PlacedRollup): boolean {
   const needed = new Set([field.via]);
   if (field.field && field.aggregate !== 'count' && field.aggregate !== 'distinctDays')
@@ -349,7 +353,7 @@ export function rollupInputsFilled(v: AppView, { field }: PlacedRollup): boolean
   return [...needed].every((id) => entryFills(v, field.table, id));
 }
 
-/** 这张表的记录上这些聚合算得出来（数字块，或者另一张表上显示出来的汇总字段）。 */
+/** These aggregations can be calculated on records of this table (number blocks, or rollup fields displayed on another table). */
 export function aggregatesOn(v: AppView, table: string, kinds: readonly string[]): boolean {
   return (
     numberBlocks(v, table).some(
@@ -359,18 +363,18 @@ export function aggregatesOn(v: AppView, table: string, kinds: readonly string[]
   );
 }
 
-/** 不用填东西、点一下就写。 */
+/** Requires no input, writes with a single tap. */
 export const isOneTap = (w: PlacedWrite): boolean => {
   if (!['tap', 'button', 'check', 'self'].includes(w.as)) return false;
   if (w.tool.do === 'create') return w.tool.ask === undefined && w.tool.values !== HERE_REF;
   return w.tool.do !== 'setAll';
 };
 
-/** 这个工具作用的那一条存在（要先有记录的话，那张表加得进去）。 */
+/** The row that this tool acts upon exists (if records are required first, that table must allow adding). */
 export const rowExists = (v: AppView, w: PlacedWrite): boolean =>
   w.rowOf === undefined || canAdd(v, w.rowOf);
 
-/** 这次新建记下了日子：日子字段有预设、有默认，或者就是创建时间。 */
+/** This new creation records the date: date field has a preset, default, or is simply the creation time. */
 export function createKnowsDay(v: AppView, w: PlacedWrite): boolean {
   if (w.tool.do !== 'create') return false;
   const table = w.tool.table;
@@ -380,7 +384,7 @@ export function createKnowsDay(v: AppView, w: PlacedWrite): boolean {
   return f !== undefined && (hasDefault(f) || createCovers(w, id));
 }
 
-/** 点一下新建一条、记得下今天：连续天数、月历只认这种。 */
+/** Create a new record with a single tap, remembering today: streak and calendar recognize only this type. */
 export const oneTapCreateTables = (v: AppView): Set<string> =>
   new Set(
     v.writes
@@ -398,7 +402,7 @@ export const oneTapCreateTables = (v: AppView): Set<string> =>
       .map((w) => w.tool.table),
   );
 
-/** 点一下就算记了（新建一条、打勾、加一、写今天，任何一种）。 */
+/** Considered logged with a single tap (creating a record, checking a box, incrementing by one, writing today, any kind). */
 export const oneTapTables = (v: AppView): Set<string> =>
   new Set([
     ...oneTapCreateTables(v),
@@ -407,7 +411,7 @@ export const oneTapTables = (v: AppView): Set<string> =>
       .map((w) => w.tool.table),
   ]);
 
-/** 这个页面上的块读或写这张表。 */
+/** Blocks on this page read or write this table. */
 export function pageTouches(v: AppView, pageId: string, table: string): boolean {
   return v.blocks.some(
     ({ page, block }) =>
@@ -417,10 +421,10 @@ export function pageTouches(v: AppView, pageId: string, table: string): boolean 
   );
 }
 
-/** 提醒的钟点（after 没有钟点）。 */
+/** Reminder time (after has no time). */
 export const reminderTime = (r: Reminder): string | null => ('at' in r.when ? r.when.at : null);
 
-/** 点开这个提醒能看到或写到这张表：打开的页面碰这张表，或者快捷操作用这张表。 */
+/** Tapping this reminder can view or write to this table: opened pages touch this table, or quick actions use this table. */
 export function reminderReaches(v: AppView, r: Reminder, table: string): boolean {
   const page = pageIdOf(r.opens);
   if (page !== null) return pageTouches(v, page, table);
@@ -429,10 +433,11 @@ export function reminderReaches(v: AppView, r: Reminder, table: string): boolean
   return wf !== undefined && stepRefs(wf, v.registry).some((ref) => ref.table === table);
 }
 
-/** 做完之后下一次会往后排：日程的 lastDone 由这张表每一条上的工具写到（写日期，或者在完成表里新建一条）。 */
+/** After completion, the next one is scheduled later: schedule's lastDone is written by a tool on each row of this table (writing a date, or creating a new record in the completion table). */
 /**
- * 每一条上点一下，新建一条完成记录：写到另一张表，引用字段指回这一条（Todoist 的完成表）。
- * 要填东西的不算（「写评论」也是这样连回来的）。
+ * Tap on each row to create a new completion record: written to another table, reference field
+ * points back to this row (Todoist-style completion table). Excludes those requiring input
+ * ("Write a comment" connected back this way is also excluded).
  */
 export function completionCreates(v: AppView, table: string): PlacedWrite[] {
   return v.writes.filter((w) => {
@@ -488,11 +493,11 @@ export function completionReschedules(v: AppView, table: string): boolean {
   return false;
 }
 
-/** 配置里用到的所有筛选条件（块、汇总字段、按钮的 when 没有细分，提醒的 unless）。 */
+/** All filter conditions used in the config (blocks, rollup fields, button when without subdivision, reminder unless). */
 function allConditions(v: AppView): Condition[] {
   const out: Condition[] = [];
   for (const { block } of v.blocks) {
-    // 文件块筛的是文件，不是记录。
+    // Files blocks filter files, not records.
     if (block.look === 'files') continue;
     const source = (
       block as {
@@ -562,7 +567,7 @@ const valueUsed = (v: AppView, value: unknown) =>
     return (tool.do === 'set' || tool.do === 'setAll') && tool.value === value;
   });
 
-/** 所有一键记录工具写的值（D-565 的对象写法用）。 */
+/** Values written by all one-tap logging tools (used by object syntax in D-565). */
 const valuesUsed = (v: AppView): unknown[] =>
   v.writes.flatMap(({ tool }) =>
     tool.do === 'create' || tool.do === 'createAll'
@@ -575,7 +580,7 @@ const valuesUsed = (v: AppView): unknown[] =>
 const usesOpen = (v: AppView) =>
   v.blocks.some(({ block }) => toolsOf(block).some((u) => isOpenUse(u) && u.opens === 'record'));
 
-// ---- 能力表 ----
+// ---- Capabilities Table ----
 
 export type CapabilityGroup = 'field' | 'write' | 'read' | 'remind' | 'connect';
 
@@ -594,7 +599,7 @@ const fieldCap = (type: Field['type']) => cap(`field.${type}`, 'field', (v) => f
 const doCap = (kind: RecordTool['do']) =>
   cap(`write.do.${kind}`, 'write', (v) => v.writes.some((w) => w.tool.do === kind));
 const asCap = (as: ToolUseAs) =>
-  // as: "list" 不写记录，运行快捷操作（D-428）。
+  // as: "list" does not write records, runs quick actions (D-428).
   cap(`write.as.${as}`, 'write', (v) =>
     as === 'list'
       ? v.blocks.some((x) =>
@@ -632,9 +637,9 @@ const streakUnitCap = (unit: 'day' | 'week' | 'month') =>
     ].some((d) => d?.unit === unit),
   );
 
-/** 全部个人记录能力。手写每一项：加了新东西，守护测试让人来这里补一个谓词。 */
+/** All personal record capabilities. Hand-written items: when new things are added, guard tests prompt adding a predicate here. */
 export const CAPABILITIES: readonly Capability[] = [
-  // 字段
+  // field
   fieldCap('text'),
   fieldCap('note'),
   fieldCap('number'),
@@ -661,7 +666,7 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('field.schedule.countEarly', 'field', (v) =>
     allFields(v).some((x) => x.field.type === 'schedule' && x.field.countEarly === true),
   ),
-  // D-568：选项代表的数、选项的颜色。
+  // D-568: Numbers represented by options, option colors.
   cap('field.choice.optionValue', 'field', (v) =>
     allFields(v).some(
       (x) => x.field.type === 'choice' && x.field.options.some((o) => o.value !== undefined),
@@ -672,7 +677,7 @@ export const CAPABILITIES: readonly Capability[] = [
       (x) => x.field.type === 'choice' && x.field.options.some((o) => o.color !== undefined),
     ),
   ),
-  // D-569：公式读勾选框或单选。
+  // D-569: Formulas read checkboxes or choices.
   cap('field.formula.checkboxOrChoice', 'field', (v) =>
     allFields(v).some(({ table, field }) => {
       if (field.type !== 'formula') return false;
@@ -686,7 +691,7 @@ export const CAPABILITIES: readonly Capability[] = [
       );
     }),
   ),
-  // D-570：记录表单的分段、条件显示，字段的填写提示和范围。
+  // D-570: Record form sections, conditional display, field entry tips and ranges.
   cap('field.table.form', 'field', (v) => tablesOf(v.config).some((t) => t.form !== undefined)),
   cap('field.table.form.when', 'field', (v) =>
     tablesOf(v.config).some((t) => (t.form?.sections ?? []).some((s) => s.when !== undefined)),
@@ -710,7 +715,7 @@ export const CAPABILITIES: readonly Capability[] = [
     tablesOf(v.config).some((t) => t.prefillRules !== undefined),
   ),
 
-  // 写
+  // write
   doCap('create'),
   doCap('set'),
   doCap('toggle'),
@@ -749,7 +754,7 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('write.value.record', 'write', (v) => valueUsed(v, RECORD_REF)),
   cap('write.value.group', 'write', (v) => valueUsed(v, GROUP_REF)),
   cap('write.value.here', 'write', (v) => valueUsed(v, HERE_REF)),
-  // D-565：从今天或这一条的日期起算的日期、抄这一条的字段、加这一条的一个数字字段。
+  // D-565: Dates calculated from today or this row's date, copying fields from this row, adding a number field from this row.
   cap('write.value.dateOffset', 'write', (v) => valuesUsed(v).some(isDateValue)),
   cap('write.value.copy', 'write', (v) => valuesUsed(v).some(isCopyValue)),
   cap('write.also', 'write', (v) =>
@@ -757,7 +762,7 @@ export const CAPABILITIES: readonly Capability[] = [
       toolsOf(block).some((u) => isRecordToolUse(u) && tapAlsoOf(u).length > 0),
     ),
   ),
-  // D-616：列表下面的「添加」勾另一张表的几条，每条建一条。
+  // D-616: "Add" below the list checks several entries of another table, creating one for each.
   cap('write.createAll.pick', 'write', (v) =>
     v.writes.some((w) => w.tool.do === 'createAll' && w.tool.pick === true),
   ),
@@ -771,7 +776,7 @@ export const CAPABILITIES: readonly Capability[] = [
     ),
   ),
 
-  // 读
+  // read
   lookCap('dial'),
   lookCap('period'),
   lookCap('choices'),
@@ -802,7 +807,7 @@ export const CAPABILITIES: readonly Capability[] = [
   cap('connect.recordsToVCard', 'connect', (v) =>
     quickActionsOf(v.config).some((q) => q.steps.some((s) => s.action === 'records.toVCard')),
   ),
-  // D-428：容器把值交给工具。
+  // D-428: Containers pass values to tools.
   cap('connect.recordRow', 'connect', (v) =>
     v.config.data.tables.some((table) => (table.recordRow?.length ?? 0) > 0),
   ),
@@ -951,7 +956,7 @@ export const CAPABILITIES: readonly Capability[] = [
     quickActionsOf(v.config).some((q) => q.steps.some((s) => s.action === 'in.records')),
   ),
 
-  // 提醒
+  // remind
   cap('remind.when.everyDay', 'remind', (v) =>
     v.reminders.some((r) => 'every' in r.when && r.when.every === 'day'),
   ),
@@ -978,7 +983,7 @@ export const CAPABILITIES: readonly Capability[] = [
     v.reminders.some((r) => r.snoozeMinutes !== undefined),
   ),
 
-  // 能力之间的连接：单项都有，也可能接不起来。
+  // Connections between capabilities: individual items exist, but may not connect.
   cap('connect.writeReadSameTable', 'connect', (v) =>
     tableIds(v).some(
       (t) =>

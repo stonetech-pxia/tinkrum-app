@@ -23,8 +23,10 @@ import { acceptNextAlert, testRegistry } from '../test-utils/render-app';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
-// R02（底线 7）：改动记录永远能回到以前任何时候。历史页一页 50 条，往下翻能一直翻到第一个版本；
-// 「设置 → 数据」找回已移出界面的表、存储空间看旧版本里的文件用到，也要读完全部历史，不能只看最近一千个。
+// R02 (Invariant 7): Change history can always return to any earlier point. History pages have 50
+// items per page, scrolling down can reach the very first version; "Settings -> Data" to retrieve
+// tables moved out of the interface and storage view for files used in old versions must also read
+// the entire history rather than only the latest thousand.
 
 const books: Collection = {
   id: 'books',
@@ -32,7 +34,7 @@ const books: Collection = {
   fields: [{ id: 'title', name: '书名', type: 'text' }],
 };
 
-/** 第一个版本：有一张「书」表和一个指向文件 oldfile 的入口；后面的版本都是空白工作空间（把它们移出去了）。 */
+/** First version: has a "Books" table and an entry pointing to oldfile; subsequent versions are blank workspaces (having removed them). */
 function firstConfig(): WorkspaceConfig {
   const result = applyOps(
     createDefaultWorkspace('zh'),
@@ -66,8 +68,8 @@ async function fill(repo: WorkspaceRepo, count: number) {
 describe.each([
   ['memory', async () => new MemoryWorkspaceRepo()],
   ['SQLite', sqliteRepo],
-] as const)('listRevisions 翻页 (%s)', (_name, make: () => Promise<WorkspaceRepo>) => {
-  it('beforeId 取比它更早的，新的在前，翻到没有为止', async () => {
+] as const)('listRevisions pagination (%s)', (_name, make: () => Promise<WorkspaceRepo>) => {
+  it('beforeId retrieves earlier items with newer ones first, continuing until none remain', async () => {
     const repo = await make();
     await fill(repo, 120);
     const ids = async (limit: number, before?: number) =>
@@ -79,8 +81,8 @@ describe.each([
   });
 });
 
-describe('超过一千个版本以后，最早的版本还是找得到', () => {
-  it('找回只在第一个版本里的表的结构', async () => {
+describe('After over a thousand versions, the earliest version is still retrievable', () => {
+  it('Retrieve table structure present only in the first version', async () => {
     const repo = new MemoryWorkspaceRepo();
     await fill(repo, 1100);
     const found = await findRevisionTables(repo, new Set(['books', 'nothing']));
@@ -88,7 +90,7 @@ describe('超过一千个版本以后，最早的版本还是找得到', () => {
     expect(found.get('books')!.fields.map((f) => f.id)).toEqual(['title']);
   });
 
-  it('找回之后不再往更早的读（全都找到了就停）', async () => {
+  it('Stop reading further back once retrieval is complete (stops when all are found)', async () => {
     const repo = new MemoryWorkspaceRepo();
     await fill(repo, 30);
     const list = jest.spyOn(repo, 'listRevisions');
@@ -96,7 +98,7 @@ describe('超过一千个版本以后，最早的版本还是找得到', () => {
     expect(list).not.toHaveBeenCalled();
   });
 
-  it('存储空间：只在第一个版本里用过的文件，标成「旧版本里用过」', async () => {
+  it('Storage: files used only in the first version are marked as "Used in old version"', async () => {
     const repo = new MemoryWorkspaceRepo();
     await fill(repo, 1100);
     const config = (await repo.getHead())!.config as WorkspaceConfig;
@@ -107,7 +109,7 @@ describe('超过一千个版本以后，最早的版本还是找得到', () => {
   });
 });
 
-describe('改动记录页', () => {
+describe('Change history page', () => {
   async function renderHistory(count: number) {
     const repo = new MemoryWorkspaceRepo();
     await fill(repo, count);
@@ -138,18 +140,18 @@ describe('改动记录页', () => {
       index: () => null,
       history: HistoryRoute,
     });
-    // 从设置进来的：有页面可以退回去（回到旧版本后返回设置）。
+    // Entered from settings: has a page to go back to (returns to settings after restoring an old version).
     await act(() => router.push('/history'));
     return { store, repo };
   }
 
-  it('版本不多：没有「加载更多」', async () => {
+  it('Few versions: no "Load more" button', async () => {
     await renderHistory(5);
     expect(await screen.findByTestId('revision-1')).toBeTruthy();
     expect(screen.queryByTestId('history-more')).toBeNull();
   });
 
-  it('120 个版本：先显示最近 50 个，点「加载更多」往下翻到第一个版本，能回到它', async () => {
+  it('120 versions: displays the latest 50 first, tap "Load more" to scroll down to the first version and return to it', async () => {
     const { store } = await renderHistory(120);
     expect(await screen.findByTestId('revision-120')).toBeTruthy();
     expect(screen.getByTestId('revision-71')).toBeTruthy();
@@ -160,10 +162,10 @@ describe('改动记录页', () => {
     expect(screen.queryByTestId('revision-20')).toBeNull();
     await fireEvent.press(screen.getByTestId('history-more'));
     expect(await screen.findByTestId('revision-1')).toBeTruthy();
-    // 翻完了就没有按钮了。
+    // No more buttons once pagination is complete.
     expect(screen.queryByTestId('history-more')).toBeNull();
 
-    // 最早的那个版本有「书」表；现在的没有。回到它是追加一个新版本，原来的都还在。
+    // The earliest version has the "Books" table; current one does not. Reverting to it appends a new version, preserving all existing ones.
     expect(store.getState().config!.data.tables.some((t) => t.id === 'books')).toBe(false);
     acceptNextAlert();
     await fireEvent.press(screen.getByTestId('restore-1'));

@@ -2,8 +2,8 @@ import type { PackManifest } from '@morph/core';
 
 import type { PackFs } from '../packs/store';
 
-// 测试用：内存里的扩展包目录、假的网络、App 里带的扩展包（D-510）和两个小清单（文字识别包 + 英文语言包）。
-// 哈希用真实的 SHA-256（Node 的 WebCrypto）。
+// For testing: in-memory pack directory, fake network, app-bundled packs (D-510), and two small
+// manifests (OCR pack + English language pack). Uses real SHA-256 hashing (Node WebCrypto).
 
 export const sha256 = async (bytes: Uint8Array) => {
   const digest = await (globalThis as { crypto: Crypto }).crypto.subtle.digest(
@@ -26,7 +26,7 @@ const dirsUnder = (keys: Iterable<string>, path: string) => {
   ];
 };
 
-/** 内存里的 packs 目录、一个假的网络和 App 里带的 packs 目录（bundle，路径一样：<id>/<version>/<文件>）。 */
+/** In-memory packs directory, fake network, and app-bundled packs directory (bundle, same path: <id>/<version>/<file>). */
 export class MemoryPackFs implements PackFs {
   files = new Map<string, Uint8Array>();
   net = new Map<string, Uint8Array>();
@@ -75,7 +75,7 @@ export class MemoryPackFs implements PackFs {
   }
 }
 
-/** 把一个扩展包按清单放进 App 里（D-510）：每个文件的内容由 body 给出。 */
+/** Bundle a pack into the app according to the manifest (D-510): each file's content is provided by body. */
 export function bundlePack(
   fs: MemoryPackFs,
   pack: PackManifest,

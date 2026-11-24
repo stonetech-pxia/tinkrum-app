@@ -15,7 +15,7 @@ import type { Collection, WorkspaceConfig } from './schema';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 一键记录工具（D-300–D-304，v34 就地的工具）。
+// One-tap record tools (D-300-D-304, v34 local tools).
 process.env.TZ = 'Europe/Paris';
 
 const now = new Date(2026, 9, 29, 18, 5);
@@ -111,7 +111,7 @@ const list = (table: string, tools: unknown[], id = 'l1', look = 'list') => ({
   tools,
 });
 
-/** 把块放到首页（或者 page 指定的页面）上，返回校验问题的文字。 */
+/** Places blocks on the home screen (or the page specified by pageId) and returns validation error messages. */
 function problems(blocks: unknown[], config: WorkspaceConfig = base(), pageId = 'home'): string {
   const copy = structuredClone(config);
   copy.containers.pages.find((p) => p.id === pageId)!.blocks.push(...(blocks as never[]));
@@ -123,7 +123,7 @@ describe('checking record tools', () => {
   it('accepts the typical set-ups', () => {
     expect(
       problems([
-        // 一键打卡、喝水 +1、上班、旅行清单一键清空、打开新记录表单。
+        // One-tap check-in, +1 water, off work, clear travel checklist in one tap, open new record form.
         button({ do: 'create', table: 'checkins', values: { habit: 'run', day: 'today' } }),
         button({ do: 'create', table: 'water', values: { glasses: 1 } }, 'b2'),
         button({ do: 'create', table: 'shifts', values: { start: 'now' } }, 'b3'),
@@ -138,7 +138,7 @@ describe('checking record tools', () => {
           'b4',
         ),
         button({ do: 'create', table: 'checkins', ask: 'all' }, 'b5'),
-        // 下班（结束为空时）、+1、标记、打卡这一行的习惯、打开这一条。
+        // Off work (when end time is empty), +1, tag, check-in habit for this row, open this entry.
         list('shifts', [
           {
             as: 'button',
@@ -194,7 +194,7 @@ describe('checking record tools', () => {
         }),
       ]),
     ).toMatch(/checkins\.note is a text field and can't be set by a button/);
-    // 结构上就不允许任意文字（不是 ID 的写法）。
+    // Syntactically prohibits arbitrary text (non-ID formatting).
     expect(
       problems([button({ do: 'create', table: 'water', values: { glasses: 'Two glasses!' } })]),
     ).not.toBe('');
@@ -265,7 +265,7 @@ describe('checking record tools', () => {
         ]),
       ]),
     ).toBe('');
-    // 预设的值照样检查。
+    // Default values are checked as usual.
     expect(
       problems([
         button({ do: 'create', table: 'checkins', values: { habit: 'swim' }, ask: 'all' }),
@@ -354,7 +354,7 @@ describe('checking record tools', () => {
   });
 
   it('a done button on a schedule’s last-done date must not hide once it is set', () => {
-    // 每周的事点过一次就不再有按钮，下周没法完成（真搭 Todoist 样板时 AI 写过）。
+    // Weekly tasks have no button after being tapped once, making them impossible to complete next week (previously written by AI when setting up Todoist sample).
     const todos = base();
     todos.data.tables.push({
       id: 'todos',
@@ -418,7 +418,7 @@ describe('checking record tools', () => {
   });
 
   it('each look takes only its own kinds of tools, and how many (registry metadata)', () => {
-    // 按钮上不能 toggle（没有「这一条」），列表上不能 setAll。
+    // Toggles are not allowed on buttons (no "this entry"), and setAll is not allowed on lists.
     expect(problems([button({ do: 'toggle', table: 'packing', field: 'packed' })])).toMatch(
       /a button block can't have a toggle tool \(allowed: create, setAll, createAll\)/,
     );
@@ -436,13 +436,13 @@ describe('checking record tools', () => {
         ]),
       ]),
     ).toMatch(/a list block can't have a setAll tool/);
-    // 列表上没有 check、drag。
+    // Lists do not support check or drag.
     expect(
       problems([
         list('packing', [{ as: 'check', do: 'toggle', table: 'packing', field: 'packed' }]),
       ]),
     ).toMatch(/as "check" doesn't fit a list block/);
-    // 每一条右边最多 3 个按钮；就地添加最多 1 个。
+    // At most 3 buttons on the right of each entry; at most 1 inline addition.
     const b = (label: string) => ({
       as: 'button',
       label,
@@ -493,7 +493,7 @@ describe('checking record tools', () => {
     ).toMatch(
       /dragging a card to another column is \{as: "drag", do: "set", table, field: bag, value: "\$group"\}/,
     );
-    // $group 只给拖动。
+    // $group gives drag-and-drop only.
     expect(
       problems([
         board({
@@ -683,7 +683,7 @@ describe('Q6: the "add" button prefills its preset values', () => {
     expect(block.look).toBe('button');
     const tool = block.tools[0]!;
     if (tool.do !== 'create') throw new Error('expected a create');
-    // v33 的按钮模式打开的是空表单（忽略 values）；v34 先填好。
+    // v33 button mode opens an empty form (ignoring values); v34 pre-fills them.
     expect(createPrefill(tool, { config, now })).toEqual({ habit: 'run', day: '2026-10-29' });
   });
 
@@ -718,7 +718,7 @@ describe('running record actions', () => {
     );
     expect(prepared).toEqual({ ok: true, values: { glasses: 1, day: '2026-10-29' } });
     expect(createInput(shifts, { start: 'now' }, { now })).toEqual({ start: '2026-10-29T18:05' });
-    // 一天从凌晨 4 点开始时，凌晨 2 点打卡算前一天（D-286）。
+    // When a day starts at 4 AM, a check-in at 2 AM counts as the previous day (D-286).
     const late = new Date(2026, 9, 30, 2, 0);
     expect(
       createInput(
@@ -727,7 +727,7 @@ describe('running record actions', () => {
         { now: late, cal: { dayStartHour: 4, weekStart: 'monday' } },
       ),
     ).toEqual({ day: '2026-10-29' });
-    // 「这一条」（$row）和记录页的那一条（$record）。
+    // "This entry" ($row) versus the entry on the record page ($record).
     expect(createInput(linkedCheckins, { habit: '$row' }, { now, rowId: 'h1abcdef' })).toEqual({
       habit: 'h1abcdef',
     });
@@ -766,7 +766,7 @@ describe('running record actions', () => {
       rowUpdateInput({ do: 'increment', table: 'shifts', field: fieldId, by }, shifts, values, {
         now,
       });
-    // 空的从 0 开始；金额两位小数；时长不会减成负数。
+    // Empty starts from 0; monetary values have two decimal places; duration will not decrease into a negative number.
     expect(inc('pay', 0.1, {})).toEqual({ pay: 0.1 });
     expect(inc('pay', 0.2, { pay: 0.1 })).toEqual({ pay: 0.3 });
     expect(inc('break', -15, { break: 10 })).toEqual({ break: 0 });
@@ -778,7 +778,7 @@ describe('running record actions', () => {
         { now },
       ),
     ).toEqual({ glasses: 8 });
-    // 字段已经不在了（旧配置）：什么也不做。
+    // Field no longer exists (legacy config): do nothing.
     expect(
       rowUpdateInput({ do: 'toggle', table: 'x', field: 'gone' }, packing, {}, { now }),
     ).toBeNull();
@@ -842,7 +842,7 @@ describe('running record actions', () => {
         after: { item: 'Passport', packed: false, bag: 'carry' },
       },
     ]);
-    // 不写筛选：整张表。
+    // No filter specified: the entire table.
     expect(
       setAllChanges(
         { do: 'setAll', table: 'packing', field: 'packed', value: true },

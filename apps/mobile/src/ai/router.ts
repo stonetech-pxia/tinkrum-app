@@ -11,8 +11,9 @@ import {
 import { t, type StringKey } from '../i18n';
 import type { AISettingsStore } from './settings';
 
-// 按设置选择 AI：内置规则、Morph 服务器，或用户自带 key 直接调用 Claude / OpenAI 兼容接口（D-241）。
-// 任何失败都返回“没有做任何修改”的拒绝，不会静默换成另一种 AI。
+// Select AI according to settings: built-in rules, Morph server, or user's own key calling Claude /
+// OpenAI compatible APIs directly (D-241). Any failure returns a rejection stating "no
+// modifications made", without silently switching to another AI.
 
 const ERROR_MESSAGES: Record<AIErrorKind | 'network' | 'bad_output', StringKey> = {
   invalid_key: 'byokInvalidKey',
@@ -28,7 +29,7 @@ const ERROR_MESSAGES: Record<AIErrorKind | 'network' | 'bad_output', StringKey> 
   bad_output: 'aiBadOutput',
 };
 
-/** OpenAI 兼容接口：提到 Claude 的几条换成不点名的说法。 */
+/** OpenAI-compatible interface: replace Claude-mentioning entries with non-specific wording. */
 const OTHER_ERROR_MESSAGES: typeof ERROR_MESSAGES = {
   ...ERROR_MESSAGES,
   spend_limit: 'byokOtherSpendLimit',
@@ -65,14 +66,14 @@ export function createAIRouter(deps: {
       const fetchImpl = deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {};
       let complete;
       if (provider === 'openai') {
-        // 本地模型可以不填 key；地址和模型名必须有。
+        // Local models may omit the API key; endpoint URL and model name are required.
         if (!baseUrl || !customModel) return reject(ctx.locale, 'byokNoEndpoint');
         complete = createOpenAICompleter({
           baseUrl,
           apiKey,
           model: customModel,
           registry: deps.registry,
-          // 本机模型可能很慢。
+          // Local models can be very slow.
           timeoutMs: 120_000,
           ...fetchImpl,
         });

@@ -5,7 +5,7 @@ import { quickActionsOf, type Locale, type Workflow, type WorkspaceConfig } from
 import { registry, workspace } from '../test-helpers';
 import { createMockAIProvider } from './mock';
 
-// 翻译（D-171、D-174）：翻译文件做成快捷操作；直接要译文仍按办事拒绝，例子点了能做成翻译快捷操作。
+// Translation (D-171, D-174): file translation implemented as a quick action; direct translation requests are rejected as task execution, but clicking examples creates translation quick actions.
 
 const ai = createMockAIProvider();
 const now = new Date(2026, 9, 23, 9, 0);
@@ -33,7 +33,7 @@ describe('mock AI — translation step phrases', () => {
     expect(translateStep(wf).params).toEqual({ from: 'auto', to: 'en' });
   });
 
-  it('reads 提取文字 after a PDF as getting its text, and 转成 PDF after text as text to PDF', async () => {
+  it('reads extract text after a PDF as getting its text, and convert to PDF after text as text to PDF', async () => {
     const wf = await added('新建一个快捷操作：选 PDF，提取文字，翻译成日文，转成 PDF，分享');
     expect(actions(wf)).toEqual([
       'in.files',
@@ -45,7 +45,7 @@ describe('mock AI — translation step phrases', () => {
     expect(translateStep(wf).params.to).toBe('ja');
   });
 
-  it('knows 翻译 alone, 存成文字 and English phrases', async () => {
+  it('knows translate alone, save as text and English phrases', async () => {
     const zh = await added('新建一个快捷操作：选截图，识别文字，翻译，存成文字文件');
     expect(actions(zh)).toEqual(['in.photos', 'ocr.recognize', 'translate.text', 'text.toFile']);
     expect(translateStep(zh)).toMatchObject({ params: { to: 'zh-Hans' }, ask: ['to'] });

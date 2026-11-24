@@ -1,5 +1,6 @@
-# LAME 3.100 的 MP3 编码器（D-183，LGPL-2.0+，见 README.md）。MorphMedia 依赖它输出 MP3。
-# 单独一个 pod：LAME 的宏和内部头文件（util.h、tables.h…）只在这里，不影响别的代码。
+# LAME 3.100 MP3 encoder (D-183, LGPL-2.0+, see README.md). MorphMedia depends on it to output MP3.
+# A separate pod: LAME macros and internal headers (util.h, tables.h...) are isolated here and do
+# not affect other code.
 
 Pod::Spec.new do |s|
   s.name           = 'MorphLame'

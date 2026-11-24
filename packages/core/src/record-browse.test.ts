@@ -7,7 +7,7 @@ import type { Op } from './ops';
 import type { Collection, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// 列表上的搜索和能换的排序、分组（show.browse），按表有没有记录显示（showIf），只显示一条记录（single）（D-424）。
+// Search on the list and sortable/groupable sorting/grouping (show.browse), display based on whether the table has records (showIf), display only a single record (single) (D-424).
 
 const ctx = { registry, locale: 'en' as const, now: new Date(0) };
 

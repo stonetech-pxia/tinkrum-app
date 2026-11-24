@@ -1,4 +1,6 @@
-"""打印干净小票的资格门槛结果（只有完整 50 份才可作结论）。"""
+"""Print qualification threshold results for clean receipts (conclusions are valid only with a
+complete set of 50 samples).
+"""
 from __future__ import annotations
 
 from pathlib import Path

@@ -77,7 +77,7 @@ describe('layoutPrintSheet', () => {
       guides: true,
     });
     expect(tight.placements).toHaveLength(6);
-    // 两列三行：竖线 x=0,600,1200，横线 y=0,600,1200,1800
+    // Two columns, three rows: vertical lines x=0, 600, 1200; horizontal lines y=0, 600, 1200, 1800
     expect(tight.guides.filter((g) => g.x1 === g.x2).map((g) => g.x1)).toEqual([0, 600, 1200]);
     expect(tight.guides.filter((g) => g.y1 === g.y2).map((g) => g.y1)).toEqual([
       0, 600, 1200, 1800,

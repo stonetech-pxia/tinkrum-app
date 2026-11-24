@@ -3,8 +3,10 @@ import { DB_MIGRATIONS, SQLiteWorkspaceRepo, migrateDatabase } from '../storage/
 import type { WorkspaceRepo } from '../storage/types';
 import { nodeSqlite, sqliteRepo } from '../test-utils/node-sqlite';
 
-// 从表格文件导入的一批（D-574）：记录和这一批的记号在同一个事务里写；撤销、删除这次导入把这一批还在的记录
-// 软删除（进「最近删除」）。SQLite 用 node:sqlite 跑真实的 SQL 和事务，和内存实现的语义一样。
+// Batch imported from spreadsheet file (D-574): records and batch identifier written in the same
+// transaction; undo or delete this import soft-deletes remaining records of this batch (into
+// "Recently Deleted"). SQLite uses node:sqlite to run real SQL and transactions, with the same
+// semantics as the in-memory implementation.
 
 const record = (id: string, title: string) => ({
   id,
@@ -62,7 +64,7 @@ describe.each([
     ]);
     await repo.importRecords(batch('imp2', 200), [record('bbbb0001', 'other batch')]);
     await repo.updateRecord('aaaa0001', { title: 'a edited' }, 50);
-    // 用户已经一条条删了的不再算。
+    // Items already deleted one by one by the user are no longer counted.
     await repo.deleteRecord('aaaa0002', 60);
     expect((await repo.listImports('orders'))[1]!.present).toBe(2);
     expect(await repo.deleteImport('imp1', 70)).toBe(2);
@@ -75,7 +77,7 @@ describe.each([
     ]);
     await repo.restoreRecord('aaaa0001');
     expect((await repo.listImports('orders'))[1]).toMatchObject({ count: 3, present: 1 });
-    // 清空回收站后，留下的那批对不上的记号不算数，也不出错。
+    // After clearing the recycle bin, remaining unmatched markers are neither counted nor cause errors.
     await repo.purgeDeletedRecords(1000);
     expect((await repo.listImports('orders'))[1]).toMatchObject({ present: 1 });
     expect(await repo.deleteImport('missing', 80)).toBe(0);
@@ -84,7 +86,7 @@ describe.each([
 
 it('the SQLite upgrade adds the two tables and changes no existing row', async () => {
   const db = nodeSqlite();
-  // 升级前的数据库：前 5 次升级，里面已经有记录和设置。
+  // Database before upgrade: first 5 upgrades, already containing records and settings.
   for (const sql of DB_MIGRATIONS.slice(0, 5)) await db.execAsync(sql);
   await db.execAsync('PRAGMA user_version = 5');
   await db.runAsync(
@@ -107,7 +109,7 @@ it('the SQLite upgrade adds the two tables and changes no existing row', async (
   expect(await db.getAllAsync('SELECT * FROM app_meta')).toEqual([{ key: 'guide', value: 'done' }]);
   const repo = new SQLiteWorkspaceRepo(db);
   expect(await repo.listImports('orders')).toEqual([]);
-  // 再跑一次升级什么都不做。
+  // Running migration again does nothing.
   await migrateDatabase(db);
   expect(await db.getAllAsync('SELECT * FROM records')).toEqual(before);
 });

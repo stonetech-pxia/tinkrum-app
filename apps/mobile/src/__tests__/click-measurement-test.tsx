@@ -6,11 +6,12 @@ import { useIncoming } from '../share/incoming';
 import { makePdf } from '../test-utils/fake-files';
 import { renderToolsApp, starterAfterGuide } from '../test-utils/render-app';
 
-// D-200：真实路由的 App 内点击计数；假选择器 / 媒体平台，不冒充模拟器、系统分享或耗时测量。
-// D-449：首页只有一个「打开文件」，先选相册还是文件，比以前多一下。
+// D-200: In-app click counting for real routing; fake selectors/media platforms do not impersonate
+// simulators, system shares, or timing measurements. D-449: Home screen has only a single "Open
+// File", requiring an extra step compared to before whether choosing the photo library or files.
 afterEach(() => useIncoming.getState().clear());
 it.each([
-  // 一份文件进预览页，要先点开「快捷操作」面板再点运行，比以前多一下（D-457）；两张照片仍进收件页面，不变。
+  // A file entering the preview page requires opening the "quick action" panel first and then running it, taking one extra step compared to before (D-457); two photos still go directly to the inbox page without change.
   ['video-too-big', 'media', 5],
   ['pdf-too-big', 'files', 5],
   ['document-packet', 'media', 7],
@@ -54,7 +55,7 @@ it.each([
       expect(files.shared).toHaveLength(iteration + 1);
       expect(trace).toHaveLength(expected);
       traces.push(trace);
-      // 完成后回首页的动作不算在「得到可分享结果」之内。
+      // The action of returning to the home screen upon completion is not counted toward "obtaining a shareable result".
       await fireEvent.press(screen.getByTestId('run-done'));
     }
     expect(traces.map((trace) => trace.length)).toEqual([expected, expected]);

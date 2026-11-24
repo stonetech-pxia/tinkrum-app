@@ -1,8 +1,10 @@
 import type { NativeDataMatch } from '../../modules/morph-vision';
 import type { SystemDataMatch } from './platform';
 
-// VisionPlatform.detectData 的 JS 部分：系统识别只做规则的补充（D-244），所以它出任何问题
-// （没下载模型、没网、系统报错、结果不对）都不影响预填，直接返回空，让规则照常工作。不下载模型。
+// JS part of VisionPlatform.detectData: system text recognition only serves as a supplement to
+// rules (D-244), so any issues (missing model, offline, system error, incorrect result) do not
+// affect prefilling; it returns empty directly, letting rules work normally. Does not download
+// models.
 
 export async function detectDataWith(
   detect: (text: string, language: string, allowDownload: boolean) => Promise<NativeDataMatch[]>,
@@ -27,12 +29,14 @@ export async function detectDataWith(
   );
 }
 
-/** 用户说过「不下载」的语言记在 app_meta 里，下次不再问。 */
+/** Languages for which the user declined downloading are recorded in app_meta to avoid prompting again. */
 const declinedKey = (language: string) => `prefill:model-declined:${language}`;
 
 /**
- * 用系统识别之前：系统说要先下载模型（Android ML Kit）时先问用户，同意了才下载（D-244）。
- * 用户不同意就记住、以后不再问，只用规则；状态查不到、下载失败也只用规则。返回能不能用系统识别。
+ * Before using system recognition: if the system reports that a model must be downloaded first
+ * (Android ML Kit), prompt the user and only download upon consent (D-244). If the user declines,
+ * remember it and never ask again, using only rules; if status cannot be queried or download
+ * fails, also fall back to rules only. Returns whether system recognition is available.
  */
 export async function prepareDataDetection(
   vision: {

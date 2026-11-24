@@ -8,7 +8,7 @@ import { TableReadyScreen } from '@/shell/TableReadyScreen';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
 import { readyNotes } from '@/draft/useApplyDraft';
 
-/** AI 新建的数据表（D-191）。被撤销后打开时说明它已经不在了。 */
+/** Data table created by AI (D-191). When opened after being reverted, explain that it no longer exists. */
 export default function TableReadyRoute() {
   const { collectionId, notes } = useLocalSearchParams<{ collectionId: string; notes?: string }>();
   const { locale } = useWorkspaceContext();

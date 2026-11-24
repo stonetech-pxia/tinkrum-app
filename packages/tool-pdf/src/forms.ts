@@ -9,15 +9,15 @@ import {
 
 import { PdfError, canEncodeStandardText, isEncodingError, loadPdf } from './core';
 
-// 表单：列出字段、填写（可选拍平）。外观用 pdf-lib 默认的 Helvetica 生成，
-// 所以填入的文字必须是标准字体可编码的。
+// Forms: list fields, fill (optionally flattening). Appearance is generated using the default
+// pdf-lib Helvetica font, so the filled text must be encodable by standard fonts.
 
 export type FormFieldType = 'text' | 'checkbox' | 'dropdown' | 'radio' | 'optionList' | 'other';
 
 export interface FormField {
   name: string;
   type: FormFieldType;
-  /** 文本内容 / 勾选状态 / 选中的选项（optionList 多选时取第一个）。 */
+  /** Text content / check state / selected option (takes the first when multi-selecting with optionList). */
   value?: string | boolean;
   options?: string[];
   multiline?: boolean;
@@ -62,7 +62,7 @@ export async function listFormFields(bytes: Uint8Array): Promise<FormField[]> {
   return doc.getForm().getFields().map(describeField);
 }
 
-/** 值必须能用标准字体画出；多行文本逐行检查。 */
+/** Values must be renderable using standard fonts; multi-line text is checked line by line. */
 function assertEncodable(text: string, name: string): void {
   if (!text.split(/\r\n|\r|\n/).every(canEncodeStandardText)) {
     throw new PdfError('unsupportedText', undefined, name);
@@ -84,7 +84,7 @@ function setField(field: PDFField, value: string | boolean, name: string): void 
     try {
       field.setText(value);
     } catch {
-      throw bad(); // 例如超过 maxLength
+      throw bad(); // e.g. exceeding maxLength
     }
   } else if (field instanceof PDFDropdown || field instanceof PDFOptionList) {
     if (!field.getOptions().includes(value)) throw bad();
@@ -99,9 +99,9 @@ function setField(field: PDFField, value: string | boolean, name: string): void 
 }
 
 /**
- * 按字段名填写：文本 / 下拉 / 单选 / 列表用字符串，复选框用布尔值。
- * 字段不存在、只读或值不匹配 → badField；无法编码的文字 → unsupportedText（都带 fieldName）。
- * flatten 为 true 时把字段画进页面并移除表单。
+ * Fill by field name: strings for text / dropdown / radio / list, boolean for checkboxes. Missing
+ * field, read-only, or mismatched value -> badField; unencodable text -> unsupportedText (both
+ * include fieldName). When flatten is true, draws fields into the page and removes the form.
  */
 export async function fillForm(
   bytes: Uint8Array,
@@ -119,7 +119,7 @@ export async function fillForm(
     if (opts.flatten) form.flatten();
     return await doc.save();
   } catch (e) {
-    // 未填写的字段里原有的非 WinAnsi 文字，在重新生成外观时也会失败。
+    // Original non-WinAnsi text in unfilled fields will also fail when regenerating appearances.
     if (isEncodingError(e)) throw new PdfError('unsupportedText');
     throw e;
   }

@@ -22,7 +22,7 @@ import type { WorkspaceRepo } from '../storage/types';
 import { FakeNotifications } from '../test-utils/fake-notifications';
 import { nodeSqlite } from '../test-utils/node-sqlite';
 
-// 提醒通知上的按钮（D-318）：「完成」只写这条记录、写完重排；「稍后提醒」再排一条；同一次点击只做一次。
+// Buttons on reminder notifications (D-318): "Done" writes only this record and re-sorts upon completion; "Snooze" schedules another; single click performs action once.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const habitsTable: Op = {
@@ -110,12 +110,12 @@ describe('the Done button (D-318)', () => {
     expect((await repo.getRecord('run'))!.values.last).toBe('2026-10-22');
     expect(platform.dismissed).toEqual(['habit-run-20748']);
     expect(platform.cancelled).toContain(snoozeId('habit', 'run'));
-    // 重排了：今天的已经过了，下一次是明天 20:00。
+    // Rescheduled: today's has passed, next is tomorrow at 20:00.
     expect(platform.scheduled![0]!.id).toBe('habit-run-20749');
   });
 
   it('a reminder saved by the v33 app (scheduleField, done set) marks the entry done after migration', async () => {
-    // v33 写法：schedule + collectionId + fieldId，done 没有 table（作用在提醒的那张表上）。
+    // v33 syntax: schedule + collectionId + fieldId, done has no table (applies to the reminder's table).
     const v33 = {
       id: 'habit',
       title: '该做了',
@@ -133,7 +133,7 @@ describe('the Done button (D-318)', () => {
       kind: 'done',
       title: '跑步',
     });
-    // 写的是提醒那张表里的这一条（v34 的 done 带 table：habits）。
+    // Writes this entry in the reminder's table (v34 done with table: habits).
     expect((await repo.getRecord('run'))!.values.last).toBe('2026-10-22');
   });
 
@@ -144,7 +144,7 @@ describe('the Done button (D-318)', () => {
     await handleReminderAction(press('done'), deps);
     expect(await handleReminderAction(press('done'), deps)).toEqual({ kind: 'skipped' });
     expect((await repo.getRecord('run'))!.values.count).toBe(3);
-    // 另一次点击照常算。
+    // Another click computes normally.
     await handleReminderAction(press('done', 'n2:2:x'), deps);
     expect((await repo.getRecord('run'))!.values.count).toBe(4);
   });
@@ -168,7 +168,7 @@ describe('the Done button (D-318)', () => {
     const missing = await setup({
       done: { do: 'create', table: 'checkins', values: { habit: '$row' } },
     });
-    // 记录还在、却存不进去：用户以为记下了，要告诉他（见下面的 runReminderAction）。
+    // Record exists but fails to save: user thinks it was logged, must inform them (see runReminderAction below).
     expect(await handleReminderAction(press('done'), missing.deps)).toEqual({
       kind: 'notSaved',
     });
@@ -204,17 +204,19 @@ describe('Remind me later (D-318)', () => {
         buttons: 'doneSnooze',
       },
     ]);
-    // 记录没变：snooze 不写记录。
+    // Record unchanged: snooze does not write records.
     expect((await repo.getRecord('run'))!.values.last).toBeUndefined();
-    // 再点「完成」：稍后提醒取消。
+    // Tap "Done" again: snooze is cancelled.
     await handleReminderAction(press('done', 'n3:3:x'), deps);
     expect(platform.snoozes).toEqual([]);
     expect(remindersOf(config)).toHaveLength(1);
   });
 });
 
-// R06：点击的去重标记和记录写入在同一个事务里。写失败了，同一次点击（系统下次启动会再送一次）还能再做，
-// 不会被当成已经处理过；写成功了但标记没写上的情况不存在（要么都写、要么都不写），所以也不会加两次。
+// R06: The deduplication marker and the record write are in the same transaction. If the write
+// fails, the same tap (resent on the next app start) can run again without being treated as already
+// handled; if the write succeeds but the marker fails, that state is impossible (either both write
+// or neither does), so it is never counted twice.
 describe('a tap whose write fails is not lost (R06)', () => {
   it('the write fails once: the same tap done again counts, and only once', async () => {
     const { repo, deps } = await setup({
@@ -252,7 +254,7 @@ describe('a tap whose write fails is not lost (R06)', () => {
       new SQLiteWorkspaceRepo(db),
     );
     await expect(handleReminderAction(press('done'), deps)).rejects.toThrow('crash before');
-    // 记录没有留下一半：还是 2，标记也没写。
+    // Record left no half-state: still 2, and the marker was not written.
     expect((await repo.getRecord('run'))!.values.count).toBe(2);
     expect(await handleReminderAction(press('done'), deps)).toEqual({
       kind: 'done',
@@ -291,13 +293,13 @@ describe('a tap whose write fails is not lost (R06)', () => {
     await repo.deleteRecord('run', 1);
     expect(await handleReminderAction(press('done'), deps)).toEqual({ kind: 'skipped' });
     await repo.restoreRecord('run');
-    // 已经处理过的点击（当时什么也没做）不会因为记录回来了又做一遍。
+    // An already-handled tap (where nothing was done at the time) is not run again just because records return.
     expect(await handleReminderAction(press('done'), deps)).toEqual({ kind: 'skipped' });
     expect((await repo.getRecord('run'))!.values.last).toBeUndefined();
   });
 });
 
-// 体检 2.5：点了通知上的按钮却没做成，不能无声无息——立刻弹一条通知，让用户打开 App 再来一次。
+// Health check 2.5: When a button on a notification fails to execute, it must not be silent—immediately pop a notification prompting the user to open the app and try again.
 describe('telling the user when a button on the reminder did not go through', () => {
   it('the write fails: a notification says it was not logged', async () => {
     const { repo, platform, deps } = await setup({

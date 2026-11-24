@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <application>
-    <!-- 把本次运行的临时文件（缓存目录 runs/）以 content:// 地址交给分享目标，只给读权限。 -->
+    <!-- Exposes temporary files of the current run (runs/ cache directory) via content:// URIs to sharing targets with read-only permission. -->
     <provider
         android:name=".MorphShareFileProvider"
         android:authorities="${applicationId}.MorphShareFileProvider"

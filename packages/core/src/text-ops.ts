@@ -1,12 +1,14 @@
 import { extractAll, type ExtractKind } from './text-rules';
 import type { Locale } from './schema';
 
-// 文字加工（D-245）：text → text 的几种固定操作。文字只在本机处理，AI 只选操作和参数；
-// 替换用的词是用户自己写的（私有参数，发给 AI 前换成占位符，D-065 / D-082），按字面替换，不是正则。
+// Text processing (D-245): fixed operations transforming text to text. Text is processed entirely
+// on-device, and the AI only selects operations and parameters; replacement terms are written by
+// the user (private parameters, replaced with placeholders before sending to the AI, D-065 /
+// D-082), using literal matching rather than regular expressions.
 
 export type BlankLines = 'keep' | 'single' | 'remove';
 
-/** 去掉多余空格（行首行尾、连续的空格和制表符）和空行（keep 不动、single 连续空行只留一个、remove 全去掉）。 */
+/** Removes extra whitespace (leading/trailing spaces, consecutive spaces, and tabs) and blank lines (keep leaves them unchanged, single collapses consecutive blank lines into one, remove deletes all). */
 export function tidyText(text: string, blankLines: BlankLines, spaces: boolean): string {
   let lines = text.replace(/\r\n?/g, '\n').split('\n');
   if (spaces) lines = lines.map((l) => l.replace(/[ \t 　]+/g, ' ').trim());
@@ -16,7 +18,7 @@ export function tidyText(text: string, blankLines: BlankLines, spaces: boolean):
   return lines.join('\n').replace(/^\n+|\n+$/g, '');
 }
 
-/** 按字面替换全部出现的地方；ignoreCase 时不分大小写。返回替换后的文字和替换了几处。 */
+/** Performs literal replacement of all occurrences; case-insensitive when ignoreCase is set. Returns the modified text and the count of replacements. */
 export function replaceText(
   text: string,
   find: string,
@@ -37,7 +39,7 @@ export function replaceText(
   return { text: out + text.slice(from), count };
 }
 
-/** 取出全部手机号 / 邮箱 / 网址 / 数字 / 日期，一行一个。 */
+/** Extracts all phone numbers / emails / URLs / numbers / dates, one per line. */
 export const extractText = (text: string, kind: ExtractKind, locale: Locale) =>
   extractAll(text, kind, locale).join('\n');
 
@@ -52,7 +54,7 @@ const JOIN: Record<LineSeparator, string> = {
   tab: '\t',
   none: '',
 };
-// 拆分时中文的逗号、分号、顿号也算。
+// Chinese commas, semicolons, and ideographic commas are also treated as delimiters during splitting.
 const SPLIT: Record<Exclude<LineSeparator, 'none' | 'newline'>, RegExp> = {
   comma: /[,，、]/,
   semicolon: /[;；]/,
@@ -61,7 +63,9 @@ const SPLIT: Record<Exclude<LineSeparator, 'none' | 'newline'>, RegExp> = {
 };
 
 /**
- * 拆成行：按分隔符拆开，每段一行（去掉首尾空格和空段）。合成一行：每行去掉首尾空格、跳过空行，用分隔符接起来。
+ * Split into lines: splits by delimiter, placing each segment on a new line (stripping
+ * leading/trailing spaces and empty segments). Join into lines: strips leading/trailing spaces
+ * from each line, skips empty lines, and concatenates with the delimiter.
  */
 export function splitOrJoinLines(text: string, mode: 'split' | 'join', separator: LineSeparator) {
   if (mode === 'join') {

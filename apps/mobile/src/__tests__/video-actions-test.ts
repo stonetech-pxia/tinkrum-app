@@ -16,8 +16,9 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeMedia } from '../test-utils/fake-files';
 
-// 视频工具（D-140–D-143）：选视频不复制、压到指定大小 / 画质、转成 MP4、剪一段，以及出错的说法。
-// 原生模块 morph-media 换成 FakeMedia：按码率和时长算出输出大小。
+// Video tools (D-140–D-143): select video without copying, compress to specified size/quality,
+// convert to MP4, trim a segment, and error messaging. Replace native module morph-media with
+// FakeMedia: compute output size based on bitrate and duration.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const MB = 1024 * 1024;
@@ -133,10 +134,10 @@ describe('video tool', () => {
     const [video] = videosOf(await run());
     expect(video).toMatchObject({ name: 'IMG_0001', ext: 'mp4', mimeType: 'video/mp4' });
     expect(video!.size).toBeLessThanOrEqual(20 * MB);
-    // 选择器的副本是移进来的，不是复制（D-142）。
+    // The selector copy is moved in rather than copied (D-142).
     expect(files.adopted).toEqual(['picker://IMG_0001.MOV']);
     expect(files.disk.has('picker://IMG_0001.MOV')).toBe(false);
-    // 1080p 原片按 20 MB 压到 720p、30 帧。
+    // Compress original 1080p video at 20 MB to 720p, 30 fps.
     expect(media.encodes).toHaveLength(1);
     expect(media.encodes[0]).toMatchObject({ shortSide: 720, maxFps: 30, audioKbps: 128 });
     expect(progress.at(-1)).toEqual(
@@ -307,7 +308,7 @@ describe('video tool', () => {
     files.nextVideos = [files.offerVideo('a.mov', { size: 60 * MB })];
     const [video] = videosOf(await run());
     expect(video).toMatchObject({ name: '旅行-2026-10-23', ext: 'mov' });
-    // 只剩一份。
+    // Only one remains.
     expect(files.runFiles()).toHaveLength(1);
   });
 
@@ -466,7 +467,7 @@ describe('video music', () => {
       [25, false],
     ]);
     expect(media.mixes[0]!.music).toBe(media.mixes[1]!.music);
-    // iOS 按扩展名认格式：移进本次运行后扩展名不能变。
+    // iOS recognizes format by extension: the extension must not change after being moved into the current run.
     expect(media.mixes[0]!.music).toMatch(/\.m4a$/);
     expect(files.lastPickTypes).toEqual(['audio/*']);
   });

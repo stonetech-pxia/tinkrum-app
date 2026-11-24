@@ -9,7 +9,7 @@ import {
 import { CURRENT_SCHEMA_VERSION } from './schema';
 import { workspace } from './test-helpers';
 
-// 门户下载的预设文件和导出的文件是同一个格式；读不了的要说清楚是哪一种原因（底线 18）。
+// Preset files downloaded from the portal use the same format as exported files; any unreadable file must clearly state the reason (invariant 18).
 describe('parseAppConfigFile', () => {
   const exported = (extra: Record<string, unknown> = {}, config: unknown = workspace('zh')) =>
     JSON.stringify({
@@ -26,7 +26,7 @@ describe('parseAppConfigFile', () => {
     expect(parseAppConfigFile(JSON.stringify(config))).toEqual({ ok: true, config });
   });
 
-  it('keeps an old configuration as it is: migrating is the next step, not this one (底线 12)', () => {
+  it('keeps an old configuration as it is: migrating is the next step, not this one (invariant 12)', () => {
     const old = { ...workspace('zh'), schemaVersion: 20 };
     expect(parseAppConfigFile(exported({}, old))).toEqual({ ok: true, config: old });
   });
@@ -68,7 +68,7 @@ describe('parseAppConfigFile', () => {
   it('refuses a file that is too large before parsing it', () => {
     const padding = ' '.repeat(MAX_APP_CONFIG_SIZE + 1);
     expect(parseAppConfigFile(exported() + padding)).toEqual({ ok: false, problem: 'tooLarge' });
-    // 刚好在上限里的没问题。
+    // Values right at the limit are fine.
     const ok = exported();
     expect(ok.length).toBeLessThan(MAX_APP_CONFIG_SIZE);
     expect(parseAppConfigFile(ok + ' '.repeat(MAX_APP_CONFIG_SIZE - ok.length)).ok).toBe(true);

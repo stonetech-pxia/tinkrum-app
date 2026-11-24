@@ -16,7 +16,7 @@ import {
 } from './sequence';
 import { registry } from './test-helpers';
 
-// 按顺序的聚合（D-284）和一天 / 一周从何时开始（D-286）。夏令时的用例按巴黎时间算。
+// Sequential aggregates (D-284) and day/week start times (D-286). Daylight saving time test cases are calculated in Paris time.
 process.env.TZ = 'Europe/Paris';
 
 const log: Collection = {
@@ -67,7 +67,7 @@ const ctx = (now: Date, dateField = 'date', cal: Calendar = DEFAULT_CALENDAR) =>
   now,
   cal,
 });
-const thursday = new Date(2026, 9, 22, 9, 0); // 2026-10-22 周四
+const thursday = new Date(2026, 9, 22, 9, 0); // 2026-10-22 Thursday
 
 describe('streakOf (D-284)', () => {
   it('empty table: no streak', () => {
@@ -81,7 +81,7 @@ describe('streakOf (D-284)', () => {
       current: 4,
       best: 4,
     });
-    // 到第二天还没记才断。
+    // Streak breaks only if nothing is logged by the next day.
     expect(streakOf(records, log, daily, ctx(new Date(2026, 9, 23, 9)))).toEqual({
       current: 0,
       best: 3,
@@ -115,9 +115,9 @@ describe('streakOf (D-284)', () => {
     const records = [on('2026-10-19'), on('2026-10-20', 'skip'), on('2026-10-21')];
     const rule: StreakRule = { ...daily, skip: { field: 'status', option: 'skip' } };
     expect(streakOf(records, log, rule, ctx(thursday))).toEqual({ current: 2, best: 2 });
-    // 不设跳过时，「跳过」那条也算记了一笔。
+    // When no skip is set, the "skip" entry is also counted as a log entry.
     expect(streakOf(records, log, daily, ctx(thursday))).toEqual({ current: 3, best: 3 });
-    // 今天标了跳过：不断，也不加。
+    // Today marked as skipped: neither breaks nor increments the streak.
     expect(streakOf([...records, on('2026-10-22', 'skip')], log, rule, ctx(thursday))).toEqual({
       current: 2,
       best: 2,
@@ -127,13 +127,13 @@ describe('streakOf (D-284)', () => {
   it('weekly goal: at least 3 entries a week; this week is not over yet', () => {
     const rule: StreakRule = { unit: 'week', perUnit: 3 };
     const records = [
-      // 09-28 那周 3 次、10-05 那周 3 次、10-12 那周 2 次（没达到，断），本周（10-19 起）1 次。
+      // 3 times in the week of 09-28, 3 times in the week of 10-05, 2 times in the week of 10-12 (target not met, streak breaks), 1 time this week (starting 10-19).
       ...['2026-09-28', '2026-09-30', '2026-10-02'].map((d) => on(d)),
       ...['2026-10-05', '2026-10-06', '2026-10-08'].map((d) => on(d)),
       ...['2026-10-13', '2026-10-15'].map((d) => on(d)),
       on('2026-10-20'),
     ];
-    // 本周只有 1 次，还没过完：当前 0（上一周没达到），最佳 2。
+    // Only 1 time this week, which is not yet finished: current 0 (previous week target not met), best 2.
     expect(streakOf(records, log, rule, ctx(thursday))).toEqual({ current: 0, best: 2 });
     const more = [...records, on('2026-10-13'), on('2026-10-21'), on('2026-10-22')];
     expect(streakOf(more, log, rule, ctx(thursday))).toEqual({ current: 4, best: 4 });
@@ -143,9 +143,9 @@ describe('streakOf (D-284)', () => {
     const rule: StreakRule = { unit: 'week', perUnit: 1 };
     const sunday: Calendar = { ...DEFAULT_CALENDAR, weekStart: 'sunday' };
     const records = [on('2026-10-04'), on('2026-10-17'), on('2026-10-18')];
-    // 周一开始：10-04 在 09-28 那周，10-17 和 10-18 都在 10-12 那周，本周（10-19）还没记。
+    // Starting Monday: 10-04 is in the 09-28 week, 10-17 and 10-18 are both in the 10-12 week, nothing logged yet this week (10-19).
     expect(streakOf(records, log, rule, ctx(thursday))).toEqual({ current: 1, best: 1 });
-    // 周日开始：10-04 那周、10-11 那周（10-17）、10-18 那周（就是本周）：连续 3 周。
+    // Starting Sunday: 10-04 week, 10-11 week (10-17), 10-18 week (the current week): 3 consecutive weeks.
     expect(streakOf(records, log, rule, ctx(thursday, 'date', sunday))).toEqual({
       current: 3,
       best: 3,
@@ -164,15 +164,15 @@ describe('streakOf (D-284)', () => {
     const twoAm: Calendar = { ...DEFAULT_CALENDAR, dayStartHour: 2 };
     const records = [
       at(new Date(2026, 9, 20, 23, 0)),
-      at(new Date(2026, 9, 22, 1, 30)), // 算 10-21
+      at(new Date(2026, 9, 22, 1, 30)), // Counted as 10-21
     ];
-    // 现在是 10-22 早上 1:45：还是 10-21。
+    // Current time is 10-22 1:45 AM: still counts as 10-21.
     const lateNight = new Date(2026, 9, 22, 1, 45);
     expect(streakOf(records, log, daily, ctx(lateNight, 'createdAt', twoAm))).toEqual({
       current: 2,
       best: 2,
     });
-    // 一天从 0 点开始时，1:30 那条算 10-22，中间 10-21 断了。
+    // When a day starts at 0:00, the 1:30 entry counts as 10-22, breaking the 10-21 streak in between.
     expect(streakOf(records, log, daily, ctx(lateNight, 'createdAt'))).toEqual({
       current: 1,
       best: 1,
@@ -180,14 +180,14 @@ describe('streakOf (D-284)', () => {
   });
 
   it('daylight saving time changes do not add or lose a day', () => {
-    // 巴黎 2026-03-29 凌晨 2 点跳到 3 点，2026-10-25 凌晨 3 点退回 2 点。
+    // Paris transitions forward 1 hour at 2:00 AM on 2026-03-29, and back 1 hour at 3:00 AM on 2026-10-25.
     const spring = ['2026-03-28', '2026-03-29', '2026-03-30'].map((d) => new Date(`${d}T21:00:00`));
     expect(
       streakOf(spring.map(at), log, daily, ctx(new Date(2026, 2, 30, 22), 'createdAt')),
     ).toEqual({ current: 3, best: 3 });
     const autumn = [
       new Date(2026, 9, 24, 23, 30),
-      new Date(2026, 9, 25, 2, 30), // 一天从 3 点开始时算 10-24
+      new Date(2026, 9, 25, 2, 30), // Counted as 10-24 when a day starts at 3:00 AM
       new Date(2026, 9, 26, 3, 30),
     ];
     const threeAm: Calendar = { ...DEFAULT_CALENDAR, dayStartHour: 3 };
@@ -220,7 +220,7 @@ describe('daysSince, avgInterval, distinctDays (D-284)', () => {
 
   it('average gap between entry days (a period-tracker cycle)', () => {
     const records = [on('2026-07-01'), on('2026-07-29'), on('2026-08-27'), on('2026-08-27')];
-    // 28 天和 29 天。
+    // 28 days and 29 days.
     expect(avgInterval(records, log, ctx(thursday))).toBe(28.5);
     expect(avgInterval([on('2026-07-01')], log, ctx(thursday))).toBeNull();
   });
@@ -280,7 +280,7 @@ describe('number and chart with these aggregates (D-284)', () => {
         ),
       ),
     ).toMatch(/days.skip.option must be an option id of status/);
-    // skip 的字段和选项一起写（结构上就是一个块）。
+    // Skip field and options defined together (structurally a single block).
     expect(
       problems(number({ aggregate: 'streak', days: { skip: { field: 'habit' } } })),
     ).not.toEqual([]);

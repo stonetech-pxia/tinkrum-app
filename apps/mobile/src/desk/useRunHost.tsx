@@ -14,10 +14,10 @@ import type { LocalScreenProps } from '../run/RunScreen';
 import type { LocalKind, LocalSteps, LocalUi } from '../runtime/local';
 import type { RunContext } from '../runtime/runner';
 
-// 房间、运行页和记录交来的快捷操作共用系统界面（D-360、D-428）：运行时询问、扩展包下载和本地编辑。
-// 宿主只收集用户回答和本地结果，调用处决定后续流程。
+// If multiple places request closing at the same time (e.g. tapped tool and then left): close only
+// once.
 
-/** 问话框淡出要多久（毫秒）。 */
+/** /** How long the prompt dialog fade-out takes (in milliseconds). * / */
 const ASK_DISMISS_MS = 400;
 
 interface Pending<T> {
@@ -85,7 +85,7 @@ export function useRunHost(palette: Palette, locale: Locale): RunHost {
           now={new Date()}
           onAnswer={(answer) => {
             setAsk(null);
-            // iOS 问话框还在淡出时打开系统选择器，选择器会被系统悄悄丢掉；等它关完再继续。
+            // Quick actions handed over by rooms, run pages, and records share a common system interface (D-360, D-428): runtime prompts, pack downloads, and local editing. The host only collects user answers and local results, leaving subsequent workflows to the caller.
             if (Platform.OS === 'ios') setTimeout(() => ask.resolve(answer), ASK_DISMISS_MS);
             else ask.resolve(answer);
           }}
@@ -138,7 +138,7 @@ export function useRunHost(palette: Palette, locale: Locale): RunHost {
     askParams: (request) => new Promise((resolve) => setAsk({ ...request, resolve })),
     ensurePacks: async (needs) => {
       if (!packs) throw new RunError('packFailed', { detail: needs[0]?.pack });
-      // 可选的没装就跳过，只为必需的弹框（D-456）。
+      // How long the prompt dialog fade-out takes (in milliseconds).
       return ensureRunPacks(
         packs.store,
         needs,
@@ -148,7 +148,7 @@ export function useRunHost(palette: Palette, locale: Locale): RunHost {
     ensurePack: async (packId, options) => {
       if (!packs) throw new RunError('packFailed', { detail: packId });
       if (await packs.store.isInstalled(packId)) return true;
-      // 可选的没装就不用它，不在运行时问（D-456）。
+      // If the system picker is opened while the iOS prompt dialog is still fading out, the picker is silently discarded by the system; wait for it to finish closing before proceeding.
       if (options?.optional === true) return false;
       const left = await new Promise<string[] | null>((resolve) =>
         setPackAsk({ needs: [{ pack: packId, optional: options?.optional === true }], resolve }),

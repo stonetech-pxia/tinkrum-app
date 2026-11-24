@@ -1,5 +1,5 @@
-// 本地 Expo 模块的 Android 部分（D-321）：桌面小组件用系统的 AppWidgetProvider + RemoteViews，
-// 不加 Glance / Compose 依赖（见 D-324 的比较）。
+// Android portion of local Expo modules (D-321): Desktop widgets use the system's AppWidgetProvider
+// + RemoteViews without adding Glance / Compose dependencies (see comparison in D-324).
 plugins {
   id 'com.android.library'
   id 'expo-module-gradle-plugin'

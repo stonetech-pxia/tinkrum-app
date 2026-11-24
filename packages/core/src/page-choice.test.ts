@@ -8,8 +8,10 @@ import { choiceRowOptions, followedFilter, resolvePageChoice } from './page-choi
 import type { Collection, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// 页面上的一排选项（D-573，创始人 2026-11-16 决定 ② 第二步）：choices 块列出一个单选字段的选项，同一页里
-// source.choice 是 "page" 的记录块、数字和图表只显示选中那一项的记录。配置检查、删块删字段删选项时的清理、纯逻辑。
+// A row of options on the page (D-573, founder decision 2 on 2026-11-16): the choices block lists
+// options for a single-select field; record blocks, numbers, and charts in the same page with
+// source.choice set to "page" display only records for the selected item. Config validation,
+// cleanup upon deleting blocks/fields/options, and pure logic.
 
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 16) };
 

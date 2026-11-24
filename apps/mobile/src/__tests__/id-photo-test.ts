@@ -6,7 +6,7 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeVision } from '../test-utils/fake-files';
 
-// 证件照换底色和自动框脸（D-252）：人脸检测和人像分割换成假的，裁剪框的计算和编码流程是真的。
+// ID photo background color change and automatic face framing (D-252): face detection and portrait segmentation are mocked, while crop box calculation and encoding pipeline are real.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const workflow = (params: Record<string, unknown>): Workflow => ({
@@ -34,7 +34,7 @@ function setup(params: Record<string, unknown>, vision = true) {
     choose: async () => null,
     open: async (kind, input) => {
       opened.push({ kind, input });
-      // 用户直接点「完成」：用界面上已经摆好的框（有自动框脸的用它，没有的居中）。
+      // User taps "Done" directly: uses the crop box already positioned on screen (uses automatic face framing box if available, otherwise centered).
       const crop = input as { items: { width: number; height: number }[]; initial?: unknown[] };
       return crop.items.map(
         (it, i) => crop.initial?.[i] ?? { x: 0, y: 0, width: it.width, height: it.height },
@@ -63,7 +63,7 @@ describe('ID photo: automatic framing', () => {
   it('starts the crop frame from the face, scaling an Android-sized detection back to the photo', async () => {
     const { files, vision, run, opened } = setup({ autoCenter: true });
     files.nextPhotos = [files.offerImage('me.jpg', 3024, 4032)];
-    // 检测用的图缩到了长边 2048。
+    // Detection image scaled down to a maximum side of 2048.
     vision.faceResults = [
       {
         width: 1536,

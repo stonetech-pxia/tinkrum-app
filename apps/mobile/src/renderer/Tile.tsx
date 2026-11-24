@@ -9,7 +9,7 @@ import { SIZES } from './style';
 import { cardColors, iconColors } from './theme';
 import { Card, IconTile } from './ui';
 
-// 入口类卡片（快捷入口、工具卡片、工具目录入口）共用的样子（D-230）。
+// Shared layout for entry-like cards (quick entries, tool cards, tool directory entries) (D-230).
 
 export function Tile({
   env,
@@ -29,7 +29,7 @@ export function Tile({
   subtitle?: string | undefined;
   onPress: () => void;
   titleColor?: string;
-  /** row = 像设置页的一行（浅色图标底、右边有箭头），tile = 大图标块（D-230）。 */
+  /** row = styled like a settings list row (light icon background, right arrow), tile = large icon block (D-230). */
   look: EntryLook;
   testID?: string;
 }) {
@@ -38,7 +38,7 @@ export function Tile({
   const scale = SIZES[style?.size ?? 'medium'];
   const center = style?.align === 'center';
   const stacked = center || env.inCell;
-  // 宫格和居中排列里没有横向的位置，总是竖着排。
+  // Grids and centered layouts have no horizontal positioning and are always arranged vertically.
   const listRow = look === 'row' && !stacked;
   const iconTile = iconColors(palette, listRow ? 'tint' : 'solid', style?.tone);
   return (
@@ -61,7 +61,7 @@ export function Tile({
           <Text
             style={[
               palette.font('title', 16 * scale),
-              // 图片上的文字一律用正文色（D-258）。
+              // Text on images always uses the primary text color (D-258).
               { color: (!style?.backdrop?.assetId && titleColor) || palette.text },
               center && styles.textCenter,
             ]}>

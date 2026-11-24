@@ -4,8 +4,9 @@ import { StyleSheet, View } from 'react-native';
 
 import type { Palette } from './theme';
 
-// 进度环和进度条（D-306 的 progress、D-307 统计的目标）。比例来自 core 的 progressOf（0–1），
-// 环的弧是 core 的 ringPath（SVG 路径，Skia 直接认）；底下一圈是边框色，读屏读的是旁边的文字。
+// Progress rings and progress bars (progress from D-306, goals stats from D-307). Ratios come from
+// core's progressOf (0-1), ring arcs from core's ringPath (SVG path, directly recognized by Skia);
+// bottom ring is border color, screen readers read adjacent text.
 
 export function ProgressRing({
   ratio,

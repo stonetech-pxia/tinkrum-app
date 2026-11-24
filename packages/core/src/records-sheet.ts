@@ -8,23 +8,23 @@ import {
 import { fieldDefinition, type Collection, type Field, type Locale } from './schema';
 import { t } from './messages';
 
-// 记录 → 表格的格子（D-427，records.toExcel）：列和 CSV 一样（字段 + 创建时间）。写 xlsx 在 tool-office。
+// Record -> spreadsheet cell (D-427, records.toExcel): columns match CSV (fields + creation time). Writing xlsx is handled in tool-office.
 
 export type SheetValue =
   | { kind: 'text'; text: string }
-  /** 真的数字或日期（Excel 的日期就是带日期格式的数字）；text 是估列宽和行高用的。 */
+  /** True number or date (Excel dates are numbers with date formatting); text is used for estimating column width and row height. */
   | { kind: 'number'; value: number; format: string; text: string };
 
 const MONEY_FORMAT = '#,##0.00';
 const DATE_FORMAT = 'yyyy-mm-dd';
 const DATE_TIME_FORMAT = 'yyyy-mm-dd hh:mm';
 
-/** 1900-03-01 之前 Excel 的序号和真实日期差一天，这种日期写成文字。 */
+/** Before 1900-03-01, Excel serial numbers differ from true dates by one day; such dates are written as text. */
 const FIRST_SERIAL_DAY = Date.UTC(1900, 2, 1);
 const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
 const DAY_MS = 86_400_000;
 
-/** 日期的各部分 → Excel 的序号；不是真的日期（2 月 31 日）时 null。 */
+/** Date components -> Excel serial number; returns null if not a valid date (e.g., February 31). */
 function serial(y: number, mo: number, d: number, h = 0, mi = 0): number | null {
   const day = Date.UTC(y, mo - 1, d);
   const check = new Date(day);
@@ -44,7 +44,7 @@ function dateCell(raw: unknown, text: string): SheetValue {
     : { kind: 'number', value, format: timed ? DATE_TIME_FORMAT : DATE_FORMAT, text };
 }
 
-/** 时长显示成「1 小时 30 分」：一个裸数字（分钟）反而看不懂，留成文字。 */
+/** Duration displayed as "1 hour 30 min": raw numbers (minutes) are hard to understand, so they are kept as text. */
 const isPlainNumber = (f: Field) =>
   fieldDefinition(f.type).numeric === true && f.type !== 'duration';
 
@@ -70,7 +70,7 @@ function cellOf(
   return { kind: 'text', text };
 }
 
-/** 第一行是字段名；省略选项时和旧版完全相同。 */
+/** First row contains field names; identical to older version when options are omitted. */
 export function recordsToSheet(
   collection: Collection,
   records: readonly DataRecord[],

@@ -1,11 +1,15 @@
 #!/usr/bin/env node
-// Android release 包冒烟（体检 4.4、任务 10）：装上、启动、看一会儿进程还在、logcat 里没有崩溃，截一张图。
-// 单测和模拟器开发版都发现不了 release 才有的崩溃（R8 删类、打包漏环境变量、原生模块），这个脚本只回答
-// 「这个包能不能打开、开着不崩」。不进 npm run check；发版前手动跑，见 docs/RELEASE_CHECKLIST.md。
+// Android release package smoke test (health check 4.4, task 10): Install, launch, verify process
+// stays alive for a while, check logcat for crashes, take a screenshot. Unit tests and simulator
+// development builds cannot catch release-only crashes (R8 dead code stripping, missing environment
+// variables in builds, native modules); this script only answers "does this package open and stay
+// open without crashing?". Excluded from npm run check; run manually before releasing, see
+// docs/RELEASE_CHECKLIST.md.
 //
-// 用法：node scripts/smoke-release-android.mjs --apk <file.apk> --serial <adb serial> [--wait 20] [--out <dir>]
-// 必须写明 --serial：不猜设备。创始人的手机只有他明确要求时才装（AGENTS.md）。
-// adb 用 $ADB，没有就用 $ANDROID_HOME/platform-tools/adb，再没有就用 PATH 里的 adb。
+// Usage: node scripts/smoke-release-android.mjs --apk <file.apk> --serial <adb serial> [--wait 20]
+// [--out <dir>] --serial is required: do not guess devices. The founder's phone is only used when
+// he explicitly requests it (AGENTS.md). adb uses $ADB, falling back to
+// $ANDROID_HOME/platform-tools/adb, and then adb in PATH.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -45,7 +49,7 @@ function adb(serial, args, { binary = false } = {}) {
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
-/** logcat 里这个包的崩溃和无响应。 */
+/** Crashes and app-not-responding errors for this package in logcat. */
 export function crashesIn(logcat, pkg) {
   const lines = logcat.split('\n');
   const found = [];
@@ -65,7 +69,7 @@ export async function smoke(argv, log = console.log) {
   const { serial, package: pkg } = opts;
   const out = resolve(opts.out ?? `smoke-${new Date().toISOString().replace(/[:.]/g, '-')}`);
 
-  // adb 刚起来时可能还没连上设备：等几次。
+  // adb may not be connected immediately upon startup: retry a few times.
   let state = adb(serial, ['get-state']);
   for (let i = 0; i < 5 && state.stdout.trim() !== 'device'; i++) {
     await sleep(2000);
@@ -76,14 +80,14 @@ export async function smoke(argv, log = console.log) {
 
   log(`Installing ${opts.apk} on ${serial} …`);
   const install = adb(serial, ['install', '-r', opts.apk]);
-  // 只有 adb 说 Success 才启动（AGENTS.md）。
+  // Start only when adb reports Success (AGENTS.md).
   if (!/\bSuccess\b/.test(install.stdout)) {
     return { ok: false, reason: `install failed: ${(install.stdout + install.stderr).trim()}` };
   }
 
   adb(serial, ['logcat', '-c']);
   adb(serial, ['shell', 'am', 'force-stop', pkg]);
-  // 启动的 Activity 从系统查（不写死类名）；am start -W 等它起来，说 Status: ok 才算启动了。
+  // Query the system for the starting Activity (do not hardcode class names); use am start -W to wait for startup, considering it started only when Status: ok is reported.
   const activity = adb(serial, [
     'shell',
     'cmd',
@@ -106,7 +110,7 @@ export async function smoke(argv, log = console.log) {
     return { ok: false, reason: `launch failed: ${(launch.stdout + launch.stderr).trim()}` };
   }
 
-  // 看 wait 秒：进程一直在。
+  // Monitor for wait seconds: process remains alive.
   let alive = true;
   for (let t = 0; t < opts.wait; t += 2) {
     await sleep(2000);

@@ -4,10 +4,12 @@ import { View } from 'react-native';
 
 import type { Palette } from '../renderer/theme';
 
-// 原图里一块的截图（D-272、D-328）：整张图按比例放大，只露出这一块（四周多留一点）。
-// 文件房间里选中格子、段落时显示在下面，核对认错的字不用切回原图（file-room §11.3）。
+// Crop of a region in the original image (D-272, D-328): entire image scaled proportionally,
+// showing only this region (with a little padding around). Displayed below when selecting cells or
+// paragraphs in the file room, allowing verification of misrecognized text without switching back
+// to the original image (file-room §11.3).
 
-/** 截图最高这么多点。 */
+/** Maximum pixel height for the crop. */
 const CROP_HEIGHT = 140;
 
 export function Crop({

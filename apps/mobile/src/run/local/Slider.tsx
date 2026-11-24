@@ -3,7 +3,7 @@ import { PanResponder, StyleSheet, View } from 'react-native';
 
 import type { Palette } from '../../renderer/theme';
 
-// 横向滑块（标注的字号、旋转）：按下哪里就跳到哪里，再左右拖。
+// Horizontal slider (annotation font size, rotation): jumps to wherever pressed, then drags horizontally.
 
 class Live {
   width = 0;
@@ -37,7 +37,7 @@ export function Slider({
   label: string;
 }) {
   const [width, setWidth] = useState(0);
-  // 手势回调里要用最新的宽度、范围和回调：放在一个不变的对象里，渲染完再更新。
+  // Gesture callbacks need the latest width, range, and callbacks: stored in an immutable object and updated after rendering.
   const [live] = useState(() => new Live());
   useEffect(() => live.sync(width, min, max, onChange));
   const [responder] = useState(() => {

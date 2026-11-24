@@ -1,11 +1,8 @@
 import type { Collection, Condition } from './schema';
 
-// 页面上的一排选项（D-573，创始人 2026-11-16 决定 ② 第二步「按一个单选字段选」）：页面上放一个 choices 块，
-// 列出一张表一个单选字段的选项（加「全部」）；同一页里读这张表、source.choice 是 "page" 的记录块、数字和图表
-// 只显示这个字段是选中那一项的记录。选了什么只在页面画着的时候有，什么都不写（底线 15）；选项 ID 是配置不是内容。
-// 这里是纯逻辑：显示哪些选项、现在选的是哪个、跟着它的块多一个什么条件。
+// Logic-related parts of the choices block (schema in components/choices.ts).
 
-/** choices 块里和逻辑有关的部分（schema 在 components/choices.ts）。 */
+/** Logic-related parts of the choices block (schema in components/choices.ts). */
 export interface ChoiceRow {
   show: {
     options?: readonly string[] | undefined;
@@ -15,14 +12,14 @@ export interface ChoiceRow {
   source: { table: string; field: string };
 }
 
-/** 页面上现在选的：哪张表的哪个字段，选的选项（null = 全部）。 */
+/** Current selection on the page: which table, which field, and the selected option (null = all). */
 export interface PageChoiceState {
   table: string;
   field: string;
   option: string | null;
 }
 
-/** 这一排显示的选项：写了 show.options 的按它的顺序（只留字段里还有的），没写是字段的全部选项。 */
+/** Options displayed in this row: respects show.options order if specified (retaining only those still present in the field); otherwise, defaults to all options in the field. */
 export function choiceRowOptions(
   row: ChoiceRow,
   table: Collection | undefined,
@@ -34,8 +31,9 @@ export function choiceRowOptions(
 }
 
 /**
- * 现在选的选项：用户点过的（还在这一排里），不然是 show.default，再不然是「全部」（show.all 是 false 时是第一个选项）。
- * picked 是 undefined 表示用户还没点过，null 是点了「全部」。
+ * Currently selected option: user-clicked (if still in this row), otherwise show.default, or
+ * fallback to "all" (or the first option if show.all is false). A picked value of undefined means
+ * the user hasn't clicked yet, while null means "all" was clicked.
  */
 export function resolvePageChoice(
   row: ChoiceRow,
@@ -51,8 +49,10 @@ export function resolvePageChoice(
 }
 
 /**
- * 跟着这一排的块用的筛选：自己的筛选再加「这个字段是选中的那一项」（放在最后，就地添加的 "$here" 按它预设）。
- * 不跟着、读的不是这张表、选的是「全部」时就是自己的筛选。
+ * Filter used by blocks following this row: combines their own filter with "this field equals the
+ * selected item" (appended at the end as locally added "$here" based on its preset). When not
+ * following, reading a different table, or when "all" is selected, it evaluates to their own
+ * filter.
  */
 export function followedFilter(
   source: { table: string; filter?: Condition[] | undefined; choice?: 'page' | undefined },

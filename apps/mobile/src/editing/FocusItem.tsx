@@ -18,7 +18,7 @@ import { Pill } from '../renderer/ui';
 import type { ItemBox } from './drop-target';
 import { LONG_PRESS_MS } from './entry';
 
-/** 单组件编辑不改变页面排版；分组里选中子项时，分组本身不变淡。 */
+/** Single-component editing does not change page layout; when a child item inside a group is selected, the group itself does not fade. */
 export function FocusItem({
   component,
   env,
@@ -33,7 +33,7 @@ export function FocusItem({
   const focus = env.focus!;
   const active = focus.selectedId !== null;
   const selected = focus.selectedId === component.id;
-  // 分组里（包括里面那层分组里）选中了别的块。
+  // Another block is selected within the group (including nested groups inside it).
   const contains =
     component.look === 'group' &&
     childrenOf(component).some(
@@ -53,11 +53,12 @@ export function FocusItem({
   const gesture = usePanGesture({
     testID: `single-drag-${id}`,
     enabled: Boolean(drag),
-    // 配置变化不替换 detector，长按选中后同一次触摸仍能继续拖。
+    // Configuration changes do not replace the detector; after long-press selection, the same touch can continue dragging.
     activateAfterLongPress: selected ? 0 : LONG_PRESS_MS,
-    // 未选中时手指先移动超过 8pt 就放弃，交给页面滚动。RNGH 长按拖动在恰好移动 10pt 时会直接激活
-    // （超过 10pt 才失败），竖直快速滑动可能正好落在这个值上，把滚动变成拖动。
-    // RNGH 不允许 minDistance 和 failOffset 同时设置。
+    // If the finger moves more than 8pt before selection, abort and hand over to page scrolling.
+    // RNGH long-press drag activates directly when movement reaches exactly 10pt (fails above
+    // 10pt); vertical fast scrolling might land right on this value, turning scrolling into
+    // dragging. RNGH does not allow setting `minDistance` and `failOffset` simultaneously.
     minDistance: selected ? 3 : undefined,
     failOffsetX: selected ? undefined : [-8, 8],
     failOffsetY: selected ? undefined : [-8, 8],
@@ -102,7 +103,7 @@ export function FocusItem({
             accessible={selected}
             onLongPress={open}
             delayLongPress={LONG_PRESS_MS}
-            // 这层只为长按；点卡片的空白处相当于点页面空白，收键盘（卡片里的按钮自己先响应）。
+            // This layer is for long press only; tapping empty space on the card is equivalent to tapping empty space on the page, dismissing the keyboard (buttons inside the card respond first).
             onPress={active ? () => undefined : () => Keyboard.dismiss()}
             accessibilityActions={[{ name: 'activate', label: t(env.locale, 'edit') }]}
             onAccessibilityAction={() => {
@@ -143,7 +144,7 @@ export function FocusItem({
     </View>
   );
 }
-/** 选中的组件现在是否画在页面上（隐藏了或删掉了就没有）。 */
+/** Whether the selected component is currently rendered on the page (it won't be present if hidden or deleted). */
 function shownOnPage(page: Page, id: string): boolean {
   const shown = (list: readonly Component[]): boolean =>
     list.some((c) => !c.hidden && (c.id === id || (c.look === 'group' && shown(c.children))));
@@ -151,9 +152,11 @@ function shownOnPage(page: Page, id: string): boolean {
 }
 
 /**
- * 选中组件的「编辑」「完成」画在滚动内容里，按量到的位置贴在组件右上方：
- * 画在组件框里时，伸出框外的那一半在 iOS 上点不到。
- * 选中的组件在操作面板里被隐藏或删掉后，pinned 的那份固定在可见区域顶部，仍然能「完成」。
+ * "Edit" and "Done" for the selected component are rendered inside the scroll content and pinned
+ * to the top-right of the component based on measured coordinates: when rendered inside the
+ * component box, the portion sticking out of the box cannot be tapped on iOS. After the selected
+ * component is hidden or deleted in the action sheet, the pinned copy is fixed at the top of the
+ * visible area and can still be tapped for "Done".
  */
 export function FocusToolbar({
   env,
@@ -170,7 +173,7 @@ export function FocusToolbar({
   const dragging = drag?.draggingId != null;
   const onPage = id !== null && shownOnPage(page, id);
   const [measured, setMeasured] = useState<{ id: string; box: ItemBox | null } | null>(null);
-  // 原生视图挂好之后才能量（layout effect 里还量不到）。
+  // Measurements can only be taken after the native view is mounted (cannot be measured in layout effect yet).
   useEffect(() => {
     if (pinned || !id || !onPage || !drag || dragging) return;
     let live = true;
@@ -178,12 +181,12 @@ export function FocusToolbar({
     return () => {
       live = false;
     };
-    // drag 每次渲染都是新对象；选中项、拖动结束和页面变化时重新量。
+    // `drag` is a new object on every render; re-measure on selection change, drag end, and page changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinned, id, onPage, dragging, page]);
   if (!id || pinned === onPage) return null;
   const { palette } = env;
-  // 只用这个选中项量到的位置；量好之前先不显示，量不到时放在内容右上角，仍然能点。
+  // Use only the position measured from this selection; hide prior to measurement, place at the top-right of the content if measurement fails, and keep it tappable.
   const done = measured?.id === id;
   const box = done ? measured.box : null;
   const shown = (pinned || done) && !dragging;

@@ -9,7 +9,7 @@ const schema = z.strictObject({
   default: z.boolean().optional(),
 });
 
-/** 勾选：是或否；新记录没勾选就是否。 */
+/** Checkbox: yes or no; unchecked by default for new records. */
 export const checkboxField: FieldDefinitionOf<'checkbox', typeof schema> = defineField({
   type: 'checkbox',
   schema,
@@ -19,7 +19,7 @@ export const checkboxField: FieldDefinitionOf<'checkbox', typeof schema> = defin
   emptyNew: false,
   format: (_f, v, locale) => (v ? t(locale, 'data_Yes_1f54e') : t(locale, 'data_No_04a4b')),
   filter: { is: (_f, v) => typeof v === 'boolean' },
-  // D-569：公式里勾了是 1，没勾是 0；没存过值的旧记录显示为没勾，也算 0。
+  // D-569: checked is 1 in formulas, unchecked is 0; old records without stored values display as unchecked and also count as 0.
   formula: 'number',
   formulaNumber: (_f, v) => (v === true ? 1 : 0),
   ai: { doc: '{default?}' },

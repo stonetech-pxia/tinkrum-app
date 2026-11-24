@@ -14,7 +14,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 列表分段（D-347）、月历认日程（D-348）、就地添加（D-349）。例子是待办，这些能力不只给待办用。
+// List sections (D-347), calendar schedule recognition (D-348), in-place addition (D-349). Example is tasks, but these capabilities are not restricted to tasks.
 
 type Router = Awaited<ReturnType<typeof renderToolsApp>>['router'];
 
@@ -85,7 +85,7 @@ const put = (repo: MemoryWorkspaceRepo, id: string, values: object) =>
     updatedAt: 1,
   });
 
-/** 点一下，等它打开新记录的表单。先等列表读完、算好（之后不再重画），再点。 */
+/** Tap and wait for it to open the new record form. Wait for the list to finish loading and calculating (so it won't redraw later) before tapping. */
 async function openForm(router: Router, testID: string) {
   await screen.findByTestId(testID);
   await act(async () => {});
@@ -111,16 +111,16 @@ it('sections show every section with its count, fold, and add into the section w
     ]),
   });
   expect(await screen.findByTestId('group-a')).toHaveTextContent(/版块1.*2/);
-  // 空的版块也列出来；没有「未选」。
+  // Empty sections are also listed; no "Unselected".
   expect(screen.getByTestId('group-b')).toHaveTextContent(/版块2.*0/);
   expect(screen.queryByTestId('group-none')).toBeNull();
   expect(screen.queryByText('早做完')).toBeNull();
-  // 折叠和展开。
+  // Collapse and expand.
   await fireEvent.press(screen.getByTestId('group-a'));
   expect(screen.queryByText('买瓷砖')).toBeNull();
   await fireEvent.press(screen.getByTestId('group-a'));
   expect(await screen.findByText('买瓷砖')).toBeTruthy();
-  // 在版块2添加：版块和筛选里的「状态 = 待办」都带上，标题由用户填。
+  // Add in section 2: include section and filters like "Status = Todo", with title entered by the user.
   await openForm(router, 'group-add-b');
   expect(router.getSearchParams()).toEqual({
     collectionId: 'tasks',
@@ -170,10 +170,10 @@ it('a weekly task sits on its coming days in the calendar and in a section per d
     ]),
   });
   const today = todayNumber(new Date());
-  // 今天这一段，标题是「今天 · …」；规则里带着钟点。
+  // Today's section, titled "Today · ..."; rule includes the hour.
   expect(await screen.findByTestId(`group-day-${today}`)).toHaveTextContent(/今天/);
   expect(screen.getAllByText(/每天 20:00/).length).toBeGreaterThan(0);
-  // 月历上今天有一条（读屏读「日期，1 条记录」）。
+  // Calendar has one entry today (screen reader reads "Date, 1 record").
   expect(
     screen.getByTestId(`calendar-cal-day-${dateOfDayNumber(today)}`).props.accessibilityLabel,
   ).toMatch(/1 条记录/);

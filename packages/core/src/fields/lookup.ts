@@ -12,9 +12,12 @@ const schema = z.strictObject({
 });
 
 /**
- * D-287：查找。从这条记录的引用字段（via）指向的那条记录取 field 的值，不存进记录、不能填。
- * 显示、筛选、排序、公式、统计都按那个字段的类型（related.ts 的 expandCollection 把它换成那种字段）；
- * 没有引用、被引用的记录删掉了、或者那个字段没有值时为空。这里的回调只在定义对不上时用（只能看有没有值）。
+ * D-287: Lookup. Retrieves the field value from the record pointed to by this record's reference
+ * field (via), not stored in records, non-fillable. Display, filtering, sorting, formulas, and
+ * statistics follow that field's type (related.ts expandCollection converts it to that field
+ * type); empty when there is no reference, the referenced record is deleted, or that field has no
+ * value. Callbacks here are only used when definitions mismatch (can only check if a value
+ * exists).
  */
 export const lookupField: FieldDefinitionOf<'lookup', typeof schema> = defineField({
   type: 'lookup',

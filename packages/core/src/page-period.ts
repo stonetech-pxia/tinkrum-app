@@ -12,14 +12,12 @@ import { PAGE_PERIODS, type PagePeriod } from './schema-primitives';
 import type { Collection, Condition, GroupUnit } from './schema';
 import { dateFieldOf } from './sequence';
 
-// 页面上的时间范围（D-440，创始人 2026-11-05 定）：页面上放一个 period 块，用户在几个选项里选一个（或自定义起止日期），
-// 同一页里 source.period 是 "page" 的图表和数字卡都按它画。选了什么只在页面画着的时候有，什么都不写（底线 15）。
-// 选项由配置决定（Tink 能改）：只有常用的几种，不是 Expensify 那十几种。这里是纯逻辑：范围怎么算、上一期是哪一段。
+// User-selected: a fixed period or custom start/end dates (inclusive of both ends, YYYY-MM-DD).
 
-/** 用户选的：一个固定的时间段，或者自己选的起止日期（含两端，YYYY-MM-DD）。 */
+/** User-selected: a fixed period or custom start/end dates (inclusive of both ends, YYYY-MM-DD). */
 export type PageChoice = { period: PagePeriod } | { start: string; end: string };
 
-/** 一段日期（含两端）。 */
+/** A date range (inclusive of both ends). */
 export interface DayRange {
   start: string;
   end: string;
@@ -27,7 +25,7 @@ export interface DayRange {
 
 const isPeriod = (c: PageChoice): c is { period: PagePeriod } => 'period' in c;
 
-/** 现在选的范围：本周是周一到周日（还没到的日子也在里面，图上是 0），最近 N 天到今天为止。 */
+/** Currently selected range: current week spans Monday to Sunday (including future days in the current week, rendered as 0 on charts), and the last N days up to today. */
 export function choiceRange(
   choice: PageChoice,
   now: Date,
@@ -39,8 +37,9 @@ export function choiceRange(
 }
 
 /**
- * 图表用的上一期：紧挨在前面的一整段，一一对应着比（本周比上周、本月比上个月、今年比去年、最近 N 天比再往前的 N 天、
- * 自定义的比前面同样长的一段）。
+ * Previous period for charts: the immediately preceding contiguous period for one-to-one
+ * comparison (this week vs. last week, this month vs. last month, this year vs. last year, last N
+ * days vs. preceding N days, custom period vs. an equally long preceding period).
  */
 export function previousFullRange(
   choice: PageChoice,
@@ -75,7 +74,7 @@ export function previousFullRange(
   }
 }
 
-/** 数字卡用的上一期：和现有的「和上一段同期比」（D-308）一样，本月到 29 号就比上个月 1–29 号。自定义的比前面同样长的一段。 */
+/** Previous period for number cards: matches existing "period-over-period comparison" (D-308); this month up to the 29th is compared against last month's 1-29. Custom compared against an equally long preceding period. */
 export function previousToDateRange(
   choice: PageChoice,
   now: Date,
@@ -86,13 +85,13 @@ export function previousToDateRange(
   return { start, end };
 }
 
-/** 图表按什么时间段分：范围不超过 31 天按天，不超过半年按周，再长按月。 */
+/** Time grouping unit for charts: daily if range is <= 31 days, weekly if <= half a year, monthly otherwise. */
 export function rangeUnit(range: DayRange): GroupUnit {
   const days = dayNumber(range.end)! - dayNumber(range.start)! + 1;
   return days <= 31 ? 'day' : days <= 184 ? 'week' : 'month';
 }
 
-/** 范围里每一段的开始日期（从早到晚）：按周的第一段从范围开始那天所在的周一（或周日）起，按月的从那个月 1 号起。 */
+/** Start dates for each segment in the range (from earliest to latest): weekly segments start on the Monday (or Sunday) of the week containing the range's start date; monthly segments start on the 1st of each month. */
 export function rangeStarts(
   range: DayRange,
   unit: GroupUnit,
@@ -114,7 +113,7 @@ export function rangeStarts(
   return out;
 }
 
-/** 日期落在这段里的记录（用哪个日期字段看 ref；创建时间、日期时间也行）。没有日期的不在任何范围里。 */
+/** Records falling within this date range (determined by the date field specified in ref; creation time or date/time fields also work). Records without dates fall outside all ranges. */
 export function recordsInRange(
   records: readonly DataRecord[],
   collection: Collection,
@@ -130,8 +129,10 @@ export function recordsInRange(
 }
 
 /**
- * 跟着页面时间范围的记录块（D-561）：和数字卡一样，筛选里的 inPeriod 不再用，其余条件照旧；
- * 按选的范围留下日期落在里面的，日期用原来 inPeriod 的那个字段，没有就用表里第一个日期字段（再没有是创建时间）。
+ * Record blocks following the page time range (D-561): like number cards, the inPeriod filter is
+ * no longer used, while other conditions remain unchanged; filters by the selected range using
+ * the date field from the original inPeriod, falling back to the table's first date field (or
+ * creation time if none exist).
  */
 export function recordsFollowingRange(
   records: readonly DataRecord[],
@@ -148,7 +149,7 @@ export function recordsFollowingRange(
   return recordsInRange(based, collection, ref, choiceRange(choice, now, cal), now, cal);
 }
 
-/** 选的是不是一个合法的范围：自定义的两端是日期、开始不晚于结束，最长五年。 */
+/** Whether the selection is a valid range: custom start/end are valid dates, start is not later than end, and maximum duration is five years. */
 export function validChoice(choice: PageChoice): boolean {
   if (isPeriod(choice)) return (PAGE_PERIODS as readonly string[]).includes(choice.period);
   const a = dayNumber(choice.start);
@@ -156,11 +157,11 @@ export function validChoice(choice: PageChoice): boolean {
   return a !== undefined && b !== undefined && a <= b && b - a < 366 * 5;
 }
 
-/** 今天是哪一天（页面上显示「今天」「本周」用）。 */
+/** Today's date text (used for displaying "Today" or "This week" on pages). */
 export const todayText = (now: Date, cal: Calendar = DEFAULT_CALENDAR): string =>
   dateOfDayNumber(todayNumber(now, cal));
 
-/** 一个时间段（图表上的一根柱子）从 start 开始、按 unit 长，到哪天结束（含）：一天、一周（7 天）或到月底。 */
+/** End date (inclusive) of a time segment (a bar on the chart) starting from start and spanning unit: one day, one week (7 days), or end of the month. */
 export function unitRange(start: string, unit: GroupUnit): DayRange {
   if (unit === 'day') return { start, end: start };
   if (unit === 'week') return { start, end: dateOfDayNumber(dayNumber(start)! + 6) };

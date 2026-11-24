@@ -11,7 +11,7 @@ import {
   type ShareDeps,
 } from '../runtime/expo-share';
 
-// 输出去向（D-119、D-120、D-123、D-196）：原生模块 MorphShare 用假的，Expo Go 的退路也用假的。
+// Output destinations (D-119, D-120, D-123, D-196): use mocks for the MorphShare native module and the Expo Go fallback.
 
 const items = [
   { uri: 'file:///cache/runs/r/1/收据 1.jpg', name: '收据 1', ext: 'jpg', mimeType: 'image/jpeg' },
@@ -38,7 +38,7 @@ function fakeNative(exportResult: () => Promise<SavedToFolder | null>, remembere
         throw Object.assign(new Error('no viewer'), { code: 'ERR_NO_VIEWER' });
       }
       if (args[0].endsWith('.bad')) {
-        // 原生里没接住的异常（例如 SecurityException），Expo 统一报 ERR_UNEXPECTED。
+        // Exceptions not caught in native (e.g., SecurityException) are uniformly reported as ERR_UNEXPECTED by Expo.
         throw Object.assign(new Error('boom'), { code: 'ERR_UNEXPECTED' });
       }
     },
@@ -61,7 +61,7 @@ function fallbackDeps(folder: PickedFolder | null) {
     },
     remembered: null,
     rememberedBy: new Map(),
-    // 像 Android：只有缓存里的 runs/ 能直接交出去。
+    // Like Android: only runs/ in the cache can be directly shared out.
     shareable: (uri) => uri.startsWith('file:///cache/runs/'),
     stageCopy: async (uri, name, first) => {
       if (first) staged.length = 0;
@@ -111,7 +111,7 @@ describe('sharing several files', () => {
       },
       { uri: 'file:///data/assets/a1/note.pdf', mimeType: 'application/pdf' },
       items[0]!,
-      // 两个同名的：第二个加 -2。
+      // Two items with the same name: append -2 to the second.
       { uri: 'file:///data/desk/d1/v3-0.docx', name: '_-1', ext: 'docx', mimeType: 'x' },
     ]);
     expect(staged).toEqual([
@@ -198,7 +198,7 @@ describe('saving to a folder', () => {
       { name: 'a-b.pdf', mimeType: 'application/pdf', source: items[1]!.uri },
     ]);
     expect(rememberedFolder(fallback.deps, 'wf1')).toBe('Receipts');
-    // 第二次直接存进记住的文件夹，不再弹选择器；choose 时才再选。
+    // Save directly to the remembered folder on the second time without showing the picker; prompt when choosing.
     await saveAllToFolder(fallback.deps, items, 'wf1', false);
     expect(fallback.picks()).toBe(1);
     await saveAllToFolder(fallback.deps, items, 'wf1', true);
@@ -215,18 +215,18 @@ describe('saving to a folder', () => {
     const contracts = memoryFolder('Contracts', []);
     const fallback = fallbackDeps(receipts.folder);
     await saveAllToFolder(fallback.deps, items, 'receipts', false);
-    // 另一个快捷操作第一次存：沿用最后选过的，不弹选择器。
+    // First save for another quick action: reuse the last selected one without showing the picker.
     expect(rememberedFolder(fallback.deps, 'contracts')).toBe('Receipts');
     await saveAllToFolder(fallback.deps, items, 'contracts', false);
     expect(fallback.picks()).toBe(1);
-    // 换文件夹只换这个快捷操作的。
+    // Changing the folder updates it only for this quick action.
     fallback.deps.pickFolder = async () => contracts.folder;
     await saveAllToFolder(fallback.deps, items, 'contracts', true);
     expect(rememberedFolder(fallback.deps, 'contracts')).toBe('Contracts');
     expect(rememberedFolder(fallback.deps, 'receipts')).toBe('Receipts');
-    // 还没存过的快捷操作用最后选过的那个。
+    // Quick actions that haven't been saved yet use the last selected one.
     expect(rememberedFolder(fallback.deps, 'new')).toBe('Contracts');
-    // 删掉的快捷操作忘掉它的文件夹，再用时回到最后选过的。
+    // Deleted quick actions forget their folder, reverting to the last selected one when used again.
     forgetFolders(fallback.deps, ['contracts']);
     expect(rememberedFolder(fallback.deps, 'receipts')).toBe('Contracts');
   });
@@ -251,7 +251,7 @@ describe('previewing a file (D-238)', () => {
         name: 'a.zzz',
       }),
     ).rejects.toEqual(new RunError('noViewer'));
-    // 别的原生错误不把错误代码显示给用户。
+    // Other native errors do not expose error codes to the user.
     await expect(
       previewFile(deps, { uri: 'content://x/a.bad', mimeType: 'application/pdf', name: 'a.pdf' }),
     ).rejects.toEqual(new RunError('previewFailed'));

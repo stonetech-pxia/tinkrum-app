@@ -5,8 +5,10 @@ import type { Op } from './ops';
 import type { Collection, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// 块「只在有符合条件的记录时显示」（D-579）：showIf 多一个可选的 filter（和列表的筛选同一种写法，汇总、查找算出来的字段
-// 也能用）。只决定画不画，不写任何东西；筛选里的字段被删了，校验会指出来，和列表的筛选一样（底线 18）。
+// Block "show only when records matching conditions exist" (D-579): showIf takes an optional filter
+// (same syntax as list filtering, rollups and lookup-calculated fields can also be used).
+// Determines only whether to render or not, does not write anything; deleted fields in filters are
+// pointed out by validation, same as list filters (invariant 18).
 
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 17) };
 const subs: Collection = {

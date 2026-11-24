@@ -1,6 +1,6 @@
 # Morph: Rules for Coding Agents
 
-Read the "Product background" section of this file and `docs/TOOLS_DESIGN.md` §0 first. The decisions are in `docs/decisions/`, one heading per decision (`docs/DECISIONS.md` says how to find and add one): open the entry for the D number of what you are changing (`git grep -n "^### D-617 " docs/decisions`) and the ones its "Changed later by" line names; a later decision overrides an earlier one. An entry says what was decided, why and who decided it when; the exact rules are in the code, its tests and `docs/agent/`. Mobile has its own `apps/mobile/AGENTS.md`. The founder communicates in Chinese; code comments follow the surrounding code, which means Chinese.
+Read the "Product background" section of this file and `docs/TOOLS_DESIGN.md` §0 first. The decisions are in `docs/decisions/`, one heading per decision (`docs/DECISIONS.md` says how to find and add one): open the entry for the D number of what you are changing (`git grep -n "^### D-617 " docs/decisions`) and the ones its "Changed later by" line names; a later decision overrides an earlier one. An entry says what was decided, why and who decided it when; the exact rules are in the code, its tests and `docs/agent/`. Mobile has its own `apps/mobile/AGENTS.md`. The founder communicates in Chinese; code comments, test titles and developer-facing script messages are written in English (D-640).
 
 This file is complete on its own. A 2026-10-25 handoff note outside the repository (`~/Library/Application Support/Claude/side-session-notes/codex-handoff/CODEX_LESSONS.md`) is optional history; parts of it are out of date, and where it disagrees with this file or the code, it is wrong.
 
@@ -163,7 +163,7 @@ The original product handoff document was deleted on 2026-11-08; the parts that 
 
 ## DECISIONS and docs
 
-- Docs (Markdown) are written in English. README.zh-CN.md is the only Chinese doc and follows README.md. Code comments still follow the surrounding code (D-499).
+- Docs (Markdown), code comments, test titles and developer-facing script messages are written in English (D-499, D-640). Other languages appear only in doc translation files (`README.zh-CN.md`, which follows `README.md`) and in product localization, multilingual parsing rules and multilingual test fixtures.
 - Do not mark something "Decided" if it is not finished. When you change a decision, `grep` for every place that cites it and update them all. When you write "the founder confirmed", say where and on what day he confirmed it.
 - Handoff reports, test plans and measurement results do not go into git; put them in `~/Library/Application Support/Claude/side-session-notes/`.
 - Decision numbers are given at merge time. On a branch, write `D-new-<branch>-1`, `D-new-<branch>-2` … in DECISIONS, comments, tests and the prompt; when merging into main, take the next free numbers and replace them in one commit (`git grep "D-new-" -- ':!AGENTS.md'` must then return nothing). A new decision is a new heading in `docs/decisions/`, in the shape `docs/DECISIONS.md` gives; when it changes an earlier decision, add its number to that entry's "Changed later by" line.

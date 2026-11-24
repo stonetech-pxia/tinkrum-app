@@ -16,8 +16,10 @@ import { newAssetId, startRun, type Run } from '../runtime/runner';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { handOver } from './handed';
 
-// 容器上的工具（D-428）：用户点了按钮才运行，把容器的值交给第一步。一个值或一条记录、最后交给 App 外面的
-// （打电话、分享 vCard）在原地跑，没有结果页；别的打开运行页面（有进度和结果）。进入页面什么都不跑（底线 15、16）。
+// Tools on a container (D-428): runs only when the user taps a button, passing container values to
+// the first step. A single value, a record, or final output directed outside the app (making a
+// call, sharing a vCard) runs in place without a results page; other operations open a run page
+// (with progress and results). Entering the page runs nothing (invariants 15, 16).
 
 export function useHandedRun(palette: Palette) {
   const { repo, files, registry, locale } = useWorkspaceContext();
@@ -28,7 +30,7 @@ export function useHandedRun(palette: Palette) {
   const host = useRunHost(palette, locale);
   const router = useRouter();
   const running = useRef(false);
-  // 分享面板可能还在用文件：下一次运行或离开页面时才删。
+  // The share panel might still be using the file: deleted only upon the next run or when leaving the page.
   const last = useRef<Run | null>(null);
   useEffect(
     () => () => {

@@ -1,6 +1,7 @@
-// 用 App 里同一份代码算每段文字的可读性（text-classify.ts）和规则命中（text-rules.ts），给 Python 评测用。
-// 用法（仓库根目录）：npx tsx tests/local-model-eval/classification/ts_features.ts <cases.jsonl>
-// 输出到标准输出，每行 {"id","readability","rules"}；文字本身不输出。
+// Compute text readability (text-classify.ts) and rule matching (text-rules.ts) for each text
+// segment using the same app code, for Python evaluation use. Usage (repository root): npx tsx
+// tests/local-model-eval/classification/ts_features.ts <cases.jsonl> Outputs to stdout, one JSON
+// object per line: `{"id","readability","rules"}`; text content itself is not output.
 import { readFileSync } from 'node:fs';
 
 import { textReadability } from '../../../packages/core/src/text-classify';

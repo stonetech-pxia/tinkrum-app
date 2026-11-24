@@ -8,7 +8,7 @@ import { checkAppFileText } from './app-file-check';
 import { designHints } from './design-hints';
 import { registry } from './test-helpers';
 
-// 设计建议（D-602）：创始人看过前后对比图后定的六种。条件按道理写，不为避开预设收窄：预设碰到了就改预设。
+// Design suggestions (D-602): six rules determined by the founder after reviewing before-and-after comparison screenshots. Conditions are written logically without narrowing to bypass presets: if a preset hits it, update the preset.
 
 const DIR = join(__dirname, 'fixtures', 'portal-apps');
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 20) };
@@ -16,7 +16,7 @@ const read = (name: string) => JSON.parse(readFileSync(join(DIR, name), 'utf8'))
 const habits = () => read('tinkrum-app-habits.json') as any;
 
 describe('designHints', () => {
-  // 我们的预设一条建议都没有：创始人 2026-11-20 同意按建议改了 Wallet、Focus、Reading。
+  // None of our presets trigger any suggestions: Founder agreed on 2026-11-20 to update Wallet, Focus, and Reading according to suggestions.
   it('has nothing to say about any of our presets', () => {
     const manifest = JSON.parse(readFileSync(join(DIR, 'manifest.json'), 'utf8')) as {
       apps: { file: string }[];
@@ -46,7 +46,7 @@ describe('designHints', () => {
     expect(designHints(d)).toEqual([
       'pages.1.blocks.1 (block "add"): the page opens with a form of 4 fields before anything else; use one add button instead (a "button" block whose tool is {"do": "create", "table": …, "ask": "all"}) and put what the page shows first; see pattern 1 in tinkrum-app-patterns.md',
     ]);
-    // 三个字段以内放在开头没关系。
+    // Having three fields or fewer at the beginning is fine.
     d.pages[1].blocks[1].tools[0].ask = ['name', 'goal', 'part'];
     expect(designHints(d)).toEqual([]);
   });
@@ -70,7 +70,7 @@ describe('designHints', () => {
 
   it('asks for a page for one entry when another table links to it', () => {
     const d = habits();
-    // 去掉「一个习惯」的页面：点开一个习惯看不到它的打卡。
+    // Remove the "A Habit" page: tapping a habit does not show its check-ins.
     d.pages = d.pages.filter((p: { of?: string }) => p.of !== 'habits-habits');
     for (const page of d.pages)
       for (const b of page.blocks) {

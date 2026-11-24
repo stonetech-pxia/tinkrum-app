@@ -1,4 +1,4 @@
-"""Kev 官方 LocalPredictor 的文件类别决策测试。"""
+"""File category decision tests for Kev's official LocalPredictor."""
 from __future__ import annotations
 
 import argparse
@@ -10,7 +10,7 @@ from pathlib import Path
 
 from evaluate import CASES, KINDS, LANG_INDEX, TOPICS, choices, damaged_text
 if sys.platform == "win32":
-    # Kev 的 suite 模块在导入时要求 Unix fcntl；本脚本不写它的 suite 缓存。
+    # Kev's `suite` module requires Unix `fcntl` upon import; this script does not write its suite cache.
     sys.modules.setdefault("fcntl", types.SimpleNamespace(LOCK_EX=2, flock=lambda *_: None))
 from kev.predictors import LocalPredictor
 

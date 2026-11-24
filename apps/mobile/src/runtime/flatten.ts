@@ -17,45 +17,48 @@ import {
 } from '@morph/tool-image';
 import { detectionInput, detectionSize } from '@morph/tool-ocr';
 
-// 扫描展平（D-274）：拉正后的页面 → 四周补深色边、缩到 488×712 → UVDoc 估计弯曲（45×31 的网格）
-// → 装了文字识别模型时，按 UVDoc 画一张小图找文字行（PP-OCRv6 det）和表格线，算整页转正和逐行拉直
-// → 三步合成一张三角网格，Skia 的 drawVertices 在原图上只画一次。几何计算在 @morph/tool-image（flatten.ts）。
-// 模型的输入、输出走临时文件（和文字识别一样），用完不管成功失败都删掉。
+// Scan flattening (D-274): straightened page -> add dark borders around, downscale to 488x712 ->
+// UVDoc estimates curvature (45x31 grid) -> when text recognition model is installed, draw a small
+// image using UVDoc to detect text lines (PP-OCRv6 det) and table lines, calculate full-page
+// straightening and per-line rectification -> combine three steps into a triangle mesh, drawn once
+// on the original image via Skia's drawVertices. Geometric calculations reside in @morph/tool-image
+// (flatten.ts). Model inputs and outputs use temporary files (same as text recognition), deleted
+// upon completion regardless of success or failure.
 
-/** 扩展包 ID（packages/core 的 PACKS）。 */
+/** Extension pack ID (PACKS in packages/core). */
 export const DEWARP_PACK = 'dewarp';
 
-/** 找文字行用的小图长边：实验里 1280 和 2000 一样整齐，1280 快一倍多。 */
+/** Long side of the small image used for text line detection: experiments show 1280 is as neat as 2000 while being more than twice as fast. */
 export const REFINE_DETECT_SIDE = 1280;
 
 export interface FlattenNative {
   modelRun(model: string, input: string, shape: number[], output: string): Promise<number[]>;
-  /** 找文字行（PP-OCRv6 det，和文字识别共用）；没有时只展平、不精修。 */
+  /** Text line detection (PP-OCRv6 det, shared with text recognition); when absent, only flattens without refinement. */
   ocrLoad?(det: string, rec: string): Promise<void>;
   ocrDetect?(input: string, width: number, height: number, output: string): Promise<void>;
 }
 
-/** 一张页面在 Skia 里打开以后能做的事（App 里是 skia.ts，测试里换成假的）。 */
+/** Operations available after a page is opened in Skia (implemented by skia.ts in the app, mocked in tests). */
 export interface FlattenPage {
   width: number;
   height: number;
-  /** 补边后缩到 488×712 的 RGBA。 */
+  /** RGBA image scaled to 488×712 after padding. */
   uvdocPixels(margin: number, padded: Size, gray: number): RgbaImage;
-  /** 按网格画到 out 大小，读回 RGBA（找文字行用的小图）。 */
+  /** Draws to out size according to mesh, reads back RGBA (small image used for text line detection). */
   render(mesh: WarpMesh, out: Size): RgbaImage;
-  /** 按网格画到原大小，编码成 JPG。 */
+  /** Draws to original size according to mesh, encodes as JPG. */
   encode(mesh: WarpMesh, quality: number): Uint8Array;
   dispose(): void;
 }
 
 export interface FlattenIo {
   installed(pack: string): Promise<boolean>;
-  /** 扩展包里文件的 file:// 地址。 */
+  /** file:// URI for a file inside a pack. */
   modelUri(pack: string, file: string): string;
   readFile(uri: string): Promise<Uint8Array>;
-  /** 写输出图，返回字节数。 */
+  /** Writes the output image, returns the byte count. */
   writeFile(uri: string, bytes: Uint8Array): Promise<number>;
-  /** 新建一个临时目录，返回它的 file:// 地址（结尾不带 /）和删除它的方法。 */
+  /** Creates a new temporary directory and returns its file:// URI (without trailing /) and a removal method. */
   tempDir(): { uri: string; remove(): void };
   open(bytes: Uint8Array): FlattenPage;
 }
@@ -78,7 +81,7 @@ export function createFlattener(
 ) {
   const now = options.now ?? (() => Date.now());
   return {
-    /** 展平一页，写到 output；展平模型没装时返回 null（调用方照常用原来的页面）。 */
+    /** Flattens a page and writes to output; returns null if the flatten model is not installed (callers fall back to the original page). */
     async flatten(uri: string, output: string): Promise<FlattenOutcome | null> {
       if (!(await io.installed(DEWARP_PACK))) return null;
       const timing: Record<string, number> = {};
@@ -108,7 +111,7 @@ export function createFlattener(
         if (shape.join() !== [1, 2, UVDOC_GRID.height, UVDOC_GRID.width].join()) {
           throw new Error(`unexpected UVDoc output ${shape.join('×')}`);
         }
-        // 复制一份：读回来的字节不一定从 4 的倍数开始。
+        // Make a copy: the read bytes do not necessarily start at a multiple of 4.
         const grid = new Float32Array((await io.readFile(outFile)).slice().buffer);
         const warp = { grid, page: size };
         lap('uvdoc');

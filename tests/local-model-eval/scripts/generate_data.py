@@ -1,4 +1,6 @@
-"""生成不含真实个人信息的三语单据与模拟 OCR；固定种子便于复测。"""
+"""Generate trilingual receipts and simulated OCR without real personal information; fixed random
+seeds facilitate re-testing.
+"""
 from __future__ import annotations
 
 import argparse
@@ -206,7 +208,7 @@ def render(lines: list[str], locale: str, difficulty: str, rng: random.Random, p
         page = page.rotate(rng.choice([-2,-1,1,2]),expand=True,fillcolor="#d7d2c9")
         w,hh=page.size
         skew=10 if difficulty=="normal" else 25
-        # Pillow QUAD 的角顺序是左上、左下、右下、右上。
+        # The corner order of Pillow QUAD is top-left, bottom-left, bottom-right, top-right.
         quad=(rng.randint(0,skew),rng.randint(0,skew),rng.randint(0,skew),hh-rng.randint(0,skew),
               w-rng.randint(0,skew),hh-rng.randint(0,skew),w-rng.randint(0,skew),rng.randint(0,skew))
         page=page.transform((w,hh),Image.Transform.QUAD,quad,fillcolor="#d7d2c9")

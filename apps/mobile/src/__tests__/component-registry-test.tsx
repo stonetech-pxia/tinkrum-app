@@ -14,8 +14,10 @@ import { RENDERERS } from '../renderer/registry';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 每个登记的组件都能画出来（新增组件时这里自动覆盖它，见 docs/COMPONENTS.md）：用定义里的 example，
-// 放在样例配置的首页（数据表 expenses、已添加的 PDF 工具）。画不出来时 App 会回退版本，这里查的就是没有回退。
+// Every registered component can be rendered (automatically covered here when new components are
+// added, see docs/COMPONENTS.md): uses the example from the definition, placed on the sample
+// configuration's home screen (expenses table, added PDF tool). If rendering fails, the app rolls
+// back its version; this check ensures no rollback occurs.
 
 type Definition = (typeof COMPONENTS)[number];
 
@@ -27,7 +29,7 @@ const seed = (def: Definition) => (locale: Locale, registry: Registry) => {
     [
       { op: 'setPackage', package: 'pdf', do: 'add' },
       templateOps('budget', config, locale)[0]!,
-      // 清单的例子要一个勾选字段。
+      // Checklist example requires a checkbox field.
       { op: 'addData', table: 'expenses', field: { id: 'paid', name: 'Paid', type: 'checkbox' } },
       { op: 'addContainer', page: 'home', block },
     ],
@@ -70,7 +72,7 @@ describe.each(COMPONENTS.map((d) => [d.look, d] as const))('component %s', (_typ
   });
 });
 
-/** 引用数据表的组件：新用户没有记录、有记录、记录很多或不规整（缺值、值不对、超大）。 */
+/** Components referencing data tables: handles new users with no records, users with records, and users with many or malformed records (missing values, incorrect values, oversized). */
 const DATA = COMPONENTS.filter((d) =>
   Object.values(d.refs ?? {}).some((ref) => ref?.to === 'table'),
 );

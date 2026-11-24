@@ -43,21 +43,27 @@ import { ProgressRing } from './Progress';
 import { onPage } from './theme';
 import { Card } from './ui';
 
-// 打卡格（D-610）：行是 source.group（每个习惯、每个选项），列是 source.across（最近几天、几周、几个月，最后一列是今天
-// 所在的那一段）。格子里有记录画实心圆（一条打勾，两条起写数；有 show.trailing 时写合计），有目标时画进度环。
-// 点空格在这一格加一条（$here：这一行、这一天）；有 remove 时点只有一条的格子把它移到「最近删除」（带撤销），两条起
-// 在下面列出这一格的记录（和月历点某天一样）；没有 remove 时点一下总是多记一条，长按列出。今天以后的格子不能点。
-// 行名固定在左边，列多了横着滚，打开时滚到今天那一列。翻页、滚动、打开格子都不写（底线 15）；数是每次画的时候算的（底线 14）。
+// Habit/check-in grid (D-610): rows are source.group (each habit, each option), columns are
+// source.across (recent days, weeks, months, with the last column being the period containing
+// today). Cells draw solid circles for records (one checkmark, two or more show the count; shows
+// totals when show.trailing is present), and progress rings when a target is set. Tapping an empty
+// space adds an entry in that cell ($here: this row, this day); when remove is present, tapping a
+// cell with only one entry moves it to "Recently deleted" (with undo), while two or more list the
+// cell's records below (like tapping a day on the calendar); when remove is absent, tapping always
+// logs an additional entry, and long-pressing lists them. Future cells cannot be tapped. Row names
+// are fixed on the left, columns scroll horizontally with many columns, and opening scrolls to
+// today's column. Pagination, scrolling, and opening cells perform no writes (Invariant 15);
+// numbers are calculated on render (Invariant 14).
 
-/** 行名那一栏的宽度。 */
+/** Width of the row header column. */
 const TITLE_WIDTH = 92;
 const ROW_HEIGHT = 44;
 const HEAD_HEIGHT = 40;
-/** 一屏大约 7 列：按卡片的宽度分，最窄 34、最宽 52。 */
+/** About 7 columns per screen: divided by card width, minimum 34, maximum 52. */
 const MIN_CELL = 34;
 const MAX_CELL = 52;
 const VISIBLE = 7;
-/** 长按列出记录要比页面的长按编辑（LONG_PRESS_MS）先到。 */
+/** Long-press to list records must trigger before the page's long-press edit (LONG_PRESS_MS). */
 const HOLD_MS = LONG_PRESS_MS - 150;
 
 const tapTool = (block: RecordBlock, kind: 'create' | 'remove'): RecordToolUse | undefined =>
@@ -79,7 +85,7 @@ export function Grid({ block, env, tone }: { block: RecordBlock; env: RenderEnv;
   if (!collection || !view || !rows || linkedAll === null) return null;
   const cal = calendarOf(env.config);
   const now = new Date();
-  // 按引用分行时先按 group.filter 筛被引用的表（和看板一样，D-351）。
+  // When splitting rows by reference, first filter referenced tables using group.filter (same as Kanban, D-351).
   const linked = linkedAll && {
     ...linkedAll,
     records: filterRecords(linkedAll.records, linkedAll.collection, group?.filter, now, cal),
@@ -104,7 +110,7 @@ export function Grid({ block, env, tone }: { block: RecordBlock; env: RenderEnv;
   const { columns } = read;
   const create = tapTool(block, 'create');
   const remove = tapTool(block, 'remove');
-  // 跟着页面上的一排选项（D-573）：在这一格加的也带上它。
+  // Follows the row of options on the page (D-573): entries added in this cell also inherit it.
   const filter = followedFilter(block.source, env.pageChoice);
   const field = block.show.trailing
     ? view.fields.find((f) => f.id === block.show.trailing)
@@ -158,7 +164,7 @@ export function Grid({ block, env, tone }: { block: RecordBlock; env: RenderEnv;
       else if (tap === 'open') setPicked({ row: row.key, column: column.key });
     };
     const press = env.interactive && tap !== 'none' ? (env.locked ?? run) : undefined;
-    // 有记录时长按列出这一格的记录（和点一下做的事分开）；空格长按照样是页面的长按编辑。
+    // List records in this cell on long-press when records exist (separate from tap behavior); long-pressing an empty space still triggers page long-press edit.
     const holdOpen = () => {
       setPicked({ row: row.key, column: column.key });
       setTimeout(() => setInnerGesture(false), LONG_PRESS_MS);
@@ -239,7 +245,7 @@ export function Grid({ block, env, tone }: { block: RecordBlock; env: RenderEnv;
     );
   };
 
-  // 打开的那一格：还在这一页里时列出它的记录（有 source.sort 时按它排，最多 limit 条）。
+  // The opened cell: lists its records while still on this page (sorted by source.sort if present, up to limit items).
   const pickedRow = picked && read.rows.find((r) => r.key === picked.row);
   const pickedIndex = picked ? columns.findIndex((c) => c.key === picked.column) : -1;
   const pickedRecords: DataRecord[] =
@@ -291,7 +297,7 @@ export function Grid({ block, env, tone }: { block: RecordBlock; env: RenderEnv;
             ref={scroller}
             horizontal
             showsHorizontalScrollIndicator={false}
-            // 今天那一列在最右边：打开、翻页时都滚到最右。
+            // Today's column is on the far right: scroll to the rightmost on open and pagination.
             onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: false })}>
             <View>
               <View style={[styles.line, { height: HEAD_HEIGHT }]}>

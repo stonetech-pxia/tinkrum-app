@@ -15,9 +15,11 @@ import { tableVersion } from '../data/records';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 按表刷新（D-555）：一个块只在它读的表（自己的表，和查找、汇总、上一条、引用要读的表）写过以后重新读、重新算；
-// 同一页上读同一张表的几个块共用一次计算（只共用还在算的那一次，和 readTable 一样）。
-// 不知道写了哪张表的（恢复、撤销删除、批量删除、导入）照旧全部重来：宁可慢，不能旧。
+// Refresh by table (D-555): a block re-reads and recalculates only after its read tables (its own
+// table, plus lookup, rollup, previous, reference tables) have been written; multiple blocks
+// reading the same table on the same page share a single computation (sharing only the active
+// computation, like readTable). Unidentified table writes (restore, undo deletion, bulk delete,
+// import) re-trigger everything as before: better slow than stale.
 
 jest.mock('@morph/core', () => {
   const actual = jest.requireActual('@morph/core');
@@ -62,7 +64,7 @@ const tables = [
   },
 ];
 
-// 六个读 tasks 的块（列表和数字各一半），另外每张表一个列表。
+// Six blocks reading tasks (half lists, half numbers), plus one list per other table.
 const blocks: NewComponent[] = [
   ...Array.from({ length: 6 }, (_, i) =>
     i % 2 === 0
@@ -176,7 +178,7 @@ it('a write to a linked table refreshes the rollup and the link title on the oth
   expect(await screen.findByText('333')).toBeTruthy();
   await repo.updateRecord('cust1aaaaa', { name: 'Alicia' }, 3);
   await act(async () => store.getState().bumpRecords(['customers']));
-  // 客户列表的标题和两条订单上的引用都换了名字。
+  // Customer list title and references on both orders have updated names.
   await waitFor(() => expect(screen.getAllByText('Alicia').length).toBe(3));
 });
 
@@ -195,7 +197,7 @@ it('a write whose table is not known refreshes every table', async () => {
 });
 
 describe('writes whose table is not known for certain refresh every table', () => {
-  /** 下一个提问按 label 那个按钮。 */
+  /** Next prompt uses the button corresponding to label. */
   const answerNext = (label: string) =>
     jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, _m, buttons?: AlertButton[]) => {
       void buttons?.find((b) => b.text === label)?.onPress?.();

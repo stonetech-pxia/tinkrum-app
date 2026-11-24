@@ -3,47 +3,52 @@ import { RunError, sanitizeFileName, uniqueFileName } from '@morph/core';
 import type { MorphShareModule, SavedToFolder } from '../../modules/morph-share';
 import type { FolderItem } from './platform';
 
-// 输出去向（D-119、D-120）：一次分享多个文件、存到用户在「文件」里选的文件夹。
-// 有本地模块 MorphShare 时用它；没有时（Expo Go）分享退回 expo-sharing 逐个打开面板，
-// 存到文件夹退回 expo-file-system 的选文件夹。每个快捷操作记住自己的文件夹（D-196），还没有时用最后选过的
-// 那个（D-123）：原生模块存在系统里，Expo Go 里只在这次打开 App 期间记住。依赖从外面传进来，测试里用假的。
+// Output destination (D-119, D-120): sharing multiple files at once, saving to a folder selected by
+// the user in Files. Uses local module MorphShare when available; otherwise (Expo Go) falls back to
+// expo-sharing to open panels one by one, and saving to a folder falls back to expo-file-system's
+// folder picker. Each quick action remembers its own folder (D-196), falling back to the last
+// selected one if none is set (D-123): native modules persist in the system, whereas Expo Go
+// remembers it only during the current app session. Dependencies are passed in from outside and
+// mocked in tests.
 
-/** 用户选好的文件夹（Expo Go 里的退路）。 */
+/** Folder selected by the user (fallback in Expo Go). */
 export interface PickedFolder {
-  /** 文件夹的显示名。 */
+  /** Display name of the folder. */
   name: string;
-  /** 文件夹里已有的文件名，不覆盖它们。 */
+  /** File names already existing in the folder, do not overwrite them. */
   names(): string[];
-  /** 新建一个文件并写入源文件的内容；写不进去时抛出 code 为 ERR_FOLDER_NOT_WRITABLE 的错误。 */
+  /** Create a new file and write the source file contents; throws an error with code ERR_FOLDER_NOT_WRITABLE if writing fails. */
   write(name: string, mimeType: string, sourceUri: string): Promise<void>;
 }
 
 export interface ShareDeps {
   native: MorphShareModule | null;
   /**
-   * 能直接交给原生分享的文件（D-466）：Android 的 FileProvider 只开放了缓存里的 runs/、preview/、share/，
-   * 桌上和文档库里的文件不在里面（三星真机上分享桌上的文件报 ERR_UNEXPECTED）。iOS 都能直接交。
+   * Files that can be handed directly to native sharing (D-466): Android's FileProvider exposes
+   * only runs/, preview/, and share/ in the cache, while files on the desktop and in document
+   * libraries are excluded (sharing desktop files on Samsung real devices throws ERR_UNEXPECTED).
+   * iOS allows handing over any file directly.
    */
   shareable(uri: string): boolean;
-  /** 把要分享的文件复制成 name（放进 share/，每次分享前清掉上一次的），返回副本的地址。 */
+  /** Copy the file to be shared as name (placed in share/, clearing the previous one before each share), returning the copy's URI. */
   stageCopy(uri: string, name: string, first: boolean): Promise<string>;
-  /** 打开一次分享面板，只带一个文件（expo-sharing）。 */
+  /** Open a share panel once with a single file (expo-sharing). */
   shareOne(item: { uri: string; mimeType: string }): Promise<void>;
-  /** 让用户选一个文件夹；取消时返回 null。 */
+  /** Prompt the user to select a folder; returns null on cancellation. */
   pickFolder(): Promise<PickedFolder | null>;
-  /** Expo Go 里最后选过的文件夹（只在内存里）。 */
+  /** Last selected folder in Expo Go (in-memory only). */
   remembered: PickedFolder | null;
-  /** Expo Go 里每个快捷操作记住的文件夹（只在内存里）。 */
+  /** Folders remembered by each quick action in Expo Go (in-memory only). */
   rememberedBy: Map<string, PickedFolder>;
 }
 
-/** 快捷操作 key 会存进的文件夹的名字：它自己的，没有时是最后选过的。 */
+/** Name of the folder where the quick action key will be stored: its own, or the last selected one if none exists. */
 export function rememberedFolder(deps: ShareDeps, key: string): string | null {
   if (deps.native) return deps.native.rememberedFolder(key);
   return (deps.rememberedBy.get(key) ?? deps.remembered)?.name ?? null;
 }
 
-/** 忘掉已经删掉的快捷操作的文件夹（keep：现在还有的快捷操作）。 */
+/** Forget folders of quick actions that have been deleted (keep: quick actions that still exist). */
 export function forgetFolders(deps: ShareDeps, keep: readonly string[]): void {
   if (deps.native) {
     deps.native.forgetFolders(keep);
@@ -56,7 +61,7 @@ export function forgetFolders(deps: ShareDeps, keep: readonly string[]): void {
 
 export const FOLDER_NOT_WRITABLE = 'ERR_FOLDER_NOT_WRITABLE';
 
-/** 分享出去时文件叫什么：有名字和扩展名时用它们（桌上的文件存成 v2-0.docx 这样的名字，D-466）。 */
+/** Default file name when sharing: use name and extension when available (desktop files are saved with names like v2-0.docx, D-466). */
 function sharedName(item: { uri: string; name?: string; ext?: string }): string {
   const own = decodeURIComponent(item.uri.replace(/^.*\//, ''));
   if (!item.name) return own;
@@ -64,8 +69,9 @@ function sharedName(item: { uri: string; name?: string; ext?: string }): string 
 }
 
 /**
- * 原生分享前先把文件放到能交出去的地方、用对的名字（D-466）：不能直接交的、或者文件名不是用户看到的名字的，
- * 复制一份（同名的加 -2）。别的原样交出去（大视频不复制）。
+ * Prior to native sharing, place the file in a shareable location with the correct name (D-466):
+ * create a copy (appending -2 for name collisions) if it cannot be shared directly or its file
+ * name differs from what the user sees. Hand over other files as-is (do not copy large videos).
  */
 export async function stageForShare(
   deps: ShareDeps,
@@ -108,7 +114,7 @@ export async function shareAll(
 
 export const NO_VIEWER = 'ERR_NO_VIEWER';
 
-/** 用系统预览打开一个文件（D-238）；Expo Go 里没有原生模块，退回分享面板（iOS 的面板上能看文件）。 */
+/** Open a file using system preview (D-238); falls back to the share panel in Expo Go (iOS panels allow viewing files). */
 export async function previewFile(
   deps: ShareDeps,
   item: { uri: string; mimeType: string; name: string },
@@ -121,14 +127,16 @@ export async function previewFile(
     await deps.native.previewFile(item.uri, item.mimeType, item.name);
   } catch (e) {
     if ((e as { code?: string }).code === NO_VIEWER) throw new RunError('noViewer');
-    // 别的原生错误（读不到文件、权限）不把错误代码显示给用户。
+    // Do not expose other native errors (file unreadable, permissions) error codes to the user.
     throw new RunError('previewFailed');
   }
 }
 
 /**
- * 存到快捷操作 key 的文件夹：choose 为 false 时有记住的文件夹就直接存进去（它自己的，没有时用最后选过的
- * 并记给它），否则（或 choose 为 true）让用户选一个，记给它，也记成最后选过的。用户取消时返回 null。
+ * Save to the quick action key's folder: when choose is false, save directly to the remembered
+ * folder if present (its own, or the last selected one if none exists); otherwise (or when choose
+ * is true) prompt the user to select one, remember it for the action, and record it as the last
+ * selected one. Returns null if the user cancels.
  */
 export async function saveAllToFolder(
   deps: ShareDeps,

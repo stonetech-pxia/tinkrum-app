@@ -22,8 +22,9 @@ import { registry } from './test-helpers';
 import { ToolManifestSchema } from './tool-download';
 import { validateWorkspace } from './validate';
 
-// 画出来的图标放进配置（D-625）：图标库、my:<id> 引用、setTheme 的补丁、功能和外观怎么分、
-// App 文件带着走、预设带着走。
+// Incorporating drawn icons into configuration (D-625): icon library, my:<id> references, setTheme
+// patches, separating features and appearance, App files travelling along, presets travelling
+// along.
 
 const ctx = { registry, locale: 'en' as const, now: new Date('2026-11-23T10:00:00Z') };
 const PAW: DrawnIcon = {
@@ -107,7 +108,7 @@ describe('the icon library in the config', () => {
     };
     visit(WorkspaceConfigSchema, null);
     expect([...keys]).toEqual(['icon']);
-    // 有图标库以外的地方（下载的工具）不收 my:。
+    // my: is not accepted outside the icon library (e.g., in downloaded tools).
     expect(IconValueSchema.safeParse('my:paw').success).toBe(true);
     expect(ListedIconValueSchema.safeParse('my:paw').success).toBe(false);
     const workflow = ToolManifestSchema.shape.workflows.element.shape.icon;
@@ -137,7 +138,7 @@ describe('setTheme {icons}', () => {
     const after = run(withApp, ops, { scope: { appId: 'fit' } });
     expect(after.icons).toEqual({ ring: RING });
     expect(scopeProblems(withApp, after, 'fit', registry)).toEqual([]);
-    // 主页用着的图标，app 里不能换。
+    // Icons used on the home screen cannot be changed within the app.
     const homeUses = run(start(), [
       { op: 'setTheme', icons: { ring: RING } },
       { op: 'addContainer', app: { id: 'fit', name: 'Fitness' } },

@@ -6,7 +6,7 @@ interface Props {
   onError?: (error: unknown) => void;
 }
 
-/** 渲染出错时显示 fallback 并通知上层（用于提交后的渲染校验和预览）。 */
+/** Displays a fallback and notifies the upper layer when rendering errors occur (used for post-commit render validation and preview). */
 export class ErrorBoundary extends Component<Props, { failed: boolean }> {
   state = { failed: false };
 

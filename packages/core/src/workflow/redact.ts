@@ -4,8 +4,9 @@ import type { WorkspaceConfig } from '../schema';
 
 export { REDACTED_FILE } from '../file-refs';
 
-// 发给 AI 的配置（D-065）：用户在快捷操作的参数里自己写的文字（水印、文字戳）换成占位符；
-// 指向用户文件的 ID 也换成占位符（底线 3）。
+// Configuration sent to AI (D-065): user-authored text in quick action parameters (watermarks, text
+// stamps) is replaced with placeholders; user file IDs are also replaced with placeholders
+// (invariant 3).
 
 export const REDACTED_TEXT = '<user text>';
 

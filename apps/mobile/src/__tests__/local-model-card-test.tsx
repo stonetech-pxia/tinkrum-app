@@ -7,7 +7,7 @@ import { LocalModelCard } from '../packs/LocalModelCard';
 import type { Packs } from '../packs/PackHost';
 import { makePalette } from '../renderer/theme';
 
-// 「设置 → 数据」的本机模型（D-396）：用户点了、确认了才下载；能删除；内存不够的手机不给下载。
+// On-device model in "Settings -> Data" (D-396): downloaded only after user tap and confirmation; can be deleted; not downloaded on phones with insufficient memory.
 
 let mockPacks: Packs | null = null;
 jest.mock('../packs/PackHost', () => ({ usePacks: () => mockPacks }));
@@ -39,7 +39,7 @@ const show = async (locale: Locale = 'zh') => {
   );
 };
 
-describe('本机模型的设置项（D-396）', () => {
+describe('On-device model settings item (D-396)', () => {
   beforeEach(() => {
     mockFits = true;
     process.env.EXPO_PUBLIC_MORPH_PACKS_URL = URL;
@@ -48,7 +48,7 @@ describe('本机模型的设置项（D-396）', () => {
     delete process.env.EXPO_PUBLIC_MORPH_PACKS_URL;
   });
 
-  it('打开页面不下载；点了下载、在确认框里同意才下载', async () => {
+  it('Does not download upon opening the page; downloads only after tapping download and confirming in the confirmation dialog', async () => {
     const store = fakeStore(false);
     await show();
     expect(store.install).not.toHaveBeenCalled();
@@ -63,7 +63,7 @@ describe('本机模型的设置项（D-396）', () => {
     expect(screen.getByTestId('local-model-remove')).toBeTruthy();
   });
 
-  it('确认框里取消：不下载，按钮还在', async () => {
+  it('Cancel in confirmation dialog: does not download, button remains', async () => {
     const store = fakeStore(false);
     await show();
     await fireEvent.press(screen.getByTestId('local-model-download'));
@@ -72,7 +72,7 @@ describe('本机模型的设置项（D-396）', () => {
     expect(screen.getByTestId('local-model-download')).toBeTruthy();
   });
 
-  it('下载过：能删除，先问', async () => {
+  it('Already downloaded: can be deleted, asks first', async () => {
     const store = fakeStore(true);
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     await show();
@@ -85,7 +85,7 @@ describe('本机模型的设置项（D-396）', () => {
     alert.mockRestore();
   });
 
-  it('内存不够又没装：完全不提本机模型', async () => {
+  it('Insufficient memory and not installed: do not mention on-device model at all', async () => {
     fakeStore(false);
     mockFits = false;
     await show();
@@ -93,7 +93,7 @@ describe('本机模型的设置项（D-396）', () => {
     expect(screen.queryByTestId('local-model-download')).toBeNull();
   });
 
-  it('内存不够但装过（例如恢复了备份）：只能删除', async () => {
+  it('Insufficient memory but already installed (e.g., restored from backup): can only be deleted', async () => {
     fakeStore(true);
     mockFits = false;
     await show();
@@ -101,7 +101,7 @@ describe('本机模型的设置项（D-396）', () => {
     expect(screen.queryByTestId('local-model-download')).toBeNull();
   });
 
-  it('没配置下载地址又没装：不提示；装好的还能删', async () => {
+  it('Download URL not configured and not installed: no prompt; installed ones can still be deleted', async () => {
     delete process.env.EXPO_PUBLIC_MORPH_PACKS_URL;
     fakeStore(false);
     await show();

@@ -2,8 +2,9 @@ import { RunCancelled, RunError, type ActionImpl, type RunItem } from '@morph/co
 
 import { displayName, fileItems, freshName, type RunServices } from './helpers';
 
-// PDF 密码（D-194）：去掉打开密码、加上打开密码。iOS 用 PDFKit（modules/morph-docs）；
-// Android 和 Expo Go 没有（P-025），运行时报不支持。密码只在这一次运行里用，不保存、不进运行记录。
+// PDF Password (D-194): Remove open password, add open password. iOS uses PDFKit
+// (modules/morph-docs); Android and Expo Go do not (P-025), reporting unsupported at runtime.
+// Passwords are used only for this run, not saved, and not logged in run history.
 
 type Impl = ActionImpl<RunServices>;
 
@@ -29,13 +30,13 @@ export const PDF_PASSWORD_IMPLS: Record<string, Impl> = {
     const out: RunItem[] = [];
     for (const [i, item] of items.entries()) {
       ctx.throwIfCancelled();
-      // 图片等别的文件原样交给下一步（例如和对账单一起合并的照片）。
+      // Other files like images are passed to the next step as-is (e.g., photos merged with statements).
       const state = item.mimeType === 'application/pdf' ? await lockStateOf(ctx, item) : 'none';
       if (state === 'none') {
         out.push(item);
         continue;
       }
-      // 不用密码就能打开、只限制了打印和复制的，不解除（P-027）。
+      // Files that can be opened without a password and only restrict printing and copying are not unlocked (P-027).
       if (state === 'restricted') throw new RunError('pdfRestricted', { name: displayName(item) });
       let wrong = false;
       for (;;) {

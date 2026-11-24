@@ -1,10 +1,10 @@
-// 把 pages/<套件>/ 里的单页来源拼成 pdfs/<套件>.pdf，并写 pdfs/<套件>.json（第几页是哪个用例、来源的 sha256）。
-// 来源按文件名排序（NN-用例名.扩展名）：
-//   .html       Chrome 打印成 PDF（数字 PDF：有文字层和矢量线）
-//   .scan.html  先打印，再画成 200dpi 的图、略微转斜、加一点噪点，只放图片（模拟扫描件）
-//   .pdf        直接取第一页（公开文档里截出的一页）
-//   .jpg/.png   图片铺满一页（照片、扫描件）
-// 用法：npx tsx tests/word-regression/build-pdfs.ts [套件名…]
+// Assemble single-page sources from pages/<suite>/ into pdfs/<suite>.pdf, and write
+// pdfs/<suite>.json (page number to case mapping and source sha256). Sources are sorted by filename
+// (NN-casename.extension): .html Chrome print to PDF (digital PDF: has text layer and vector lines)
+// .scan.html Print first, then rasterize to 200dpi image, slightly skew, add minor noise, and keep
+// as image only (simulating scanned documents) .pdf Take the first page directly (one page clipped
+// from a public document) .jpg/.png Image filling the page (photos, scanned documents) Usage: npx
+// tsx tests/word-regression/build-pdfs.ts [suite-names...]
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -43,7 +43,7 @@ function printHtml(file: string): Uint8Array {
   return new Uint8Array(readFileSync(out));
 }
 
-/** 画成图、转斜、加噪点：同一个来源每次得到同样的字节（噪点用固定的种子）。 */
+/** Rasterize, skew, and add noise: the same source yields the exact same bytes every time (noise uses a fixed seed). */
 async function scanOf(pdf: Uint8Array, seed: string) {
   const file = join(tmp, `${seed}.pdf`);
   writeFileSync(file, pdf);
@@ -136,7 +136,7 @@ try {
       }
       manifest.push({ page: out.getPageCount(), id, source: f, sha256: sha(bytes) });
     }
-    // 固定元数据，同样的来源拼出同样的字节。
+    // Fixed metadata so the same source produces identical bytes.
     const epoch = new Date('2026-01-01T00:00:00Z');
     out.setCreationDate(epoch);
     out.setModificationDate(epoch);

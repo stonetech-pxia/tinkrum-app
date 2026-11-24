@@ -24,7 +24,7 @@ export const SYSTEM_TARGET_LABELS: Record<SystemTarget, Localized> = {
   settings: { en: 'Settings', zh: '设置', fr: 'Paramètres' },
 };
 
-/** `tink` 是 Tink 的小锤子（D-436），只有这个入口用，不在配置能写的图标白名单里。 */
+/** `tink` is Tink's small hammer icon (D-436), used exclusively for this entry point and not included in the whitelist of icons allowed in the configuration. */
 export const SYSTEM_TARGET_ICONS: Record<SystemTarget, IconName | 'tink'> = {
   quickActions: 'workflow',
   tools: 'apps',
@@ -33,7 +33,7 @@ export const SYSTEM_TARGET_ICONS: Record<SystemTarget, IconName | 'tink'> = {
   settings: 'settings',
 };
 
-/** 首次启动时写入的默认工作空间（revision 1）。 */
+/** Default workspace written on first startup (revision 1). */
 export function createDefaultWorkspace(locale: Locale): WorkspaceConfig {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -58,7 +58,7 @@ export function createDefaultWorkspace(locale: Locale): WorkspaceConfig {
                 subtitle: t(locale, 'defaults_Tap_AI_and_describe_how_this_app_shoul_7d958'),
               },
             },
-            // 「添加工具」：主色标题、加号、大块（原 catalogLink，M7）。
+            // "Add Tool": primary-colored title, plus sign, large block (formerly catalogLink, M7).
             {
               id: 'catalog',
               look: 'entry',
@@ -70,7 +70,7 @@ export function createDefaultWorkspace(locale: Locale): WorkspaceConfig {
               },
               opens: 'tools',
             },
-            // 最近的文件：不是图片的用户文件（原 fileList 不写 mimeType）。
+            // Recent files: user files that are not images (formerly fileList without mimeType).
             {
               id: 'recent-files',
               look: 'files',

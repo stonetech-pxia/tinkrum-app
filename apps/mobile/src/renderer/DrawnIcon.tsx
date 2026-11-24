@@ -3,8 +3,10 @@ import { Canvas, Group, Path, Skia, type SkPath } from '@shopify/react-native-sk
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { Platform, View } from 'react-native';
 
-// 画出来的图标（D-625）：配置里 icons 的路径数据，用 Skia 按 24×24 的画布缩放画成一种颜色。
-// 图标库从这里的 context 来，Icon 的调用处不用改；正在显示的配置（正式版本和草稿）由根布局放进来。
+// Rendered icons (D-625): path data for icons in config, scaled and rendered in a single color
+// using Skia on a 24x24 canvas. The icon library comes from the context here, so Icon call sites do
+// not need modification; displayed configs (official version and draft) are injected by the root
+// layout.
 
 const DrawnIconsContext = createContext<DrawnIcons>({});
 
@@ -18,18 +20,19 @@ export function DrawnIconsProvider({
   return <DrawnIconsContext.Provider value={icons ?? {}}>{children}</DrawnIconsContext.Provider>;
 }
 
-/** 正在显示的配置里的图标库。 */
+/** Icon library in the currently displayed configuration. */
 export const useDrawnIcons = (): DrawnIcons => useContext(DrawnIconsContext);
 
-/** 图标值对应的定义：不是 my:<id>、或者库里没有，返回 null。 */
+/** Definition corresponding to the icon value: returns null if not my:<id> or not found in the library. */
 export function drawnIconOf(name: string, icons: DrawnIcons): DrawnIcon | null {
   const id = drawnIconId(name);
   return id !== null ? (icons[id] ?? null) : null;
 }
 
 /**
- * 把路径数据交给 Skia；有一条读不了就整个不画（Web 上没有加载 Skia，也不画）。填满的几条合成一条按 even-odd 画，
- * 一条里的形状套在另一条里也是挖空；只画线的各画各的。
+ * Passes path data to Skia; if any path fails to load, renders nothing (Skia is not loaded on
+ * Web, so nothing is rendered). Multiple filled paths are combined using even-odd fill rules, and
+ * nested shapes within a path create cutouts; line-only paths are rendered individually.
  */
 export function parseDrawnPaths(icon: DrawnIcon): SkPath[] | null {
   if (Platform.OS === 'web') return null;
@@ -45,7 +48,7 @@ export function parseDrawnPaths(icon: DrawnIcon): SkPath[] | null {
   }
 }
 
-/** my:<id> 图标。库里没有或画不出来时只占位，保持大小，布局不跳。 */
+/** my:<id> icon. Renders a placeholder to maintain size and prevent layout jumps when missing from the library or failing to render. */
 export function DrawnIconView({
   name,
   size,

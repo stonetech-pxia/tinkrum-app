@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { scanWorkflows } from './scan';
 
-// D-450：扫描的文件都留在 App 的文档库（创始人 2026-11-05 在对话里定）：扫描成 PDF 的内设快捷操作最后一步存到文件。
+// D-450: Scanned files remain in the app's document library (decided by the founder in conversation on 2026-11-05): the final step of a scan-to-PDF built-in quick action saves to files.
 describe('scan presets keep the result in the app', () => {
   it.each(['zh', 'en', 'fr'] as const)(
     'scan-camera and scan-library end with file.save (%s)',
@@ -11,7 +11,7 @@ describe('scan presets keep the result in the app', () => {
       for (const id of ['scan-camera', 'scan-library']) {
         const steps = flows.find((w) => w.id === id)!.steps;
         expect(steps.at(-1)!.action).toBe('file.save');
-        // D-455：带文字层，文档库能按 PDF 里的字搜。
+        // D-455: Includes a text layer so the document library can search by words inside the PDF.
         expect(steps.find((s) => s.action === 'pdf.fromImages')!.params).toMatchObject({
           textLayer: true,
         });

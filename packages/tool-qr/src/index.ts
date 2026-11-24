@@ -1,9 +1,10 @@
 import jsQRModule from 'jsqr';
 import { correction, generate, mode } from 'lean-qr';
 
-// 二维码生成与识别（T1）。只依赖字节数组，不依赖 DOM / Canvas：
-// 生成得到模块矩阵和 RGBA 像素（App 用 Skia 编码成 PNG），识别直接吃 RGBA 像素。
-// lean-qr 主入口是纯 ESM，顶层只用 TextEncoder（Hermes 已内置）。
+// QR code generation and recognition (T1). Depends solely on byte arrays, without DOM/Canvas:
+// generation yields a module matrix and RGBA pixels (encoded into PNG by the app via Skia), and
+// recognition directly consumes RGBA pixels. The lean-qr main entry is pure ESM, using only
+// TextEncoder at the top level (built into Hermes).
 
 export type QrErrorCode = 'empty' | 'tooLong';
 
@@ -16,26 +17,27 @@ export class QrError extends Error {
 export type QrEcc = 'L' | 'M' | 'Q' | 'H';
 
 export interface QrMatrix {
-  /** 每边的模块数（不含留白）。 */
+  /** Number of modules per side (excluding quiet zone). */
   size: number;
-  /** size*size 个模块，按行存储，1 = 深色。 */
+  /** size*size modules, stored row by row, 1 = dark. */
   modules: Uint8Array;
 }
 
 export interface RgbaImage {
   width: number;
   height: number;
-  /** width*height*4 字节，RGBA 顺序。 */
+  /** width*height*4 bytes, RGBA order. */
   data: Uint8Array;
 }
 
 export const MAX_TEXT_LENGTH = 1000;
 
-// 不用 lean-qr 默认的 shift_jis 模式：它会调用 TextDecoder('sjis')，Hermes 不支持。
-// 非 ASCII 文本走 UTF-8（ECI 26），jsQR 和主流扫码器都能正确识别中文。
+// Avoid lean-qr's default shift_jis mode: it calls TextDecoder('sjis'), which is unsupported by
+// Hermes. Non-ASCII text uses UTF-8 (ECI 26), which can be correctly recognized by jsQR and
+// mainstream QR scanners.
 const MODES = [mode.numeric, mode.alphaNumeric, mode.ascii, mode.utf8];
 
-/** 生成二维码矩阵。ecc 是最低纠错等级，版本有余量时 lean-qr 会自动提高。 */
+/** Generate a QR code matrix. ecc is the minimum error correction level; lean-qr automatically increases it if the version has capacity headroom. */
 export function qrMatrix(text: string, { ecc = 'M' }: { ecc?: QrEcc } = {}): QrMatrix {
   const length = [...text].length;
   if (length === 0) throw new QrError('empty');
@@ -44,7 +46,7 @@ export function qrMatrix(text: string, { ecc = 'M' }: { ecc?: QrEcc } = {}): QrM
   try {
     code = generate(text, { minCorrectionLevel: correction[ecc], modes: MODES });
   } catch {
-    // 唯一可能的失败是内容超出最大版本（40）的容量，比如 1000 个汉字。
+    // The only possible failure is content exceeding the capacity of the maximum version (40), such as 1000 Chinese characters.
     throw new QrError('tooLong');
   }
   const { size } = code;
@@ -56,11 +58,11 @@ export function qrMatrix(text: string, { ecc = 'M' }: { ecc?: QrEcc } = {}): QrM
 }
 
 export interface QrRgbaOptions {
-  /** 每个模块占多少像素（正整数）。 */
+  /** Number of pixels per module (positive integer). */
   scale: number;
-  /** 四周留白的模块数，规范要求至少 4。 */
+  /** Number of quiet zone modules around the perimeter, specification requires at least 4. */
   marginModules?: number;
-  /** `#RGB`、`#RRGGBB` 或 `#RRGGBBAA`。 */
+  /** `#RGB`, `#RRGGBB`, or `#RRGGBBAA`. */
   dark?: string;
   light?: string;
 }
@@ -75,7 +77,7 @@ function parseColor(hex: string): [number, number, number, number] {
   return [channel(0), channel(1), channel(2), channel(3)];
 }
 
-/** 把矩阵光栅化成 RGBA 像素。 */
+/** Rasterize the matrix into RGBA pixels. */
 export function qrToRgba(
   matrix: QrMatrix,
   { scale, marginModules = 4, dark = '#000000', light = '#FFFFFF' }: QrRgbaOptions,
@@ -90,7 +92,7 @@ export function qrToRgba(
   const width = (size + marginModules * 2) * scale;
   const height = width;
   const data = new Uint8Array(width * height * 4);
-  // 每个模块行先画出一行像素，再整行复制 scale 次。
+  // Draw a row of pixels for each module row first, then replicate the row scale times.
   const row = new Uint8Array(width * 4);
   for (let my = -marginModules; my < size + marginModules; my++) {
     for (let mx = -marginModules; mx < size + marginModules; mx++) {
@@ -106,8 +108,9 @@ export function qrToRgba(
 }
 
 /**
- * 按盒式平均把图片缩到长边不超过 maxSide（默认 1600 px），已经足够小就原样返回。
- * 识别前先缩小：大照片直接交给 jsQR 又慢又费内存。
+ * Downscale the image using box averaging so the long side does not exceed maxSide (default 1600
+ * px), returning as-is if already small enough. Downscale before recognition: passing large
+ * photos directly to jsQR is both slow and memory-intensive.
  */
 export function downscaleRgba(image: RgbaImage, maxSide = 1600): RgbaImage {
   const { width, height, data } = image;
@@ -147,13 +150,13 @@ export function downscaleRgba(image: RgbaImage, maxSide = 1600): RgbaImage {
   return { width: tw, height: th, data: out };
 }
 
-// jsqr 是 CommonJS 包：Metro/Babel 会取 .default，Node 原生 ESM 则拿到整个 exports 对象。
+// jsqr is a CommonJS package: Metro/Babel will pick .default, while Node native ESM gets the entire exports object.
 const jsQR: typeof jsQRModule =
   typeof jsQRModule === 'function'
     ? jsQRModule
     : (jsQRModule as unknown as { default: typeof jsQRModule }).default;
 
-/** 识别图片里的二维码，找不到返回 null。同时尝试反色（深底浅码）。 */
+/** Recognize QR codes in the image, returning null if none are found. Also tries inverted colors (dark background, light code). */
 export function decodeQr({ data, width, height }: RgbaImage): string | null {
   if (data.length !== width * height * 4) {
     throw new RangeError(`expected ${width * height * 4} bytes, got ${data.length}`);
@@ -168,13 +171,13 @@ export interface WifiNetwork {
   hidden: boolean;
 }
 
-/** Wi-Fi 二维码里的文字有问题：网络名（空、超过 32 字节）或密码（没填、WPA 不是 8–63 个字符）。 */
+/** Issues with text in the Wi-Fi QR code: network name (empty, exceeds 32 bytes) or password (missing, WPA not 8–63 characters). */
 export type WifiProblem = 'name' | 'passwordMissing' | 'password';
 
-/** 网络名、密码里的 \ ; , : " 前面加反斜杠（Wi-Fi 二维码格式的转义）。 */
+/** Prepend backslashes to \\, ;, ,, :, and " in the network name and password (escaping for Wi-Fi QR code format). */
 const wifiEscape = (s: string) => s.replace(/[\\;,:"]/g, (c) => `\\${c}`);
 
-/** UTF-8 字节数（这个包的类型里没有 TextEncoder）。 */
+/** UTF-8 byte length (TextEncoder is not present in this package's types). */
 function utf8Length(s: string): number {
   let n = 0;
   for (const ch of s) {
@@ -184,7 +187,7 @@ function utf8Length(s: string): number {
   return n;
 }
 
-/** 先检查，有问题时返回问题，否则返回 null。 */
+/** Validate first, returning the problem if any, otherwise null. */
 export function wifiProblem(net: WifiNetwork): WifiProblem | null {
   if (!net.name.trim() || utf8Length(net.name) > 32) return 'name';
   if (net.security === 'none') return null;
@@ -196,8 +199,9 @@ export function wifiProblem(net: WifiNetwork): WifiProblem | null {
 }
 
 /**
- * 手机相机扫 Wi-Fi 二维码时认的文字（D-199）：WIFI:T:WPA;S:网络名;P:密码;H:true;;
- * 没有密码时 T:nopass、不写 P。先用 wifiProblem 检查。
+ * Text recognized by phone cameras when scanning Wi-Fi QR codes (D-199):
+ * WIFI:T:WPA;S:network_name;P:password;H:true;; T:nopass and no P when there is no password.
+ * Validate with wifiProblem first.
  */
 export function wifiText(net: WifiNetwork): string {
   const type = net.security === 'none' ? 'nopass' : net.security;

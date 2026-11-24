@@ -4,8 +4,9 @@ import { clearFileRefs, countFileRefs, keepChosenFiles, newFileRefs } from './fi
 import { createDefaultWorkspace } from './defaults';
 import type { WorkspaceConfig } from './schema';
 
-// 整套设置交给别的 AI 再交回来：发出去时文件引用都清了（底线 3），回来时用户自己选的图片放回原处，
-// 不新增任何文件引用。
+// Full setup handed over to another AI and brought back: file references were cleared upon export
+// (invariant 3), and upon return, user-selected images are restored to their original places
+// without adding any new file references.
 
 function withPictures(): WorkspaceConfig {
   const config = createDefaultWorkspace('en');

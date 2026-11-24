@@ -19,9 +19,12 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import kotlin.math.roundToInt
 
-// 长任务的前台服务（D-160）：运行期间通知栏有一条带进度的通知，Morph 切到别的 App、锁屏都继续跑。
-// 服务本身不做事，只让系统别冻结、别杀掉 App 的进程；视频和音频还是由 morph-media / morph-speech 处理。
-// Android 15 起类型是 mediaProcessing（每 24 小时最多 6 小时，到了调 onTimeout），Android 14 用 dataSync。
+// Foreground service for long-running tasks (D-160): during execution, there is a progress
+// notification in the status bar, and tasks continue to run even when Morph switches to another app
+// or the lock screen activates. The service itself does not perform tasks; it only prevents the
+// system from freezing or killing the app process. Video and audio are still handled by morph-media
+// / morph-speech. Starting with Android 15, the type is mediaProcessing (at most 6 hours every 24
+// hours; onTimeout is called when reached); Android 14 uses dataSync.
 
 private const val TAG = "MorphBackground"
 
@@ -41,7 +44,7 @@ class MorphBackgroundService : Service() {
       intent?.getStringExtra(EXTRA_TEXT).orEmpty(),
       null,
     )
-    // 先试 mediaProcessing；有的 Android 15 系统没开这种类型（报「type none」），退回 dataSync。
+    // Try mediaProcessing first; if some Android 15 systems do not have this type enabled (reporting "type none"), fall back to dataSync.
     val started = serviceTypes().any { type ->
       try {
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
@@ -52,14 +55,14 @@ class MorphBackgroundService : Service() {
       }
     }
     if (!started) {
-      // 系统不让（例如已经在后台）：不保活，任务照旧只在前台跑。
+      // When the system disallows it (e.g. already in the background): do not keep alive, and tasks run only in the foreground as usual.
       stopSelf()
       return START_NOT_STICKY
     }
     running = true
     if (wakeLock == null) {
       val power = getSystemService(Context.POWER_SERVICE) as PowerManager
-      // 锁屏后 CPU 不睡；最长 7 小时（mediaProcessing 每天最多 6 小时），防止忘了释放。
+      // Keep the CPU awake after screen lock; maximum of 7 hours (mediaProcessing allows up to 6 hours daily) to prevent forgetting to release it.
       wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Morph:background").apply {
         setReferenceCounted(false)
         acquire(7 * 60 * 60 * 1000L)
@@ -68,7 +71,7 @@ class MorphBackgroundService : Service() {
     return START_NOT_STICKY
   }
 
-  // Android 15：这种类型今天的 6 小时用完了。停掉服务，任务回到普通的后台规则。
+  // Android 15: today's 6 hours for this type have been exhausted. Stop the service, and return the task to normal background rules.
   override fun onTimeout(startId: Int, fgsType: Int) {
     Log.w(TAG, "foreground service timed out")
     stop()
@@ -96,7 +99,7 @@ class MorphBackgroundService : Service() {
     private const val EXTRA_TITLE = "title"
     private const val EXTRA_TEXT = "text"
 
-    /** 服务已经在前台（startForeground 成功、还没停）：只有这时才改进度通知。 */
+    /** The service is already in the foreground (startForeground succeeded and not yet stopped): only update the progress notification under this condition. */
     @Volatile
     var running = false
       private set
@@ -110,7 +113,7 @@ class MorphBackgroundService : Service() {
       else -> listOf(0)
     }
 
-    /** 开始保活；系统不让时（Android 12 起 App 在后台不能启动前台服务）返回 false。 */
+    /** Start keep-alive; returns false when the system disallows it (starting with Android 12, apps cannot start foreground services from the background). */
     fun start(context: Context, title: String, text: String): Boolean {
       ensureChannels(context)
       val intent = Intent(context, MorphBackgroundService::class.java)
@@ -125,13 +128,13 @@ class MorphBackgroundService : Service() {
       }
     }
 
-    /** 结束保活。和 start 走同一个队列，保证先 startForeground 再停（反过来系统会让 App 崩溃）。 */
+    /** End keep-alive. Follows the same queue as start to ensure startForeground runs before stopping (doing it in reverse causes the system to crash the app). */
     fun stop(context: Context) {
       val intent = Intent(context, MorphBackgroundService::class.java).setAction(ACTION_STOP)
       try {
         context.startService(intent)
       } catch (e: Exception) {
-        // 服务没在跑（start 失败过）时，后台的 App 不能 startService。
+        // When the service is not running (start failed previously), background apps cannot call startService.
         context.stopService(Intent(context, MorphBackgroundService::class.java))
       }
     }
@@ -168,7 +171,7 @@ class MorphBackgroundService : Service() {
         .build()
     }
 
-    /** 点通知回到 Morph 原来的任务（运行页或结果页），不新开页面。 */
+    /** Tapping the notification returns to Morph's original task (run page or result page) without opening a new page. */
     private fun openApp(context: Context): PendingIntent? =
       context.packageManager.getLaunchIntentForPackage(context.packageName)?.let { intent ->
         PendingIntent.getActivity(

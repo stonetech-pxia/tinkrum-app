@@ -1,6 +1,7 @@
-// 打 release 包时，Expo 会在 web 平台上把路由先跑一遍（导出服务端清单），入口最先加载的
-// reminders/background.ts 也会被执行。web 上 expo-notifications 没有 getLastNotificationResponse，
-// 一调用就抛错，整个打包失败。web 上不能去听通知按钮。
+// When building a release package, Expo preruns routes on the web platform (exporting server
+// manifests), executing `reminders/background.ts` loaded at the entry point first. On web,
+// `expo-notifications` lacks `getLastNotificationResponse`, throwing an error on call and failing
+// the entire build. Do not listen to notification buttons on web.
 
 jest.mock('expo-notifications', () => ({
   registerTaskAsync: jest.fn(async () => undefined),
@@ -34,7 +35,7 @@ it('loads on web without listening to notification buttons', () => {
   jest.useFakeTimers();
   const load = () =>
     jest.isolateModules(() => {
-      // 换成 web 必须在同一份隔离的模块里，background.ts 读的就是这一份。
+      // Switching to web requires using the same isolated module; `background.ts` reads this exact copy.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { Platform } = require('react-native');
       Object.defineProperty(Platform, 'OS', { get: () => 'web', configurable: true });

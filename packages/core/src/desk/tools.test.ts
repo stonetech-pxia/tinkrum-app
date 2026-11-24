@@ -22,7 +22,7 @@ import {
   deskWorkflowFits,
 } from './tools';
 
-// 房间的工具栏和布局配置（file-room DESIGN §4、§5，D-358、D-359）。
+// Toolbar and layout configuration for the room (file-room DESIGN §4, §5, D-358, D-359).
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -39,13 +39,13 @@ const pdf = f('pdf', 'application/pdf');
 const xlsx = f('xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 const docx = f('docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 
-/** 工具栏一项里的动作（快捷操作的项是字符串 ID，没有动作）。 */
+/** An action in a toolbar item (quick action items are string IDs and have no actions). */
 const actionOf = (i: DeskTool) => (typeof i === 'object' ? [i.action] : []);
 const actionsIn = (groups: ReturnType<typeof defaultDeskTools>, id: string) =>
   groups.find((g) => g.id === id)?.items.flatMap(actionOf) ?? [];
 
-describe('默认工具栏：按文件种类从注册表生成', () => {
-  it('图片：编辑里是要亲手操作的（裁剪、标注、打码），处理是类型不变的，转换是换了类型的', () => {
+describe('Default toolbar: generated from registry based on file type', () => {
+  it('Images: editing requires manual operation (crop, annotate, redact), processing preserves the type, and conversion changes the type', () => {
     const groups = defaultDeskTools('image', registry, [], 'zh');
     expect(groups.map((g) => g.id)).toEqual(['edit', 'adjust', 'convert', 'quick']);
     expect(actionsIn(groups, 'edit')).toEqual(
@@ -57,14 +57,14 @@ describe('默认工具栏：按文件种类从注册表生成', () => {
     expect(actionsIn(groups, 'convert')).toEqual(
       expect.arrayContaining(['pdf.fromImages', 'ocr.toExcel', 'ocr.toWord', 'ocr.recognize']),
     );
-    // 选文件、保存、分享、命名不是工具（房间的「完成」管它们）。
+    // Selecting files, saving, sharing, and renaming are not tools ("Done" in the room handles them).
     const all = groups.flatMap((g) => g.items.flatMap(actionOf));
     expect(all.filter((a) => /^(in|out|file)\./.test(a))).toEqual([]);
-    // 图片没有 PDF、视频的工具。
+    // Images do not have PDF or video tools.
     expect(all.filter((a) => /^(pdf\.(compress|sign)|video\.)/.test(a))).toEqual([]);
   });
 
-  it('PDF 按用途分：标注（画、写、签）、页面（整理、拆分）、处理、转换；快捷操作只放自己的', () => {
+  it('PDF categorized by purpose: annotation (draw, write, sign), pages (organize, split), processing, conversion; quick actions only include custom ones', () => {
     const groups = defaultDeskTools('pdf', registry, [], 'zh');
     expect(groups.map((g) => g.id)).toEqual(['annotate', 'pages', 'adjust', 'convert']);
     expect(actionsIn(groups, 'annotate')).toEqual(
@@ -74,7 +74,7 @@ describe('默认工具栏：按文件种类从注册表生成', () => {
       expect.arrayContaining(['pdf.pages', 'pdf.selectPages', 'pdf.rotate', 'pdf.split']),
     );
     expect(actionsIn(groups, 'adjust')).toEqual(expect.arrayContaining(['pdf.protect']));
-    // 压缩不放在 PDF 桌面里；标注 PDF 的每种起手工具各一个按钮。
+    // Compression is not placed in the PDF desk; each starting tool for annotating a PDF gets its own button.
     expect(groups.flatMap((g) => g.items.flatMap(actionOf))).not.toContain('pdf.compress');
     expect(
       groups
@@ -87,7 +87,7 @@ describe('默认工具栏：按文件种类从注册表生成', () => {
       expect.arrayContaining(['pdf.toImages', 'pdf.extractText']),
     );
     expect(actionsIn(groups, 'adjust')).not.toContain('image.rotate');
-    // 内设的快捷操作（转音频、翻译……）不在 PDF 桌面里；用户自己的在。
+    // Built-in quick actions (convert audio, translate, etc.) are not in the PDF desk; user-defined ones are.
     const own: Workflow = {
       id: 'mine',
       kind: 'quickAction',
@@ -103,7 +103,7 @@ describe('默认工具栏：按文件种类从注册表生成', () => {
     ).toEqual(['mine']);
   });
 
-  it('Excel、Word：只有转 PDF（合并、打包这种收任何文件的不放）', () => {
+  it('Excel and Word: convert to PDF only (aggregators like merge and bundle that accept any file are excluded)', () => {
     for (const kind of ['sheet', 'doc'] as const) {
       const groups = defaultDeskTools(kind, registry, [], 'zh');
       const all = groups.flatMap((g) => g.items.flatMap(actionOf));
@@ -111,11 +111,11 @@ describe('默认工具栏：按文件种类从注册表生成', () => {
     }
   });
 
-  it('认不出的文件没有工具', () => {
+  it('Unrecognized files have no tools', () => {
     expect(defaultDeskTools('other', registry, [], 'zh')).toEqual([]);
   });
 
-  it('快捷操作：接得上这种文件的，自己的在前；工具自带的单功能快捷操作不放（和工具重复）', () => {
+  it('Quick actions: those matching this file type appear first; single-function quick actions built into tools are excluded (to avoid duplication with tools)', () => {
     const own: Workflow = {
       id: 'mine',
       kind: 'quickAction',
@@ -143,8 +143,8 @@ describe('默认工具栏：按文件种类从注册表生成', () => {
   });
 });
 
-describe('用一个工具 = 输入 + 这个工具', () => {
-  it('输入步骤按桌上文件的种类和个数选', () => {
+describe('Using a tool = input + this tool', () => {
+  it('Input steps selected based on the type and count of files on the desk', () => {
     expect(deskInputStep([jpg, { ...jpg, id: 'b' }])).toMatchObject({
       action: 'in.photos',
       params: { min: 1, max: 2 },
@@ -161,25 +161,25 @@ describe('用一个工具 = 输入 + 这个工具', () => {
     expect(deskInputStep([f('mov', 'video/quicktime')])).toMatchObject({ action: 'in.videos' });
   });
 
-  it('接得上的工具得到一个能通过检查的工作流；接不上的返回 null（工具栏上变灰）', () => {
+  it('Compatible tools yield a workflow that passes validation; incompatible ones return null (appear dimmed on the toolbar)', () => {
     expect(deskToolWorkflow('image.rotate', [jpg], registry)?.steps.map((s) => s.action)).toEqual([
       'in.photos',
       'image.rotate',
     ]);
     expect(deskToolWorkflow('pdf.compress', [jpg], registry)).toBeNull();
     expect(deskToolWorkflow('pdf.fromDocument', [docx], registry)).not.toBeNull();
-    // 选输入、分享不能当工具。
+    // Selecting inputs and sharing cannot act as tools.
     expect(deskToolWorkflow('out.share', [jpg], registry)).toBeNull();
     expect(deskToolWorkflow('nope.nope', [jpg], registry)).toBeNull();
     expect(deskToolWorkflow('image.rotate', [], registry)).toBeNull();
   });
 
-  it('默认参数不完整（文字戳要写字）时先算接得上；填好的参数不对时接不上', () => {
+  it('Incomplete default parameters (e.g., text stamp requires text) are initially considered compatible; invalid filled parameters are incompatible', () => {
     expect(deskToolWorkflow('pdf.stamp', [pdf], registry)).not.toBeNull();
     expect(deskToolWorkflow('pdf.stamp', [pdf], registry, { text: '' })).toBeNull();
   });
 
-  it('快捷操作能不能作用到桌上的文件：看第一步收不收', () => {
+  it('Whether a quick action can apply to files on the desk: checked by whether the first step accepts them', () => {
     const photos: Workflow = {
       id: 'p',
       kind: 'quickAction',
@@ -192,32 +192,32 @@ describe('用一个工具 = 输入 + 这个工具', () => {
   });
 });
 
-describe('单工具：哪些要先弹参数面板（D-363）', () => {
+describe('Single tools: those that should prompt for parameters first (D-363)', () => {
   const asks = (id: string) => deskToolAsks(registry.actions.get(id)!);
 
-  it('识别类（转 Excel、转 Word、识别文字）和文档转 PDF 不问，直接跑（D-278：语言自动）', () => {
+  it('Recognition classes (convert to Excel, convert to Word, recognize text) and document-to-PDF do not prompt and run directly (D-278: language is automatic)', () => {
     for (const id of ['ocr.toExcel', 'ocr.toWord', 'ocr.recognize', 'pdf.fromDocument']) {
       expect([id, asks(id)]).toEqual([id, []]);
     }
   });
 
-  it('要调参数的工具照旧弹面板：旋转问角度，文字戳问文字，压缩问大小', () => {
+  it('Tools requiring parameter tuning prompt for the panel as usual: rotate asks for angle, text stamp asks for text, compression asks for size', () => {
     expect(asks('image.rotate')).toContain('angle');
     expect(asks('pdf.stamp')).toContain('text');
     expect(asks('image.compress').length).toBeGreaterThan(0);
   });
 
-  it('水印只问文字、颜色、方向（创始人 2026-11-06）', () => {
+  it('Watermark only asks for text, color, and direction (Founder, 2026-11-06)', () => {
     expect(asks('pdf.stamp')).toEqual(['text', 'color', 'angle']);
   });
 
-  it('密码不在面板里（执行器跑的时候问）', () => {
+  it('Password is not in the panel (asked when the executor runs)', () => {
     expect(asks('pdf.protect')).not.toContain('password');
   });
 });
 
-describe('工具栏的图标（D-364）', () => {
-  it('同一个工具的不同动作图标不一样（旋转、裁剪、压缩、标注、转 PDF……）', () => {
+describe('Toolbar icons (D-364)', () => {
+  it('Different actions of the same tool have different icons (rotate, crop, compress, annotate, convert to PDF...)', () => {
     for (const kind of ['image', 'pdf', 'video', 'audio'] as const) {
       const items = defaultDeskTools(kind, registry, [], 'zh').flatMap((g) =>
         g.items.filter((i): i is { action: string; preset?: string } => typeof i === 'object'),
@@ -225,7 +225,7 @@ describe('工具栏的图标（D-364）', () => {
       const icons = items.map((i) =>
         deskToolIcon(registry.actions.get(i.action)!, registry, i.preset),
       );
-      // 大部分不一样：只有少数几个共用（例如两种「转成文字」）。
+      // Most are distinct: only a few are shared (e.g., two variants of "convert to text").
       expect(new Set(icons).size).toBeGreaterThanOrEqual(Math.ceil(items.length * 0.75));
     }
     const icon = (id: string) => deskToolIcon(registry.actions.get(id)!, registry);
@@ -236,13 +236,13 @@ describe('工具栏的图标（D-364）', () => {
   });
 });
 
-describe('布局配置（创始人 2026-10-30 确认：默认预览居中、工具栏在底部，AI 以后能改）', () => {
-  it('没有配置时：工具栏在底部，预览占满，有文件条，预览上下没有组件', () => {
+describe('Layout configuration (confirmed by Founder, 2026-10-30: default preview centered, toolbar at bottom, AI can modify later)', () => {
+  it('When unconfigured: toolbar at bottom, preview fills space, file bar present, no components above or below preview', () => {
     expect(resolveDeskLayout(undefined)).toEqual(DEFAULT_DESK_LAYOUT);
     expect(DEFAULT_DESK_LAYOUT).toMatchObject({ toolbar: 'bottom', preview: 'fill', strip: true });
   });
 
-  it('能改工具栏位置、预览大小、文件条、预览上下的说明组件、每种文件的工具', () => {
+  it('Can customize toolbar position, preview size, file bar, explanatory components above/below preview, and tools per file type', () => {
     const layout = DeskLayoutSchema.parse({
       toolbar: 'top',
       preview: 'medium',
@@ -256,7 +256,7 @@ describe('布局配置（创始人 2026-10-30 确认：默认预览居中、工�
     expect(resolved.tools.pdf).toHaveLength(1);
   });
 
-  it('没有能让预览消失、能碰文件的写法；预览上下只能放说明和入口', () => {
+  it('No patterns allowed that make the preview disappear or interact with files; above and below the preview can only contain explanations and entry points', () => {
     expect(DeskLayoutSchema.safeParse({ preview: 'none' }).success).toBe(false);
     expect(DeskLayoutSchema.safeParse({ files: [] }).success).toBe(false);
     expect(DeskLayoutSchema.safeParse({ hidePreview: true }).success).toBe(false);
@@ -267,14 +267,14 @@ describe('布局配置（创始人 2026-10-30 确认：默认预览居中、工�
       tools: [{ as: 'submit', do: 'create', table: 'c', ask: ['name'] }],
     };
     expect(DeskLayoutSchema.safeParse({ below: [form] }).success).toBe(false);
-    // 编辑层的工具（插入行、删块）不是动作，写不进工具栏。
+    // Editing layer tools (insert row, delete block) are not actions and cannot be written into the toolbar.
     expect(
       DeskLayoutSchema.safeParse({ tools: { sheet: [{ items: [{ edit: 'insertRow' }] }] } })
         .success,
     ).toBe(false);
   });
 
-  it('配置里写了的种类用配置的，指向已经没有的工具、快捷操作的项不显示；没写的种类用默认的', () => {
+  it('File types specified in the config use the configured settings, items pointing to non-existent tools or quick actions are hidden, and unconfigured types use defaults', () => {
     const configured: DeskToolsConfig = {
       pdf: [{ title: '常用', items: [{ action: 'pdf.sign' }, 'gone'] }],
     };
@@ -286,7 +286,7 @@ describe('布局配置（创始人 2026-10-30 确认：默认预览居中、工�
     );
   });
 
-  it('工作空间配置里可以有 containers.desk，也可以没有', () => {
+  it('Workspace configuration may or may not contain containers.desk', () => {
     const config = workspace('zh');
     const withDesk = (desk: unknown) => ({
       ...config,
@@ -295,7 +295,7 @@ describe('布局配置（创始人 2026-10-30 确认：默认预览居中、工�
     expect(WorkspaceConfigSchema.safeParse(config).success).toBe(true);
     expect(WorkspaceConfigSchema.safeParse(withDesk({ toolbar: 'top' })).success).toBe(true);
     expect(WorkspaceConfigSchema.safeParse(withDesk({ toolbar: 'left' })).success).toBe(false);
-    // v33 的位置（顶层 desk）不再认。
+    // v33 position (top-level desk) is no longer recognized.
     expect(WorkspaceConfigSchema.safeParse({ ...config, desk: { toolbar: 'top' } }).success).toBe(
       false,
     );

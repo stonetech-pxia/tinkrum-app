@@ -2,7 +2,7 @@ import type { Locale } from './schema';
 
 type Translated<T> = { en: T; zh: T; fr?: T };
 
-/** 下载目录或过渡期文案缺少法语时，统一回退到英文。 */
+/** Fallback uniformly to English when French copy is missing in download directory or during transition period. */
 export function localize<T>(text: Translated<T>, locale: Locale): T;
 export function localize<T>(text: Translated<T> | undefined, locale: Locale): T | undefined;
 export function localize<T>(text: Translated<T> | undefined, locale: Locale): T | undefined {
@@ -11,7 +11,7 @@ export function localize<T>(text: Translated<T> | undefined, locale: Locale): T 
 
 export const localeTag = (locale: Locale) => ({ en: 'en-US', zh: 'zh-CN', fr: 'fr-FR' })[locale];
 
-/** 文件大小按二进制换算；法语使用本地小数符和 octet 单位。 */
+/** File sizes are converted using binary scale; French uses local decimal separators and the "octet" unit. */
 export function formatFileSize(
   bytes: number,
   locale: Locale = 'en',

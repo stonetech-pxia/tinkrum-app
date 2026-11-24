@@ -4,13 +4,16 @@ import { AIHttpError, type AIErrorKind } from './http';
 import type { Complete, Completion, PlannerMessage } from './planner';
 import { systemPromptFor } from './prompt';
 
-// OpenAI 兼容接口（POST {baseUrl}/chat/completions）的传输层，供「自带 key」选了非 Anthropic 时使用（D-241）。
-// 覆盖 OpenAI、OpenRouter、DeepSeek、Gemini 的兼容接口、Groq、Ollama、LM Studio 等。
-// 只发标准字段（model、messages），不发 Anthropic 专用的思考力度和提示缓存，也不发 response_format：
-// 不是每家都支持，回复一律走规划器的 JSON 解析、校验和修正。
-// key 只放在 Authorization 头里发给用户填的地址，不写入日志、不出现在错误信息中；本地模型可以不填 key。
+// Transport layer for OpenAI-compatible interfaces (POST {baseUrl}/chat/completions), used when
+// "bring your own key" selects a non-Anthropic provider (D-241). Covers OpenAI, OpenRouter,
+// DeepSeek, Gemini's compatible interface, Groq, Ollama, LM Studio, etc. Sends only standard fields
+// (model, messages), omitting Anthropic-specific thinking effort and prompt caching, as well as
+// response_format: not all providers support it, and responses always go through the planner's JSON
+// parsing, validation, and correction. The key is placed only in the Authorization header and sent
+// to the address filled in by the user; it is never written to logs or exposed in error messages.
+// Local models do not require a key.
 
-/** 常见 provider 的 Base URL，只用来帮用户填地址。 */
+/** Base URLs of common providers, used only to help users fill in the address. */
 export const OPENAI_COMPATIBLE_PRESETS: readonly { id: string; name: string; baseUrl: string }[] = [
   { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
   { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' },
@@ -28,9 +31,10 @@ export type BaseUrlCheck = { ok: true; url: string } | { ok: false; issue: 'inva
 const LOOPBACK = /^(localhost|127(\.\d{1,3}){3}|\[::1\])$/i;
 
 /**
- * 检查用户填的 Base URL：必须是 https；http 只允许本机（localhost、127.x、[::1]）。
- * 局域网 http 不允许：Android 正式包默认禁止明文请求，而且 key 会明文经过 Wi-Fi（P-042）。
- * 不用 `new URL`：React Native 的 URL 不支持 hostname。
+ * Check the Base URL entered by the user: must be https; http is allowed only for localhost
+ * (localhost, 127.x, [::1]). Local network http is not allowed: Android release builds disable
+ * plaintext requests by default, and the key would pass in plaintext over Wi-Fi (P-042). Avoids
+ * `new URL`: React Native's URL does not support hostname.
  */
 export function checkBaseUrl(raw: string): BaseUrlCheck {
   const match = /^(https?):\/\/(\[[0-9a-f:.]+\]|[a-z0-9.-]+)(:\d{1,5})?(\/[^\s?#]*)?$/i.exec(
@@ -49,7 +53,7 @@ export function checkBaseUrl(raw: string): BaseUrlCheck {
   };
 }
 
-/** 地址里的主机名，给界面说明「发到哪里」。 */
+/** Hostname in the address, providing UI guidance on "where it is sent". */
 export const hostOf = (url: string) => /^https?:\/\/([^/:]+|\[[^\]]+\])/i.exec(url)?.[1] ?? url;
 
 interface ErrorBody {
@@ -71,7 +75,7 @@ function classify(status: number, body: ErrorBody | null): AIErrorKind {
 
 export interface OpenAICompatibleOptions {
   baseUrl: string;
-  /** 本地模型可以没有 key。 */
+  /** Local models can have no key. */
   apiKey?: string | null | undefined;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
@@ -120,7 +124,7 @@ interface ChatResponse {
   };
 }
 
-/** 修正重试时，上一轮的内容块（[{ type: 'text', text }]）转回字符串。 */
+/** During correction retries, converts the previous round's content blocks ([{ type: 'text', text }]) back to a string. */
 const toText = (content: PlannerMessage['content']) =>
   typeof content === 'string'
     ? content
@@ -161,13 +165,13 @@ export function createOpenAICompleter(options: OpenAICompletionOptions): Complet
     }
     const raw = choice.message.content;
     const text = (typeof raw === 'string' ? raw : toText(raw ?? []))
-      // 有些推理模型（如本机跑的 DeepSeek R1、Qwen）把思考过程放在 <think> 里，和回答混在一起。
+      // Some reasoning models (such as locally run DeepSeek R1, Qwen) put the thinking process inside <think> tags, mixed with the answer.
       .replace(/<think>[\s\S]*?<\/think>/g, '')
       .trim();
     const refused = Boolean(choice.message.refusal) || choice.finish_reason === 'content_filter';
     return {
       text,
-      // 统一成规划器认识的结束原因：拒答记为 refusal，其余原样保留。
+      // Normalize to the stop reason recognized by the planner: refusals are marked as refusal, and others are preserved as-is.
       stopReason: refused ? 'refusal' : (choice.finish_reason ?? null),
       content: [{ type: 'text', text }],
       model: data?.model ?? options.model,
@@ -181,7 +185,7 @@ export function createOpenAICompleter(options: OpenAICompletionOptions): Complet
   };
 }
 
-/** 供应商提供的模型 id 列表：GET {baseUrl}/models；没有列表接口时返回空数组。 */
+/** List of model IDs provided by the vendor: GET {baseUrl}/models; returns an empty array if there is no list endpoint. */
 export async function listOpenAICompatibleModels(
   options: OpenAICompatibleOptions,
 ): Promise<string[]> {
@@ -195,8 +199,9 @@ export async function listOpenAICompatibleModels(
 }
 
 /**
- * 检查地址和 key 是否可用：GET {baseUrl}/models，不消耗 token。
- * 列表里找不到所填的模型时报 not_found；各家模型 id 写法不同（Gemini 带 models/，Ollama 带 :latest），宽松比较。
+ * Check whether the address and key are valid: GET {baseUrl}/models, consuming no tokens. Reports
+ * not_found if the filled model cannot be found in the list; since model ID naming varies across
+ * vendors (Gemini uses models/, Ollama uses :latest), uses loose comparison.
  */
 export async function checkOpenAICompatible(
   model: string,

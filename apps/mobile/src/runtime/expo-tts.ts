@@ -1,12 +1,13 @@
 import type { MorphTTSModule } from '../../modules/morph-tts';
 import type { SpeakErrorCode, SpeakPlatform } from './platform';
 
-// SpeakPlatform 的实现：本地 Expo 模块 MorphTTS（D-270）。没有这个模块（Expo Go、测试）时为 null。
-// 取消和语音转文字一样：每 0.3 秒看一次运行页的「停止」，交给原生模块停掉系统朗读。
+// Implementation of SpeakPlatform: local Expo module MorphTTS (D-270). Null when this module is
+// absent (Expo Go, tests). Cancellation is identical to speech-to-text: check the run page Stop
+// button every 0.3 seconds and hand off to the native module to stop system text-to-speech.
 
 const CANCEL_POLL_MS = 300;
 
-/** 原生模块的错误码 → 平台错误码。 */
+/** Native module error codes -> platform error codes. */
 const CODES: Record<string, SpeakErrorCode> = {
   ERR_TTS_NO_VOICE: 'noVoice',
   ERR_TTS_NOT_DOWNLOADED: 'notDownloaded',

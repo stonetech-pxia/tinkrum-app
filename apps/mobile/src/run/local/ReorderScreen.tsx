@@ -7,7 +7,7 @@ import { Icon } from '../../renderer/Icon';
 import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 
-// 排序和删除（TOOLS_DESIGN §4 reorder）：上移、下移、去掉。结果是保留的下标，按新顺序。
+// Reorder and delete (TOOLS_DESIGN §4 reorder): move up, move down, remove. Result is the retained indices in the new order.
 
 export function ReorderScreen({
   input,

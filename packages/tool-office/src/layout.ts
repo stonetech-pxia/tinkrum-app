@@ -1,13 +1,15 @@
 import type { Box, OcrBox, RgbaImage } from './types';
 
-// 扫描件转 Word（D-328）的版面分析：PP-DocLayout-S（扩展包 layout）的前后处理和区域整理，阅读顺序。
-// 模型改成了一个 float32 输入（1×3×480×480，不保持宽高比缩放，ImageNet 归一化）、一个 float32 输出
-// （N×6：类别、分数、x1、y1、x2、y2，坐标在 480×480 的输入里；NMS 在图里做好了），App 的 modelRun 直接能跑。
+// Layout analysis for scan-to-Word (D-328): PP-DocLayout-S (layout extension pack)
+// preprocessing/postprocessing, region sorting, and reading order. The model has been updated to
+// use a float32 input (1x3x480x480, resized without preserving aspect ratio, ImageNet normalized)
+// and a float32 output (Nx6: category, score, x1, y1, x2, y2, with coordinates in 480x480 input
+// space; NMS performed in model), runnable directly via app modelRun.
 
-/** 模型输入的边长（PP-DocLayout-S）。 */
+/** Side length of model input (PP-DocLayout-S). */
 export const LAYOUT_INPUT = 480;
 
-/** 模型的 23 个类别（官方 inference.yml 的顺序）。 */
+/** Model's 23 categories (in official inference.yml order). */
 export const LAYOUT_LABELS = [
   'paragraph_title',
   'image',
@@ -34,18 +36,18 @@ export const LAYOUT_LABELS = [
   'aside_text',
 ] as const;
 
-/** 转 Word 用到的几种区域：标题、正文、表格、图片、页码（不写进文件）。 */
+/** Region types used in Word export: title, text, table, image, pageNumber (not written to file). */
 export type RegionKind = 'title' | 'text' | 'table' | 'image' | 'pageNumber';
 
 export interface LayoutRegion {
   kind: RegionKind;
-  /** 模型的原始类别（doc_title 是一级标题）。 */
+  /** Model's original category (doc_title is a primary heading). */
   label: string;
   score: number;
   box: Box;
-  /** 单个类别都不够图片线，靠几个类别同框加起来才留下的图片（D-524）：里面一个字都不能有。 */
+  /** Images retained only by combining scores from multiple co-occurring categories rather than meeting image thresholds independently (D-524): must not contain any text inside. */
   fused?: boolean;
-  /** 三类弱分恢复仅供 Word：加入工作表共用列线可能改变已有列宽和打印分页。 */
+  /** Three-class weak score recovery is for Word export only: adding shared column lines to worksheets might alter existing column widths and print pagination. */
   wordOnly?: true;
 }
 
@@ -61,18 +63,21 @@ const KIND_OF: Record<string, RegionKind> = {
   number: 'pageNumber',
 };
 
-/** 分数线：实验（word-exp）里 0.5 漏掉很多正文块，0.3 漏得少；图片和表格误报多，要求高一点。 */
+/** Score threshold: in experiments (word-exp), 0.5 misses many text blocks while 0.3 misses fewer; images and tables have more false positives, requiring a higher threshold. */
 const MIN_SCORE = 0.3;
 const MIN_SCORE_IMAGE = 0.45;
 /**
- * 模型常把一张图的分数拆给几个类别（image / chart / header_image / footer_image），在差不多同一个框上各得 0.2–0.4，
- * 单看都过不了图片线（D-524）：这样的同框检测按类别（每个类别取最高分）加起来再和图片线比。
- * 低于 FIGURE_PART_MIN 的零星检测不参与；同一个类别重复不叠加；印章不参与（有自己的规则）。
+ * Models frequently split an image's score across multiple categories (image / chart /
+ * header_image / footer_image), yielding 0.2-0.4 on roughly the same box, failing image
+ * thresholds individually (D-524): such co-occurring detections are summed by category (taking
+ * the highest score per category) and compared against the image threshold. Sporadic detections
+ * below FIGURE_PART_MIN are excluded; duplicate detections within the same category are not
+ * stacked; stamps are excluded (having their own rules).
  */
 const FIGURE_PART_MIN = 0.15;
-/** 两个框交并比达到这么多才算「同一个框」。 */
+/** Intersection over Union threshold required to consider two boxes as the "same box". */
 const FIGURE_SAME_BOX_IOU = 0.7;
-/** 更弱的辅类只走独立恢复路径：主类 ≥ 0.3、至少三类各 ≥ 0.1、总分 ≥ 0.55、框几乎重合。 */
+/** Weaker auxiliary classes follow a separate independent recovery path: primary class >= 0.3, at least three classes >= 0.1 each, total score >= 0.55, and nearly overlapping boxes. */
 const FIGURE_SUPPORT_MIN = 0.1;
 const FIGURE_SUPPORT_SUM = 0.55;
 const FIGURE_SUPPORT_IOU = 0.9;
@@ -80,7 +85,7 @@ const FIGURE_SUPPORT_IOU = 0.9;
 const MEAN = [0.485, 0.456, 0.406] as const;
 const STD = [0.229, 0.224, 0.225] as const;
 
-/** 模型输入：整张图双线性缩放到 side × side（不保持宽高比，和训练时一样），按通道归一化，CHW。 */
+/** Model input: full image bilinearly resized to side x side (without preserving aspect ratio, same as training), channel-normalized, CHW format. */
 export function layoutInput(image: RgbaImage, side = LAYOUT_INPUT): Float32Array {
   const { width, height, data } = image;
   const out = new Float32Array(3 * side * side);
@@ -112,7 +117,7 @@ export function layoutInput(image: RgbaImage, side = LAYOUT_INPUT): Float32Array
   return out;
 }
 
-/** 模型输出（N×6）→ 原图坐标里的区域；没用的类别和低分的去掉。 */
+/** Model output (Nx6) -> regions in original image coordinates; discard useless categories and low-scoring results. */
 export function parseLayout(
   output: ArrayLike<number>,
   size: { width: number; height: number },
@@ -138,13 +143,13 @@ export function parseLayout(
     const region = { kind, label, score, box: { x: x1, y: y1, width: x2 - x1, height: y2 - y1 } };
     (figurePart ? parts : regions).push(region);
   }
-  // 已有图片仍用原来的输入和分数；辅类不能改变已通过的框、分数或去重顺序。
+  // Existing images continue to use original inputs and scores; auxiliary classes cannot alter accepted boxes, scores, or deduplication order.
   const figures = fuseFigures(parts.filter((p) => p.score >= FIGURE_PART_MIN));
   const existing = [...regions.filter((r) => r.kind === 'image'), ...figures];
   return [...regions, ...figures, ...corroboratedFigures(parts, existing)];
 }
 
-/** 三类几乎同框才补收；不替换任何旧图片，仍标为 fused，后续只准保留完全无字的框。 */
+/** Accepted only when corroborated by three nearly identical boxes; does not replace any old images, marked as fused, and subsequently restricted to boxes completely free of text. */
 function corroboratedFigures(
   parts: readonly LayoutRegion[],
   existing: readonly LayoutRegion[],
@@ -170,7 +175,7 @@ function corroboratedFigures(
   return recovered;
 }
 
-/** 图片类检测按同框合并：分数从高到低，和某一组领头的框交并比够高的并进去；组分 = 每个类别最高分之和，不够图片线的丢掉。 */
+/** Image detections merged by overlapping boxes: sorted by score from highest to lowest, merging boxes with sufficient IoU with a leading group box; group score = sum of highest scores per category, discarding those below image threshold. */
 function fuseFigures(parts: readonly LayoutRegion[]): LayoutRegion[] {
   const groups: LayoutRegion[][] = [];
   for (const p of [...parts].sort((a, b) => b.score - a.score)) {
@@ -199,26 +204,30 @@ const iou = (a: Box, b: Box) => {
   return inter / (area(a) + area(b) - inter || 1);
 };
 
-/** 一行文字有多少在这个区域里（按行的面积算）。 */
+/** Proportion of a text line located within this region (calculated by line area). */
 export const lineShareIn = (line: Box, region: Box) => overlap(line, region) / (area(line) || 1);
 
-/** 图片区域里最多这么多行字（标志、照片里的字）；更多的是认错了的正文。 */
+/** Maximum number of text lines permitted in an image region (logos, text inside photos); excess is treated as misrecognized body text. */
 const IMAGE_MAX_LINES = 3;
-/** 图片里的字加起来最多这么多个。 */
+/** Maximum total character count permitted inside an image. */
 const IMAGE_MAX_CHARS = 30;
 /**
- * 印章（模型的 seal，D-463）里本来就都是字（一圈机构名、地址），认出来是乱的（「WPANTIMN」），
- * 当图片剪下来放进文件（和原件一样）；不超过这么多行、这么多个字，更多的是认错了的正文。
+ * Stamps (model seal, D-463) inherently consist entirely of text (a circle of institution name
+ * and address), recognized as garbled text ("WPANTIMN"), cropped as images and placed into the
+ * file (just like originals); restricted to this line count and character limit, with excess
+ * treated as misrecognized body text.
  */
 const SEAL_MAX_LINES = 6;
 const SEAL_MAX_CHARS = 100;
-/** 图片最多占整页的这么多：整页都是「图片」是密集的表单、正文认错了（实验里 19 页有 5 页这样）。 */
+/** Maximum page share an image can occupy: an entire page being an "image" indicates dense forms or misrecognized body text (5 out of 19 pages in experiments). */
 const IMAGE_MAX_PAGE_SHARE = 0.5;
 
 /**
- * 整理模型给的区域（D-328）：图片里字太多、或者大得占了半页的不当图片（那些字按正文排；印章里的字多一些也还是图片，D-463）；
- * 模型的表格不用（表格只认带线的，和转 Excel 一样，D-272；无线表留给第三期），里面的字按正文排；
- * 一行字只能属于一个区域。
+ * Organize model-provided regions (D-328): reject images with too much text or occupying half a
+ * page (those text lines are formatted as body text; stamps with slightly more text remain
+ * images, D-463); model tables are ignored (tables rely on line detection, same as Excel export,
+ * D-272; borderless tables are left to phase 3), and their text is formatted as body text; a text
+ * line can belong to only one region.
  */
 export function cleanRegions(
   regions: readonly LayoutRegion[],
@@ -228,8 +237,10 @@ export function cleanRegions(
   protectedImages: ReadonlySet<LayoutRegion> = new Set(),
 ): LayoutRegion[] {
   const pageArea = size.width * size.height;
-  // 同一张图常被认成两个区域（image 和 header_image）：和更高分的图片重叠一半以上的不要。
-  // 占了半页以上的「图片」不参与：它本来就要丢，不能让它把里面真正的小图当成重复一起带走（D-524）。
+  // The same image is frequently recognized as two regions (image and header_image): discard those
+  // overlapping more than half with a higher-scoring image. "Images" occupying over half a page are
+  // excluded: they are slated for deletion anyway and must not drag along real small inner images
+  // as duplicates (D-524).
   const images = regions
     .filter(
       (r) =>
@@ -253,24 +264,27 @@ export function cleanRegions(
     const inside = lines.filter((l) => lineShareIn(l, r.box) >= 0.5);
     const chars = inside.reduce((n, l) => n + [...l.text.trim()].length, 0);
     if (r.label === 'seal') return inside.length <= SEAL_MAX_LINES && chars <= SEAL_MAX_CHARS;
-    // 靠同框加分才留下的图片证据弱：里面有字就不信（字会被吞进图里；表单里的格子也是短字加框线），也不走示意图那条路（D-524）。
+    // Image evidence retained solely through co-occurrence score boosting is weak: untrusted if it contains text (text would be swallowed into the image; form grid lines are also short text with borders), and does not use the schematic path (D-524).
     if (r.fused) return inside.length === 0;
     if (inside.length <= IMAGE_MAX_LINES && chars <= IMAGE_MAX_CHARS) return true;
     return image !== undefined && isDiagram(image, r.box, inside);
   });
 }
 
-/** 示意图里标注的字：每行最多这么多个字、中位数最多这么多个，行数最多这么多。 */
+/** Diagram annotation text: maximum characters per line, maximum median characters, and maximum line count. */
 const DIAGRAM_LINE_CHARS = 28;
 const DIAGRAM_MEDIAN_CHARS = 16;
 const DIAGRAM_MAX_LINES = 60;
-/** 框里字以外有图形（线、箭头、色块）的像素至少占这么多。 */
+/** Pixels occupied by graphics (lines, arrows, color blocks) other than text inside the box must account for at least this proportion. */
 const DIAGRAM_MIN_INK = 0.12;
 
 /**
- * 带很多标注的示意图、流程图（模型认成图片，但里面的字多于标志里的字）：字都是短标注（没有成行的正文），
- * 而且框里除了字以外有不少线、箭头、色块——表单里认错了的「图片」是成行的字加几条横线，图形占得很少。
- * 这样的整张剪成图片，标注文字留在图里。
+ * Diagrams and flowcharts with numerous annotations (recognized as images by the model, but
+ * containing more text than logos): text consists entirely of short annotations (no continuous
+ * text lines), and the box contains substantial lines, arrows, or color blocks in addition to
+ * text - whereas misrecognized "images" in forms consist of text lines with a few horizontal
+ * lines, with graphics occupying very little space. Such items are cropped as images, leaving
+ * annotation text inside the image.
  */
 export function isDiagram(image: RgbaImage, box: Box, inside: readonly OcrBox[]): boolean {
   if (inside.length === 0 || inside.length > DIAGRAM_MAX_LINES) return false;
@@ -284,7 +298,7 @@ export function isDiagram(image: RgbaImage, box: Box, inside: readonly OcrBox[])
   const y0 = Math.max(0, Math.floor(box.y));
   const x1 = Math.min(image.width, Math.ceil(box.x + box.width));
   const y1 = Math.min(image.height, Math.ceil(box.y + box.height));
-  // 隔几个像素取一个点，够判断占比。
+  // Sample a point every few pixels; enough to determine the ratio.
   const step = Math.max(1, Math.round(Math.max(x1 - x0, y1 - y0) / 200));
   let total = 0;
   let ink = 0;
@@ -306,8 +320,10 @@ export function isDiagram(image: RgbaImage, box: Box, inside: readonly OcrBox[])
 }
 
 /**
- * 每行字属于哪个区域（下标；不属于任何区域时是 -1）：一行至少一半在区域里；几个区域都包住它时
- * 选包住得最多的，一样多时选小的（标题框常常在正文框里面）。
+ * Determines which region each text line belongs to (index; -1 when it belongs to no region): a
+ * line is at least half inside a region; when multiple regions enclose it, choose the one with
+ * the maximum coverage, and when tied, choose the smaller one (title boxes are often inside body
+ * boxes).
  */
 export function assignLines(lines: readonly Box[], regions: readonly { box: Box }[]): number[] {
   return lines.map((line) => {
@@ -328,8 +344,10 @@ export function assignLines(lines: readonly Box[], regions: readonly { box: Box 
 }
 
 /**
- * 一组区间按重叠连成几段，只在最宽的空隙（和差不多宽的）处断开：小的空隙留给下一层再切
- * （两栏的段落之间也有窄的横向空隙，先在那里横着切会把两栏的段落交错排）。gap 以下的不算空隙。
+ * Groups a set of intervals into segments based on overlaps, breaking only at the widest gaps
+ * (and those of similar width): smaller gaps are left for the next layer to split (adjacent
+ * two-column paragraphs also have narrow horizontal gaps; splitting horizontally there first
+ * would interleave the two-column paragraphs). Gaps below `gap` are not considered gaps.
  */
 function bands(
   spans: readonly [number, number][],
@@ -357,14 +375,18 @@ function bands(
   return { groups, widest };
 }
 
-/** 各栏共用的一排表头最多这么多行高。 */
+/** Maximum height in lines for a header row shared across columns. */
 const HEADER_ROW_LINES = 3;
 
 /**
- * 竖着切开的几栏里，有一栏只有最上面的一排短字（框起来的表单的列标题「CONCEPTO  BASE  TIPO  APORTACIÓN」，
- * 下面的填写处没有字，EU 样本 016）：这一排是各栏共用的表头，不是一栏。整块落在这一排里的字先排（按左右），
- * 剩下的再排；不然右边的列标题排到左边所有的项目后面。这一排不超过 HEADER_ROW_LINES 个行高，
- * 至少两栏各有一块整块在这一排里（两栏正文的段落比这一排高，不受影响）。
+ * Among several columns split vertically, if one column contains only a top row of short text
+ * (column titles in a boxed form like "CONCEPTO BASE TIPO APORTACIÓN", with no text in the entry
+ * areas below, EU sample 016): this row is a shared header across columns, not a single-column
+ * block. Text falling entirely within this row is ordered first (by x-coordinate), and the
+ * remaining text is ordered afterwards; otherwise, right-hand column titles would be ordered
+ * after all left-hand items. This row does not exceed `HEADER_ROW_LINES` line heights, and at
+ * least two columns each contain a complete block within this row (two-column body paragraphs are
+ * taller than this row and remain unaffected).
  */
 function headerRow<T extends { box: Box }>(
   items: readonly T[],
@@ -375,27 +397,29 @@ function headerRow<T extends { box: Box }>(
   const bottomOf = (it: T) => it.box.y + it.box.height;
   const top = Math.min(...items.map((it) => it.box.y));
   const bottoms = groups.map((g) => Math.max(...g.map((i) => bottomOf(items[i]!))));
-  // 只有这一排的几栏：整栏不超过 HEADER_ROW_LINES 个行高。
+  // Columns restricted to this single row: the entire column does not exceed `HEADER_ROW_LINES` line heights.
   const short = bottoms.filter((b) => b - top <= HEADER_ROW_LINES * lineHeight);
   if (!short.length || short.length === bottoms.length) return null;
   const row = Math.max(...short);
   const inRow = (it: T) => bottomOf(it) <= row + gap;
   if (groups.filter((g) => g.some((i) => inRow(items[i]!))).length < 2) return null;
   const head = items.filter(inRow);
-  // 所有的字都在这一排里（EU 样本 077）：没有表头和下面之分，照常按栏排；不然 readingOrder 原样递归下去。
+  // All text resides within this single row (EU sample 077): there is no distinction between header and body below; columns are ordered as usual, otherwise `readingOrder` recurses as before.
   if (head.length === items.length) return null;
   return [head, items.filter((it) => !inRow(it))];
 }
 
 /**
- * 阅读顺序（XY 切分）：横着能切开就分成上下几段、从上到下，竖着能切开就分成几栏、从左到右，
- * 两种都能切时按空隙宽的那种切（两栏之间的空隙比栏里段落之间的宽）；都切不开时按上边、再按左边排。
- * gap 是算作空隙的最小宽度（防止紧挨着的两块被切开）。
+ * Reading order (XY cut): splits into top-and-bottom segments from top-to-bottom if horizontally
+ * separable, and into left-to-right columns if vertically separable. When both cuts are possible,
+ * choose the one with the wider gap (the inter-column gap is wider than the intra-paragraph gap).
+ * When neither is separable, sort by top edge then left edge. `gap` is the minimum width
+ * considered a gap (preventing tightly adjacent blocks from being split).
  */
 export function readingOrder<T extends { box: Box }>(
   items: readonly T[],
   gap = 0,
-  /** 正文行高：给了才认各栏共用的一排表头（headerRow）。 */
+  /** Body line height: recognized for shared headers across columns (`headerRow`) only when provided. */
   lineHeight?: number,
 ): T[] {
   if (items.length <= 1) return [...items];

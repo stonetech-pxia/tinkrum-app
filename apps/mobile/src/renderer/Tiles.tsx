@@ -30,12 +30,15 @@ import { cardColors } from './theme';
 import { ColorDot, recordMarks } from './record-marks';
 import { Card } from './ui';
 
-// 记录列表的大圆块外观（D-311，Streaks 那种）：每条记录一个大圆，下面是标题；有 progress 时圆外一圈进度环，
-// 到了目标圆就填满。点一下执行这一块的行操作（第一个 when 满足的，D-300，执行是一键操作的代码），
-// 没有行操作时打开这条记录；有行操作时长按打开记录。最多 24 个（D-312）。
+// Large circular block appearance for record lists (D-311, similar to Streaks): one large circle
+// per entry with the title below; displays a progress ring around the circle when progress is
+// present, filling completely when the target is reached. Tapping executes the row action for this
+// block (the first satisfied when clause, D-300, executed via one-tap action code), or opens the
+// entry if there is no row action; long-pressing opens the entry when a row action exists. Maximum
+// of 24 items (D-312).
 
 const SIZE = 84;
-/** 长按打开记录要比页面的长按编辑（LONG_PRESS_MS）先到。 */
+/** Long press to open an entry must trigger before the page's long press edit action (LONG_PRESS_MS). */
 const HOLD_MS = LONG_PRESS_MS - 150;
 const STROKE = 6;
 
@@ -64,7 +67,7 @@ export function Tiles({ block, env, tone }: { block: RecordBlock; env: RenderEnv
   const marks = recordMarks(show, view, env, now);
 
   const tile = (r: DataRecord) => {
-    // 警示色（D-541）：右侧的值，没有右侧字段时是标题。
+    // Warning color (D-541): values on the right, or the title if no right-side field exists.
     const warn = marks.warns(r);
     const title =
       formatRef(r, view, show.title, locale, links, now, cal) ||
@@ -86,7 +89,7 @@ export function Tiles({ block, env, tone }: { block: RecordBlock; env: RenderEnv
     const text = show.trailing ? formatRef(r, view, show.trailing, locale, links, now, cal) : '';
     const open = () => openRow(router, block.opens, collection.id, r.id);
     const run = action ? () => void runner.runRow(action, r) : open;
-    // 打开记录后这一块可能等不到松手（onPressOut），过了页面长按编辑的时间再放开。
+    // After opening an entry, this block might not receive an onPressOut event if released after the page's long-press edit duration elapses.
     const holdOpen = () => {
       open();
       setTimeout(() => setInnerGesture(false), LONG_PRESS_MS);
@@ -99,7 +102,7 @@ export function Tiles({ block, env, tone }: { block: RecordBlock; env: RenderEnv
           accessibilityRole="button"
           accessibilityLabel={[title, inside ?? text].filter(Boolean).join(', ')}
           accessibilityHint={action?.label}
-          // 有行操作时点一下执行它；读屏用户另外可以选「打开」看这条记录。
+          // Executes row actions on tap when present; screen reader users can alternatively select "Open" to view the entry.
           accessibilityActions={
             action
               ? [
@@ -116,7 +119,7 @@ export function Tiles({ block, env, tone }: { block: RecordBlock; env: RenderEnv
           }}
           disabled={!press}
           onPress={press}
-          // 有行操作时长按打开这条记录（D-311）：功能优先，单组件编辑（D-235）让路，长按圆块以外的地方照样进编辑。
+          // Long-press to open this entry when a row action exists (D-311): prioritizes functionality over single-component editing (D-235), allowing long presses outside the circular block to still trigger editing.
           onPressIn={action && env.interactive ? () => setInnerGesture(true) : undefined}
           onPressOut={action ? () => setInnerGesture(false) : undefined}
           onLongPress={

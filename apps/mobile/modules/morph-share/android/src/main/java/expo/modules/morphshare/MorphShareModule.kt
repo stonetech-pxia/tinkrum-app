@@ -17,16 +17,19 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
 import kotlin.concurrent.thread
 
-// 分享和存到文件夹的 Android 实现（D-119、D-120）：
-// - 分享：ACTION_SEND_MULTIPLE 一次带上全部文件（content:// 地址，只给读权限）。
-// - 存到文件夹：存储访问框架 ACTION_OPEN_DOCUMENT_TREE，用户选文件夹（本机、Google Drive 等文档提供者），
-//   逐个 createDocument 并复制。记住上次选的文件夹（P-019、D-123）：申请长期读写授权、把地址存在
-//   SharedPreferences，下次直接存进去；换文件夹时放掉旧的授权，文件夹没了或授权被收回时重新让用户选。
-//   每个快捷操作记自己的文件夹（D-196）：另存「folder:快捷操作 ID → 地址」，还没有时用最后选过的那个并记给它；
-//   某个文件夹不再被任何快捷操作（也不是最后选过的）用到时才放掉授权。
-// - 预览（D-238）：复制进缓存 preview/ 后用 ACTION_VIEW 交给能打开这个文件的 App（系统的 PDF 阅读器、
-//   Google 云端硬盘等），只给读权限。
-// 文件内容和文件名不写日志。
+// Android implementation of sharing and saving to folders (D-119, D-120):
+// - Share: ACTION_SEND_MULTIPLE with all files at once (content:// URIs, read-only permission).
+// - Save to folder: Storage Access Framework ACTION_OPEN_DOCUMENT_TREE, user picks a folder (local,
+// Google Drive, or other document providers), creates documents one by one and copies them.
+// Remembers the last picked folder (P-019, D-123): requests long-term read/write permission, stores
+// the URI in SharedPreferences, and saves directly next time; drops old permission when changing
+// folders, and re-prompts the user if the folder is missing or permission is revoked. Each quick
+// action records its own folder (D-196): saves "folder:quickActionId -> URI", falls back to the
+// last picked one when not set; releases permission only when a folder is no longer used by any
+// quick action (nor is the last picked one).
+// - Preview (D-238): copies into preview/ cache then uses ACTION_VIEW to hand off to an app capable
+// of opening the file (system PDF reader, Google Drive, etc.), with read-only permission. File
+// contents and names are not logged.
 
 class MorphShareFileProvider : FileProvider()
 
@@ -66,7 +69,7 @@ class MorphShareModule : Module() {
 
   private fun fileOf(uri: String) = File(Uri.parse(uri).path!!)
 
-  /** 打开一次系统分享面板，带上全部文件；text 不为空时也放进去（EXTRA_TEXT）。面板关掉后 promise 才返回。 */
+  /** Opens the system share sheet once with all files; also includes text when not empty (EXTRA_TEXT). Promise resolves only after the share sheet is dismissed. */
   private fun shareSheet(text: String?, uris: List<String>, mimeTypes: List<String>, promise: Promise) {
     val activity = appContext.currentActivity
     if (activity == null) {
@@ -86,7 +89,7 @@ class MorphShareModule : Module() {
     }
     intent.type = commonType(mimeTypes)
     if (text != null) intent.putExtra(Intent.EXTRA_TEXT, text)
-    // 读权限通过 ClipData 交给选中的 App（只有它，只读）。
+    // Read permission is granted to the selected app via ClipData (only it, read-only).
     val clip = ClipData.newRawUri(null, contentUris[0])
     for (uri in contentUris.drop(1)) clip.addItem(ClipData.Item(uri))
     intent.clipData = clip
@@ -102,15 +105,17 @@ class MorphShareModule : Module() {
       shareSheet(null, uris, mimeTypes, promise)
     }.runOnQueue(Queues.MAIN)
 
-    // 交给别的 AI App（D-611）：提示词放进 EXTRA_TEXT，和文件一起交出去；收到的 App 把文字放进输入框。
+    // Hand off to other AI apps (D-611): prompt is passed in EXTRA_TEXT along with files; receiving app puts the text into its input box.
     AsyncFunction("shareFilesWithText") { text: String, uris: List<String>, mimeTypes: List<String>, promise: Promise ->
       shareSheet(text, uris, mimeTypes, promise)
     }.runOnQueue(Queues.MAIN)
 
-    // 打开别的 App 后就返回，不等用户回来。先把文件复制进自己的缓存 preview/（用原来的文件名），再用自己的
-    // FileProvider 地址交出去：分享进来的 content:// 是别的 App 的，不一定能把读权限再转交给第三个 App
-    // （创始人的三星上报过 ERR_UNEXPECTED），文件路径也不一定在 FileProvider 允许的目录里。
-    // 每次只留一份：复制前清掉上一次的。
+    // Returns immediately after opening another app, without waiting for the user to return. First
+    // copies the file into internal preview/ cache (using the original filename), then shares via
+    // own FileProvider URI: incoming content:// URIs belong to other apps and may not be able to
+    // re-grant read permission to a third-party app (founder's Samsung reported ERR_UNEXPECTED),
+    // and file paths might not be within FileProvider allowed directories. Keeps only one copy at a
+    // time: clears the previous one before copying.
     AsyncFunction("previewFile") { uri: String, mimeType: String, name: String, promise: Promise ->
       val activity = appContext.currentActivity
       if (activity == null) {
@@ -132,7 +137,7 @@ class MorphShareModule : Module() {
           requireNotNull(input) { "no input" }.use { from -> copy.outputStream().use { from.copyTo(it) } }
           FileProvider.getUriForFile(context, "${context.packageName}.MorphShareFileProvider", copy)
         } catch (e: Exception) {
-          // 只记异常类型，不记文件名和地址。
+          // Logs only exception type, not filenames or URIs.
           Log.w("MorphShare", "previewFile copy failed: ${e.javaClass.simpleName}")
           promise.reject(PreviewFailedException())
           return@thread
@@ -164,7 +169,7 @@ class MorphShareModule : Module() {
       }
     }
 
-    // useRemembered：有记住的文件夹就直接存进去，不弹选择器。key：快捷操作 ID。
+    // useRemembered: saves directly if a remembered folder exists, without showing the picker. key: quick action ID.
     AsyncFunction("exportFiles") { uris: List<String>, names: List<String>, mimeTypes: List<String>, useRemembered: Boolean, key: String, promise: Promise ->
       if (pendingShare != null || pendingExport != null) {
         promise.reject(SheetBusyException())
@@ -185,10 +190,14 @@ class MorphShareModule : Module() {
       activity.startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), FOLDER_REQUEST)
     }.runOnQueue(Queues.MAIN)
 
-    // 分享目标选了 Tinkrum 自己时，系统把分享交回同一个界面，分享面板的返回结果不会送到（真机日志：选 Gmail 或按返回
-    // 都有 onActivityResult，只有选 Tinkrum 没有）。回到前台时 pendingShare 还在就说明面板已经关了：放掉它，
-    // 不然之后每一次分享、保存都报「Another share or save sheet is open」，直到把 App 划掉。
-    // 正常关闭时结果在回到前台之前就到了，这里 pendingShare 已经是空的。
+    // When Tinkrum itself is selected as the share target, the system hands the share back to the
+    // same interface, and onActivityResult is not delivered for the share sheet's return result
+    // (real-device log: selecting Gmail or pressing back both trigger onActivityResult, only
+    // selecting Tinkrum does not). If pendingShare is still present when returning to the
+    // foreground, it means the sheet has closed: release it, otherwise every subsequent share or
+    // save reports "Another share or save sheet is open" until the app is swiped away. On normal
+    // close, the result arrives before returning to the foreground, where pendingShare is already
+    // empty.
     OnActivityEntersForeground {
       pendingShare?.resolve(null)
       pendingShare = null
@@ -215,7 +224,7 @@ class MorphShareModule : Module() {
     }
   }
 
-  // 复制放到后台，不卡界面。结果：存了几个、文件夹名。
+  // Copies in the background without blocking the UI. Result: count of saved items, folder name.
   private fun copyInBackground(tree: Uri, name: String, pending: PendingExport) {
     thread {
       try {
@@ -234,8 +243,9 @@ class MorphShareModule : Module() {
   private val prefs
     get() = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-  // 快捷操作 key 的文件夹（地址和名字）：它自己的，没有时是最后选过的（adopt 为 true 时记给它，真正要存的
-  // 时候才记）。都没有、授权被收回或文件夹已经不在了时返回 null（并忘掉失效的那个）。
+  // Folder (URI and name) for a quick action key: its own, or the last picked one if none (recorded
+  // when adopt is true, only when actually saving). Returns null if none, authorization is revoked,
+  // or folder no longer exists (and forgets the invalid one).
   private fun rememberedFolder(key: String, adopt: Boolean): Pair<Uri, String>? {
     usable(FOLDER_PREFIX + key)?.let { return it }
     val last = usable(FOLDER_KEY) ?: return null
@@ -243,7 +253,7 @@ class MorphShareModule : Module() {
     return last
   }
 
-  // 存在 pref 这一项里的文件夹；授权被收回或文件夹已经不在了时忘掉这个文件夹（所有用到它的地方）。
+  // Folder stored under the pref entry; forgets this folder everywhere if authorization is revoked or the folder no longer exists.
   private fun usable(pref: String): Pair<Uri, String>? {
     val tree = prefs.getString(pref, null)?.let(Uri::parse) ?: return null
     val granted = context.contentResolver.persistedUriPermissions.any {
@@ -259,13 +269,13 @@ class MorphShareModule : Module() {
     return tree to name
   }
 
-  // 记给这个快捷操作，也记成最后选过的。
+  // Record for this quick action, and also remember as the last picked one.
   private fun remember(tree: Uri, key: String) {
     val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
     try {
       context.contentResolver.takePersistableUriPermission(tree, flags)
     } catch (e: SecurityException) {
-      // 这个文档提供者不给长期授权：这次照样存，下次再问。
+      // This document provider does not grant long-term permission: saves this time, asks again next time.
       return
     }
     updateFolders {
@@ -274,7 +284,7 @@ class MorphShareModule : Module() {
     }
   }
 
-  // 改记住的文件夹；改完后没有任何地方再用到的文件夹放掉长期授权。
+  // Update remembered folders; releases long-term permissions for folders no longer used anywhere after updating.
   private fun updateFolders(change: (android.content.SharedPreferences.Editor) -> Unit) {
     val before = folderUris()
     val edit = prefs.edit()
@@ -285,16 +295,16 @@ class MorphShareModule : Module() {
       try {
         context.contentResolver.releasePersistableUriPermission(Uri.parse(uri), flags)
       } catch (e: SecurityException) {
-        // 本来就没有授权。
+        // No authorization existed in the first place.
       }
     }
   }
 
-  // 现在记着的所有文件夹地址（最后选过的和每个快捷操作的）。
+  // All currently remembered folder URIs (last picked one and each quick action's).
   private fun folderUris(): Set<String> =
     prefs.all.filterKeys { it.startsWith(FOLDER_KEY) }.values.filterIsInstance<String>().toSet()
 
-  // 文件夹的显示名；文件夹不在了时返回 null。
+  // Display name of the folder; returns null if the folder no longer exists.
   private fun folderName(tree: Uri): String? = try {
     val doc = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
     context.contentResolver.query(doc, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)
@@ -307,7 +317,7 @@ class MorphShareModule : Module() {
     val resolver = context.contentResolver
     val folder = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
     for ((i, file) in pending.files.withIndex()) {
-      // 同名文件由文档提供者自己改名（例如「报告 (1).pdf」），不会覆盖。
+      // Files with duplicate names are renamed by the document provider itself (e.g., "Report (1).pdf"), avoiding overwrites.
       val doc = DocumentsContract.createDocument(resolver, folder, pending.mimeTypes[i], pending.names[i])
         ?: throw FolderNotWritableException()
       val out = resolver.openOutputStream(doc) ?: throw FolderNotWritableException()
@@ -316,7 +326,7 @@ class MorphShareModule : Module() {
     return pending.files.size
   }
 
-  // 全部同一种类型就用它；同一大类（都是图片）用 image/*；否则 */*。
+  // Use type directly if all are the same type; image/* if same broad category (all images); otherwise */*.
   private fun commonType(mimeTypes: List<String>): String {
     val distinct = mimeTypes.distinct()
     if (distinct.size == 1) return distinct[0]

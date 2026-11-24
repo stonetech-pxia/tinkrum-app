@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
-// 正在走的计时（D-306 的 elapsed）每秒刷新一次。所有正在走的行共用一个计时器：没有正在走的行时不跑，
-// App 退到后台时也停（回到前台马上刷新一次），省电。只有显示出来的、没有结束时间的行才订阅。
+// Running timers (elapsed from D-306) refresh every second. All running rows share a single timer:
+// it doesn't run when there are no running rows, and stops when the app goes to the background
+// (refreshing immediately upon returning to the foreground) to save power. Only visible rows
+// without an end time subscribe.
 
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -23,7 +25,7 @@ AppState.addEventListener?.('change', (state) => {
   sync();
 });
 
-/** running 为 true 时每秒返回新的现在；为 false 时不订阅。 */
+/** When running is true, returns the new current time every second; when false, does not subscribe. */
 export function useTicker(running: boolean): Date {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {

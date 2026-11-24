@@ -4,8 +4,9 @@ import { ICON_NAMES } from './schema-base';
 import { ID_MESSAGE } from './schema-primitives';
 import { closest, didYouMean, idFrom } from './suggest';
 
-// 校验问题的文字（发给模型修正，D10）。z.union 全部分支都不合格时只报 Invalid input，模型不知道哪里错：
-// 这里展开到最接近的分支，报出具体的路径和问题。
+// Validation issue text (sent to model for correction, D10). When all branches of z.union fail, it
+// only reports Invalid input and the model does not know what is wrong: here it expands to the
+// closest branch, reporting the specific path and issue.
 
 type Issue = z.ZodError['issues'][number];
 
@@ -13,13 +14,13 @@ interface Line {
   path: PropertyKey[];
   code: string;
   message: string;
-  /** 字面量不对时可选的值。 */
+  /** Optional values when literal is incorrect. */
   values?: readonly unknown[];
-  /** 判别的键（look、type、kind）不是任何一个可选的值时：键名和可选的值。 */
+  /** When the discriminated key (look, type, kind) is not any of the optional values: key name and optional values. */
   discriminator?: { key: string; options: readonly unknown[] };
 }
 
-/** 这一支离输入有多远：类型都不对的最远，判别的字面量（kind、every）不对、多了键的次之，然后看问题个数。 */
+/** How far this branch is from the input: completely wrong types are furthest, incorrect literal (kind, every) or extra keys are secondary, then number of issues. */
 function distance(lines: readonly Line[], depth: number): number {
   let score = lines.length;
   for (const line of lines) {
@@ -32,7 +33,7 @@ function distance(lines: readonly Line[], depth: number): number {
 
 const samePath = (a: Line, b: Line) => a.path.join('.') === b.path.join('.');
 
-/** 每一支都说这个键不对（do 拼错）时，把各支要的值合起来：只说第一支要的 "create" 会把模型带错。 */
+/** When every branch says this key is incorrect (e.g. do misspelled), combine the values required by each branch: only saying the first branch's required "create" leads the model astray. */
 function withAllValues(line: Line, branches: readonly Line[][]): Line {
   if (!line.values) return line;
   const values = branches.flatMap((lines) =>
@@ -48,7 +49,7 @@ function expand(issue: Issue, base: readonly PropertyKey[]): Line[] {
     return [{ path, code: issue.code, message: issue.message, values: issue.values }];
   if (issue.code !== 'invalid_union')
     return [{ path, code: issue.code ?? 'custom', message: issue.message }];
-  // 判别的键（look、op、type）不是任何一个可选的值时没有分支可以展开。
+  // When the discriminated key (look, op, type) is not any of the optional values, there are no branches to expand.
   if (issue.errors.length === 0) {
     const key = issue.discriminator;
     const options = (issue as { options?: readonly unknown[] }).options ?? [];
@@ -68,7 +69,7 @@ function expand(issue: Issue, base: readonly PropertyKey[]): Line[] {
   return best.map((line) => withAllValues(line, branches));
 }
 
-/** 记录块的这些地方写的是字段 ID，模型常写成要显示的文字。 */
+/** Record block positions of this form are field IDs, which the model often writes as display text. */
 const FIELD_ID_PLACE = /(?:^|\.)show\.(title|subtitles|trailing)(?:\.\d+)?$/;
 
 function text(line: Line, input?: { value: unknown }): string {
@@ -96,7 +97,7 @@ function valueAt(root: unknown, path: readonly PropertyKey[]): unknown {
 const show = (value: unknown) => JSON.stringify(value);
 const choices = (values: readonly unknown[]) => values.map(show).join('|');
 const strings = (values: readonly unknown[]) => values.filter((v) => typeof v === 'string');
-/** 记录块的 show.title 等处写的是要显示的文字（有空格、中文，或者像 "Calendar" 这样的一个词），不是写错的 id。 */
+/** Record block show.title and similar places written as display text (containing spaces, Chinese, or a single word like "Calendar"), not an incorrect ID. */
 const looksLikeText = (value: string) =>
   /\s|[^\x00-\x7f]/.test(value) || /^[A-Z][a-z]*$/.test(value);
 const ID_RULE = 'lowercase letters, digits and -, starting with a letter';
@@ -106,15 +107,16 @@ const ICON_MESSAGES = new Set([
 ]);
 
 /**
- * 有文件原文时（检查别的 AI 写的 App 文件，D-597）：说出写的是什么、该怎么改。照着改不了的照旧（undefined）。
- * Tink 那边不传原文，说法不变。
+ * When file original text is available (checking other AI-written App files, D-597): state what
+ * is written and how to fix it. Unfixable ones remain as is (undefined). Tink does not pass the
+ * original text, description remains unchanged.
  */
 function withFix(line: Line, where: string, value: unknown): string | undefined {
   if (line.message === ID_MESSAGE && typeof value === 'string') {
     const place = FIELD_ID_PLACE.exec(where);
     if (place && looksLikeText(value))
       return `${show(value)} is text, but show.${place[1]} takes a field id of the block's table; put text in a header block or the page title`;
-    // 只要 id 的地方写成了目标（"page:x"）：只写后面的 id。
+    // Where only an ID is expected but a target is written ("page:x"): write only the ID after it.
     const target = /^(?:page|tool|app):(.+)$/.exec(value)?.[1];
     if (target !== undefined && idFrom(target) === target)
       return `${show(value)} is not a valid id; this place takes the id alone: write ${show(target)}`;
@@ -146,7 +148,8 @@ function withFix(line: Line, where: string, value: unknown): string | undefined 
 }
 
 /**
- * 一个 zod 错误的每个问题一行：「路径: 问题」。给了原文（input.value）时，每行再说写的是什么、该怎么改（D-597）。
+ * One line per issue for a Zod error: "path: issue". When original text (input.value) is
+ * provided, each line additionally states what is written and how to fix it (D-597).
  */
 export function issueLines(error: z.ZodError, input?: { value: unknown }): string[] {
   return error.issues.flatMap((issue) => expand(issue, [])).map((line) => text(line, input));

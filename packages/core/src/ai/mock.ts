@@ -60,9 +60,11 @@ import { splitOps } from './kinds';
 import { FIX_REQUEST_PREFIX } from './session';
 import type { AIProvider, BuildPlan, Plan, PlanContext, RejectReason } from './types';
 
-// 基于规则的 mock AI（§7F）。不是语言模型：只认识 docs/MOCK_AI_PHRASES.md 中的句式。
-// v34（2026-10-30）：读 v34 配置、出 14 种新操作；句式没有改（第三阶段再按 MAPPING_V33.md C1 整理）。
-// 一句话按标点拆成若干子句；任何一个子句无法理解，整句都拒绝，绝不生成猜测性修改。
+// Rule-based mock AI (§7F). Not a language model: only recognizes sentence patterns in
+// docs/MOCK_AI_PHRASES.md. v34 (2026-10-30): reads v34 config, produces 14 new operations; sentence
+// patterns unchanged (to be organized in phase 3 according to MAPPING_V33.md C1). Splits a sentence
+// into clauses by punctuation; if any clause is not understood, the entire sentence is rejected,
+// never generating speculative modifications.
 
 const EXAMPLES: Localized[] = [
   { zh: '把 PDF 放到最上面', en: 'Put PDF at the top', fr: 'Mettre le PDF en haut' },
@@ -107,17 +109,17 @@ class Rejection extends Error {
 
 interface State {
   ctx: PlanContext;
-  /** 已应用前面子句后的工作副本。 */
+  /** Working copy after applying preceding clauses. */
   config: WorkspaceConfig;
-  /** 整句话中提到的工具，供“完成后按日期命名”这类省略主语的子句使用。 */
+  /** Tool mentioned in the entire sentence, used for subjectless clauses such as "name by date after completion". */
   mentionedTool: ToolDefinition | undefined;
-  /** 这个子句做完功能后剩下的外观请求（D-191），例如建好数据表后的「增加记账页面」。 */
+  /** Remaining appearance request after completing the feature work for this clause (D-191), e.g., "add an expense page" after creating a data table. */
   next?: string;
 }
 
 const say = (locale: Locale, zh: string, en: string) => (locale === 'zh' ? zh : en);
 
-/** 「新建一个工作流：选照片，压到 500KB，分享」：冒号后面的逗号是步骤之间的分隔，不拆成子句。 */
+/** "Create a workflow: select photos, compress to 500KB, share": the comma after the colon is a separator between steps and is not split into a clause. */
 function joinWorkflowSteps(input: string): string {
   return input.replace(
     /((?:快捷操作|工作流|流程|workflow|quick action)[:：])([^。！？!?\n]*)/gi,
@@ -184,12 +186,12 @@ function resolveComponent(rawName: string, target: Page, state: State): Componen
   let found: Component | undefined;
   if (tool) {
     requireInstalled(tool, state);
-    // 工具包的入口（原 toolCard）：look entry、opens package:<id>。
+    // Tool package entry point (formerly toolCard): look entry, opens package:<id>.
     found = find((c) => c.look === 'entry' && c.opens === packageTarget(tool.id));
   } else if (/欢迎|标题|welcome|header|title/i.test(name)) {
     found = find((c) => c.look === 'header');
   } else if (/工具目录|添加工具|catalog|add tools/i.test(name)) {
-    // 「添加工具」入口（原 catalogLink）：主色标题的 entry。
+    // "Add tool" entry point (formerly catalogLink): entry with primary color title.
     found = find(
       (c) => c.look === 'entry' && entryKind(c as Parameters<typeof entryKind>[0]) === 'link',
     );
@@ -211,7 +213,7 @@ function resolveComponent(rawName: string, target: Page, state: State): Componen
   return found;
 }
 
-/** 把块移到 index 时，以“移出该块后的列表”为参照。 */
+/** When moving a block to index, use the "list after removing that block" as reference. */
 function withoutComponent(p: Page, componentId: string): Page {
   return { ...p, blocks: p.blocks.filter((c) => c.id !== componentId) };
 }
@@ -418,7 +420,7 @@ const presetRule: Rule = (clause) => {
     clause.match(
       /^(?:switch to |use |make it |apply )?(?:an? |the )?(.+?) (?:style|theme|look)$/i,
     ) ??
-    // 法语界面的风格选择器发的句子（presetRequest，D-234）：内置规则别的法语都不认（P-037）。
+    // Sentence sent by the style selector in the French UI (presetRequest, D-234): built-in rules do not recognize any other French (P-037).
     clause.match(/^passer au style (.+)$/i);
   if (!m) return null;
   const name = m[1]!.trim().toLowerCase();
@@ -444,7 +446,7 @@ const PROTECTED_MESSAGE = (locale: Locale) =>
     'Settings can’t be removed: it holds Tink and Change history entries, so without it you couldn’t change or undo anything. You can make it a floating button instead.',
   );
 
-/** 从导航栏和浮动按钮里去掉一个入口（AI 修改、历史和工具都可以去掉，设置页里仍有入口）。 */
+/** Remove an entry point from the navigation bar and floating button (can be removed from AI modifications, history, and tools, but entry point remains in the settings page). */
 const removeEntryRule: Rule = (clause, state) => {
   const m =
     clause.match(
@@ -584,7 +586,7 @@ const TEMPLATE_WORDS: [RegExp, DataTemplate][] = [
   [/^(?:笔记|笔记本|notes?)$/i, 'notes'],
 ];
 
-/** 预设里说的模板名字：「增加记账页面」「Add a budget page」又会回到 templateRule。 */
+/** Template names mentioned in presets: "Add a budget page" will fall back to templateRule. */
 const TEMPLATE_NAMES: Record<DataTemplate, Localized> = {
   budget: { zh: '记账', en: 'budget', fr: 'Budget' },
   todo: { zh: '待办', en: 'to-do list', fr: 'liste de tâches' },
@@ -593,8 +595,10 @@ const TEMPLATE_NAMES: Record<DataTemplate, Localized> = {
 };
 
 /**
- * 内置数据页面模板：「新建一个记账页面」「Create a to-do list」。数据表是功能、页面是外观（D-191）：
- * 先只建数据表，页面留作下一句；数据表已经建好、还没有页面时，这句话就是加页面。
+ * Built-in data page template: "Create a new budget page", "Create a to-do list". Data tables are
+ * features, pages are appearance (D-191): create only the data table first, leaving the page for
+ * the next sentence; when the data table is already created but without a page, this sentence
+ * adds the page.
  */
 const templateRule: Rule = (clause, state) => {
   const m =
@@ -616,7 +620,7 @@ function newFieldId(fields: readonly { id: string }[]): string {
   for (let n = 1; ; n++) if (!fields.some((f) => f.id === `field-${n}`)) return `field-${n}`;
 }
 
-/** 「给账目加一个「支付方式」字段」：加一个文字字段。 */
+/** "Add a payment method field to expenses": add a text field. */
 const addFieldRule: Rule = (clause, state) => {
   const m =
     clause.match(
@@ -647,8 +651,10 @@ const addFieldRule: Rule = (clause, state) => {
 };
 
 /**
- * 「给账目加照片」「账目里存发票」「attach receipts to Expenses」（D-263）：给这张表加一个附件字段，
- * 用户在表单里自己拍照、选照片和文件。不另外搭「记一笔」快捷操作。已经有附件字段时不用改。
+ * "Add photos to expenses", "Store invoices in expenses", "attach receipts to Expenses" (D-263):
+ * add an attachment field to this table so users can take photos, select photos, and pick files
+ * directly in the form. Do not create a separate "Log an expense" quick action. Do not modify if
+ * an attachment field already exists.
  */
 const attachRule: Rule = (clause, state) => {
   const m =
@@ -700,7 +706,7 @@ function newComponentId(prefix: string, p: Page): string {
   for (let n = 1; ; n++) if (!ids.has(`${prefix}-${n}`)) return `${prefix}-${n}`;
 }
 
-/** 「在首页顶部加一张图片」：放一个图片位，照片由用户自己选（D-045）。 */
+/** "Add an image at the top of home": place an image slot, with photos chosen by the user (D-045). */
 const imageRule: Rule = (clause, state) => {
   const zh = clause.match(
     /^(?:在|给)?(.+?)(?:的)?(顶部|最上面|开头|上面|底部|最下面|下面)?(?:加|添加|放|增加)(?:一张|一个|张|个)?(?:大)?(图片|照片|横幅|头图|封面|配图)$/,
@@ -732,7 +738,7 @@ const imageRule: Rule = (clause, state) => {
   ];
 };
 
-/** 「把记账页面的图标换成💰」 */
+/** "Change the budget page icon to 💰" */
 const pageIconRule: Rule = (clause, state) => {
   const m =
     clause.match(/^(?:把|将)?(.+?)的图标(?:换成|改成|改为|设为|用)(.+)$/) ??
@@ -786,7 +792,7 @@ const simplifyRule: Rule = (clause, state) => {
   const keep = new Set(STEP_KEYWORDS.filter(([re]) => re.test(clause)).flatMap(([, ids]) => ids));
   if (keep.size === 0) return null;
   const ops: Op[] = [];
-  // 只改含有这些步骤的工作流（例如「上传和合并」只改合并流程，不动拆分、加页码等单功能工作流）。
+  // Modify only workflows containing these steps (e.g., "Upload and merge" modifies only the merge workflow, leaving single-function workflows such as splitting or adding page numbers untouched).
   const core = [...keep].filter((id) => !id.startsWith('in.') && id !== 'file.rename');
   const targets = quickActionsOf(state.config).filter(
     (w) => w.package === tool.id && core.every((id) => w.steps.some((s) => s.action === id)),
@@ -794,7 +800,7 @@ const simplifyRule: Rule = (clause, state) => {
   for (const wf of targets) {
     for (const step of wf.steps) {
       if (keep.has(step.action) || step.action === 'file.save') continue;
-      // 命名和保存是自动完成的，不算用户可见的步骤：命名保留，只是不再询问。
+      // Naming and saving are automatic and not counted as user-visible steps: naming is preserved, but no longer prompted.
       if (step.action === 'file.rename') {
         if (step.ask?.length) {
           ops.push({ op: 'updateTool', tool: wf.id, step: step.id, changes: { ask: [] } });
@@ -942,13 +948,13 @@ const titleRule: Rule = (clause, state) => {
   return ops;
 };
 
-// ---- 工作流（W1–W8，T7）：新建、从预设添加、改名、删除、放到首页、加一步、改大小、去掉一步 ----
+// ---- Workflows (W1–W8, T7): create, add from preset, rename, delete, put on home, add step, change size, remove step ----
 
 const Q = '"?';
 
-/** 句子里说的工作流：先按名字找，再按预设找（「签证照片」→ 从签证预设添加的那个）。 */
+/** Workflow mentioned in the sentence: find by name first, then by preset ("Visa photo" -> the one added from the visa preset). */
 function workflowNamed(rawName: string, state: State): Workflow | undefined {
-  // 从一个快捷操作打开 AI 时（D-124），「这个」「它」就是那个快捷操作。
+  // When opening AI from a quick action (D-124), "this" or "it" refers to that quick action.
   const about = state.ctx.about;
   if (about?.kind === 'workflow' && THIS.test(rawName.replace(/"/g, '').trim())) {
     return quickActionsOf(state.config).find((w) => w.id === about.workflowId);
@@ -986,8 +992,9 @@ function stepPhrases(text: string, state: State, before: PhraseKind | null = nul
 }
 
 /**
- * 记一笔（D-187）：句子里的表名换成 collectionId。没说表名、只有一张表时用它；找不到时整句拒绝
- * （AI 不替用户建表：先说「新建一个记账页面」）。
+ * Log an expense (D-187): replace the table name in the sentence with collectionId. Use it when
+ * no table name is specified and there is only one table; reject the entire sentence if not found
+ * (AI does not create tables for the user: say "Create a new budget page" first).
  */
 function withTable(step: StepPhrase, state: State): StepPhrase {
   const name = step.table!.toLowerCase();
@@ -1016,7 +1023,8 @@ function withTable(step: StepPhrase, state: State): StepPhrase {
 }
 
 /**
- * 记一笔收文件时表里要有附件字段（D-187）：没有就先加一个「附件」字段（结构修改，不碰记录）。
+ * Logging an expense receiving files requires an attachment field in the table (D-187): if
+ * missing, add an "Attachment" field first (structural change, does not touch records).
  */
 function recordFieldOps(steps: readonly WorkflowStep[], state: State): Op[] {
   const ops: Op[] = [];
@@ -1040,7 +1048,7 @@ function recordFieldOps(steps: readonly WorkflowStep[], state: State): Op[] {
   return ops;
 }
 
-/** 步骤接不上（例如 PDF 之后存到相册）时整句拒绝，说明是哪一步。 */
+/** Reject the entire sentence and specify which step when steps cannot be connected (e.g., saving to photo library after PDF). */
 function requireWorkable(wf: Workflow, state: State): void {
   const problem = workflowProblems(wf, state.ctx.registry)[0];
   if (!problem) return;
@@ -1071,7 +1079,7 @@ const addPresetRule: Rule = (clause, state) => {
   if (!m) return null;
   const preset = findPreset(m[1]!);
   if (!preset) return null;
-  // 已经添加过就不再重复（整句没有修改时会提示「已经是这样了」）。
+  // Do not repeat if already added (prompts "Already like this" when the sentence results in no changes).
   if (quickActionsOf(state.config).some((w) => w.preset === preset.id)) return [];
   const id = newWorkflowId(preset.id, state.config.tools);
   return [{ op: 'addTool', tool: presetWorkflow(preset, state.ctx.locale, id) }];
@@ -1155,7 +1163,7 @@ const workflowToHomeRule: Rule = (clause, state) => {
   const ops: Op[] = [];
   let wf = workflowNamed(m[1]!, state);
   if (!wf) {
-    // 还没添加的预设：先添加再放到首页。
+    // Preset not yet added: add it first, then place it on home.
     const preset = findPreset(m[1]!);
     if (!preset) return null;
     wf = presetWorkflow(preset, state.ctx.locale, newWorkflowId(preset.id, state.config.tools));
@@ -1186,7 +1194,7 @@ const workflowToHomeRule: Rule = (clause, state) => {
   return ops;
 };
 
-// ---- 手机桌面（HS，D-271）：「放到桌面 / 主屏幕」是手机桌面；「首页 / 主页」仍是 App 的首页（D-109）----
+// ---- Phone Desktop (HS, D-271): "Put on desktop / Home Screen" refers to the phone's home screen; "Home" still refers to the app's home screen (D-109) ----
 
 const HOME_SCREEN_ZH = '(?:手机)?(?:桌面|主屏幕|主屏)';
 const HOME_SCREEN_EN = "(?:the |my )?(?:phone(?:'s)? )?home ?screen";
@@ -1231,7 +1239,7 @@ const workflowToHomeScreenRule: Rule = (clause, state) => {
   const ops: Op[] = [];
   let wf = workflowNamed(m[1]!, state);
   if (!wf) {
-    // 还没添加的预设：先添加再放到桌面。
+    // Preset not yet added: add it first, then place it on the desktop.
     const preset = findPreset(m[1]!);
     if (!preset) return null;
     wf = presetWorkflow(preset, state.ctx.locale, newWorkflowId(preset.id, state.config.tools));
@@ -1251,7 +1259,7 @@ const workflowToHomeScreenRule: Rule = (clause, state) => {
       ),
     );
   }
-  // 按快捷操作在 tools[] 里的顺序排（同 v33 的 homeScreen；刚加的排在最后）。
+  // Order according to the quick actions' sequence in tools[] (same as homeScreen in v33; newly added ones are placed last).
   const order = quickActionsOf(state.config).map((w) => w.id);
   const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
   const next = [...onScreen, wf.id].sort((a, b) => rank(a) - rank(b));
@@ -1272,9 +1280,9 @@ const addStepRule: Rule = (clause, state) => {
     clause.match(/^in (?:the )?"?(.+?)"? (?:workflow|quick action),? add (?:a step:? )?(.+)$/i);
   if (!m) return null;
   const wf = requireWorkflow(m[1]!, state);
-  // 「压到 N MB」按快捷操作里处理的是视频、PDF 还是图片来选动作。
+  // "Compress to N MB" selects actions based on whether the quick action handles video, PDF, or images.
   const phrases = stepPhrases(m[2]!, state, kindOfSteps(wf.steps));
-  // 处理类的步骤插在结尾的命名 / 保存 / 分享之前；输出类的放在最后。
+  // Processing steps are inserted before the trailing naming / saving / sharing; output-related ones are placed last.
   let index = wf.steps.length;
   const ops: Op[] = [];
   const steps = [...wf.steps];
@@ -1392,7 +1400,7 @@ const PERIOD_WORDS: [RegExp, string][] = [
   [/最近\s*365\s*天|最近一年|last 365 days|past year/i, 'last365days'],
 ];
 
-/** W9：用某张数据表的记录生成 PDF 报表（新建工作流；AI 不读记录，记录在本机填进模板）。 */
+/** W9: Generate a PDF report using records from a data table (create new workflow; AI does not read records, records are filled into templates locally). */
 const reportRule: Rule = (clause, state) => {
   const m =
     clause.match(
@@ -1429,12 +1437,12 @@ const reportRule: Rule = (clause, state) => {
   return [{ op: 'addTool', tool: wf }];
 };
 
-// ---- 翻译文件（D-171、D-174）：「把这份合同翻译成英文」是文件上的事，做一个翻译快捷操作 ----
+// ---- Translate files (D-171, D-174): "Translate this contract into English" is a file-related task, create a translation quick action ----
 
 const DOC_WORD =
   '(合同|文件|pdf|材料|文档|说明书|信|通知|证明|成绩单|论文|报告|截图|照片|图片|扫描件|菜单|告示|' +
   'contract|document|pdf|file|letter|notice|certificate|transcript|report|paper|screenshot|photo|picture|image|scan|menu|sign)';
-/** 文件是图片：先识别文字。 */
+/** File is an image: recognize text first. */
 const IMAGE_DOC =
   /^(?:截图|照片|图片|扫描件|菜单|告示|screenshot|photo|picture|image|scan|menu|sign)$/i;
 const MEASURE = '(?:这|那)?(?:一)?(?:份|个|些|张|几张|几份|封|篇|页|几页)?';
@@ -1480,7 +1488,7 @@ const translateDocRule: Rule = (clause, state) => {
         { id: 'pdf', action: 'text.toPdf', params: { pageSize: 'a4', fontSize: 12 } },
         { id: 'share', action: 'out.share', params: {} },
       ];
-  // 名字最长 40 个字：简体中文就叫「中文」。
+  // Name up to 40 characters: Simplified Chinese is called "Chinese".
   const language =
     to === 'zh-Hans'
       ? say(locale, '中文', 'Chinese')
@@ -1504,7 +1512,7 @@ const translateDocRule: Rule = (clause, state) => {
   return [{ op: 'addTool', tool: wf }];
 };
 
-/** 新手引导第 1 步的句子（D-231、D-449）：扫描和打开文件两个入口一起加，并排放；三种语言都认。 */
+/** Sentences for step 1 of onboarding (D-231, D-449): add both scan and open file entry points side by side; recognized in all three languages. */
 const bothFilePicksRule: Rule = (clause, state) => {
   if (
     !/^(?:首页)?(?:加入|加上|添加)[「“"](?:打开(?:相册|图片)|扫描)[」”"]和[「“"]打开文件[」”"](?:两个)?按钮$|^add the [“"](?:open photo library|scan)[”"] and [“"]open files[”"] buttons$|^ajouter les boutons « numériser » et « ouvrir les fichiers »$/i.test(
@@ -1548,7 +1556,7 @@ const RULES: Rule[] = [
   filePickRule,
   reportRule,
   translateDocRule,
-  // 工作流的句式先判断：它们都要求句子里有工作流的名字或「工作流」，不会抢走其他句式。
+  // Evaluate workflow sentence patterns first: they all require the workflow name or "workflow" in the sentence, preventing them from intercepting other sentence patterns.
   newWorkflowRule,
   addPresetRule,
   renameWorkflowRule,
@@ -1587,7 +1595,7 @@ const RULES: Rule[] = [
   titleRule,
 ];
 
-/** 读、写、删、统计用户记录的请求（AI 只改界面，从不接触记录内容）。 */
+/** Requests to read, write, delete, or aggregate user records (AI only modifies the UI and never touches record content). */
 const USER_DATA = new RegExp(
   [
     '^记(?:一笔|一下|个账)',
@@ -1610,8 +1618,10 @@ const THIS =
   /^(?:这个|它|这一个|该)(?:快捷操作|工作流|流程)?$|^(?:this|it|this quick action|this workflow)$/i;
 
 /**
- * 替用户办事、而不是改 App 的请求（D-113、D-128）：写东西、翻译、总结或解释内容、提问、搜索。
- * 整句检查：这类话里常有逗号，拆开后的子句看不出来。
+ * Requests to perform errands for the user rather than modify the app (D-113, D-128): writing
+ * text, translating, summarizing or explaining content, answering questions, searching.
+ * Full-sentence check: such sentences often contain commas, making them unrecognizable after
+ * being split into clauses.
  */
 const ERRAND = new RegExp(
   [
@@ -1629,12 +1639,12 @@ const ERRAND = new RegExp(
   ].join('|'),
   'i',
 );
-/** 「现在帮我运行签证照片」：AI 不替用户运行，点快捷操作就能开始。 */
+/** "Help me run visa photo now": AI does not run things for the user; tapping the quick action starts it. */
 const RUN_NOW =
   /^(?:现在|马上|立刻)?(?:帮我)?(?:运行|执行|跑一下|跑一遍|开始)|^(?:please )?(?:run|start)\b/i;
 
-/** 办事类请求的拒绝例子：都是内置规则认得的句子。 */
-/** 直接要译文（「帮我翻译一下这句话：…」）：Tinkrum 不给译文，可以做一个翻译快捷操作（D-171）。 */
+/** Example rejection for errand-type requests: these are all sentences recognized by built-in rules. */
+/** Direct translation request ("Help me translate this sentence: ..."): Tinkrum does not provide translations, but a translation quick action can be created (D-171). */
 const TRANSLATE_ERRAND = /翻译|翻成|译成|怎么说|\btranslat/i;
 const TRANSLATE_EXAMPLES: Localized[] = [
   {
@@ -1653,7 +1663,7 @@ const TRANSLATE_EXAMPLES: Localized[] = [
     fr: 'Créer une action rapide : choisir un PDF, extraire le texte du PDF, traduire en anglais, créer un PDF, partager',
   },
 ];
-/** 说的是改快捷操作本身（「添加截图翻译快捷操作」「新建一个快捷操作：…，翻译成英文」），不是办事。 */
+/** Refers to modifying the quick action itself ("Add screenshot translation quick action", "Create a new quick action: ..., translate to English"), not performing an errand. */
 const ABOUT_QUICK_ACTION = /快捷操作|工作流|\bquick action\b|\bworkflow\b/i;
 
 const ERRAND_EXAMPLES: Localized[] = [
@@ -1687,7 +1697,7 @@ interface ClauseResult {
   next?: string;
 }
 
-/** 一个子句一个子句地套用规则；已经是目标状态的子句（例如 PDF 本来就在最上面）不产生修改。 */
+/** Apply rules clause by clause; clauses already in the target state (e.g., PDF is already at the top) produce no modifications. */
 function runClauses(clauses: string[], ctx: PlanContext): ClauseResult[] {
   const state: State = { ctx, config: ctx.config, mentionedTool: findTool(clauses.join(' '), ctx) };
   const results: ClauseResult[] = [];
@@ -1741,7 +1751,7 @@ function runClauses(clauses: string[], ctx: PlanContext): ClauseResult[] {
   return results;
 }
 
-/** 子句拼回一句话：中文用逗号，英文用句号（splitClauses 不按英文逗号拆）；引号换回「」。 */
+/** Reassemble clauses into a sentence: use commas for Chinese, periods for English (splitClauses does not split on English commas); restore quotes to 「」. */
 function joinClauses(clauses: string[], locale: Locale): string {
   return locale === 'zh'
     ? clauses.map((c) => c.replace(/"([^"]*)"/g, '「$1」')).join('，')
@@ -1765,7 +1775,7 @@ function planClauses(clauses: string[], ctx: PlanContext): Plan {
   }
   const fn = new Set(splitOps(ops).function);
   if (fn.size === 0) return { kind: 'ops', ops };
-  // 功能先做（D-191）：外观的子句不做，拼成下一句；功能的子句不带外观再算一遍。
+  // Perform features first (D-191): appearance clauses are skipped and assembled into the next sentence; feature clauses are re-evaluated without appearance.
   const isFn = (r: ClauseResult) => r.ops.some((op) => fn.has(op));
   const fnClauses = first.filter(isFn).map((r) => r.clause);
   const second = fnClauses.length === first.length ? first : runClauses(fnClauses, ctx);
@@ -1782,18 +1792,18 @@ function planClauses(clauses: string[], ctx: PlanContext): Plan {
   };
 }
 
-/** 内置规则认得的大工程说法（规则 53、D-415）：「搭建一个记账 App」「Build a budget app」。 */
+/** Built-in rule recognizing large-scale app building phrasing (Rule 53, D-415): "Build a budget app". */
 const BUILD_REQUEST = /^(?:从头)?搭建|^build (?:me )?(?:a |an )?.*\bapp\b/i;
-/** 模拟器上试失败的路径：「搭建一个记账 App，有一步会失败」「…with a failing step」。 */
+/** Simulator test path for failure case: "Build a budget app, with a failing step". */
 const BUILD_FAILING = /失败|fail/i;
-/** 带这个记号的请求第一次抛错，第二次（重试）照常做。 */
+/** Requests with this marker throw an error on the first attempt and succeed normally on the second (retry). */
 const FAIL_ONCE = ' #fail-once';
-/** 模拟器上试「把这些补上」的路径：「搭建一个记账 App，缺页面」「…with no page」。 */
+/** Simulator test path for filling in missing pages: "Build a budget app, with no page". */
 const BUILD_GAP = /缺页面|no page/i;
-/** 带这个记号的请求不留 next：页面没人接着做。 */
+/** Requests with this marker do not retain next: no subsequent page creation. */
 const NO_NEXT = ' #no-next';
 
-/** 模拟器上试一个计划里功能和外观都有的路径（D-419）：「做个月历（混合计划）」「Make a month calendar (mixed plan)」。 */
+/** Simulator test path for a mixed plan containing both features and look changes (D-419): "Make a month calendar (mixed plan)". */
 const MIXED_PLAN = /混合计划|mixed plan/i;
 
 function mixedPlan(locale: Locale): Plan {
@@ -1895,8 +1905,9 @@ function buildPlanFor(input: string, locale: Locale, uiLocale: Locale): BuildPla
 }
 
 /**
- * 「把这些补上」（D-418）：内置规则只会补一种，表没有地方看或没有地方添加，在首页放上列表和添加按钮。
- * 别的不猜（§7F）。规则不靠读句子，直接看配置。
+ * "Fill these in" (D-418): built-in rules only fill one missing aspect (table has nowhere to view
+ * or nowhere to add), placing a list and add button on home. No other guessing (§7F). Rules look
+ * directly at configuration instead of reading sentences.
  */
 function fixPlan(ctx: PlanContext): Plan {
   const issues = checkTools(ctx.config, ctx.registry).issues.filter(
@@ -1939,7 +1950,7 @@ function fixPlan(ctx: PlanContext): Plan {
   };
 }
 
-/** AI 页的两个预设句子（标签文字）→ 对应的整套样板。 */
+/** Two preset sentences (tag text) on the AI page -> corresponding complete templates. */
 const WANT_SAMPLES = [
   ['wantReceiptsChip', 'receipts'],
   ['wantCardsChip', 'business-cards'],
@@ -1963,14 +1974,14 @@ export function createMockAIProvider(): AIProvider {
         }
       }
       const uiLocale = ctx.locale;
-      // 「我想要记录收据 / 我想要存名片」两个标签填进输入框的句子：直接套整套样板，不看别的规则、不问模型。
+      // Sentences populated into the input box from the two tags "I want to log receipts / I want to store business cards": directly apply the complete template without checking other rules or querying the model.
       const wanted = WANT_SAMPLES.find(([key]) => input.trim() === t(uiLocale, key));
       if (wanted) {
         const result = sampleOps(wanted[1], ctx.config, uiLocale, ctx.scope?.appId);
         if (result.ok) return { kind: 'ops', ops: result.ops };
         return { kind: 'reject', reason: 'unknown', message: result.message, examples: [] };
       }
-      // 内置规则只识别中英文句式；法语界面使用英文示例和回复（P-037）。
+      // Built-in rules only recognize Chinese and English sentence patterns; French interface uses English examples and responses (P-037).
       if (ctx.locale === 'fr') ctx = { ...ctx, locale: 'en' };
       if (input.startsWith(FIX_REQUEST_PREFIX)) return fixPlan(ctx);
       if (MIXED_PLAN.test(input)) return mixedPlan(ctx.locale);

@@ -18,11 +18,13 @@ import { Icon } from '../renderer/Icon';
 import type { Palette } from '../renderer/theme';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 
-// 页面右上角的 AI 入口（D-406）：所有页面都有，除了设置（含它的子页面）、改动记录和 AI 页本身。
-// 从这里进 AI 页，「这个页面」默认指这一页（PlanAbout，只有 ID，没有记录和文件名，底线 1、2）。
-// 从别的地方进（导航栏、设置里的「修改这个 App」）不带页面。
+// AI entry point in the top right corner of the page (D-406): present on all pages except Settings
+// (including its subpages), Change History, and the AI page itself. Entering the AI page from here
+// defaults "this page" to refer to this page (PlanAbout, ID only, no records or file names,
+// invariants 1 and 2). Entering from elsewhere (navigation bar, "Modify this app" in settings)
+// carries no page context.
 
-/** 打开 AI 页时的路由参数；ChangeScreen 用 aboutFromParams 读回来。 */
+/** Route parameters when opening the AI page; ChangeScreen reads them back using aboutFromParams. */
 export function aboutParams(about: PlanAbout): Record<string, string> {
   switch (about.kind) {
     case 'page':
@@ -55,7 +57,7 @@ export function aboutFromParams(
   return undefined;
 }
 
-/** AI 页和草稿聊天框上「现在修改的是哪一页」的提示；快捷操作和收件页面有自己的说法。 */
+/** Tooltip on the AI page and draft chat box indicating "which page is currently being modified"; quick actions and inbox pages have their own terminology. */
 export function aboutPlace(
   about: PlanAbout | undefined,
   config: WorkspaceConfig | null,
@@ -89,7 +91,7 @@ export function aboutPlace(
   }
 }
 
-/** 外壳里这一页的入口带什么；null = 没有入口（设置、改动记录）。 */
+/** What entry context this page carries in the shell; null = no entry point (settings, change history). */
 export function shellAbout(target: NavTarget): PlanAbout | null {
   const pageId = pageIdOf(target);
   if (pageId !== null) return { kind: 'page', pageId };
@@ -97,7 +99,7 @@ export function shellAbout(target: NavTarget): PlanAbout | null {
   return null;
 }
 
-/** AI 只看得到配置里的快捷操作；内设的还没改过（D-236），算在快捷操作页面上。 */
+/** The AI only sees quick actions in the config; built-in ones not yet modified (D-236) are counted on the quick actions page. */
 export function workflowAbout(config: WorkspaceConfig, workflowId: string): PlanAbout {
   return quickActionsOf(config).some((w) => w.id === workflowId)
     ? { kind: 'workflow', workflowId }
@@ -105,8 +107,9 @@ export function workflowAbout(config: WorkspaceConfig, workflowId: string): Plan
 }
 
 /**
- * 右上角的入口：草稿模式里打开聊天框（和 D-190 一样），否则打开 AI 页。
- * 引导时（D-447）外壳传 `onPress` 和 `lively`：Tink 会动，点了打开引导的那句话。
+ * Top-right entry point: opens chat box in draft mode (same as D-190), or AI page otherwise.
+ * During guidance (D-447), the shell passes `onPress` and `lively`: Tink animates and tapping it
+ * opens the guide prompt.
  */
 export function AIEntry({
   about,
@@ -123,7 +126,7 @@ export function AIEntry({
   const router = useRouter();
   const inDraft = useWorkspace((s) => !!s.draft?.open);
   const setChatOpen = useDraftUi((s) => s.setChatOpen);
-  // 草稿预览里 Tink 的气泡展开着时（D-526）Tink 也会动、带光圈；缩成三个点、聊天框开着、退出草稿就不动了。
+  // Tink's speech bubble remains expanded in draft preview (D-526) with animation and a halo; it shrinks to three dots, closes the chat box, and stops animating when exiting the draft.
   const lastStep = useWorkspace((s) =>
     s.draft?.open ? s.draft.steps.at(-1)?.changeRequestId : undefined,
   );
@@ -146,7 +149,7 @@ export function AIEntry({
   );
 }
 
-/** 入口的样子；收件页面打开 AI 前还要留住分享的文件，自己传 onPress。 */
+/** Appearance of the entry point; inbox pages must preserve shared files before opening the AI, passing their own onPress. */
 export function AIEntryButton({
   palette,
   locale,
@@ -174,7 +177,7 @@ export function AIEntryButton({
   );
 }
 
-// 导航栏的 headerRight。
+// headerRight for the navigation bar.
 export function entryOption(about: PlanAbout, palette: Palette) {
   return function HeaderEntry() {
     return <AIEntry about={about} palette={palette} />;

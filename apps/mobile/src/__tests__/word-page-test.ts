@@ -9,8 +9,10 @@ import { JSDOM } from 'jsdom';
 
 import { blockBase, paperWidth, wordPageHtml } from '../desk/word-page';
 
-// 桌上的 Word 整页直接改（D-465）：页面按原件排；页面里的脚本读回每一块的样子，合回文档。
-// 这里用 jsdom 跑真的页面脚本（没有排版，也没有 execCommand：改 DOM 的地方照浏览器会做的那样手动改）。
+// Directly editing Word full pages on the desk (D-465): pages are laid out according to the
+// original; scripts within the page read back the appearance of each block and reassemble them into
+// the document. Here, jsdom runs real page scripts (no pagination and no execCommand: DOM
+// modifications are performed manually as a browser would do).
 
 const WIDTH = 412;
 it('shows a landscape source sheet and scales editable point sizes by its physical width', () => {
@@ -187,9 +189,9 @@ describe('Word page layout like the original (D-464, D-465)', () => {
     const { q } = open();
     expect(q('[data-ref="0-0"]').style.marginLeft).toBe('0px');
     expect(q('[data-ref="0-1"]').style.marginLeft).toBe('0px');
-    // Pantin 在原图里比 Docteur 靠右 400 像素（页宽 1000）。
+    // Pantin is 400 pixels to the right of Docteur in the original image (page width 1000).
     expect(parseFloat(q('[data-ref="0-2"]').style.marginLeft)).toBeGreaterThan(130);
-    // 纸的两边留出原件的左边空白。
+    // Leave the original's left margin on both sides of the paper.
     expect(parseFloat(q('.paper').style.paddingLeft)).toBeGreaterThan(40);
   });
 
@@ -212,7 +214,7 @@ describe('Word page layout like the original (D-464, D-465)', () => {
   });
 
   it('gives each table column its width from the original, even when the first row spans columns (D-501)', () => {
-    // table-layout:fixed 只看第一行：第一行一格跨两列时，没有 colgroup 浏览器会把宽平分给这两列。
+    // table-layout:fixed checks only the first row: when a cell in the first row spans two columns, browsers will evenly split the width between these two columns if there is no colgroup.
     const spanned: DocDoc = {
       version: 1,
       pages: [
@@ -279,7 +281,7 @@ describe('the original above the cursor (D-468)', () => {
     expect(word.pages[0]!.img).toBe('data:image/jpeg;base64,AAAA');
   });
 
-  it('the 「换成原件」 button sits on the preview, counts selected lines, and is not shown in a table cell (D-469)', () => {
+  it('the switch-to-original button sits on the preview, counts selected lines, and is not shown in a table cell (D-469)', () => {
     const html = wordPageHtml(
       doc,
       WIDTH,
@@ -300,7 +302,7 @@ describe('the original above the cursor (D-468)', () => {
     (dom.window as unknown as { ReactNativeWebView: unknown }).ReactNativeWebView = {
       postMessage: (m: string) => sent.push(JSON.parse(m)),
     };
-    // jsdom 没有 queryCommandState（浏览器里有）。
+    // jsdom lacks queryCommandState (which exists in browsers).
     (document as unknown as { queryCommandState: () => boolean }).queryCommandState = () => false;
     const paper = document.querySelector('.paper') as HTMLElement;
     paper.tabIndex = 0;
@@ -318,25 +320,25 @@ describe('the original above the cursor (D-468)', () => {
     expect(document.getElementById('word-original')!.style.display).toBe('block');
     expect(pill().style.display).toBe('flex');
     expect(pill().textContent).toBe('换成原件');
-    // 按钮在截图正下方、不压住截图（2026-11-06 三星：压在右下角挡住了原图的字）。
+    // The button sits directly below the screenshot without covering it (2026-11-06 Samsung: covering the bottom-right corner blocked text in the original image).
     const shot = document.getElementById('word-original')!.firstElementChild as HTMLElement;
     expect(parseFloat(pill().style.top)).toBeGreaterThan(parseFloat(shot.style.height));
     expect(pill().style.right).toBe('');
-    // 和 App 里的按钮一样用主题的颜色（2026-11-06 三星：主题是橙色，按钮却是写死的绿色），字上下左右居中。
+    // Uses theme colors just like App buttons (2026-11-06 Samsung: theme is orange, but the button was hardcoded to green), with text centered both vertically and horizontally.
     expect(pill().style.background).toContain('rgb(251, 233, 225)');
     expect(pill().style.color).toBe('rgb(154, 63, 27)');
     expect(pill().style.alignItems).toBe('center');
     expect(pill().style.justifyContent).toBe('center');
-    // 选中两行。
+    // Select two rows.
     select(
       document.querySelector('[data-ref="0-1"]')!.firstChild!,
       document.querySelector('[data-ref="0-2"]')!.firstChild!,
     );
     expect(pill().textContent).toBe('换成原件（2 行）');
-    // 点按钮交给 App 去换。
+    // Clicking the button delegates to the App to switch.
     pill().dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(sent.some((m) => m.type === 'swap')).toBe(true);
-    // 表格里：小窗不显示（表格格子没有原图位置时）或者不显示按钮。
+    // In tables: small window is hidden (when table cells lack original image positions) or the button is hidden.
     select(document.querySelector('[data-ref="0-5"] td')!.firstChild!);
     expect(
       pill().style.display === 'none' ||
@@ -391,7 +393,7 @@ describe('reading the page back (D-465)', () => {
 
   it('bold, italic, underline and size on a few characters become runs', () => {
     const { q, merge } = open();
-    // 浏览器加粗选中的「teur」、把「Doc」改成斜体加大一号。
+    // Browser bolds selected "teur" and changes "Doc" to italic with a larger font size.
     q('[data-ref="0-1"]').innerHTML =
       '<i><span style="font-size:9px">Doc</span></i><b><u>teur</u></b>';
     const p = merge().pages[0]!.blocks[1] as DocParagraph;
@@ -413,21 +415,21 @@ describe('reading the page back (D-465)', () => {
   it('typing, Enter, alignment, a new list item, a table cell and deleting a block', () => {
     const { q, window, merge } = open();
     const d = window.document;
-    // 回车：浏览器把段落分成两个（属性跟着复制）。
+    // Pressing Enter: browser splits the paragraph into two (attributes are copied over).
     const first = q('[data-ref="0-1"]');
     const second = first.cloneNode(false) as HTMLElement;
     first.textContent = 'Doc';
     second.textContent = 'teur Martin';
     first.after(second);
-    // 居中「Pantin」。
+    // Center-align "Pantin".
     q('[data-ref="0-2"]').style.textAlign = 'center';
-    // 列表加一项。
+    // Add an item to the list.
     const li = d.createElement('li');
     li.textContent = 'trois';
     q('[data-ref="0-4"]').appendChild(li);
-    // 改格子。
+    // Modify a cell.
     q('[data-ref="0-5"] td[data-i="1"]').textContent = '-3.00';
-    // 删掉中心名。
+    // Delete the center name.
     q('[data-ref="0-0"]').remove();
     const blocks = merge().pages[0]!.blocks;
     expect(blocks.map((b) => (b.kind === 'paragraph' ? b.text : b.kind))).toEqual([
@@ -468,7 +470,7 @@ describe('reading the page back (D-465)', () => {
     expect(merged.runs![0]).toEqual({ text: 'Doc' });
     expect(merged.runs![1]!.text).toBe('teur');
     expect(merged.runs![1]!.size).toBe(base.docSize + 2);
-    // 段落自己的字号还在。
+    // The paragraph's own font size remains.
     expect(p.style.fontSize).not.toBe('');
   });
 

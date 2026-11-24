@@ -7,7 +7,7 @@ import { makePalette } from '../renderer/theme';
 import { PacksScreen } from '../shell/PacksScreen';
 import { MemoryPackFs, bundlePack, manifests, sha256, text } from '../test-utils/memory-packs';
 
-// 「设置 → 扩展包」：列出已下载的扩展包和占用空间；删除文字识别包时语言包一起删除。
+// "Settings -> Extension packs": lists downloaded extension packs and used space; deleting the OCR pack also deletes the language packs together.
 
 describe('extension packs screen', () => {
   afterEach(() => jest.restoreAllMocks());
@@ -22,7 +22,7 @@ describe('extension packs screen', () => {
 
     expect(await screen.findByTestId('pack-ocr')).toBeTruthy();
     expect(screen.getByTestId('pack-ocr-eng')).toBeTruthy();
-    // 3 + 4 + 7 字节。
+    // 3 + 4 + 7 bytes.
     expect(screen.getByTestId('packs-total').props.children).toBe('共占用 14 B');
 
     const alert = jest.spyOn(Alert, 'alert').mockImplementationOnce((_t, message, buttons) => {
@@ -35,7 +35,7 @@ describe('extension packs screen', () => {
     expect(await store.isInstalled('ocr-eng')).toBe(false);
   });
 
-  // D-510：随 App 打包的不是下载的，不列（删了用到时又会从 App 里复制回来）；说明也不再说 PDF 预览要下载。
+  // D-510: packs bundled with the app are not downloaded, so they are not listed (if deleted, they will be copied back from the app when needed); the description also no longer says PDF preview needs to be downloaded.
   it('does not list the packs that come with the app as downloads', async () => {
     const fs = new MemoryPackFs();
     const lookup = await manifests(fs);

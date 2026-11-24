@@ -5,25 +5,26 @@ import type { TextLayer, TextLine } from '@morph/tool-pdf';
 import type { DeskFs } from '../desk/fs';
 import type { SpeechPlatform } from './speech';
 
-/** 识别出的一行；PP-OCRv6 还给出每个字的大致位置（at：占这一行的比例，D-272）。 */
+/** Recognized text line; PP-OCRv6 also provides approximate character positions (at: proportion within the line, D-272). */
 export interface RecognizedLine extends TextLine {
   chars?: readonly { text: string; at: number }[];
 }
 
-/** 一张图识别出的行（width / height 是识别时图片的大小）。 */
+/** Recognized lines in an image (width / height represent image dimensions during OCR). */
 export interface RecognizedLayer extends TextLayer {
   lines: readonly RecognizedLine[];
 }
 
-/** RGBA 像素（每像素 4 字节）。 */
+/** RGBA pixels (4 bytes per pixel). */
 export interface Pixels {
   width: number;
   height: number;
   data: Uint8Array;
 }
 
-// 平台能力（App 中由 Expo 模块实现，见 expo-platform.ts；测试中用 test-utils/fake-files.ts 的内存实现）。
-// 动作实现只通过这里接触文件系统和系统界面。
+// Platform capabilities (implemented via Expo modules in the app, see expo-platform.ts; in-memory
+// implementation in test-utils/fake-files.ts for tests). Action implementations access the file
+// system and system interfaces exclusively through here.
 
 export interface PickedFile {
   uri: string;
@@ -32,29 +33,31 @@ export interface PickedFile {
   mimeType: string | null;
   width?: number;
   height?: number;
-  /** 照片的拍摄时间（毫秒）。 */
+  /** Photo capture timestamp (milliseconds). */
   takenAt?: number;
-  /** 文件的修改时间（毫秒，「文件」App 选的文件有，D-242）。 */
+  /** File modification timestamp (milliseconds, present for files selected from the Files app, D-242). */
   modifiedAt?: number;
-  /** 系统文档相机拍的页面：已经找边拉正。 */
+  /** Page captured by system document camera: border-detected and deskewed. */
   straightened?: boolean;
-  /** 视频、音频的时长（毫秒），选择器给得出时。 */
+  /** Duration of video or audio (milliseconds), when available from the picker. */
   durationMs?: number;
-  /** 打开、分享时已经存进文档库的那一份（D-455）：存成记录等直接用它，不再复制。 */
+  /** The copy saved to the document library when opening or sharing (D-455): stored directly as records etc. without re-copying. */
   assetId?: string;
   /**
-   * 桌上的 Word 的中间格式（D-466，图片已经换成能读的地址）：带进运行（RunItem.docDoc），文档转 PDF 按它的版面排，
-   * 不再交给通用的 Word 排版（Android 上对不齐、字号全丢）。
+   * Intermediate format for Word on the desk (D-466, images already converted to readable URIs):
+   * passed into the run (RunItem.docDoc), document-to-PDF formatting follows its layout rather
+   * than relying on generic Word layout (which causes misalignment and font-size loss on
+   * Android).
    */
   docDoc?: DocDoc;
 }
 
 export type ImageFormat = 'jpeg' | 'png' | 'webp';
 
-/** 扫描件增强（D-266，Skia）：自动（去阴影，按页面选彩色或灰度）、灰度、黑白。 */
+/** Scan enhancement (D-266, Skia): auto (shadow removal, page-based color/grayscale selection), grayscale, black and white. */
 export type EnhanceMode = 'auto' | 'gray' | 'bw';
 
-/** 一次图片处理：先裁剪（原图像素坐标），再缩放，再旋转 / 翻转。 */
+/** A single image operation: crop first (original image pixel coordinates), then scale, then rotate/flip. */
 export interface ImageOps {
   crop?: { x: number; y: number; width: number; height: number };
   resize?: { width: number; height: number };
@@ -77,28 +80,30 @@ export interface Box {
 }
 
 /**
- * 离屏合成的一步（拼图、打码、水印、相纸排版）。只有固定的几种绘制，不执行任何配置里的代码。
- * 图片来源是本次运行的临时文件或刚画好的字节（文字水印）。
+ * A step in offscreen compositing (collages, pixelation/censoring, watermarks, photo print
+ * layouts). Only fixed types of drawing are performed, with no configuration code execution.
+ * Image sources are temporary files from the current run or freshly drawn bytes (text
+ * watermarks).
  */
 export type DrawOp =
   | {
       kind: 'image';
       source: { uri: string } | { bytes: Uint8Array };
-      /** 取源图的哪一部分（像素）；默认整张。 */
+      /** Which part of the source image to extract (in pixels); defaults to the entire image. */
       src?: Box;
       dst: Box;
-      /** 绕 dst 中心旋转（度）。 */
+      /** Rotation angle (in degrees) around the destination center. */
       angleDeg?: number;
       /** 0–1。 */
       opacity?: number;
     }
   | { kind: 'rect'; rect: Box; color: string }
-  /** 把画布上这块区域模糊（打码）。 */
+  /** Blur this region on the canvas (censoring/pixelation). */
   | { kind: 'blur'; rect: Box; sigma: number }
   | { kind: 'path'; points: { x: number; y: number }[]; color: string; width: number }
   | { kind: 'line'; x1: number; y1: number; x2: number; y2: number; color: string; width: number };
 
-/** 用户存好的签名（documentDirectory/signatures/，不进配置和版本，不发给 AI）。 */
+/** User-saved signature (documentDirectory/signatures/, excluded from configuration and versions, never sent to AI). */
 export interface SavedSignature {
   uri: string;
   bytes: Uint8Array;
@@ -106,9 +111,10 @@ export interface SavedSignature {
 }
 
 /**
- * 系统自带的文字识别和扫描（modules/morph-vision）：iOS 是 Vision / VisionKit / Core Image（D-084–D-086），
- * Android 是 Google ML Kit（D-087）。没有时（Expo Go）为 null。系统做不了的（Android 找边、俄文识别）
- * 退回扩展包。全部在本机处理。
+ * System-native text recognition and scanning (modules/morph-vision): iOS uses Vision / VisionKit
+ * / Core Image (D-084–D-086), Android uses Google ML Kit (D-087). Returns null when unavailable
+ * (e.g. Expo Go). Capabilities unsupported by the system (Android edge detection, Russian OCR)
+ * fall back to extension packs. All processing is local.
  */
 export interface ImageAdjustSettings {
   mode: 'auto' | 'manual';
@@ -117,18 +123,18 @@ export interface ImageAdjustSettings {
   saturation: number;
 }
 
-/** 展平后的页面（D-274）：和输入一样大；refined 是按文字行精修过（装了文字识别模型、文字行够多）。 */
+/** Flattened page (D-274): same size as input; refined indicates it was post-processed by text lines (OCR model installed, sufficient text lines). */
 export interface FlattenResult {
   uri: string;
   width: number;
   height: number;
   size: number;
   refined: boolean;
-  /** 每一步的耗时（毫秒），测性能用。 */
+  /** Duration of each step in milliseconds, used for performance profiling. */
   timing: Record<string, number>;
 }
 
-/** 系统识别出的日期或金额（VisionPlatform.detectData），和 @morph/core 预填的 SystemMatch 一样。 */
+/** System-recognized date or amount (VisionPlatform.detectData), identical to SystemMatch pre-filled by @morph/core. */
 export interface SystemDataMatch {
   kind: 'amount' | 'date';
   start: number;
@@ -136,7 +142,7 @@ export interface SystemDataMatch {
   value?: string;
 }
 
-/** 图像分类的一个标签（VisionPlatform.classifyImage）。 */
+/** An image classification label (VisionPlatform.classifyImage). */
 export interface ImageLabel {
   id: string;
   /** 0–1。 */
@@ -163,31 +169,37 @@ export interface VisionPlatform {
   ): Promise<EncodedImage>;
 
   /**
-   * 证件照（D-252）：找人脸。坐标是 width × height 的图（已摆正，Android 会先缩小）上的像素，
-   * 调用方按比例换回原图。没有这个能力时没有这个方法。
+   * ID photo (D-252): face detection. Coordinates are pixels on a width × height image (already
+   * oriented, Android scales down first), and callers scale them back relative to the original
+   * image. Absent when this capability is not available.
    */
   detectFaces?(uri: string): Promise<{ width: number; height: number; faces: Box[] }>;
   /**
-   * 照片里是什么（没有文字的照片做推荐用，还没接进推荐）：标签是平台自己的英文标识，从高到低，
-   * 只有不低于 minConfidence 的。signal 取消时 Promise 马上以 code 为 cancelled 的错误结束，
-   * 不等原生那边。没有这个能力时（旧开发构建）没有这个方法。
+   * What is in the photo (used for recommendations on photos without text, not yet integrated
+   * into recommendations): labels are platform-specific English identifiers, ordered from highest
+   * to lowest confidence, including only those at or above minConfidence. When signal is
+   * cancelled, the Promise immediately rejects with a cancelled error code, without waiting for
+   * native completion. Absent when this capability is not available (older development builds).
    */
   classifyImage?(
     uri: string,
     options?: { maxResults?: number; minConfidence?: number; signal?: AbortSignal },
   ): Promise<ImageLabel[]>;
   /**
-   * 「记一笔」预填用的系统识别（D-244，只做规则的补充，还没接进记一笔）：文字里的日期和金额在哪里。
-   * 不下载模型；系统做不了、模型没下载或者出错时返回空（只用规则）。
+   * System recognition used for "log an expense" pre-filling (D-244, strictly a rule supplement,
+   * not yet integrated into expenses): locations of dates and amounts in the text. Does not
+   * download models; returns empty if system capabilities are lacking, the model is not
+   * downloaded, or an error occurs (uses rules only).
    */
   detectData?(text: string, language: string): Promise<SystemDataMatch[]>;
-  /** 这种语言的系统识别：ready 能用；download 要先下载模型（先问用户）；unsupported 不支持。 */
+  /** System recognition status for this language: ready for use; download requires downloading the model first (prompting the user); unsupported is not supported. */
   dataDetectionStatus?(language: string): Promise<'ready' | 'download' | 'unsupported'>;
-  /** 下载识别模型（Android）；只在用户同意以后调用。 */
+  /** Download the recognition model (Android); called only after user consent. */
   downloadDataModel?(language: string): Promise<void>;
   /**
-   * 证件照换底色（D-252）：人留下，其余换成纯色，输出 PNG。iOS 用人像分割（iOS 15 起），
-   * Android 用主体分割（和去背景同一个模型，要 Google Play 服务）。
+   * ID photo background replacement (D-252): preserves the person, replaces the rest with a solid
+   * color, outputs PNG. iOS uses person segmentation (since iOS 15), Android uses subject
+   * segmentation (same model as background removal, requires Google Play Services).
    */
   replaceBackground?(
     uri: string,
@@ -195,59 +207,67 @@ export interface VisionPlatform {
     runId: string,
     relPath: string,
   ): Promise<EncodedImage>;
-  /** replaceBackground 用的是系统自带的人像分割（iOS），不用先确认下载模型（Android 的主体分割要）。 */
+  /** replaceBackground uses system-native person segmentation (iOS) without requiring prior confirmation to download a model (unlike Android subject segmentation). */
   readonly personSegmentation?: boolean;
 
-  /** 这种语言（BCP 47）这台设备能不能识别（PP-OCRv6 的语言要先下载模型，见 ocrModel）。 */
+  /** Whether this device can recognize text in this language (BCP 47) (PP-OCRv6 languages require downloading a model first, see ocrModel). */
   supportsLanguage(code: string): boolean;
   /**
-   * 文字识别模型（D-269）：这些语言（BCP 47 的语言部分）用 PP-OCRv6 识别，要先下载 pack 这个扩展包；
-   * 其余语言用系统自带的（iOS Vision、Android 只剩韩文用 ML Kit）。没有原生模型接口的旧版 App 没有这一项。
+   * Text recognition model (D-269): these languages (BCP 47 language subtag) are recognized using
+   * PP-OCRv6 and require downloading the pack extension first; remaining languages use
+   * system-native OCR (iOS Vision, Android uses ML Kit only for Korean). Older app versions
+   * lacking native model interfaces do not have this property.
    */
   readonly ocrModel?: { pack: string; languages: readonly string[] };
-  /** 识别文字；languages 是 BCP 47，第一种是用户选的语言。文字只返回给 App。 */
+  /** Recognize text; languages is BCP 47, with the first being the user-selected language. Text is returned only to the app. */
   recognizeText(uri: string, languages: readonly string[]): Promise<string>;
   /**
-   * PDF 的文字层（D-455）：iOS PDFKit，Android 15 起的 PdfRenderer；没有文字层或系统不支持时是 null。
-   * 文字只返回给 App。
+   * PDF text layer (D-455): iOS PDFKit, Android 15+ PdfRenderer; null when there is no text layer
+   * or system support. Text is returned only to the app.
    */
   pdfText?(uri: string): Promise<string | null>;
   /**
-   * 识别文字，给出每行的位置（可搜索 PDF 的文字层，D-195）。pixels 是同一张图已经解码好的像素
-   * （tablePixels 给的），PP-OCRv6 直接用它，不再解码一次（转 Excel，D-272）。
+   * Recognize text and provide line positions (searchable PDF text layer, D-195). pixels are
+   * already-decoded pixels of the same image (provided by tablePixels), used directly by PP-OCRv6
+   * without re-decoding (for Excel conversion, D-272).
    */
   recognizeLines(
     uri: string,
     languages: readonly string[],
     pixels?: Pixels,
   ): Promise<RecognizedLayer>;
-  /** 转 Excel（D-272）：解码成识别时的大小（长边 2000 以内），找表格线用；没有 Skia 时没有。 */
+  /** Excel conversion (D-272): decodes to recognition size (long side under 2000), used for finding table lines; absent if Skia is unavailable. */
   tablePixels?(uri: string): Promise<Pixels>;
   /**
-   * 扫描展平的模型（D-274）：配置了扩展包下载地址时才有，扫描时提示下载 pack 这个扩展包（不下载也照样扫描）。
-   * 没配置下载地址但已经装好时（模拟器测试），flatten 照样能用，只是不提示下载。
+   * Scan flattening model (D-274): present only when extension pack download URL is configured,
+   * prompting to download the pack during scanning (scanning works without downloading). When no
+   * download URL is configured but the pack is already installed (simulator testing), flatten
+   * works normally without download prompts.
    */
   readonly flattenModel?: { pack: string };
   /**
-   * 展平一张拉正后的页面（D-274）：UVDoc 估计弯曲，装了文字识别模型时再按文字行精修，只重采样一次。
-   * 展平模型没装时返回 null（照常扫描，只是不展平）。
+   * Flatten an unwarped page (D-274): UVDoc estimates warping, and if an OCR model is installed,
+   * it further refines by text lines, performing only a single resampling. Returns null if the
+   * flattening model is not installed (scans normally without flattening).
    */
   flatten?(uri: string, runId: string, relPath: string): Promise<FlattenResult | null>;
   /**
-   * 转 Word 的版面分析模型（D-328）：配置了扩展包下载地址时才有，转 Word 时提示下载 pack 这个扩展包
-   * （可选：不下载也照样转，只是不分标题和图片）。
+   * Layout analysis model for Word conversion (D-328): present only when extension pack download
+   * URL is configured, prompting to download the pack during Word conversion (optional: converts
+   * without downloading, but without distinguishing titles and images).
    */
   readonly layoutModel?: { pack: string };
-  /** 一页的版面区域（坐标和 pixels 一样，pixels 是 tablePixels 给的）；模型没装时返回 null。 */
+  /** Layout regions for a page (coordinates match pixels, where pixels are provided by tablePixels); returns null if the model is not installed. */
   detectLayout?(pixels: Pixels): Promise<LayoutRegion[] | null>;
-  /** 能不能给照片找边和拉正（findPaper / straighten）；Android 的 ML Kit 不能。 */
+  /** Whether edge detection and straightening (findPaper / straighten) can be performed on photos; Android ML Kit cannot. */
   readonly canFindPaper: boolean;
   /**
-   * 找纸张的候选四边形（像素，已按拍摄方向摆正；四个点顺序不定）和一张小灰度图，
-   * 挑哪个由 App 的 pickPaper 决定，和扫描包一样（D-326、D-327）。
+   * Finds paper candidate quadrilaterals (pixels, oriented according to shooting orientation;
+   * four points in arbitrary order) and a small grayscale image; which one to pick is determined
+   * by the app's pickPaper, same as the scanning pack (D-326, D-327).
    */
   findPaper(uri: string): Promise<{ candidates: Point[][]; gray: GrayImage }>;
-  /** 按四个角拉正，缩放到 size，存成本次运行的 JPG 临时文件。 */
+  /** Straightens based on four corners, scales to size, and saves as a temporary JPG file for the current run. */
   straighten(
     uri: string,
     quad: Quad,
@@ -255,75 +275,81 @@ export interface VisionPlatform {
     runId: string,
     relPath: string,
   ): Promise<EncodedImage>;
-  /** 系统文档相机能不能用（模拟器上不能）。 */
+  /** Whether the system document camera is available (unavailable on simulators). */
   readonly documentCamera: boolean;
-  /** 打开系统文档相机（实时找边、自动拍摄、多页），页面放进本次运行的临时目录；用户取消时返回 null。 */
+  /** Opens the system document camera (real-time edge detection, auto-capture, multi-page), placing pages into the temporary directory of the current run; returns null if cancelled by the user. */
   scanDocuments(runId: string, maxSide: number): Promise<PickedFile[] | null>;
 }
 
 /**
- * 系统自带的本机翻译（modules/morph-translate，D-170）：iOS 是 Translation 框架（iOS 18 起），
- * Android 是 ML Kit（语言模型第一次用时下载，约 30 MB）。语言用 BCP 47。没有原生模块时（Expo Go）为 null。
- * 文字只在本机处理，不上传、不发给 AI。
+ * System-native local translation (modules/morph-translate, D-170): iOS uses the Translation
+ * framework (since iOS 18), Android uses ML Kit (language model downloaded on first use, ~30 MB).
+ * Languages use BCP 47. Null when native modules are absent (Expo Go). Text is processed entirely
+ * locally, never uploaded or sent to AI.
  */
 export interface TranslatePlatform {
-  /** 这台设备能不能翻译（iOS 17 及更早没有系统翻译）。 */
+  /** Whether this device can translate (iOS 17 and earlier lack system translation). */
   readonly supported: boolean;
-  /** 每段文字的语言；认不出时为 null。 */
+  /** Language of each text segment; null if unrecognised. */
   detectLanguages(texts: readonly string[]): Promise<(string | null)[]>;
   /**
-   * 这一对语言现在能不能翻：installed 直接能翻；download 要先下载，missing 是还没下载的语言（Android，
-   * 由 App 先问用户）；iOS 不给 missing，系统在翻译时自己弹窗问。unsupported 不能翻。
+   * Whether this language pair can currently be translated: installed means ready to translate;
+   * download requires downloading first, missing indicates languages not yet downloaded (Android,
+   * prompting the user first); iOS provides no missing status, prompting the user itself during
+   * translation. unsupported cannot be translated.
    */
   status(
     from: string,
     to: string,
   ): Promise<{ status: 'installed' | 'download' | 'unsupported'; missing?: string[] }>;
-  /** 每种语言要下载多少字节（估计，Android 的 ML Kit 约 30 MB）。 */
+  /** Number of bytes to download for each language (estimated, Android ML Kit is ~30 MB). */
   readonly downloadBytes?: number;
-  /** 下载一种语言的模型（Android）；没有网络时抛出。iOS 没有这个方法。 */
+  /** Download a language model (Android); throws if offline. iOS does not have this method. */
   download?(language: string): Promise<void>;
-  /** 已下载的语言（Android，「设置 → 已下载内容」列出；iOS 的语言由系统设置管理，没有这个方法）。 */
+  /** Downloaded languages (Android, listed in "Settings -> Downloaded Content"; iOS languages are managed by system settings and lack this method). */
   downloadedLanguages?(): Promise<string[]>;
-  /** 删除一种语言的模型（Android）。 */
+  /** Delete a language model (Android). */
   removeLanguage?(language: string): Promise<void>;
   /**
-   * 翻译，一段对一段。iOS 需要下载时系统会弹窗；用户取消时抛出 code 为 cancelled 的错误。
+   * Translate, segment by segment. On iOS, the system pops up a confirmation dialog if download
+   * is required; throws an error with code cancelled if the user cancels.
    */
   translate(texts: readonly string[], from: string, to: string): Promise<string[]>;
-  /** 先下载好一对语言（只有 iOS：系统弹窗确认；用户取消时 code 是 cancelled）。 */
+  /** Pre-download a language pair (iOS only: system confirmation dialog; code is cancelled if the user cancels). */
   prepare?(from: string, to: string): Promise<void>;
 }
 
-/** 朗读失败的原因（modules/morph-tts，D-270）：动作实现按它告诉用户怎么办。 */
+/** Reasons for speech synthesis failure (modules/morph-tts, D-270): action implementations instruct users based on this. */
 export type SpeakErrorCode = 'noVoice' | 'notDownloaded' | 'unavailable' | 'cancelled' | 'failed';
 
 export interface SpeakRequest {
-  /** 声音的地区代码（BCP 47：zh-CN、en-US，core 的 SPEAK_VOICE_LOCALES）。 */
+  /** Voice locale code (BCP 47: zh-CN, en-US, core SPEAK_VOICE_LOCALES). */
   voice: string;
-  /** 1 是正常语速，0.5–2。 */
+  /** 1 is normal speed, ranging from 0.5 to 2. */
   rate: number;
   runId: string;
-  /** 输出的 WAV 放在本次运行的临时目录 runs/<runId>/<relPath>。 */
+  /** Output WAV placed in the current run's temporary directory runs/<runId>/<relPath>. */
   relPath: string;
   /** 0–1。 */
   onProgress?: (fraction: number) => void;
-  /** 运行页点了「停止」（每 0.3 秒看一次）。 */
+  /** Stop tapped on the run page (checked every 0.3 seconds). */
   isCancelled?: () => boolean;
 }
 
 /**
- * 系统声音朗读（modules/morph-tts，D-270）：iOS 是 AVSpeechSynthesizer，Android 是系统的 TextToSpeech。
- * 只把文字读成音频文件，不播放。没有原生模块时（Expo Go）为 null。文字只交给系统，不上传、不发给 AI。
- * 出错时抛出带 code（SpeakErrorCode）的错误。
+ * System speech synthesis (modules/morph-tts, D-270): iOS uses AVSpeechSynthesizer, Android uses
+ * system TextToSpeech. Converts text to audio files only, without playing them. Null when native
+ * modules are absent (Expo Go). Text is passed only to the system, never uploaded or sent to AI.
+ * Throws an error with a code (SpeakErrorCode) on failure.
  */
 export interface SpeakPlatform {
   /**
-   * 这种声音能不能用：installed 能用；notDownloaded 声音数据还没下载（Android，要到系统设置里下载）；
-   * unsupported 没有这种语言的声音；noEngine 没有朗读引擎（Android）。
+   * Whether this voice can be used: installed is usable; notDownloaded means voice data is not
+   * yet downloaded (Android, download via system settings); unsupported means no voice exists for
+   * this language; noEngine means no TTS engine is available (Android).
    */
   voiceStatus(voice: string): Promise<'installed' | 'notDownloaded' | 'unsupported' | 'noEngine'>;
-  /** 几段文字按顺序读成一个 16 位 PCM 的 WAV；中间文件由原生模块删掉，失败、取消时不留输出文件。 */
+  /** Synthesizes text segments in order into a 16-bit PCM WAV file; intermediate files are deleted by native modules, leaving no output files on failure or cancellation. */
   synthesize(
     segments: readonly string[],
     request: SpeakRequest,
@@ -336,7 +362,7 @@ export interface SpeakPlatform {
   }>;
 }
 
-/** 存到文件夹的一个文件：本机地址、文件名（不含扩展名）和扩展名。 */
+/** A file stored in a folder: local URI, file name (without extension), and extension. */
 export interface FolderItem {
   uri: string;
   name: string;
@@ -344,14 +370,14 @@ export interface FolderItem {
   mimeType: string;
 }
 
-/** 视频、音频的信息（modules/morph-media 的 probe，D-141）。 */
+/** Video and audio metadata (modules/morph-media probe, D-141). */
 export interface MediaInfo {
   kind: 'video' | 'audio';
   durationMs: number;
   size: number;
   hasVideo: boolean;
   hasAudio: boolean;
-  /** 画面摆正之后的宽高。 */
+  /** Width and height after orienting the video. */
   width?: number;
   height?: number;
   fps?: number;
@@ -364,22 +390,22 @@ export interface MediaInfo {
   channels?: number;
 }
 
-/** 一次视频编码的要求（H.264 + AAC 的 MP4）。 */
+/** Requirements for a video encoding task (H.264 + AAC MP4). */
 export interface VideoEncode {
-  /** 视频和声音一起变速，声音随之变调。 */
+  /** Changes video and audio speed together, with audio pitch changing accordingly. */
   speed?: number;
-  /** 居中裁剪到这个宽高比。 */
+  /** Crop to this aspect ratio from the center. */
   aspectRatio?: number;
   videoKbps: number;
-  /** 0 = 去掉声音。 */
+  /** 0 = remove audio. */
   audioKbps: number;
-  /** 缩小到这个短边；不缩小时不给。 */
+  /** Scale down to this short side; omitted when no scaling is needed. */
   shortSide?: number;
   maxFps: number;
   range?: { startMs: number; endMs: number };
 }
 
-/** 音频的编码要求（core 的 AudioPlan）：M4A（AAC）、WAV（16 位 PCM）或 MP3（D-183）；range 只要其中一段。 */
+/** Audio encoding requirements (core AudioPlan): M4A (AAC), WAV (16-bit PCM), or MP3 (D-183); range specifies a subsegment. */
 export interface AudioEncode {
   format: 'm4a' | 'wav' | 'mp3';
   bitrateKbps: number;
@@ -388,13 +414,13 @@ export interface AudioEncode {
   range?: { startMs: number; endMs: number };
 }
 
-/** 一个长任务：步内进度（0–1）和取消。 */
+/** A long-running task: intra-step progress (0–1) and cancellation. */
 export interface MediaJob {
   progress(fraction: number): void;
   isCancelled(): boolean;
 }
 
-/** 处理结果：本次运行的临时文件。 */
+/** Processing result: temporary file for the current run. */
 export interface MediaOutput {
   uri: string;
   ext: string;
@@ -402,7 +428,7 @@ export interface MediaOutput {
   info: MediaInfo;
 }
 
-/** 写好的动图（D-184）：本次运行的临时文件。 */
+/** Generated animated GIF (D-184): temporary file for the current run. */
 export interface GifOutput {
   uri: string;
   size: number;
@@ -412,13 +438,14 @@ export interface GifOutput {
 }
 
 /**
- * 在本机处理视频和音频（modules/morph-media：iOS AVFoundation、Android Media3，D-141）。
- * 没有原生模块时（Expo Go）为 null，视频动作报 needsFullApp。处理期间屏幕不灭（D-148）。
- * 出错时抛出带 code 的错误（ERR_MEDIA_UNSUPPORTED / CANCELLED / INTERRUPTED / NOT_IMPLEMENTED / FAILED）。
+ * Process video and audio on-device (modules/morph-media: iOS AVFoundation, Android Media3,
+ * D-141). Returns null when native modules are absent (Expo Go); video actions report
+ * needsFullApp. Screen stays on during processing (D-148). Throws errors with codes on failure
+ * (ERR_MEDIA_UNSUPPORTED / CANCELLED / INTERRUPTED / NOT_IMPLEMENTED / FAILED).
  */
 export interface MediaPlatform {
   probe(uri: string): Promise<MediaInfo>;
-  /** 重新编码成 MP4，写进本次运行的临时目录 relPath（扩展名 .mp4）。 */
+  /** Re-encode into MP4, writing to the temporary directory relPath for the current run (extension .mp4). */
   encodeVideo(
     uri: string,
     settings: VideoEncode,
@@ -426,8 +453,8 @@ export interface MediaPlatform {
     relPath: string,
     job: MediaJob,
   ): Promise<MediaOutput>;
-  /** 同一个响度动作接音频或视频；视频设置存在时保留画面。 */
-  /** 按视频完整时间轴提取 WAV，给本机字幕识别，包含开头/结尾静音。 */
+  /** Extract WAV along the full video timeline for on-device subtitle recognition, including leading/trailing silence. */
+  /** Extract WAV along the full video timeline for on-device subtitle recognition, including leading/trailing silence. */
   speechAudio(uri: string, runId: string, relPath: string, job: MediaJob): Promise<MediaOutput>;
   volume(
     uri: string,
@@ -443,7 +470,7 @@ export interface MediaPlatform {
     relPath: string,
     job: MediaJob,
   ): Promise<MediaOutput>;
-  /** 去掉声音；iOS 不重新编码，Android 重新编码画面。 */
+  /** Remove audio; iOS does not re-encode, Android re-encodes the video stream. */
   muteVideo(
     uri: string,
     settings: VideoEncode,
@@ -451,7 +478,7 @@ export interface MediaPlatform {
     relPath: string,
     job: MediaJob,
   ): Promise<MediaOutput>;
-  /** 顺时针旋转；iOS 只改方向信息，Android 重新编码。 */
+  /** Rotate clockwise; iOS only updates orientation metadata, Android re-encodes. */
   rotateVideo(
     uri: string,
     degrees: 90 | 180 | 270,
@@ -460,7 +487,7 @@ export interface MediaPlatform {
     relPath: string,
     job: MediaJob,
   ): Promise<MediaOutput>;
-  /** 配乐运行时选择，不作为工作流中的第二个传递值。 */
+  /** Selected at soundtrack runtime, not passed as a secondary value in the workflow. */
   mixVideoAudio(
     uri: string,
     music: string,
@@ -474,7 +501,7 @@ export interface MediaPlatform {
     relPath: string,
     job: MediaJob,
   ): Promise<MediaOutput>;
-  /** 按顺序拼接视频，尺寸和帧率以第一段为准，不同比例留黑边。 */
+  /** Concatenate videos in order; dimensions and frame rate follow the first segment, with letterboxing for mismatched aspect ratios. */
   concatVideo(
     uris: readonly string[],
     settings: VideoEncode & { width: number; height: number },
@@ -482,7 +509,7 @@ export interface MediaPlatform {
     relPath: string,
     job: MediaJob,
   ): Promise<MediaOutput>;
-  /** 不重新编码地剪一段；输出的扩展名可能和 relPath 不同（MP4 放不下原来的声音时用 MOV）。 */
+  /** Trim without re-encoding; output extension may differ from relPath (uses MOV when MP4 cannot hold the original audio). */
   trim(
     uri: string,
     range: { startMs: number; endMs: number },
@@ -490,16 +517,16 @@ export interface MediaPlatform {
     relPath: string,
     job: MediaJob,
   ): Promise<MediaOutput>;
-  /** 精确解码指定时间附近的一帧，原尺寸 JPEG，已摆正。 */
+  /** Accurately decode a single frame near the specified timestamp at original resolution, JPEG format, properly oriented. */
   frame(uri: string, timeMs: number, runId: string): Promise<string>;
-  /** 按时间取画面（已摆正），JPEG 放进本次运行的临时目录。 */
+  /** Extract frames by timestamp (properly oriented), saving JPEGs into the temporary directory of the current run. */
   thumbnails(
     uri: string,
     timesMs: readonly number[],
     maxSide: number,
     runId: string,
   ): Promise<string[]>;
-  /** 音频（或视频的声音）编码成 M4A / WAV / MP3（D-153、D-183）。 */
+  /** Encode audio (or video sound) into M4A / WAV / MP3 (D-153, D-183). */
   encodeAudio(
     uri: string,
     settings: AudioEncode,
@@ -507,7 +534,7 @@ export interface MediaPlatform {
     relPath: string,
     job: MediaJob,
   ): Promise<MediaOutput>;
-  /** 几段按顺序接成一段（D-155），格式、采样率可以不同。 */
+  /** Concatenate multiple segments in order into a single file (D-155), supporting differing formats and sample rates. */
   concatAudio(
     uris: readonly string[],
     settings: AudioEncode,
@@ -515,9 +542,9 @@ export interface MediaPlatform {
     relPath: string,
     job: MediaJob,
   ): Promise<MediaOutput>;
-  /** 波形（buckets 个 0–1 的峰值），剪一段界面用；读不到时返回 null。 */
+  /** Waveform (buckets of 0-1 peak values), for UI snippet trimming; returns null if it cannot be read. */
   waveform(uri: string, buckets: number): Promise<number[] | null>;
-  /** 整段视频转成 GIF（D-184）：按 fps 取画面，宽度不超过 width。 */
+  /** Convert an entire video to GIF (D-184): extract frames by fps, capping width at width. */
   videoGif(
     uri: string,
     settings: { width: number; fps: number },
@@ -525,7 +552,7 @@ export interface MediaPlatform {
     relPath: string,
     job: MediaJob,
   ): Promise<GifOutput>;
-  /** 几张图片做成 GIF（D-184）：长边缩到 maxSide，按第一张的尺寸居中摆放，每张停 delayMs。 */
+  /** Create a GIF from multiple images (D-184): shrink long side to maxSide, center-align based on the first image's dimensions, holding each frame for delayMs. */
   imagesGif(
     uris: readonly string[],
     settings: { delayMs: number; maxSide: number },
@@ -536,14 +563,15 @@ export interface MediaPlatform {
 }
 
 /**
- * 办公文档转 PDF（D-186）。iOS 用系统的文档预览排版（modules/morph-docs），Word、Excel、PowerPoint、RTF 都能转；
- * Android（和没有原生模块的 Expo Go）用 mammoth 把 Word（.docx）转成网页再打印成 PDF。
+ * Convert office documents to PDF (D-186). iOS uses system document preview rendering
+ * (modules/morph-docs), supporting Word, Excel, PowerPoint, and RTF; Android (and Expo Go without
+ * native modules) uses mammoth to convert Word (.docx) into HTML and prints it to PDF.
  */
-/** PDF 密码（D-194，modules/morph-docs 的 PDFKit）。结果写成本次运行的临时文件 runs/<runId>/<relPath>。 */
+/** PDF password (D-194, PDFKit in modules/morph-docs). Results are written to the current run's temporary file runs/<runId>/<relPath>. */
 export interface PdfPasswordPlatform {
-  /** none：没有加密；restricted：不用密码能打开但有限制；locked：要密码才能打开。打不开时抛出错误。 */
+  /** none: no encryption; restricted: can open without password but with restrictions; locked: requires password to open. Throws an error if it cannot be opened. */
   lockState(uri: string): Promise<'none' | 'restricted' | 'locked'>;
-  /** 另存一份没有密码的；密码不对时返回 null。 */
+  /** Save a copy without a password; returns null if the password is incorrect. */
   unlock(
     uri: string,
     password: string,
@@ -559,11 +587,11 @@ export interface PdfPasswordPlatform {
 }
 
 export interface DocumentPlatform {
-  /** 能转的扩展名（小写）。 */
+  /** Supported file extensions (lowercase). */
   readonly extensions: readonly string[];
-  /** PDF 密码；Android 和 Expo Go 没有（P-025）。 */
+  /** PDF password support; absent on Android and Expo Go (P-025). */
   readonly passwords: PdfPasswordPlatform | null;
-  /** 转成本次运行的 PDF 临时文件；打不开时抛出 code 为 ERR_DOC_UNREADABLE 的错误。 */
+  /** Convert to a temporary PDF file for the current run; throws an error with code ERR_DOC_UNREADABLE if it cannot be opened. */
   toPdf(
     uri: string,
     ext: string,
@@ -574,58 +602,63 @@ export interface DocumentPlatform {
 }
 
 /**
- * 长任务切到别的 App 也继续（modules/morph-background，D-160–D-163）：Android 是前台服务和进度通知，
- * iOS 26 是系统的后台任务（默认关着）。运行入口在一次含长步骤的运行前后调用；没有原生模块时为 null。
+ * Keep long tasks running even when switching to other apps (modules/morph-background,
+ * D-160-D-163): Android uses a foreground service and progress notifications, while iOS 16 uses
+ * system background tasks (disabled by default). Run entry points are called before and after
+ * operations containing long steps; returns null when native modules are absent.
  */
 export interface BackgroundPlatform {
-  /** 切到别的 App 时会不会继续；运行页据此提示「可以切走」或「请留在 Morph 里」。 */
+  /** Whether execution continues when switching to another app; the run page uses this to display "You can switch away" or "Please stay in Morph". */
   readonly continuesInBackground: boolean;
-  /** Android 13 起第一次时问一次通知权限（D-161）；返回现在能不能发通知。 */
+  /** Prompt for notification permission the first time starting from Android 13 (D-161); returns whether notifications can currently be sent. */
   ensureNotificationPermission(): Promise<boolean>;
-  /** 系统不让开始时返回 false，任务照旧只在前台跑。 */
+  /** Returns false if the system disallows starting, and the task runs in the foreground as usual. */
   begin(title: string, text: string): boolean;
-  /** fraction 为 null 时进度不定。 */
+  /** Progress is indeterminate when fraction is null. */
   update(text: string, fraction: number | null): void;
-  /** done 不为 null 时发一条完成通知（D-162）。 */
+  /** Send a completion notification when done is not null (D-162). */
   end(done: { title: string; body: string } | null): void;
-  /** Morph 现在在不在前台（决定发不发完成通知）。 */
+  /** Whether Morph is currently in the foreground (determines whether to send completion notifications). */
   isForeground(): boolean;
 }
 
 export interface FilePlatform {
-  /** 办公文档转 PDF（D-186）。 */
+  /** Convert office documents to PDF (D-186). */
   readonly documents: DocumentPlatform;
-  /** 系统自带的文字识别和扫描；没有时为 null。 */
+  /** System-provided text recognition and scanning; null when unavailable. */
   readonly vision: VisionPlatform | null;
-  /** 系统自带的本机翻译（D-170）；没有原生模块时为 null。 */
+  /** System-provided on-device translation (D-170); null when native modules are absent. */
   readonly translator: TranslatePlatform | null;
-  /** 本机处理视频和音频；没有时（Expo Go）为 null。 */
+  /** On-device video and audio processing; null when unavailable (Expo Go). */
   readonly media: MediaPlatform | null;
-  /** 本机语音转文字（D-150、D-151，modules/morph-speech）；没有时（Expo Go）为 null。 */
+  /** On-device speech-to-text (D-150, D-151, modules/morph-speech); null when unavailable (Expo Go). */
   readonly speech: SpeechPlatform | null;
-  /** 系统声音把文字读成音频文件（D-270，modules/morph-tts）；没有时（Expo Go）为 null。 */
+  /** Synthesize text into audio files using system speech (D-270, modules/morph-tts); null when unavailable (Expo Go). */
   readonly speaker: SpeakPlatform | null;
-  /** 长任务切到后台也继续（D-160）；没有原生模块时（Expo Go）为 null。 */
+  /** Keep long tasks running when switched to the background (D-160); null when native modules are absent (Expo Go). */
   readonly background: BackgroundPlatform | null;
-  /** 文件房间的桌面目录（D-357，文档目录下的 desk/）。 */
+  /** Desk directory in the document workspace (D-357, desk/ under the documents directory). */
   readonly desk: DeskFs;
 
-  // ---- 用户文件（assets/<id>/<文件名>，D-019）----
+  // ---- User files (assets/<id>/<filename>, D-019) ----
   /**
-   * 从相册选一张照片（图片组件、图片背景用），重新编码成 JPEG，最长边缩到 maxSide（默认 2048）以内，
-   * 解码时就缩小；用户取消时返回 null。
+   * Pick a photo from the photo library (used for image components and backgrounds), re-encoding
+   * to JPEG with its longest side scaled down to maxSide (default 2048), scaling during decode;
+   * returns null if the user cancels.
    */
   pickImage(maxSide?: number): Promise<PickedFile | null>;
-  /** 某个用户文件可以直接显示的地址（图片组件用）。 */
+  /** Direct display URI for a user file (used by image components). */
   fileUri(path: string): string;
   /**
-   * PDF 第一页的缩略图（D-451）：PDF 存进用户文件时在本机生成，放在同一个目录里；
-   * 没有（不是 PDF、打不开、以前存的）时是 null。只读，不生成。
+   * Thumbnail URI for the first page of a PDF (D-451): generated on-device when a PDF is saved to
+   * user files, stored in the same directory; null when unavailable (not a PDF, unreadable, or
+   * legacy storage). Read-only, never generated on demand.
    */
   thumbnailUri?(path: string): string | null;
   /**
-   * 文件里的文字（D-455，底线 14 的例外）：图片识别出的、PDF 文字层的，存在这个文件旁边，跟着文件一起删。
-   * 只在本机，不进配置、不发给 AI。
+   * Text extracted from files (D-455, exception to invariant 14): OCR text from images and text
+   * layers from PDFs are stored next to the file and deleted alongside it. On-device only,
+   * excluded from config and never sent to AI.
    */
   saveAssetText?(path: string, text: string): Promise<void>;
   assetText?(path: string): Promise<string | null>;
@@ -635,15 +668,16 @@ export interface FilePlatform {
     name: string,
   ): Promise<{ path: string; size: number }>;
   /**
-   * 删掉一个用户文件在磁盘上的目录 assets/<id>/（「设置 → 存储空间」，D-264）。path 不在 assets/ 下时什么都不做；
-   * 已经不在了也不算错。
+   * Delete a user file directory assets/<id>/ from disk ("Settings -> Storage", D-264). Does
+   * nothing if path is not under assets/; missing files are ignored.
    */
   removeAssetFile(path: string): Promise<void>;
   readBytes(path: string): Promise<Uint8Array>;
   /**
-   * 文件内容的 SHA-256（小写十六进制）：原生边读边算，大文件也不进 JS 内存。uri 可以是选出来的文件
-   * （file://、content://）或用户文件的地址（fileUri）。只在本机用来分辨两个文件是不是同一份，摘要不存、不发（底线 1、2）。
-   * 读不到时抛错。
+   * SHA-256 digest of file contents (lowercase hex): computed natively on the fly so large files
+   * do not enter JS memory. uri can be a picked file (file://, content://) or a user file URI
+   * (fileUri). Used on-device only to distinguish file identities; digests are never stored or
+   * transmitted (invariants 1, 2). Throws on read failure.
    */
   contentDigest(uri: string): Promise<string>;
   writeBytes(
@@ -652,38 +686,43 @@ export interface FilePlatform {
     bytes: Uint8Array,
   ): Promise<{ path: string; size: number }>;
   share(path: string, mimeType: string): Promise<void>;
-  /** 把一段文字存成临时文件并打开系统分享面板（导出 CSV 用）。不会成为用户文件。 */
+  /** Save text to a temporary file and open the system share sheet (used for CSV export). Never becomes a user file. */
   shareText(fileName: string, text: string, mimeType: string): Promise<void>;
   /**
-   * 交给别的 AI App（D-611）：App 文件连同提示词交给系统分享面板，用户自己挑 App、自己点发送（底线 10）。
-   * 有原生分享时 App 文件作附件，打包在 App 里的检查器（tinkrum-check.js）也附上；prompt 按实际带了什么写。
-   * 没有原生分享（Expo Go）时只发文字，App 文件写在提示词后面。App 文件只有结构（底线 1、2、3）。
+   * Send to other AI apps (D-611): app files along with prompts are passed to the system share
+   * sheet, letting the user manually choose the app and tap send (invariant 10). When native
+   * sharing is available, app files are attached alongside the packaged inspector
+   * (tinkrum-check.js); prompts include actual provided contents. When native sharing is absent
+   * (Expo Go), only text is sent, with app files appended to the prompt. App files contain
+   * structure only (invariants 1, 2, 3).
    */
   shareWithAi(input: {
     file?: { name: string; text: string };
     prompt: (how: { attached: boolean; checker: boolean; docs?: boolean }) => string;
-    /** 有文件时分享的文字：提示词本身放进 tinkrum-request.md 附件，文字只是指一下它。 */
+    /** Shared text when files are present: the prompt itself is placed inside the tinkrum-request.md attachment, and the text merely points to it. */
     pointer: string;
   }): Promise<void>;
   /**
-   * 读用户从「文件」选的一个文字文件（恢复预填记忆的备份用）。读完删掉选择器放在 App 缓存里的副本
-   * （Caches/DocumentPicker，是 App 自己的）；原件不动。
+   * Read a text file selected by the user from the "Files" app (used for restoring prefilled
+   * memory backups). Deletes the picker's temporary copy in App cache (Caches/DocumentPicker,
+   * internal to the app) after reading; the original file remains untouched.
    */
   readPickedText(uri: string): Promise<string>;
 
-  // ---- 工作流执行：选择 ----
-  /** 从相册混选照片和视频；用户取消时返回 null。 */
+  // ---- Workflow execution: Selection ----
+  /** Select a mix of photos and videos from the photo library; returns null if the user cancels. */
   pickMedia(max: number): Promise<PickedFile[] | null>;
-  /** 从相册多选照片；用户取消时返回 null。 */
+  /** Select multiple photos from the photo library; returns null if the user cancels. */
   pickPhotos(max: number): Promise<PickedFile[] | null>;
-  /** 拍一张照片；用户取消时返回 null，没有相机时抛出 cameraUnavailable。 */
+  /** Take a photo; returns null if the user cancels, throws cameraUnavailable if no camera is present. */
   takePhoto(): Promise<PickedFile | null>;
-  /** 从相册多选视频（不在选的时候转码）；用户取消时返回 null。 */
+  /** Select multiple videos from the photo library (without transcoding at selection time); returns null if the user cancels. */
   pickVideos(max: number): Promise<PickedFile[] | null>;
   /**
-   * 从「文件」App 选文件；types 是 MIME 类型（可含 image/*、* / *）。
-   * inPlace 为 true 时不复制进缓存，给原件的地址（iOS 是原位置，Android 是 content://）：几个 GB 的压缩包不先复制一遍
-   * （整体恢复，D-600）；原件只读，不移动、不删除。
+   * Select files from the "Files" app; types specifies MIME types (may include image/*, * /*).
+   * When inPlace is true, files are not copied to cache, returning the original URI (original
+   * path on iOS, content:// on Android): avoids copying multi-gigabyte archives (full restore,
+   * D-600); originals are read-only and never moved or deleted.
    */
   pickDocuments(
     types: readonly string[],
@@ -691,12 +730,15 @@ export interface FilePlatform {
     inPlace?: boolean,
   ): Promise<PickedFile[] | null>;
 
-  // ---- 工作流执行：临时文件（缓存目录 runs/<runId>/，D-063）----
-  /** 把选择器给的文件复制进本次运行的临时目录。 */
+  // ---- Workflow execution: Temporary files (cache directory runs/<runId>/, D-063) ----
+  /** Copy a file provided by the picker into the temporary directory of the current run. */
   copyToRun(uri: string, runId: string, fileName: string): Promise<{ uri: string; size: number }>;
   /**
-   * 大文件（视频、音频）不复制（D-142）：选择器放在 App 缓存里的副本移进本次运行的临时目录（之后一起删）；
-   * 分享进来的（共享目录、content://）原地使用，返回原地址；keepSource 为 true 时缓存副本也不移动（收件页要支持再次运行）。
+   * Do not copy large files (videos, audio) (D-142): move the picker's cached copy into the
+   * current run's temporary directory (to be deleted together later); files shared in place
+   * (shared directory, content://) are used directly and their original URI is returned; when
+   * keepSource is true, cached copies are also not moved (the inbox page needs to support
+   * re-running).
    */
   adoptIntoRun(
     uri: string,
@@ -704,7 +746,7 @@ export interface FilePlatform {
     fileName: string,
     keepSource?: boolean,
   ): Promise<{ uri: string; size: number }>;
-  /** 手机剩余空间（字节）；读不到时为 null。 */
+  /** Remaining free space on device in bytes; null if unreadable. */
   freeDiskBytes(): number | null;
   writeRunFile(
     runId: string,
@@ -712,65 +754,70 @@ export interface FilePlatform {
     bytes: Uint8Array,
   ): Promise<{ uri: string; size: number }>;
   readUri(uri: string): Promise<Uint8Array>;
-  /** 删掉本次运行里的一个临时文件（编辑后的 xlsx 写成了新文件，旧的不要了，D-272）；只删运行目录里的。 */
+  /** Delete a temporary file in the current run (edited xlsx written as a new file, discarding the old one, D-272); restricts deletion strictly to the run directory. */
   removeRunFile(uri: string): Promise<void>;
-  /** 删除本次运行的临时目录。 */
+  /** Delete the temporary directory for the current run. */
   removeRun(runId: string): Promise<void>;
-  /** 启动时清理上次没来得及删除的临时目录。 */
+  /** Clean up leftover temporary directories from previous uncompleted startups. */
   removeAllRuns(): Promise<void>;
   /**
-   * 删除分享进来的文件的副本（D-116）：iOS 分享扩展放进 App Group 共享目录的文件，keep 以外的全部删掉
-   * （只动共享目录最上层、UUID 文件名的文件）；copies 是 Android 原生模块复制到缓存目录的副本，只删缓存目录里的。
-   * Android 的 content:// 地址本身不用删。
+   * Delete copies of shared files (D-116): delete all files in the App Group shared directory
+   * except those in keep (restricts to top-level, UUID-named files in the shared directory);
+   * copies refers to native Android module copies in the cache directory, restricted to the cache
+   * directory. Android content:// URIs themselves require no deletion.
    */
   removeShared(keep?: readonly string[], copies?: readonly string[]): Promise<void>;
   /**
-   * 删除选择器放在 App 缓存目录里的副本（相册、「文件」选完之后系统复制的那份）。不在缓存目录的
-   * （相册原件、content://、用户文件、运行临时目录 runs/）一律不动。
+   * Delete picker copies stored in the app cache directory (copies created by the system after
+   * selecting from photo library or "Files"). Files outside the cache directory (original photo
+   * library items, content:// URIs, user files, run temporary directories runs/) are never
+   * touched.
    */
   removePickedCopies(uris: readonly string[]): Promise<void>;
-  /** 启动时调用：这时内存里没有任何一批收件，选择器缓存目录里剩下的副本都没人用了。 */
+  /** Called at startup: at this point no inbox batches are in memory, so any remaining copies in the picker cache directory are obsolete. */
   removeStalePickerCopies(): Promise<void>;
-  /** 把临时文件存成用户文件。 */
+  /** Save a temporary file as a user file. */
   saveRunFile(uri: string, assetId: string, name: string): Promise<{ path: string; size: number }>;
 
-  // ---- 工作流执行：输出 ----
-  /** 打开一次系统分享面板带上全部文件（MorphShare，D-119）；没有原生模块时（Expo Go）逐个打开。 */
-  /** name、ext 是用户看到的文件名（分享出去用它，D-466）；没有时用文件本身的名字。 */
+  // ---- Workflow execution: Output ----
+  /** Open the system share sheet once with all files included (MorphShare, D-119); opens them individually when native modules are absent (Expo Go). */
+  /** name and ext are the filenames seen by the user (used when sharing, D-466); falls back to the file's own name when absent. */
   shareUris(
     items: readonly { uri: string; mimeType: string; name?: string; ext?: string }[],
   ): Promise<void>;
   /**
-   * 把文件复制进「文件」里的一个文件夹（D-120）。每个快捷操作（key 是它的 ID）记住自己的文件夹（D-196）：
-   * choose 不为 true 时有记住的就直接存进去，还没有时用最后选过的那个（D-123）并记给它；
-   * 否则让用户选一个并记住它。返回存了几个和文件夹名，用户取消时返回 null。
-   * 文件夹写不进去时抛出 folderNotWritable。
+   * Copies a file into a folder within "Files" (D-120). Each quick action (keyed by its ID)
+   * remembers its own folder (D-196): if choose is not true, saves directly to the remembered one
+   * if present, or uses the last chosen one (D-123) and remembers it; otherwise prompts the user
+   * to choose one and remembers it. Returns the count of saved files and the folder name, or null
+   * if cancelled. Throws folderNotWritable if the folder cannot be written to.
    */
   saveToFolder(
     items: readonly FolderItem[],
     key: string,
     choose?: boolean,
   ): Promise<{ saved: number; folder: string } | null>;
-  /** 这个快捷操作会存进的文件夹的名字；没有时为 null。 */
+  /** The name of the folder this quick action will save into; null if none remembered. */
   rememberedFolder(key: string): string | null;
-  /** 忘掉已经删掉的快捷操作的文件夹（keep：现在还有的快捷操作 ID），打开 App 时调用。 */
+  /** Forgets folders of quick actions that have been deleted (keep: IDs of currently existing quick actions); called on app startup. */
   forgetFolders(keep: readonly string[]): void;
-  /** 存到系统相册；没有权限时抛出 permissionDenied。 */
+  /** Saves to the system photo library; throws permissionDenied if permissions are lacking. */
   saveToPhotos(uris: readonly string[]): Promise<void>;
   /**
-   * 用系统预览打开一个文件（收件页面上的 PDF 等，D-238）：iOS 是 QuickLook，Android 交给能打开它的 App。
-   * 没有能打开它的 App 时抛出 noViewer。
+   * Opens a file using the system viewer (such as PDFs on the inbox page, D-238): QuickLook on
+   * iOS, hands off to an app capable of opening it on Android. Throws noViewer if no app can open
+   * it.
    */
   previewFile(item: { uri: string; mimeType: string; name: string }): Promise<void>;
   print(item: { uri: string; mimeType: string }): Promise<void>;
   copyText(text: string): Promise<void>;
-  /** 剪贴板里的文字（用户点「从剪贴板粘贴」时才读，D-593）；没有文字时是空字符串。 */
+  /** Text from the clipboard (read only when the user taps "Paste from clipboard", D-593); empty string when there is no text. */
   readClipboardText(): Promise<string>;
 
-  // ---- 图片（expo-image-manipulator）----
-  /** 图片尺寸（已按拍摄方向摆正）。 */
+  // ---- Images (expo-image-manipulator) ----
+  /** Image dimensions (corrected for capture orientation). */
   imageSize(uri: string): Promise<{ width: number; height: number }>;
-  /** 处理并编码成本次运行的临时文件；quality 0–1，PNG 忽略。重新编码会去掉 EXIF（包括位置）。 */
+  /** Processes and encodes into a temporary file for the current run; quality 0-1, ignored for PNG. Re-encoding strips EXIF metadata (including location). */
   transformImage(
     uri: string,
     ops: ImageOps,
@@ -779,7 +826,7 @@ export interface FilePlatform {
     relPath: string,
   ): Promise<EncodedImage>;
 
-  /** 增强一张图片（扫描件），输出 JPG 临时文件；skew 和 base 是转正的角度和转正前的大小（D-267）。 */
+  /** Enhances an image (scanned document), outputting a temporary JPG file; skew and base are the rotation angle and pre-rotation dimensions (D-267). */
   enhanceImage(
     uri: string,
     mode: EnhanceMode,
@@ -787,7 +834,7 @@ export interface FilePlatform {
     relPath: string,
   ): Promise<EncodedImage & { skew: number; base: { width: number; height: number } }>;
 
-  /** 离屏合成一张图，编码成本次运行的临时文件。 */
+  /** Off-screen composition of an image, encoded into a temporary file for the current run. */
   composeImage(
     canvas: { width: number; height: number; background: string },
     ops: readonly DrawOp[],
@@ -795,14 +842,16 @@ export interface FilePlatform {
     runId: string,
     relPath: string,
   ): Promise<EncodedImage>;
-  /** 读出图片的 RGBA 像素（长边缩到 maxSide 以内），识别二维码用。 */
+  /** Reads RGBA pixels of an image (with the long side scaled down within maxSide), used for QR code recognition. */
   imagePixels(
     uri: string,
     maxSide: number,
   ): Promise<{ width: number; height: number; data: Uint8Array }>;
   /**
-   * 把一张图变成长边不超过 maxSide 的 JPEG，存成本次运行的临时文件（D-425）。解码时就缩小，
-   * 几千万像素的照片也不会整张进内存（AGENTS.md 的 Android 规则）；重新编码也去掉位置等元数据（D-047）。
+   * Converts an image into a JPEG with a long side not exceeding maxSide, saved as a temporary
+   * file for the current run (D-425). Downscales during decoding so multi-megapixel photos do not
+   * load entirely into memory (Android rules in AGENTS.md); re-encoding also strips location and
+   * other metadata (D-047).
    */
   reducedJpeg(
     uri: string,
@@ -811,22 +860,22 @@ export interface FilePlatform {
     runId: string,
     relPath: string,
   ): Promise<EncodedImage>;
-  /** 用系统的打印排版把 HTML 变成 PDF（expo-print），存成本次运行的临时文件。 */
+  /** Converts HTML into a PDF using system print layout (expo-print), saved as a temporary file for the current run. */
   htmlToPdf(
     html: string,
     page: { width: number; height: number },
     runId: string,
     relPath: string,
-    /** 页边距（磅）；没有时用默认的（网页自己留边距时传 0）。 */
+    /** Page margins (in points); defaults used when omitted (pass 0 if the web page defines its own margins). */
     margins?: { left: number; right: number; top: number; bottom: number },
   ): Promise<{ uri: string; size: number; pageCount: number }>;
 
-  // ---- 签名 ----
+  // ---- Signatures ----
   loadSignatures(): Promise<SavedSignature[]>;
   saveSignature(png: Uint8Array, aspect: number): Promise<void>;
 
   // ---- Skia ----
-  /** 用系统字体（含中日韩文字和 emoji）把一行字画成透明背景的 PNG。 */
+  /** Renders a line of text into a transparent-background PNG using system fonts (including CJK characters and emoji). */
   renderText(
     text: string,
     style: { fontSize: number; color: string; opacity: number; background?: string },

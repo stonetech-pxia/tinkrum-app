@@ -3,7 +3,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'no
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-// 没有 --apply 时只看计划；检查在临时 worktree 里做，不读取生产 .env 或请求记录。
+// Without --apply, only inspect the plan; checks run in a temporary worktree and do not read the production .env or request logs.
 const usage =
   'Usage: scripts/deploy.sh --ref <commit-or-tag> --tag <api-release-tag> [--repo <path>] [--apply]';
 const options = { repo: join(homedir(), 'projects/morph-prod'), apply: false };
@@ -32,7 +32,7 @@ function command(name, args, cwd, capture = false) {
     stdio: capture ? ['ignore', 'pipe', 'pipe'] : ['ignore', 'inherit', 'inherit'],
     env: { ...process.env, VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? '1' },
   });
-  // launchctl print 的输出可能有环境变量：失败时也不能把整个输出塞进错误。
+  // launchctl print output may contain environment variables: do not dump the entire output into errors on failure.
   if (result.error || result.status !== 0)
     throw new Error(`${name} failed (exit ${result.status ?? 'unavailable'}).`);
   return result.stdout?.trim() ?? '';
@@ -101,7 +101,7 @@ try {
     const gitDir = git(['rev-parse', '--absolute-git-dir']);
     const lockPath = join(gitDir, 'morph-deploy.lock');
     mkdirSync(lockPath);
-    lock = lockPath; // 已有锁时退出，不替另一个部署删锁。
+    lock = lockPath; // Exit if a lock already exists; do not delete another deployment's lock.
     receipt = join(gitDir, 'morph-deployments.jsonl');
     staging = mkdtempSync(join(tmpdir(), 'morph-deploy-'));
     command('git', ['worktree', 'add', '--detach', staging, target], repo);

@@ -29,7 +29,7 @@ import { createToolDownloads, toolRevoked } from '../tool-download/state';
 import { ToolDownloadStore } from '../tool-download/store';
 import { createWorkspaceStore } from '../workspace/store';
 
-// 从服务器下载的工具（D-177、D-178）：签名目录、下载检查、在工具页添加 / 更新 / 停用、恢复历史版本。
+// Tools downloaded from the server (D-177, D-178): signature directory, download verification, add/update/disable in the tools page, restoring historical versions.
 
 function setup(now = () => 1_000) {
   const fs = new MemoryToolFs();
@@ -73,16 +73,16 @@ describe('tool download store', () => {
     expect((await store.refreshCatalog()).seq).toBe(2);
     expect((await store.cachedCatalog())?.catalog.seq).toBe(2);
 
-    // 有人拿出一份旧目录（seq 1）：不接受，还用 seq 2 的。
+    // Someone provides an old catalog (seq 1): rejected, keep using seq 2.
     await publish(fs, [exampleManifest()], { seq: 1 });
     expect(await codeOf(store.refreshCatalog())).toBe('stale');
     expect((await store.cachedCatalog())?.catalog.seq).toBe(2);
 
-    // 签名对不上：不接受。
+    // Signature mismatch: rejected.
     fs.net.set(`${TOOLS_URL}/catalog.sig`, new TextEncoder().encode('AAAA'));
     expect(await codeOf(store.refreshCatalog())).toBe('signature');
 
-    // 本机存的目录被改过：读出来也当作没有。
+    // Locally stored catalog has been modified: reading it treats it as absent.
     fs.files.set('catalog.json', fs.files.get('catalog.json')!.replace('job-apply', 'job-apply '));
     expect(await store.cachedCatalog()).toBeNull();
   });
@@ -104,7 +104,7 @@ describe('tool download store', () => {
     await store.download(ok.tools[0]!, registry);
     expect((await store.downloaded()).map((d) => d.manifest.version)).toEqual(['1.0.0']);
 
-    // 新版本替换旧版本；不能退回旧版本。
+    // New version replaces old version; cannot downgrade to old version.
     const next = await publish(fs, [v110()], { seq: 3 });
     await store.download(next.tools[0]!, registry);
     expect((await store.downloaded()).map((d) => d.manifest.version)).toEqual(['1.1.0']);
@@ -132,7 +132,7 @@ describe('tool download store', () => {
     await first.downloads.getState().download(catalog.tools[0]!);
     expect(first.registry.tools.get('job-apply')?.version).toBe('1.0.0');
 
-    // 下一次启动：新的注册表，从磁盘上读回来。
+    // Next startup: new registry, read back from disk.
     const registry = createRegistry(BUILTIN_TOOLS);
     const store = new ToolDownloadStore(first.fs, toolSha256, {
       baseUrl: TOOLS_URL,
@@ -165,7 +165,7 @@ describe('tool download store', () => {
   });
 });
 
-/** 点一下，等下载、检查和添加这一串异步操作都做完（包在 act 里，免得 React 报警告）。 */
+/** Tap and wait for download, verification, and addition asynchronous operations to complete (wrapped in act to prevent React warnings). */
 async function pressAndSettle(testID: string) {
   const target = await screen.findByTestId(testID);
   await act(async () => {
@@ -191,7 +191,7 @@ describe('downloaded tools in the app (UI)', () => {
 
   it('adds a tool from the catalog: download, check, add, open its page', async () => {
     const { fs, store } = await openTools();
-    // 打开工具页时拉目录，可下载的工具排在内置工具后面，标出大小。
+    // Pull catalog when opening the tools page; downloadable tools are listed after built-in tools with their sizes shown.
     expect(await screen.findByTestId('catalog-job-apply')).toBeTruthy();
     expect(screen.getByText('求职材料')).toBeTruthy();
     expect(screen.getByText(/^需要下载 \d+ KB$/)).toBeTruthy();
@@ -289,7 +289,7 @@ describe('restoring a version that used a downloaded tool', () => {
       .proposeOps([{ op: 'setPackage', package: 'job-apply', do: 'remove' }], '移除');
     await first.getState().confirm();
 
-    // 换一台手机：没有这个工具，但目录里查得到它的名字。
+    // Switching phones: tool is absent, but its name is found in the catalog.
     const second = createWorkspaceStore({
       ...deps,
       registry: createRegistry(BUILTIN_TOOLS),

@@ -4,9 +4,10 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.util.Random
 
-// zip 编解码的测试（Android 端，和 tests/main.swift 同一套检查）：
-//   ZipTestKt <工作目录> <python 做的压缩包目录>
-// 写出的包交给 unzip 和 python 核对（scripts/test-native-archive.mjs 做），这里读 python 写的包、读自己写的包、检查恶意的包被拒绝。
+// ZIP codec tests (Android side, same check suite as tests/main.swift): ZipTestKt <working-dir>
+// <python-archive-dir>. Written archives are verified against unzip and python (via
+// scripts/test-native-archive.mjs). Reads python-generated archives and self-generated archives,
+// and tests that malicious archives are correctly rejected.
 
 var failures = 0
 fun check(ok: Boolean, what: String) {
@@ -23,7 +24,7 @@ fun writeArchive(file: File, force: Boolean, files: List<Triple<String, ByteArra
   for ((name, data, store) in files) {
     var at = 0
     w.add(name, data.size.toLong(), System.currentTimeMillis(), store, { buf ->
-      // 分成几块给，试到多块的路径。
+      // Supplied in multiple chunks to exercise multi-chunk code paths.
       val n = minOf(buf.size, data.size - at, 100_000)
       if (n <= 0) -1 else {
         System.arraycopy(data, at, buf, 0, n)
@@ -112,7 +113,7 @@ fun main(args: Array<String>) {
       check(want == got, "$name: got $got, want $want")
     }
   }
-  // 取消。
+  // Cancellation.
   try {
     val w = ZipWriter(File(work, "cancel.zip").path)
     var calls = 0

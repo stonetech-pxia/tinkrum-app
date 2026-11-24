@@ -21,8 +21,11 @@ import { renderToolsApp, testRegistry } from '../test-utils/render-app';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
-// R05：表单打开之后，同一条记录被别的入口（通知按钮、桌面小组件、别的页面）改了——保存时不能静默改回旧值。
-// 在存储这一层按「打开时的值」做条件写入；冲突时让用户选：保留我的修改 / 用最新的 / 取消（创始人 2026-11-07 定）。
+// R05: after a form opens, if the same record is modified by another entry point (notification
+// button, home screen widget, another page)—it cannot be silently overwritten with old values upon
+// saving. At the storage layer, conditional writes are performed based on "values when opened"; on
+// conflict, let the user choose: keep my edits / use latest / cancel (decided by founder
+// 2026-11-07).
 
 const tasks: Collection = {
   id: 'tasks',
@@ -55,7 +58,7 @@ describe.each([
   ['memory', async () => new MemoryWorkspaceRepo()],
   ['SQLite', sqliteRepo],
 ] as const)('updateRecordIfUnchanged (%s)', (_name, make: () => Promise<WorkspaceRepo>) => {
-  it('值还是打开时的：写入；键的顺序不同不算变了', async () => {
+  it('Values match opening state: write; different key order is not considered a change', async () => {
     const repo = await make();
     await repo.insertRecord(opened({ name: '跑步', count: 2 }));
     const result = await repo.updateRecordIfUnchanged(
@@ -71,7 +74,7 @@ describe.each([
     });
   });
 
-  it('值已经被改过：不写，原样留着', async () => {
+  it('Values have already been modified: do not write, leave as is', async () => {
     const repo = await make();
     await repo.insertRecord(opened());
     await repo.updateRecord('run00001', { name: '跑步', count: 3 }, 2);
@@ -88,7 +91,7 @@ describe.each([
     });
   });
 
-  it('记录已经删了（在最近删除里）或不存在：gone，不写', async () => {
+  it('Record already deleted (in recently deleted) or does not exist: gone, do not write', async () => {
     const repo = await make();
     await repo.insertRecord(opened());
     await repo.deleteRecord('run00001', 9);
@@ -128,8 +131,8 @@ async function hookSetup() {
   return { repo, hook };
 }
 
-describe('保存一条已有的记录', () => {
-  it('表单是旧的，别处刚改过：不覆盖，报冲突并带上最新的那条', async () => {
+describe('Save an existing record', () => {
+  it('Form is outdated, modified elsewhere just now: do not overwrite, report conflict with the latest version', async () => {
     const { repo, hook } = await hookSetup();
     const openedRecord = (await repo.getRecord('run00001'))!;
     await repo.updateRecord('run00001', { name: '跑步', count: 3 }, 100);
@@ -141,7 +144,7 @@ describe('保存一条已有的记录', () => {
     expect((await repo.getRecord('run00001'))!.values).toEqual({ name: '跑步', count: 3 });
   });
 
-  it('没人改过：照常保存，别的项不动', async () => {
+  it('Not modified by anyone: save normally, leave other fields untouched', async () => {
     const { repo, hook } = await hookSetup();
     const openedRecord = (await repo.getRecord('run00001'))!;
     await act(async () => {
@@ -153,7 +156,7 @@ describe('保存一条已有的记录', () => {
     expect((await repo.getRecord('run00001'))!.values).toEqual({ name: '慢跑', count: 2 });
   });
 
-  it('列表上勾一下（只改一项）：按现在存的那条改，别处刚改的项保持最新', async () => {
+  it('Toggle on the list (modify single item): update based on current stored version, keep items modified elsewhere up to date', async () => {
     const { repo, hook } = await hookSetup();
     await repo.updateRecord('run00001', { name: '跑步', count: 3 }, 100);
     await act(async () => {
@@ -169,7 +172,7 @@ describe('保存一条已有的记录', () => {
     });
   });
 
-  it('改的时候记录被删了：不写', async () => {
+  it('Record deleted while modifying: do not write', async () => {
     const { repo, hook } = await hookSetup();
     const openedRecord = (await repo.getRecord('run00001'))!;
     await repo.deleteRecord('run00001', 9);
@@ -183,10 +186,10 @@ describe('保存一条已有的记录', () => {
   });
 });
 
-describe('记录页：保存时发现记录刚被别处改过', () => {
+describe('Record page: discovered record was just modified elsewhere upon saving', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  /** 打开记录页，把名字改成「慢跑」，别处把次数改成 3，再点保存。返回弹出的确认框。 */
+  /** Open the record page, change name to "Jogging", modify count to 3 elsewhere, then tap save. Returns the popped confirmation dialog. */
   async function conflict(locale: Locale = 'zh') {
     const repo = new MemoryWorkspaceRepo();
     await repo.insertRecord(opened());
@@ -206,14 +209,14 @@ describe('记录页：保存时发现记录刚被别处改过', () => {
     return { ...app, repo, shown: shown!, press };
   }
 
-  it('先问：不覆盖，三个选项：保留我的修改、用最新的、取消', async () => {
+  it('Ask first: do not overwrite, three options: keep my changes, use latest, cancel', async () => {
     const { repo, shown } = await conflict();
     expect(shown.title).toBe('这条记录刚被别处改过');
     expect(shown.buttons.map((b) => b.text)).toEqual(['保留我的修改', '用最新的', '取消']);
     expect((await repo.getRecord('run00001'))!.values).toEqual({ name: '跑步', count: 3 });
   });
 
-  it('用最新的：放弃我的修改，表单换成最新的，什么都不写', async () => {
+  it('Use latest: discard my changes, replace form with the latest version, write nothing', async () => {
     const { repo, press } = await conflict();
     await press('用最新的');
     await waitFor(() => expect(screen.getByTestId('editor-name').props.value).toBe('跑步'));
@@ -221,14 +224,14 @@ describe('记录页：保存时发现记录刚被别处改过', () => {
     expect((await repo.getRecord('run00001'))!.values).toEqual({ name: '跑步', count: 3 });
   });
 
-  it('取消：留在表单上，我的修改还在，什么都不写', async () => {
+  it('Cancel: stay on form, my changes remain, write nothing', async () => {
     const { repo, press } = await conflict();
     await press('取消');
     expect(screen.getByTestId('editor-name').props.value).toBe('慢跑');
     expect((await repo.getRecord('run00001'))!.values).toEqual({ name: '跑步', count: 3 });
   });
 
-  it('法语：确认框是法语', async () => {
+  it('French: confirmation dialog is in French', async () => {
     const { shown } = await conflict('fr');
     expect(shown.title).toBe('Cette entrée vient d’être modifiée ailleurs');
     expect(shown.buttons.map((b) => b.text)).toEqual([
@@ -238,7 +241,7 @@ describe('记录页：保存时发现记录刚被别处改过', () => {
     ]);
   });
 
-  it('改的时候这条被删了：说一声，什么都没存', async () => {
+  it('Deleted while modifying: report it, nothing stored', async () => {
     const repo = new MemoryWorkspaceRepo();
     await repo.insertRecord(opened());
     await renderToolsApp(repo, undefined, { seed });
@@ -252,14 +255,14 @@ describe('记录页：保存时发现记录刚被别处改过', () => {
     expect(((await repo.getRecord('run00001')) as StoredRecord).values.name).toBe('跑步');
   });
 
-  // 放在最后：存好以后页面返回，测试环境里 router 是全局的，返回会带走下一个用例的页面。
-  it('保留我的修改：只保存我改过的项，别处改的次数保持最新', async () => {
+  // Placed last: after saving, the page returns; in test environments the router is global, and returning carries away the next test case's page.
+  it('Keep my changes: save only fields I modified, keep modification counts for elsewhere at the latest version', async () => {
     const { repo, press } = await conflict();
     await press('保留我的修改');
     await waitFor(async () =>
       expect((await repo.getRecord('run00001'))!.values).toEqual({ name: '慢跑', count: 3 }),
     );
-    // 存好了就回去（等回去了再结束，免得下一个用例被它的返回带走）。
+    // Go back once saved (wait for return before finishing, to prevent the next test case from being affected by its navigation).
     await waitFor(() => expect(screen.queryByTestId('editor-name')).toBeNull());
   });
 });

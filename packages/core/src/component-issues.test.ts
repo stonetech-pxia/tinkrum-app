@@ -5,8 +5,9 @@ import type { Component, Locale, WorkspaceConfig } from './schema';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 每种外观的引用问题和修改说明（组件登记表重构时存的基线，v34 按块的新写法重写）。问题文字会发给 AI
-// 让它改正，说明文字给用户看；这里锁住文字和顺序。
+// Reference issues and modification notes for each look (baseline stored during component registry
+// refactoring, v34 rewritten with the new block-based style). Issue text is sent to the AI for
+// correction, notes are for the user; this locks text and order.
 
 const table = {
   id: 'spend',

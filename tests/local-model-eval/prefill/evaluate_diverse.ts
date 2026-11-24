@@ -1,4 +1,4 @@
-// 不同类型、不同用户字段的合成文字筛查；不是实机 OCR 或真实世界准确率。
+// Synthetic text screening for different types and user fields; not live OCR or real-world accuracy.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 

@@ -28,8 +28,9 @@ import { AppIconPicker, AppMenuRow, AppMenuSheet } from './AppMenu';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 
 /**
- * 设置页由内核固定提供「AI 修改」「历史版本」「工具」入口（§5.1）：
- * 导航栏和浮动按钮里可以没有它们，但设置本身必须始终可达，所以随时都能修改和撤销。
+ * The settings page fixedly provides "AI modify", "Version history", and "Tools" entry points via
+ * the core (§5.1): they may be absent from the navigation bar or floating button, but settings
+ * itself must always remain reachable, so modifications and undos are possible at any time.
  */
 export function SettingsView({ env }: { env: RenderEnv }) {
   const { palette, locale } = env;
@@ -49,8 +50,9 @@ export function SettingsView({ env }: { env: RenderEnv }) {
               : (MODELS.find((m) => m.id === aiModel)?.name ?? aiModel),
         })
       : t(locale, aiMode === 'server' ? 'aiEngineRemote' : 'aiEngineMock');
-  // 长按一个 App：放到手机桌面的菜单里，或拿掉；Android 上放进去以后还能单独放一个图标（D-271、D-485）；
-  // 换图标（D-606）。picking：菜单里正在选图标。
+  // Long-press an App: menu options to place it on the mobile home screen, or remove it; on
+  // Android, once placed, an individual icon can also be placed separately (D-271, D-485); change
+  // icon (D-606). picking: currently selecting an icon in the menu.
   const [menu, setMenu] = useState<{
     appId: string;
     origin: AppFile | null;
@@ -63,7 +65,7 @@ export function SettingsView({ env }: { env: RenderEnv }) {
   const confirm = useWorkspace((s) => s.confirm);
   const cancel = useWorkspace((s) => s.cancel);
 
-  /** 恢复这个 App 的初始样子（D-485）：先预览，确认后生效，能在改动记录里撤销；记录一条不动。 */
+  /** Restore this App to its initial state (D-485): preview first, take effect upon confirmation, can be undone in change history; records remain completely untouched. */
   async function restoreApp(appId: string, name: string, origin: AppFile) {
     const plan = appResetOps(origin, env.config, registry);
     if (!plan.ok) {
@@ -91,11 +93,11 @@ export function SettingsView({ env }: { env: RenderEnv }) {
   }
 
   async function openAppMenu(appId: string) {
-    // 从文件导入的 App 才有初始样子；Tink 或自己搭的没有，不显示这一项。
+    // Only Apps imported from files have an initial state; those created by Tink or oneself do not, so this item is not displayed.
     setMenu({ appId, origin: await loadAppOrigin(repo, appId), picking: false });
   }
 
-  /** 菜单里的项：点了先收起菜单再做。 */
+  /** Items in the menu: tap to collapse the menu first before performing the action. */
   function appMenuItems(appId: string, name: string, origin: AppFile | null) {
     const id = appTarget(appId);
     const onHome = (env.config.nav.phoneHomeScreen ?? []).includes(id);
@@ -109,7 +111,7 @@ export function SettingsView({ env }: { env: RenderEnv }) {
         t(locale, onHome ? 'homeScreenRemoved' : 'homeScreenAdded', { name }),
       );
     };
-    // Android：在桌面上单独放一个图标，画的是这个 App 自己的图标（D-606）。系统弹确认框，用户决定。
+    // Android: place an individual icon on the home screen displaying this App's own icon (D-606). The system prompts a confirmation dialog, and the user decides.
     const pin = () => {
       const entry = homeScreenEntries(env.config).find((e) => e.id === id);
       if (entry)
@@ -117,7 +119,7 @@ export function SettingsView({ env }: { env: RenderEnv }) {
           if (!sent) Alert.alert(t(locale, 'homeScreenPinFailed'));
         });
     };
-    // 分享这个 App（D-545）：只有结构，用户文件的引用清空；用户自己点了才发出去（底线 3、10、14）。
+    // Share this App (D-545): structure only, user file references are cleared; sent only after the user explicitly taps it (Invariants 3, 10, 14).
     const share = () => {
       const file = appFileOfApp(env.config, appId);
       if (file)
@@ -132,7 +134,7 @@ export function SettingsView({ env }: { env: RenderEnv }) {
       ...(onHome && homeScreen?.canPin()
         ? [{ id: 'pin', label: t(locale, 'homeScreenPin'), run: pin }]
         : []),
-      // 这一项不收起菜单：菜单里换成选图标的格子。
+      // This item does not collapse the menu: the menu switches to an icon selection grid.
       {
         id: 'icon',
         label: t(locale, 'appIconItem'),
@@ -151,7 +153,7 @@ export function SettingsView({ env }: { env: RenderEnv }) {
     ];
   }
 
-  /** 换图标（D-606）：用户点的就是确认，直接生效，能在改动记录里撤销。 */
+  /** Change icon (D-606): what the user taps is confirmation, taking effect immediately, and can be undone in change history. */
   function pickIcon(appId: string, name: string, icon: IconValue) {
     setMenu(null);
     void change(
@@ -194,7 +196,7 @@ export function SettingsView({ env }: { env: RenderEnv }) {
         </AppMenuSheet>
       ) : null}
       <PageTitle palette={palette}>{t(locale, 'settingsTitle')}</PageTitle>
-      {/* 我的 App（D-485）：入口可以没有，这里一定进得去。系统层，AI 改不了。 */}
+      {/* My Apps (D-485): the entry point may be absent, but this is always accessible. System layer, cannot be modified by AI. */}
       {(env.config.nav.apps ?? []).length > 0 ? (
         <>
           <SectionLabel palette={palette}>{t(locale, 'settingsMyApps')}</SectionLabel>
@@ -245,7 +247,7 @@ export function SettingsView({ env }: { env: RenderEnv }) {
           onPress={env.locked ?? (() => router.push('/reminders'))}
         />
       ) : null}
-      {/* App 和预设、数据、存储空间各占一行，不再折叠（D-614）；已下载内容在「数据 → 更多」里。 */}
+      {/* Apps, presets, data, and storage space each occupy a single row without further collapsing (D-614); downloaded content is under "Data -> More". */}
       <ListRow
         palette={palette}
         testID="settings-presets"

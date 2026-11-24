@@ -7,8 +7,10 @@ import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 做完是「记一笔」的快捷操作（D-588）：运行时不摆步骤列表，只说一句在做什么；记好了或者用户取消了，
-// 直接回到来的地方，不停在结果页；没有「记一笔」的快捷操作和以前一样。
+// Completion is a "Log an entry" quick action (D-588): runtime does not display step list, displays
+// only a single sentence stating what is being done; once logged or cancelled by user, returns
+// directly to origin without staying on result page; quick actions without "Log an entry" behave as
+// before.
 
 const seed = (locale: Locale, registry: Registry) => {
   const r = applyOps(
@@ -65,16 +67,16 @@ async function openRun() {
 
 afterEach(() => useGuide.setState({ stage: null, repo: null }));
 
-describe('a quick action that ends in 记一笔 (D-588)', () => {
+describe('a quick action that ends in Log an entry (D-588)', () => {
   it('shows only one line while it works, and goes back by itself once the entry is saved', async () => {
     const repo = await openRun();
-    // 表单盖在运行页上：没有步骤列表，运行页是简洁的一句话。
+    // Form overlays execution page: no step list, execution page is a concise single sentence.
     expect(await screen.findByTestId('local-done')).toBeTruthy();
     expect(screen.getByTestId('run-compact')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('local-done'));
     await settle();
     expect((await repo.listRecords('jot')).length).toBe(1);
-    // 不停在结果页：没有「再来一次 / 完成」，回到了主页。
+    // Does not stay on result page: no "Run again / Done", returned to home.
     expect(screen.queryByTestId('run-done')).toBeNull();
     expect(screen.queryByTestId('run-screen')).toBeNull();
     expect(await screen.findByTestId('nav-settings')).toBeTruthy();

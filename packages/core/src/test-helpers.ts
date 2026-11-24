@@ -1,4 +1,4 @@
-// 仅供测试使用的辅助函数（不从 index.ts 导出）。
+// Test-only helper functions (not exported from index.ts).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -26,8 +26,8 @@ export function workspace(locale: Locale = 'zh', { withPdf = false } = {}): Work
 }
 
 /**
- * 一份 v33 的配置（测试里照旧写的，或者 fixtures/v33/ 里存的）经过迁移链升到 v34。只迁移、不校验：
- * 校验交给要测的那一步。
+ * A v33 configuration (written as usual in tests, or stored in fixtures/v33/) upgraded to v34 via
+ * migration chain. Migrate only, no validation: validation delegated to the tested step.
  */
 export function fromV33(raw: unknown): WorkspaceConfig {
   const result = migrateWorkspace({ schemaVersion: 33, ...(raw as object) });
@@ -36,9 +36,10 @@ export function fromV33(raw: unknown): WorkspaceConfig {
 }
 
 /**
- * D-450：扫描工具的「扫描成 PDF」「照片扫描成 PDF」最后多了一步存到文件（扫描的文件都留在文档库）；
- * D-455：转 PDF 那一步带文字层。
- * v33 存下来的固定样本里还没有这一步：和现在的新配置比时补上，其余照旧逐字比。
+ * D-450: Scanning tools ("Scan to PDF", "Photo scan to PDF") now have an extra final step to save
+ * to files (all scanned files remain in document library); D-455: PDF conversion step includes
+ * text layer. Stored v33 golden samples lack this step: supplemented when comparing with current
+ * new config, otherwise compared line by line as usual.
  */
 export function withScanKeep(config: WorkspaceConfig): WorkspaceConfig {
   const next = structuredClone(config);
@@ -47,7 +48,7 @@ export function withScanKeep(config: WorkspaceConfig): WorkspaceConfig {
     if (tool.id !== 'scan-camera' && tool.id !== 'scan-library') continue;
     if (tool.steps.at(-1)?.action !== 'file.save')
       tool.steps.push({ id: 'keep', action: 'file.save', params: {} });
-    // D-455：扫描成 PDF 带文字层。
+    // D-455: Scan to PDF includes text layer.
     const pdf = tool.steps.find((s) => s.action === 'pdf.fromImages');
     if (pdf) pdf.params = { ...pdf.params, textLayer: true };
   }
@@ -55,17 +56,20 @@ export function withScanKeep(config: WorkspaceConfig): WorkspaceConfig {
 }
 
 /**
- * D-487：新用户的起始配置用精修的 Clay（STARTER_THEME）。v33 存下来的起始配置和样板是旧风格；
- * 和现在的新配置比时换成新风格，其余照旧逐字比。
+ * D-487: New users' starting config uses refined Clay (STARTER_THEME). v33 stored starting config
+ * and sample apps use old style; replaced with new style when comparing with current new config,
+ * otherwise compared line by line as usual.
  */
 export function withStarterTheme(config: WorkspaceConfig): WorkspaceConfig {
   return { ...structuredClone(config), theme: structuredClone(STARTER_THEME) };
 }
 
-/** fixtures/v33/<name>.json：v34 迁移前用 v33 代码存下来的配置（默认、新用户、模版、样板、评测 setup）。 */
+/** fixtures/v33/<name>.json: configuration saved using v33 code before v34 migration (default, new user, template, sample app, evaluation setup). */
 export function v33Fixture(name: string): Record<string, unknown> {
-  // 欢迎语是存下来时的默认文案；D-436 把 AI 改名 Tink 后，新配置的默认文案不同，老配置的不动。
-  // D-510：文件工具随 App 打包，扫描和文字识别工具页的说明不再说第一次要下载；同样只有新配置换了文案。
+  // Welcome message is the default copy when saved; after D-436 renamed AI to Tink, new configs
+  // have different default copy, old configs remain unchanged. D-510: File tools are bundled with
+  // the app, scanner and OCR tool page descriptions no longer state first-time download is
+  // required; similarly only new configs have updated copy.
   const raw = readFileSync(join(__dirname, 'fixtures', 'v33', `${name}.json`), 'utf8')
     .replaceAll('点「AI 修改」', '点「Tink」')
     .replaceAll('Tap AI and describe', 'Tap Tink and describe')
@@ -87,8 +91,9 @@ export function v33Fixture(name: string): Record<string, unknown> {
 }
 
 /**
- * 快照用的紧凑写法：一项一行（「路径 = JSON」），比展开的对象小得多，差异也好读。
- * 太长的对象和数组再往下拆一层；undefined 写成 "∅undefined"。
+ * Compact formatting for snapshots: one item per line ("path = JSON"), much smaller than expanded
+ * objects and easier to read differences. Objects and arrays that are too long are split another
+ * level down; undefined rendered as "∅undefined".
  */
 export function snapshotLines(value: unknown, width = 100): string {
   const out: string[] = [];

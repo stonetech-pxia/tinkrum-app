@@ -7,15 +7,18 @@ import type { ToolDefinition } from '../registry';
 import type { Locale, Localized, Workflow } from '../schema';
 import type { ActionDefinition } from '../workflow/contract';
 
-// 翻译工具（D-170–D-176）：iOS 用系统的 Translation 框架、Android 用 ML Kit 在本机翻译，文字不上传、
-// 不发给 AI（D-036）。这是用户自己运行的工具；AI 只会把它搭进快捷操作，不会直接给出译文（D-113、D-128）。
-// 只输出纯文字（可以再排成 PDF），不保留原文件的排版。
+// Translation tool (D-170–D-176): iOS uses the system Translation framework, Android uses ML Kit
+// for on-device translation; text is neither uploaded nor sent to the AI (D-036). This is a tool
+// run by the user directly; the AI only embeds it into quick actions and will never output
+// translations directly (D-113, D-128). Outputs plain text only (which can be formatted into a PDF
+// later), without preserving the original file layout.
 
 export const TRANSLATE_TOOL_ID = 'translate';
 
 /**
- * 能选的语言（BCP 47）：Apple 翻译和 ML Kit 都支持的常用语言。繁体中文只有 iOS 支持
- * （ML Kit 只有一种中文，译文是简体）。App 把它们换成各平台自己的语言代码。
+ * Available languages (BCP 47): common languages supported by both Apple Translation and ML Kit.
+ * Traditional Chinese is only supported by iOS (ML Kit only has a single Chinese, translating to
+ * Simplified). The app maps these to each platform's native language codes.
  */
 export const TRANSLATE_LANGUAGES = [
   'zh-Hans',
@@ -64,7 +67,7 @@ export const TRANSLATE_LANGUAGE_NAMES: Record<TranslateLanguage, Localized> = {
   hi: { en: 'Hindi', zh: '印地文', fr: 'Hindi' },
 };
 
-/** 一次最多翻译多少字（约 30 页）：本机翻译很快，但太长会让用户等很久。 */
+/** Maximum characters per translation batch (approx. 30 pages): on-device translation is fast, but excessively long texts make the user wait too long. */
 export const MAX_TRANSLATE_CHARS = 100_000;
 
 const languageOptions = TRANSLATE_LANGUAGES.map((value) => ({
@@ -104,13 +107,13 @@ export const TRANSLATE_ACTIONS: readonly ActionDefinition[] = [
         key: 'to',
         label: { en: 'Into', zh: '翻译成', fr: 'Vers' },
         kind: 'choice',
-        // 简体中文、英文排在最前（最常用）。只有这一个参数要问，不另设常用规格按钮（会和选项重复）。
+        // Simplified Chinese and English are placed at the top (most frequently used). This is the only parameter that prompts; no separate frequency shortcut buttons are provided (which would duplicate options).
         options: languageOptions,
         ask: true,
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match: new RegExp(
@@ -121,7 +124,7 @@ export const TRANSLATE_ACTIONS: readonly ActionDefinition[] = [
           params: { from: 'auto', to: languageOf(m[1] ?? m[2]!)! },
         }),
       },
-      // 只说「翻译」：翻成界面语言，每次运行时可以换。
+      // Simply saying "Translate": translates to the interface language, switchable on each run.
       {
         match: /^翻译(?:一下)?$|^translate(?: it| them)?$/i,
         step: (_m, locale) => ({
@@ -133,17 +136,17 @@ export const TRANSLATE_ACTIONS: readonly ActionDefinition[] = [
   },
 ];
 
-// ---- 分段和拼回（纯函数，App 端翻译前后用）----
+// ---- Segmentation and reassembly (pure functions, used before and after app-side translation) ----
 
 const CJK = '　-〿぀-ヿ㐀-䶿一-鿿가-힯＀-￯';
 const ENDS_CJK = new RegExp(`[${CJK}]$`);
 const STARTS_CJK = new RegExp(`^[${CJK}]`);
-/** 一行在这里结束一句话（或是标题、称呼）：后面另起。 */
+/** A line ends a sentence here (or a heading/salutation): followed by a line break. */
 const HARD_END = /[.!?。！？:：;；]["'”’）)]?$/;
-/** 列表项、编号：前面另起。 */
+/** List items and numbered points: preceded by a line break. */
 const LIST_START =
   /^(?:[-•*·●▪◦]\s|\d{1,3}[.)、]\s?|[a-zA-Z][.)]\s|[一二三四五六七八九十]+[、.]|[（(]\d{1,3}[）)])/;
-/** 一段太长时按句子切开（系统翻译一次处理的文字有限）。 */
+/** When a paragraph is too long, split it by sentences (system translation has limits on the text processed in a single call). */
 const MAX_UNIT = 1500;
 const SENTENCE = /[^.!?。！？]+[.!?。！？]+["'”’）)]?\s*|[^.!?。！？]+$/g;
 
@@ -173,18 +176,23 @@ function splitLong(unit: string): string[] {
 }
 
 /**
- * 康熙部首（U+2F00–2FDF）和部首补充（U+2E80–2EFF）换成同形的普通汉字（「⼗⼀⽉」→「十一月」）。
- * Mac、iPhone 用苹方生成的 PDF 取出的文字常是这些字符，看着一样，但翻译、搜索都认不出。
- * 只换这两个区：整段做 NFKC 会把中文的全角标点也改成半角。
+ * Replace Kangxi Radicals (U+2F00–2FDF) and CJK Radicals Supplement (U+2E80–2EFF) with
+ * homoglyphic standard characters (e.g., November radical form to standard form). Text extracted
+ * from PDFs generated using PingFang on Mac and iPhone often uses these characters; they look
+ * identical but cannot be recognized by translation or search. Only replace these two ranges:
+ * running NFKC on the entire segment would also convert full-width Chinese punctuation to
+ * half-width.
  */
 export function fixCjkRadicals(text: string): string {
   return text.replace(/[\u2E80-\u2EFF\u2F00-\u2FDF]/g, (c) => c.normalize('NFKC'));
 }
 
 /**
- * 把文字拆成要翻译的小段：空行分段；段里的行重新接起来（文字识别和 PDF 每一行都断开，逐行翻译会把
- * 一句话拆坏），但一句话结束、短行（标题、地址、称呼）和列表项另起。结果是「段 → 行 → 片」，
- * 一行太长时按句子切成几片。
+ * Splits text into small segments for translation: empty lines separate paragraphs; lines within
+ * a paragraph are reconnected (OCR and PDFs break every line, and translating line-by-line breaks
+ * sentences), but sentence boundaries, short lines (headings, addresses, salutations), and list
+ * items start new lines. The result is "paragraph → line → chunk"; if a line is too long, it is
+ * split into multiple chunks by sentence.
  */
 export function splitForTranslation(text: string): string[][][] {
   return fixCjkRadicals(text)
@@ -204,7 +212,7 @@ export function splitForTranslation(text: string): string[][][] {
       lines.forEach((line, i) => {
         current = current ? joinLine(current, line) : line;
         const next = lines[i + 1];
-        // 断字（agree-/ment）一定接着下一行。
+        // Hyphenated words (agree-/ment) must always connect to the next line.
         const short = line.length < longest * 0.6 && !/\p{L}-$/u.test(line);
         if (!next || HARD_END.test(line) || short || LIST_START.test(next)) {
           units.push(current);
@@ -215,7 +223,7 @@ export function splitForTranslation(text: string): string[][][] {
     });
 }
 
-/** 拼回去：同一行的几片按译文的文字接起来，行之间换行，段之间空一行。 */
+/** Reassembly: chunks within the same line are joined with translated text, lines are separated by line breaks, and paragraphs are separated by an empty line. */
 export function joinTranslation(pieces: string[][][], to: string): string {
   const cjk = /^(?:zh|ja)/.test(to);
   const joined = pieces
@@ -223,11 +231,11 @@ export function joinTranslation(pieces: string[][][], to: string): string {
       lines.map((parts) => parts.map((p) => p.trim()).join(cjk ? '' : ' ')).join('\n'),
     )
     .join('\n\n');
-  // ML Kit 翻成中文、日文时句号后面还留着原文的空格（「公寓。 请…」）。
+  // When ML Kit translates into Chinese or Japanese, trailing spaces from the original text remain after periods (e.g., "apartment. Please...").
   return cjk ? joined.replace(/([。！？；：，、])[ \t]+/g, '$1') : joined;
 }
 
-/** 系统识别出的语言代码 → 翻译用的代码；认不出（und、拼音）返回 null。 */
+/** System-detected language code → translation code; returns null if unrecognized (und, pinyin). */
 export function normalizeDetected(code: string | null | undefined): string | null {
   if (!code || code === 'und') return null;
   const lower = code.toLowerCase();
@@ -238,16 +246,17 @@ export function normalizeDetected(code: string | null | undefined): string | nul
   return lower.split(/[-_]/)[0]!;
 }
 
-/** 两个代码是不是同一种语言（「zh-Hans」和「zh-Hant」不算）。 */
+/** Checks whether two codes represent the same language ("zh-Hans" and "zh-Hant" are not considered the same). */
 export const sameLanguage = (a: string, b: string) =>
   (normalizeDetected(a) ?? a) === (normalizeDetected(b) ?? b);
 
-/** 有没有要翻译的字（只有数字、符号的片原样保留）。 */
+/** Checks whether there are words to translate (chunks containing only numbers or symbols are preserved as-is). */
 export const hasWords = (text: string) => /\p{L}/u.test(text);
 
 /**
- * 按原文语言分组：返回「原文语言 → 片的下标」。from 是 auto 时用每一片识别出的语言，识别不出的
- * 跟着全文最多的语言（按字数）；和目标语言相同的不翻译。
+ * Groups by source language: returns "source language → chunk indices". When 'from' is auto, uses
+ * the language detected for each chunk; unrecognized chunks fall back to the majority language of
+ * the full text (by character count); chunks matching the target language are not translated.
  */
 export function groupBySource(
   pieces: readonly string[],
@@ -270,17 +279,18 @@ export function groupBySource(
   return groups;
 }
 
-/** 语言的显示名；不在列表里的（自动识别出的瑞典文等）显示代码。 */
+/** Display name of a language; displays the code for unlisted languages (such as auto-detected Swedish). */
 export function translateLanguageName(code: string, locale: Locale): string {
   const known = TRANSLATE_LANGUAGE_NAMES[code as TranslateLanguage];
   return known ? localize(known, locale) : code;
 }
 
-// ---- 工具 ----
+// ---- Tools ----
 
 /**
- * 单功能工作流（D-061）：目标语言每次运行时问（D-072），默认是界面语言；照片里的文字默认按英文
- * （中文界面）或中文（英文界面）识别，也是每次问。
+ * Single-function workflow (D-061): target language prompts on each run (D-072), defaulting to
+ * the interface language; text in photos defaults to English recognition (for Chinese interface)
+ * or Chinese recognition (for English interface), also prompting on each run.
  */
 export function translateWorkflows(locale: Locale): Workflow[] {
   const to = locale === 'zh' ? 'zh-Hans' : locale === 'fr' ? 'fr' : 'en';

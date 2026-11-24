@@ -8,29 +8,32 @@ import {
 import type { TextPage } from './prefill/rows';
 import type { Collection, Field, Locale } from './schema';
 
-// 新建表单页的字段操作（D-444）：都是纯函数，表还没进配置，点「记下」才建。
-// 字段名来自用户点的文字；配置里只有字段名，没有值（底线 14）。
+// Field operations in the new form page (D-444): all are pure functions. Tables are not yet in the
+// config and are only created when tapping "Log". Field names come from the text clicked by the
+// user; the config contains only field names, not values (Invariant 14).
 
 const LOCALE_CURRENCY: Record<Locale, string> = { en: 'USD', zh: 'CNY', fr: 'EUR' };
 const CURRENCY_SIGNS: readonly [RegExp, string][] = [
   [/€|\beur\b/i, 'EUR'],
   [/£|\bgbp\b/i, 'GBP'],
   [/[¥￥元]|\bcny\b|\brmb\b/i, 'CNY'],
-  // 马币（D-548）：RM 后面紧跟数字才算，大写（RMB 是人民币）。
+  // Malaysian Ringgit (D-548): RM must be immediately followed by a digit and uppercase (RMB is Chinese Yuan).
   [/\bRM(?=\s?\d)/, 'MYR'],
   [/\bmyr\b/i, 'MYR'],
   [/\$|\busd\b/i, 'USD'],
 ];
 
-/** 金额字段的货币（字段一定要有）：这个金额那一行的符号，没有就按界面语言。 */
+/** Currency of the amount field (fields must have a currency): the symbol on that amount's line, falling back to the UI locale if none. */
 function currencyOf(raw: string, page: TextPage, locale: Locale): string {
   const line = page.lines.find((l) => l.text.includes(raw))?.text ?? raw;
   return CURRENCY_SIGNS.find(([sign]) => sign.test(line))?.[1] ?? LOCALE_CURRENCY[locale];
 }
 
 /**
- * 文件上金额的货币（D-548）：第一个金额那一行有符号或代码就是它；都没有返回 null（表照旧按界面语言）。
- * 用文件建表时金额字段用它，不然马币小票会存成美元（2026-11-09、11-10 用户测试）。
+ * Currency of amounts in files (D-548): if the first amount line has a symbol or code, use it;
+ * otherwise return null (the table falls back to the UI locale as usual). Used for amount fields
+ * when creating tables from files, preventing Malaysian receipts from being saved as USD (user
+ * testing on Nov 9 and Nov 10, 2026).
  */
 export function fileCurrency(pages: readonly TextPage[], locale: Locale): string | null {
   for (const [i, page] of pages.entries())
@@ -43,7 +46,7 @@ export function fileCurrency(pages: readonly TextPage[], locale: Locale): string
   return null;
 }
 
-/** 表里每个金额字段都用这个货币；每一笔单独选货币的（D-429、D-549），这一笔没选时用它。 */
+/** Use this currency for every amount field in the table; used when a entry with per-entry currency selection (D-429, D-549) has no currency selected. */
 export function withCurrency(table: Collection, currency: string): Collection {
   return {
     ...table,
@@ -52,8 +55,10 @@ export function withCurrency(table: Collection, currency: string): Collection {
 }
 
 /**
- * 新建表单页的候选：规则照旧，字段名和文件上的标签完全一样时（用户刚从文件里点的），标签旁边的值排第一。
- * 只是候选，点了才填（D-394）。不用模型：这一页每改一次字段都要重新算（D-444）。
+ * Candidates for the new form page: standard rules apply. When the field name exactly matches the
+ * label on the file (just clicked by the user from the file), the value next to the label is
+ * ranked first. Candidates only, filled only upon tapping (D-394). No model is used: recalculated
+ * on every field modification on this page (D-444).
  */
 export const draftEngine: PrefillEngine = async (input, signal, onPartial) => {
   const base = await ruleEngine(input, signal, onPartial);
@@ -79,7 +84,7 @@ export const draftEngine: PrefillEngine = async (input, signal, onPartial) => {
   return out;
 };
 
-/** 从文件旁边的值判断字段类型：金额、日期、电话、邮箱；看不出来就是文字。不用模型。 */
+/** Determine field type from the value next to the file: amount, date, phone, email; defaults to text if unclear. No model used. */
 export function fieldTypeFor(
   name: string,
   pages: readonly TextPage[],
@@ -98,11 +103,11 @@ export function fieldTypeFor(
   return { type: 'text' };
 }
 
-/** 这个名字的字段已经有了。 */
+/** A field with this name already exists. */
 export const draftHasField = (table: Collection, name: string) =>
   table.fields.some((f) => fieldNameKey(f.name) === fieldNameKey(name));
 
-/** 加一个字段（放在附件前面）。名字空的或重复的不加。 */
+/** Add a field (placed before attachments). Empty or duplicate names are ignored. */
 export function addDraftField(
   table: Collection,
   name: string,
@@ -125,7 +130,7 @@ export function addDraftField(
   return { ...table, fields: next };
 }
 
-/** 改字段名。空的或和别的字段重复时不改。 */
+/** Rename a field. Ignored if empty or duplicate with other fields. */
 export function renameDraftField(table: Collection, id: string, name: string): Collection {
   const trimmed = name.trim();
   const fields = table.fields;
@@ -134,7 +139,7 @@ export function renameDraftField(table: Collection, id: string, name: string): C
   return { ...table, fields: fields.map((f) => (f.id === id ? { ...f, name: trimmed } : f)) };
 }
 
-/** 去掉字段。附件字段留着：文件要放在那里。去掉的是金额的货币（D-549）：金额改回整张表一个货币。 */
+/** Remove a field. Attachment fields are kept: files need to be stored there. Amount currencies are removed (D-549): amounts revert to a single table-wide currency. */
 export function removeDraftField(table: Collection, id: string): Collection {
   return {
     ...table,

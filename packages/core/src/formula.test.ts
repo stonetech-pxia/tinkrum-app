@@ -55,7 +55,7 @@ describe('parseFormula / evaluateFormula (D-188)', () => {
 
 describe('if(compare, a, b) (D-246)', () => {
   it('picks the second or third part by a comparison', () => {
-    // 满 100 打九折。
+    // 10% discount for orders of 100 or more.
     const discount = 'if({total} >= 100, {total} * 0.9, {total})';
     expect(calc(discount, { total: 120 })).toBeCloseTo(108);
     expect(calc(discount, { total: 100 })).toBeCloseTo(90);
@@ -63,7 +63,7 @@ describe('if(compare, a, b) (D-246)', () => {
     expect(calc('if({a} = 0.3, 1, 0)', { a: 0.1 + 0.2 })).toBe(1);
     expect(calc('if({a} < {b}, {b} - {a}, 0)', { a: 2, b: 5 })).toBe(3);
     expect(calc('if({a} > 2, 1, 0) + if({a} <= 2, 10, 0)', { a: 2 })).toBe(10);
-    // 中文输入法的逗号和 ≥ 也认。
+    // Recognize Chinese input method commas and ≥ as well.
     expect(calc('if({a} ≥ 1， 1， 0)', { a: 1 })).toBe(1);
   });
 
@@ -76,7 +76,7 @@ describe('if(compare, a, b) (D-246)', () => {
 
   it('has no value when either side of the comparison is empty', () => {
     expect(calc('if({a} > 1, 1, 0)', {})).toBeUndefined();
-    // 没选中的那一边空着没关系。
+    // It is fine if the unselected side is empty.
     expect(calc('if({a} > 1, 1, {b})', { a: 5 })).toBe(1);
   });
 
@@ -179,7 +179,7 @@ describe('dates in formulas (D-247)', () => {
   it('counts the days left until a date, as of the given day', () => {
     const r = record({ due: '2026-11-01' });
     expect(recordValue(r, collection, 'left', new Date(2026, 9, 22, 23, 30))).toBe(10);
-    // 跨过夏令时切换（欧洲 10 月 25 日）也是整天数。
+    // Crossing daylight saving time switch (Europe October 25) is also full day count.
     expect(recordValue(r, collection, 'left', new Date(2026, 9, 31))).toBe(1);
     expect(
       recordValue(record({ due: '2026-10-01' }), collection, 'left', new Date(2026, 9, 22)),

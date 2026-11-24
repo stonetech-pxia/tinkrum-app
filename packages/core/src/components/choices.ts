@@ -5,23 +5,26 @@ import { IdSchema } from '../schema-base';
 import type { Page } from '../schema';
 import { type LookDefinitionOf, defineLook } from './define';
 
-// 页面上的一排选项（D-573，创始人 2026-11-16 决定 ② 第二步）：一张表的一个单选字段的选项排成一排（加「全部」），
-// 用户点一个，同一页里读这张表、source.choice 是 "page" 的记录块、数字和图表只显示这个字段是那一项的记录。
-// 和时间范围块（period，D-440）一个写法。选了什么只在页面画着的时候有，什么都不写（底线 15）；没有任何东西自己运行。
-// 「选一条记录」「选一天」没批，不在这里。
+// A row of option tabs on the page (D-573, founder decision 2 on 2026-11-16): options of a
+// single-choice field in a table arranged in a row (plus "All"), where tapping one makes record
+// blocks, numbers, and charts on the same page reading this table with source.choice as "page"
+// display only records where this field matches that item. Same syntax as time range blocks
+// (period, D-440). Selection state exists only while rendering the page, stored nowhere (invariant
+// 15); nothing runs automatically. "Pick a record" and "Pick a day" were not approved and are not
+// here.
 
 const shape = {
   show: z.strictObject({
-    /** 显示哪些选项、按什么顺序（选项 ID）；不写是这个字段的全部选项，按字段里的顺序。 */
+    /** Which options to display and in what order (option IDs); omitted means all options of the field, in field order. */
     options: z
       .array(IdSchema)
       .min(1)
       .max(50)
       .refine((list) => new Set(list).size === list.length, 'options must be different')
       .optional(),
-    /** false：没有「全部」，总是选着一项。 */
+    /** false: excludes "All", always selects an item. */
     all: z.literal(false).optional(),
-    /** 打开页面时选哪一项（选项 ID）；不写是「全部」（没有「全部」时是第一项）。 */
+    /** Default selected item (option ID) when opening the page; omitted means "All" (or the first item if "All" is excluded). */
     default: IdSchema.optional(),
   }),
   source: z.strictObject({ table: IdSchema, field: IdSchema }),
@@ -75,8 +78,10 @@ export const choicesComponent: LookDefinitionOf<'choices', typeof shape> = defin
 });
 
 /**
- * 跟着这一排的块（记录块、数字、图表）的检查：页面上要有一排选项，读的是同一张表；按同一个字段分组的块已经把每个
- * 选项都画出来了，不跟；列表自己的 show.browse.filter 用了同一个字段时留一个（D-561 对时间范围也是这样）。
+ * Checks for blocks following the option row (record blocks, numbers, charts): the page must
+ * contain an option row reading the same table; blocks grouped by the same field already render
+ * each option individually and are not followed; list browse.filter using the same field leaves
+ * one (D-561 does the same for time ranges).
  */
 export function followChoiceProblems(
   source: {

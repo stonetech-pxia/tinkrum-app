@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RecordSourceSchema } from './components/records';
 
-// 实测（v34 评测 P10、TD17-en）：模型有时不写 limit，整份回复就被拒绝。不写时用列表平常的 30 条。
+// Observed (v34 eval P10, TD17-en): models sometimes omit limit, causing the entire response to be rejected. Defaults to standard list limit of 30 items when omitted.
 describe('RecordSourceSchema limit', () => {
   it('defaults to 30 when the AI leaves it out', () => {
     const parsed = RecordSourceSchema.safeParse({ table: 'books' });

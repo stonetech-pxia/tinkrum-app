@@ -24,7 +24,7 @@ describe('planAudioSize', () => {
   });
 
   it('picks a bitrate from the duration, with a margin', () => {
-    // 10 分钟压到 5 MB：5 MB × 8 × 0.94 ÷ 600 秒 ≈ 65.7 kbps → 单声道 44.1 kHz。
+    // Compress 10 minutes to 5 MB: 5 MB × 8 × 0.94 ÷ 600 seconds ≈ 65.7 kbps → mono 44.1 kHz.
     const plan = planAudioSize({ durationMs: minutes(10), size: 20 * MB }, 5 * MB);
     expect(plan).toEqual({
       kind: 'encode',
@@ -51,7 +51,7 @@ describe('planAudioSize', () => {
     const plan = planAudioSize({ durationMs: minutes(60), size: 60 * MB }, 2 * MB);
     expect(plan.kind).toBe('tooSmall');
     if (plan.kind === 'tooSmall') {
-      // 60 分钟 × 24 kbps ÷ 0.94 ≈ 10.96 MB
+      // 60 minutes × 24 kbps ÷ 0.94 ≈ 10.96 MB
       expect(plan.minMB).toBe(11);
       expect(planAudioSize({ durationMs: minutes(60), size: 60 * MB }, plan.minMB * MB).kind).toBe(
         'encode',
@@ -86,7 +86,7 @@ describe('planAudioQuality', () => {
   });
 
   it('works out the original bitrate from the size when it is not known', () => {
-    // 1 分钟 0.9 MB ≈ 126 kbps → 「高」也只用原来的码率。
+    // 1 minute 0.9 MB ≈ 126 kbps → "high" uses only the original bitrate.
     const plan = planAudioQuality({ durationMs: minutes(1), size: 0.9 * MB }, 'high');
     expect(plan.bitrateKbps).toBe(126);
     expect(plan.bitrateKbps).toBeGreaterThanOrEqual(MIN_AUDIO_KBPS);

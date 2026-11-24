@@ -63,7 +63,7 @@ function fixture() {
 
 describe('Word figure ownership', () => {
   it('does not take a whole cover page with its title as one uncaptioned picture (EU sample 036)', () => {
-    // 右半是照片、左上是深色标题带：版面模型给一个盖满整页的图框，里面只有四行字。
+    // Right half is a photo, top-left is a dark title band: the layout model provides a bounding box covering the entire page containing only four lines of text.
     const image = renderPage(size.width, size.height, [
       { x: 560, y: 0, width: 440, height: 1400, shade: 120 },
       { x: 0, y: 140, width: 670, height: 280, shade: 40 },
@@ -151,8 +151,9 @@ describe('Word figure ownership', () => {
     ]);
   });
   it('keeps a row of three pictures in one row when neighbouring boxes overlap by a few pixels', () => {
-    // 商品目录的卡片图：剪出的图带一点留边，相邻两张的框互相压了 4–6 像素。
-    // 中间那张和左右两张都「重叠」，曾被单独放在这一排上面，三排图成了六排。
+    // Product catalog card images: cropped images include a slight margin, with adjacent boxes
+    // overlapping by 4-6 pixels. The middle image overlaps both left and right images and was
+    // previously placed above this row, turning three rows of images into six.
     const figures = [
       { x: 33, y: 165, width: 451, height: 331 },
       { x: 478, y: 165, width: 456, height: 331 },
@@ -267,7 +268,7 @@ describe('Word figure ownership', () => {
       ),
       fakeLine('Genre  Other label', { x: 580, y: 110, width: 300, height: 20 }, size, true),
     ];
-    // 故意按粗网格分配原字，第二行的开头和第一行的末尾落在同一格。
+    // Intentionally allocate original text according to coarse grid; the beginning of the second row and the end of the first row fall into the same cell.
     for (const c of block.table.cells)
       c.text = lines
         .map((l) =>
@@ -333,8 +334,10 @@ describe('Word figure ownership', () => {
     expect(text(page)).toContain(body.text);
   });
   it('keeps labels inside a native figure as text when their PDF text is not drawn into the crop', () => {
-    // 轴标签和图右边的说明在同一段 PDF 文字里：这段字只有约六成在图里，不画进剪图；
-    // 图里的标签就不能当成图的一部分从正文里去掉，不然哪儿都没有。
+    // Axis labels and descriptions to the right of the figure share the same PDF text block: only
+    // about 60% of this text is inside the figure and is not drawn into the crop; figure labels
+    // cannot be stripped from the body text as part of the figure, otherwise they disappear
+    // entirely.
     const f = fixture();
     const loose = { x: 120, y: 120, width: 860, height: 110 };
     const page = buildDocPage({
@@ -347,7 +350,7 @@ describe('Word figure ownership', () => {
     for (const label of ['Encoder', 'Structure tags', 'Output boxes'])
       expect(text(page)).toContain(label);
     expect(leafBlocks(page).filter((b) => b.kind === 'image')).toHaveLength(1);
-    // 画进了剪图的字（不在 nativeText 里）照旧归图。
+    // Text drawn inside the crop (not present in nativeText) is classified as part of the figure as usual.
     const drawn = buildDocPage({
       image: f.image,
       lines: f.lines,
@@ -471,7 +474,7 @@ describe('Word figure ownership', () => {
       image: f.image,
       lines: f.lines,
       source: 'diagram.jpg',
-      // 原始 PDF 已证明这些像素是图；不能再次被表格/短标签的启发式否决。
+      // Original PDF data proves these pixels are a figure; they must not be overruled by table/short label heuristics.
       nativeFigures: [f.picture.box],
     } as Parameters<typeof buildDocPage>[0]);
     const blocks = leafBlocks(page);
@@ -896,7 +899,7 @@ describe('Word figure ownership', () => {
       line(t, 120, 120 + i * 60, 150),
       line(values[i]!, 370, 120 + i * 60, 160),
     ]);
-    // 证件照：右边一列合并的四格里一块有纹理的深色图。
+    // ID photo: a textured dark patch within four merged cells on the right column.
     const photo: Rect[] = [{ x: 740, y: 140, width: 120, height: 150 }];
     for (let y = 115; y < 330; y += 4)
       for (let x = 720; x < 880; x += 4)
@@ -930,7 +933,7 @@ describe('Word figure ownership', () => {
   });
 
   it('keeps a ruled form as a table when a logo above it reaches into its top band (EU sample 062)', () => {
-    // 表上面的标志：PDF 里的图比画出来的标志高，下面透明的一截压进了表的标题条（约占图高的四分之一）。
+    // Header icons above the table: the PDF figure is taller than the rendered icon, and its transparent bottom portion encroaches into the table title bar (taking up about a quarter of the figure height).
     const labels = ['Section A', 'Surname', 'Given names', 'Street', 'House no.'];
     const lines = [
       line(labels[0]!, 120, 235, 150),
@@ -959,8 +962,11 @@ describe('Word figure ownership', () => {
   });
 
   it('keeps the rules a native logo overlaps, so its cell and the merged band below stay whole (EU sample 090)', () => {
-    // 表头左上格的标志：PDF 里的图框压过了这一格的上下两条横线。抹图时把横线也抹掉一截，
-    // 标志格和下面横跨整张表的「Dati paziente」一排连成不是长方形的一块，整张表退回不合并，标志跨了好几格。
+    // Top-left header cell icon: the PDF bounding box crosses the top and bottom horizontal lines
+    // of this cell. Erasing the figure also erases a portion of the horizontal lines, merging the
+    // icon cell with the "Dati paziente" row spanning the entire table into a non-rectangular
+    // block, causing the entire table to revert from merging and leaving the icon spanning multiple
+    // cells.
     const lines = [
       line('MODULO RICHIESTA ESAMI', 450, 150, 350),
       line('Dati paziente', 430, 232, 140),
@@ -971,7 +977,7 @@ describe('Word figure ownership', () => {
       line('mg/dL', 450, 350, 80),
       line('10 - 50', 700, 350, 100),
     ];
-    // 第一列（勾选框那一列，100–220）只在下面的数据行有竖线。
+    // The first column (the checkbox column, 100-220) has vertical lines only in the data rows below.
     const grid = gridRects([100, 220, 400, 650, 900], [100, 220, 260, 320, 380], {
       skipV: [
         [1, 0],

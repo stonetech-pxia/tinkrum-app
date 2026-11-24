@@ -1,24 +1,27 @@
 import type { OcrBox, RgbaImage } from './types';
 
-// 列表的圆点「•」、短横「-」（EU 样本 026、027）：识别常常读不出这个小记号，行从后面的字开始。
-// 没有记号时列表项变成普通段落，两项接成一段、一项的折行又被拆开。在行左边找这个记号：
-// 一小块实心的墨（圆点）或者一小截横线（短横），在字的半腰，周围空着；整页至少两行在同一个位置有同样的记号才算。
-// 找到的接在行的前面（「• 」「- 」），后面照常按列表排。
+// List bullet "•", hyphen "-" (EU samples 026, 027): OCR often fails to read this small mark,
+// causing the line to start from the subsequent text. When no mark is present, list items collapse
+// into regular paragraphs, merging two items into one or splitting a single item's wrapping. Look
+// for this mark to the left of the line: a small solid ink blob (bullet) or a short horizontal
+// stroke (hyphen) at the mid-height of the text, surrounded by whitespace; valid only if at least
+// two lines on the page share the same mark at the same position. Prepend the found mark to the
+// line ("• ", "- "), and format the remainder as a standard list.
 
-/** 记号离字最远这么多个行高，最近这么多个行高。 */
+/** Maximum and minimum distance of the mark from the text in line heights. */
 const MARK_FAR = 2.5;
 const MARK_NEAR = 0.15;
-/** 圆点的直径：这么多到这么多个行高。 */
+/** Bullet diameter: range in line heights. */
 const DOT_MIN = 0.12;
 const DOT_MAX = 0.5;
-/** 短横：长这么多到这么多个行高，粗不超过这么多个行高。 */
+/** Hyphen: length range in line heights, thickness at most this many line heights. */
 const DASH_MIN = 0.18;
 const DASH_MAX = 1.1;
 const DASH_THICK = 0.15;
-/** 同一种记号至少这么多行、左边差不到这么多个行高，才是列表。 */
+/** A list requires at least this many lines of the same mark type with left alignments within this line-height threshold. */
 const MARKS_MIN = 2;
 const MARK_ALIGN = 0.5;
-/** 第一个字的中心离字的左边约这么多个行高；第一个字离框的左边至少这么多个行高才算框里有记号。 */
+/** The center of the first character is approximately this many line heights from the left of the text; the first character must be at least this far from the left of the box for the box to contain a mark. */
 const CHAR_HALF = 0.25;
 const INSIDE_MIN = 0.6;
 
@@ -34,8 +37,9 @@ const inkAt = (image: RgbaImage, x: number, y: number) => {
 };
 
 /**
- * 字真正从哪里开始：识别框常常从记号开始（框里有「■」，字里却没有它，EU 样本 041），
- * 第一个字的位置离框的左边超过半个行高时按第一个字算。
+ * True start position of the text: OCR boxes often start at the mark (e.g., box contains ■ but
+ * text does not, EU sample 041); when the first character's position is more than half a line
+ * height from the box's left edge, use the first character.
  */
 function textStart(line: OcrBox): number {
   const first = line.chars?.length === [...line.text].length ? line.chars[0] : undefined;
@@ -44,7 +48,7 @@ function textStart(line: OcrBox): number {
   return x - line.x >= INSIDE_MIN * line.height ? x : line.x;
 }
 
-/** 行左边的一小块墨：只有一块、大小和位置像圆点或短横时返回它。 */
+/** Small ink blob on the left of the line: return it if there is only a single blob whose size and position resemble a bullet or hyphen. */
 function markOf(image: RgbaImage, line: OcrBox): Mark | null {
   const h = line.height;
   const start = textStart(line);
@@ -60,7 +64,7 @@ function markOf(image: RgbaImage, line: OcrBox): Mark | null {
     for (let x = x0; x < x1; x++) {
       const k = (y - y0) * w + (x - x0);
       if (seen[k] || !inkAt(image, x, y)) continue;
-      // 第二块墨：不是单独的一个记号。
+      // Second ink blob: not an isolated single mark.
       if (blob) return null;
       const b = { x0: x, y0: y, x1: x, y1: y, n: 0 };
       const stack = [k];
@@ -96,7 +100,7 @@ function markOf(image: RgbaImage, line: OcrBox): Mark | null {
   if (!blob) return null;
   const bw = blob.x1 - blob.x0 + 1;
   const bh = blob.y1 - blob.y0 + 1;
-  // 贴着找的范围的边（左边的别的字、上下行的字伸进来）：不是单独的记号。
+  // Touching the search boundary edge (other text on the left, or text from adjacent lines extending into the area): not an isolated mark.
   if (blob.x0 === x0 || blob.y0 === y0 || blob.y1 === y1 - 1) return null;
   const cy = (blob.y0 + blob.y1) / 2 - line.y;
   if (cy < 0.25 * h || cy > 0.8 * h) return null;
@@ -118,8 +122,9 @@ function markOf(image: RgbaImage, line: OcrBox): Mark | null {
 const TEXT = { dot: '•', dash: '-' } as const;
 
 /**
- * 给识别漏了列表记号的行补上记号。已经以记号、编号开头的行不动。
- * 返回新的行，和新行 → 原来的识别行。
+ * Append markers to lines whose list markers were missed by OCR. Lines already starting with
+ * markers or numbers are left unchanged. Returns new lines and a mapping of new lines to original
+ * OCR lines.
  */
 export function withBullets(
   image: RgbaImage,
@@ -135,7 +140,7 @@ export function withBullets(
   const out = lines.map((l) => {
     const mark = found.get(l);
     if (!mark) return l;
-    // 同一种记号、左边对齐的至少还有一行。
+    // At least one other line has the same mark type and left alignment.
     const peers = [...found].filter(
       ([o, m]) => m.kind === mark.kind && Math.abs(m.x - mark.x) <= MARK_ALIGN * o.height,
     );

@@ -35,10 +35,10 @@ function setup(workflow: Workflow, answer: string | null = '我的合并') {
   const files = new FakeFiles();
   const asked: string[] = [];
   const confirms: boolean[] = [];
-  /** 运行中问一句（ui.choose）时依次回答；记下每次给的选项。 */
+  /** Answer sequentially when prompted during execution (`ui.choose`); record the options provided each time. */
   const choices: (number | null)[] = [];
   const offered: string[][] = [];
-  /** 本地操作界面（ui.open）依次给的结果；记下打开了哪些。 */
+  /** Record the results returned sequentially by the local UI interface (`ui.open`); keep track of what was opened. */
   const locals: unknown[] = [];
   const opened: { kind: string; input: unknown }[] = [];
   const ui: LocalUi = {
@@ -52,7 +52,7 @@ function setup(workflow: Workflow, answer: string | null = '我的合并') {
       return (locals.shift() ?? null) as never;
     },
   };
-  // 运行页面的询问：记录建议的名字，回答 answer。
+  // Run page inquiries: record the suggested name and respond with the answer.
   const askParams = async (request: AskRequest) => {
     asked.push(String(request.params.template));
     return answer === null ? null : { template: answer };
@@ -171,7 +171,7 @@ describe('PDF passwords (D-194)', () => {
     const items =
       done.status === 'succeeded' && done.value && 'items' in done.value ? done.value.items : [];
     expect(text(files, items[0]!.uri)).toBe('%LOCK:s3cret\n%PDF 合同');
-    // 运行记录里只有状态，没有密码。
+    // Run logs contain status only, no passwords.
     expect(JSON.stringify(await repo.listToolRuns(10))).not.toContain('s3cret');
 
     files.nextPick = [pdf(files, '合同.pdf', '%PDF 合同')];
@@ -193,14 +193,14 @@ describe('adding an existing file (D-197)', () => {
 
   it('offers the last result of this quick action and puts it first', async () => {
     const { files, choices, offered, run, repo } = setup(wf);
-    // 第一次：还没有上次的结果，「这次新开一份」。
+    // First time: no previous result, so "start a new copy this time".
     files.nextPick = [files.offer('收据1.pdf', new Uint8Array([1]))];
     choices.push(1);
     expect(names(await run())).toEqual(['报销单']);
     expect(offered[0]).toEqual(['从「文件」里选一个', '这次新开一份']);
     const first = (await repo.listAssets())[0]!;
 
-    // 第二次：默认接上上次存下的报销单，放在前面。
+    // Second time: default to continuing from the previously saved expense report, placing it at the front.
     files.nextPick = [files.offer('收据2.pdf', new Uint8Array([2]))];
     choices.push(0);
     const result = await run();
@@ -211,7 +211,7 @@ describe('adding an existing file (D-197)', () => {
         ? result.value.items
         : [];
     expect(items.map((i) => files.disk.get(i.uri)?.[0])).toEqual([1, 2]);
-    // 旧的那份留着（P-030）。
+    // Keep the old copy (P-030).
     expect((await repo.listAssets()).map((a) => a.id)).toContain(first.id);
   });
 
@@ -219,7 +219,7 @@ describe('adding an existing file (D-197)', () => {
     const { files, choices, run } = setup(wf);
     files.nextPick = [files.offer('收据.pdf', new Uint8Array([2]))];
     choices.push(0);
-    // 没有上次的结果时第一项是「从文件里选」；选择器第二次给的是要加上的旧文件。
+    // When there is no previous result, the first item is "Pick from files"; the selector provides the old files to append on the second call.
     const original = files.pickDocuments.bind(files);
     let calls = 0;
     let addTypes: readonly string[] = [];
@@ -258,7 +258,7 @@ describe('PDF merge workflow (migrated to typed steps)', () => {
     expect(result).toMatchObject({ status: 'succeeded' });
     if (result.status !== 'succeeded' || result.value?.type !== 'pdf') throw new Error('no pdf');
     expect(files.lastPickTypes).toEqual(['application/pdf']);
-    // 询问时传入的是模板，运行页面再把它显示成「报告-合并」。
+    // Templates are passed during inquiries, and the run page renders them as "report-merged".
     expect(asked).toEqual(['{sourceName}-合并']);
     const [out] = result.value.items;
     expect(out).toMatchObject({ name: '我的合并', ext: 'pdf', pageCount: 3 });
@@ -268,7 +268,7 @@ describe('PDF merge workflow (migrated to typed steps)', () => {
     const merged = await PDFDocument.load(files.disk.get(saved.path)!);
     expect(merged.getPages().map((p) => p.getWidth())).toEqual([200, 200, 201]);
 
-    // 选中的 PDF 不再导入成用户文件（D-063）；输出授权给 PDF 工具；执行记录只有元数据。
+    // Selected PDFs are no longer imported as user files (D-063); output is authorized to the PDF tool; execution logs contain metadata only.
     expect((await repo.listAssets()).map((a) => a.name)).toEqual(['我的合并.pdf']);
     expect(await repo.hasGrant('pdf', saved.id)).toBe(true);
     expect(await repo.listToolRuns(1)).toEqual([
@@ -276,7 +276,7 @@ describe('PDF merge workflow (migrated to typed steps)', () => {
     ]);
   });
 
-  it('C: after simplification it saves automatically as 合并-日期, never overwriting', async () => {
+  it('C: after simplification it saves automatically as merged-date, never overwriting', async () => {
     const simplified = mergeWorkflow([
       {
         op: 'updateTool',
@@ -362,7 +362,7 @@ describe('PDF merge workflow (migrated to typed steps)', () => {
     expect(await run()).toMatchObject({
       error: { code: 'accessDenied', detail: { name: 'gone.pdf' } },
     });
-    // 失败时临时文件已经删掉。
+    // Temporary files are deleted upon failure.
     expect(files.runFiles()).toEqual([]);
   });
 });
@@ -395,14 +395,14 @@ describe('input and output actions', () => {
       '收据-2026-10-22-02.jpg',
     ]);
     expect(result.value.items[0]).toMatchObject({ width: 4032, mimeType: 'image/jpeg' });
-    // 分享出去的文件名就是命名后的名字。
+    // The shared file name matches the renamed title.
     expect(files.shared.map((u) => u.split('/').pop())).toEqual([
       '收据-2025-01-02-01.heic',
       '收据-2026-10-22-02.jpg',
     ]);
     expect(files.savedToPhotos).toHaveLength(2);
     expect(files.printed).toHaveLength(2);
-    // 没有保存步骤：没有产生用户文件，临时文件留给结果页使用。
+    // No save step: no user files are generated, leaving temporary files for the result page to use.
     expect(await repo.listAssets()).toEqual([]);
     expect(files.runFiles().length).toBeGreaterThan(0);
   });
@@ -423,10 +423,10 @@ describe('input and output actions', () => {
     expect([...folder.keys()]).toEqual(['a.jpg', 'b.jpg', 'c.jpg']);
     expect(folder.get('a.jpg')).toEqual(new Uint8Array([0xff, 0xd8, 1]));
     expect(files.folderPicks).toBe(1);
-    // 记给这个快捷操作（D-196）。
+    // Record against this quick action (D-196).
     expect(files.rememberedBy.get(wf.id)).toBe('MorphOut');
 
-    // 记住了文件夹（D-123）：下次直接存进去，不再弹选择器。
+    // Remembered folder (D-123): save directly next time without opening the picker.
     files.nextPhotos = [photo(files, 'd.jpg')];
     expect(await run()).toMatchObject({ status: 'succeeded' });
     expect(files.folderPicks).toBe(1);
@@ -441,7 +441,7 @@ describe('input and output actions', () => {
     const { files, run } = setup(wf);
     files.nextPhotos = [photo(files, 'a.jpg')];
     files.folderChoice = 'cancel';
-    // 和关掉分享面板一样：运行成功，结果页上还可以再存。
+    // Same as closing the share panel: run succeeded, and users can save again from the result page.
     expect(await run()).toMatchObject({ status: 'succeeded', value: { type: 'images' } });
     expect(files.folders.size).toBe(0);
     expect(files.remembered).toBeNull();

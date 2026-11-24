@@ -5,11 +5,15 @@ import { parseFormula } from './formula';
 import type { Registry } from './registry';
 import { ICON_NAMES } from './schema-base';
 
-// 导出的文件「用到了什么」（D-556）：App 文件和 App 配置文件在外层（format、version 旁边，不在配置里面）带一份清单，
-// 导出时从内容算出来，从不存进本机的配置（不改配置格式，不升版本号）。读文件的版本拿它和自己认识的比，
-// 缺什么就准确地说出来，而不是笼统地「用不了」。没有这一份的文件（旧版本导出的）和以前一样。
-// 外观、字段类型、动作、图标从登记表来，以后加的自动算进去；v39 以后在已有的键上加的键或取值一样一样写在
-// USES_FEATURES 里（以后再加这样的东西，要在这里加一项）。
+// Exported file "dependencies" manifest (D-556): App files and app configuration files include a
+// manifest at the outer level (alongside format and version, not inside the config). It is
+// calculated from content during export and never stored in local configuration files (does not
+// alter config format or increment version numbers). When reading files, it compares the manifest
+// against known versions and accurately reports missing features rather than failing with a generic
+// error. Files lacking this manifest (exported from older versions) behave as before. Appearance,
+// field types, actions, icons come from registries and are automatically accounted for; keys or
+// values added under existing keys post-v39 are explicitly listed in USES_FEATURES (future
+// additions of this kind must be added here).
 
 export interface FileUses {
   looks?: string[];
@@ -19,7 +23,7 @@ export interface FileUses {
   features?: string[];
 }
 
-/** v39 以后加的、更早的版本会拒绝的键和取值（不是新外观、新字段类型、新动作、新图标的那些）。 */
+/** Keys and values added after v39 that older versions will reject (excluding new appearances, field types, actions, or icons). */
 export const USES_FEATURES = [
   'numberCalc',
   'chartExtrema',
@@ -28,61 +32,61 @@ export const USES_FEATURES = [
   'calendarDayValue',
   'calendarWeek',
   'calendarUntil',
-  /** 筛选条件 is 的值是几个选项（D-538）。 */
+  /** Filter condition 'is' values containing multiple options (D-538). */
   'filterAnyOf',
-  /** 时间段 next7days / next30days / next90days（D-537）。 */
+  /** Time periods next7days / next30days / next90days (D-537). */
   'periodNextDays',
-  /** 表格样子的 show.columns（D-539）。 */
+  /** Table layout show.columns (D-539). */
   'showColumns',
-  /** 记录块的 show.highlight（D-541）。 */
+  /** Record block show.highlight (D-541). */
   'showHighlight',
-  /** 日历以外的记录块上的 show.color（D-541）。 */
+  /** Record block show.color outside of calendars (D-541). */
   'showColorAnyLook',
-  /** 提醒属于一个 App（D-485 补充）。 */
+  /** Reminders belonging to an App (supplementing D-485). */
   'reminderInApp',
-  /** 手机桌面菜单里放 App（app:<id>，D-485 补充）。 */
+  /** Placing Apps in the phone home screen menu (app:<id>, supplementing D-485). */
   'appOnPhoneHomeScreen',
-  /** single 块的 source.record "$record"：给一条记录用的页面上显示打开的那一条（D-558）。 */
+  /** Single block source.record "$record": displays the opened record on a page dedicated to a single record (D-558). */
   'singleOpenedRecord',
-  /** 时间段 yesterday / lastWeek / lastMonth / lastYear / tomorrow / nextWeek / nextMonth（D-559）。 */
+  /** Time periods yesterday / lastWeek / lastMonth / lastYear / tomorrow / nextWeek / nextMonth (D-559). */
   'periodNeighbours',
-  /** 记录块的 source.sort 是几个字段的列表（D-560）。 */
+  /** Record block source.sort listing multiple fields (D-560). */
   'sortMany',
-  /** 记录块的 source.period "page"：跟着页面上的时间范围（D-561）。 */
+  /** Record block source.period "page": follows the time range specified on the page (D-561). */
   'recordsFollowPagePeriod',
-  /** 提醒 when {before, minutes}：日期时间前几分钟（D-562）。 */
+  /** Reminder when {before, minutes}: minutes before a date/time (D-562). */
   'reminderMinutesBefore',
-  /** 每天、每周的提醒带 unless（D-563）。 */
+  /** Daily and weekly reminders with 'unless' condition (D-563). */
   'reminderUnlessRepeating',
-  /** 提醒 when {every: "month", day}：每月几号（D-577）。 */
+  /** Reminder when {every: "month", day}: specific day of every month (D-577). */
   'reminderMonthly',
-  /** 一键记录工具写的值 {from, add, unit}：从今天或这一条的日期起加几天、几个月（D-565）。 */
+  /** One-tap record tool value {from, add, unit}: adds days or months relative to today or the record's date (D-565). */
   'recordToolDateValue',
-  /** 一键记录工具写的值 {copy}：抄这一条的一个字段（D-565）。 */
+  /** One-tap record tool value {copy}: copies a field from the current record (D-565). */
   'recordToolCopyValue',
-  /** increment 的 by 是这一条的一个数字字段（D-565）。 */
+  /** Increment 'by' referencing a numeric field of the current record (D-565). */
   'incrementByField',
-  /** 点一下改几处：就地工具上的 also（D-566）。 */
+  /** Tap to modify multiple places: 'also' on in-place tools (D-566). */
   'tapAlso',
-  /** 一键记录工具的第六种：批量新建（D-567）。 */
+  /** Sixth type of one-tap record tool: batch creation (D-567). */
   'createAll',
-  /** 单选选项上的 value（D-568）。 */
+  /** Value on single-choice options (D-568). */
   'choiceOptionValue',
-  /** 单选选项上的 color（D-568）。 */
+  /** Color on single-choice options (D-568). */
   'choiceOptionColor',
-  /** 公式读勾选框或单选（D-569）。 */
+  /** Formulas reading checkboxes or single-choice fields (D-569). */
   'formulaReadsCheckboxOrChoice',
-  /** 表上的 form：记录表单的分段和条件显示（D-570）。 */
+  /** Table form: sections and conditional display for record forms (D-570). */
   'entryForm',
-  /** 字段上的 hint：填写提示（D-570）。 */
+  /** Field hint: input placeholder guidance (D-570). */
   'fieldHint',
-  /** 数字、金额、时长字段上的 min / max（D-570）。 */
+  /** Min / max constraints on number, currency, and duration fields (D-570). */
   'fieldRange',
-  /** 记录块、数字、图表的 source.choice "page"：跟着页面上的一排选项（D-573）。 */
+  /** Record block, number, and chart source.choice "page": follows a row of options on the page (D-573). */
   'blocksFollowPageChoice',
-  /** 主题上的 card：卡片的边框和阴影用参数写（D-624）。 */
+  /** Theme card: parameter-driven card borders and shadows (D-624). */
   'themeCard',
-  /** 画出来的图标：顶层的 icons，图标写 "my:<id>"（D-625）。 */
+  /** Drawn icons: top-level icons, specified as "my:<id>" (D-625). */
   'drawnIcons',
 ] as const;
 
@@ -102,7 +106,7 @@ const ICON_NAME = /^[a-z][a-z0-9-]*$/;
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** 算一份内容（整份配置，或 App 文件去掉外层的部分）用到了什么；排好序、不重复，空的不写。 */
+/** Computes the dependencies of a content payload (full config, or app file with outer layers removed); sorted, deduplicated, omitting empty values. */
 export function usesOf(content: unknown): FileUses {
   const found = {
     looks: new Set<string>(),
@@ -113,7 +117,7 @@ export function usesOf(content: unknown): FileUses {
   };
   const walk = (node: unknown, key: string | null) => {
     if (Array.isArray(node)) {
-      // 公式读同一张表的勾选框或单选（D-569）。
+      // Formulas reading checkboxes or single-choice fields of the same table (D-569).
       if (key === 'fields') {
         const readable = new Set(
           node
@@ -130,10 +134,10 @@ export function usesOf(content: unknown): FileUses {
       for (const item of node) {
         if (key === 'fields' && isObject(item) && typeof item.type === 'string') {
           found.fieldTypes.add(item.type);
-          // 填写提示、范围（D-570）。
+          // Input hints and ranges (D-570).
           if (item.hint !== undefined) found.features.add('fieldHint');
           if (item.min !== undefined || item.max !== undefined) found.features.add('fieldRange');
-          // 单选选项上的数和颜色（D-568）。
+          // Values and colors on single-choice options (D-568).
           for (const o of Array.isArray(item.options) ? item.options : []) {
             if (isObject(o) && o.value !== undefined) found.features.add('choiceOptionValue');
             if (isObject(o) && o.color !== undefined) found.features.add('choiceOptionColor');
@@ -146,12 +150,12 @@ export function usesOf(content: unknown): FileUses {
       return;
     }
     if (!isObject(node)) return;
-    // 块：有 id 和 look 的（页面、分组里的，包括这个版本不认识的外观）。
+    // Blocks with id and look (in pages, groups, including unrecognized looks in this version).
     if (typeof node.look === 'string' && typeof node.id === 'string') {
       found.looks.add(node.look);
       const show = node.show;
       if (isObject(show)) {
-        // period 块的选项和默认（D-559）。
+        // Options and defaults for period blocks (D-559).
         if (
           node.look === 'period' &&
           [show.options, show.default]
@@ -187,9 +191,9 @@ export function usesOf(content: unknown): FileUses {
         if (source.choice !== undefined) found.features.add('blocksFollowPageChoice');
       }
     }
-    // 快捷操作的步骤、工具栏上的动作。
+    // Quick action steps, actions on the toolbar.
     if (typeof node.action === 'string') found.actions.add(node.action);
-    // 筛选条件（块、汇总、提醒、快捷操作里的都是这个形状）。
+    // Filter conditions (used in blocks, summaries, reminders, and quick actions).
     if (typeof node.field === 'string' && typeof node.op === 'string') {
       if (Array.isArray(node.value)) found.features.add('filterAnyOf');
       if (node.op === 'inPeriod' && typeof node.value === 'string' && NEXT_DAYS.has(node.value))
@@ -201,7 +205,7 @@ export function usesOf(content: unknown): FileUses {
       found.features.add('periodNextDays');
     if (typeof node.period === 'string' && NEIGHBOURS.has(node.period))
       found.features.add('periodNeighbours');
-    // 一键记录工具（块上的、提醒的 done）写的值（D-565）。
+    // Values written by one-tap record tools (on blocks, reminder done) (D-565).
     if (typeof node.do === 'string') {
       const values = [node.value, ...(isObject(node.values) ? Object.values(node.values) : [])];
       for (const v of values) {
@@ -214,9 +218,9 @@ export function usesOf(content: unknown): FileUses {
       if (Array.isArray(node.also)) found.features.add('tapAlso');
       if (node.do === 'createAll') found.features.add('createAll');
     }
-    // 表上的 form（D-570）：有 fields 的那一层是表。
+    // Form on a table (D-570): the layer with fields is a form.
     if (Array.isArray(node.fields) && node.form !== undefined) found.features.add('entryForm');
-    // 主题上的 card（D-624）：有 cardStyle 的那一层是主题。
+    // Card on a theme (D-624): the layer with cardStyle is a theme.
     if (typeof node.cardStyle === 'string' && node.card !== undefined)
       found.features.add('themeCard');
     if (node.kind === 'reminder' && node.app !== undefined) found.features.add('reminderInApp');
@@ -228,7 +232,7 @@ export function usesOf(content: unknown): FileUses {
       if (node.when.every === 'month') found.features.add('reminderMonthly');
     }
     for (const [k, v] of Object.entries(node)) {
-      // 图标：白名单里的名字（emoji 不算，哪个版本都认）；画出来的 my:<id> 算一项功能，不算图标名。
+      // Icon: whitelist name (emojis do not count, recognized across all versions); rendered my:<id> counts as a feature, not an icon name.
       if (k === 'icon' && typeof v === 'string' && ICON_NAME.test(v)) found.icons.add(v);
       if (k === 'icon' && isDrawnIconRef(v)) found.features.add('drawnIcons');
       walk(v, k);
@@ -246,8 +250,9 @@ const strings = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 
 /**
- * 文件外层的清单里这个版本没有的（按外观、字段类型、动作、图标、其他的顺序）。没有清单、清单不对、
- * 文件读不了的都返回空：那样的文件照以前的路走。
+ * Items in the outer file manifest not recognized by this version (ordered by look, field type,
+ * action, icon, others). Missing manifest, invalid manifest, or unreadable files all return
+ * empty: such files follow legacy behavior.
  */
 export function missingUses(text: string, registry: Registry): string[] {
   let data: unknown;

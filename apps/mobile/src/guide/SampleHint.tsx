@@ -8,8 +8,10 @@ import type { Palette } from '../renderer/theme';
 import { Pill, Card } from '../renderer/ui';
 import { useWorkspaceContext } from '../workspace/context';
 
-// 样板 App 应用之后（D-260）：回到它的主页面，顶部照常有「已改好 · 撤销」，下面一张小卡片提示可以用 AI 接着改。
-// 只在这次打开 App 时显示，不存盘；点「用 AI 接着改」把一句开头填进 AI 输入框，由用户自己写完、发送。
+// After applying the sample app (D-260): returns to its main page, with the top showing "Modified ·
+// Undo" as usual, and a small card below prompting that AI can be used to continue modifying. Shown
+// only during this app opening, not persisted; tapping "Use AI to continue" fills a starting
+// sentence into the AI input box for the user to finish writing and send themselves.
 
 interface SampleHintState {
   hint: { sample: SampleApp; pageId: string } | null;
@@ -71,7 +73,7 @@ export function SampleHint({ pageId, palette }: { pageId: string; palette: Palet
 }
 
 const styles = StyleSheet.create({
-  // 左右贴着页面边距（D-454），在用的地方写。
+  // Attached to left and right page margins (D-454), written where used.
   wrap: { paddingTop: 8 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' },
 });

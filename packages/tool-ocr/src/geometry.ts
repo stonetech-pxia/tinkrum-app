@@ -1,12 +1,13 @@
-// 找文字行的几何计算（D-269）：凸包、最小外接矩形（旋转卡壳）、矩形往外扩、四个角排顺序。
-// 和 PaddleOCR 的 DB 后处理（OpenCV 的 minAreaRect、pyclipper 的 offset）结果一致，但不依赖它们。
+// Geometric calculations for finding text lines (D-269): convex hull, minimum bounding rectangle
+// (rotating calipers), expanding rectangles, sorting four corners. Consistent with PaddleOCR's DB
+// post-processing (OpenCV's minAreaRect, pyclipper's offset) results without depending on them.
 
 export interface Point {
   x: number;
   y: number;
 }
 
-/** 旋转的矩形：中心、两条轴（单位向量）和两条轴方向上的长度。 */
+/** Rotated rectangle: center, two axes (unit vectors), and lengths along the two axes directions. */
 export interface RotatedRect {
   cx: number;
   cy: number;
@@ -19,7 +20,7 @@ export interface RotatedRect {
 const cross = (o: Point, a: Point, b: Point) =>
   (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
-/** 凸包（Andrew 单调链），逆时针，不含共线点。 */
+/** Convex hull (Andrew's monotone chain), counter-clockwise, excluding collinear points. */
 export function convexHull(points: readonly Point[]): Point[] {
   const pts = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
   if (pts.length <= 2) return pts;
@@ -37,7 +38,7 @@ export function convexHull(points: readonly Point[]): Point[] {
   return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 }
 
-/** 面积最小的外接矩形：最小矩形一定有一条边和凸包的某条边重合，逐条边试。 */
+/** Minimum area bounding rectangle: the minimum rectangle must share an edge with an edge of the convex hull; test edge by edge. */
 export function minAreaRect(points: readonly Point[]): RotatedRect {
   const hull = convexHull(points);
   if (hull.length === 0) return { cx: 0, cy: 0, u: { x: 1, y: 0 }, v: { x: 0, y: 1 }, w: 0, h: 0 };
@@ -80,7 +81,7 @@ export function minAreaRect(points: readonly Point[]): RotatedRect {
   return best!;
 }
 
-/** 矩形的四个角，按左上、右上、右下、左下排（PaddleOCR 的 get_mini_boxes：先按 x 排，左右两对里各按 y 分上下）。 */
+/** Four corners of the rectangle, ordered as top-left, top-right, bottom-right, bottom-left (PaddleOCR's get_mini_boxes: sort by x first, then split each left/right pair into top/bottom by y). */
 export function rectCorners(rect: RotatedRect): [Point, Point, Point, Point] {
   const { cx, cy, u, v, w, h } = rect;
   const corner = (su: number, sv: number) => ({
@@ -97,8 +98,9 @@ export function rectCorners(rect: RotatedRect): [Point, Point, Point, Point] {
 }
 
 /**
- * 文字区域往外扩（DB 的 unclip）：扩的距离 = 面积 × ratio ÷ 周长。矩形按圆角往外扩之后，
- * 最小外接矩形就是每边各加这个距离。
+ * Expanding text regions outward (DB's unclip): expansion distance = area × ratio ÷ perimeter.
+ * After expanding the rectangle by rounded corners, the minimum bounding rectangle is each side
+ * plus this distance.
  */
 export function unclipRect(rect: RotatedRect, ratio: number): RotatedRect {
   const perimeter = 2 * (rect.w + rect.h);

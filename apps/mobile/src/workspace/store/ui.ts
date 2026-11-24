@@ -3,7 +3,7 @@ import { appOfTarget, appViewOf, firstTarget } from '@morph/core';
 import type { Kernel } from './kernel';
 import type { WorkspaceState } from './types';
 
-// 界面状态：版本提示条（banner）、记录提示（toast）、当前导航项、文件和记录的刷新信号。
+// UI state: Version banner, record toast, current navigation item, and file/record refresh signals.
 
 export function createUI({
   set,
@@ -71,7 +71,7 @@ export function createUI({
 
     dismissToast: () => set({ toast: null }),
 
-    // 按住 / 松开时换一个新对象，提示条的定时器跟着停和重新开始。
+    // Swaps to a new object on hold/release, restarting and stopping the banner timer accordingly.
     holdBanner(held) {
       const banner = get().banner;
       if (banner && !!banner.held !== held) set({ banner: { ...banner, held } });

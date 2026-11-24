@@ -1,4 +1,4 @@
-"""用 llama.cpp CPU 验证 Qwen3 Embedding GGUF 的分类、内存和速度。"""
+"""Verify classification, memory, and speed of Qwen3 Embedding GGUF using llama.cpp CPU."""
 from __future__ import annotations
 
 import argparse
@@ -80,7 +80,7 @@ def emb_options(server: Path, model: Path, port: int, threads: int, noise: bool)
             return vectors
 
         setup_start = time.perf_counter()
-        # 用户类别的向量只需在类别增删或改描述时重算。
+        # User-defined category vectors only need to be recomputed when categories are added/deleted or descriptions are modified.
         candidates = {(lang, facet): embed([sentence for _, sentence in choices(facet, lang)])
                       for lang in LANG_INDEX for facet in ("kind", "topic")}
         setup_s = time.perf_counter() - setup_start

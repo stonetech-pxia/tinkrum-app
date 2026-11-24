@@ -2,12 +2,14 @@ import type { z } from 'zod';
 
 import type { Field, Locale, Localized } from '../schema';
 
-// 动作契约：每个动作声明「输入类型 → 输出类型」、参数结构和参数的界面元数据。
-// 只有登记过的动作才能出现在工作流里；实现由 tool-* 包和 App 运行时提供，这里只描述契约。
+// Action contract: each action declares its input type -> output type, parameter schema, and
+// parameter UI metadata. Only registered actions can appear in workflows; implementation is
+// provided by tool-* packages and the app runtime, whereas this describes the contract only.
 
 /**
- * 步骤之间传递的值的类型（D-060）。files 是 images、pdf、zip、video、audio 的父类型。
- * video 和 audio 一起加（D-140）：音频的动作由以后的音频工具提供。
+ * Types of values passed between steps (D-060). files is the parent type of images, pdf, zip,
+ * video, and audio. video and audio added together (D-140): audio actions are provided by future
+ * audio tools.
  */
 export const VALUE_TYPES = [
   'images',
@@ -23,17 +25,17 @@ export type ValueType = (typeof VALUE_TYPES)[number];
 
 const FILE_SUBTYPES: readonly ValueType[] = ['images', 'pdf', 'zip', 'video', 'audio', 'files'];
 
-/** 动作接受 accepted 中的类型时，值 actual 能不能接上。 */
+/** Checks whether an actual value type is compatible when an action accepts types in accepted. */
 export function acceptsType(accepted: readonly ValueType[], actual: ValueType): boolean {
   if (accepted.includes(actual)) return true;
   return accepted.includes('files') && FILE_SUBTYPES.includes(actual);
 }
 
-/** 动作能不能接上类型为 actual 的值：接受的类型里有它，而且不在 rejects 里。 */
+/** Whether an action can accept a value of type actual: included in accepted types and not in rejects. */
 export const actionAccepts = (action: ActionDefinition, actual: ValueType): boolean =>
   acceptsType(action.input, actual) && !action.rejects?.includes(actual);
 
-/** 文件的值类型：files 是其余几种的父类型（排第一，下面按这个顺序找第一步要的）。 */
+/** File value types: files is the parent type of the others (listed first, searched in this order for the first step). */
 export const FILE_VALUE_TYPES = [
   'files',
   'images',
@@ -45,23 +47,25 @@ export const FILE_VALUE_TYPES = [
 export type HandedFileType = (typeof FILE_VALUE_TYPES)[number];
 
 /**
- * 容器能交给工具的值（创始人 2026-11-04 在对话里定，2026-11-05 加了文件）：记录页、单条记录块交这一条（records），
- * 字段交它的值（text），列表交它现在选出的记录（records）；附件字段交里面的文件（files，副本，D-442）。
- * 第一步要这几种的快捷操作不用输入步骤；收件页面、桌面交的文件不是这样交的（D-115）。
+ * Values the container can pass to tools (founder set in conversation 2026-11-04, added files on
+ * 2026-11-05): record page and single record blocks pass this entry (records), fields pass their
+ * values (text), lists pass currently selected records (records); attachment fields pass internal
+ * files (files, copies, D-442). Quick actions requiring these as the first step do not need input
+ * steps; inbox and desktop files are not passed this way (D-115).
  */
 export const HANDED_TYPES = ['text', 'records', 'files'] as const satisfies readonly ValueType[];
 export type HandedType = (typeof HANDED_TYPES)[number];
 
-/** 第一步收文件时，容器该交哪一种文件：收任何文件的是 files，否则是它收的第一种。 */
+/** File type the container should pass when the first step receives files: files accepts any file, otherwise the first accepted file type. */
 export const handedFileTypeOf = (action: ActionDefinition): HandedFileType | null =>
   FILE_VALUE_TYPES.find((type) => actionAccepts(action, type)) ?? null;
 
-/** 这个动作当第一步时要容器交什么；输入动作不算。 */
+/** What container value this action expects when acting as the first step; input actions are excluded. */
 export const handedTypeOf = (action: ActionDefinition): HandedType | null =>
   (['text', 'records'] as const).find((type) => actionAccepts(action, type)) ??
   (handedFileTypeOf(action) !== null ? 'files' : null);
 
-/** 需要用户在本地亲手操作的步骤（TOOLS_DESIGN §4）。AI 只决定它出现在哪里，看不到操作内容。 */
+/** Steps requiring manual user operation on device (TOOLS_DESIGN §4). AI only determines where they appear and cannot see operation contents. */
 export const LOCAL_STEP_KINDS = [
   'crop',
   'reorder',
@@ -88,20 +92,23 @@ export type Permission = (typeof PERMISSIONS)[number];
 
 export type ParamUnit = 'px' | 'KB' | 'MB' | '%' | '°' | 'mm' | 'pt' | 'in';
 
-/** 单位按语言写：法语的 KB、MB 是 Ko、Mo。 */
+/** Localized unit labels: French KB and MB are Ko and Mo. */
 export const paramUnitLabel = (unit: ParamUnit, locale: Locale): string =>
   locale === 'fr' && unit === 'KB' ? 'Ko' : locale === 'fr' && unit === 'MB' ? 'Mo' : unit;
 
-/** 一个参数的界面元数据：编辑器据此生成表单，运行时询问也用它。 */
+/** UI metadata for a parameter: used by the editor to generate forms and by runtime prompts. */
 export interface ParamField {
   key: string;
   label: Localized;
   /**
-   * collection：选一张数据表（选项来自配置）；fields：选这张表的几个字段（同一步有 collection 参数时是那张表，
-   * 否则是传进来的记录所在的表；编辑页按前面「读取记录」步骤的表列出）。这两种就是参数引用配置的声明
-   * （CHAIN_AUDIT A3）：检查和删表、删字段时的清理按它们来（workflow/refs.ts），不按动作 ID 写死。
-   * secret：密码（D-194、D-199）。不在参数结构里，配置存不进去、AI 看不到；每次运行时都问，
-   * 只交给这一次运行（StepContext.secrets），不进运行记录。
+   * collection: select a data table (options from config); fields: select fields from this table
+   * (uses that table if a collection parameter exists in the same step, otherwise the table of
+   * the incoming record; editor lists fields according to the preceding "Read records" step).
+   * These two parameter reference config declarations (CHAIN_AUDIT A3): cleanup during
+   * validation, table deletion, and field deletion follows them (workflow/refs.ts) rather than
+   * hardcoded action IDs. secret: password (D-194, D-199). Excluded from parameter schema, not
+   * persisted in config, invisible to AI; prompted at runtime, passed only to this execution
+   * (StepContext.secrets), and excluded from run logs.
    */
   kind:
     | 'number'
@@ -114,48 +121,50 @@ export interface ParamField {
     | 'fields'
     | 'secret';
   /**
-   * collection 参数：这一步把传进来的值存进这张表（记一笔，D-187）。表里要有放它的字段：文件要有附件字段，
-   * 文字要有长文本或文字字段。
+   * collection parameter: stores the incoming value into this table (log an entry, D-187). The
+   * table must contain appropriate fields: attachment fields for files, long text or text fields
+   * for text.
    */
   receives?: boolean;
-  /** 此表约束传进来的记录；不能从别的表交入。 */
+  /** Restricts incoming records to this table; cannot be passed from other tables. */
   bindsInput?: boolean;
-  /** fields 参数引用哪一个 collection 参数；不写沿用输入记录的表。 */
+  /** Which collection parameter the fields parameter references; defaults to input record's table if omitted. */
   collectionKey?: string;
-  /** 字段选择器允许的类型；单字段选择也仍保存为字段 ID 数组。 */
+  /** Permitted types for field selectors; single field selection is still stored as an array of field IDs. */
   fieldTypes?: readonly Field['type'][];
   single?: boolean;
   textFormat?: 'email' | 'phone' | 'url';
   builtInCreated?: boolean;
-  /** 多行文字（文字转 PDF、二维码内容）。 */
+  /** Multiline text (text-to-PDF, QR code content). */
   multiline?: boolean;
   unit?: ParamUnit;
   min?: number;
   max?: number;
   step?: number;
-  /** 数字参数第一次放上来时的值（没有时用 min）：例如页码从 1 开始、字号 10。 */
+  /** Initial value of a numeric parameter when first added (uses min if absent): e.g., page numbers starting at 1, font size 10. */
   initial?: number;
-  /** 数字参数是 0 时的意思（例如「大小不限」）：说明里只写这一句，表单上写「0 = 不限」。 */
+  /** Meaning when a numeric parameter is 0 (e.g., "unlimited size"): description only contains this sentence, form displays "0 = unlimited". */
   zeroMeans?: Localized;
   options?: readonly { value: string | number; label: Localized }[];
-  /** 只在某些参数取某个值时才显示，例如「按长边」时才显示长边像素。 */
+  /** Display only when specific parameters take certain values, e.g., display long edge pixels only when "by long edge" is selected. */
   showIf?: { key: string; equals: readonly (string | number | boolean)[] };
   /**
-   * false：默认值就是对的、不用每次问（例如识别语言「自动」，D-278）。房间里单用这个动作时，
-   * 参数都是 false 就直接跑、不弹参数面板（D-363，desk/tools.ts 的 deskToolAsks）。
+   * false: default value is correct, no need to prompt each time (e.g., recognition language
+   * "auto", D-278). When using this action alone in a room, if all parameters are false, it runs
+   * directly without showing the parameter panel (D-363, deskToolAsks in desk/tools.ts).
    */
   ask?: boolean;
-  /** 必须在快捷操作的设置里确定，不能在运行时改输出种类或配置引用。 */
+  /** Must be configured in quick action settings; cannot change output type or config references at runtime. */
   fixed?: boolean;
-  /** 用户自己写的文字（水印、文字戳）：发给 AI 前替换成占位符（D-065）。 */
+  /** User-written text (watermarks, text stamps): replaced with placeholders before sending to AI (D-065). */
   private?: boolean;
-  /** secret 要输两遍、一样才行（给 PDF 加密码，D-194）。 */
+  /** secret must be entered twice and match (adding PDF password, D-194). */
   confirm?: boolean;
-  /** toggle 没写这个参数时显示成打开（动作把「不写」当成打开，例如扫描的展平，D-274）。 */
+  /** toggle displays as on when this parameter is omitted (action treats omission as on, e.g., scan flattening, D-274). */
   defaultOn?: boolean;
 }
 
-/** 常用规格：一键填入一组参数，例如「护照 35×45」「4 MB」。 */
+/** Common presets: one-click fill for a parameter group, e.g., "Passport 35x45", "4 MB". */
 export interface ParamPreset {
   id: string;
   label: Localized;
@@ -167,50 +176,55 @@ export type OutputSpec = ValueType | 'same' | ((params: Record<string, unknown>)
 export interface ActionDefinition {
   id: string;
   label: Localized;
-  /** 步骤按参数换的名字（来源是相机时「选照片」改叫「拍照」）；不写或返回 undefined 时用 label。 */
+  /** Dynamic step name based on parameters (e.g., "Select photos" renamed to "Take photo" when source is camera); uses label if omitted or returns undefined. */
   labelFor?: (params: Record<string, unknown>) => Localized | undefined;
-  /** 一句话说明，显示在动作选择器里，也发给 AI。 */
+  /** One-sentence description, displayed in action selector and sent to AI. */
   description: Localized;
-  /** 接受的输入类型；空数组表示输入动作（只能是第一步）。 */
+  /** Accepted input types; empty array indicates an input action (must be step 1). */
   input: readonly ValueType[];
-  /** 虽然接受 files，但处理不了的子类型（例如合并 PDF 不收视频和音频）。 */
+  /** Subtypes that cannot be processed despite accepting files (e.g., PDF merge does not accept video and audio). */
   rejects?: readonly ValueType[];
   output: OutputSpec;
   params: z.ZodType<Record<string, unknown>>;
   fields: readonly ParamField[];
   presets?: readonly ParamPreset[];
-  /** 需要用户本地操作的步骤。 */
+  /** Steps requiring local user operation. */
   local?: LocalStepKind;
   /**
-   * 把这段文字当成这种链接打开（打电话、发短信、发邮件、打开网站）：只由 core 的 fieldLink 规则造链接。
-   * 记录页上这个字段的值对不上时按钮不显示（D-428）。
+   * Open this text as a link of the specified type (phone call, SMS, email, web URL): links are
+   * generated solely by core's fieldLink rules. Button hidden on record page if the field value
+   * is mismatched (D-428).
    */
   opensLink?: 'phone' | 'message' | 'email' | 'url';
-  /** 只收一条记录时：这一条能不能用这个动作（名片内容为空时做不出 vCard）。不写就是能用。 */
+  /** When receiving a single record: whether this entry is compatible with this action (cannot generate vCard if business card content is empty). Defaults to compatible. */
   recordFits?: (fields: readonly Field[], values: Readonly<Record<string, unknown>>) => boolean;
-  /** 需要的扩展包（D-064）。 */
+  /** Required expansion pack (D-064). */
   pack?: string;
-  /** 扩展包取决于参数时（文字识别的语言包）：返回本次要确保安装的扩展包，它会连同依赖一起下载。 */
+  /** When a pack depends on parameters (such as the language pack for text recognition): returns the pack that must be ensured installed for this run, which will be downloaded along with its dependencies. */
   packFor?: (params: Record<string, unknown>) => string | undefined;
   requires: readonly Permission[];
   /**
-   * 给 AI 的提示（英文，随动作目录发给模型）：用户怎么说时用这个动作、怎么设参数、前后接什么、
-   * 要在 notes 里提醒什么。提示词规则 20 只留建工作流的通用规则。改了要跑受影响的评测。
+   * Prompt for the AI (in English, sent to the model with the action catalog): when the user says
+   * X, use this action, how to set parameters, what precedes/follows it, and what to remind in
+   * notes. Prompt rule 20 keeps only general workflow-building rules. If changed, run affected
+   * evals.
    */
   ai?: string;
   /**
-   * 只和这个动作有关、要单独教 AI 的规则（像组件的 ai.rule）：n 是提示词「## Rules」里的编号，
-   * 取现在最后一条规则的编号加 1。text 是英文，改了要跑受影响的评测。
+   * Rules specific to this action to teach the AI separately (like component `ai.rule`): `n` is
+   * the number in the prompt's `## Rules` section, taking the number of the current last rule
+   * plus 1. `text` is in English; if changed, run affected evals.
    */
   aiRules?: readonly { n: number; text: string }[];
   /**
-   * 内置规则（mock AI）认的步骤说法，用在「新建一个快捷操作：选照片，压到 500KB，分享」这类句子里（D-265）。
-   * 整个短语匹配；不同动作的说法不能重叠（workflow-phrases.test.ts 检查）。
+   * Step phrasing recognized by built-in rules (mock AI), used in sentences like "Create a quick
+   * action: select photos, compress to 500KB, share" (D-265). Matched as full phrases; phrasings
+   * across different actions must not overlap (checked by `workflow-phrases.test.ts`).
    */
   phrases?: readonly StepPhraseRule[];
 }
 
-/** 一种步骤说法：match 匹配短语，step 给出参数（不写时参数为空）。 */
+/** A step phrasing rule: `match` matches the phrase, `step` provides the parameters (empty when omitted). */
 export interface StepPhraseRule {
   match: RegExp;
   step?: (
@@ -218,14 +232,14 @@ export interface StepPhraseRule {
     locale: Locale,
   ) => {
     params: Record<string, unknown>;
-    /** 每次运行时问的参数。 */
+    /** Parameters asked at each run. */
     ask?: string[];
-    /** 记一笔（D-187）：句子里说的表名；空字符串表示没说。 */
+    /** Log an expense (D-187): table name mentioned in the sentence; empty string means none was mentioned. */
     table?: string;
   };
 }
 
-/** 动作在给定参数和输入类型下的输出类型。 */
+/** Output type of the action given parameters and input types. */
 export function outputTypeOf(
   action: ActionDefinition,
   params: Record<string, unknown>,

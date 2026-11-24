@@ -29,20 +29,20 @@ import { displayName, fileItems, freshName, type RunServices } from './helpers';
 import { t } from '../../i18n';
 import { backgroundModel, eachImage, encode, formatBytes, sizeOf } from './image';
 
-// T6 图片合成（D-079）：排版在 packages/tool-image 计算，像素由 Skia 离屏绘制（platform.composeImage）。
+// T6 Image Composition (D-079): layout calculated in packages/tool-image, pixels rendered off-screen by Skia (platform.composeImage).
 
 type Impl = ActionImpl<RunServices>;
 type Ctx = Parameters<Impl>[2];
 
-/** 拼长图单张的最长边：GPU 离屏画布的上限。超过就分成几张。 */
+/** Maximum side length for a single stitched long image: GPU off-screen canvas limit. Exceeds this and it splits into multiple images. */
 const STITCH_MAX_SIDE = MAX_SURFACE_SIDE;
-/** 拼长图的宽度不超过它（手机截图 1290 左右），控制内存。 */
+/** Stitched long image width capped at this value (mobile screenshots are around 1290) to control memory usage. */
 const STITCH_MAX_CROSS = 1600;
-/** 为了拼成一张，宽度最多收窄到这里（再窄字就看不清了）。 */
+/** Minimum width constraint when stitching into a single image (narrower than this makes text illegible). */
 const STITCH_MIN_CROSS = 720;
-/** 宫格输出宽度。 */
+/** Grid output width. */
 const GRID_WIDTH = 2400;
-/** 冲印 300 dpi。 */
+/** Print DPI of 300. */
 const PRINT_DPI = 300;
 
 const SHEETS: Record<string, { widthIn: number; heightIn: number }> = {
@@ -59,7 +59,7 @@ async function compose(
   ops: DrawOp[],
   format: 'jpeg' | 'png' = 'jpeg',
 ): Promise<RunItem> {
-  // 画布超过 GPU 上限会让 App 直接崩溃：整体按比例缩小（大照片加水印、打码，很多张拼宫格）。
+  // Canvases exceeding GPU limits will crash the app directly: scale down proportionally overall (large photos with watermarks/censorship, or multi-image grids).
   const k = surfaceScale(canvas);
   if (k < 1) {
     canvas = {
@@ -125,13 +125,15 @@ function scaleOp(op: DrawOp, k: number): DrawOp {
   }
 }
 
-/** 图片按比例铺满格子：居中裁掉多余部分。 */
+/** Scale image to cover the cell proportionally: center and crop excess portions. */
 const cover = (size: { width: number; height: number }, cell: Rect): Rect =>
   centeredCropForAspect(size, cell.width / cell.height);
 
 /**
- * Skia 能直接画的输入：PNG 原样用（截图，没有方向信息）；其他格式（HEIC、带方向的 JPG）先用系统编码器
- * 转成 JPG，顺便按拍摄方向摆正。Skia 解不了 HEIC，也不一定按 EXIF 方向画。
+ * Inputs Skia can draw directly: PNGs are used as is (screenshots, no orientation info); other
+ * formats (HEIC, JPGs with orientation) are first converted to JPG using the system encoder,
+ * which also straightens them according to capture orientation. Skia cannot decode HEIC and does
+ * not necessarily render according to EXIF orientation.
  */
 async function drawable(ctx: Ctx, item: RunItem): Promise<RunItem> {
   if (item.mimeType === 'image/png') return { ...item, ...(await sizeOf(ctx, item)) };
@@ -147,7 +149,7 @@ async function withSizes(ctx: Ctx, items: RunItem[]) {
   return ready;
 }
 
-/** 证件照换底色（D-252）：人留下，其余换成纯色。iOS 用人像分割；Android 用主体分割，第一次要确认下载模型。 */
+/** ID photo background replacement (D-252): keep the person, replace the rest with a solid color. iOS uses portrait segmentation; Android uses subject segmentation, requiring model download confirmation on first use. */
 async function replaceBackgrounds(ctx: Ctx, items: RunItem[], color: string): Promise<RunItem[]> {
   const system = ctx.services.files.vision;
   if (!system?.replaceBackground)
@@ -172,7 +174,7 @@ async function replaceBackgrounds(ctx: Ctx, items: RunItem[], color: string): Pr
   return out;
 }
 
-/** 每张照片按最大的那张脸先摆好的框；找不到脸或没有系统人脸检测（Expo Go）时为 null（居中）。 */
+/** Each photo is framed according to the largest face; returns null (centered) if no face is found or system face detection is unavailable (Expo Go). */
 async function faceFrames(
   ctx: Ctx,
   items: RunItem[],
@@ -187,7 +189,7 @@ async function faceFrames(
     ctx.throwIfCancelled();
     try {
       const found = await vision.detectFaces(item.uri);
-      // 检测用的图可能缩小过（Android）：换回这张照片的像素。
+      // The image used for detection may have been scaled down (Android): revert to the photo's actual pixel dimensions.
       const kx = item.width! / found.width;
       const ky = item.height! / found.height;
       const face = mainFace(
@@ -208,7 +210,7 @@ async function faceFrames(
   return frames;
 }
 
-/** 一块区域打成马赛克：按格子取原图的平均色，画成一格一格的色块。 */
+/** Mosaic an area: sample the average color of the original image per grid cell, and draw it as a grid of solid color blocks. */
 async function mosaicOps(
   ctx: Ctx,
   base: RunItem,
@@ -218,7 +220,7 @@ async function mosaicOps(
   const px = await ctx.services.files.imagePixels(base.uri, Math.max(size.width, size.height));
   const sx = px.width / size.width;
   const sy = px.height / size.height;
-  // 格子大小跟着框走（短边的 1/8，至少 8 点），看不出原来的字。
+  // Grid cell size follows the box dimensions (1/8 of the shorter side, at least 8 points) so that original text is illegible.
   const cell = Math.max(8, Math.min(rect.width, rect.height) / 8);
   const ops: DrawOp[] = [];
   for (let y = rect.y; y < rect.y + rect.height; y += cell) {
@@ -257,8 +259,9 @@ async function mosaicOps(
 }
 
 /**
- * 把一页的标注画出来：没有 base 时是一张透明 PNG（盖在 PDF 页面上），有 base 时画在这张图上
- * （擦除、打码要换掉页面，见 pdf.annotate）。图片标注和 PDF 标注共用。
+ * Render a page's annotations: when there is no base, it is a transparent PNG (overlaid on the
+ * PDF page); when there is a base, it is drawn directly onto this image (erasing or redacting
+ * replaces the page, see pdf.annotate). Shared between image and PDF annotations.
  */
 export async function drawMarks(
   ctx: Ctx,
@@ -271,7 +274,7 @@ export async function drawMarks(
   const ops: DrawOp[] = base
     ? [{ kind: 'image', source: { uri: base.uri }, dst: { x: 0, y: 0, ...size } }]
     : [];
-  // 擦除、打码先画（在原图上），文字、画笔盖在它们上面。
+  // Draw erasures and redactions first (on the original image), with text and brush strokes drawn on top of them.
   for (const mark of marks) {
     if (mark.kind === 'erase') ops.push({ kind: 'rect', rect: markRect(mark), color: '#FFFFFF' });
     if (mark.kind === 'mosaic' && base)
@@ -344,7 +347,7 @@ export const COMPOSE_IMPLS: Record<string, Impl> = {
     const sizes = items.map((i) => ({ width: i.width!, height: i.height! }));
     const vertical = direction === 'vertical';
     let across = Math.min(STITCH_MAX_CROSS, ...sizes.map((s) => (vertical ? s.width : s.height)));
-    // 总长超过画布上限时先把宽度收窄（不低于 STITCH_MIN_CROSS），尽量拼成一张；还放不下才分段。
+    // When total length exceeds canvas limits, narrow the width first (not below STITCH_MIN_CROSS) to fit into a single image as much as possible; split into segments only if it still doesn't fit.
     const length =
       sizes.reduce(
         (sum, s) =>
@@ -426,7 +429,7 @@ export const COMPOSE_IMPLS: Record<string, Impl> = {
       ctx.throwIfCancelled();
       const size = { width: item.width!, height: item.height! };
       const marks = boxes[i] ?? [];
-      // 模糊强度跟着图片大小走：短边的 2%，至少 12 像素，看不出原来的字。
+      // Blur intensity scales with image size: 2% of the shorter side, at least 12 pixels, so original text is illegible.
       const sigma = Math.max(12, Math.min(size.width, size.height) * 0.02);
       const ops: DrawOp[] = [
         { kind: 'image', source: { uri: item.uri }, dst: { x: 0, y: 0, ...size } },
@@ -436,7 +439,7 @@ export const COMPOSE_IMPLS: Record<string, Impl> = {
             : { kind: 'blur', rect, sigma },
         ),
       ];
-      // 打码的原因是隐私：一律重新编码，不保留原图的元数据。
+      // Reason for redaction is privacy: always re-encode, discarding original image metadata.
       out.push(await compose(ctx, item.name, { ...size, background: '#FFFFFF' }, ops));
       ctx.progress(i + 1, items.length);
     }
@@ -452,7 +455,7 @@ export const COMPOSE_IMPLS: Record<string, Impl> = {
       opacity: number;
       color: string;
     };
-    // 用系统字体画成透明 PNG（中日韩文字和 emoji 都能显示），再按排版贴到图上。
+    // Draw as a transparent PNG using system fonts (supports CJK characters and emojis), then paste onto the image according to layout.
     const mark = await ctx.services.files.renderText(text, { fontSize: 160, color, opacity: 1 });
     return eachImage(input, ctx, async (original) => {
       const item = await drawable(ctx, original);
@@ -481,7 +484,7 @@ export const COMPOSE_IMPLS: Record<string, Impl> = {
     const spec = ID_PHOTO_SPECS.find((s) => s.id === params.spec);
     if (!spec) throw new RunError('unexpected', { detail: String(params.spec) });
     const maxKB = Number(params.maxKB);
-    // 裁剪和缩放由系统编码器完成（认识 HEIC 和拍摄方向），不需要先转换。
+    // Cropping and scaling are performed by the system encoder (which understands HEIC and capture orientation), avoiding the need for prior conversion.
     const aspect = spec.widthMm / spec.heightMm;
     const background = params.background as string | undefined;
     const color =
@@ -492,9 +495,9 @@ export const COMPOSE_IMPLS: Record<string, Impl> = {
         : null;
     let items: RunItem[] = [];
     for (const item of fileItems(input)) items.push({ ...item, ...(await sizeOf(ctx, item)) });
-    // D-252：换底色在裁剪之前做（整张照片分割得更准），输出 PNG，后面照常裁剪、编码成 JPG。
+    // D-252: background replacement is done before cropping (for more accurate segmentation of the whole photo), outputting a PNG, which is then cropped and encoded to JPG as usual.
     if (color) items = await replaceBackgrounds(ctx, items, color);
-    // 自动框脸：先在本机找脸，按规格的头部比例摆好框；用户在裁剪界面里确认、可以再调。
+    // Automatic face framing: first find faces locally, set up the frame according to spec head proportions; users can review and readjust in the crop interface.
     const initial =
       params.autoCenter === true ? await faceFrames(ctx, items, spec.id, aspect) : undefined;
     const rects = await ctx.services.ui.open('crop', {
@@ -508,7 +511,7 @@ export const COMPOSE_IMPLS: Record<string, Impl> = {
       const ops = { crop: rects[i++]!, resize: { width: spec.widthPx, height: spec.heightPx } };
       let last = await encode(ctx, item, ops, 'jpeg', 0.92);
       if (maxKB > 0 && last.size > maxKB * 1024) {
-        // 像素尺寸是规格要求的，不能缩小：只降低质量。
+        // Pixel dimensions are required by specifications and cannot be downscaled: reduce quality only.
         const result = await searchForTargetSize({
           targetBytes: maxKB * 1024,
           minScale: 1,
@@ -536,7 +539,7 @@ export const COMPOSE_IMPLS: Record<string, Impl> = {
     return eachImage(input, ctx, async (original) => {
       const item = await drawable(ctx, original);
       const size = { width: item.width!, height: item.height! };
-      // 照片按 300 dpi 算实际尺寸（证件照步骤输出的就是 300 dpi 的规格像素）。
+      // Calculate actual physical size of photos based on 300 dpi (ID photo step outputs specification pixels at 300 dpi).
       const photo = {
         widthMm: (size.width / PRINT_DPI) * 25.4,
         heightMm: (size.height / PRINT_DPI) * 25.4,
@@ -545,7 +548,7 @@ export const COMPOSE_IMPLS: Record<string, Impl> = {
         sheet,
         dpi: PRINT_DPI,
         photo,
-        // 冲印店的做法：照片紧挨着排满，靠裁切线分开（2×2 英寸在 4×6 上正好 6 张）。
+        // Print shop approach: photos are packed tightly together, separated by crop lines (6 photos fit exactly on a 4x6 inch page for 2x2 inch size).
         gapMm: 0,
         marginMm: 0,
         guides,
@@ -556,7 +559,7 @@ export const COMPOSE_IMPLS: Record<string, Impl> = {
       const ops: DrawOp[] = [
         ...layout.placements.map((dst): DrawOp =>
           layout.rotated
-            ? // 照片转 90° 放进横着的格子：以格子中心旋转，画的时候宽高对调。
+            ? // Photo rotated 90 degrees to fit into a horizontal grid cell: rotate around the cell center, swapping width and height when drawing.
               {
                 kind: 'image',
                 source: { uri: item.uri },

@@ -10,8 +10,9 @@ import java.io.FileOutputStream
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-// PDF 第一页的缩略图（D-451）：系统的 PdfRenderer，本机画，不联网。白底（PDF 页面本身可能是透明的），
-// 长边不超过 maxSide，存成 JPEG。打不开（损坏、要密码）时抛出，App 显示 PDF 图标。
+// PDF first-page thumbnail (D-451): system PdfRenderer, rendered locally, offline. White background
+// (PDF pages may be transparent), long side not exceeding maxSide, saved as JPEG. Throws when it
+// cannot be opened (damaged, password-protected), causing the app to display a PDF icon.
 object PdfThumbnail {
   fun render(input: File, output: File, maxSide: Int): Map<String, Any> {
     val fd = ParcelFileDescriptor.open(input, ParcelFileDescriptor.MODE_READ_ONLY)
@@ -43,7 +44,7 @@ object PdfThumbnail {
     }
   }
 
-  /** PDF 的文字层（D-455）：Android 15（API 35）起 PdfRenderer 能读页面文字；更早的系统、打不开时返回 null。 */
+  /** PDF text layer (D-455): PdfRenderer can read page text starting from Android 15 (API 35); returns null on earlier systems or when it cannot be opened. */
   fun text(input: File): String? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return null
     return try {

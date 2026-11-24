@@ -17,9 +17,12 @@ import type { Collection, Component, WorkspaceConfig } from './schema';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 勾选新建（D-616，创始人 2026-11-21「开工」）：多对多、连接本身带数据（菜谱 → 食材和用量）。在菜谱页上「添加」，
-// 勾几样食材，每样在「菜谱用料」里建一条，连着这个菜谱（列表筛选里的等于条件，"$here"）和勾的那样食材（"$row"）。
-// 已经连着的显示成「已添加」，不再建。照样先问、最多 200 条、提示条能撤回这一批（底线 11，D-567）。
+// Check-and-create (D-616, founder 2026-11-21 "start work"): many-to-many relationships where the
+// link itself carries data (recipe → ingredients and quantities). Tap "Add" on a recipe page, check
+// several ingredients, creating an entry in "Recipe ingredients" for each, linked to this recipe
+// (equality condition in list filtering, "$here") and the checked ingredient ("$row"). Already
+// linked ones are displayed as "Added" and not created again. Still asks first, caps at 200 items,
+// and the banner can undo this batch (invariant 11, D-567).
 process.env.TZ = 'Europe/Paris';
 const now = new Date(2026, 10, 21, 9, 0);
 
@@ -99,7 +102,7 @@ describe('pick several, create one each (D-616)', () => {
 
   it('sits as the Add under a list of join entries on a recipe page', () => {
     expect(problems([itemsList([pick])])).toBe('');
-    // 也能只给能勾的那些（来源表的筛选），预设别的值。
+    // Can also restrict to checkable ones (source table filter) with preset other values.
     expect(
       problems([
         itemsList([
@@ -111,7 +114,7 @@ describe('pick several, create one each (D-616)', () => {
         ]),
       ]),
     ).toBe('');
-    // 卡片、表格、清单下面也行。
+    // Also works under cards, table, and list views.
     for (const look of ['cards', 'table'])
       expect(problems([{ ...itemsList([pick]), look }])).toBe('');
   });
@@ -142,13 +145,13 @@ describe('pick several, create one each (D-616)', () => {
         },
       ],
     };
-    // 那一天由月历填（"$here"），values 不能再写它。
+    // That date is populated by the calendar ("$here"), and values cannot overwrite it.
     expect(problems([calendar], 'home', config)).toMatch(
       /on is already filled by this list \(its filter or section\)/,
     );
     const { on: _on, ...values } = calendar.tools[0]!.values;
     const fixed = { ...calendar, tools: [{ ...calendar.tools[0], values }] };
-    // 分段的值不一定有（「未分」），所以必填的日期没有默认值时也拒绝；有默认值就行。
+    // Segment values might not exist ("Unassigned"), so required dates without default values are also rejected; default values are allowed.
     expect(problems([fixed], 'home', config)).toMatch(/required field on would be empty/);
     const dated = structuredClone(config);
     const on = dated.data.tables.find((t) => t.id === 'plans')!.fields[1]!;
@@ -157,18 +160,18 @@ describe('pick several, create one each (D-616)', () => {
   });
 
   it('is refused anywhere else, with the shape to use', () => {
-    // 按钮块：没有「这一段」，也没有「已添加」。
+    // Button block: no "here" segment, and no "Added".
     const { as: _as, label: _label, ...tool } = pick;
     expect(
       problems([
         { id: 'b', look: 'button', show: { label: 'Add', variant: 'filled' }, tools: [tool] },
       ]),
     ).toMatch(/pick: true only works as the "Add" under a list of entries/);
-    // 每一条上的按钮。
+    // Button on each item.
     expect(problems([itemsList([{ ...pick, as: 'button' }])])).toMatch(
       /pick: true only works as the "Add" under a list/,
     );
-    // 列表下面不勾的批量新建（每一条筛出来的）仍然只在按钮块上。
+    // Batch creation without checking below lists (for each filtered item) is still restricted to button blocks.
     const { pick: _pick, ...all } = pick;
     expect(problems([itemsList([all])])).toMatch(
       /createAll on every entry a filter selects belongs on a button block; under a list, let the user pick/,
@@ -176,7 +179,7 @@ describe('pick several, create one each (D-616)', () => {
     expect(problems([itemsList([{ ...all, as: 'button' }])])).toMatch(
       /createAll on every entry a filter selects belongs on a button block/,
     );
-    // 打卡格、大圆块没有「添加」。
+    // Check-in grids and large circles do not have "Add".
     expect(
       problems([
         {
@@ -208,15 +211,15 @@ describe('pick several, create one each (D-616)', () => {
     expect(
       problems([itemsList([{ ...pick, values: { ingredient: '$row', spare: '$row' } }])]),
     ).toMatch(/exactly one link field.*not ingredient, spare/);
-    // 菜谱由列表的筛选填（这一条菜谱），values 再写就不在这一段里了。
+    // Recipe is populated by list filtering (this recipe); if values specify it again, it is outside this segment.
     expect(
       problems([itemsList([{ ...pick, values: { ingredient: '$row', recipe: '$record' } }])]),
     ).toMatch(/recipe is already filled by this list/);
-    // 列表没按菜谱筛：必填的菜谱没人填，存不进去。
+    // List not filtered by recipe: required recipe is left unfilled by anyone, so it cannot be saved.
     expect(
       problems([{ ...itemsList([pick]), source: { table: 'recipe-items', limit: 30 } }]),
     ).toMatch(/required field recipe would be empty/);
-    // 文字常量仍然不行（D-301）。
+    // Text constants are still not allowed (D-301).
     expect(
       problems([itemsList([{ ...pick, values: { ingredient: '$row', amount: 'x' } }])]),
     ).toMatch(/recipe-items\.amount is a number field/);
@@ -249,13 +252,13 @@ describe('pick several, create one each (D-616)', () => {
         'recipe-items',
         [
           rec('x1', 'recipe-items', { recipe: 'r1', ingredient: 'flour', amount: 200 }),
-          // 别的菜谱用了鸡蛋：这个菜谱里还没有。
+          // Other recipes use eggs: not yet in this recipe.
           rec('x2', 'recipe-items', { recipe: 'r2', ingredient: 'egg', amount: 2 }),
         ],
       ],
     ]);
     const config = base();
-    // 菜谱页上的列表：打开 r1 时 "$record" 换成 r1，"$here" 是 {recipe: r1}。
+    // List on recipe page: opening r1 replaces "$record" with r1, and "$here" is {recipe: r1}.
     const block = bindRecord(itemsList([pick]) as unknown as Component, 'r1');
     const read = readRecords(
       block as never,
@@ -274,14 +277,14 @@ describe('pick several, create one each (D-616)', () => {
     expect([...already]).toEqual(['flour']);
     const sourceView = expandCollection(tables, ingredients);
     const sources = computeRecords(tables, 'ingredients', stored, now);
-    // 只给不在储藏柜里的：牛奶不能勾。
+    // Only give items not in pantry: milk cannot be checked.
     const filtered = { ...tool, filter: [{ field: 'pantry', op: 'is' as const, value: false }] };
     expect(pickChoices(filtered, sourceView, sources, { now }).map((r) => r.id)).toEqual([
       'flour',
       'egg',
       'salt',
     ]);
-    // 勾了面粉（已添加）、盐、鸡蛋：按勾的顺序，只建盐和鸡蛋，都连着这个菜谱。
+    // Checked flour (already added), salt, egg: in check order, only create salt and egg, both linked to this recipe.
     const picked = ['flour', 'salt', 'egg'].map((id) => sources.find((r) => r.id === id)!);
     expect(pickCreateInputs(tool, target, sourceView, picked, here, already, { now })).toEqual([
       { sourceId: 'salt', input: { recipe: 'r1', ingredient: 'salt' } },
@@ -314,11 +317,11 @@ describe('pick several, create one each (D-616)', () => {
 
   it('deleting the picked table or the link field removes the Add, keeping the list (invariant 18)', () => {
     const config = base();
-    // 标题用用量：删掉的字段是列表标题时，删除另有规矩（不在这里测）。
+    // Title uses amount: deleting a field when it is used as a list title has separate rules (not tested here).
     const list = { ...itemsList([pick]), show: { title: 'amount' } };
     config.containers.pages.find((p) => p.id === 'recipe')!.blocks.push(list as never);
     const ctx = { registry, locale: 'en' as const, now };
-    // 被引用的表要先删掉引用它的字段（ops.ts），一起删也一样。
+    // Referenced tables must have fields referencing them deleted first (ops.ts), or deleted together.
     for (const ops of [
       [{ op: 'removeData', table: 'recipe-items', field: 'ingredient' }],
       [

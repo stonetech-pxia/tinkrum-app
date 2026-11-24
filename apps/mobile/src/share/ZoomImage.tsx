@@ -9,8 +9,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-// 全屏看图时双指缩放（D-277）：双指放大（1–5 倍），放大后单指拖动看局部，双击放大到 2.5 倍 / 复原。
-// 没放大时单指的横滑交给外面的翻页列表（onZoomed 告诉它暂时别翻页）。
+// Two-finger pinch-to-zoom in full-screen image view (D-277): two-finger zoom (1–5x), single-finger
+// drag to view details when zoomed, double-tap to zoom to 2.5x / reset. When not zoomed,
+// single-finger horizontal swipes are delegated to the outer pagination list (onZoomed tells it
+// temporarily not to paginate).
 
 const MAX = 5;
 
@@ -25,7 +27,7 @@ export function ZoomImage({
   width: number;
   height: number;
   onZoomed?: (zoomed: boolean) => void;
-  /** 图片比框窄或矮时贴着上边（预览页，D-457）；不写就在框里居中（全屏看图）。 */
+  /** Stick to the top edge when the image is narrower or shorter than the frame (preview page, D-457); otherwise centered in the frame (full-screen image viewer). */
   top?: boolean;
 }) {
   const scale = useSharedValue(1);
@@ -41,7 +43,7 @@ export function ZoomImage({
     setIsZoomed(value);
     onZoomed?.(value);
   };
-  /** 放大后能拖动的范围：图片不离开屏幕。 */
+  /** Draggable bounds after zooming: the image stays within the screen. */
   const clampOffsets = () => {
     'worklet';
     const mx = ((scale.value - 1) * width) / 2;
@@ -76,7 +78,7 @@ export function ZoomImage({
       }
     });
   const pan = Gesture.Pan()
-    // 没放大时不接单指拖动，横滑由翻页列表处理。
+    // Do not handle single-finger drag when not zoomed; horizontal swipes are handled by the pagination list.
     .enabled(isZoomed)
     .averageTouches(true)
     .onStart(() => {

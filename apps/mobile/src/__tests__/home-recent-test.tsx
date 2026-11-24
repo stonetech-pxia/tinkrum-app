@@ -7,7 +7,7 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp, starterAfterGuide } from '../test-utils/render-app';
 
-// D-450–D-452：新用户首页的「最近操作」（读运行记录）和「最近文件」（缩略图、点开预览、「全部」）。
+// D-450–D-452: New user home page "Recent actions" (reading run logs) and "Recent files" (thumbnails, tap to preview, "All").
 
 async function start(prepare?: (repo: MemoryWorkspaceRepo, files: FakeFiles) => Promise<void>) {
   const repo = new MemoryWorkspaceRepo();
@@ -59,19 +59,19 @@ describe('home: recent actions and recent files', () => {
       }
       f.thumbnails_.set('assets/a2/扫描 11月5日.pdf', 'file:///fake/assets/a2/.thumb.jpg');
     });
-    // 最近 3 个，从新到旧；图片用原图、PDF 用第一页，Word 用图标。
+    // Top 3, from newest to oldest; images use original photos, PDFs use the first page, Word documents use icons.
     expect(await screen.findByTestId('file-合同.docx')).toBeTruthy();
     expect(screen.getByTestId('file-扫描 11月5日.pdf')).toHaveTextContent(/PDF/);
     expect(screen.queryByTestId('file-旧的.pdf')).toBeNull();
     expect(screen.getByTestId('file-thumb-a1')).toBeTruthy();
     expect(screen.getByTestId('file-thumb-a2')).toBeTruthy();
     expect(screen.queryByTestId('file-thumb-a3')).toBeNull();
-    // 点一行进文件预览页（D-457），不是系统预览；返回回到首页。
+    // Tap a row to open the file preview page (D-457) instead of system preview; going back returns to the home page.
     await fireEvent.press(screen.getByTestId('file-扫描 11月5日.pdf'));
     expect(await screen.findByTestId('preview-bar')).toBeTruthy();
     expect(files.previewed).toEqual([]);
     await act(() => router.back());
-    // D-453：「全部」打开全部文件页面（不是存储空间）：搜索、排序、类型筛选，没有固定按钮。
+    // D-453: "All" opens the all files page (not storage): search, sorting, type filtering, without fixed buttons.
     await fireEvent.press(screen.getByTestId('files-all'));
     const page = await screen.findByTestId('files-screen');
     const order = () =>
@@ -81,7 +81,7 @@ describe('home: recent actions and recent files', () => {
         .filter((id) => !id.startsWith('thumb-'));
     expect(order()).toEqual(['合同.docx', '扫描 11月5日.pdf', '收据.jpg', '旧的.pdf']);
     await fireEvent.press(within(page).getByTestId('files-sort-name'));
-    // 按名称：中文按拼音（合 he、旧 jiu、扫 sao、收 shou）。
+    // By name: Chinese sorted by Pinyin (he, jiu, sao, shou).
     expect(order()).toEqual(['合同.docx', '旧的.pdf', '扫描 11月5日.pdf', '收据.jpg']);
     await fireEvent.press(within(page).getByTestId('files-kind-pdf'));
     expect(order()).toEqual(['旧的.pdf', '扫描 11月5日.pdf']);
@@ -106,7 +106,7 @@ describe('home: recent actions and recent files', () => {
       await run('pdf-merge');
       await run('pdf-compress', false);
     });
-    // 运行记录在回到首页时读（跑完快捷操作回来就有）：离开再回来。
+    // Run logs are read upon returning to the home page (available after completing a quick action and returning): leave and come back.
     await act(() => router.push('/storage'));
     await act(() => router.back());
     const list = await screen.findByTestId('recent-actions');

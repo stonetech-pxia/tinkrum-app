@@ -1,6 +1,8 @@
-// 门户的「Clay」预设（App 文件，D-487）：新用户默认界面的精修版——扫描和转换的快捷操作放在最前面，
-// 文件按类型摆好，工具箱在底栏上。纯配置，没有表、没有记录、不带用户文件。
-// 用法：npx tsx scripts/build-clay-app.ts <输出目录（packages/core/src/fixtures/portal-apps）>
+// Portal "Clay" preset (App file, D-487): a refined version of the default interface for new
+// users—quick actions for scanning and converting are placed first, files are organized by type,
+// and the toolbox is on the bottom bar. Pure configuration, with no tables, no records, and no user
+// files. Usage: npx tsx scripts/build-clay-app.ts <output_dir
+// (packages/core/src/fixtures/portal-apps)>
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -27,26 +29,26 @@ const registry = createRegistry(BUILTIN_TOOLS);
 const NOW = new Date('2026-11-07T12:00:00');
 const ctx = { registry, locale: 'en' as const, now: NOW };
 
-// 1. 新用户的起始配置 + 引导给的首页入口（就是 D-487 的默认首页）。
+// 1. Starter configuration for new users + home entry point provided by the onboarding guidance (i.e., the default home screen from D-487).
 const starter = createStarterWorkspace('en', registry);
 const withHome = applyOps(starter, homeFileEntryOps(starter, 'en'), ctx);
 if (!withHome.ok) throw new Error(withHome.error);
 const config = structuredClone(withHome.config);
 
-// 2. 预设里首页不放工具箱入口（工具箱在底栏上），多一页「文件」：按类型分开摆。
+// 2. In the preset, the home screen does not include a toolbox entry (the toolbox is on the bottom bar), and adds a "Files" page: organized separately by type.
 const home = config.containers.pages.find((p) => p.id === 'home')!;
 home.blocks = home.blocks.filter((b) => b.id !== 'toolbox-entry');
-// 文件页按语言生成，导入后跟着界面语言显示（D-582）。
+// The Files page is generated according to the language and displays matching the interface language after import (D-582).
 config.containers.pages.push(filesByTypePage('en'));
-// D-552：预设的页面背景用纯沙色，不用 STARTER_THEME 的渐变（下半屏的鼠尾草绿发灰，像一层色雾）。
+// D-552: preset page background uses solid sand color instead of STARTER_THEME's gradient (sage green in the bottom half appears grayish, resembling a color mist).
 config.theme.backdrop = 'plain';
-// 整份配置的底栏必须有设置；转成 App 文件时设置会被去掉（App 的底栏只有页面和 Tink）。
+// The bottom bar of the entire configuration must include settings; settings are removed when converted to an app file (app bottom bars only contain pages and Tink).
 config.nav.bar = ['page:home', 'page:files', 'page:toolbox', 'ai', 'settings'];
 
 const valid = validateWorkspace(config, registry);
 if (!valid.ok) throw new Error(valid.issues.map((i) => `${i.code}: ${i.message}`).join('\n'));
 
-// 3. 转成 App 文件，读回来，导入到一个新用户的工作区里试一遍。
+// 3. Convert to an app file, read it back, and test by importing it into a new user's workspace.
 const file = appFileFromWorkspace(config, { id: 'clay', name: 'Clay', icon: 'paper' });
 const text = appFileText(file, NOW);
 const back = readAppFile(text);
@@ -57,7 +59,7 @@ const check = prepareOps(createStarterWorkspace('en', registry), plan.ops, ctx);
 if (!check.ok) throw new Error(check.issues.join('; '));
 writeFileSync(join(outDir, 'tinkrum-app-clay.json'), text);
 
-// 4. 清单里加（或更新）一条，放在第一个。
+// 4. Add (or update) an entry in the manifest, placed at the top.
 const manifestPath = join(outDir, 'manifest.json');
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { apps: { id: string }[] };
 const entry = {

@@ -1,12 +1,14 @@
 import type { FilePlatform } from '../runtime/platform';
 
-/** 存下来的文字最多这么长（一份很长的 PDF 也只留前面这些，够搜索用）。 */
+/** Maximum retained text length (even a very long PDF retains only this leading portion, which is sufficient for searching). */
 const MAX_TEXT = 200_000;
 
 /**
- * 文件里的文字（D-455，底线 14 的例外）：用户扫描、分享、打开、保存文件、文件存进文档库时，
- * PDF 读文字层，图片在本机识别，存在这个文件旁边，跟着文件一起删。只在本机，不进配置、不发给 AI。
- * 读不出、识别包没装（不为这个下载）就没有文字，不报错。
+ * Text within files (D-455, exception to invariant 14): when a user scans, shares, opens, saves a
+ * file, or stores a file into the document library, PDFs have their text layer read and images
+ * are recognized on-device. This text is stored alongside the file and deleted together with it.
+ * Local only, never enters configuration and never sent to the AI. If unreadable or OCR package
+ * is not installed (no download triggered for this), no text is stored and no error is thrown.
  */
 export async function indexAssetText(
   files: FilePlatform,
@@ -17,7 +19,7 @@ export async function indexAssetText(
   let text: string | null = null;
   try {
     if (asset.mimeType === 'application/pdf') text = (await files.vision.pdfText?.(uri)) ?? null;
-    // PP-OCRv6 一个模型就认中日英法德西葡意（D-269）：语言只用来选引擎。
+    // PP-OCRv6 recognizes Chinese, English, Japanese, French, German, Spanish, Portuguese, and Italian using a single model (D-269): language is used solely to select the engine.
     else if (asset.mimeType.startsWith('image/'))
       text = await files.vision.recognizeText(uri, ['en']);
   } catch {

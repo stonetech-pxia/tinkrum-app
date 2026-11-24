@@ -12,21 +12,23 @@ import { WORKFLOW_PRESETS, type WorkflowPreset } from '../workflows/presets';
 
 export { LANGUAGE_WORD, languageOf } from '../workflow/phrase-words';
 
-// mock AI 的工作流句式（docs/MOCK_AI_PHRASES.md W1–W7）：把「选照片、压到 500KB、分享」这类短语
-// 翻译成步骤。只认识固定的说法；认不出的短语返回 null，由调用方整句拒绝。
-// 每个动作认的说法写在动作定义的 phrases 里（tools/*.ts）；这里只按前一步换成接得上的动作、拼成步骤。
+// Mock AI workflow phrasing (docs/MOCK_AI_PHRASES.md W1–W7): translates phrases like "choose
+// photos, compress to 500KB, share" into steps. Recognizes fixed phrasings only; unrecognized
+// phrases return null, causing the caller to reject the entire sentence. Phrasings recognized by
+// each action are written in action definitions (tools/*.ts); here, steps are simply chained by
+// replacing the previous step with a compatible action and assembling them.
 
-/** 一个步骤短语 → 动作和参数。 */
+/** A step phrasing → action and parameters. */
 export interface StepPhrase {
   action: string;
   params: Record<string, unknown>;
-  /** 每次运行时问的参数（「输入文字」要问文字）。 */
+  /** Parameters asked for at runtime (e.g., "Enter text" requires asking for text). */
   ask?: string[] | undefined;
-  /** 记一笔（D-187）：句子里说的表名，由调用方按当前配置换成 collectionId；空字符串表示没说。 */
+  /** Log an expense (D-187): table name mentioned in the sentence, replaced by the caller with collectionId based on current config; empty string indicates none specified. */
   table?: string;
 }
 
-/** 把命名短语里的「日期」换成模板。 */
+/** Replace "date" in naming phrases with a template. */
 export function nameTemplateOf(words: string): string {
   return words
     .replace(/日期|\bdate\b/gi, '{date:YYYY-MM-DD}')
@@ -34,8 +36,10 @@ export function nameTemplateOf(words: string): string {
 }
 
 /**
- * 认步骤说法的动作：内置的全部动作，说法写在各自定义的 phrases 里（D-265）。
- * 不同动作的说法互不重叠，所以先查哪个动作都一样。下载的工具不能加动作，不用看注册表。
+ * Actions that recognize step phrasings: all built-in actions, with phrasings written in their
+ * respective definitions (D-265). Phrasings of different actions do not overlap, so the check
+ * order of actions does not matter. Downloaded tools cannot add actions and do not need to be
+ * looked up in the registry.
  */
 const PHRASE_ACTIONS: readonly ActionDefinition[] = [
   ...CORE_ACTIONS,
@@ -61,7 +65,7 @@ export function parseStepPhrase(text: string, locale: Locale): StepPhrase | null
   return null;
 }
 
-/** 「选照片、压到 500KB、分享」/「choose photos, compress to 500 KB, then share」→ 步骤短语。 */
+/** "choose photos, compress to 500 KB, then share" -> step phrases. */
 export function splitStepPhrases(text: string): string[] {
   return text
     .split(/、|→|->|,|，|然后|\bthen\b|\band\b(?! (?:images|photos))/i)
@@ -69,7 +73,7 @@ export function splitStepPhrases(text: string): string[] {
     .filter(Boolean);
 }
 
-/** 新步骤的 ID：动作名的后半段，重复时加序号。 */
+/** ID for a new step: second half of the action name, with a sequence number appended if duplicate. */
 export function stepIdFor(action: string, taken: readonly { id: string }[]): string {
   const base = action
     .split('.')[1]!
@@ -80,7 +84,7 @@ export function stepIdFor(action: string, taken: readonly { id: string }[]): str
   for (let i = 2; ; i++) if (!used.has(`${base}-${i}`)) return `${base}-${i}`;
 }
 
-/** 输出文字的动作：后面的「转成 PDF」是文字转 PDF（D-174）。 */
+/** Actions that output text: "Convert to PDF" below is text-to-PDF (D-174). */
 const TEXT_OUTPUT = new Set([
   'in.text',
   'audio.transcribe',
@@ -92,8 +96,8 @@ const TEXT_OUTPUT = new Set([
 ]);
 
 /**
- * 同一句话按前一步换成接得上的动作：选 PDF 之后的「提取文字」是提取 PDF 文字；
- * 文字之后的「转成 PDF」是文字转 PDF。
+ * Adapting to the previous step within the same sentence: "Extract text" after selecting a PDF
+ * means extracting PDF text; "Convert to PDF" after text means text-to-PDF.
  */
 function fitToPrevious(p: StepPhrase, previous: WorkflowStep | undefined): StepPhrase {
   if (
@@ -106,8 +110,8 @@ function fitToPrevious(p: StepPhrase, previous: WorkflowStep | undefined): StepP
   if (p.action === 'pdf.fromImages' && previous && TEXT_OUTPUT.has(previous.action)) {
     return { action: 'text.toPdf', params: { pageSize: 'a4', fontSize: 12 } };
   }
-  // 格式转换（D-183–D-186）：Word 之后的「转成 PDF」是文档转 PDF；视频之后的「转成 GIF」是视频转 GIF，
-  // 「转成 MP3」是提取视频里的声音。
+  // Format conversion (D-183–D-186): "Convert to PDF" after Word means document-to-PDF; "Convert to
+  // GIF" after video means video-to-GIF, and "Convert to MP3" extracts audio from video.
   if (
     p.action === 'pdf.fromImages' &&
     previous?.action === 'in.files' &&
@@ -123,7 +127,7 @@ function fitToPrevious(p: StepPhrase, previous: WorkflowStep | undefined): StepP
   return p;
 }
 
-/** 这一步的结果是视频。 */
+/** The result of this step is a video. */
 const makesVideo = (step: WorkflowStep) =>
   step.action === 'in.videos' ||
   (step.action !== 'video.subtitles' &&
@@ -131,7 +135,7 @@ const makesVideo = (step: WorkflowStep) =>
     !['video.toGif', 'video.frame'].includes(step.action)) ||
   (step.action === 'in.files' && step.params.accept === 'videos');
 
-/** 这一步之后的值大致是什么（只用来给「压到 N MB」选动作）。 */
+/** Approximate value type after this step (used only to select actions for "Compress to N MB"). */
 export type PhraseKind = 'images' | 'video' | 'audio' | 'pdf' | 'other';
 
 function kindAfter(step: StepPhrase, before: PhraseKind | null): PhraseKind | null {
@@ -160,8 +164,9 @@ function kindAfter(step: StepPhrase, before: PhraseKind | null): PhraseKind | nu
 }
 
 /**
- * 「压到 N MB」默认是压图片；前面是视频时换成压缩视频，是 PDF 时换成压缩 PDF（D-147）。
- * before：这些步骤之前的值（往已有快捷操作里加步骤时）。
+ * "Compress to N MB" defaults to compressing images; changes to compressing video when preceded
+ * by video, or compressing PDF when preceded by PDF (D-147). before: values prior to these steps
+ * (when adding steps to an existing quick action).
  */
 export function fitSizePhrases(
   phrases: readonly StepPhrase[],
@@ -170,7 +175,7 @@ export function fitSizePhrases(
   let kind = before;
   return phrases.map((p) => {
     let step = p;
-    // 音频（D-157）：「压到 N MB」是压音频，「剪一段」是剪音频，「合并」是合成一段。
+    // Audio (D-157): "Compress to N MB" compresses audio, "Trim a clip" trims audio, and "Merge" combines clips into one.
     if (kind === 'audio') {
       if (p.action === 'image.compress') {
         const mb = Number(p.params.maxKB) / 1024;
@@ -206,7 +211,7 @@ export function fitSizePhrases(
   });
 }
 
-/** 一串已有步骤之后的值大致是什么。 */
+/** Approximate value type following a sequence of existing steps. */
 export function kindOfSteps(steps: readonly StepPhrase[]): PhraseKind | null {
   return steps.reduce<PhraseKind | null>((kind, step) => kindAfter(step, kind), null);
 }
@@ -225,7 +230,7 @@ export function stepsFrom(phrases: readonly StepPhrase[]): WorkflowStep[] {
   return steps;
 }
 
-/** 预设的叫法（words）按这个顺序查：标了 wordsFirst 的先查，其余按预设的顺序。 */
+/** Preset names (words) are looked up in this order: those marked with wordsFirst are checked first, followed by the rest in preset order. */
 const PRESETS_BY_WORDS = [
   ...WORKFLOW_PRESETS.filter((p) => p.words && p.wordsFirst),
   ...WORKFLOW_PRESETS.filter((p) => p.words && !p.wordsFirst),
@@ -240,7 +245,7 @@ export function findPreset(text: string): WorkflowPreset | undefined {
   return PRESETS_BY_WORDS.find((p) => p.words!.test(text));
 }
 
-/** 按名字找工作流（完全相同优先，其次包含）。 */
+/** Find workflow by name (exact match preferred, containment second). */
 export function findWorkflowByName(rawName: string, config: WorkspaceConfig): Workflow | undefined {
   const name = rawName
     .replace(/"/g, '')

@@ -14,8 +14,10 @@ import { CURRENT_SCHEMA_VERSION, HOME_PAGE_ID, type WorkspaceConfig } from './sc
 import { createStarterWorkspace } from './starter';
 import { registry } from './test-helpers';
 
-// 用改过的 App 文件更新装好的同一个 App（D-611）：别的 AI 改完交回来的文件，ID 不变，按 ID 接上。
-// 页面、快捷操作、提醒、风格、底栏换成文件里的；表按 ID 对，字段加、改、去、排序；记录不动（底线 5）。
+// Update an installed app using a modified app file (D-611): Files returned by another AI retain
+// their IDs and reconnect by ID. Pages, quick actions, reminders, styles, and bottom bar are
+// replaced by the file contents; tables are matched by ID, fields are added, modified, removed, or
+// reordered; records remain untouched (invariant 5).
 
 const ctx = { registry, locale: 'en' as const, now: new Date('2026-11-21T10:00:00Z') };
 
@@ -91,7 +93,7 @@ function installed(): WorkspaceConfig {
   return run(base, plan.ops);
 }
 
-/** 从装好的 App 导出（和分享、交给别的 AI 时一样），再按 edit 改。 */
+/** Export from an installed app (same as sharing or handing off to another AI), then modify via edit. */
 function edited(config: WorkspaceConfig, edit: (f: AppFile) => void): AppFile {
   const out = {
     format: 'tinkrum-app',
@@ -106,7 +108,7 @@ function edited(config: WorkspaceConfig, edit: (f: AppFile) => void): AppFile {
 
 const table = (config: WorkspaceConfig, id: string) => config.data.tables.find((t) => t.id === id)!;
 
-describe('appUpdateOps：用改过的 App 文件更新同一个 App', () => {
+describe('appUpdateOps: update the same app with a modified app file', () => {
   it('needs the app to be installed', () => {
     const plan = appUpdateOps(file(), createStarterWorkspace('en', registry), registry);
     expect(plan.ok).toBe(false);
@@ -136,7 +138,7 @@ describe('appUpdateOps：用改过的 App 文件更新同一个 App', () => {
       f.pages[0]!.title = 'Bookshelf';
       const books = f.tables[0]!;
       books.name = 'All books';
-      // 改名、加选项、加字段、去字段、调顺序、数字换成金额（兼容的类型）。
+      // Rename, add options, add fields, remove fields, reorder, convert numbers to currency (compatible types).
       books.fields = [
         { id: 'title', name: 'Book title', type: 'text', required: true },
         {
@@ -261,7 +263,7 @@ describe('appUpdateOps：用改过的 App 文件更新同一个 App', () => {
   });
 });
 
-// 预览里只说真正变了的，不说「移除 App」「新建 App」（更新是先移除再装回，逐个操作的说法会误导）。
+// In the preview, only state what actually changed, not "Remove App" or "New App" (an update is an operation that first removes and then reinstalls, describing each individual operation would be misleading).
 describe('describeAppUpdate', () => {
   it('lists only what really changed', () => {
     const config = installed();

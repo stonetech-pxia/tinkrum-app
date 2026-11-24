@@ -14,9 +14,9 @@ import { t } from '../i18n';
 import type { Palette } from '../renderer/theme';
 import { useWorkspace } from '../workspace/context';
 
-// 根据动作的参数界面元数据自动生成表单（动作契约见 packages/core/src/workflow/contract.ts）。运行时询问和工作流编辑页共用。
+// Automatically generate a form based on the action's parameter schema metadata (action contract see packages/core/src/workflow/contract.ts). Shared by runtime prompts and workflow edit pages.
 
-/** 要输两遍的密码，第二遍放在这个键里（只在表单里，不交出去）。 */
+/** Password requiring two inputs; the second input is placed under this key (form-only, not exported). */
 export const againKey = (key: string) => `${key}:again`;
 
 export function visibleFields(
@@ -24,7 +24,7 @@ export function visibleFields(
   values: Record<string, unknown>,
   only?: readonly string[],
 ): ParamField[] {
-  // 密码只在运行时问（D-194），编辑页不显示。
+  // Passwords are asked only at runtime (D-194), hidden on the edit page.
   return action.fields.filter(
     (f) =>
       (only ? only.includes(f.key) : f.kind !== 'secret') &&
@@ -50,12 +50,12 @@ export function ParamForm({
   locale: Locale;
   only?: readonly string[];
   testPrefix?: string;
-  /** 只有一个参数、标题已经说明时不再重复显示标签。 */
+  /** Hide labels when there is only a single parameter and the title already explains it. */
   hideLabels?: boolean;
-  /** 「字段」参数从这张表里选（工作流里前面「读取记录」步骤的表）。 */
+  /** "Field" parameter chosen from this table (the table from the preceding "Read records" step in the workflow). */
   collection?: Collection | undefined;
 }) {
-  // 运行时询问时也给常用规格，只填被问到的参数。
+  // Provide common specs during runtime prompting as well, filling only the requested parameters.
   const shown = visibleFields(action, values, only);
   const all = (action.presets ?? []).map((p) => ({
     ...p,
@@ -63,8 +63,9 @@ export function ParamForm({
       ? Object.fromEntries(Object.entries(p.values).filter(([k]) => only.includes(k)))
       : p.values,
   }));
-  // 和下面某个选项同名、设的就是那个选项的规格（例如证件照规格）：按钮和选项重复，不显示；
-  // 改由选那个选项时一起填上规格里的其他参数（证件照的大小上限）。
+  // Shares name with an option below and sets that option's specs (e.g., ID photo specs): button
+  // and option are redundant, so hide it; instead, fill other parameters within the spec (such as
+  // maximum ID photo size) together when selecting that option.
   const choiceFor = (p: (typeof all)[number]) =>
     shown.find(
       (f) =>
@@ -77,7 +78,7 @@ export function ParamForm({
     );
   const presets = all.filter((p, i) => {
     const keys = Object.keys(p.values);
-    // 只剩一个选项参数时，按钮和下面的选项重复，不显示。
+    // When only a single option parameter remains, the button and the option below are redundant and thus hidden.
     const sameAsChoice =
       keys.length === 1 && action.fields.find((f) => f.key === keys[0])?.kind === 'choice';
     return (
@@ -354,7 +355,7 @@ function FieldSelection({
   );
 }
 
-/** 选一张数据表（选项来自当前配置）。 */
+/** Select a data table (options come from current config). */
 function CollectionInput({
   value,
   onChange,

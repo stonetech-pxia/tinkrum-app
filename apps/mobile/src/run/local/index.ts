@@ -17,7 +17,7 @@ import { SignScreen } from './SignScreen';
 import { FrameScreen } from './FrameScreen';
 import { TrimScreen } from './TrimScreen';
 
-// 每种本地操作对应的界面。
+// Interface corresponding to each type of local action.
 export const LOCAL_SCREENS: { [K in LocalKind]?: ComponentType<LocalScreenProps<K>> } = {
   crop: CropScreen,
   pages: PagesScreen,

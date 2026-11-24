@@ -8,18 +8,19 @@ import { V4_CUSTOM_ASK, V4_DEFAULT_MERGE, V4_FIXED_NAME } from './fixtures/v4';
 import { DEFAULT_THEME } from './theme';
 import { CURRENT_SCHEMA_VERSION, quickActionsOf } from './schema';
 
-// 旧版本的快照（v1…v33）经过整条迁移链升到 v34（M13）。v33 以前的迁移只认 v33 的形状，
-// 所以「只提升版本号」的测试从 v33 的配置（fixtures/v33/）出发，不再用 v34 的 workspace()。
+// Older version snapshots (v1…v33) upgraded to v34 through the complete migration chain (M13).
+// Migrations prior to v33 only recognize v33 structure, so version-bump-only tests start from v33
+// configurations (fixtures/v33/) instead of using v34 workspace().
 
 type Json = Record<string, any>;
-/** v33 的默认工作空间（中文）。 */
+/** v33 default workspace (Chinese). */
 const v33Default = () => v33Fixture('default-zh') as Json;
-/** v33 的默认工作空间装上 PDF 工具。 */
+/** v33 default workspace has PDF tool installed. */
 const v33WithPdf = () => v33Fixture('setup-pdf-zh') as Json;
-/** v33 的页面按 v34 的块写法（迁移结果）。 */
+/** v33 pages follow v34 block schema (migration result). */
 const asV34Page = (page: unknown) => migratePageV33(page as Json, v33Tables([]));
 
-/** schemaVersion 1 的真实快照：装了 PDF，导航栏已精简，AI 和历史是浮动按钮。 */
+/** Real schemaVersion 1 snapshot: PDF installed, navigation bar minimized, AI and history are floating buttons. */
 const v1Snapshot = {
   schemaVersion: 1,
   theme: { primaryColor: '#3B5BDB', mode: 'system' },
@@ -94,7 +95,7 @@ describe('migrateWorkspace', () => {
         oldRead('fra'),
       ],
     };
-    // 用户改过的：换了语言、改了张数、或者是自己的快捷操作，都不动。
+    // User modifications (language changed, count changed, or custom quick actions) remain untouched.
     const picked = { ...photos('jpn') };
     const fewer = {
       ...photos('eng'),
@@ -119,7 +120,7 @@ describe('migrateWorkspace', () => {
     expect(after[1]!.steps[2]).toEqual(newRead);
     expect(after.slice(2)).toEqual(previous.workflows.slice(2));
     expect((result.config as { schemaVersion: number }).schemaVersion).toBe(20);
-    // 用户换过语言的 ocr-photos：不动，照样每次按用户选的语言认。
+    // User who changed language in ocr-photos: untouched, continues to recognize text in the user's chosen language every time.
     const custom = { ...v33Default(), schemaVersion: 19, workflows: [picked] };
     const kept = migrateWorkspace(custom, undefined, 20);
     expect(kept.ok && (kept.config as { workflows: unknown[] }).workflows).toEqual([picked]);
@@ -305,7 +306,7 @@ describe('migrateWorkspace', () => {
     });
     const prepared = prepareSnapshot(previous, registry);
     expect(prepared.ok).toBe(true);
-    // 升级后没有哪个快捷操作在桌面上：用户没说过的不会出现在手机桌面。
+    // No quick action is placed on the home screen after upgrade: user-unspecified ones do not appear on the phone desktop.
     if (prepared.ok) expect(prepared.after.nav.phoneHomeScreen).toBeUndefined();
   });
   it('v9 → v10 preserves the existing home without adding file pickers', () => {
@@ -321,7 +322,7 @@ describe('migrateWorkspace', () => {
     const result = prepareSnapshot(v1Snapshot, registry);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // 没改过的 v1 默认主色换成 Clay 主色；外观模式保留。
+    // Unmodified v1 default primary color changes to Clay primary color; appearance mode is preserved.
     expect(result.after.theme).toEqual({ ...DEFAULT_THEME, mode: 'system' });
     expect(result.after.nav).toEqual({
       bar: v1Snapshot.shell.nav,
@@ -387,7 +388,7 @@ describe('migrateWorkspace', () => {
         ],
       },
     ]);
-    // 页面和其他配置不变。
+    // Pages and other configurations remain unchanged.
     expect(result.after.containers.pages).toEqual(V4_DEFAULT_MERGE.pages.map(asV34Page));
   });
 
@@ -443,7 +444,7 @@ describe('migrateWorkspace', () => {
     if (!result.ok) expect(result.stage).toBe('validate');
   });
 
-  // v37 → v38（D-483）：旧首页的「工具箱」入口（描边按钮）升成 row；别的按钮、别的数据不动。
+  // v37 → v38 (D-483): old home page "toolbox" entry (outlined button) upgraded to row; other buttons and data remain unchanged.
   it('v37 → v38 turns the home toolbox entry into a row and leaves other buttons alone', () => {
     const current = workspace('zh');
     const entry = (id: string, opens: string, variant: string) => ({

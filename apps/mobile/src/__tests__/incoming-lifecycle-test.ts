@@ -4,7 +4,7 @@ import { FakeFiles, TINY_JPEG } from '../test-utils/fake-files';
 it('picker batches delete only the picker cache copies, never share copies or originals', async () => {
   const files = new FakeFiles();
   const photo = files.offer('copy.jpg', TINY_JPEG, 'image/jpeg');
-  // Android 相册直接给的 content:// 地址：不是副本，不能删。
+  // content:// URI provided directly by Android photo gallery: not a copy, cannot be deleted.
   const original = {
     uri: 'content://media/42',
     name: 'original.jpg',
@@ -16,7 +16,7 @@ it('picker batches delete only the picker cache copies, never share copies or or
   useIncoming.getState().receive([photo, original], [], 'picker');
   const id = useIncoming.getState().share!.id;
   await releaseShare(files, id);
-  await releaseShare(files, id); // 重复关闭也不能调用分享文件删除。
+  await releaseShare(files, id); // Repeated closing must not trigger shared file deletion.
   expect(remove).not.toHaveBeenCalled();
   expect(files.disk.has(photo.uri)).toBe(false);
   expect(files.disk.has(original.uri)).toBe(true);

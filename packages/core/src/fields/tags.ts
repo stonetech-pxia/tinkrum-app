@@ -2,16 +2,16 @@ import { z } from 'zod';
 
 import { defineField, fieldBase, isText, type FieldDefinitionOf } from './define';
 
-/** 一条记录最多几个标签，一个标签最多几个字。 */
+/** Maximum number of tags per record, and maximum length per tag. */
 export const MAX_RECORD_TAGS = 20;
 export const MAX_TAG_LENGTH = 30;
 
 const schema = z.strictObject({ ...fieldBase, type: z.literal('tags') });
 
-/** 比较两个标签时用的写法：不分大小写，全角半角一样。 */
+/** Comparison logic for tags: case-insensitive, full-width and half-width characters treated equally. */
 export const tagKey = (tag: string) => tag.normalize('NFKC').toLowerCase();
 
-/** 去掉前后空白、空的和重复的（保留第一次出现的写法）；不是文字的跳过。 */
+/** Trims surrounding whitespace, removes empty and duplicate tags (keeping the first occurrence), and skips non-text entries. */
 export function cleanTags(raw: readonly unknown[]): string[] {
   const seen = new Set<string>();
   const tags: string[] = [];
@@ -26,9 +26,12 @@ export function cleanTags(raw: readonly unknown[]): string[] {
 }
 
 /**
- * 标签（创始人 2026-11-04 定）：值是这条记录自己的一组文字，存在记录里。配置里没有标签名（底线 14）：
- * 有哪些标签从记录现算（tagsInRecords），没有记录用的标签就没有了。AI 只知道有这个字段，看不到值（底线 2）。
- * 配置里的筛选只能看有没有标签（emptyOnly）：is 的值就是标签名，不能写进配置；列表上临时的筛选在内存里（browseFilter）。
+ * Tags (set by the founder 2026-11-04): Values are a set of strings stored directly within the
+ * record. No tag names are stored in the config (Invariant 14); available tags are computed
+ * dynamically from records (tagsInRecords), and tags without records cease to exist. The AI knows
+ * this field exists but cannot see its values (Invariant 2). Filters in config only check whether
+ * tags are present (emptyOnly): the 'is' value specifies the tag name and cannot be written
+ * directly into config; temporary browse filters are kept in memory (browseFilter).
  */
 export const tagsField: FieldDefinitionOf<'tags', typeof schema> = defineField({
   type: 'tags',

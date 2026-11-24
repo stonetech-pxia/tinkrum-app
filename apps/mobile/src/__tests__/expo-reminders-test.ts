@@ -1,10 +1,11 @@
 import type { PlannedNotification } from '@morph/core';
 
-// 换一批提醒（D-319）时，系统随时可能挂起 App（例如后台点了「完成」）。中途停下也不能把还要的提醒取消掉：
-// 只取消不要的、只排新的或变了的。
+// When refreshing reminders (D-319), the system may suspend the app at any time (e.g., tapping
+// "Done" in the background). Stopping midway must not cancel required reminders: only cancel
+// unwanted ones, and schedule new or changed ones.
 
 const mockPending = new Map<string, { identifier: string; content: Record<string, unknown> }>();
-/** 还能过几次桥；到 0 之后的调用永远不返回（App 被挂起）。 */
+/** Remaining bridge budget; calls after reaching 0 never return (app suspended). */
 let mockBudget = Infinity;
 const mockCalls: string[] = [];
 const mockBridge = <T>(name: string, run: () => T): Promise<T> => {
@@ -114,14 +115,14 @@ describe('replacing the planned reminders (D-319)', () => {
     await platform.replaceAll(before);
     expect(mockPending.size).toBe(21);
 
-    // 浇水做完了：今天那次不要了，往后加一次。只有两次过桥的时间就被挂起。
+    // Watering is done: skip today's instance, add one for the future. Suspended with only two bridge calls remaining.
     const after = [...week('run'), ...week('read'), ...week('water', 1)];
     mockBudget = 2;
     void platform.replaceAll(after);
     await new Promise((r) => setTimeout(r, 0));
     const wanted = new Set(after.map((x) => x.id));
     const kept = [...mockPending.keys()].filter((id) => wanted.has(id));
-    // 跑步、读书的 14 条和浇水还要的 6 条都还在。
+    // The 14 running/reading items and the 6 required watering items are still present.
     expect(kept.length).toBeGreaterThanOrEqual(20);
   });
 

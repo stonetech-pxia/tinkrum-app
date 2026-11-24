@@ -9,16 +9,18 @@ import { SectionLabel } from '@/renderer/ui';
 import { RowGroup } from '@/shell/RowGroup';
 
 /**
- * 「设置 → 数据」：用户记录的管理页，由内核提供，AI 不能修改（底线 8）。
- * 一屏看完（D-614、D-615）：最上面是备份和恢复（D-600）、最近删除（D-037）、不在界面里的表（D-038、D-041）、更多；
- * 下面每张表一行（名字和条数），有几个 App 时按 App 分组，点进去是这张表的导出、导入、批次、选择删除、
- * 附件设置（data-table/[tableId]）；隐私说明是页底的一行小字。
+ * 'Settings -> Data': user record management page, provided by the core, cannot be modified by AI
+ * (invariant 8). Fits on one screen (D-614, D-615): backup and restore at the top (D-600),
+ * recently deleted (D-037), unused tables (D-038, D-041), more; below are rows for each table
+ * (name and count), grouped by app when multiple apps exist, tapping enters export, import,
+ * batches, selective deletion, and attachment settings for that table (data-table/[tableId]);
+ * privacy notice is the fine print at the bottom.
  */
 export default function DataRoute() {
   const { locale, config, palette, router, counts, orphans, deleted } = useDataOverview();
   const apps = config.nav.apps ?? [];
 
-  // 按 App 分组：主页在前，再按 App 的顺序；表指向的 App 不存在时算主页。
+  // Group by app: home first, then ordered by app sequence; tables pointing to non-existent apps default to home.
   const groups: { key: string; name: string; tables: Collection[] }[] = [];
   for (const c of config.data.tables) {
     const app = c.app ? apps.find((a) => a.id === c.app) : undefined;
@@ -32,18 +34,18 @@ export default function DataRoute() {
   }
   const order = (key: string) => (key === '' ? -1 : apps.findIndex((a) => a.id === key));
   groups.sort((a, b) => order(a.key) - order(b.key));
-  // 只有一组时不写 App 名字，标题还是「数据表」。
+  // Omit app name when there is only one group, keeping the title as 'Data Tables'.
   const single = groups.length <= 1;
 
   return (
     <ScrollView
       style={{ backgroundColor: palette.background }}
       contentContainerStyle={{ padding: palette.pad, gap: palette.gap - 4, paddingBottom: 48 }}>
-      {/* 标题在导航栏上，页面里不再写一遍（D-614）。这几行在表的上面，表再多也总在第一屏（D-615）。 */}
+      {/* Title is in the navigation bar, not repeated in the page (D-614). These lines are above the tables, ensuring they remain on the first screen regardless of how many tables exist (D-615). */}
       <RowGroup
         palette={palette}
         rows={[
-          // Expo Go 和测试里没有原生的打包模块，备份做不了，这一行就不出现（D-600）。
+          // Expo Go and tests lack native packaging modules, so backup cannot be performed and this row is omitted (D-600).
           ...(backupAvailable()
             ? [
                 {
@@ -59,7 +61,7 @@ export default function DataRoute() {
             trailing: t(locale, 'recordCount', { count: deleted.length }),
             onPress: () => router.push('/data-deleted'),
           },
-          // 没有不在界面里的表，这一行就不出现。
+          // If there are no unused tables in the UI, this row does not appear.
           ...(orphans.length > 0
             ? [
                 {

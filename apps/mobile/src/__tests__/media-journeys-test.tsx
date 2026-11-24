@@ -16,7 +16,7 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
-// 图片、富文本、emoji 图标（D-044–D-046）。
+// Image, rich text, and emoji icons (D-044-D-046).
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -63,12 +63,12 @@ async function askAi(text: string) {
   await fireEvent.press(screen.getByTestId('nav-ai'));
   await fireEvent.changeText(await screen.findByTestId('change-input'), text);
   await fireEvent.press(screen.getByTestId('change-submit'));
-  // 进入草稿（D-190），应用。
+  // Enter draft (D-190), apply.
   await fireEvent.press(await screen.findByTestId('draft-apply'));
   expect(await screen.findByTestId('banner')).toBeTruthy();
 }
 
-/** 系统弹窗：点名字为 label 的按钮。 */
+/** System alert: press the button named label. */
 function pressInNextAlert(label: string) {
   jest.spyOn(Alert, 'alert').mockImplementationOnce((_title, _message, buttons) => {
     buttons?.find((b) => b.text === label)?.onPress?.();
@@ -89,7 +89,7 @@ describe('pictures', () => {
       show: { aspect: 'wide' },
     });
 
-    // 选照片：照片成为用户文件，配置里只记录文件 ID，这次修改记为“手动修改”。
+    // Select photo: photo becomes a user file, only file ID is recorded in config, this modification is recorded as "manual modification".
     files.nextImage = files.offer('IMG_0001.jpg', photo, 'image/jpeg');
     await fireEvent.press(screen.getByTestId('image-slot-image-1'));
     expect(await screen.findByTestId('image-image-1')).toBeTruthy();
@@ -99,23 +99,23 @@ describe('pictures', () => {
       show: { asset: asset!.id },
     });
     expect(store.getState().head).toMatchObject({ source: 'user', summary: '设置图片' });
-    // 文件列表只显示文档，不列出界面用的照片。
+    // File list shows only documents, does not list UI photos.
     expect(screen.getByTestId('component-recent-files')).toBeTruthy();
     expect(screen.queryByTestId('file-IMG_0001.jpg')).toBeNull();
 
-    // 取消选择不做任何修改。
+    // Deselecting makes no modifications.
     files.nextImage = null;
     pressInNextAlert('更换照片');
     await fireEvent.press(screen.getByTestId('image-slot-image-1'));
     expect(store.getState().head).toMatchObject({ summary: '设置图片' });
 
-    // 移除照片：回到图片位；照片文件本身保留。
+    // Remove photo: returns to photo slot; photo file itself is retained.
     pressInNextAlert('移除照片');
     await fireEvent.press(screen.getByTestId('image-slot-image-1'));
     expect(await screen.findByText('点按选择一张照片')).toBeTruthy();
     expect(await repo.listAssets()).toHaveLength(1);
 
-    // 撤销：照片回来。
+    // Undo: photo comes back.
     await fireEvent.press(screen.getByText('撤销'));
     await store.getState().confirm();
     expect(await screen.findByTestId('image-image-1')).toBeTruthy();

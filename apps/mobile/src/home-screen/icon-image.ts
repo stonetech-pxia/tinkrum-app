@@ -1,9 +1,10 @@
 import type { HomeScreenArt } from './platform';
 
-// 桌面图标上的图只有 Android 画（icon-image.android.ts，D-606）。iOS 的菜单只收系统图标，这里不画；
-// 分成两个文件，Android 用的图标字体就不会打进 iOS 的包。
+// Graphics on desktop icons are only drawn on Android (icon-image.android.ts, D-606). iOS menus
+// only accept system icons, nothing is drawn here; split into two files so Android icon fonts are
+// not bundled into iOS builds.
 
-/** 画不了：调用方不带图。 */
+/** Unable to draw: caller supplies no icon. */
 export async function drawHomeScreenIcon(_art: HomeScreenArt): Promise<string | null> {
   return null;
 }

@@ -6,8 +6,9 @@ import type { Collection, Component, NewComponent, WorkspaceConfig } from './sch
 import { allComponents } from './schema';
 import { apply, registry, workspace } from './test-helpers';
 
-// D-310：AI 新加了一个记录块（列表、卡片……），而这张表在整个 App 里没有任何添加的地方时，
-// 在它上方补一个「添加」按钮（就地的 {do: "create", ask: "all"}，打开完整的添加页），并在草稿说明里写出来。
+// D-310: When AI adds a record block (list, card, etc.) and this table has no add entry point
+// anywhere in the app, prepend an "Add" button above it (an inline {do: "create", ask: "all"} that
+// opens the full add page) and document it in the draft description.
 
 const habits: Collection = {
   id: 'habits',
@@ -157,7 +158,7 @@ describe('a new record block of a table that has no way to add entries (D-310)',
     );
     expect(looks(page('habits-page').blocks)).toEqual(['list', 'form']);
 
-    // 打卡表靠习惯列表每一行的「打卡」按钮添加；习惯表本身仍然需要添加的地方。
+    // The check-in table adds records via the "Check-in" button on each habit list row; the habit table itself still requires an add location.
     const doneButton = {
       as: 'button',
       label: '打卡',

@@ -8,7 +8,7 @@ import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 import { formatTime, seek, useThumbnails } from './TrimScreen';
 
-/** 时间轴与剪切共用缩略图；截帧只选一个时间，选择结果留在设备上。 */
+/** Timeline and trimming share thumbnails; frame capture selects a single timestamp, with the selection result kept on device. */
 export function FrameScreen({
   input,
   palette,
@@ -58,7 +58,7 @@ export function FrameScreen({
           onPress={(e) => {
             if (width > 0) select((e.nativeEvent.locationX / width) * end);
           }}>
-          {/* 缩略图不接收点击：否则 locationX 是相对被点中的那一张算的，点中间会选到开头附近。 */}
+          {/* Thumbnails do not receive clicks: otherwise locationX would be calculated relative to the tapped thumbnail, and tapping the middle might select the beginning instead. */}
           <View style={styles.strip} pointerEvents="none">
             {thumbnails.map((thumb, i) => (
               <Image key={i} source={thumb} contentFit="cover" style={styles.thumb} />

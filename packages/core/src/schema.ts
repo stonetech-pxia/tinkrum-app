@@ -24,12 +24,16 @@ import {
 } from './schema-base';
 import { ConditionSchema, FieldRefSchema } from './schema-primitives';
 
-// 可变层（交接文档 §5.2）的唯一定义：v34「数据 · 容器 · 工具」（D-368，创始人 2026-10-30 定）。
-// 数据 data（表结构、日期设置），容器 containers（页面 → 块、文件房间的布局）和 nav（导航栏、浮动入口、
-// 手机桌面菜单），工具 tools（快捷操作、提醒），工具包 packages（界面上叫「工具」），主题 theme。
-// 块的外观定义在 components/（每种一个文件，见 docs/COMPONENTS.md），字段在 fields/，其余部分在 schema-base.ts。
-// 修改已有结构（包括给已有外观加键）时，必须提升 CURRENT_SCHEMA_VERSION 并在 migrate.ts 中添加迁移；
-// 只新增一种外观不提升（D-254：老配置照样能读，旧 App 读到新外观时原样保留）。
+// The sole definition of the mutable layer (handoff doc §5.2): v34 "Data . Containers . Tools"
+// (D-368, established by the founder on 2026-10-30). `data` (table schemas, date settings),
+// `containers` (pages -> blocks, file room layout) and `nav` (navigation bar, floating entry
+// points, phone home screen menu), `tools` (quick actions, reminders), `packages` (called "tools"
+// in the UI), and `theme`. Block appearances are defined in `components/` (one file per type, see
+// `docs/COMPONENTS.md`), fields in `fields/`, and the rest in `schema-base.ts`. When modifying
+// existing structures (including adding keys to existing appearances), `CURRENT_SCHEMA_VERSION`
+// must be incremented and a migration added in `migrate.ts`; adding only a new appearance does not
+// require incrementing it (D-254: legacy configs can still be read, and old apps retain new
+// appearances as-is).
 
 export const CURRENT_SCHEMA_VERSION = 40;
 
@@ -75,54 +79,56 @@ export {
 } from './components';
 export type QuickActionListComponent = ComponentOf<'library'>;
 
-// ---- 容器：页面 ----
+// ---- Containers: Pages ----
 
-/** 页面最多几个顶层块。 */
+/** Maximum number of top-level blocks per page. */
 export const MAX_PAGE_BLOCKS = 30;
-/** 页面、表的总数（所有 app 共用，D-485，原来各 20）。 */
+/** Total number of pages and tables (shared across all apps, D-485, previously 20 each). */
 export const MAX_PAGES = 60;
 export const MAX_TABLES = 40;
 
 export const PageSchema = z.strictObject({
   id: IdSchema,
   title: boundedText(1, 40),
-  /** 属于哪个 app（D-485）；没写属于主页。 */
+  /** Which app it belongs to (D-485); defaults to the home page when omitted. */
   app: IdSchema.optional(),
-  /** 导航栏里显示的图标。 */
+  /** Icon displayed in the navigation bar. */
   icon: IconValueSchema.optional(),
-  /** 由某个工具包创建的页面（原 toolId）；移除工具包时一并移除。 */
+  /** Page created by a tool package (formerly `toolId`); removed together when the tool package is removed. */
   package: IdSchema.optional(),
-  /** 整个页面的背景图片（D-258，schemaVersion 18），块浮在上面。 */
+  /** Background image for the entire page (D-258, schemaVersion 18), with blocks floating on top. */
   backdrop: BackdropSchema.optional(),
   /**
-   * 给某张表的一条记录用的页面（D-342，原 recordOf）：从这张表的记录块（opens）点一条打开，块里的
-   * "$record" 指那条记录。不能放进导航栏，也不能从按钮、入口、提醒直接打开。
+   * Page dedicated to a single record of a table (D-342, formerly `recordOf`): opened by tapping
+   * an entry in a record block (`opens`) of that table, where "$record" refers to that record.
+   * Cannot be placed in the navigation bar, nor opened directly from buttons, entry points, or
+   * reminders.
    */
   of: IdSchema.optional(),
   blocks: z.array(ComponentSchema).max(MAX_PAGE_BLOCKS),
 });
-/** 页面；块里可能有这个版本不认识的（D-254，见 UnknownComponent）。 */
+/** Page; blocks may contain types unrecognized by this version (D-254, see `UnknownComponent`). */
 export type Page = Omit<z.infer<typeof PageSchema>, 'blocks'> & { blocks: Component[] };
 
 export const ContainersSchema = z.strictObject({
   pages: z.array(PageSchema).min(1).max(MAX_PAGES),
-  /** 文件房间的布局（D-358）；没有时是默认布局（预览居中、工具栏在底部）。AI 修改等 R3（Q7）。 */
+  /** File room layout (D-358); defaults to the standard layout when absent (preview centered, toolbar at the bottom). AI modifications and other R3 features (Q7). */
   desk: DeskLayoutSchema.optional(),
 });
 
-// ---- 工具包（界面上叫「工具」）----
+// ---- Tool Packages (called "Tools" in UI) ----
 
-/** 已添加的工具包（原 InstalledTool {toolId, version, pageId}）。 */
+/** Added tool packages (formerly `InstalledTool {toolId, version, pageId}`). */
 export const PackageSchema = z.strictObject({
   id: IdSchema,
   version: z.string().min(1),
   page: IdSchema,
 });
 export type InstalledPackage = z.infer<typeof PackageSchema>;
-/** v33 的名字。 */
+/** v33 name. */
 export type InstalledTool = InstalledPackage;
 
-// ---- 工具：快捷操作、提醒 ----
+// ---- Tools: Quick Actions, Reminders ----
 
 export const ActionIdSchema = z.string().regex(/^[a-z]+\.[a-zA-Z0-9]+$/, 'invalid action id');
 
@@ -130,30 +136,32 @@ export const WorkflowStepSchema = z.strictObject({
   id: IdSchema,
   action: ActionIdSchema,
   params: z.record(z.string(), z.unknown()),
-  /** 这些参数每次运行时问用户（键必须是该动作界面元数据里的参数）。 */
+  /** Parameters asked of the user upon each run (keys must match parameters in the action's UI metadata). */
   ask: z.array(z.string().min(1).max(40)).max(10).optional(),
 });
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 
-/** 一个快捷操作最多的步骤数。 */
+/** Maximum number of steps in a quick action. */
 export const MAX_WORKFLOW_STEPS = 12;
 
-/** 快捷操作总数上限：装满全部工具包约 40 个单功能快捷操作，再加用户自己的。 */
+/** Upper limit on total quick actions: around 40 single-function quick actions when all tool packages are installed, plus user-defined ones. */
 export const MAX_WORKFLOWS = 100;
 
-/** 手机桌面上长按 Morph 图标的菜单里最多放几个快捷操作（D-271）：iOS 只显示 4 个，Android 跟着一样。 */
+/** Maximum number of quick actions in the menu when long-pressing the Morph icon on the mobile home screen (D-271): iOS displays only 4, and Android follows suit. */
 export const MAX_HOME_SCREEN = 4;
 
 /**
- * 快捷操作：线性步骤序列，步骤之间传递一个有类型的值（§7C、D-060，非图灵完备；关系规则 13：
- * 工具不能触发工具，只有这里的线性步骤能串）。package：添加工具包时创建，移除时一起移除（原 toolId）；
- * preset：从哪个预设复制来的（D-062，D-236，原 presetId）。放到手机桌面见 nav.phoneHomeScreen（D-271）。
+ * Quick action: a linear sequence of steps passing a typed value between them (§7C, D-060,
+ * non-Turing-complete; relation rule 13: tools cannot trigger tools, only linear steps here can
+ * be chained). `package`: created when adding a tool package and removed together with it
+ * (formerly `toolId`); `preset`: the preset copied from (D-062, D-236, formerly `presetId`).
+ * Placed on the mobile home screen via `nav.phoneHomeScreen` (D-271).
  */
 export const QuickActionSchema = z.strictObject({
   id: IdSchema,
   kind: z.literal('quickAction'),
   name: boundedText(1, 40),
-  /** 属于哪个 app（D-485）；没写属于主页。 */
+  /** Which app it belongs to (D-485); defaults to the home page when omitted. */
   app: IdSchema.optional(),
   icon: IconValueSchema.optional(),
   package: IdSchema.optional(),
@@ -161,13 +169,13 @@ export const QuickActionSchema = z.strictObject({
   steps: z.array(WorkflowStepSchema).min(1).max(MAX_WORKFLOW_STEPS),
 });
 export type QuickAction = z.infer<typeof QuickActionSchema>;
-/** v33 的名字（同一个东西）。 */
+/** v33 name (same thing). */
 export type Workflow = QuickAction;
 
-/** 一天里的时间 HH:mm（设备本地时间）。 */
+/** Time of day in `HH:mm` format (device local time). */
 export const TimeOfDaySchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time like 09:00');
 
-/** 点提醒打开哪里：一个页面或系统入口，或者一个快捷操作（只打开，不运行，D-251）。 */
+/** Where to open when tapping a reminder: a page, a system entry point, or a quick action (opened only, not executed, D-251). */
 export type ReminderTarget = OpenTarget;
 export const ReminderTargetSchema = openTargetSchema(
   'opens must be a page, a system entry or tool:<id>',
@@ -177,12 +185,15 @@ export const ReminderTargetSchema = openTargetSchema(
 const tableField = z.strictObject({ table: IdSchema, field: IdSchema });
 
 /**
- * 提醒什么时候响：every day / week（days：1 = 周一 … 7 = 周日）/ month（day：每月几号，1–28，D-577）在 at 提醒；before 在一张表的日期字段
- * 到期前 days 天的 at 提醒（每条记录一次，原 dateField）；each 按一张表的日程字段给每条记录各排各的
- * （D-316，原 scheduleField）；after 在一张表每加一条记录后 minutes 分钟提醒一次（D-391）；
- * before + minutes 在日期时间字段那一刻之前 minutes 分钟提醒（D-562，最多 7 天）。
+ * When a reminder rings: `every` day / week (`days`: 1 = Monday ... 7 = Sunday) / month (`day`:
+ * day of the month, 1-28, D-577) at `at` time; `before` rings at `at` time `days` days before a
+ * date field in a table expires (once per record, formerly `dateField`); `each` schedules
+ * reminders individually for each record based on a schedule field in a table (D-316, formerly
+ * `scheduleField`); `after` reminds `minutes` minutes after each record is added to a table
+ * (D-391); `before` + `minutes` reminds `minutes` minutes before the exact moment of a datetime
+ * field (D-562, up to 7 days).
  */
-/** 日期时间前几分钟提醒（D-562）最多提前多久：7 天。 */
+/** Maximum advance time for reminding minutes before a datetime (D-562): 7 days. */
 export const MAX_BEFORE_MINUTES = 7 * 24 * 60;
 
 export const ReminderWhenSchema = z.union([
@@ -203,7 +214,7 @@ export const ReminderWhenSchema = z.union([
     minutes: z.number().int().min(1).max(1440),
   }),
   z.strictObject({ before: tableField, minutes: z.number().int().min(1).max(MAX_BEFORE_MINUTES) }),
-  // D-577：每月 day 号（1–28，每个月都有这一天）。
+  // D-577: Day `day` of every month (1-28, ensuring valid days across all months).
   z.strictObject({
     every: z.literal('month'),
     day: z.number().int().min(1).max(28),
@@ -213,14 +224,16 @@ export const ReminderWhenSchema = z.union([
 export type ReminderWhen = z.infer<typeof ReminderWhenSchema>;
 
 /**
- * 提醒（D-251）：本地通知，不用推送、不需要服务器。时间触发，点通知只打开 opens，绝不运行任何东西
- * （关系规则 13、14：不能挂会把数据带出 App 的动作）。title 是通知的标题（配置里的文字，AI 能看到）；
- * 按记录的提醒正文在本机按记录生成（记录内容不进配置，不发给 AI）。
+ * Reminder (D-251): local notification, no push, no server needed. Time-triggered, tapping the
+ * notification only opens opens, never runs anything (relation rules 13, 14: cannot hook up
+ * actions that export data out of the app). title is the notification title (text in config,
+ * visible to AI); the reminder body based on the record is generated locally from the record
+ * (record content does not enter config and is not sent to AI).
  */
 export const ReminderSchema = z.strictObject({
   id: IdSchema,
   kind: z.literal('reminder'),
-  /** 属于哪个 app（D-485）；没写属于主页。 */
+  /** Which app it belongs to (D-485); defaults to the home page when omitted. */
   app: IdSchema.optional(),
   package: IdSchema.optional(),
   preset: IdSchema.optional(),
@@ -228,14 +241,15 @@ export const ReminderSchema = z.strictObject({
   enabled: z.boolean(),
   when: ReminderWhenSchema,
   opens: ReminderTargetSchema,
-  /** 只有 each（D-318）：通知上的「完成」按钮对这条记录（$row）做的一键记录工具（只写记录）。 */
+  /** each only (D-318): the "Complete" button on the notification is a one-touch record tool (writes records only) acting on this record ($row). */
   done: RecordToolSchema.optional(),
-  /** 只有 each（D-318）：通知上的「稍后提醒」按钮，过几分钟再提醒一次。 */
+  /** each only (D-318): the "Snooze" button on the notification, reminds again in a few minutes. */
   snoozeMinutes: z.number().int().min(5).max(240).optional(),
   /**
-   * 只有 each（D-317）：那天所在的这一天 / 这一周 / 这个月里，table 表里已经有符合 filter 的记录就不提醒。
-   * 日子按 date（不写是创建时间）；是同一张表时只看这条记录自己，link 是那张表里指向这张表的引用字段时
-   * 只看指向这条记录的。
+   * unless only (D-317): do not remind if the table already has a record matching the filter on
+   * that day / in that week / in that month. Days are based on date (creation time if omitted);
+   * when it is the same table, check only this record itself; when link is a reference field in
+   * that table pointing to this table, check only records pointing to this record.
    */
   unless: z
     .strictObject({
@@ -249,20 +263,21 @@ export const ReminderSchema = z.strictObject({
 });
 export type Reminder = z.infer<typeof ReminderSchema>;
 
-/** 每天、每周、到期提醒最多几个（D-251）。 */
+/** Maximum number of daily, weekly, and due reminders (D-251). */
 export const MAX_REMINDERS = 20;
-/** 按记录排的提醒（each）最多几个，另算，不占上面 20 个的名额（D-316）。 */
+/** Maximum number of record-based reminders (each), counted separately and not occupying the above 20 slots (D-316). */
 export const MAX_RECORD_REMINDERS = 10;
 
 export const isRecordReminder = (r: Reminder) => 'each' in r.when;
 
-/** 独立的工具（tools[]）：快捷操作、提醒。就地的一键记录工具写在块里（Q1）。 */
+/** Independent tools (tools[]): quick actions, reminders. Local one-touch record tools are defined inside blocks (Q1). */
 export const ToolSchema = z.discriminatedUnion('kind', [QuickActionSchema, ReminderSchema]);
 export type Tool = z.infer<typeof ToolSchema>;
 
 /**
- * 工具的登记（v34「数据 · 容器 · 工具」）：每种独立工具作用在哪层、读写什么、怎么触发。
- * trigger：tap = 用户点了才做；time = 到点出通知（只打开，关系规则 13、14）。
+ * Tool registry (v34 "Data, Container, Tool"): where each independent tool acts, what it reads
+ * and writes, and how it is triggered. trigger: tap = user action required; time = time-triggered
+ * notification (opens only, relation rules 13, 14).
  */
 export const TOOL_KINDS = {
   quickAction: { kind: 'tool', layer: 'file', access: 'write', trigger: 'tap', runs: 'steps' },
@@ -286,17 +301,17 @@ export const ToolsSchema = z
     { message: `at most ${MAX_RECORD_REMINDERS} reminders for each entry (when.each)` },
   );
 
-// ---- 数据 ----
+// ---- Data ----
 
 export const DataSchema = z.strictObject({
-  /** 数据表结构（原 collections）。记录内容不在配置里，也从不发给 AI。 */
+  /** Data table schema (formerly collections). Record content is not in the config and is never sent to the AI. */
   tables: z.array(CollectionSchema).max(MAX_TABLES),
-  /** 一天、一周从什么时候开始（D-286）；没有时是 0 点、周一。 */
+  /** When a day or week starts (D-286); defaults to midnight and Monday when absent. */
   calendar: CalendarSchema.optional(),
 });
 
 export const HOME_PAGE_ID = 'home';
-/** 新用户的工具箱页面（D-181）。是用户自己的页面，可以改、也可以删；「设置 → 工具」始终列出全部工具。 */
+/** New user's toolbox page (D-181). A user page that can be edited or deleted; "Settings -> Tools" always lists all tools. */
 export const TOOLBOX_PAGE_ID = 'toolbox';
 
 export const WorkspaceConfigSchema = z.strictObject({
@@ -307,7 +322,7 @@ export const WorkspaceConfigSchema = z.strictObject({
   containers: ContainersSchema,
   tools: ToolsSchema,
   packages: z.array(PackageSchema),
-  /** 画出来的图标（D-625）：用的地方写 "my:<id>"。空的不存。 */
+  /** Drawn icons (D-625): referenced as "my:<id>". Empty ones are not stored. */
   icons: DrawnIconsSchema.optional(),
 });
 type ParsedConfig = z.infer<typeof WorkspaceConfigSchema>;
@@ -315,21 +330,21 @@ export type WorkspaceConfig = Omit<ParsedConfig, 'containers'> & {
   containers: Omit<ParsedConfig['containers'], 'pages'> & { pages: Page[] };
 };
 
-// ---- 读配置的辅助函数 ----
+// ---- Config reading helper functions ----
 
-/** 快捷操作（tools[] 里 kind 是 quickAction 的，按原顺序）。 */
+/** Quick actions (quickAction kind in tools[], in original order). */
 export const quickActionsOf = (config: Pick<WorkspaceConfig, 'tools'>): QuickAction[] =>
   config.tools.filter((t): t is QuickAction => t.kind === 'quickAction');
-/** 提醒（tools[] 里 kind 是 reminder 的，按原顺序）。 */
+/** Reminders (reminder kind in tools[], in original order). */
 export const remindersOf = (config: Pick<WorkspaceConfig, 'tools'>): Reminder[] =>
   config.tools.filter((t): t is Reminder => t.kind === 'reminder');
 export const tablesOf = (config: Pick<WorkspaceConfig, 'data'>) => config.data.tables;
 
-/** 块的子块（分组的 children；别的块没有）。 */
+/** Block child blocks (grouped children; other blocks have none). */
 export const childrenOf = (c: Component): Component[] =>
   isKnownComponent(c) && c.look === 'group' ? (c.children as Component[]) : [];
 
-/** 页面上的所有块，包括分组里的子块（两层，深度优先，按显示顺序）。 */
+/** All blocks on the page, including child blocks within groups (two levels, depth-first, in display order). */
 export function allComponents(page: Page): Component[] {
   const walk = (list: readonly Component[]): Component[] =>
     list.flatMap((c) => [c, ...walk(childrenOf(c))]);
@@ -337,15 +352,16 @@ export function allComponents(page: Page): Component[] {
 }
 export const allBlocks = allComponents;
 
-/** 块所在的分组（顶层块是 null）。 */
+/** Group containing the block (top-level blocks are null). */
 export function parentOf(page: Page, blockId: string): Component | null {
   for (const c of allComponents(page)) if (childrenOf(c).some((x) => x.id === blockId)) return c;
   return null;
 }
 
 /**
- * 一个工具宫格显示哪些工具包（D-181）：写了 ids 就按它的顺序；没写就是目录里
- * 同一页面上其他宫格都没列出的。目录里没有的不显示。
+ * Which tool packs a tool grid displays (D-181): if ids are specified, follow their order;
+ * otherwise, display those not listed in any other grid on the same page in the directory.
+ * Unlisted tools are hidden.
  */
 export function toolGridToolIds(
   grid: ComponentOf<'packages'>,
@@ -361,13 +377,13 @@ export function toolGridToolIds(
   return catalog.filter((id) => !listed.has(id));
 }
 
-/** 读表的块读的数据表（定义里 refs 指向 table 的键；$files 不算）。 */
+/** Data table read by a data-reading block (defined with refs pointing to a table key; $files is excluded). */
 export function componentCollection(c: Component): string | null {
   const id = componentRefs(c, 'table')[0] as string | undefined;
   return id === undefined || id.startsWith('$') ? null : id;
 }
 
-/** 按钮和入口这类块打开的目标（opens）。 */
+/** Target opened by buttons and entry points (opens). */
 export function componentTarget(c: Component): OpenTarget | null {
   return (componentRefs(c, 'target')[0] as OpenTarget | undefined) ?? null;
 }

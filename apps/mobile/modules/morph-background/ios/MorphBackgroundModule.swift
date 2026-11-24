@@ -3,14 +3,17 @@ import ExpoModulesCore
 import ExpoNotifications
 import UIKit
 
-// 长任务切到后台也继续的 iOS 部分（D-163）：iOS 26 的 BGContinuedProcessingTask。用户点了运行之后提交，
-// 系统在锁屏和灵动岛上显示进度，切到别的 App 也给时间继续跑；系统收回时间时让 morph-media 按「切到后台」中断。
-// 关着时什么都不做，iOS 和 D-148 一样要留在 Morph 里。2026-10-31 在 iPhone 真机上确认能用后打开。
+// iOS part of continuing long-running tasks in the background (D-163): iOS 26
+// BGContinuedProcessingTask. Submitted after the user taps run, the system displays progress on the
+// lock screen and Dynamic Island, and grants time to continue running when switched to other apps;
+// when the system reclaims the time, morph-media is interrupted as "switched to background". When
+// disabled, it does nothing, and iOS must stay in Morph just like D-148. Enabled after confirmation
+// on a physical iPhone on 2026-10-31.
 
-/** 开关（D-163）。 */
+/** Switch (D-163). */
 private let continuedProcessingEnabled = true
 
-/** 和 morph-media 约定的通知名（两个模块互相看不到对方的代码）。 */
+/** Notification name agreed upon with morph-media (both modules cannot see each other's code). */
 private let changedNotification = Notification.Name("MorphContinuedProcessingChanged")
 private let expiredNotification = Notification.Name("MorphContinuedProcessingExpired")
 
@@ -21,22 +24,27 @@ struct DoneNotice: Record {
 
 public class MorphBackgroundModule: Module {
   private let lock = NSLock()
-  /** 这次运行的任务标识；end 之后为 nil（系统晚到的任务直接结束）。 */
+  /** Task identifier for this run; nil after end (late system tasks terminate immediately). */
   private var identifier: String?
-  /** 系统开始运行的任务（BGContinuedProcessingTask，iOS 26 起）。 */
+  /** Task started running by the system (BGContinuedProcessingTask, starting with iOS 26). */
   private var task: AnyObject?
   private var title = ""
 
-  /** 提醒按钮的后台时间（D-318）。 */
+  /** Background time holder for reminder buttons (D-318). */
   private let actionHold = ReminderActionHold()
 
   public func definition() -> ModuleDefinition {
     Name("MorphBackground")
 
-    // 提醒通知上的按钮（D-318）不打开 App：系统在后台拉起或唤醒 App，expo-notifications 一收到点击就回复系统，
-    // 之后 App 随时可能被挂起，JS 来不及写记录。所以先要一段后台时间，JS 处理完调 releaseActionTime 还掉：
-    // App 挂在后台时收到 Morph 的按钮就要（代理）；App 没在运行、被系统在后台拉起时，点击可能在代理挂上之前
-    // 就被 expo-notifications 收走了，所以模块创建时 App 在后台也先要（JS 几秒内没收到点击就还）。
+    // Buttons on reminder notifications (D-318) do not open the app: the system pulls or wakes up
+    // the app in the background, expo-notifications replies to the system as soon as a click is
+    // received, after which the app may be suspended at any time, leaving JS insufficient time to
+    // write records. Therefore, background time is requested first, and JS calls releaseActionTime
+    // after processing: requested when receiving Morph's button while the app is suspended in the
+    // background (delegate); when the app is not running and is pulled up by the system in the
+    // background, the click might be consumed by expo-notifications before the delegate is
+    // attached, so background time is also requested when the module is created even if the app is
+    // in the background (released if JS receives no click within a few seconds).
     OnCreate {
       NotificationCenterManager.shared.addDelegate(self.actionHold)
       DispatchQueue.main.async {
@@ -55,7 +63,7 @@ public class MorphBackgroundModule: Module {
 
     Constant("continuesInBackground") { Self.available }
 
-    // iOS 不发我们自己的通知：进度和完成都由系统的后台任务界面显示。
+    // iOS does not send our own notifications: progress and completion are both displayed by the system's background task interface.
     AsyncFunction("ensureNotificationPermission") { () -> Bool in false }
 
     Function("begin") { (title: String, text: String) -> Bool in
@@ -73,7 +81,7 @@ public class MorphBackgroundModule: Module {
 
   private static var available: Bool {
     guard continuedProcessingEnabled else { return false }
-    // 模拟器没有 BGTaskScheduler（提交报「not available on this platform」）。
+    // Simulators do not have BGTaskScheduler (submission reports "not available on this platform").
     #if targetEnvironment(simulator)
       return false
     #else
@@ -86,7 +94,7 @@ public class MorphBackgroundModule: Module {
     guard Self.available else { return false }
     guard #available(iOS 26.0, *) else { return false }
     let bundle = Bundle.main.bundleIdentifier ?? "dev.stonetech.tinkrum"
-    // Info.plist 的 BGTaskSchedulerPermittedIdentifiers 里是 dev.stonetech.tinkrum.work.*；每次一个新标识（同一个标识注册两次系统会杀掉 App）。
+    // Info.plist's BGTaskSchedulerPermittedIdentifiers contains dev.stonetech.tinkrum.work.*; a new identifier is used each time (registering the same identifier twice causes the system to kill the app).
     let id = "\(bundle).work.\(UUID().uuidString)"
     lock.withLock {
       identifier = id
@@ -104,7 +112,7 @@ public class MorphBackgroundModule: Module {
         self.task = bgTask
         return true
       }
-      // 运行已经结束了才轮到：直接结束。
+      // Reached only after execution has already ended: terminate immediately.
       guard current else {
         bgTask.setTaskCompleted(success: true)
         return
@@ -119,7 +127,7 @@ public class MorphBackgroundModule: Module {
       return false
     }
     let request = BGContinuedProcessingTaskRequest(identifier: id, title: title, subtitle: text)
-    // 现在跑不了就算了（还在 Morph 里，照旧在前台跑），不排队。
+    // Forget about running right now if it cannot run (still inside Morph, run in the foreground as usual) without queueing.
     request.strategy = .fail
     do {
       try BGTaskScheduler.shared.submit(request)
@@ -154,7 +162,7 @@ public class MorphBackgroundModule: Module {
     }
   }
 
-  /** 系统收回了后台时间：正在处理的视频和音频按「切到后台」中断（ERR_MEDIA_INTERRUPTED）。 */
+  /** The system reclaimed background time: video and audio currently being processed are interrupted as "switched to background" (ERR_MEDIA_INTERRUPTED). */
   private func expire(_ id: String) {
     let task = lock.withLock { () -> AnyObject? in
       guard identifier == id else { return nil }
@@ -170,12 +178,13 @@ public class MorphBackgroundModule: Module {
   }
 }
 
-/** 和 reminders/platform.ts 的 DONE_ACTION、SNOOZE_ACTION 一样。 */
+/** Same as DONE_ACTION and SNOOZE_ACTION in reminders/platform.ts. */
 private let reminderActions: Set<String> = ["morph-done", "morph-snooze"]
 
 /**
- * 收到提醒按钮的点击就向系统要一段后台时间（D-318）。不算处理了这条点击（返回 false），点击照样交给
- * expo-notifications 送到 JS。
+ * Requests background time from the system upon receiving a click on a reminder button (D-318).
+ * Does not count as handling the click (returns false), so the click is still passed to
+ * expo-notifications and delivered to JS.
  */
 final class ReminderActionHold: NSObject, NotificationDelegate {
   private var task: UIBackgroundTaskIdentifier = .invalid

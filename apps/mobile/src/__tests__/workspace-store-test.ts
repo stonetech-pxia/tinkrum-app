@@ -28,7 +28,7 @@ async function booted(repo = new MemoryWorkspaceRepo()) {
   return { repo, store };
 }
 
-/** 提议 → 确认 → 模拟渲染成功。 */
+/** Proposal -> Confirm -> Simulate successful render. */
 async function applyText(store: WorkspaceStore, input: string) {
   const result = await store.getState().propose(input);
   if (result.kind !== 'preview')
@@ -85,7 +85,7 @@ describe('workspace store', () => {
     const { repo, store } = await booted();
     const result = await store.getState().propose('导航栏只保留首页、工具、设置');
     expect(result.kind).toBe('preview');
-    // 预览阶段：当前配置不变，也没有新版本。
+    // Preview phase: current config remains unchanged, and no new version is created.
     expect(nav(store)).toEqual(['page:home', 'tools', 'ai', 'history', 'settings']);
     expect((await repo.listRevisions(10)).length).toBe(1);
 
@@ -99,7 +99,7 @@ describe('workspace store', () => {
       resultRevisionId: 2,
     });
 
-    // “重启”：用同一个存储新建 store。
+    // "Restart": create a new store using the same storage.
     const { store: restarted } = await booted(repo);
     expect(nav(restarted)).toEqual(['page:home', 'tools', 'settings']);
   });
@@ -225,12 +225,12 @@ describe('workspace store', () => {
     expect(store.getState().config!.theme.primaryColor).toBe('#C8623A');
     expect(store.getState().banner).toMatchObject({ kind: 'rolledBack' });
     expect(store.getState().head).toMatchObject({ source: 'rollback' });
-    // 改动记录里给用户看的说明不带报错原文（2026-11-06 测试：英文 ReferenceError 直接显示给用户）。
+    // The user-facing description in the change history does not include raw error text (2026-11-06 test: English ReferenceError displayed directly to the user).
     expect(store.getState().head!.summary).not.toMatch(/Error|boom/);
     expect(await repo.getChangeRequest(1)).toMatchObject({ status: 'rolled_back' });
   });
 
-  // 2026-11-06 模拟器：一个和配置无关的渲染错误（代码热更新时少了一个函数）把用户的 App 换成了默认空白工作空间。
+  // keeps a version that already rendered when a later render fails
   it('keeps a version that already rendered when a later render fails', async () => {
     const { store } = await booted();
     await store.getState().propose('主题换成绿色');
@@ -241,7 +241,7 @@ describe('workspace store', () => {
     await store.getState().reportRenderError(new Error('ReferenceError: x is not defined'));
     expect(store.getState().config).toEqual(before);
     expect(store.getState().head!.id).toBe(head);
-    // 再画一次；还是出错的话，连续第三次停在出错页。
+    // Render again; if it still fails, stop at the error page on the third consecutive attempt.
     expect(store.getState().renderAttempt).toBe(1);
     await store.getState().reportRenderError(new Error('again'));
     await store.getState().reportRenderError(new Error('again'));
@@ -276,7 +276,7 @@ describe('workspace store', () => {
       expect(result.proposal.homeEntry).toEqual({ workflowIds: [id], on: true });
       expect(result.proposal.focusPageId).toBe('home');
       expect(runners(result.proposal.after)).toEqual([id]);
-      // 改动清单里不重复列出首页入口：它是单独的勾选项。
+      // The list of changes does not redundantly list the home screen entry point: it is a separate checkbox item.
       expect(result.proposal.lines.join('\n')).not.toMatch(/首页/);
 
       store.getState().setHomeEntry(false);

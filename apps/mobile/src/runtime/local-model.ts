@@ -11,44 +11,50 @@ import MorphVision from '../../modules/morph-vision';
 import { expoPackFs } from '../packs/expo-pack-fs';
 import type { PackStore } from '../packs/store';
 
-// 新记录表单的本机模型（D-396）在手机上怎么跑：llama.rn，只用 CPU，用完就释放，不常驻。
-// 模型结果只进候选；这里不联网（下载走扩展包，用户在「设置 → 数据」点了才下载）。
-// 没装、内存不够、加载失败时给 null 或报错，引擎安静退回只有规则。
+// How the local model for new record forms (D-396) runs on mobile: llama.rn, CPU-only, released
+// after use, non-resident. Model results go into candidates only; no network access here (downloads
+// go through packs, triggered by user in Settings -> Data). Returns null or errors when
+// uninstalled, low on memory, or failed to load, and the engine silently falls back to rules-only.
 
 /**
- * 设备总内存至少这么多才加载。2B 在 11 GB 的三星上进程峰值实测 3.2–4.5 GB（含文字识别留下的内存，
- * 现在加载前先放掉）；更小的手机没测过。iOS 单个 App 的上限也大约是总内存的一半；
- * 8 GB 的机器系统报出来常常不足 8，所以写 7（暂定，D-401）。
+ * Minimum total device memory required to load. 2B on an 11 GB Samsung showed a measured process
+ * peak of 3.2–4.5 GB (including memory left by OCR, which is now released prior to loading);
+ * smaller phones have not been tested. The iOS single-app limit is also roughly half of total
+ * memory; 8 GB devices often report slightly under 8, so set to 7 (provisional, D-401).
  */
 export const MODEL_MIN_MEMORY = 7 * 1024 * 1024 * 1024;
 
 /**
- * 总内存到这么多才重排权重（D-402）。重排把权重复制进匿名内存：三星上模型快约一倍，进程峰值多约 1.2 GB。
- * 不重排时权重留在系统能回收的文件映射里。拿不到总内存时按小的算。
+ * Total memory threshold required to repack weights (D-402). Repacking copies weights into
+ * anonymous memory: the model is about twice as fast on Samsung, with process peak increasing by
+ * ~1.2 GB. Without repacking, weights remain in system-reclaimable file mappings. Treated as low
+ * memory if total memory is unavailable.
  */
 export const REPACK_MIN_MEMORY = 10 * 1024 * 1024 * 1024;
 const noRepack = () => Device.totalMemory === null || Device.totalMemory < REPACK_MIN_MEMORY;
 
-/** 上下文长度：和 2B、4B 真机测量一样；文字由 core 按这个长度截断。 */
+/** Context length: matches real-device measurements for 2B and 4B; text is truncated to this length by core. */
 const CONTEXT = 4096;
-/** 三星上测过 6 线程。iPhone 大核少，没测过，先用 4。 */
+/** Tested with 6 threads on Samsung. iPhones have fewer performance cores and are untested, default to 4. */
 const threads = () => (Platform.OS === 'android' ? 6 : 4);
 
-/** totalMemory 拿不到（Expo Go、部分模拟器）时算够：加载失败也只是退回规则。 */
+/** Assumed sufficient when total memory cannot be retrieved (Expo Go, some simulators): loading failures simply fall back to rules. */
 export const deviceFitsLocalModel = () =>
   Device.totalMemory === null || Device.totalMemory >= MODEL_MIN_MEMORY;
 
-/** 原生调用可能抛错、拒绝，也可能什么都不返回（没在生成时的 stopCompletion）：都不当回事。 */
+/** Native calls may throw, reject, or return nothing (when stopCompletion is not during generation): all ignored. */
 async function quietly(call: () => unknown): Promise<void> {
   try {
     await call();
   } catch {
-    // 释放的路上出错也要接着走完。
+    // Continue execution even if an error occurs during release.
   }
 }
 
-// 任何时候最多一个模型在加载或在内存里（2B 一个约 3 GB，两个会被系统杀进程）：一个一个排队，
-// 轮到下一个要等上一个释放完，包括还在加载、加载回来才知道被取消的那个（用户换附件、关开表单时会连着来）。
+// At most one model is loading or in memory at any time (one 2B model is ~3 GB, two will trigger OS
+// termination): queued sequentially, waiting for the previous model to fully release before the
+// next starts, including models still loading that discover cancellation upon completion (triggered
+// rapidly when users switch attachments or open/close forms).
 let last: Promise<void> = Promise.resolve();
 
 export function openLocalModel(store: PackStore): OpenModel {
@@ -64,11 +70,11 @@ export function openLocalModel(store: PackStore): OpenModel {
       finish();
       return null;
     }
-    // 文字识别的模型和内存池刚用完还留在内存里（大图片要 1 GB 以上），先放掉；下次识别时再加载。
+    // OCR model and memory pool remain in memory immediately after use (large images require 1+ GB), release them first; reload on next recognition.
     await quietly(() => MorphVision?.ocrUnload?.());
     let context: Awaited<ReturnType<typeof import('llama.rn').initLlama>>;
     try {
-      // 原生模块只在真的要用时才加载：Expo Go 里没有它，这里报错就退回规则。
+      // Native modules are loaded only when actually needed: absent in Expo Go, errors here fall back to rules.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { initLlama } = require('llama.rn') as typeof import('llama.rn');
       context = await initLlama({
@@ -112,7 +118,7 @@ export function openLocalModel(store: PackStore): OpenModel {
         }
       },
       release() {
-        // 还在生成时先停、等它结束再释放，否则原生那边还在用这块内存。释放完才轮到下一个。
+        // Stop generation if active and wait for completion before releasing, otherwise native side is still using this memory. Proceed to the next only after release.
         released ??= (async () => {
           await quietly(() => context.stopCompletion());
           await running;

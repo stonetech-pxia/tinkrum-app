@@ -7,7 +7,7 @@ import { type LookDefinitionOf, defineLook } from './define';
 
 const shape = {
   show: z.strictObject({ title: boundedText(1, 60) }),
-  /** 读系统表 $files（Q2）；不写 sort 是创建时间从新到旧（同今天）。 */
+  /** Reads system table $files (Q2); sorting defaults to creation time newest-first (same-day order) if omitted. */
   source: z.strictObject({
     table: z.literal(FILES_TABLE),
     filter: filterSchema().optional(),
@@ -16,7 +16,7 @@ const shape = {
   }),
 };
 
-/** 文件列表（原 fileList）：用户文件里的一类（筛选 $files 的 kind 等自动字段）。 */
+/** File list (original fileList): a category of user files (filtering automatic fields like kind in $files). */
 export const filesComponent: LookDefinitionOf<'files', typeof shape> = defineLook({
   look: 'files',
   shape,

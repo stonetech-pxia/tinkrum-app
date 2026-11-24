@@ -11,7 +11,7 @@ import { screen } from 'expo-router/testing-library';
 import type { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from './render-app';
 
-// 勾选新建（D-616）的测试用的：菜谱、食材、菜谱用料；菜谱页上用料列表下面的「添加食材」是 {do: "createAll", pick: true}。
+// For testing record creation (D-616): recipes, ingredients, and recipe items; "Add ingredient" below the item list on the recipe page is {do: "createAll", pick: true}.
 
 export const tables: Collection[] = [
   { id: 'recipes', name: '菜谱', fields: [{ id: 'name', name: '名字', type: 'text' }] },
@@ -84,7 +84,7 @@ export const seed = (locale: Locale, registry: Registry) => {
 export const put = (repo: MemoryWorkspaceRepo, id: string, collectionId: string, values: object) =>
   repo.insertRecord({ id, collectionId, values: { ...values }, createdAt: 1, updatedAt: 1 });
 
-/** 首页点菜谱 r1，在它的页面上点「添加食材」，等勾选页面读完。 */
+/** On the home screen, tap recipe r1, tap "Add ingredient" on its page, and wait for the picker page to load. */
 export async function openPicker(repo: MemoryWorkspaceRepo, locale: Locale = 'zh') {
   const { router } = await renderToolsApp(repo, undefined, { seed, locale });
   await screen.findByTestId('record-r1');

@@ -1,9 +1,10 @@
-// 视频和音频（D-140–D-143）：判断文件是不是视频 / 音频，以及「压到指定大小 / 画质」时的码率和分辨率。
-// 真正的编码在 App 的原生模块 morph-media 里，这里只有纯计算，可以在 Node 里测试。
+// Video and audio (D-140–D-143): Determining whether a file is video/audio, and calculating bitrate
+// and resolution when compressing to a specified size/quality. Actual encoding is handled by the
+// app's native morph-media module; only pure calculations reside here, allowing tests in Node.
 
 export type MediaKind = 'image' | 'pdf' | 'video' | 'audio' | 'zip' | 'other';
 
-/** 视频、音频的扩展名 → MIME 类型（选择器和分享不一定给出 MIME 类型）。 */
+/** Video/audio extension -> MIME type (selectors and shares do not always provide MIME types). */
 export const MEDIA_MIME_BY_EXT: Readonly<Record<string, string>> = {
   mp4: 'video/mp4',
   m4v: 'video/x-m4v',
@@ -25,7 +26,7 @@ export const MEDIA_MIME_BY_EXT: Readonly<Record<string, string>> = {
 
 const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif']);
 
-/** 办公文档的扩展名 → MIME 类型（D-186：Word、Excel、PowerPoint 转 PDF）。 */
+/** Office document extension -> MIME type (D-186: Word, Excel, PowerPoint to PDF). */
 export const OFFICE_MIME_BY_EXT: Readonly<Record<string, string>> = {
   doc: 'application/msword',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -33,14 +34,14 @@ export const OFFICE_MIME_BY_EXT: Readonly<Record<string, string>> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ppt: 'application/vnd.ms-powerpoint',
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  // 系统的文件选择器认 text/rtf（application/rtf 选不了），别的 App 分享过来时两种都有。
+  // System file picker recognizes text/rtf (application/rtf cannot be selected), while shares from other apps may provide either.
   rtf: 'text/rtf',
 };
 export const OFFICE_MIME_TYPES = [
   ...new Set([...Object.values(OFFICE_MIME_BY_EXT), 'application/rtf']),
 ];
 
-/** 是不是办公文档：MIME 类型认得出就看它，否则看扩展名。 */
+/** Whether it is an office document: check MIME type if recognized, otherwise check extension. */
 export function isOfficeFile(mimeType: string | null | undefined, name: string): boolean {
   const mime = (mimeType ?? '').toLowerCase();
   if (OFFICE_MIME_TYPES.includes(mime)) return true;
@@ -51,8 +52,9 @@ export function isOfficeFile(mimeType: string | null | undefined, name: string):
 const extOf = (name: string) => /\.([^./]+)$/.exec(name)?.[1]?.toLowerCase() ?? '';
 
 /**
- * 文件是哪一类：先看 MIME 类型，MIME 类型不可靠（空或 application/octet-stream）时看扩展名。
- * nameOrExt 可以是文件名，也可以只是扩展名。
+ * Determine file category: check MIME type first; if unreliable (empty or
+ * application/octet-stream), fall back to extension. nameOrExt can be a file name or just an
+ * extension.
  */
 export function mediaKindOf(mimeType: string | null | undefined, nameOrExt = ''): MediaKind {
   const mime = (mimeType ?? '').toLowerCase();
@@ -75,26 +77,26 @@ export const isVideoFile = (mimeType: string | null | undefined, nameOrExt = '')
 export const isAudioFile = (mimeType: string | null | undefined, nameOrExt = '') =>
   mediaKindOf(mimeType, nameOrExt) === 'audio';
 
-// ---- 动图 GIF（video.toGif、image.toGif，D-184）----
+// ---- Animated GIFs (video.toGif, image.toGif, D-184) ----
 
-/** 视频转 GIF 最长几秒：GIF 每一帧都是一整张图，再长就有几十 MB。 */
+/** Maximum duration for video-to-GIF conversion in seconds: each frame in a GIF is a full image, so longer durations result in tens of megabytes. */
 export const GIF_MAX_SECONDS = 30;
-/** 多张图片做成动图最多几张。 */
+/** Maximum number of images for creating an animated GIF from multiple pictures. */
 export const GIF_MAX_FRAMES = 50;
 
-// ---- 压视频（video.compress）----
+// ---- Video compression (video.compress) ----
 
 export const VIDEO_QUALITIES = ['1080p', '720p', '480p'] as const;
 export type VideoQuality = (typeof VIDEO_QUALITIES)[number];
 
-/** 画质档位：短边像素和视频码率（kbps，H.264、最高 30 帧）。 */
+/** Quality tiers: short-side pixels and video bitrate (kbps, H.264, up to 30 fps). */
 const QUALITY_TIERS: Record<VideoQuality, { shortSide: number; videoKbps: number }> = {
   '1080p': { shortSide: 1080, videoKbps: 5000 },
   '720p': { shortSide: 720, videoKbps: 2500 },
   '480p': { shortSide: 480, videoKbps: 1000 },
 };
 
-/** 按码率选短边：码率太低时分辨率也要降，否则画面全是方块。 */
+/** Select short side based on bitrate: resolution must also drop when bitrate is too low, otherwise the image becomes heavily pixelated. */
 const SIZE_LADDER: readonly { minKbps: number; shortSide: number }[] = [
   { minKbps: 4000, shortSide: 1080 },
   { minKbps: 1800, shortSide: 720 },
@@ -102,10 +104,10 @@ const SIZE_LADDER: readonly { minKbps: number; shortSide: number }[] = [
   { minKbps: 0, shortSide: 360 },
 ];
 
-/** 视频码率低于这个就看不清了：目标大小算出来更低时直接报错，不浪费时间压。 */
+/** Video bitrates below this threshold become unclear: if the target size calculates to an even lower bitrate, throw an error immediately without wasting time compressing. */
 export const MIN_VIDEO_KBPS = 150;
 
-/** 压到指定大小时留的余量：容器开销和硬件编码器的码率误差。 */
+/** Margin reserved when compressing to a target size: accounts for container overhead and hardware encoder bitrate errors. */
 export const SIZE_MARGIN = 0.92;
 
 export interface VideoSource {
@@ -114,24 +116,24 @@ export interface VideoSource {
   width?: number;
   height?: number;
   hasAudio: boolean;
-  /** 原视频的视频码率（读得到时）：不会把码率往上调。 */
+  /** Original video's video bitrate (when readable): never scales bitrate upward. */
   videoKbps?: number;
 }
 
 export interface VideoPlan {
   videoKbps: number;
-  /** 0 = 没有声音。 */
+  /** 0 = no audio. */
   audioKbps: number;
-  /** 输出的短边像素；不放大原视频。 */
+  /** Output short-side pixels; does not upscale original video. */
   shortSide: number;
   maxFps: number;
 }
 
 export type VideoCompressPlan =
   | { kind: 'encode'; plan: VideoPlan }
-  /** 原文件已经不超过目标大小：原样交给下一步。 */
+  /** Original file is already within target size: pass through to the next step as-is. */
   | { kind: 'keep' }
-  /** 目标太小：minMB 是至少要多大。 */
+  /** Target too small: minMB specifies the minimum required size. */
   | { kind: 'tooSmall'; minMB: number };
 
 const MB = 1024 * 1024;
@@ -145,11 +147,11 @@ function audioKbpsFor(totalKbps: number): number {
   return 32;
 }
 
-/** 按画质档位压：不放大，也不把码率调得比原来高。 */
+/** Compress according to quality tier: no upscaling, and never increases bitrate above the original. */
 export function planVideoQuality(source: VideoSource, quality: VideoQuality): VideoPlan {
   const tier = QUALITY_TIERS[quality];
   const shortSide = Math.min(tier.shortSide, shortSideOf(source));
-  // 原视频比这一档小时按像素比例降码率。
+  // Scale down bitrate proportionally if the original video is smaller than this tier.
   const pixelRatio = Number.isFinite(shortSide) ? (shortSide / tier.shortSide) ** 2 : 1;
   let videoKbps = Math.round(tier.videoKbps * Math.min(1, pixelRatio));
   if (source.videoKbps) videoKbps = Math.min(videoKbps, source.videoKbps);
@@ -162,8 +164,10 @@ export function planVideoQuality(source: VideoSource, quality: VideoQuality): Vi
 }
 
 /**
- * 压到不超过 targetBytes：总码率 = 目标大小 × 8 × 余量 ÷ 时长，减去声音的码率就是视频码率，
- * 再按视频码率选分辨率。factor 用于压完还超时再压一次（按超出的比例降码率）。
+ * Compress to not exceed targetBytes: total bitrate = target size × 8 × margin ÷ duration;
+ * subtracting audio bitrate yields video bitrate, and resolution is then selected based on video
+ * bitrate. factor is used to re-compress if still overtime after compression (reducing bitrate by
+ * the excess proportion).
  */
 export function planVideoSize(
   source: VideoSource,
@@ -193,12 +197,13 @@ export function planVideoSize(
   };
 }
 
-/** 转格式（video.convert）：尽量保持原画质，最高 4K、30 帧以上保留到 60 帧。 */
+/** Format conversion (video.convert): preserve original quality as much as possible, retaining up to 4K and 60 fps for sources above 30 fps. */
 export function planVideoConvert(source: VideoSource): VideoPlan {
   const shortSide = Math.min(2160, shortSideOf(source));
   const side = Number.isFinite(shortSide) ? shortSide : 1080;
-  // H.264 大约每百万像素 6 Mbps（30 帧）能保持原画质。原视频多半是更省的 HEVC，
-  // 所以上限是原码率的 1.5 倍，不会越转越大太多。
+  // H.264 requires roughly 6 Mbps per megapixels (at 30 fps) to maintain original quality.
+  // Originals are usually more efficient HEVC, so the upper limit is set to 1.5 times the original
+  // bitrate to prevent excessive bloat during conversion.
   const pixels = (side * side * 16) / 9;
   let videoKbps = Math.round((pixels / 1_000_000) * 6000);
   if (source.videoKbps) {

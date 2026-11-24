@@ -84,7 +84,7 @@ describe('mergeEdited (D-465)', () => {
     expect(p.text).toBe('Body text');
     expect(p.runs).toEqual([{ text: 'Body ' }, { text: 'text', bold: true, size: 14 }]);
     expect(p.align).toBe('center');
-    // 原来的位置留着。
+    // Original position is retained.
     expect(p.box).toEqual(doc.pages[0]!.blocks[1]!.box);
   });
 

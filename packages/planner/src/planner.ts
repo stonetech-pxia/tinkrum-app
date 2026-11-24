@@ -27,15 +27,17 @@ import {
 } from './prompt';
 import { routeRequest } from './route';
 
-// 规划器：服务端（SDK）和 App 内（HTTP，用户自带 key，Claude 或 OpenAI 兼容接口）共用同一份逻辑。
-// 模型以 JSON 文本回复 core 的 Plan 格式；回复一律经过 PlanSchema 与 prepareOps 校验，
-// 不合格时带着具体问题请求一次修正（§8：模型输出从不被直接信任）。
-// 合格的计划再跑工具检查（AGENT_PLAN §3.6）：这次新增了「工具用不了」的问题，就发回去再要一次。
-// 一轮最多 3 次模型调用（第一次、格式修正、工具补救）；这里只算不写，写入在 App 收到结果之后（底线 16）。
+// Planner: server (SDK) and in-app (HTTP, user bring-your-own-key, Claude or OpenAI-compatible
+// interface) share the same logic. The model replies with JSON text conforming to core's Plan
+// format; all replies go through PlanSchema and prepareOps validation, requesting a correction with
+// specific issues when invalid (§8: model output is never trusted directly). Validated plans then
+// run tool checks (AGENT_PLAN §3.6): if a new "tool unusable" issue is found, it is sent back to
+// request another attempt. Maximum 3 model calls per round (initial, format repair, tool remedy);
+// writing is not counted here, and is performed after the app receives the result (Invariant 16).
 
 export interface PlannerMessage {
   role: 'user' | 'assistant';
-  /** 字符串，或模型上一轮返回的原始内容块（修正重试时原样追加）。 */
+  /** String, or the raw content blocks returned by the model in the previous round (appended as-is during correction retries). */
   content: string | unknown[];
 }
 
@@ -47,18 +49,19 @@ export interface Usage {
 }
 
 export interface Completion {
-  /** 回复中的文字部分。 */
+  /** Text portion of the reply. */
   text: string;
   stopReason: string | null;
-  /** 模型返回的完整内容块。 */
+  /** Complete content blocks returned by the model. */
   content: unknown[];
   model: string;
   usage: Usage;
 }
 
 /**
- * 一次模型调用。传输方式（SDK、HTTP、测试替身）由调用方提供。system 是这次用的系统提示词
- * （按需加载时只含路由挑出的部分）；不给时传输层用完整的提示词。
+ * A single model call. The transport method (SDK, HTTP, test double) is provided by the caller.
+ * system is the system prompt used for this call (loaded on demand to contain only the parts
+ * selected by routing); when omitted, the transport layer uses the complete prompt.
  */
 export type Complete = (messages: PlannerMessage[], system?: string) => Promise<Completion>;
 
@@ -68,26 +71,28 @@ export interface PlannerOptions {
   complete: Complete;
   registry: Registry;
   now: () => Date;
-  /** 回复不合格时，带着问题清单再请求的次数。 */
+  /** Number of requests with the issue list when the reply is invalid. */
   maxRepairs?: number;
   onCompletion?: (completion: Completion) => void;
   /**
-   * 提示词按需加载（route.ts）：默认关（创始人 2026-10-31），每次都发完整的提示词；true 时按路由只发需要的部分。
-   * onRoute 报告每次请求用的路由（评测统计用）。
+   * On-demand prompt loading (route.ts): off by default (founder, 2026-10-31), sending the full
+   * prompt every time; when true, sends only the required parts based on routing. onRoute reports
+   * the route used for each request (used for evaluation statistics).
    */
   route?: boolean;
   onRoute?: (route: PromptRoute) => void;
 }
 
-/** 工具检查的补救次数。 */
+/** Maximum remedy attempts for tool checks. */
 const MAX_TOOL_REPAIRS = 1;
 
 const refusalMessage = (locale: 'en' | 'zh' | 'fr') =>
   t(locale, 'planner_This_request_can_t_be_handled_Try_desc_04270');
 
 /**
- * 从回复文字中取出 JSON（容忍模型偶尔加上的代码块标记）。
- * 非 Claude 模型常在 JSON 前后加一句话，整段解析失败时再试第一个 { 到最后一个 } 之间的部分。
+ * Extract JSON from reply text (tolerant of code block markers occasionally added by models).
+ * Non-Claude models often wrap JSON with extra text; if full-text parsing fails, retries parsing
+ * the substring between the first { and the last }.
  */
 export function parseJson(
   text: string,
@@ -106,7 +111,7 @@ export function parseJson(
     try {
       return { ok: true, value: JSON.parse(candidate) };
     } catch {
-      // 试下一个
+      // Try the next one
     }
   }
   return { ok: false, issue: 'the reply was not a single valid JSON object' };
@@ -121,8 +126,10 @@ function isNeedMore(value: unknown): boolean {
 type OpsPlan = Extract<Plan, { kind: 'ops' }>;
 
 /**
- * 这个计划新增的严重问题：只看比改之前多出来的 blocker，加上用户说的数和词没落到参数上的。
- * 按个数比：同一个地方多了一个（又一个必填字段没人填）也算新增；原来就有的、只是换了说法的不算。
+ * Severe issues newly introduced by this plan: counts only additional blockers compared to before
+ * the change, plus counts and terms from the user utterance not mapped to parameters. By count
+ * comparison: adding one more issue in the same place (another required field left unfilled)
+ * counts as new; pre-existing issues merely rephrased do not count.
  */
 function newToolIssues(
   input: string,
@@ -131,7 +138,7 @@ function newToolIssues(
   after: WorkspaceConfig,
   plan: OpsPlan,
   registry: Registry,
-  /** 这是搭建计划的一步，后面还有步骤：页面可能在后面（和 next 一样，规则 53）。 */
+  /** moreSteps: boolean, indicating this is a step of a building plan with subsequent steps to follow: pages may appear later (same as next, rule 53). */
   moreSteps: boolean,
 ): ToolIssue[] {
   const keyOf = (i: ToolIssue) => `${i.code}|${i.target}`;
@@ -159,7 +166,7 @@ function newToolIssues(
   return [...added, ...checkRequestParams(input, locale, before, after)];
 }
 
-/** 补救后还有问题：计划照样返回（只提醒不拒绝，底线 19），在 notes 里用用户的语言说一句。notes 最多 4 条。 */
+/** Issues remaining after remedies: plan is still returned (reminders only, no refusal per Invariant 19), with a note in the user's language. Maximum 4 notes. */
 function withToolNotes(plan: OpsPlan, issues: readonly ToolIssue[], locale: Locale): OpsPlan {
   if (issues.length === 0) return plan;
   const ours = [
@@ -170,8 +177,10 @@ function withToolNotes(plan: OpsPlan, issues: readonly ToolIssue[], locale: Loca
 }
 
 /**
- * 发回给模型的旧回复只留文字：修正时中间的回复已经换过，思考块和上下文对不上，API 可能拒绝。
- * 模型没有写字时放一个占位：/v1/complete 和 Claude API 都不收空内容。
+ * Old replies sent back to the model retain only text: intermediate replies during corrections
+ * have changed, thinking blocks and context mismatch, and the API might reject them. When the
+ * model writes nothing, inserts a placeholder: both /v1/complete and the Claude API reject empty
+ * content.
  */
 function replayableReply(completion: Completion): unknown[] {
   const texts = completion.content.flatMap((block) => {
@@ -190,7 +199,7 @@ export function createClaudePlanner(options: PlannerOptions): AIProvider {
       const first: PlannerMessage = {
         role: 'user',
         content: buildUserMessage(
-          // 在 app 里：模型只看到这个 app 的部分（D-485），改动在完整配置上执行并检查范围。
+          // In-app: the model sees only a portion of this app (D-485), and changes are executed and scope-checked against the complete configuration.
           ctx.scope
             ? scopedViewForAI(redactForAI(ctx.config, ctx.registry), ctx.scope.appId)
             : redactForAI(ctx.config, ctx.registry),
@@ -205,7 +214,7 @@ export function createClaudePlanner(options: PlannerOptions): AIProvider {
             : undefined,
         ),
       };
-      // 永远是 1 条或 3 条（用户、最新回复、最新修正）：服务器 /v1/complete 只收这两种。
+      // Always 1 or 3 items (user message, latest reply, latest correction): server /v1/complete accepts only these two structures.
       let messages: PlannerMessage[] = [first];
       let route: PromptRoute =
         options.route !== true
@@ -218,7 +227,7 @@ export function createClaudePlanner(options: PlannerOptions): AIProvider {
             });
       let repairs = 0;
       let toolRepairs = 0;
-      /** 目前最好的合法计划：补救失败（不合法、拒绝、出错）时退回它，不把能用的结果变成失败。 */
+      /** Currently best valid plan: fallback to this when remedies fail (invalid, refused, error), avoiding turning a usable result into a failure. */
       let best: { plan: OpsPlan; issues: ToolIssue[] } | null = null;
       const settle = (b: NonNullable<typeof best>) => withToolNotes(b.plan, b.issues, ctx.locale);
       for (;;) {
@@ -245,12 +254,12 @@ export function createClaudePlanner(options: PlannerOptions): AIProvider {
 
         let issues: string[];
         const json = parseJson(completion.text);
-        // 省掉的部分模型要用（needMore）：换成完整的提示词，同一句再问一次，不算修正次数。
+        // Model requests parts that were omitted (needMore): switches to the full prompt and re-asks the same sentence, without counting towards correction limits.
         if (route !== 'full' && json.ok && isNeedMore(json.value)) {
           route = 'full';
           continue;
         }
-        // 预设的简写 addTool {tool: {preset, params?}} 先展开成完整的快捷操作（D-259）。
+        // Preset shorthand addTool ({tool: {preset, params?}}) is first expanded into full quick actions (D-259).
         const expanded = json.ok ? expandPresetWorkflows(json.value, ctx.config, ctx.locale) : null;
         const parsed =
           expanded && !expanded.issues.length ? PlanSchema.safeParse(expanded.value) : null;
@@ -263,7 +272,7 @@ export function createClaudePlanner(options: PlannerOptions): AIProvider {
         } else {
           const plan = parsed!.data;
           if (plan.kind === 'build' && ctx.session?.step) {
-            // 已经在做计划的一步了，不能再出一份计划（规则 53）。
+            // Already executing a plan step, cannot generate another plan (rule 53).
             if (best) return settle(best);
             if (repairs >= maxRepairs)
               throw new AIOutputError('unusable model reply: a plan inside a step');
@@ -299,7 +308,7 @@ export function createClaudePlanner(options: PlannerOptions): AIProvider {
               options.registry,
               (ctx.session?.step?.remaining ?? 0) > 0,
             );
-            // 补救后问题没变少就留着之前那个；一样多用新的（模型看过问题了）。
+            // If issues do not decrease after remedy, keep the previous one; if equal in count, use the new one (model has reviewed the issues).
             if (!best || found.length <= best.issues.length) best = { plan, issues: found };
             if (best.issues.length === 0) return best.plan;
             if (toolRepairs >= MAX_TOOL_REPAIRS) return settle(best);
@@ -316,7 +325,7 @@ export function createClaudePlanner(options: PlannerOptions): AIProvider {
             continue;
           }
           issues = prepared.issues;
-          // 修正次数用完时原样返回，由 App 端校验拦截并向用户说明。
+          // Returns as-is when correction attempts are exhausted; app-level validation intercepts and explains it to the user.
           if (!best && repairs >= maxRepairs) return plan;
         }
         if (best) return settle(best);
@@ -329,7 +338,7 @@ export function createClaudePlanner(options: PlannerOptions): AIProvider {
           { role: 'assistant', content: replayableReply(completion) },
           { role: 'user', content: buildRepairMessage(issues) },
         ];
-        // 修正时用完整的提示词：省掉的部分里可能正好有要改对的写法。
+        // Use complete prompts during correction: omitted parts might contain the correct syntax needed for the fix.
         route = 'full';
       }
     },

@@ -3,12 +3,15 @@ import CryptoKit
 import ExpoModulesCore
 import Speech
 
-// 语音转文字（D-150）：只用 iOS 自带的 Speech 框架，全部在本机识别。
-// iOS 26 起用 SpeechAnalyzer：优先 SpeechTranscriber（长录音更准、更快）；这台设备没有它（模拟器上
-// isAvailable 是 false）或它不支持这种语言（俄语、越南语）时用 DictationTranscriber（系统听写的模型，
-// 语言更多）。识别模型由系统管理、所有 App 共用。更早的系统退回 SFSpeechRecognizer，并要求只在本机识别
+// Speech-to-text (D-150): uses only Apple's built-in Speech framework, with all recognition
+// performed on-device. Starting from iOS 26, uses SpeechAnalyzer: prefers SpeechTranscriber (more
+// accurate and faster for long recordings); falls back to DictationTranscriber (system dictation
+// model, supports more languages) when unavailable on the device (isAvailable is false on
+// simulators) or unsupported for the language (Russian, Vietnamese). Recognition models are managed
+// by the system and shared across all apps. Older systems fall back to SFSpeechRecognizer and
+// require on-device-only recognition.
 // （requiresOnDeviceRecognition）。
-// 识别出的文字只返回给 App，不写日志。
+// Recognized text is returned only to the app and is not logged.
 
 private func speechError(_ code: String, _ reason: String) -> Exception {
   Exception(name: "SpeechError", description: reason, code: code)
@@ -39,7 +42,7 @@ struct TranscribeOptions: Record {
 }
 
 public class MorphSpeechModule: Module {
-  /** 正在进行的识别，取消用（用 lock 保护）。 */
+  /** Ongoing transcriptions for cancellation (protected by a lock). */
   private var running: [String: Task<[String: Any], Error>] = [:]
   private let lock = NSLock()
 
@@ -92,7 +95,7 @@ public class MorphSpeechModule: Module {
   private static func languageStatus(_ language: String) async -> String {
     if #available(iOS 26.0, *), let module = await analyzerModule(language) {
       var status = await AssetInventory.status(forModules: [module])
-      // 模型已经在手机上（别的 App 或系统听写下载过）时，占一个名额就能用，不用再问用户下载（占名额不联网）。
+      // When the recognition model is already on the phone (downloaded by another app or system dictation), acquiring a slot allows using it immediately without prompting the user to download (slot acquisition is offline).
       if status == .supported, let locale = (module as? any LocaleDependentSpeechModule)?.selectedLocales.first,
         (try? await AssetInventory.reserve(locale: locale)) == true
       {
@@ -104,14 +107,14 @@ public class MorphSpeechModule: Module {
       default: return "unsupported"
       }
     }
-    // iOS 26 以前，或 SpeechAnalyzer 不支持的语言：看旧接口能不能在本机识别。
+    // Before iOS 26, or for languages unsupported by SpeechAnalyzer: check if the legacy API can perform on-device recognition.
     return legacyRecognizer(language) == nil ? "unsupported" : "installed"
   }
 
   private func prepareLanguage(_ language: String, taskId: String) async throws {
     guard #available(iOS 26.0, *) else { return }
     guard let module = await Self.analyzerModule(language) else { return }
-    // 先占一个语言名额（系统限制每个 App 同时保留几种语言），不然状态一直是 supported。
+    // Acquire a language slot first (the system limits the number of concurrent languages each app can retain), otherwise status remains supported.
     if let locale = (module as? any LocaleDependentSpeechModule)?.selectedLocales.first {
       _ = try? await AssetInventory.reserve(locale: locale)
     }
@@ -163,7 +166,7 @@ public class MorphSpeechModule: Module {
     task?.cancel()
   }
 
-  // 边读边算 SHA-256，一次 4 MB。
+  // Computes SHA-256 while reading, 4 MB at a time.
   private static func sha256(_ uri: URL) throws -> String {
     let handle = try FileHandle(forReadingFrom: uri)
     defer { try? handle.close() }
@@ -180,9 +183,9 @@ public class MorphSpeechModule: Module {
     lock.unlock()
   }
 
-  // MARK: - iOS 26 起：SpeechAnalyzer
+  // MARK: - Starting from iOS 26: SpeechAnalyzer
 
-  /** 这种语言用哪个 SpeechAnalyzer 模块；都不支持时为 nil。 */
+  /** Which SpeechAnalyzer module to use for this language; nil if none support it. */
   @available(iOS 26.0, *)
   private static func analyzerModule(_ language: String) async -> (any SpeechModule)? {
     let wanted = Locale(identifier: language)
@@ -202,7 +205,7 @@ public class MorphSpeechModule: Module {
   private static func analyze(
     file: AVAudioFile, module: any SpeechModule, language: String, progress: @escaping (Double) -> Void
   ) async throws -> [[String: Any]] {
-    // 识别模型由系统下载（prepareLanguage）；这里不偷偷下载（D-064：下载要用户确认）。
+    // Ensure recognition model is downloaded by the system (prepareLanguage); does not download stealthily here (D-064: downloads require user confirmation).
     guard await AssetInventory.status(forModules: [module]) == .installed else {
       throw needsDownload(language)
     }
@@ -224,9 +227,11 @@ public class MorphSpeechModule: Module {
       }
       return segments
     }
-    // analyzeSequence(from: file) 不转换格式（模拟器上 DictationTranscriber 报「Audio format is not supported」），
-    // 所以自己一块一块读出来，转成识别器要的格式再喂进去。
-    // 没有能用的格式时不能硬喂（会在系统里崩溃）：模拟器上就是这样，模型「已安装」但一种格式也没有。
+    // analyzeSequence(from: file) does not convert formats (DictationTranscriber throws 'Audio
+    // format is not supported' on simulators), so we read it chunk by chunk ourselves and convert
+    // it to the format required by the recognizer before feeding it in. Cannot force-feed when no
+    // usable format is available (causes system crashes): this happens on simulators where models
+    // are 'installed' but no audio formats are available.
     guard
       let format = await SpeechAnalyzer.bestAvailableAudioFormat(
         compatibleWith: [module], considering: file.processingFormat)
@@ -250,7 +255,7 @@ public class MorphSpeechModule: Module {
     }
   }
 
-  /** 把文件按 1 秒一块读出来、转成 format，作为识别器的输入。 */
+  /** Read the file in 1-second chunks, convert to format, and use as input for the recognizer. */
   @available(iOS 26.0, *)
   private static func audioInput(file: AVAudioFile, format: AVAudioFormat) throws -> AsyncThrowingStream<
     AnalyzerInput, Error
@@ -297,7 +302,7 @@ public class MorphSpeechModule: Module {
     }
   }
 
-  // MARK: - 更早的系统：SFSpeechRecognizer，只在本机识别
+  // MARK: - Earlier system: SFSpeechRecognizer, performs on-device recognition only
 
   private static func legacyRecognizer(_ language: String) -> SFSpeechRecognizer? {
     guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: language)),
@@ -339,7 +344,7 @@ public class MorphSpeechModule: Module {
             let end = words.last.map { ($0.timestamp + $0.duration) * 1000 } ?? start
             if result.isFinal {
               if timed {
-                // 使用系统实际的词时间戳，不把整段录音伪装成一个字幕。
+                // Use the system's actual word timestamps instead of disguising the entire recording as a single subtitle.
                 for word in words {
                   segments.append(["startMs": word.timestamp*1000, "endMs": (word.timestamp+word.duration)*1000, "text": word.substring])
                 }
@@ -355,14 +360,14 @@ public class MorphSpeechModule: Module {
           }
           if let error {
             finished = true
-            // 没有听到任何话时系统报错（kAFAssistantErrorDomain 1110），当成空结果。
+            // System error when nothing is heard (kAFAssistantErrorDomain 1110), treated as an empty result.
             let ns = error as NSError
             if ns.code == 1110 || ns.code == 203 {
               cont.resume(returning: segments)
             } else if box.cancelled {
               cont.resume(throwing: CancellationError())
             } else {
-              // 文件前面已经用 AVAudioFile 打开过，这里的失败是识别器的（模拟器上是「Failed to initialize recognizer」）。
+              // The file was already opened with AVAudioFile earlier; the failure here originates from the recognizer (shows as "Failed to initialize recognizer" on the simulator).
               cont.resume(throwing: speechError("ERR_SPEECH_UNAVAILABLE", error.localizedDescription))
             }
           }

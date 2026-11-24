@@ -2,9 +2,12 @@ import type { Registry } from '../registry';
 import type { IconName } from '../schema';
 import type { ActionDefinition } from '../workflow/contract';
 
-// 房间工具栏的图标（D-364）：一个工具（例如「图片处理」）有很多动作，用工具的图标时一整排都一样。
-// 这里按动作给图标：先看完整的动作 ID，再看动作名（点后面那段，旋转、压缩这类各工具通用），都没有时用工具的图标。
-// 这些图标只在房间里用，不在 ICON_NAMES（配置和 AI 能写的白名单）里，AI 改不了也看不到。
+// Icons for desk toolbars (D-364): a tool (such as "Image Processing") has many actions, and using
+// the tool icon makes the entire row identical. Icons are assigned by action here: first check the
+// full action ID, then the action verb (the part after the dot, such as rotate or compress, which
+// are shared across tools); fall back to the tool icon if neither matches. These icons are only
+// used on the desk and are not part of ICON_NAMES (the whitelist writable by config and AI), so the
+// AI cannot change or see them.
 
 export const TOOL_ICON_NAMES = [
   'rotate',
@@ -53,7 +56,7 @@ export const TOOL_ICON_NAMES = [
 export type ToolIconName = (typeof TOOL_ICON_NAMES)[number];
 export type DeskIcon = IconName | ToolIconName;
 
-/** 完整的动作 ID（动作名在不同工具里意思不一样的）。 */
+/** Full action ID (action names may have different meanings across tools). */
 const BY_ID: Readonly<Record<string, DeskIcon>> = {
   'image.idPhoto': 'person',
   'image.printSheet': 'printer',
@@ -75,7 +78,7 @@ const BY_ID: Readonly<Record<string, DeskIcon>> = {
   'audio.transcribe': 'note',
 };
 
-/** 动作名（点后面那段）：同一种操作在图片、PDF、视频、音频里用同一个图标。 */
+/** Action verb (the part after the dot): the same operation uses the same icon across images, PDFs, videos, and audio. */
 const BY_VERB: Readonly<Record<string, DeskIcon>> = {
   rotate: 'rotate',
   crop: 'crop',
@@ -106,7 +109,7 @@ const BY_VERB: Readonly<Record<string, DeskIcon>> = {
   subtitles: 'captions',
 };
 
-/** 同一个动作的不同起手工具（标注 PDF 的插入文字、注释、画笔……）各用各的图标。 */
+/** Different starting tools for the same action (e.g., PDF annotation tools for inserting text, comments, brushes) each use their own respective icon. */
 const BY_PRESET: Readonly<Record<string, DeskIcon>> = {
   'pdf.annotate:text': 'textbox',
   'pdf.annotate:note': 'sticky',
@@ -117,7 +120,7 @@ const BY_PRESET: Readonly<Record<string, DeskIcon>> = {
   'pdf.annotate:mosaic': 'mosaic',
 };
 
-/** 工具栏上一个动作的图标（带起手工具时先看起手工具）。 */
+/** Icon for an action on the toolbar (checks starting tools first when applicable). */
 export function deskToolIcon(
   action: ActionDefinition,
   registry: Registry,

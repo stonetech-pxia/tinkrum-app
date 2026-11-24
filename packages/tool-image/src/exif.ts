@@ -1,5 +1,5 @@
-// JPEG 元数据：读取拍摄时间/方向/是否含位置，以及无损去除元数据。
-// 只用 Uint8Array / DataView，手工解码 ASCII，Hermes 上可直接运行。
+// JPEG metadata: read capture time/orientation/has location, and strip metadata losslessly. Uses
+// only Uint8Array / DataView, manually decodes ASCII, runs directly on Hermes.
 
 export type ImageErrorCode = 'notJpeg' | 'malformed';
 
@@ -10,19 +10,19 @@ export class ImageError extends Error {
 }
 
 export interface ExifInfo {
-  /** DateTimeOriginal，没有时用 DateTime；EXIF 不带时区，按本地时间解释。 */
+  /** DateTimeOriginal; falls back to DateTime if absent. EXIF lacks timezone information, interpreted in local time. */
   takenAt: Date | null;
-  /** 1–8，见 EXIF Orientation 定义。 */
+  /** 1-8, see EXIF Orientation definition. */
   orientation: number | null;
-  /** 含 GPS 坐标（GPS IFD 无法解析时也视为含位置）。 */
+  /** Contains GPS coordinates (also considered to have location if GPS IFD cannot be parsed). */
   hasLocation: boolean;
 }
 
 interface Segment {
   marker: number;
-  /** 段起点（含前面的填充 0xFF）。 */
+  /** Segment start (including preceding 0xFF padding). */
   start: number;
-  /** 段数据起点（长度字段之后）。 */
+  /** Segment data start (after length field). */
   data: number;
   end: number;
 }
@@ -38,7 +38,7 @@ function byteAt(bytes: Uint8Array, i: number): number {
   return b;
 }
 
-/** 手工按 ASCII 解码，遇到 NUL 停止。 */
+/** Manually decode as ASCII, stopping upon encountering NUL. */
 function ascii(bytes: Uint8Array, start: number, length: number): string {
   let s = '';
   for (let i = start; i < start + length && i < bytes.length; i++) {
@@ -57,7 +57,7 @@ function startsWith(bytes: Uint8Array, at: number, end: number, prefix: string):
   return true;
 }
 
-/** 列出扫描数据（SOS）之前的所有段。 */
+/** List all segments before start of scan (SOS). */
 function readSegments(bytes: Uint8Array): { segments: Segment[]; scanStart: number } {
   if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new ImageError('notJpeg');
   const segments: Segment[] = [];
@@ -65,11 +65,11 @@ function readSegments(bytes: Uint8Array): { segments: Segment[]; scanStart: numb
   for (;;) {
     if (byteAt(bytes, i) !== 0xff) throw new ImageError('malformed');
     let j = i;
-    while (byteAt(bytes, j + 1) === 0xff) j++; // 段前允许多个填充 0xFF
+    while (byteAt(bytes, j + 1) === 0xff) j++; // Multiple 0xFF padding bytes allowed before segment
     const marker = byteAt(bytes, j + 1);
     if (marker === SOS || marker === EOI) return { segments, scanStart: i };
     if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
-      segments.push({ marker, start: i, data: j + 2, end: j + 2 }); // 无长度字段的标记
+      segments.push({ marker, start: i, data: j + 2, end: j + 2 }); // Markers without length field
       i = j + 2;
       continue;
     }
@@ -84,7 +84,7 @@ function readSegments(bytes: Uint8Array): { segments: Segment[]; scanStart: numb
 interface Entry {
   type: number;
   count: number;
-  /** 值或值偏移所在位置（相对 TIFF 头）。 */
+  /** Position of value or value offset (relative to TIFF header). */
   at: number;
 }
 
@@ -112,7 +112,7 @@ function attempt<T>(fn: () => T): T | undefined {
   }
 }
 
-/** 解析 TIFF 结构（APP1 中 "Exif\0\0" 之后），两种字节序都支持；损坏处跳过。 */
+/** Parse TIFF structure (after "Exif\0\0" in APP1), supporting both byte orders; skips corrupted parts. */
 function parseTiff(bytes: Uint8Array, start: number, end: number): ExifInfo {
   const info: ExifInfo = { takenAt: null, orientation: null, hasLocation: false };
   const view = new DataView(bytes.buffer, bytes.byteOffset + start, end - start);
@@ -157,13 +157,13 @@ function parseTiff(bytes: Uint8Array, start: number, end: number): ExifInfo {
   const gpsPtr = ifd0.get(0x8825);
   if (gpsPtr) {
     const gps = attempt(() => readIfd(u32(gpsPtr.at)));
-    // 只写了版本号的 GPS IFD 不算位置；解析失败时保守地认为有。
+    // GPS IFD with only version number does not count as a location; conservatively assumes present when parsing fails.
     info.hasLocation = gps ? gps.has(0x0002) || gps.has(0x0004) : true;
   }
   return info;
 }
 
-/** 读取 JPEG 的拍摄时间、方向和位置标记。非 JPEG 或没有 EXIF 时返回空结果，不抛错。 */
+/** Read JPEG capture time, orientation, and location markers. Returns empty result instead of throwing on non-JPEG or missing EXIF. */
 export function readExif(bytes: Uint8Array): ExifInfo {
   const empty: ExifInfo = { takenAt: null, orientation: null, hasLocation: false };
   const parsed = attempt(() => readSegments(bytes));
@@ -188,9 +188,10 @@ function segmentName(bytes: Uint8Array, seg: Segment): string {
 }
 
 /**
- * 无损去除 APP1（EXIF、XMP）和 APP13（Photoshop/IPTC）段，保留 JFIF（APP0）、
- * ICC（APP2）等其他段和图像数据。去掉 EXIF 也会去掉方向标记，
- * 调用方必须先把方向"烧"进像素（例如先用 expo-image-manipulator 旋转一次）。
+ * Losslessly strip APP1 (EXIF, XMP) and APP13 (Photoshop/IPTC) segments while keeping JFIF
+ * (APP0), ICC (APP2), and other segments and image data. Removing EXIF also removes the
+ * orientation flag, so the caller must "burn" the orientation into pixels first (e.g., rotate
+ * once using expo-image-manipulator).
  */
 export function stripJpegMetadata(bytes: Uint8Array): { bytes: Uint8Array; removed: string[] } {
   const { segments, scanStart } = readSegments(bytes);

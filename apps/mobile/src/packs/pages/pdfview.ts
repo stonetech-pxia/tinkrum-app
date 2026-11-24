@@ -1,9 +1,10 @@
 import { packPage, PDFJS_POLYFILLS } from './common';
 import { PDF_GRAPHICS_SCRIPT } from './pdf-graphics';
 
-// PDF 预览包页面：pdf.js（legacy ESM 版本）从 blob: 地址加载，worker 失败时 pdf.js 自己退回主线程。
-// cmap、字体和解码器通过 BinaryDataFactory 按需向 App 要（只送这个文件用到的）。
-// 只渲染和读文字：不加载 pdf.sandbox，不执行 PDF 里的脚本，不传 url（N3）。
+// PDF preview pack page: pdf.js (legacy ESM version) loaded from blob: URL; if worker fails, pdf.js
+// falls back to the main thread itself. Cmap, fonts, and decoders are requested on demand from the
+// App via BinaryDataFactory (only requesting those used by this file). Renders and reads text only:
+// does not load pdf.sandbox, does not execute PDF scripts, does not pass url (N3).
 
 const SCRIPT = String.raw`
 const POLY = ${JSON.stringify(PDFJS_POLYFILLS)} + '\n';
@@ -38,11 +39,11 @@ async function open(file) {
     verbosity: 0,
   });
   const doc = await task.promise;
-  // 关闭文档并结束 worker（6.x 里关闭在加载任务上）。
+  // Close document and terminate worker (closing is on the loading task in 6.x).
   doc.close = () => task.destroy().catch(() => undefined);
   return doc;
 }
-// iOS WebView 的 canvas 上限约 1677 万像素。
+// iOS WebView canvas upper limit is approximately 16.77 million pixels.
 const MAX_PIXELS = 16000000;
 async function renderList(doc, list, maxSide, quality) {
   const out = [];
@@ -82,7 +83,7 @@ handlers.render = async ({ file, pages, maxSide, quality }) => {
     await doc.close();
   }
 };
-// 文件房间的大预览（D-360）：一次只画要看的几页，同时告诉 App 一共几页。
+// Large previews for file rooms (D-360): render only the pages to be viewed at a time, while informing the App of the total page count.
 handlers.preview = async ({ file, pages, maxSide, quality }) => {
   const doc = await open(file);
   try {
@@ -114,8 +115,9 @@ handlers.text = async ({ file }) => {
     await doc.close();
   }
 };
-// 新记录表单的候选值（D-394）：前几页文字层的每一段和它的位置（点，左上角为原点），
-// App 按竖直重叠分排；扫描件没有文字层时 lines 是空的。
+// Candidate values for new record forms (D-394): each paragraph of the text layer in the first few
+// pages and its position (points, origin at top-left), ordered by the App using vertical overlap;
+// lines is empty when scans lack a text layer.
 handlers.lines = async ({ file, pages }) => {
   const doc = await open(file);
   try {

@@ -4,20 +4,23 @@ import { Image, Pressable, StyleSheet, type ImageSourcePropType } from 'react-na
 import { Icon } from './Icon';
 import type { Palette } from './theme';
 
-/** 首页图标按钮用的线条图（D-449）：单色 PNG，按主题染色（和 Tink 的小锤子一样）。 */
+/** Line art used for home screen icon buttons (D-449): monochrome PNG, tinted by theme (same as Tink's hammer). */
 const GLYPHS = {
   scan: require('../../assets/images/scan-outline.png') as ImageSourcePropType,
   folderOpen: require('../../assets/images/folder-open-outline.png') as ImageSourcePropType,
 };
 export type IconButtonGlyph = keyof typeof GLYPHS;
 
-/** 配置里的图标在这种按钮上换成线条图：扫描用扫描框。 */
+/** Configured icon names replaced with line art on such buttons: scan uses a scan frame. */
 const GLYPH_OF: Partial<Record<string, IconButtonGlyph>> = { scan: 'scan' };
 
 /**
- * 只有图标的方形按钮（D-449）：新用户首页的「扫描」「打开文件」。和设置页的图标底同一个形状
- * （三个大圆角、左下角小圆角，跟着主题的圆角缩放），白底、主色线条图标；
- * 比格子小一圈：靠边那一列贴着页面边距（和下面的卡片、标题对齐，D-454），两个按钮之间留出空。字不显示，但读屏会读出 label。
+ * Square buttons with icons only (D-449): "Scan", "Open file" on new user home screen. Shares the
+ * same icon background shape as settings page (three large rounded corners, small bottom-left
+ * corner rounded, scaling with theme corner radius), white background, primary-colored line
+ * icons; slightly smaller than grid cells: edge columns hug page margins (aligned with cards and
+ * titles below, D-454), with spacing between buttons. Text is hidden, but screen readers read the
+ * label.
  */
 export function IconButton({
   palette,
@@ -31,7 +34,7 @@ export function IconButton({
   column,
 }: {
   palette: Palette;
-  /** 配置里的图标名；glyph 给了就用线条图。 */
+  /** Icon name in config; uses line art if glyph is provided. */
   icon: IconValue;
   glyph?: IconButtonGlyph;
   label: string;
@@ -39,7 +42,7 @@ export function IconButton({
   onLongPress?: (() => void) | undefined;
   disabled?: boolean;
   testID: string;
-  /** 在网格的第几列：第一列靠左、最后一列靠右、中间居中。 */
+  /** Column index in grid: left-aligned for first column, right-aligned for last column, centered for middle columns. */
   column?: { index: number; of: number } | undefined;
 }) {
   const shown = glyph ?? (typeof icon === 'string' ? GLYPH_OF[icon] : undefined);

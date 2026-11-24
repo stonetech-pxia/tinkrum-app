@@ -22,14 +22,14 @@ import {
 import type { Collection, NewComponent } from './schema';
 import { registry } from './test-helpers';
 
-// 日程（D-292–D-296）。夏令时的用例按巴黎时间算。
+// Schedules (D-292–D-296). Daylight saving time test cases are calculated in Paris time.
 process.env.TZ = 'Europe/Paris';
 
 const d = (s: string) => dayNumber(s)!;
 const date = (n: number) => new Date(n * 86_400_000).toISOString().slice(0, 10);
 const sunday: Calendar = { ...DEFAULT_CALENDAR, weekStart: 'sunday' };
 
-/** 规则在 today 那天的「下一次」（日期）、今天该不该做、过期几天。 */
+/** The rule's "next occurrence" date on today, whether it is due today, and how many days overdue. */
 function status(rule: ScheduleRule, done: string[], today: string, cal = DEFAULT_CALENDAR) {
   const s = scheduleStatus(rule, done.map(d), d(today), cal);
   return {
@@ -40,7 +40,7 @@ function status(rule: ScheduleRule, done: string[], today: string, cal = DEFAULT
 }
 
 describe('schedule rules without a last-done source', () => {
-  // 2026-10-22 是星期四。
+  // 2026-10-22 is Thursday.
   it('every day is due today', () => {
     expect(status({ repeat: 'daily' }, [], '2026-10-22')).toEqual({
       next: '2026-10-22',
@@ -53,9 +53,9 @@ describe('schedule rules without a last-done source', () => {
     const mwf: ScheduleRule = { repeat: 'weekdays', days: [1, 3, 5] };
     expect(status(mwf, [], '2026-10-22')).toEqual({ next: '2026-10-23', due: false, overdue: 0 });
     expect(status(mwf, [], '2026-10-23').due).toBe(true);
-    // 周六 → 下周一。
+    // Saturday → next Monday.
     expect(status(mwf, [], '2026-10-24').next).toBe('2026-10-26');
-    // 周日（7）。
+    // Sunday (7).
     expect(status({ repeat: 'weekdays', days: [7] }, [], '2026-10-22').next).toBe('2026-10-25');
   });
 
@@ -65,7 +65,7 @@ describe('schedule rules without a last-done source', () => {
     expect(status(on31, [], '2028-02-10').next).toBe('2028-02-29');
     expect(status(on31, [], '2026-04-05').next).toBe('2026-04-30');
     expect(status(on31, [], '2026-05-01').next).toBe('2026-05-31');
-    // 30 号在 2 月也落在月底。
+    // Day 30 in February lands on the last day of the month.
     expect(status({ repeat: 'monthDays', days: [30] }, [], '2026-02-01').next).toBe('2026-02-28');
   });
 
@@ -116,11 +116,11 @@ describe('schedule rules with the days it was done', () => {
       due: false,
       overdue: 0,
     });
-    // 跨月、跨年。
+    // Cross-month and cross-year.
     expect(status({ repeat: 'interval', every: 60 }, ['2026-12-15'], '2026-12-20').next).toBe(
       '2027-02-13',
     );
-    // 今天以后的不算（例如填错的日期）。
+    // Dates after today are ignored (e.g., incorrectly entered dates).
     expect(status(weekly, ['2026-10-15', '2026-11-30'], '2026-10-22').next).toBe('2026-10-22');
   });
 
@@ -142,7 +142,7 @@ describe('schedule rules with the days it was done', () => {
       due: true,
       overdue: 1,
     });
-    // 订阅每月 31 号扣费，上次 1 月 31 日 → 2 月 28 日（跨月到月底）。
+    // Subscription billed on the 31st of every month, last time January 31 → February 28 (rolls over to end of month).
     expect(status({ repeat: 'monthDays', days: [31] }, ['2026-01-31'], '2026-02-01').next).toBe(
       '2026-02-28',
     );
@@ -150,33 +150,33 @@ describe('schedule rules with the days it was done', () => {
 
   it('3 times a week with 2 done this week is still due today', () => {
     const three: ScheduleRule = { repeat: 'times', per: 'week', count: 3 };
-    // 2026-10-19 是周一。
+    // 2026-10-19 is a Monday.
     expect(status(three, ['2026-10-19', '2026-10-20'], '2026-10-22')).toEqual({
       next: '2026-10-22',
       due: true,
       overdue: 0,
     });
-    // 今天做过了 → 明天。
+    // Done today → tomorrow.
     expect(status(three, ['2026-10-19', '2026-10-22'], '2026-10-22').next).toBe('2026-10-23');
-    // 做够 3 次 → 下周一。
+    // Completed 3 times → next Monday.
     expect(status(three, ['2026-10-19', '2026-10-20', '2026-10-21'], '2026-10-22')).toEqual({
       next: '2026-10-26',
       due: false,
       overdue: 0,
     });
-    // 上周做的不算这周。
+    // Done last week does not count for this week.
     expect(status(three, ['2026-10-14', '2026-10-15', '2026-10-16'], '2026-10-22').due).toBe(true);
-    // 同一天做两次只算一天。
+    // Doing it twice on the same day counts as only one day.
     expect(status(three, ['2026-10-19', '2026-10-19', '2026-10-19'], '2026-10-22').due).toBe(true);
   });
 
   it('a week starting on Sunday changes which days count as this week', () => {
     const three: ScheduleRule = { repeat: 'times', per: 'week', count: 3 };
     const done = ['2026-10-19', '2026-10-20', '2026-10-21'];
-    // 2026-10-25 是周日：周一开始的一周已经做够，周日开始的一周刚开始。
+    // 2026-10-25 is a Sunday: the week starting Monday already has enough completions, while the week starting Sunday has just begun.
     expect(status(three, done, '2026-10-25').next).toBe('2026-10-26');
     expect(status(three, done, '2026-10-25', sunday).due).toBe(true);
-    // 周日开始的一周做够了 → 下一个周日。
+    // Enough completions in the week starting Sunday → next Sunday.
     expect(status(three, done, '2026-10-22', sunday).next).toBe('2026-10-25');
   });
 
@@ -189,7 +189,7 @@ describe('schedule rules with the days it was done', () => {
     const twoWeeks: ScheduleRule = { repeat: 'times', per: 'twoWeeks', count: 1 };
     const cal: Calendar = { ...DEFAULT_CALENDAR, twoWeekStart: '2026-10-12' };
     expect(status(twoWeeks, ['2026-10-13'], '2026-10-22', cal).next).toBe('2026-10-26');
-    // 月底做最后一天：今天做过了，明天是下个月。
+    // Do on the last day of the month: done today, tomorrow is next month.
     expect(
       status({ repeat: 'times', per: 'month', count: 5 }, ['2026-10-31'], '2026-10-31').next,
     ).toBe('2026-11-01');
@@ -224,9 +224,9 @@ describe('reading and writing a schedule', () => {
     expect(readSchedule({ repeat: 'times', per: 'week', count: 8 })).toBeUndefined();
     expect(readSchedule({ repeat: 'hourly' })).toBeUndefined();
     expect(readSchedule('FREQ=DAILY')).toBeUndefined();
-    // 不认识的属性丢掉，不是整条作废（恢复旧版本时）。
+    // Unrecognized properties are dropped rather than invalidating the entire entry (when restoring an old version).
     expect(readSchedule({ repeat: 'daily', color: 'red' })).toEqual({ repeat: 'daily' });
-    // perDay 1 是默认，不存。
+    // perDay 1 is the default and is not stored.
     expect(readSchedule({ repeat: 'daily', perDay: 1 })).toEqual({ repeat: 'daily' });
   });
 
@@ -282,7 +282,7 @@ describe('reading and writing a schedule', () => {
   });
 });
 
-// ---- 记录上的日程：上次完成来自同一张表的日期字段 ----
+// ---- Schedules on records: last completed date field from the same table ----
 
 const plants: Collection = {
   id: 'plants',
@@ -310,12 +310,12 @@ const plant = (name: string, values: Record<string, unknown>): DataRecord => ({
   updatedAt: seq,
 });
 
-const now = new Date(2026, 9, 22, 9, 0); // 周四
-const fern = plant('Fern', { watered: '2026-10-15' }); // 今天该浇
+const now = new Date(2026, 9, 22, 9, 0); // Thursday
+const fern = plant('Fern', { watered: '2026-10-15' }); // Due to be watered today
 const cactus = plant('Cactus', { plan: { repeat: 'interval', every: 30 }, watered: '2026-10-20' });
-const ivy = plant('Ivy', { watered: '2026-10-10' }); // 过期 5 天
-const palm = plant('Palm', { plan: { repeat: 'interval', every: 3 }, watered: '2026-10-21' }); // 周六
-const fresh = plant('Fresh', {}); // 没浇过 → 今天
+const ivy = plant('Ivy', { watered: '2026-10-10' }); // 5 days overdue
+const palm = plant('Palm', { plan: { repeat: 'interval', every: 3 }, watered: '2026-10-21' }); // Saturday
+const fresh = plant('Fresh', {}); // Never watered → today
 const none = plant('None', { plan: undefined });
 const all = [fern, cactus, ivy, palm, fresh, none];
 const names = (rs: DataRecord[]) => rs.map((r) => r.values.name);
@@ -327,7 +327,7 @@ describe('schedules on records', () => {
     expect(due('today')).toEqual(['Fern', 'Ivy', 'Fresh']);
     expect(due('overdue')).toEqual(['Ivy']);
     expect(due('thisWeek')).toEqual(['Fern', 'Ivy', 'Palm', 'Fresh']);
-    // 一周从周日开始：周四 → 这周到周六。
+    // Week starts on Sunday: Thursday → this week up to Saturday.
     expect(due('thisWeek', now, sunday)).toEqual(['Fern', 'Ivy', 'Palm', 'Fresh']);
     expect(due('thisWeek', new Date(2026, 9, 24, 9), sunday)).toEqual([
       'Fern',
@@ -335,7 +335,7 @@ describe('schedules on records', () => {
       'Palm',
       'Fresh',
     ]);
-    // 周日开始的一周，周日那天的「这周」到下周六，仙人掌 11-19 还不到。
+    // In a week starting Sunday, "this week" on Sunday reaches through to next Saturday; Cactus on Nov 19 is not due yet.
     expect(due('thisWeek', new Date(2026, 9, 25, 9), sunday)).not.toContain('Cactus');
   });
 
@@ -343,7 +343,7 @@ describe('schedules on records', () => {
     const twoAm: Calendar = { ...DEFAULT_CALENDAR, dayStartHour: 2 };
     const late = new Date(2026, 9, 23, 1, 30);
     const daily = { ...plants, fields: plants.fields.map((f) => f) };
-    const fernTomorrow = plant('Late', { watered: '2026-10-16' }); // 10-23 到期
+    const fernTomorrow = plant('Late', { watered: '2026-10-16' }); // Due Oct 23
     expect(
       names(
         filterRecords(
@@ -382,13 +382,13 @@ describe('schedules on records', () => {
     const at = new Date(2026, 9, 23, 10);
     const due = (cal: Calendar) =>
       filterRecords([r], chores, [{ field: 'plan', op: 'due', value: 'today' }], at, cal).length;
-    // 0 点开始：今天做过了。2 点开始：1:30 算 22 号，23 号还没做。
+    // Starts at midnight: done today. Starts at 2 AM: 1:30 counts as the 22nd, and the 23rd is not done yet.
     expect(due(DEFAULT_CALENDAR)).toBe(0);
     expect(due(twoAm)).toBe(1);
   });
 
   it('the day the clocks change does not shift the next date', () => {
-    // 巴黎 2026-03-29 和 2026-10-25 换夏令时。
+    // Paris switches to daylight saving time on 2026-03-29 and 2026-10-25.
     const spring = plant('Spring', {
       plan: { repeat: 'interval', every: 1 },
       watered: '2026-03-28',
@@ -407,7 +407,7 @@ describe('schedules on records', () => {
 
   it('sorts by the next date, entries without a schedule last', () => {
     const sorted = sortRecords(all, plants, { field: 'plan', direction: 'asc' }, now);
-    // 同一天的按创建时间从新到旧（Fresh 比 Fern 新）。
+    // Same-day items are ordered by creation time from newest to oldest (Fresh is newer than Fern).
     expect(names(sorted)).toEqual(['Ivy', 'Fresh', 'Fern', 'Palm', 'Cactus', 'None']);
   });
 
@@ -514,7 +514,7 @@ describe('checking schedule fields and filters', () => {
   });
 });
 
-// D-340：「一次」——只做一次，可以不定日期；做过一次就结束。
+// D-340: "once"—do only once, can be without a date; ends after being done once.
 describe('a once rule', () => {
   const once = (date?: string): ScheduleRule =>
     date ? { repeat: 'once', date } : { repeat: 'once' };
@@ -530,7 +530,7 @@ describe('a once rule', () => {
       due: true,
       overdue: 2,
     });
-    // 提前做了也算做完。
+    // Doing it early still counts as completed.
     const done = scheduleStatus(once('2026-10-25'), [d('2026-10-21')], d('2026-10-22'));
     expect(done).toEqual({ next: undefined, dueToday: false, overdueDays: 0, finished: true });
   });
@@ -538,7 +538,7 @@ describe('a once rule', () => {
   it('without a date it is never due, but still pending until done', () => {
     expect(status(once(), [], '2026-10-22')).toEqual({ next: undefined, due: false, overdue: 0 });
     expect(scheduleOccurrences(once(), [], d('2026-10-22'), 7)).toEqual([]);
-    // 有日子时只排一次；过期了排今天。
+    // Schedules once when a date is present; overdue items are scheduled for today.
     expect(scheduleOccurrences(once('2026-10-25'), [], d('2026-10-22'), 7)).toEqual([
       d('2026-10-25'),
     ]);
@@ -567,10 +567,10 @@ describe('a once rule', () => {
   });
 });
 
-// D-341：countEarly——提前做了算这一次（Todoist 的重复任务）。
+// D-341: countEarly—doing it early counts toward the current occurrence (Todoist-style repeating tasks).
 describe('counting an early completion', () => {
   const monday: ScheduleRule = { repeat: 'weekdays', days: [1] };
-  // 2026-10-19 周一建的，2026-10-26 和 11-02 也是周一。
+  // Created on Monday 2026-10-19; 2026-10-26 and Nov 2 are also Mondays.
   const early = (done: string[], today: string, since = '2026-10-19') => {
     const s = scheduleStatus(monday, done.map(d), d(today), DEFAULT_CALENDAR, {
       countEarly: true,
@@ -580,12 +580,12 @@ describe('counting an early completion', () => {
   };
 
   it('done on the Sunday before counts for that Monday', () => {
-    // 19 号那次周一做了，25 号（周日）提前做了 26 号那次 → 下一次 11-02。
+    // Done on Monday the 19th, did the 26th occurrence early on the 25th (Sunday) → next occurrence Nov 2.
     expect(early(['2026-10-19', '2026-10-25'], '2026-10-25')).toEqual({
       next: '2026-11-02',
       overdue: 0,
     });
-    // 不开 countEarly 时（D-293）仍是 26 号。
+    // Without countEarly enabled (D-293), it is still the 26th.
     expect(status(monday, ['2026-10-19', '2026-10-25'], '2026-10-25').next).toBe('2026-10-26');
   });
 
@@ -594,7 +594,7 @@ describe('counting an early completion', () => {
   });
 
   it('done long after it was due moves to the first Monday after that day', () => {
-    // 19 号到期，30 号才做 → 11-02，不会排出一个已经过去的周一。
+    // Due on the 19th, completed only on the 30th → Nov 2, does not schedule a Monday that has already passed.
     expect(early(['2026-10-30'], '2026-10-30')).toEqual({ next: '2026-11-02', overdue: 0 });
   });
 
@@ -678,7 +678,7 @@ describe('once and pending on records', () => {
   });
 });
 
-// D-346：每种规则都可以带钟点。
+// D-346: Every schedule rule can include a specific time.
 describe('a time on a schedule', () => {
   it('reads and validates the time on any rule', () => {
     expect(readSchedule({ repeat: 'once', date: '2026-11-05', time: '15:00' })).toEqual({

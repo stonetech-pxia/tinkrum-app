@@ -1,10 +1,13 @@
-# ML Kit 各个库都带一份改了名的内部类，靠组件注册在运行时连起来。release 包开了 R8，
-# 会把这些类合并、改写，结果在手机上空指针（例如语言识别读到另一个库的类）。整个 ML Kit 不让 R8 动。
+# Each ML Kit library contains its own copy of renamed internal classes, which are wired together at
+# runtime via component registration. With R8 enabled in the release build, these classes would be
+# merged and obfuscated, resulting in NullPointerExceptions on device (e.g., language recognition
+# reading a class from another library). Prevent R8 from modifying the entire ML Kit.
 -keep class com.google.mlkit.** { *; }
 -keep class com.google.android.gms.internal.mlkit_** { *; }
-# ONNX Runtime（D-269）：原生代码按名字找 Java 类和方法，R8 不能改名或删掉。
+# ONNX Runtime (D-269): native code looks up Java classes and methods by name; R8 must not rename or remove them.
 -keep class ai.onnxruntime.** { *; }
-# ML Kit 实体识别（预填日期和金额）带进了 WorkManager：它用 Room 按名字反射创建 WorkDatabase_Impl，
-# R8 删掉后 App 一启动就崩（Failed to create an instance of androidx.work.impl.WorkDatabase）。
+# ML Kit entity extraction (pre-filling date and amount) brings in WorkManager: it uses Room
+# reflection to instantiate WorkDatabase_Impl by name, and if R8 removes it, the app crashes on
+# startup (Failed to create an instance of androidx.work.impl.WorkDatabase).
 -keep class * extends androidx.room.RoomDatabase { <init>(); }
 -keep class androidx.work.impl.WorkDatabase_Impl { *; }

@@ -13,15 +13,15 @@ import {
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// v33 → v34 的迁移（D-368）：v33 代码存下来的每一份配置都要升成合法的 v34；
-// 风险 M1–M13 各有一个针对性的例子。
+// v33 to v34 migration (D-368): Every configuration saved by v33 code must be upgraded to valid
+// v34; risks M1–M13 each have a targeted test case.
 
 type Json = Record<string, any>;
 
 const FIXTURES = readdirSync(join(__dirname, 'fixtures', 'v33'))
   .filter((f) => f.endsWith('.json'))
   .map((f) => f.slice(0, -'.json'.length))
-  // coverage-*：别的测试为读派生数据手写的配置（v33 也不合法），不是 v33 代码存下来的。
+  // coverage-*: Configurations manually written by other tests to read derived data (invalid in v33), not saved by v33 code.
   .filter((f) => !f.startsWith('coverage-'));
 
 function expectValid(config: unknown) {
@@ -31,7 +31,7 @@ function expectValid(config: unknown) {
   expect(valid.ok ? [] : valid.issues).toEqual([]);
 }
 
-/** 默认工作空间（v33）加上几张表、页面、快捷操作、提醒。 */
+/** Default workspace (v33) populated with tables, pages, quick actions, and reminders. */
 function v33(extra: Json): Json {
   const base = v33Fixture('default-zh') as Json;
   return {
@@ -63,7 +63,7 @@ const TASKS = {
       id: 'status',
       name: '状态',
       type: 'choice',
-      // 选项 ID 恰好叫 row（M5）。
+      // Option ID named row (M5).
       options: [
         { id: 'todo', label: '待办' },
         { id: 'row', label: '一行' },
@@ -95,7 +95,7 @@ describe('v33 fixtures migrate to valid v34 configs', () => {
   });
 
   it.each(FIXTURES)('%s keeps every id (tables, fields, pages, blocks, quick actions)', (name) => {
-    // M2、M10：桌面小组件、运行记录、通知按 ID 找；ID 一律不改（提醒只在撞号时改，M1）。
+    // M2, M10: Home Screen widgets, run logs, and notifications are located by ID; IDs are never changed (reminders are only changed on ID collision, M1).
     const raw = v33Fixture(name) as Json;
     const after = fromV33(raw);
     const blockIds = (comps: Json[]): string[] =>
@@ -119,7 +119,7 @@ describe('v34 scope fixtures (templates-v34 without a v33 counterpart)', () => {
     const config = JSON.parse(
       readFileSync(join(__dirname, 'fixtures', 'v34', `${name}.json`), 'utf8'),
     ) as unknown;
-    // 存下来的是 v34；读的时候升到现在的版本。
+    // Saved data is v34; upgraded to the current version upon reading.
     const result = migrateWorkspace(config);
     expect(result.ok).toBe(true);
     if (result.ok) expectValid(result.config);
@@ -152,11 +152,11 @@ describe('v33 → v34 risks', () => {
     expect(config.tools.map((t) => [t.kind, t.id])).toEqual([
       ['quickAction', 'same'],
       ['reminder', 'same-reminder'],
-      // 改出来的 ID 和后面原有的撞了，原有的那个再换。
+      // Generated ID collided with an existing one, so the existing one is reassigned.
       ['reminder', 'same-reminder-reminder'],
       ['reminder', 'other'],
     ]);
-    // 快捷操作的引用不跟着动：打开它的提醒、手机桌面菜单。
+    // Quick action references remain unchanged: reminders that open it, Home Screen menus.
     expect(config.tools[1]).toMatchObject({
       opens: 'tool:same',
       when: { every: 'day', at: '09:00' },
@@ -199,7 +199,7 @@ describe('v33 → v34 risks', () => {
     const fields = config.data.tables[0]!.fields as Json[];
     const month = fields.find((f) => f.id === 'month')!;
     expect(month.filter).toHaveLength(6);
-    // 没写 dateField：第一个日期字段（related.ts 的 rollupDate）。
+    // Missing dateField: defaults to the first date field (rollupDate in related.ts).
     expect(month.filter.at(-1)).toEqual({ field: 'when', op: 'inPeriod', value: 'thisMonth' });
     expect(month).not.toHaveProperty('period');
     expect(fields.find((f) => f.id === 'picked')).toMatchObject({
@@ -266,13 +266,13 @@ describe('v33 → v34 risks', () => {
       id: 'add',
       look: 'button',
       show: { label: '添加', variant: 'filled' },
-      // fieldIds 在按钮模式下本来就不起作用（打开完整表单），丢掉。
+      // fieldIds are ignored in button mode anyway (opens the full form), so they are discarded.
       tools: [
         {
           do: 'create',
           table: 'tasks',
           ask: 'all',
-          // M5：引用字段上的 row 是「这一行」，单选的 row 是一个选项。
+          // M5: row on a reference field refers to "this row", while row on a single-choice field refers to an option.
           values: { status: 'row', parent: '$row' },
         },
       ],
@@ -434,7 +434,7 @@ describe('v33 → v34 risks', () => {
         pages: [
           page('p', [
             list('check', { display: 'checklist', checkField: 'done', addHere: true }),
-            // 非 checklist 上的 checkField 渲染器不用，丢掉。
+            // checkField renderers on non-checklist components are unused and discarded.
             list('plain', {
               display: 'list',
               checkField: 'done',
@@ -514,7 +514,7 @@ describe('v33 → v34 risks', () => {
       preset: 'merge-pdf',
       steps: merge.steps,
     });
-    // 放到手机桌面的按原 workflows 的顺序。
+    // Items placed on the Home Screen follow the original workflow order.
     expect(config.nav.phoneHomeScreen).toEqual(['merge', 'third']);
     expect(block(config, 'p', 'open')).toEqual({
       id: 'open',

@@ -7,7 +7,7 @@ import { makePalette } from '../renderer/theme';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 运行页上正在做的那一步（D-276）：有「正在处理」的转圈，处理多张时写出是第几张。
+// The step currently executing on the run page (D-276): show a "processing" spinner, and indicate the index when processing multiple items.
 
 const wf: Workflow = {
   kind: 'quickAction',
@@ -21,7 +21,7 @@ const wf: Workflow = {
 
 it('shows a spinner and which image is being processed, from the first one on', async () => {
   const files = new FakeFiles();
-  // 每张图都卡住，直到测试放行。
+  // Block every image until the test releases it.
   const gates: (() => void)[] = [];
   const transform = files.transformImage.bind(files);
   jest
@@ -38,10 +38,10 @@ it('shows a spinner and which image is being processed, from the first one on', 
     router.push({ pathname: '/run/[workflowId]', params: { workflowId: wf.id } }),
   );
   await waitFor(() => expect(gates).toHaveLength(1), { timeout: 3000 });
-  // 第一张还没处理完，就已经看得出在处理第 1 张。
+  // Before the first image finishes processing, it already shows that image 1 is being processed.
   expect(screen.getByTestId('run-step-resize')).toHaveTextContent(/第 1\/3 张/);
   expect(screen.getByTestId('run-busy-resize')).toBeTruthy();
-  // 步骤圆点是实色主色底，上面的序号和其他强调色底的文字用同一条规则取色。
+  // Step dots have a solid primary color background, and text on top uses the same color-picking rule as other accent-colored backgrounds.
   const palette = makePalette(createDefaultWorkspace('zh').theme, false);
   expect(within(screen.getByTestId('run-step-resize')).getByText('2')).toHaveStyle({
     color: palette.onAccent(palette.primary),

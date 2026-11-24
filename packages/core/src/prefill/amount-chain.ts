@@ -3,16 +3,18 @@ import { ruleCandidates } from './candidates';
 import { receiptRules } from './doc-context';
 import { normalizeNumber } from '../text-rules';
 
-// 算术找总额（创始人 2026-11-01 的想法，测量见 per-field/REPORT.md 的考卷一节）：不看字段名，只看数。
-// 1. 付款 − 找零 = x，x 就是总额（这两排要有付款、找零字样）。
-// 2. 否则：小计 = 上面连续几排明细的和；总额 = 小计 ± 下面的某个数（优惠、税）。
-// 3. 否则：小计本身。
+// Arithmetic total finding (founder's idea from 2026-11-01, measurement see per-field/REPORT.md
+// test paper section): ignore field names, look only at numbers.
+// 1. Payment - change = x, where x is the total (these two rows must have payment/change keywords).
+// 2. Otherwise: subtotal = sum of consecutive detail rows above; total = subtotal +/- some number
+// below (discount, tax).
+// 3. Otherwise: subtotal itself.
 
 const NOT_MONEY =
   /\b(tel|fax|phone|gst\s*(reg|id|no)|reg\.?\s*no|invoice\s*no|bill\s*no|no\s*:|qty|date|time)\b|电话|编号|单号|日期|\d{1,2}[:/]\d{2}/i;
 const PAY_ROW = /cash|tender|paid|payment|visa|master|card|现金|实收|收款|esp[èe]ces|pay[ée]/i;
 const CHANGE_ROW = /change|找零|monnaie|rendu|kembali/i;
-// 西方语言的付款、找零、优惠、合计字样（整词，不用相似度）。
+// Western language payment, change, discount, and total keywords (whole words, no similarity matching).
 const W_PAY_ROW =
   /(^|[^\p{L}])(bar|barzahlung|ec[\s-]?karte|girocard|karte|kontaktlos|bezahlt|contanti|contante|bancomat|pagato|efectivo|tarjeta|pagado|contant|pin|dinheiro|cartão|cartao|cb|carte|carte bancaire|esp[eè]ces)([^\p{L}]|$)/iu;
 const W_CHANGE_ROW =
@@ -23,13 +25,13 @@ const W_TOTAL_ROW =
   /(^|[^\p{L}])(summe|gesamt|gesamtsumme|gesamtbetrag|totale|totaal|importe|importo|a pagar|zu zahlen)([^\p{L}]|$)/iu;
 const W_NOT_FINAL_ROW = /(^|[^\p{L}])(mwst|ust|iva|btw|netto|imponibile)([^\p{L}]|$)/iu;
 const DISCOUNT_ROW = /优惠|折扣|discount|remise|promo|voucher|less/i;
-/** 数太多（长发票、对账单）时不算：三重循环在手机上要几百毫秒，这种单据也不是这个算法针对的。 */
+/** Skip when there are too many numbers (long receipts, statements): triple loops take hundreds of milliseconds on mobile, and such documents are not targeted by this algorithm. */
 const MAX_AMOUNTS = 120;
 
-/** 写着合计的排（付款字样也可能出现在这种排上：Total Paid）。 */
+/** Row stating total (payment keywords may also appear on such rows: Total Paid). */
 const TOTAL_ROW = /total|合计|总计|总额|montant|amount|应付|实付/i;
 const NOT_TOTAL_ROW = /sub[\s.-]*total|小计|sous-total/i;
-/** 写着 total 但不是合计的排（Total Qty、Total Tax）。 */
+/** Row stating total but not a grand total (Total Qty, Total Tax). */
 const NOT_FINAL_ROW = /qty|quantity|\bitems?\b|\b(?:tax|gst|vat|tva)\b|税|数量/i;
 
 const isPay = (r: string) => PAY_ROW.test(r) || (receiptRules() && W_PAY_ROW.test(r));
@@ -43,7 +45,7 @@ interface Amount {
   v: number;
   row: number;
   last: boolean;
-  /** 付款排上没有小数的数（Cash 100）：只在「付款 − 找零」里当付款用。 */
+  /** Numbers without decimals on payment rows (Cash 100): used as payment only within "payment - change". */
   payOnly?: boolean;
 }
 
@@ -55,9 +57,9 @@ function amountsOf(rows: readonly string[], noDecimals: boolean, locale: Locale)
       for (const m of r.matchAll(/\d{1,3}(?:[.,]\d{3})+(?:[.,]00)?|\d{4,}/g))
         vs.push(Number(m[0].replace(/[.,]00$/, '').replace(/\D/g, '')));
     } else {
-      // 每排只取带两位小数的数（小票上的金额），避免数量、编号。
+      // Extract only numbers with two decimal places per row (amounts on receipts) to avoid quantities and numbers.
       for (const m of r.matchAll(/-?\d{1,3}(?:[ ,.]\d{3})*[.,]\d{2}(?!\d)/g)) {
-        // 空格做千位分隔的数（2 368,66）单独交给 ruleCandidates 会只读到后半（368,66）；后面紧跟 €/EUR 才合并。
+        // Numbers with spaces as thousand separators (2 368.66) passed to ruleCandidates alone would only read the second half (368.66); merged only when immediately followed by €/EUR.
         if (
           receiptRules() &&
           /^-?\d{1,3}(?: \d{3})+[.,]\d{2}$/.test(m[0]) &&
@@ -68,7 +70,7 @@ function amountsOf(rows: readonly string[], noDecimals: boolean, locale: Locale)
           continue;
         }
         const c = ruleCandidates(m[0], locale).find((x) => x.kind === 'amount');
-        // 优惠常写成负数：减的是它的绝对值。
+        // Discounts are often written as negative numbers: subtract their absolute value.
         if (c) vs.push(isDiscount(r) ? Math.abs(Number(c.value)) : Number(c.value));
       }
     }
@@ -86,11 +88,11 @@ export interface AmountChain {
   how: 'payMinusChange' | 'subtotalAdjust' | 'subtotal';
 }
 
-/** 差多少算相等：没有小数的币种差 1，其他差一分。 */
+/** Difference threshold for equality: currencies without decimals differ by 1, others differ by 0.01. */
 export const amountNear = (a: number, b: number, noDecimals: boolean) =>
   Math.abs(a - b) <= (noDecimals ? 1 : 0.011);
 
-/** 算出来的总额；算不出来是 null。noDecimals：印尼盾这类没有小数的币种。 */
+/** Calculated total; null if it cannot be calculated. noDecimals: currencies without decimals like Indonesian Rupiah. */
 export function amountChain(
   rows: readonly string[],
   noDecimals: boolean,
@@ -105,8 +107,10 @@ export function amountChain(
   const isTotal = (row: number) =>
     (TOTAL_ROW.test(rows[row]!) || (receiptRules() && W_TOTAL_ROW.test(rows[row]!))) &&
     !NOT_TOTAL_ROW.test(rows[row]!);
-  // 合计那排有数时，下面的付款排（Cash 20.00）就只是付出去的钱，不能当算出来的总额或小计。
-  // 合计那排 OCR 没读出数（TOTAL 单独一排、28-90）时付款排的数才可能是总额（真实小票上常见）。
+  // When the total row has a number, payment rows below it (Cash 20.00) are just outgoing money and
+  // cannot be treated as the calculated total or subtotal. Only when the total row OCR fails to
+  // read a number (TOTAL on a separate row, 28-90) can the payment row numbers possibly be the
+  // total (common on real receipts).
   const notPayRow = (a: Amount) =>
     !isPay(rows[a.row]!) ||
     isTotal(a.row) ||
@@ -121,7 +125,7 @@ export function amountChain(
           ch.row > x.row &&
           isChange(rows[ch.row]!) &&
           near(pay.v - ch.v, x.v) &&
-          // 找零比总额大（付整钞）时，要那排写着合计、差一分也不行，否则一排明细也会被算成总额。
+          // When change is greater than the total (paying with large bills), require the row to say total and not differ even by a cent, otherwise a detail row will be miscalculated as the total.
           (ch.v < x.v || (isTotal(x.row) && Math.abs(pay.v - ch.v - x.v) < 0.005))
         )
           return { value: x.v, how: 'payMinusChange' };
@@ -142,7 +146,7 @@ export function amountChain(
         }
       }
     }
-    // 只有一项明细时，小计 = 上面某一排的数。
+    // When there is only a single detail item, subtotal = number from a row above.
     if (
       !subs.includes(x) &&
       above.some((a) => near(a.v, x.v)) &&
@@ -157,7 +161,7 @@ export function amountChain(
       for (const adj of all) {
         if (adj === x || adj === sub || adj.v >= sub.v) continue;
         if (near(sub.v + adj.v, x.v)) adjusted = x.v;
-        // 小计 − 优惠 = 总额，和「含税总额 − 不含税 = 税额」算术一样：减的那排写着优惠才取小的，否则取大的。
+        // Subtotal - discount = total, same arithmetic as "gross total - net = tax amount": take the smaller number if the subtracted row says discount, otherwise take the larger.
         else if (near(sub.v - adj.v, x.v))
           adjusted = isDiscount(rows[adj.row]!) ? x.v : Math.max(sub.v, x.v);
       }

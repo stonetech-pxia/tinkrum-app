@@ -17,7 +17,7 @@ import type { Collection, Reminder } from './schema';
 import { dayValue, readRecords } from './source';
 import { registry, workspace } from './test-helpers';
 
-// 算出来的日期（D-542）：开始日期加 N 天或 N 个月（N 是固定数或这条的数字字段），不存，按日期显示、筛选、排序。
+// Computed date (D-542): start date plus N days or N months (N is a fixed number or a number field of this entry), not stored, used on-the-fly for display, filtering, and sorting.
 
 const contracts: Collection = {
   id: 'contracts',
@@ -50,7 +50,7 @@ describe('computed date field (D-542)', () => {
     expect(recordValue(rec('c', { start: '2026-03-15', term: -3 }), contracts, 'ends', now)).toBe(
       '2025-12-15',
     );
-    // 开始日期或 N 没有值时没有值。
+    // Yields no value when start date or N is missing.
     expect(recordValue(rec('d', { term: 2 }), contracts, 'ends', now)).toBeUndefined();
     expect(recordValue(rec('e', { start: '2026-01-01' }), contracts, 'ends', now)).toBeUndefined();
   });
@@ -99,7 +99,7 @@ it('removing the start or amount field is refused while a computed date reads it
   }
 });
 
-// 算出来的日期能放进月历、当「到期前提醒」的日期（D-550）：都是现算，不存。
+// A computed date drives calendars and "before" reminders (D-550): all computed on demand, not stored.
 describe('a computed date drives calendars and "before" reminders (D-550)', () => {
   const ctx = { registry, locale: 'en' as const, now };
   const calendarPage: Op = {
@@ -160,7 +160,7 @@ describe('a computed date drives calendars and "before" reminders (D-550)', () =
     expect([...december.days!.days.values()].map((d) => d.records.map((r) => r.id))).toEqual([
       ['a'],
     ]);
-    // 点某一天添加时不预设它（算出来的，不能填）；看月历不写任何东西（底线 14、15）。
+    // Do not preset a day when tapped to add (it's computed, cannot be filled); do not write anything when viewing the calendar (invariants 14, 15).
     expect(dayValue(read, dayNumber('2026-11-30')!)).toBeUndefined();
     expect(records.every((r) => !('ends' in r.values))).toBe(true);
   });
@@ -168,7 +168,7 @@ describe('a computed date drives calendars and "before" reminders (D-550)', () =
   it('a "before" reminder can watch it and fires that many days before the computed day', () => {
     const config = setup([{ op: 'addTool', tool: expiring }]);
     const records = [
-      rec('a', { name: 'Gym', start: '2026-08-14', term: 4 }), // 2026-12-14 → 11-14 09:00，已过
+      rec('a', { name: 'Gym', start: '2026-08-14', term: 4 }), // 2026-12-14 → 11-14 09:00, passed
       rec('b', { name: 'Phone', start: '2026-01-15', term: 11 }), // 2026-12-15 → 11-15 09:00
       rec('c', { name: 'No term', start: '2026-12-01' }),
     ];
@@ -178,11 +178,11 @@ describe('a computed date drives calendars and "before" reminders (D-550)', () =
         new Date((n.trigger as { at: number }).at).toString(),
       ]);
     expect(plan()).toEqual([['expiring-b', new Date(2026, 10, 15, 9, 0).toString()]]);
-    // 改了开始日期：重新排时跟着变。
+    // Changed start date: reschedules accordingly.
     expect(plan(config, [rec('b', { start: '2026-02-20', term: 11 })])).toEqual([
       ['expiring-b', new Date(2026, 11, 21, 9, 0).toString()],
     ]);
-    // 改了字段的定义（加几个月）：也跟着变。
+    // Changed field definition (adding months): updates accordingly.
     const longer = prepareOps(
       config,
       [
@@ -201,8 +201,8 @@ describe('a computed date drives calendars and "before" reminders (D-550)', () =
     ]);
   });
 
-  it('falls on the same day whatever hour the day starts at (设置 → 日期, D-286)', () => {
-    // 算出来的日期没有钟点：一天从 4 点开始时不该往前挪一天，不然筛选漏掉、月历放错格、提醒早一天。
+  it('falls on the same day whatever hour the day starts at (Settings → Date, D-286)', () => {
+    // Computed dates have no time of day: when a day starts at 4 AM, it should not be shifted back by one day; otherwise, filters miss records, calendar cells are misplaced, and reminders fire a day early.
     const late = { ...DEFAULT_CALENDAR, dayStartHour: 4 };
     const b = rec('b', { name: 'Phone', start: '2026-01-15', term: 11 });
     expect(recordDay(b, contracts, 'ends', now, late)).toBe('2026-12-15');

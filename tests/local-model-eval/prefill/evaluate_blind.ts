@@ -1,6 +1,7 @@
-// 没看过的测试样本（prefill/blind/cases.jsonl，由没读过规则代码的人写）上的最终成绩：
-// 旧的 text-rules extractFirst 对新的 prefillRecord（候选 + 按标签挑，没有版式记忆、没有系统识别）。
-// 用法（仓库根目录）：npx tsx tests/local-model-eval/prefill/evaluate_blind.ts [--show-wrong]
+// Final score on unseen test samples (prefill/blind/cases.jsonl, written by people who have not
+// read the rule code): old text-rules extractFirst vs new prefillRecord (candidate + tag-based
+// picking, no layout memory, no system recognition). Usage (repository root): npx tsx
+// tests/local-model-eval/prefill/evaluate_blind.ts [--show-wrong]
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

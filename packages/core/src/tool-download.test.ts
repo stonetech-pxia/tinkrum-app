@@ -79,7 +79,7 @@ describe('tool manifests (D-177)', () => {
   });
 
   it('turns a v33-shaped manifest (format 1 on the server) into v34 blocks and quick actions', () => {
-    // 服务器上的清单是 v33 写法：fileList 的 mimeType 变成 $files 的 kind 筛选，工作流带 kind 和 package。
+    // The server manifest uses v33 syntax: fileList's mimeType becomes $files' kind filter, and workflows carry kind and package.
     const manifest: ToolManifest = {
       ...example(),
       workflows: [{ ...example().workflows[0]!, icon: 'document' }],
@@ -111,7 +111,7 @@ describe('tool manifests (D-177)', () => {
       steps: manifest.workflows[0]!.steps,
     });
     expect(wf).not.toHaveProperty('toolId');
-    // 不写 mimeType：列出不是图片的文件（同 v33 的 FileList）。
+    // Omit mimeType: list non-image files (same as v33 FileList).
     const any = toolFromManifest({
       ...manifest,
       fileList: { ...manifest.fileList!, mimeType: undefined },
@@ -144,7 +144,7 @@ describe('tool manifests (D-177)', () => {
       page: 'tool-job-apply',
     });
 
-    // 新版本多了一个快捷操作：「更新」补上它，保留用户的修改。
+    // The new version has an extra quick action: "Update" appends it while preserving user modifications.
     const next = example();
     next.version = '1.1.0';
     next.workflows.push({
@@ -228,7 +228,7 @@ describe('tool manifests (D-177)', () => {
     expect(
       check((m) => (m.workflows[1]!.steps[3]!.params = { maxKB: -1, format: 'jpeg' })),
     ).not.toBe('');
-    // 存到相册要 photos.save 权限，清单里没有声明。
+    // Saving to the photo library requires `photos.save` permission, which is not declared in the manifest.
     expect(
       check((m) =>
         m.workflows[1]!.steps.splice(4, 1, { id: 'save', action: 'out.saveToPhotos', params: {} }),
@@ -322,7 +322,7 @@ describe('signed catalog (D-178)', () => {
   it('trusts the dev key only when asked to', () => {
     expect(trustedToolKeys(false)).not.toContain(DEV_TOOL_SIGNING_KEY);
     expect(trustedToolKeys(true)).toContain(DEV_TOOL_SIGNING_KEY);
-    // 仓库里的开发私钥和代码里的开发公钥是一对。
+    // The development private key in the repository and the development public key in the code form a pair.
     const secret = repoFile('tools/dev-signing-key.txt')
       .split('\n')
       .find((l) => l.trim() && !l.startsWith('#'))!;

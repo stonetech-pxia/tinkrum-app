@@ -15,9 +15,11 @@ import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { holdFormCopies, recordChoices, type RecordChoice } from './save-as-record';
 
 /**
- * 存成记录（D-392，创始人 2026-10-31 在对话里选定）：收到的文件复制成用户文件（收件这一批照旧，离开收件页面
- * 时释放）。放进已有的表：打开新记录表单，附件已经放好。新建：打开新建表单页，点「记下」才建表（D-444）。
- * 没保存就离开时，下一页删掉这些副本。收件页面和预览页（D-457）共用。
+ * Save as record (D-392, selected by founder in conversation on 2026-10-31): received files are
+ * copied as user files (the inbox batch remains as is, released upon leaving the inbox page). Add
+ * to existing table: open new record form with attachments pre-populated. Create new: open new
+ * form page, table is created only when tapping 'Log' (D-444). If leaving without saving, the
+ * next page deletes these copies. Shared between the inbox page and the preview page (D-457).
  */
 export function useSaveAsRecord(picked: readonly PickedFile[], onDone: () => void) {
   const { repo, files, locale } = useWorkspaceContext();
@@ -34,7 +36,7 @@ export function useSaveAsRecord(picked: readonly PickedFile[], onDone: () => voi
     let copied: string[] = [];
     try {
       const result = await copyUserFiles(picked.slice(0, MAX_ATTACHMENTS), files, repo);
-      // 打开、分享时已经存进文档库的不算副本（D-455）：放弃时只删这一次新复制的。
+      // Files already stored in the document library when opened or shared are not counted as copies (D-455): only newly copied files from this session are deleted upon cancellation.
       copied = result.created;
       const attached = result.assetIds;
       if (result.problem) {
@@ -74,7 +76,7 @@ export function useSaveAsRecord(picked: readonly PickedFile[], onDone: () => voi
     } catch (e) {
       setError(String(e));
     } finally {
-      // 没交给下一页的副本不留下。
+      // Do not retain copies that were not handed over to the next page.
       if (copied.length > 0) await deleteUserFiles(copied, repo, files).catch(() => undefined);
       setPlacing(false);
     }
@@ -83,7 +85,7 @@ export function useSaveAsRecord(picked: readonly PickedFile[], onDone: () => voi
   return { placing, error, saveAsRecord };
 }
 
-/** 存成记录的列表：「新建表单」在最前（表多了不用滚动），再是有附件字段的表。 */
+/** List for saving as records: 'New form' is placed at the top (avoiding scrolling when there are many tables), followed by tables containing attachment fields. */
 export function RecordChooser({
   count,
   files,
@@ -93,7 +95,7 @@ export function RecordChooser({
   onChoose,
 }: {
   count: number;
-  /** 收到的文件：在本机读文字，像收据时推荐带收据规则的表（D-477）。 */
+  /** Received files: reads text locally; for items like receipts, recommends tables with receipt rules (D-477). */
   files: readonly PickedFile[];
   placing: boolean;
   palette: Palette;
@@ -150,7 +152,7 @@ export function RecordChooser({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  // 「你的表」和上面「新建表单」的说明隔开（2026-11-06 测试：挤在一起）。
+  // Separates "Your tables" from the explanation for "New form" above (2026-11-06 test: jammed together).
   heading: { marginTop: 12 },
   chooser: { gap: 4, paddingBottom: 8 },
   choice: {

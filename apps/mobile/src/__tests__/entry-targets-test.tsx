@@ -13,7 +13,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// D-256：首页的按钮、快捷入口打开一个快捷操作。点一下只把它摆出来，用户点「开始」才运行。
+// D-256: home screen buttons and quick entry points open a quick action. Tapping once only lays it out, and the user runs it by tapping "Start".
 
 const seed = (target: OpenTarget) => (locale: Locale, registry: Registry) => {
   const components: NewComponent[] = [

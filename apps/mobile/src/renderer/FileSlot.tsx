@@ -9,9 +9,11 @@ import type { RenderEnv } from './components';
 import { importSlotFile, type SlotImport, type SlotSource } from './slot-file';
 import { Tile } from './Tile';
 
-// 文件入口（D-257）：AI 只放空位；用户点空位从相册或「文件」选一个文件，复制一份存成用户文件，
-// 配置里只记录文件 ID。之后点一下用系统预览打开；换文件、移除文件在长按编辑里。
-// 文件名只在本机显示，不进配置，也不发给 AI。
+// File entry (D-257): AI only provides empty slots; the user taps an empty slot to choose a file
+// from the photo library or Files, makes a copy stored as a user file, and the config records only
+// the file ID. Tapping it opens it with the system preview; changing or removing the file is done
+// in long-press edit. File names are displayed only locally, are not included in the config, and
+// are never sent to the AI.
 
 const IMPORT_ERRORS: Record<Exclude<SlotImport['kind'], 'saved' | 'cancelled'>, StringKey> = {
   tooLarge: 'fileSlotTooLarge',
@@ -19,7 +21,7 @@ const IMPORT_ERRORS: Record<Exclude<SlotImport['kind'], 'saved' | 'cancelled'>, 
   copyFailed: 'fileSlotCopyFailed',
 };
 
-/** 问从哪里选，选好后复制进 App。返回新的用户文件 ID；取消或出错（已提示）时返回 null。 */
+/** Prompt where to choose from, and copy into the App after selection. Returns the new user file ID; returns null on cancellation or error (already alerted). */
 export function chooseSlotFile(
   locale: RenderEnv['locale'],
   title: string,
@@ -46,7 +48,7 @@ export function chooseSlotFile(
   });
 }
 
-/** 读一个文件入口指向的用户文件。undefined：读取中；null：没有或不在这台设备上。 */
+/** Read a user file pointed to by a file entry. undefined: loading; null: absent or not on this device. */
 export function useSlotAsset(assetId: string | null | undefined): AssetRecord | null | undefined {
   const { repo } = useWorkspaceContext();
   const [loaded, setLoaded] = useState<{ id: string; asset: AssetRecord | null } | null>(null);
@@ -64,7 +66,7 @@ export function useSlotAsset(assetId: string | null | undefined): AssetRecord | 
 
 export function FileSlot({ component, env }: { component: BlockOf<'entry'>; env: RenderEnv }) {
   const { locale } = env;
-  // 文件位是 opens 为 {file} 的入口（原 fileSlot）。
+  // File slots are entries where opens is {file} (formerly fileSlot).
   const show = component.show ?? {};
   const title = show.title ?? '';
   const assetId = isFileTarget(component.opens) ? component.opens.file : null;

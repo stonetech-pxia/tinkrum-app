@@ -6,23 +6,25 @@ import { FieldRefSchema, IdSchema } from '../schema-base';
 import { RECORD_REF } from '../schema-primitives';
 import { collectionName, type LookDefinitionOf, defineLook } from './define';
 
-// 只显示一张表的一条记录（最早加的那条，D-424）：几个字段、一个「编辑」，可以再加这条记录的 vCard 二维码。
-// 配置里只有表和字段的引用；二维码画的时候现算，不存（底线 14）。
-// 给一条记录用的页面（page.of 是这张表）上可以写 source.record "$record"：显示打开的那一条（D-558）。
-// 配置里只有占位，ID 只在画的时候换进去（record-pages.ts 的 bindRecord），AI 看不到（底线 2、14）。
+// Displays a single record from a table (earliest added entry, D-424): several fields, an "Edit"
+// button, and optionally a vCard QR code for this record. Config contains only table and field
+// references; QR codes are computed on demand and not stored (invariant 14). Pages dedicated to a
+// single record (page.of is this table) can specify source.record "$record": displays the opened
+// record (D-558). Config contains only placeholders, IDs are bound only during rendering
+// (bindRecord in record-pages.ts), invisible to AI (invariants 2, 14).
 
 const shape = {
   source: z.strictObject({
     table: IdSchema,
-    /** 打开的那一条（D-558），只在 page.of 是这张表的页面上。 */
+    /** Opened record (D-558), valid only on pages where page.of is this table. */
     record: z.literal(RECORD_REF).optional(),
   }),
   show: z.strictObject({
     fields: z.array(FieldRefSchema).min(1).max(8),
-    /** 画这条记录的 vCard 二维码。 */
+    /** Render a vCard QR code for this record. */
     qr: z.literal(true).optional(),
   }),
-  /** 一个按钮，运行收记录的快捷操作，把这一条交给它（D-428）。 */
+  /** A single button that runs a record-capturing quick action, passing this record to it (D-428). */
   tools: z.array(ToolUseSchema).min(1).max(1).optional(),
 };
 

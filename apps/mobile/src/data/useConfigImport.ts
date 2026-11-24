@@ -24,7 +24,7 @@ import type { SavedPreset } from '@/storage/types';
 import { useWorkspaceContext } from '@/workspace/context';
 import { useAiReturn } from '@/ai/return';
 
-/** 文件、主动粘贴和深链接共用的导入与预览；打开页面本身不读取剪贴板、不导入。 */
+/** Unified import and preview shared by files, manual paste, and deep links; opening the page itself does not read the clipboard or perform imports. */
 export function useConfigImport(previewPreset = false) {
   const { repo, files, locale, registry, store } = useWorkspaceContext();
   const router = useRouter();
@@ -40,7 +40,7 @@ export function useConfigImport(previewPreset = false) {
     leaveApp,
     proposePreset,
   } = state();
-  // 回到主页上的卡片也能用，不能无条件 back 到一张不存在的页面。
+  // Cards on the home screen can also use it; cannot unconditionally go back to a non-existent page.
   function goHome() {
     leaveApp();
     selectTab(pageTarget(HOME_PAGE_ID));
@@ -48,8 +48,10 @@ export function useConfigImport(previewPreset = false) {
     else router.replace('/');
   }
   /**
-   * 从剪贴板粘贴（D-593）：别的 AI（Claude、ChatGPT）在对话里写好的 App 文件，复制过来直接导入，不用先存成文件。
-   * 之后和「从文件导入」完全一样（先问、预览、能撤销）；整份配置存成预设时用默认名字。
+   * Paste from clipboard (D-593): app files written by other AIs (Claude, ChatGPT) in chat can be
+   * copied and imported directly without saving to a file first. Followed by the exact same flow
+   * as "Import from file" (prompt, preview, undoable); uses default name when saving full config
+   * as preset.
    */
   async function pasteFile() {
     const title = t(locale, 'presetsPaste');
@@ -65,7 +67,7 @@ export function useConfigImport(previewPreset = false) {
     await importText(text, '', title);
   }
 
-  /** 读出来的文字按自己的格式处理：App 文件加成新 App，整份配置存成预设。代码块、前后的话先去掉。 */
+  /** Process read text according to its format: app files added as new apps, full config saved as presets. Strip code blocks and surrounding conversational text first. */
   async function importText(raw: string, fileName: string, title: string) {
     if (raw.length > MAX_APP_CONFIG_SIZE) {
       Alert.alert(title, configFileProblemText(locale, 'tooLarge'));
@@ -77,7 +79,7 @@ export function useConfigImport(previewPreset = false) {
       importApp(appFile, text, title);
       return;
     }
-    // 说自己是 App 文件、却读不了的（多半是 AI 写错了）：逐条说哪里不对，可以复制给写它的 AI。
+    // When file claims to be an app file but fails to read (likely AI error): report specific errors line by line so they can be copied back to the authoring AI.
     if (formatOf(text) === APP_FILE_FORMAT) {
       const check = checkAppFileText(text, { registry, locale, now: new Date() });
       if (!check.ok) {
@@ -101,14 +103,15 @@ export function useConfigImport(previewPreset = false) {
       Alert.alert(title, t(locale, 'presetsFull', { max: MAX_SAVED_PRESETS }));
     else if (result.kind === 'saved') {
       useAiReturn.getState().dismiss(pending?.id);
-      // 整套设置从别的 AI App 交回来（点了卡片、打开链接，或刚交出去一套设置）：直接预览，用户选的图片留在原处。
+      // When the full setup is handed back from another AI app (via card tap, link open, or just handing out a setup): previews directly, leaving the user's selected images in place.
       if (previewPreset || pending?.scope === 'setup') await apply(result.preset, true);
     }
   }
 
   /**
-   * App 文件导入不了：列出前几条原因，另有一个按钮把全部原因复制下来，用户贴回给写文件的 AI 去改。
-   * 只有结构上的问题（ID、外观、字段），没有记录和文件；只在用户点了才复制（底线 10）。
+   * App file import failure: lists initial reasons, plus a button to copy all reasons so the user
+   * can paste them back to the AI author for correction. Structural issues only (IDs, appearance,
+   * fields), no records or files; copies only upon user tap (invariant 10).
    */
   function problemsAlert(title: string, lead: string, problems: readonly string[]) {
     Alert.alert(title, [lead, ...problems.slice(0, 3)].join('\n'), [
@@ -124,8 +127,10 @@ export function useConfigImport(previewPreset = false) {
   }
 
   /**
-   * 文件外层的清单（D-556）里有这个版本没有的：准确地说缺什么、要更新。只在导入不成的时候用它代替笼统的说法
-   * （这个版本不认识的外观在整份配置里会原样留着，D-254，那样的预设照样存得进去）。没有清单的文件返回 null。
+   * File outer manifest (D-556) contains items missing from this version: specifies exactly what
+   * is missing and needs updating. Used instead of general wording only when import fails
+   * (unrecognized appearances in this version are preserved as-is in the full config, D-254, and
+   * such presets can still be saved). Returns null for files without a manifest.
    */
   function needsUpdate(text: string): string | null {
     const missing = missingUses(text, registry);
@@ -134,9 +139,9 @@ export function useConfigImport(previewPreset = false) {
       : null;
   }
 
-  /** 导入一个 App 文件：先选「导入主页」还是「做成新 App」，再预览，确认后生效，能在改动记录里撤销（底线 5、7）。 */
+  /** Import an app file: choose between "Import Home" or "Create New App", preview, confirm to apply, undoable in change history (invariants 5, 7). */
   function importApp(appFile: AppFile, text: string, title: string) {
-    // 已经装了同一个 App（别的 AI 改完交回来的，D-611）：默认更新它，按 ID 接上，记录都留着。
+    // Already installed the same app (returned after edits by another AI, D-611): defaults to updating it, connects by ID, preserves all records.
     const installed = (state().config!.nav.apps ?? []).find((a) => a.id === appFile.app.id);
     if (installed) {
       Alert.alert(installed.name, t(locale, 'importUpdateChoose', { name: installed.name }), [
@@ -193,15 +198,16 @@ export function useConfigImport(previewPreset = false) {
       { fromAppFile: true },
     );
     if (result.kind === 'invalid') {
-      // 文件说了它用到的、这个版本没有的（D-556）：直接说缺什么。
+      // File states requirements used by it but missing from this version (D-556): explicitly state what is missing.
       const newer = needsUpdate(text);
       if (newer) {
         Alert.alert(title, newer);
         return;
       }
-      // 和网站、自检脚本同一套说法（D-595）：按文件里的位置说哪里不对（tables.1.fields.3.id），不是导入操作的
-      // 编号；文件没说自己用到了新东西，就不说「先更新」。文件本身没错、只是和这台手机上已有的东西对不上的
-      // （上限、表的归属这类），说这里的原因。
+      // Same wording as website and self-test scripts (D-595): reports errors by file location
+      // (tables.1.fields.3.id) rather than import operation ID. Does not prompt to "update first"
+      // unless file specifies new dependencies. Reports local mismatch reasons (limits, table
+      // ownership) when the file itself is valid but conflicts with existing device contents.
       const check = checkAppFileText(text, { registry, locale, now: new Date() });
       if (check.ok) problemsAlert(title, t(locale, 'importAppConfigBroken'), result.issues);
       else problemsAlert(title, t(locale, 'importAppFileBroken'), check.problems);
@@ -223,7 +229,7 @@ export function useConfigImport(previewPreset = false) {
               : 'importAppConfirm',
           { name: plan.name },
         ),
-        // 更新是先移除再装回（D-611）：逐个操作的说法会说「移除 App」，这里只列真正变了的。
+        // Update is removal followed by re-installation (D-611): step-by-step descriptions say "Remove App", here we list only actual changes.
         ...(mode === 'update'
           ? describeAppUpdate(result.proposal.before, result.proposal.after, appFile.app.id, locale)
           : result.proposal.lines),
@@ -235,9 +241,9 @@ export function useConfigImport(previewPreset = false) {
           onPress: () =>
             void (async () => {
               if (!(await confirm())) return;
-              // 做成 App 的，原文件记在本机：以后能「恢复初始样子」。
+              // For apps created as standalone apps, record original file locally: enables "Restore initial state" later.
               if (mode === 'app') await saveAppOrigin(repo, appFile.app.id, text);
-              // 回到主页，新 App 的入口（或新页面）就在那里。
+              // Return to home screen, the new app's entry point (or new page) is located there.
               useAiReturn.getState().dismiss(pending?.id);
               goHome();
             })(),
@@ -265,10 +271,10 @@ export function useConfigImport(previewPreset = false) {
           onPress: () =>
             void (async () => {
               if (!(await confirm())) return;
-              // 换了一个 App，上一次修改剩下的那句和下一步的建议也就接不上了。
+              // Switched apps, leaving previous modification's remaining sentence and next step suggestions obsolete.
               await clearNext();
               await clearSuggest();
-              // 回到首页看结果，顶部的提示条能撤销。
+              // Return to home screen to view results, top prompt bar provides undo.
               goHome();
             })(),
         },
@@ -279,7 +285,7 @@ export function useConfigImport(previewPreset = false) {
   return { importText, pasteFile, apply };
 }
 
-/** 文字里 JSON 的 format；不是 JSON 或没有 format 时是 undefined。 */
+/** JSON format within text; undefined if not JSON or lacking format. */
 function formatOf(text: string): unknown {
   try {
     const data = JSON.parse(text) as unknown;

@@ -4,7 +4,7 @@ import { MAX_ATTACHMENTS } from './field-values';
 import { appendPrefill, attachRoom } from './record-append';
 import type { Collection } from './schema';
 
-// 把一次运行的结果放进一条已有的记录（out.addRecord 的 into: "existing"，D-443）：只追加，不替换、不删除。
+// Put the result of a run into an existing record (out.addRecord with into: "existing", D-443): append only, no replacement or deletion.
 
 const table: Collection = {
   id: 'docs',

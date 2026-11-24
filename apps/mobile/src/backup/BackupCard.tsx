@@ -9,10 +9,11 @@ import type { FilePlatform } from '@/runtime/platform';
 import { backupAvailable, getBackup } from './index';
 import { useBackupStatus, type BackupErrorKind, type BackupStep } from './service';
 
-// 「设置 → 数据 → 备份和恢复」这一页（D-600、D-615）：整体导出、从压缩包恢复。流程和规则在 service.ts；
-// 状态在 useBackupStatus 里，所以离开这一页再回来，进度还在。
+// "Settings -> Data -> Backup and restore" page (D-600, D-615): overall export, restore from
+// archive. Flow and rules in service.ts; state in useBackupStatus so leaving and returning to this
+// page preserves progress.
 
-/** 恢复只收 zip；有的文件提供者把 zip 标成 octet-stream，也让它能选（选了不是备份会被拒绝）。 */
+/** Restore accepts only zip; some file providers mark zip as octet-stream, allow selecting it too (non-backup selections will be rejected). */
 const ZIP_TYPES = ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'];
 
 const STEP_TEXT: Record<BackupStep, StringKey> = {
@@ -43,10 +44,10 @@ export function BackupCard({
   files: FilePlatform;
 }) {
   const status = useBackupStatus();
-  // 存到哪个文件夹了（给「已存到…」用）；save 失败的说明。
+  // Folder where backup was saved (for "Saved to..." message); description of save failure.
   const [saved, setSaved] = useState<string | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
-  // Expo Go 和测试里没有原生模块：这一块不显示。
+  // No native modules in Expo Go and tests: hide this section.
   if (!backupAvailable()) return null;
   const backup = getBackup();
   const caption = [palette.font('body', 13), { color: palette.muted }];
@@ -57,7 +58,7 @@ export function BackupCard({
     setSaved(null);
     setSaveFailed(false);
     backup.dismissError();
-    // 备份文件没有加密，先说清楚（D-600）。
+    // Backup files are unencrypted, state this clearly first (D-600).
     Alert.alert(t(locale, 'backupExportTitle'), t(locale, 'backupExportConfirm'), [
       { text: t(locale, 'cancel'), style: 'cancel' },
       { text: t(locale, 'backupExportAction'), onPress: () => void backup.exportAll() },
@@ -126,7 +127,7 @@ export function BackupCard({
 
   return (
     <>
-      {/* 标题在导航栏上（D-615）。 */}
+      {/* Title in navigation bar (D-615). */}
       <Card palette={palette} testID="backup">
         <Text style={caption}>{t(locale, 'backupHint')}</Text>
         {busy ? (

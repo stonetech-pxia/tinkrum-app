@@ -63,7 +63,7 @@ export {
   type DocTable,
 } from './doc-support';
 
-/** 一页的 DocPage。 */
+/** A single DocPage. */
 export function buildDocPage(input: DocPageInput, options: DocBuildOptions = {}): DocPage {
   if (input.paper) input = { ...input, paper: fitPaper(input.paper) };
   const page = buildPage(input, options, true);
@@ -128,7 +128,7 @@ export function buildDocPage(input: DocPageInput, options: DocBuildOptions = {})
         );
       });
       const rows = rowsOf(lines);
-      // 跨格识别行已在组表时按字符切过；不能拿整行框给某一格定位。
+      // Cross-cell recognized lines have already been sliced by characters during table grouping; the full-line bounding box cannot be used to locate a specific cell.
       const compact = (s: string) => s.replace(/\s/g, '');
       if (
         rows.length !== cell.text.split('\n').length ||
@@ -150,7 +150,7 @@ export function buildDocPage(input: DocPageInput, options: DocBuildOptions = {})
   }
   if (input.prior && input.nativeFigures?.length) {
     const candidate = insertWordFigures(input.prior, input.nativeFigures);
-    // 只换图且可编辑块完全相同时保留原分栏顺序；组表或正文有变化时仍用隔离后的重建结果。
+    // Preserve original column order when only changing the image and editable blocks are identical; use isolated reconstruction results when table grouping or body text changes.
     const signature = (page: DocPage) =>
       leafBlocks(page)
         .filter((b) => b.kind !== 'image')

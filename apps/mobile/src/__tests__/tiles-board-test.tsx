@@ -11,7 +11,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 记录列表的大圆块（D-311、D-312）和看板（D-313、D-314）。拖动本身要在模拟器上测，这里测点按和「移到…」。
+// Large circular blocks for record lists (D-311, D-312) and boards (D-313, D-314). Dragging itself must be tested on the simulator; here we test taps and "Move to...".
 
 const habits: Collection = {
   id: 'habits',
@@ -108,7 +108,7 @@ it('long-pressing a tile with a row action opens its entry instead of editing th
   await fireEvent(await screen.findByTestId('tile-run'), 'longPress');
   expect(await screen.findByDisplayValue('跑步')).toBeTruthy();
   expect(screen.queryByTestId('single-toolbar-grid')).toBeNull();
-  // 长按只是打开，不打卡。
+  // Long press only opens, does not check in.
   expect((await repo.getRecord('run'))?.values.today).toBe(1);
 });
 
@@ -135,7 +135,7 @@ it('moves a card with "Move to…" without dragging, with no undo; moving it bac
   await put(repo, 't2', 'tasks', { title: '没分的' });
   await renderToolsApp(repo, undefined, { seed });
   await fireEvent.press(await screen.findByTestId('board-card-t1'));
-  // 菜单里没有它现在所在的「待办」。
+  // The menu does not list its current "Todo" category.
   expect(screen.queryByTestId('board-menu-to:todo')).toBeNull();
   expect(screen.getByTestId('board-menu-to:')).toHaveTextContent('移到「未分」');
   await fireEvent.press(screen.getByTestId('board-menu-to:doing'));
@@ -146,7 +146,7 @@ it('moves a card with "Move to…" without dragging, with no undo; moving it bac
   await fireEvent.press(screen.getByTestId('board-menu-to:todo'));
   await screen.findByText('已移到「待办」');
   expect((await repo.getRecord('t1'))?.values).toEqual({ title: '写报告', status: 'todo' });
-  // 「未分」里的卡片移到一个选项。
+  // Move a card from "Unassigned" to an option.
   await fireEvent.press(screen.getByTestId('board-card-t2'));
   await fireEvent.press(screen.getByTestId('board-menu-to:done'));
   await screen.findByText('已移到「完成」');

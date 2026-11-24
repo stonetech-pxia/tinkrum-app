@@ -1,4 +1,4 @@
-// geometry 套件：纸张大小、位置和缩进、栏宽、表格行高、图片大小。
+// geometry suite: page size, position and indentation, column widths, table row heights, image dimensions.
 import { aligned, custom, leaves, sideBySide, table } from '../lib/checks';
 import type { Case } from '../lib/case';
 import {
@@ -11,7 +11,7 @@ import {
   xmlPara,
 } from '../lib/layout-checks';
 
-/** 1 毫米 = 56.69 twip。 */
+/** 1 millimeter = 56.69 twips. */
 const MM = 1440 / 25.4;
 
 export const GEOMETRY: Case[] = [

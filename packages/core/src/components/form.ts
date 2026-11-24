@@ -6,16 +6,16 @@ import { isRecordToolUse, ToolUseSchema } from '../record-ops-schema';
 import { collectionName, type LookDefinitionOf, defineLook, duplicates } from './define';
 
 const shape = {
-  /** inline 直接在页面上填；sheet（D-352）页面右下角一个「+」，点了从底部弹出添加框。 */
+  /** inline fills directly on the page; sheet (D-352) shows a "+" at the bottom right of the page, popping up an add dialog from the bottom when tapped. */
   show: z.strictObject({ mode: z.enum(['inline', 'sheet']) }),
-  /** 一个 {as: "submit", label, do: "create", table, ask: [字段], values?, smartDate?}。 */
+  /** A {as: "submit", label, do: "create", table, ask: [fields], values?, smartDate?}. */
   tools: z.array(ToolUseSchema).min(1).max(1),
 };
 
-/** smartDate 能填的字段（D-344）。 */
+/** Fields compatible with smartDate (D-344). */
 export const SMART_DATE_TYPES: readonly string[] = ['date', 'datetime', 'schedule'];
 
-/** 添加表单（原 recordForm inline / sheet）：表单是容器，提交是就地的 create 工具（ask = 表单里的字段）。 */
+/** Add form (original recordForm inline / sheet): forms are containers, submission is an in-place create tool (ask = fields in the form). */
 export const formComponent: LookDefinitionOf<'form', typeof shape> = defineLook({
   look: 'form',
   shape,
@@ -32,14 +32,14 @@ export const formComponent: LookDefinitionOf<'form', typeof shape> = defineLook(
       return ['a form has one tool {as: "submit", label, do: "create", table, ask: [fields]}'];
     }
     if (!tool.label) problems.push('the submit tool of a form needs a label');
-    // 用配置里原来的表：查找、汇总在检查别的块时换成了它们显示的那种字段（D-287）。
+    // Uses the original table from config: lookups and summaries are mapped to the fields they display when checking other blocks (D-287).
     const table = config.data.tables.find((x) => x.id === tool.table) ?? collection!;
     const ask = tool.ask;
     if (!Array.isArray(ask)) return [...problems, 'a form asks a list of fields: ask: [field ids]'];
     for (const id of ask) {
       const f = table.fields.find((x) => x.id === id);
       if (!f) problems.push(`form field ${id} does not exist`);
-      // 公式是算出来的（D-188）：表单里填不了（字段定义的 inForm）。附件可以在表单里选（D-263）。
+      // Formulas are computed (D-188): cannot be filled in forms (inForm in field definition). Attachments can be selected in forms (D-263).
       else if (fieldDefinition(f.type).inForm === false)
         problems.push(`form field ${id} is a ${f.type} field and cannot be filled in a form`);
     }
@@ -49,7 +49,7 @@ export const formComponent: LookDefinitionOf<'form', typeof shape> = defineLook(
     for (const id of Object.keys(values))
       if (ask.includes(id))
         problems.push(`${id} is both asked and in values; a preset value is not shown`);
-    // D-352：浮动的「+」放在页面右下角，一页一个，不能放进分组。
+    // D-352: Floating "+" placed at the bottom right of the page, one per page, cannot be placed inside groups.
     if (c.show.mode === 'sheet') {
       if (parent)
         problems.push(

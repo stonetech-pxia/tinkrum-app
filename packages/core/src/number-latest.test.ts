@@ -7,8 +7,11 @@ import { readNumber, type SourceContext } from './source';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 数字块的「最新」（D-618，创始人 2026-11-21「做前三个」）：最新一条记录的某个数字字段，和汇总字段的 latest 同一个「最新」：
-// 按 days.date（默认第一个日期字段，再第一个日期时间字段，再创建时间），同一天后建的算新，没有日期或这个字段没有值的不算。
+// "Latest" in number blocks (D-618, founder Nov 21, 2026 "do the first three"): the "latest" value
+// of a number field in the latest entry, matching the summary field's latest logic: sorted by
+// days.date (defaulting to the first date field, then the first datetime field, then creation
+// time), with ties broken by later creation time. Entries without dates or without a value in this
+// field are excluded.
 
 const people: Collection = {
   id: 'people',
@@ -77,12 +80,12 @@ const now = new Date(2026, 10, 18, 9);
 const rows = [
   record('weights', 'w1', { who: 'ann', date: '2026-11-10', kg: 72.4, logged: '2026-11-17' }, 1),
   record('weights', 'w2', { who: 'ann', date: '2026-11-16', kg: 71.8, logged: '2026-11-11' }, 2),
-  // 同一天两条：后建的算新。
+  // Two entries on the same day: the later created one is considered latest.
   record('weights', 'w3', { who: 'bob', date: '2026-11-15', kg: 80, logged: '2026-11-01' }, 3),
   record('weights', 'w4', { who: 'bob', date: '2026-11-15', kg: 79.5, logged: '2026-11-02' }, 4),
-  // 更新的一天，但没有体重：不算。
+  // Updated on the same day, but no weight: excluded.
   record('weights', 'w5', { who: 'ann', date: '2026-11-17', note: 'forgot' }, 5),
-  // 没有日期：不算。
+  // No date: excluded.
   record('weights', 'w6', { who: 'bob', kg: 60 }, 6),
 ];
 const ctx = (list: DataRecord[] = rows): SourceContext => ({
@@ -110,7 +113,7 @@ describe('a number block can show the latest value (D-618)', () => {
     expect(problems([number({ field: 'kg', days: { unit: 'week' } })])).toMatch(
       /days.unit, perUnit and skip only apply to aggregate "streak"/,
     );
-    // 每笔自己选货币的金额：最新一笔的货币和别的不一样，一个数说不清。
+    // Per-entry currency amounts: the latest entry has a different currency from others, making a single number ambiguous.
     expect(problems([number({ field: 'price' })])).toMatch(/price has its own currency/);
   });
 
@@ -122,21 +125,21 @@ describe('a number block can show the latest value (D-618)', () => {
     expect(
       readNumber({ table: 'weights', aggregate: 'latest', field: 'kg', filter: bob }, ctx())?.value,
     ).toBe(79.5);
-    // 另一个日期字段。
+    // Another date field.
     expect(
       readNumber(
         { table: 'weights', aggregate: 'latest', field: 'kg', days: { date: 'logged' } },
         ctx(),
       )?.value,
     ).toBe(72.4);
-    // 按创建时间。
+    // By creation time.
     expect(
       readNumber(
         { table: 'weights', aggregate: 'latest', field: 'kg', days: { date: 'createdAt' } },
         ctx(),
       )?.value,
     ).toBe(60);
-    // 一条都没有：没有值。
+    // None at all: no value.
     expect(
       readNumber({ table: 'weights', aggregate: 'latest', field: 'kg' }, ctx([]))?.value,
     ).toBeNull();

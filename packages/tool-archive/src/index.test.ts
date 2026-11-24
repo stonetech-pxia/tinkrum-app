@@ -81,7 +81,7 @@ describe('createZip / extractZip', () => {
 
 describe('extractZip safety', () => {
   it('flattens traversal paths to safe base names', () => {
-    // 手工构造的恶意路径：fflate 会原样写入这些名字。
+    // Manually constructed malicious paths: fflate writes these names as-is.
     const zip = zipSync({
       '../../evil.txt': text('1'),
       '/etc/passwd': text('2'),
@@ -138,13 +138,13 @@ describe('extractZip safety', () => {
       code: 'tooLarge',
       fileName: 'zeros.bin',
     });
-    // 小文件即使比例很高也放行。
+    // Small files are permitted even at high ratios.
     expect(extractZip(zipSync({ 'small.bin': new Uint8Array(100_000) }))).toHaveLength(1);
   });
 
   it('detects encrypted entries via the general-purpose flag', () => {
     const zip = zipSync({ 'secret.txt': text('hidden') });
-    // 把中央目录和本地头的第 0 位标志都置 1，模拟 ZipCrypto 加密。
+    // Set flags at offset 0 of central directory and local header to 1, simulating ZipCrypto encryption.
     for (let i = 0; i + 4 <= zip.length; i++) {
       const sig = zip[i]! | (zip[i + 1]! << 8) | (zip[i + 2]! << 16) | (zip[i + 3]! << 24);
       if (sig === 0x02014b50) zip[i + 8]! |= 1;
@@ -165,7 +165,7 @@ describe('extractZip safety', () => {
     const truncated = zip.slice(0, zip.length - 10);
     expect(errorOf(() => extractZip(truncated))).toMatchObject({ code: 'unreadable' });
 
-    // 压缩数据开头被破坏（中央目录完好）：本地头 30 字节 + 文件名 5 字节之后就是 deflate 数据。
+    // Compressed data beginning corrupted (central directory intact): deflate data starts right after 30-byte local header + 5-byte filename.
     const damaged = zip.slice();
     for (let i = 35; i < 45; i++) damaged[i] = 0xff;
     expect(errorOf(() => extractZip(damaged))).toMatchObject({ code: 'unreadable' });

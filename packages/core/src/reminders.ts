@@ -28,24 +28,27 @@ import {
   type WorkspaceConfig,
 } from './schema';
 
-// 提醒（D-251）：用本地通知，不用推送、不需要服务器。配置里只有提醒的设置（AI 能新建、修改）；
-// 到期提醒要的记录在本机读，正文在本机生成，记录内容不进配置、不发给 AI。
-// 点通知只打开对应的页面或快捷操作，绝不自动运行任何东西（收件页面不自动运行的规则不变；关系规则 13、14：
-// 提醒没有步骤，不能触发别的工具，也不能把数据带出 App。「完成」只是作用在这一条（$row）上的一键记录工具）。
+// Reminders (D-251): use local notifications, no push, no server needed. Config contains only
+// reminder settings (AI can create and modify); expiration reminder records are read locally, body
+// is generated locally, record content does not enter config and is not sent to AI. Tapping a
+// notification only opens the corresponding page or quick action, never automatically runs anything
+// (inbox auto-run restriction unchanged; relation rules 13, 14: reminders have no steps, cannot
+// trigger other tools, and cannot take data out of the app. "Done" is just a one-tap logging tool
+// acting on this entry ($row)).
 
-/** iOS 最多同时排 64 条本地通知：到期提醒最多排这么多条（最近的先排），每次打开 App 再补上后面的。 */
+/** iOS schedules at most 64 local notifications simultaneously: expiration reminders queue up to this many (most recent first), filling in the rest each time the app is opened. */
 export const MAX_DATE_NOTIFICATIONS = 48;
-/** 系统待发通知的上限（iOS 64 条，D-319）：全部提醒加上稍后提醒一起不超过它，超了只排最近的。 */
+/** System pending notification limit (iOS 64, D-319): total reminders plus snoozes together cannot exceed this; if exceeded, only the most recent are scheduled. */
 export const MAX_PENDING_NOTIFICATIONS = 64;
-/** 按记录排的提醒（scheduleField）最多排几条（D-319，待创始人确认）：最近的先排。 */
+/** Maximum number of record-based reminders (scheduleField) to schedule (D-319, pending founder confirmation): most recent first. */
 export const MAX_RECORD_NOTIFICATIONS = 40;
-/** 每条记录最多往后排几次（之后的等 App 下次重排）。 */
+/** Maximum number of future occurrences per record (subsequent ones wait for the app's next rescheduling). */
 export const RECORD_OCCURRENCES = 7;
 
-/** 打开快捷操作的提醒目标 tool:<id> → id（只把它摆出来，不运行）；不是时为 null。 */
+/** Reminder target opening quick action tool:<id> → id (only exposes it, does not run); null if not. */
 export const reminderToolId = (target: ReminderTarget): string | null => toolTargetId(target);
 
-/** 到期提醒（when.before，天数或分钟数）、按记录的提醒（when.each）、加完提醒（when.after，看创建时间）看的表和字段。 */
+/** Tables and fields checked by expiration reminders (when.before, days or minutes), record-based reminders (when.each), and post-creation reminders (when.after, based on creation time). */
 export const reminderTable = (r: Reminder): { table: string; field: string } | undefined =>
   'before' in r.when
     ? r.when.before
@@ -55,13 +58,13 @@ export const reminderTable = (r: Reminder): { table: string; field: string } | u
         ? { table: r.when.after.table, field: 'createdAt' }
         : undefined;
 
-/** 提醒的设置有没有问题：要打开的地方、要看的表和日期字段都要在。 */
+/** Check if reminder settings have issues: target to open, tables to watch, and date fields must all exist. */
 export function reminderProblems(r: Reminder, config: WorkspaceConfig): string[] {
   const problems: string[] = [];
   const where = `reminder ${r.id}`;
   const when = r.when;
   if ('before' in when && 'minutes' in when) {
-    // 前几分钟（D-562）要钟点：只能是日期时间字段。
+    // Minutes before (D-562) needs hour/minute: must be a datetime field.
     const collection = config.data.tables.find((c) => c.id === when.before.table);
     if (!collection) problems.push(`${where}: data table ${when.before.table} does not exist`);
     else if (collection.fields.find((f) => f.id === when.before.field)?.type !== 'datetime')
@@ -84,7 +87,7 @@ export function reminderProblems(r: Reminder, config: WorkspaceConfig): string[]
     problems.push(`${where}: data table ${when.after.table} does not exist`);
   if ('each' in when) problems.push(...recordReminderProblems(r, when.each, config));
   else {
-    // 每天、每周的提醒可以带 unless（D-563），没有「这一条」，所以不能有 link。
+    // Daily and weekly reminders can have unless (D-563), but since there is no "this entry", link is not allowed.
     if ('every' in when && r.unless) {
       problems.push(...unlessProblems(r, undefined, config));
       if (r.unless.link !== undefined)
@@ -102,7 +105,7 @@ export function reminderProblems(r: Reminder, config: WorkspaceConfig): string[]
     const pageId = pageIdOf(r.opens);
     const page = pageId === null ? undefined : config.containers.pages.find((p) => p.id === pageId);
     if (pageId !== null && !page) problems.push(`${where}: opens missing page ${pageId}`);
-    // D-342：给一条记录用的页面不知道打开哪一条。
+    // D-342: Page for a single record does not know which entry to open.
     if (page?.of)
       problems.push(
         `${where}: opens page ${pageId}, which shows one entry of ${page.of}; open another page`,
@@ -111,7 +114,7 @@ export function reminderProblems(r: Reminder, config: WorkspaceConfig): string[]
   return problems;
 }
 
-/** 按记录排的提醒（D-316–D-318）：日程字段、unless 条件、「完成」按钮的工具。 */
+/** Record-based reminders (D-316–D-318): schedule fields, unless conditions, and tools for the "Done" button. */
 function recordReminderProblems(
   r: Reminder,
   each: { table: string; field: string },
@@ -124,7 +127,7 @@ function recordReminderProblems(
   if (collection.fields.find((f) => f.id === each.field)?.type !== 'schedule')
     problems.push(`${where}: when.each.field must be a schedule field of ${collection.id}`);
   problems.push(...unlessProblems(r, collection, config));
-  // 关系规则 12、13：「完成」作用在这一条（$row，when.each.table 的一条）上，只是一键记录工具。
+  // Relation rules 12, 13: "Done" acts on this entry ($row, an entry from when.each.table), serving merely as a one-tap logging tool.
   if (r.done)
     problems.push(
       ...recordToolProblems(r.done, config, {
@@ -136,7 +139,7 @@ function recordReminderProblems(
   return problems;
 }
 
-/** unless 的表、筛选、日期字段；link 要指向 collection（按记录的提醒那张表，D-317）。 */
+/** unless table, filter, date field; link must point to collection (the record-based reminder table, D-317). */
 function unlessProblems(
   r: Reminder,
   collection: Collection | undefined,
@@ -166,27 +169,27 @@ function unlessProblems(
 
 export type NotificationTrigger =
   | { kind: 'daily'; hour: number; minute: number }
-  /** weekday：1 = 周一 … 7 = 周日（App 交给 expo-notifications 时换成它的 1 = 周日）。 */
+  /** weekday: 1 = Monday ... 7 = Sunday (converted to expo-notifications' 1 = Sunday when passed by the app). */
   | { kind: 'weekly'; weekday: number; hour: number; minute: number }
   | { kind: 'date'; at: number };
 
 export interface PlannedNotification {
-  /** 稳定的 ID：提醒 ID，周提醒加星期几，到期提醒加记录 ID。 */
+  /** Stable ID: reminder ID, weekly reminder plus weekday, expiration reminder plus record ID. */
   id: string;
   reminderId: string;
   title: string;
   body: string;
   trigger: NotificationTrigger;
   opens: ReminderTarget;
-  /** 按记录排的提醒：是哪条记录（「完成」和「稍后提醒」按钮用）。 */
+  /** Record-based reminder: which record it is (used by "Done" and "Snooze" buttons). */
   recordId?: string;
-  /** 通知上的按钮（D-318）：完成、稍后提醒，或者两个都有。 */
+  /** Buttons on the notification (D-318): Done, Snooze, or both. */
   buttons?: NotificationButtons;
 }
 
 export type NotificationButtons = 'done' | 'snooze' | 'doneSnooze';
 
-/** 提醒上有哪些按钮。 */
+/** Which buttons are present on the reminder. */
 export function reminderButtons(r: Reminder): NotificationButtons | undefined {
   if (r.done && r.snoozeMinutes !== undefined) return 'doneSnooze';
   if (r.done) return 'done';
@@ -194,7 +197,7 @@ export function reminderButtons(r: Reminder): NotificationButtons | undefined {
 }
 
 export interface PlanOptions {
-  /** 已经占用的待发通知（稍后提醒），从上限里扣掉。 */
+  /** Occupied pending notifications (snoozed), deducted from the limit. */
   reserved?: number;
 }
 
@@ -204,9 +207,10 @@ const hm = (time: string) => {
 };
 
 /**
- * 要排的本地通知（纯函数，App 每次打开、提醒或记录有变化时重新排一遍）。
- * records：到期提醒用到的表的记录（没删的）。到期提醒：日期 − daysBefore 天的 time，已经过去的不排；
- * 最多 MAX_DATE_NOTIFICATIONS 条，最近的先排。
+ * Local notifications to schedule (pure function, re-run every time the app opens or
+ * reminders/records change). records: records of tables used by expiration reminders (not
+ * deleted). Expiration reminders: time of date minus daysBefore days, past ones are not
+ * scheduled; at most MAX_DATE_NOTIFICATIONS items, most recent first.
  */
 export function planNotifications(
   config: WorkspaceConfig,
@@ -224,7 +228,7 @@ export function planNotifications(
     const when = r.when;
     const base = { reminderId: r.id, title: r.title, opens: r.opens };
     if ('after' in when) {
-      // 加完一条记录 minutes 分钟后提醒一次（D-391）；已经过了的不排。正文只写表名（P-043 ②）。
+      // Remind once minutes minutes after adding a record (D-391); past ones are not scheduled. Body only writes table name (P-043 ②).
       const collection = config.data.tables.find((c) => c.id === when.after.table)!;
       for (const record of records.get(collection.id) ?? []) {
         const at = record.createdAt + when.minutes * 60_000;
@@ -239,7 +243,7 @@ export function planNotifications(
       continue;
     }
     if ('before' in when && 'minutes' in when) {
-      // 日期时间那一刻之前 minutes 分钟（D-562）；已经过了的不排。正文只写表名和钟点（P-043 ②）。
+      // Minutes minutes before the datetime moment (D-562); past ones are not scheduled. Body only writes table name and time (P-043 ②).
       const collection = config.data.tables.find((c) => c.id === when.before.table)!;
       const field = collection.fields.find((f) => f.id === when.before.field)!;
       for (const record of records.get(collection.id) ?? []) {
@@ -268,8 +272,10 @@ export function planNotifications(
         ...planRecordReminder(r, { ...when.each, at: when.at }, config, records, now, locale, cal),
       );
     } else if ('every' in when && (r.unless || when.every === 'month')) {
-      // 带 unless 的每天、每周提醒（D-563）：不能交给系统按天重复，一天一天排，已经有记录的那天不排。
-      // 每月几号的提醒（D-577）：系统没有按月重复的通知，也这样排接下来的几次（有 unless 时同样跳过）。
+      // Daily and weekly reminders with unless (D-563): cannot be delegated to system daily
+      // repetition, scheduled day by day, skipping days that already have records. Monthly date
+      // reminders (D-577): system lacks monthly repeating notifications, scheduled this way for the
+      // next few occurrences (also skipping when unless is present).
       const today = dayNumber(localDate(now))!;
       const span = when.every === 'month' ? 366 : 7 * 8;
       let added = 0;
@@ -280,7 +286,7 @@ export function planNotifications(
         if (when.every === 'month' && d !== when.day) continue;
         const time = new Date(y, m - 1, d, hour, minute).getTime();
         if (time <= now.getTime()) continue;
-        // 这个钟点算哪一天（早于一天开始的钟点算前一天，D-286）。
+        // Which day this time belongs to (times earlier than day start hour belong to the previous day, D-286).
         const logical = hour < cal.dayStartHour ? day - 1 : day;
         if (reminderSkipped(r, null, logical, config, records, now)) continue;
         dated.push({
@@ -306,13 +312,13 @@ export function planNotifications(
       const collection = config.data.tables.find((c) => c.id === when.before.table)!;
       const before = when.days;
       for (const record of records.get(collection.id) ?? []) {
-        // 算出来的日期（D-550）现算，不存。
+        // Calculated date (D-550) computed on the fly, not stored.
         const due = recordDay(record, collection, when.before.field, now, cal);
         if (typeof due !== 'string') continue;
         const [y, m, d] = due.split('-').map(Number) as [number, number, number];
         const at = new Date(y, m - 1, d - before, hour, minute);
         if (at.getTime() <= now.getTime()) continue;
-        // 通知会出现在锁屏上：正文只写表名，不写记录的标题（P-043 ②）。
+        // Notifications appear on the lock screen: body only writes the table name, not the record title (P-043 ②).
         const table = collection.name;
         const body =
           before === 0
@@ -335,7 +341,7 @@ export function planNotifications(
   const byTime = (a: PlannedNotification, b: PlannedNotification) => at(a) - at(b);
   dated.sort(byTime);
   perRecord.sort(byTime);
-  // 系统上限（D-319）：重复的提醒每条只占一个位置，先排；剩下的位置给到期提醒和按记录的提醒，最近的先排。
+  // System limit (D-319): recurring reminders take one slot each and are scheduled first; remaining slots go to expiration and record-based reminders, most recent first.
   const room = Math.max(0, MAX_PENDING_NOTIFICATIONS - (options.reserved ?? 0) - repeating.length);
   const timed = [
     ...dated.slice(0, MAX_DATE_NOTIFICATIONS),
@@ -344,13 +350,13 @@ export function planNotifications(
   return [...repeating.slice(0, MAX_PENDING_NOTIFICATIONS), ...timed.slice(0, room)];
 }
 
-/** 天数那一天的 hour:minute（本机时间）。早于一天开始的钟点时是下一个日历日的（D-286）。 */
+/** hour:minute of that day (local time). For times earlier than day start hour, belongs to the next calendar day (D-286). */
 function atDay(day: number, hour: number, minute: number, cal: Calendar): number {
   const [y, m, d] = dateOfDayNumber(day).split('-').map(Number) as [number, number, number];
   return new Date(y, m - 1, d + (hour < cal.dayStartHour ? 1 : 0), hour, minute).getTime();
 }
 
-/** 这一天所在的这一天 / 这一周 / 这个月（天数，含两端）。 */
+/** The day / week / month containing this day (days, inclusive of both ends). */
 function periodAround(day: number, within: 'day' | 'week' | 'month', cal: Calendar) {
   if (within === 'day') return [day, day] as const;
   if (within === 'week') return [weekStartOf(day, cal), weekStartOf(day, cal) + 6] as const;
@@ -362,8 +368,10 @@ function periodAround(day: number, within: 'day' | 'week' | 'month', cal: Calend
 }
 
 /**
- * unless（D-317）：record 这条的 day 那天要不要跳过。看 unless 表里符合筛选的记录（同一张表只看这条自己，
- * 有 link 只看指向这条的）有没有一条落在那天所在的时间段里。每天、每周的提醒（D-563）没有这一条（null），看整张表。
+ * unless (D-317): whether to skip day for this record. Checks if any record matching the filter
+ * in the unless table (same table checks only self; if link is present, checks only those
+ * pointing to this entry) falls within the time range of that day. Daily and weekly reminders
+ * (D-563) have no entry (null), checking the whole table.
  */
 export function reminderSkipped(
   r: Reminder,
@@ -395,8 +403,10 @@ export function reminderSkipped(
 }
 
 /**
- * 一个 when.each 提醒要排的通知（D-316）：每条记录按自己的日程接下来几次，每次在 at；已经过去的、
- * unless 说要跳过的不排。标题是记录的标题，在本机拼出来（AI 看不到记录），正文是提醒的 title。
+ * Notifications to schedule for a when.each reminder (D-316): each record follows its own
+ * schedule for the next few occurrences, each at at; past ones or those skipped by unless are not
+ * scheduled. Title is the record title, assembled locally (AI cannot see records), body is the
+ * reminder title.
  */
 function planRecordReminder(
   r: Reminder,
@@ -418,10 +428,10 @@ function planRecordReminder(
   for (const record of records.get(collection.id) ?? []) {
     const rule = readValue(field, record.values[field.id]) as ScheduleRule | undefined;
     if (!rule) continue;
-    // 记录自己的钟点优先（D-346），没有时用提醒的 at。
+    // Record's own time takes priority (D-346), falling back to reminder's at if absent.
     const { hour, minute } = hm(rule.time ?? each.at);
     const done = scheduleDoneDays(record, collection, field, now, cal);
-    // 多算一次：今天的时间已经过了时用后面的补上。
+    // Calculate extra: fill in with subsequent ones when today's time has passed.
     const days = scheduleOccurrences(
       rule,
       done,
@@ -453,8 +463,10 @@ function planRecordReminder(
 }
 
 /**
- * 「完成」按钮要写什么（D-318）：create 是新记录的表单输入（"$row" 指这条），set / toggle / increment 是
- * 这条记录要改的值。字段、表已经不在了（或者是检查不让用的 setAll）时为 null。结果再交给 prepareRecordValues。
+ * What the "Done" button should write (D-318): create is form input for a new record ("$row"
+ * refers to this one), set / toggle / increment are values to modify on this record. Null if
+ * fields or tables no longer exist (or are disallowed by setAll checks). Result is then passed to
+ * prepareRecordValues.
  */
 export function reminderDoneInput(
   done: RecordTool,
@@ -462,7 +474,7 @@ export function reminderDoneInput(
   collection: Collection,
   record: DataRecord,
   now: Date,
-  /** 算好的这一条（D-565：done 抄它的字段、从它的日期起算时要用；不给时只读存着的值）。 */
+  /** Computed entry (D-565: used when done copies its fields or calculates from its date; when omitted, only reads stored values). */
   computed: DataRecord = record,
 ):
   | { kind: 'create'; collection: Collection; input: Record<string, unknown> }
@@ -489,19 +501,20 @@ export function reminderDoneInput(
   return input ? { kind: 'update', input } : null;
 }
 
-/** 稍后提醒的通知 ID（一条记录一个，重排时保留，点了「完成」时取消）。 */
+/** Notification ID for snooze (one per record, preserved during reordering, cancelled when 'Done' is tapped). */
 export const snoozeId = (reminderId: string, recordId: string) =>
   `snooze-${reminderId}-${recordId}`;
 
 /**
- * 到期提醒和按记录排的提醒要读哪些表的记录（按记录排的要算好的记录：日程的 lastDone 可能是汇总，
- * unless 的筛选可能用查找来的值）。
+ * Tables whose records should be read by due date reminders and record-based reminders
+ * (record-based ones compute target records: e.g., a schedule's lastDone might be an aggregate,
+ * and an unless filter might use looked-up values).
  */
 export const reminderCollections = (config: WorkspaceConfig): string[] => [
   ...new Set(
     remindersOf(config).flatMap((r) => {
       const on = reminderTable(r);
-      // 带 unless 的每天、每周提醒（D-563）只读 unless 的表。
+      // Daily and weekly reminders with an unless condition (D-563) only read the unless table.
       if (r.enabled && r.unless && 'every' in r.when) return [r.unless.table];
       if (!r.enabled || !on) return [];
       return r.unless && 'each' in r.when ? [on.table, r.unless.table] : [on.table];
@@ -509,6 +522,6 @@ export const reminderCollections = (config: WorkspaceConfig): string[] => [
   ),
 ];
 
-/** 有没有开着的提醒（没有时不申请通知权限）。 */
+/** Whether there are any active reminders (does not request notification permissions when none exist). */
 export const hasActiveReminders = (config: WorkspaceConfig) =>
   remindersOf(config).some((r) => r.enabled);

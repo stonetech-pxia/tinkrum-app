@@ -9,8 +9,9 @@ import { Button, Card } from '@/renderer/ui';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
 
 /**
- * 「设置 → 提醒」（D-251）：列出提醒，可以开关、移除（都生成一个可撤销的版本）。
- * 新建和改时间由 AI 修改（「每天 9 点提醒我记账」），这里说明怎么做。
+ * "Settings -> Reminders" (D-251): list reminders, can toggle or remove (both generate an
+ * undoable version). Creating and rescheduling are handled by AI modifications ("Remind me to log
+ * expenses every day at 9 AM"), explained here.
  */
 export default function RemindersRoute() {
   const { locale } = useWorkspaceContext();

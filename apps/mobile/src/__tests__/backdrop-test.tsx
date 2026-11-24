@@ -25,8 +25,9 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore, type WorkspaceStore } from '../workspace/store';
 
-// 图片背景（D-258）：AI 只能打开、关掉、调遮罩；图片由用户在长按编辑里选、换、移除，存成用户文件，
-// 配置里只有 ID。图片上的文字用正文色，遮罩保证对比度。
+// Image backdrop (D-258): AI can only open, close, and adjust the mask; images are selected,
+// changed, and removed by the user in long-press edit, stored as user files, with only the ID in
+// config. Text on images uses body text color, and the mask ensures contrast.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -100,7 +101,7 @@ const home = (store: WorkspaceStore) => store.getState().config!.containers.page
 const tipStyle = (store: WorkspaceStore) =>
   (home(store).blocks.find((c) => c.id === 'tip') as { style?: Record<string, unknown> }).style;
 
-/** 长按 → 编辑：打开这个组件的操作面板。 */
+/** Long press -> edit: open the action panel for this component. */
 async function openSheet(id: string) {
   await fireEvent(screen.getByTestId(`component-${id}`), 'longPress');
   await fireEvent.press(await screen.findByTestId(`single-edit-${id}`));
@@ -117,14 +118,14 @@ describe('picture backgrounds', () => {
   it('a card turned on by AI shows its color until the user picks a picture in the long-press sheet', async () => {
     const { repo, store, files } = await renderApp();
     await commit(store, [NOTE], '加提示');
-    // 开着但还没有图片：照常显示底色。
+    // Enabled but no picture yet: display background color as usual.
     expect(screen.queryByTestId('backdrop-picture')).toBeNull();
 
     await openSheet('tip');
     files.nextImage = files.offer('IMG_7.jpg', photo, 'image/jpeg');
     await fireEvent.press(screen.getByTestId('edit-backdrop-choose'));
     expect(await screen.findByTestId('backdrop-picture')).toBeTruthy();
-    // 卡片的图片缩到 1200 以内再存。
+    // Card images are scaled down to under 1200 before saving.
     expect(files.imageSides).toEqual([BACKDROP_SIDE.card]);
     await done('tip');
 
@@ -133,7 +134,7 @@ describe('picture backgrounds', () => {
     expect(tipStyle(store)).toEqual({ backdrop: { overlay: 'medium', assetId: asset!.id } });
     expect(JSON.stringify(store.getState().config)).not.toContain('IMG_7');
 
-    // 遮罩是卡片的底色，不透明度保证正文过对比度检查；图片上的文字用正文色。
+    // The mask is the card background color, with opacity ensuring body text passes contrast check; text on the image uses body text color.
     const c = resolveColors(store.getState().config!.theme, false);
     expect(StyleSheet.flatten(screen.getByTestId('backdrop-overlay').props.style)).toMatchObject({
       backgroundColor: c.secondaryTint,
@@ -149,7 +150,7 @@ describe('picture backgrounds', () => {
     files.nextImage = files.offer('IMG_7.jpg', photo, 'image/jpeg');
     await fireEvent.press(screen.getByTestId('edit-backdrop-choose'));
     await screen.findByTestId('backdrop-picture');
-    // 选好图片面板就关了；再点「编辑」。调遮罩时面板不关，可以连着试。
+    // Selecting an image closes the panel; tapping "Edit" again. The panel does not close when adjusting the mask, allowing continuous tweaking.
     await fireEvent.press(await screen.findByTestId('single-edit-tip'));
     await fireEvent.press(screen.getByTestId('edit-backdrop-overlay-strong'));
     expect(screen.getByTestId('edit-sheet')).toBeTruthy();

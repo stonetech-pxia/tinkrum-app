@@ -7,11 +7,12 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-// WAV 的读和接（D-270）：TextToSpeech.synthesizeToFile 每段写一个 16 位 PCM 的 WAV，这里把它们按顺序
-// 接成一个。只认 PCM（格式 1）；同一个声音的各段格式相同，不同时报错（不悄悄混在一起变调）。
-// 纯 Kotlin，不依赖 Android，测试见 src/test/…/WavTest.kt。
+// WAV reading and joining (D-270): TextToSpeech.synthesizeToFile writes a 16-bit PCM WAV for each
+// segment, which are concatenated in order here. Only supports PCM (format 1); requires matching
+// formats across segments of the same audio, otherwise throws an error (prevents silent mixing that
+// alters pitch). Pure Kotlin, Android-independent; tests located in src/test/…/WavTest.kt.
 
-/** 一个 WAV 的格式和数据在文件里的位置。 */
+/** Format and data position of a WAV file. */
 data class WavInfo(
   val channels: Int,
   val sampleRate: Int,
@@ -28,7 +29,7 @@ data class WavInfo(
 object Wav {
   private const val HEADER_BYTES = 44
 
-  /** 读 RIFF 的块，找到 fmt 和 data。有的引擎边写边出，data 的长度是 0 或 0xFFFFFFFF，这时按文件长度算。 */
+  /** Read RIFF chunks to locate fmt and data. Some engines write incrementally, leaving data length as 0 or 0xFFFFFFFF, in which case file length is used. */
   fun read(file: File): WavInfo = RandomAccessFile(file, "r").use { raf ->
     val length = raf.length()
     if (length < 12) throw IOException("not a WAV: too short")
@@ -59,7 +60,7 @@ object Wav {
           b.int // byteRate
           b.short // blockAlign
           bits = b.short.toInt() and 0xFFFF
-          // 1 = PCM；0xFFFE = WAVE_FORMAT_EXTENSIBLE（里面也是 PCM 时同样能接）。
+          // 1 = PCM; 0xFFFE = WAVE_FORMAT_EXTENSIBLE (can also be joined if it contains PCM).
           if (format != 1 && format != 0xFFFE) throw IOException("not PCM: $format")
         }
         "data" -> {
@@ -74,7 +75,7 @@ object Wav {
     throw IOException("no data chunk")
   }
 
-  /** 标准的 44 字节 PCM 头。 */
+  /** Standard 44-byte PCM header. */
   fun header(channels: Int, sampleRate: Int, bitsPerSample: Int, dataSize: Long): ByteArray {
     val blockAlign = channels * (bitsPerSample / 8)
     return ByteBuffer.allocate(HEADER_BYTES).order(ByteOrder.LITTLE_ENDIAN).apply {
@@ -95,8 +96,9 @@ object Wav {
   }
 
   /**
-   * 按顺序接成 output（已有的覆盖）；返回结果的格式。isCancelled 每复制 1 MB 看一次。
-   * 出错时 output 不删，由调用方删（它也要在取消时删）。
+   * Concatenate into output in order (overwriting existing files); returns the format of the
+   * result. Checks cancellation every 1 MB copied. On error, output is not deleted; deletion is
+   * left to the caller (which must also delete it on cancellation).
    */
   fun join(inputs: List<File>, output: File, isCancelled: () -> Boolean = { false }): WavInfo {
     if (inputs.isEmpty()) throw IOException("nothing to join")
@@ -106,7 +108,7 @@ object Wav {
       if (!info.sameFormat(first)) throw IOException("segment $i has a different format")
     }
     val total = infos.sumOf { it.dataSize }
-    // WAV 的长度字段是 32 位：超过 4 GB 写不进去（朗读最多几百 MB，到不了）。
+    // WAV length field is 32-bit: cannot write files over 4 GB (TTS reads at most a few hundred MB, so it never reaches this limit).
     if (total + 36 > 0xFFFFFFFFL) throw IOException("too long for a WAV")
     output.parentFile?.mkdirs()
     FileOutputStream(output).use { out ->

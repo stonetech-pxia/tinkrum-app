@@ -11,7 +11,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 时间、日期时间、时长字段的填写和显示（D-279），工时公式（D-280、D-281）。
+// Filling and display of time, datetime, and duration fields (D-279), and working hours formulas (D-280, D-281).
 
 const shifts: Collection = {
   id: 'shifts',
@@ -80,14 +80,14 @@ it('a new user logs a night shift with a break and sees the worked hours', async
   await fireEvent.press(screen.getByTestId('form-log-submit'));
   const saved = await repo.listRecords('shifts');
   expect(saved).toHaveLength(1);
-  // 打卡没填，默认是现在。
+  // Check-in left blank defaults to the current time.
   expect(saved[0]!.values).toEqual({
     start: '22:00',
     end: '06:00',
     break: 30,
     in: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
   });
-  // 跨午夜 8 小时减 30 分钟。
+  // 8 hours across midnight minus 30 minutes.
   expect(await screen.findByText('7.5 h')).toBeTruthy();
   expect(screen.getByText('0:30')).toBeTruthy();
 });
@@ -130,7 +130,7 @@ it('shows stored entries in French, and nothing for values that no longer fit', 
     createdAt: 1,
     updatedAt: 1,
   });
-  // 恢复旧版本后类型对不上的值：不显示，也不让公式算错。
+  // Values with mismatched types after restoring an old version: not displayed, nor allowed to break formulas.
   await repo.insertRecord({
     id: 'r2',
     collectionId: 'shifts',

@@ -47,10 +47,13 @@ import v34Habits from '../../../../packages/core/src/fixtures/v34/habits.json';
 import v34Tasks from '../../../../packages/core/src/fixtures/v34/tasks.json';
 import v34Todo from '../../../../packages/core/src/fixtures/v34/todo.json';
 
-// Tinkrum 的 19 条底线（AGENTS.md「底线」，创始人 2026-10-31 暂定，同一天改了 3、7、11、16，加了 19）在 App 这一层的守护测试：发给 AI 的请求、
-// 记录在改 App 前后是否还在、看页面会不会写数据、写数据能不能撤销。core 那一层在
-// packages/core/src/invariants.test.ts，文件平台在 invariants-files-test.ts。
-// 测出真的违反时不改代码：标 it.failing，注释写「违反底线 N，待创始人决定：…」。
+// Guard tests for Tinkrum's 19 invariants (AGENTS.md "Invariants", provisionally set by founder on
+// 2026-10-31, with invariants 3, 7, 11, 16 modified and 19 added on the same day) at the app layer:
+// requests sent to AI, verifying whether records persist before and after app modifications,
+// checking that read-only pages write no data, and verifying that data writes are undoable. The
+// core layer is tested in packages/core/src/invariants.test.ts, and the file platform in
+// invariants-files-test.ts. When a real violation is detected, do not fix code: mark as it.failing
+// with comment "violates invariant N, awaiting founder's decision: ...".
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const NOW = new Date(2026, 9, 31, 9, 0);
@@ -58,7 +61,7 @@ const SENTINEL = 'SENTINEL-私密-7f3a';
 const ASSET = 'sentinelasset01';
 const OTHER_ASSET = 'otherasset0002';
 
-/** 默认配置加一张笔记表和首页上一个文件位（指向用户自己选的文件）。 */
+/** Default config with a notes table and a file slot on the home screen (pointing to a user-selected file). */
 function seeded(locale: Locale = 'zh'): WorkspaceConfig {
   const ops: Op[] = [
     {
@@ -83,7 +86,7 @@ function seeded(locale: Locale = 'zh'): WorkspaceConfig {
   return r.config;
 }
 
-/** 记录、文件名、识别出的文字（存在记录里）都带哨兵字符串。 */
+/** Records, file names, and recognized text (stored within records) all contain sentinel strings. */
 async function repoWithPrivateData() {
   const repo = new MemoryWorkspaceRepo();
   await repo.insertRecord({
@@ -108,7 +111,7 @@ async function repoWithPrivateData() {
 
 const themePlan: Plan = { kind: 'ops', ops: [{ op: 'setTheme', primaryColor: '#336699' }] };
 
-/** 假的 fetch：记下发出去的每个请求体，回一个合法的计划。 */
+/** Mock fetch: records every outgoing request body and returns a valid plan. */
 function capturingFetch(reply: (plan: string) => unknown) {
   const bodies: string[] = [];
   const fetchImpl = (async (_url: string, init: RequestInit) => {
@@ -154,7 +157,7 @@ async function bootedStore(provider: AIProvider, repo?: MemoryWorkspaceRepo) {
 
 const fixedPlanner = (plan: Plan): AIProvider => ({ plan: async () => plan });
 
-describe('底线 1 / 2：AI 的请求里没有数据内容（记录、文件名、文件内容、识别文字）', () => {
+describe('Invariant 1 / 2: AI requests contain no data content (records, file names, file content, recognized text)', () => {
   const shared = {
     id: 1,
     source: 'share' as const,
@@ -180,10 +183,10 @@ describe('底线 1 / 2：AI 的请求里没有数据内容（记录、文件名�
     });
     const { store } = await bootedStore(provider);
     expect((await store.getState().change('换个颜色', provider)).kind).toBe('drafted');
-    // 草稿聊天框接着说（带上之前说过的话，D-207）。
+    // Continue the draft chat conversation (including previously spoken messages, D-207).
     await store.getState().draftChange('再深一点');
     await store.getState().deleteDraft();
-    // 收件页面打开 AI：只带文件的类型和个数。
+    // Inbox opens AI: sends only file types and counts.
     await store.getState().change('给这些做个快捷操作', provider, { about: sharedAbout(shared) });
     await store.getState().deleteDraft();
     await store.getState().propose('换个颜色', provider, sharedAbout(shared));
@@ -192,7 +195,7 @@ describe('底线 1 / 2：AI 的请求里没有数据内容（记录、文件名�
       expect(body).not.toContain(SENTINEL);
       expect(body).not.toContain('识别出的文字');
     }
-    // 配置本身是发了的（AI 要看结构）；文件位里只有占位符，连随机的文件 ID 也不发（底线 3）。
+    // The configuration itself is sent (AI needs to inspect the structure); file slots contain only placeholders, without even random file IDs (Invariant 3).
     expect(bodies[0]).toContain('notes');
     for (const body of bodies) {
       expect(body).not.toContain(ASSET);
@@ -201,7 +204,7 @@ describe('底线 1 / 2：AI 的请求里没有数据内容（记录、文件名�
     expect(bodies[0]).toContain(REDACTED_FILE);
   });
 
-  // D-423：表单读到的二维码只进候选，不存，AI 的请求里没有。这里走真的计划请求，配置里也查不到。
+  // D-423: QR codes read in the form enter candidates only and are not stored; they are excluded from AI requests. Uses real plan requests, and cannot be found in config either.
   it('a QR code read in the form never reaches the AI request', async () => {
     const { bodies, fetchImpl } = capturingFetch(relayReply);
     const provider = createRemoteAIProvider({
@@ -232,7 +235,7 @@ describe('底线 1 / 2：AI 的请求里没有数据内容（记录、文件名�
       { files },
       new AbortController().signal,
     );
-    // 真的读到了（不是没读到所以没发）。
+    // Successfully read (not omitted due to a read failure).
     expect(codes.join()).toContain(code);
     expect(JSON.stringify(store.getState().config)).not.toContain(code);
     expect((await store.getState().change('换个颜色', provider)).kind).toBe('drafted');
@@ -255,7 +258,7 @@ describe('底线 1 / 2：AI 的请求里没有数据内容（记录、文件名�
     if (saved.kind !== 'saved') return;
     expect(store.getState().config).not.toHaveProperty('presets');
     await repo.insertPreset({ ...saved.preset, id: 'otherpreset', name: `另一个-${SENTINEL}` });
-    // 应用过一个预设之后，版本说明里有它的名字，也不发给 AI。
+    // After applying a preset, its name appears in the release notes and is not sent to AI.
     expect((await store.getState().proposePreset(saved.preset.id)).kind).toBe('preview');
     await store.getState().confirm();
     await store.getState().markRendered(store.getState().head!.id);
@@ -283,8 +286,8 @@ describe('底线 1 / 2：AI 的请求里没有数据内容（记录、文件名�
   });
 });
 
-describe('底线 3：AI 永远不碰文件', () => {
-  // 创始人 2026-10-31（对话）：AI 的修改一律不能写文件引用，只有用户在长按编辑里选。
+describe('Invariant 3: AI never touches files', () => {
+  // Founder 2026-10-31 (conversation): AI modifications may never write file references; only the user picks them via long-press edit.
   it('AI cannot point a file slot at one of the user’s files; only the user picks it', async () => {
     const plan: Plan = {
       kind: 'ops',
@@ -320,7 +323,7 @@ describe('底线 3：AI 永远不碰文件', () => {
   });
 });
 
-describe('底线 5：改 App 永远不删数据', () => {
+describe('Invariant 5: Changing the app never deletes data', () => {
   async function apply(store: Awaited<ReturnType<typeof bootedStore>>['store'], ops: Op[]) {
     const r = await store.getState().proposeOps(ops, 'x');
     expect(r.kind).toBe('preview');
@@ -335,12 +338,12 @@ describe('底线 5：改 App 永远不删数据', () => {
     expect((await repo.getRecord('r1'))!.values.body).toContain(SENTINEL);
     await apply(store, [{ op: 'removeData', table: 'notes' }]);
     expect((await repo.listRecords('notes')).map((r) => r.id)).toEqual(['r1']);
-    // 恢复到最早的版本：表回来了，记录一直都在。
+    // Restore to earliest version: table is restored, and records remain intact.
     expect((await store.getState().proposeRestore(first)).kind).toBe('preview');
     await store.getState().confirm();
     expect(store.getState().config!.data.tables.some((t) => t.id === 'notes')).toBe(true);
     expect((await repo.getRecord('r1'))!.values.body).toContain(SENTINEL);
-    // 撤销也一样。
+    // Undo behaves the same way.
     await store.getState().undo();
     expect((await repo.listRecords('notes')).length).toBe(1);
   });
@@ -374,7 +377,7 @@ describe('底线 5：改 App 永远不删数据', () => {
   });
 });
 
-describe('底线 7：外观修改先进草稿；功能修改直接生效，随时能在改动记录里撤销', () => {
+describe('Invariant 7: Look changes go into a draft first; feature changes take effect directly, can be undone at any time in Change history', () => {
   it('an AI change to the look goes into a draft; the app does not change until the user applies it', async () => {
     const { store } = await bootedStore(fixedPlanner(themePlan));
     const head = store.getState().head!.id;
@@ -389,7 +392,7 @@ describe('底线 7：外观修改先进草稿；功能修改直接生效，随�
     expect(store.getState().config!.theme.primaryColor).not.toBe('#336699');
   });
 
-  // D-411：草稿聊天框里说的功能修改也一样，草稿接着开着，外观还没生效。
+  // D-411: Function modifications stated in the draft chat are recorded and can be undone; the draft remains open and visual changes are not yet applied.
   it('a function change said in the draft chat is recorded and can be undone; the look stays a draft', async () => {
     const table: Plan = {
       kind: 'ops',
@@ -416,8 +419,9 @@ describe('底线 7：外观修改先进草稿；功能修改直接生效，随�
     expect(store.getState().draft!.open).toBe(true);
   });
 
-  // 创始人 2026-10-31（对话）改了底线 7 的措辞：功能修改（D-191，建表、加快捷操作等）直接生效，但随时能在
-  // 改动记录里撤销。
+  // Founder 2026-10-31 (conversation) updated Invariant 7 wording: function modifications (D-191,
+  // creating tables, adding quick actions, etc.) take effect immediately, but can be undone at any
+  // time in Change history.
   it('an AI change to function (a new table) applies at once, is recorded in the history and can be undone', async () => {
     const plan: Plan = {
       kind: 'ops',
@@ -441,7 +445,7 @@ describe('底线 7：外观修改先进草稿；功能修改直接生效，随�
     expect(after.id).not.toBe(head);
     expect(after.source).toBe('ai');
     expect(store.getState().config!.data.tables.some((t) => t.id === 'books')).toBe(true);
-    // 改动记录里有这一版，前一版随时能回去。
+    // Change history contains this version, and any previous version can be reverted to at any time.
     expect((await repo.listRevisions(50)).map((r) => r.id)).toEqual(
       expect.arrayContaining([head, after.id]),
     );
@@ -453,7 +457,7 @@ describe('底线 7：外观修改先进草稿；功能修改直接生效，随�
     expect(store.getState().config!.data.tables.some((t) => t.id === 'books')).toBe(true);
   });
 
-  // R02（创始人 2026-11-07 定：做翻页）：改动记录永远能回到以前任何时候——一页一页往下翻，翻得到第一个版本。
+  // R02 (founder decided on 2026-11-07: implement pagination): Change history can always return to any previous point -- paging downwards until reaching the very first version.
   it('the change history pages back to the very first version however many there are', async () => {
     const { repo, store } = await bootedStore(fixedPlanner(themePlan));
     const first = store.getState().head!;
@@ -479,9 +483,9 @@ describe('底线 7：外观修改先进草稿；功能修改直接生效，随�
   });
 });
 
-// ---- 渲染：看页面不写数据（底线 15、16），写数据能撤销（底线 11）----
+// ---- Rendering: viewing pages writes no data (Invariants 15, 16), writing data is undoable (Invariant 11) ----
 
-/** 每张表几条简单的记录（只填存下来的、好填的字段）。 */
+/** A few simple records per table (populating only stored, easily fillable fields). */
 async function fillRecords(repo: MemoryWorkspaceRepo, tables: readonly Collection[]) {
   for (const t of tables)
     for (let i = 0; i < 3; i++) {
@@ -521,7 +525,7 @@ function spyWrites(repo: MemoryWorkspaceRepo) {
   return WRITES.map((name) => [name, jest.spyOn(repo, name)] as const);
 }
 
-// core 里冻结的配置：v34 的范围模版、v33 代码存下来的样板（迁移到现在）。
+// Frozen core config: v34 scope templates, templates stored by v33 code (migrated to current).
 const V34: Record<string, unknown> = {
   habits: v34Habits,
   calendar: v34Calendar,
@@ -551,7 +555,7 @@ function withTemplate(
 
 const VIEWED: [string, () => WorkspaceConfig, Locale][] = [
   ['default (fr)', () => createDefaultWorkspace('fr'), 'fr'],
-  // 收件页面「存成记录」的预设表（D-392）和隐藏的预设（D-444）也一样只看不写。
+  // Inbox "Save as record" preset table (D-392) and hidden presets (D-444) similarly perform read-only operations without writing.
   ...[...DATA_TEMPLATES, ...FILE_RECORD_PRESETS, ...HIDDEN_RECORD_PRESETS].map(
     (t): [string, () => WorkspaceConfig, Locale] => [`template ${t}`, () => withTemplate(t), 'zh'],
   ),
@@ -567,13 +571,13 @@ const VIEWED: [string, () => WorkspaceConfig, Locale][] = [
       'zh',
     ],
   ),
-  // 名片样板（D-423）：有二维码的页面、按表显示的块、能搜索的列表，看的时候也不写。
+  // Business card sample (D-423): pages with QR codes, block views based on tables, searchable lists -- viewable without writing.
   ['sample business-cards', businessCards, 'zh'],
-  // 打卡格（D-610）：画格子、算每格的数不写。
+  // Habit grid (D-610): drawing grids and computing cell values writes nothing.
   ['grid', gridConfig, 'zh'],
 ];
 
-/** 习惯 × 最近 7 天的打卡格（D-610），在页面 week 上。 */
+/** Habit × last 7 days habit grid (D-610), located on the week page. */
 function gridConfig(): WorkspaceConfig {
   const r = applyOps(
     createDefaultWorkspace('zh'),
@@ -644,14 +648,14 @@ async function renderSeeded(
   return renderToolsApp(repo, new FakeFiles(), { seed: () => config, locale });
 }
 
-// renderRouter 换成了假的计时器：往前拨一点，让页面上的读取、动画跑完。
+// renderRouter replaced with fake timers: advance slightly to let page reads and animations finish.
 const settle = () =>
   act(async () => {
     jest.advanceTimersByTime(200);
     await Promise.resolve();
   });
 
-describe('底线 15 / 16：看永远不会改；每次写入都来自用户的一次操作（例外：启动时清空回收站里超过 30 天的）', () => {
+describe('Invariant 15 / 16: Looking never changes anything; every write comes from one user action (exception: clearing trash older than 30 days at startup)', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     useGuide.setState({ stage: null, repo: null });
@@ -662,7 +666,7 @@ describe('底线 15 / 16：看永远不会改；每次写入都来自用户的�
     async (_name, make, locale) => {
       const config = make();
       const { repo, store } = await renderSeeded(config, locale);
-      // 种子版本能用（不是退回去的默认配置），页面才是要看的那些。
+      // Seed version is usable (not a reverted default config), and pages are the ones intended for viewing.
       expect(store.getState().head!.source).toBe('seed');
       await settle();
       const spies = spyWrites(repo);
@@ -675,13 +679,13 @@ describe('底线 15 / 16：看永远不会改；每次写入都来自用户的�
       }
       await settle();
       expect(spies.filter(([, s]) => s.mock.calls.length > 0).map(([n]) => n)).toEqual([]);
-      // 页面真的画出来、读了记录（不是什么都没显示所以没写）。
+      // Pages are genuinely rendered and read records (not showing nothing and thus omitting reads).
       if (config.data.tables.length > 0) expect(reads).toHaveBeenCalled();
     },
     20_000,
   );
 
-  // D-422、D-423、D-428：记录页顶部的按钮只是打开系统的页面。
+  // D-422, D-423, D-428: Top buttons on the entry page merely open system applications.
   it('tapping call, message, email, website or share on an entry writes nothing', async () => {
     const opened = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined as never);
     const asked = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
@@ -754,7 +758,7 @@ describe('底线 15 / 16：看永远不会改；每次写入都来自用户的�
     expect((await repo.getRecord('c1'))!.updatedAt).toBe(1);
   });
 
-  // D-424：搜索、换排序、换分组只在块里，不写记录，也不写配置（版本不变）。
+  // D-424: Searching, switching sort, and changing grouping only affect the block view, without writing records or configuration (version remains unchanged).
   it('searching, switching sort and group on a list writes nothing', async () => {
     const base = createDefaultWorkspace('zh');
     const added = applyOps(
@@ -810,9 +814,10 @@ describe('底线 15 / 16：看永远不会改；每次写入都来自用户的�
     expect(store.getState().head!.id).toBe(head);
   });
 
-  // 创始人 2026-10-31（对话）定的例外（D-037）：回收站里删掉超过 30 天的记录在启动时永久删除，起因是用户自己删的。
-  // 这是启动时唯一的写入。启动兜底页的计数文件在数据库外面，是 App 自己的记账、不是数据（创始人 2026-11-22，
-  // D-621），不在这里数。
+  // Founder 2026-10-31 (conversation) set exception (D-037): records in the trash deleted more than
+  // 30 days ago are permanently deleted at startup, originating from the user's own deletion. This
+  // is the only write at startup. The rescue page's start counter is outside the database, is the
+  // app's own bookkeeping and not data (founder 2026-11-22, D-621), and is not counted here.
   it('starting the app writes nothing except emptying entries deleted more than 30 days ago', async () => {
     const repo = await repoWithPrivateData();
     await repo.insertRecord({
@@ -829,7 +834,7 @@ describe('底线 15 / 16：看永远不会改；每次写入都来自用户的�
       createdAt: NOW.getTime(),
       updatedAt: NOW.getTime(),
     });
-    // 第一次打开（存下种子版本），然后用户删了两条：一条 60 天前，一条 5 天前。
+    // First open (saves the seed version), then the user deleted two entries: one 60 days ago, one 5 days ago.
     await bootedStore(fixedPlanner(themePlan), repo);
     await repo.deleteRecord('r2', NOW.getTime() - 60 * 86_400_000);
     await repo.deleteRecord('r3', NOW.getTime() - 5 * 86_400_000);
@@ -844,18 +849,21 @@ describe('底线 15 / 16：看永远不会改；每次写入都来自用户的�
   });
 });
 
-describe('底线 11：写数据的操作都能挽回；一个简单操作改不回来的才弹撤销（删除、点一下改几处、批量新建、导入的一批）', () => {
-  // 创始人 2026-10-31（对话）：「存储东西或者是经过用户确认的操作，就不要撤销了，除了删除操作」。存下的和用户确认过的
-  // （表单保存、打勾、一键新建、+1、拖看板、点圆块、批量修改、桌面小组件）不弹撤销，用户用同样简单的操作改回去；
-  // 批量修改一定先问（record-actions-test.tsx）。创始人 2026-11-16（对话，决定 ③④）：删除、点一下改几处（D-566）
-  // 和批量新建（D-567）弹撤销（record-tap-also-test.tsx）；同一天（决定 ⑦）：导入的一批也弹撤销（D-574，
+describe('Invariant 11: Every write action can be taken back; an undo banner is shown only where one simple action cannot take it back (deletion, tapping once that changes several places, bulk creation, an imported batch)', () => {
+  // Founder 2026-10-31 (conversation): "Store things or operations confirmed by the user should not
+  // be undone, except for deletion." What is saved and confirmed by the user (form save, check,
+  // one-way create, +1, Kanban drag, tapping circles, bulk edit, home screen widget) shows no undo,
+  // and the user reverses it with an equally simple action; bulk edit must always ask first
+  // (record-actions-test.tsx). Founder 2026-11-16 (conversation, decisions ③④): deletion, tapping
+  // once that changes several places (D-566), and bulk create (D-567) show undo
+  // (record-tap-also-test.tsx); same day (decision ⑦): an imported batch also shows undo (D-574).
   // import-records-test.tsx）。
   afterEach(() => {
     jest.restoreAllMocks();
     useGuide.setState({ stage: null, repo: null });
   });
 
-  // 每个测试重新渲染，但 expo-router 的全局 router 记得上一个测试停在哪：带一个不同的参数，保证推进的是新的一页。
+  // Each test re-renders, but expo-router's global router remembers where the last test stopped: with a different parameter, guaranteeing that a new page is advanced to.
   let visit = 0;
   async function openPage(config: WorkspaceConfig, pageId: string, repo?: MemoryWorkspaceRepo) {
     const app = await renderSeeded(config, 'zh', repo);
@@ -882,7 +890,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     const added = (await repo.listRecords('todos')).find((r) => r.values.title === '买牛奶')!;
     expect(added).toBeDefined();
     expect(screen.queryByTestId('toast-undo')).toBeNull();
-    // 新的一条就在这张表上，点开删掉（删除照常有撤销）。
+    // The new entry is right on this table, tap to open and delete it (deletion has undo as usual).
     await fireEvent.press(await screen.findByText('买牛奶'));
     await fireEvent.press(await screen.findByTestId('editor-delete'));
     await waitFor(() => expect(store.getState().toast?.restoreRecordId).toBe(added.id));
@@ -901,7 +909,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     expect((await repo.getRecord('todos-1'))!.values.done ?? false).toBe(before);
   });
 
-  // 清单的勾带 also（D-617）：勾上同时记下完成日期，一次写；取消把它们都清空，就是拿回勾上做的全部，所以不弹撤销。
+  // Todo check has "also" (D-617): ticking also records the completion date in a single write; unticking clears them, which undoes everything done by ticking, so no undo is shown.
   it('ticking a check that also records a date shows no undo; unticking takes all of it back', async () => {
     const config = v34('todo');
     config.data.tables
@@ -920,7 +928,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
       },
     ];
     const { repo } = await openPage(config, 'todo');
-    // todos 0 是勾着的：先取消（清空完成于），再勾（记下今天），再取消，回到第一次取消后的样子；都不弹撤销。
+    // Todos 0 is ticked: first untick (clear completedAt), then tick (record today), then untick, returning to the state after the first untick; none show undo.
     const press = async () => {
       await fireEvent.press(await screen.findByTestId('check-todos-0'));
       await settle();
@@ -1007,7 +1015,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     await settle();
     await fireEvent.press(await screen.findByTestId('import-continue'));
     await settle();
-    // 先问：汇总出来了，什么都没写。
+    // Ask first: summary generated, nothing written yet.
     expect(screen.getByTestId('import-summary')).toHaveTextContent(/加入 2 条记录。/);
     expect(await ids()).toEqual(before);
     await fireEvent.press(screen.getByTestId('import-confirm'));
@@ -1016,7 +1024,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
     await fireEvent.press(await screen.findByTestId('toast-undo'));
     await settle();
     expect(await ids()).toEqual(before);
-    // 撤销的是用户自己的内容：进「最近删除」，能放回来。
+    // What is undone is the user's own content: enter "Recently Deleted", it can be restored.
     expect((await repo.listDeletedRecords()).map((r) => r.values.title).sort()).toEqual(
       ['买牛奶', '交房租'].sort(),
     );
@@ -1040,7 +1048,7 @@ describe('底线 11：写数据的操作都能挽回；一个简单操作改不�
   });
 });
 
-describe('工具清单和搭建计划不破坏底线（D-414、D-415、D-416）', () => {
+describe('Tool list and build plans do not break invariants (D-414, D-415, D-416)', () => {
   const steps = [
     { id: 'theme', kind: 'look', title: '颜色', request: '换颜色' },
     { id: 'pkg', kind: 'file', title: '工具', request: '加图片工具' },
@@ -1057,7 +1065,7 @@ describe('工具清单和搭建计划不破坏底线（D-414、D-415、D-416）'
   const persisted = async (repo: MemoryWorkspaceRepo) =>
     `${(await repo.getMeta('session')) ?? ''}${(await repo.getMeta('build')) ?? ''}`;
 
-  it('底线 1 / 2 / 14：清单和发给 AI 的 <session> 里没有记录内容', async () => {
+  it('Invariant 1 / 2 / 14: Checklists and <session> sent to AI contain no record content', async () => {
     const { bodies, fetchImpl } = capturingFetch(relayReply);
     const provider = createRemoteAIProvider({
       baseUrl: 'https://relay.test',
@@ -1076,7 +1084,7 @@ describe('工具清单和搭建计划不破坏底线（D-414、D-415、D-416）'
     expect(JSON.stringify(store.getState().session)).toContain('换个颜色');
   });
 
-  it('底线 7：外观步骤进草稿，功能步骤进正式版本，能在改动记录里撤销', async () => {
+  it('Invariant 7: Look steps go into draft, feature steps go into official version, can be undone in Change history', async () => {
     const calls: string[] = [];
     const provider = scripted(calls);
     const { store } = await bootedStore(provider);
@@ -1091,7 +1099,7 @@ describe('工具清单和搭建计划不破坏底线（D-414、D-415、D-416）'
     expect(head!.source).toBe('ai');
   });
 
-  it('底线 8：清单和计划不在配置里，模型的回复写不到它们', async () => {
+  it('Invariant 8: Checklists and plans are not in config, model replies cannot write to them', async () => {
     const provider: AIProvider = {
       plan: async () =>
         ({
@@ -1104,13 +1112,13 @@ describe('工具清单和搭建计划不破坏底线（D-414、D-415、D-416）'
     await store.getState().change('记一句', provider);
     const session = await repo.getMeta('session');
     expect(store.getState().config).not.toHaveProperty('session');
-    // 多带字段的回复过不了 PlanSchema，什么都没变，清单只记「没做」。
+    // Replies with multiple fields fail PlanSchema, nothing changes, checklist only notes "not done".
     expect(session).toContain('记一句');
     expect(store.getState().session.items).toEqual([]);
     expect(store.getState().draft).toBeNull();
   });
 
-  it('底线 16：计划不点「开始」不做；重启、停下都不自动继续；一次「开始」连续做完（D-416）', async () => {
+  it('Invariant 16: Plan does not run until "Start" is tapped; restart or stop does not auto-resume; a single "Start" runs continuously to completion (D-416)', async () => {
     const calls: string[] = [];
     const provider = scripted(calls);
     const repo = new MemoryWorkspaceRepo();
@@ -1124,7 +1132,7 @@ describe('工具清单和搭建计划不破坏底线（D-414、D-415、D-416）'
     expect(calls).toEqual(['搭一个']);
     expect(store.getState().head!.id).toBe(heads);
 
-    // 重启：还是只有计划。
+    // Restart: still only the plan.
     const again = make();
     await again.getState().boot();
     await settle();
@@ -1137,7 +1145,7 @@ describe('工具清单和搭建计划不破坏底线（D-414、D-415、D-416）'
   });
 });
 
-describe('底线 5 / 15 / 19：保存前问一句有没有一样的（D-426）', () => {
+describe('Invariant 5 / 15 / 19: Ask if there are duplicates before saving (D-426)', () => {
   const receipts: Collection = {
     id: 'claims',
     name: '报销',
@@ -1186,29 +1194,29 @@ describe('底线 5 / 15 / 19：保存前问一句有没有一样的（D-426）',
     useGuide.setState({ stage: null, repo: null });
     await flush();
     await flush();
-    // 路由卸载以后的收尾（renderRouter 下次会再换成假的计时器）。
+    // Cleanup after router unmount (renderRouter will switch back to mock timers next time).
     jest.useRealTimers();
     await new Promise((resolve) => setTimeout(resolve, 20));
   });
 
-  it('底线 15：opening the form writes nothing', async () => {
+  it('Invariant 15: opening the form writes nothing', async () => {
     const { spies } = await openForm();
     await settle();
     expect(spies.filter(([, s]) => s.mock.calls.length > 0).map(([n]) => n)).toEqual([]);
   });
 
-  it('底线 19 and 5: the prompt can always be passed, every time, and removes nothing', async () => {
+  it('Invariant 19 and 5: the prompt can always be passed, every time, and removes nothing', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     const { repo, spies } = await openForm();
     await fireEvent.changeText(screen.getByTestId('editor-amount'), '30');
     await fireEvent.changeText(screen.getByTestId('editor-date'), '2026-11-03');
     await fireEvent.press(screen.getByTestId('editor-save'));
     await waitFor(() => expect(alert).toHaveBeenCalledTimes(1));
-    // 回到表单什么都不写。
+    // Back to the form, write nothing.
     const buttons = () => alert.mock.calls.at(-1)![2]!;
     await act(async () => buttons()[0]!.onPress!());
     expect(spies.filter(([, s]) => s.mock.calls.length > 0).map(([n]) => n)).toEqual([]);
-    // 再点一次还是能选「仍然保存」，只多一条，原来的还在。
+    // Tap again and you can still select "Save anyway", only one extra is added and the original remains.
     await fireEvent.press(screen.getByTestId('editor-save'));
     await waitFor(() => expect(alert).toHaveBeenCalledTimes(2));
     expect(buttons().map((b) => b.text)).toEqual(['回到表单', '仍然保存']);
@@ -1221,7 +1229,7 @@ describe('底线 5 / 15 / 19：保存前问一句有没有一样的（D-426）',
     ]);
   });
 
-  it('底线 19: when the records cannot be read, the save still goes through', async () => {
+  it('Invariant 19: when the records cannot be read, the save still goes through', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     const { repo } = await openForm();
     jest.spyOn(repo, 'listRecords').mockRejectedValueOnce(new Error('disk'));
@@ -1234,8 +1242,8 @@ describe('底线 5 / 15 / 19：保存前问一句有没有一样的（D-426）',
   });
 });
 
-// 容器把数据交给工具（D-428，创始人 2026-11-04 在对话里定：进入页面什么都不跑，点了才交）。
-describe('底线 10 / 15 / 16：进入页面、记录页、列表什么都不跑、什么都不写（D-428）', () => {
+// Containers hand over data to tools (D-428, founder 2026-11-04 set in conversation: entering page runs nothing, tapped before handing over).
+describe('Invariant 10 / 15 / 16: entering page, record page, list run nothing, write nothing (D-428)', () => {
   async function viewed() {
     const repo = new MemoryWorkspaceRepo();
     const files = new FakeFiles();
@@ -1306,7 +1314,7 @@ describe('底线 10 / 15 / 16：进入页面、记录页、列表什么都不跑
   });
 });
 
-describe('底线 15：搜索、排序、筛选、展开浮动按钮什么都不写（创始人 2026-11-04 定）', () => {
+describe('Invariant 15: search, sorting, filtering, expanding floating buttons write nothing (set by founder 2026-11-04)', () => {
   it('typing in the search, picking a sort or a tag, loading more and opening the dial write nothing', async () => {
     const repo = new MemoryWorkspaceRepo();
     await repo.setMeta('guide', 'done');
@@ -1350,7 +1358,7 @@ describe('底线 15：搜索、排序、筛选、展开浮动按钮什么都不�
   });
 });
 
-describe('底线 2：标签的值不发给 AI（创始人 2026-11-04 定）', () => {
+describe('Invariant 2: tag values are not sent to AI (set by founder 2026-11-04)', () => {
   it('the request has the tags field, not the values', async () => {
     const { bodies, fetchImpl } = capturingFetch(relayReply);
     const provider = createRemoteAIProvider({
@@ -1376,7 +1384,7 @@ describe('底线 2：标签的值不发给 AI（创始人 2026-11-04 定）', ()
   });
 });
 
-describe('底线 11 / 15：打卡格（D-610）', () => {
+describe('Invariant 11 / 15: check-in grid (D-610)', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     useGuide.setState({ stage: null, repo: null });
@@ -1408,20 +1416,20 @@ describe('底线 11 / 15：打卡格（D-610）', () => {
     return { ...app, repo };
   }
 
-  it('底线 15: paging back and forth and opening a cell writes nothing', async () => {
+  it('Invariant 15: paging back and forth and opening a cell writes nothing', async () => {
     const { repo } = await openGrid();
     const spies = spyWrites(repo);
     await fireEvent.press(screen.getByTestId('grid-grid-prev'));
     await fireEvent.press(screen.getByTestId('grid-grid-prev'));
     await fireEvent.press(screen.getByTestId('grid-grid-today'));
-    // 两条的格子点一下只是列出来；有记录的格子长按也只是列出来。
+    // Tapping a cell with two entries just lists them; long-pressing a cell with records also just lists them.
     await fireEvent.press(await screen.findByTestId(`grid-grid-cell-read-${today(2)}`));
     await fireEvent(screen.getByTestId(`grid-grid-cell-run-${today()}`), 'longPress');
     await settle();
     expect(spies.filter(([, s]) => s.mock.calls.length > 0).map(([n]) => n)).toEqual([]);
   });
 
-  it('底线 11: adding in a cell shows no undo; removing the only entry of a cell shows undo', async () => {
+  it('Invariant 11: adding in a cell shows no undo; removing the only entry of a cell shows undo', async () => {
     const { repo } = await openGrid();
     await fireEvent.press(screen.getByTestId(`grid-grid-cell-read-${today()}`));
     expect(await screen.findByTestId('toast')).toHaveTextContent(/已在「打卡」添加一条/);

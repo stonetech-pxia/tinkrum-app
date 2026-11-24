@@ -21,7 +21,7 @@ import {
 import { lineShareIn } from './layout';
 import { type Box, type OcrBox, type TableBlock } from './types';
 
-/** 找线组表，保留空白填写格并释放误判的网格。 */
+/** Find lines and group tables, retaining blank fill-in cells and releasing misidentified grids. */
 export function buildRuledTables(
   state: Pick<
     PreparePageState,
@@ -54,13 +54,13 @@ export function buildRuledTables(
     fontWidthPx,
   } = state;
 
-  // 带线的表格（和转 Excel 一样）；放进表格的行不再参加分段。
+  // Line-enabled tables (similar to Excel export); lines placed inside tables no longer participate in paragraph segmentation.
   const placedIn = new Map<TableBlock, readonly OcrBox[]>();
   const choppedIn = new Map<TableBlock, number>();
-  // 横竖线画满的网格（格子都是线分出来的），只有这样的才可能是留给人填的空白表格。
+  // Grids fully enclosed by horizontal and vertical lines (all cells separated by lines); only these qualify as blank tables intended for user entry.
   const ruledGrids = new Set<TableBlock>();
   const blankForm = (t: TableBlock) => ruledGrids.has(t) && isBlankFormGrid(t);
-  // 只是框着几行字的框（EU 样本 075 的信）：不当表，字放回正文。
+  // Boxes merely framing a few text lines (letters in EU sample 075): not treated as tables, text returned to body.
   const framedTexts = new Set<TableBlock>();
   const tableInput = {
     image: working,
@@ -69,19 +69,21 @@ export function buildRuledTables(
     source: input.source,
     ...(tableSkew !== undefined ? { skew: tableSkew } : {}),
   };
-  // 格子里的字按原图一排一行（D-333）：表单一格里的地址、日期各占一行，不接成一段（Word 里格子宽按原图，字号按比例）。
-  // 没有线的表在下面去掉竖排、零星的字以后再认（D-471）。
+  // Text inside cells follows original image row formatting (D-333): addresses and dates in form
+  // cells occupy individual lines without merging into paragraphs (Word cell widths match original
+  // images, font sizes proportional). Unruled tables are recognized after removing vertical and
+  // sporadic text below (D-471).
   const tableOptions = (splitStacked: boolean): BuildOptions => ({
     ...options,
     textTables: false,
-    // 电子版模板常用很浅的灰线画表（EU 样本 001、006），转 Word 时也找。
+    // Light rules: electronic templates often use very light gray lines for tables (EU sample 001, 006), which should also be detected during Word conversion.
     lightRules: true,
-    // 空白的商品栏：表头写在网格上面（EU 样本 001）。
+    // Header above: blank product columns with headers written above the grid (EU sample 001).
     headerAbove: true,
     splitStacked,
     joinLines: (cell) => {
       const rows = rowsOf(cell);
-      // 一格里是一段正文（框起来的提示，EU 样本 038）：接成一段，在 Word 里能重新折行。
+      // Single cell containing body text (boxed prompts, EU sample 038): joined into a single paragraph to allow re-flowing in Word.
       if (proseRows(rows)) return joinParagraph(rows.flatMap((r) => r.lines)).trim();
       return rows.map((r) => join(r.lines).trim()).join('\n');
     },
@@ -104,15 +106,18 @@ export function buildRuledTables(
       cy <= box.y + box.height + tol
     );
   };
-  // 列线把很多行字从词中间切开的表（D-502）：网格认错了（字的笔画、折痕当成了列线），不当表，
-  // 里面的字按行排（没有线的表照样能认出来）。
+  // Tables where column lines split many text lines mid-word (D-502): grid is misidentified (text
+  // strokes or creases mistaken for column lines), reject as table and format inner text by lines
+  // (detectable even without lines).
   const chopsMuch = (t: TableBlock) => {
     const chopped = choppedIn.get(t) ?? 0;
     return chopped >= CHOP_MIN && chopped >= CHOP_SHARE * (placedIn.get(t)?.length ?? 0);
   };
-  // 图内的网格（表大半在图里）不要；图跨过表的好几格时（整页的版式框把图表框在里面，D-533）也不要。
-  // 图在表的一格里（表单的证件照占着合并的一格）时表照样要；只是边上压进表的一格（表上面的标志剪下来时带着
-  // 下面一点，EU 样本 062）也照样要：看压进表里的那一部分在不在一格里。
+  // Exclude grids inside images (tables mostly inside images); also exclude when images span
+  // multiple table cells (full-page layout frames enclosing table blocks, D-533). Tables are
+  // retained when images reside within a single cell (ID photos occupying merged form cells);
+  // marginal overlap into a table cell (logos clipped with a sliver below, EU sample 062) is also
+  // retained: determined by whether the overlapping portion lies entirely within a single cell.
   const insideOf = (f: Box, b: Box): Box => {
     const x = Math.max(f.x, b.x);
     const y = Math.max(f.y, b.y);
@@ -140,14 +145,17 @@ export function buildRuledTables(
   const sparse = (t: TableBlock) =>
     repairTables && !blankForm(t) && (isSparseColumnLayout(t) || framedTexts.has(t));
   const colWidthsOf = new Map(sheetTables.map((t) => [t, sheet.colWidths] as const));
-  // 共用一个外框、上下叠着的几张表（EU 样本 004 的登记表）连成了一张：在列线换了的横线处分开（findTables 的
-  // splitStacked），每张各自判断。原来要当表的，分开后能当表的部分当表（都不能时照旧整张）；原来被当成表单画线
-  // 丢掉、或者太空被拆开的，只把其中的空白表格（isBlankFormGrid）留下当表，别的部分照旧排成文字。
+  // Multiple vertically stacked tables sharing an external border (registration tables in EU sample
+  // 004) merged into one: split at horizontal lines where column layouts change (findTables
+  // splitStacked), evaluating each separately. Tables originally intended as tables retain their
+  // tabular parts after splitting (falling back to full tables if none qualify); parts previously
+  // discarded as ruled form lines or split due to excessive whitespace retain only blank form grids
+  // (isBlankFormGrid) as tables, formatting remaining parts as text.
   const stacked = buildTablePage(tableInput, tableOptions(true));
   const stackedTables = stacked.blocks.filter((b): b is TableBlock => b.kind === 'table');
   const ruled: TableBlock[] = [];
   const rejected: TableBlock[] = [];
-  // 当成表单画线不要的网格（或者分开后不要的部分）里，一排排的填写框照样当表（EU 样本 062）。
+  // Within grids discarded as ruled forms (or unselected parts after splitting), row-by-row fill-in boxes are still treated as tables (EU sample 062).
   const carveFieldBoxes = (t: TableBlock, colWidths: readonly number[]) => {
     if (!repairTables || chopsMuch(t)) return;
     const placed = placedIn.get(t) ?? [];
@@ -185,12 +193,12 @@ export function buildRuledTables(
     else carveFieldBoxes(t, colWidthsOf.get(t)!);
   }
   const tables: DocTable[] = ruled.map((table) => {
-    // 表里的字号按表里文字的行高（D-335），和正文分开算。
+    // Table font sizes are determined by text line heights within the table (D-335), calculated separately from body text.
     const h = median(lines.filter((l) => inBox(l, table.box)).map((l) => l.height));
     return {
       kind: 'table',
       ...(rotated ? { direction: 'tbRl' as const } : {}),
-      // 空着的列够写字（填写栏）时不并：只并双线之间、细缝那样的窄列。
+      // Columns wide enough for writing (fill-in fields) are not merged: merge only narrow columns resembling gaps between double lines.
       table: foldEmptyColumns({ ...table, col: 0 }, FILL_IN_LINES * lineHeight),
       colWidths: colWidthsOf.get(table)!.slice(table.col, table.col + table.cols),
       ...(h ? { size: Math.min(BODY_MAX, Math.max(FORM_MIN, fontSizeOf(h, fontWidthPx))) } : {}),

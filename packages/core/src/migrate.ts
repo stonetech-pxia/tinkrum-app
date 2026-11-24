@@ -2,18 +2,20 @@ import { migrateV33toV34 as migrateShapeV33toV34 } from './migrate-v34';
 import { CURRENT_SCHEMA_VERSION } from './schema';
 import { DEFAULT_THEME } from './theme';
 
-// Schema 迁移（§7E）：恢复旧快照时逐级升级到当前版本，然后再校验。
-// 每次提升 CURRENT_SCHEMA_VERSION，都必须在 MIGRATIONS 中加入上一版本的迁移函数和测试。
-// 只新增一种组件不提升版本号（D-254），见 schema.ts。
+// Schema migration (§7E): upgrade step-by-step to the current version when restoring an old
+// snapshot, then validate. Each time CURRENT_SCHEMA_VERSION is incremented, the migration function
+// and tests for the previous version must be added to MIGRATIONS. Adding a single component type
+// does not increment the version number (D-254), see schema.ts.
 
 export type Migration = (config: Record<string, unknown>) => Record<string, unknown>;
 
-/** v1 的默认主色；没改过主色的工作空间升级后换成新的默认风格（Clay）。 */
+/** v1 default primary color; workspaces with unmodified primary colors get the new default style (Clay) after upgrade. */
 const V1_DEFAULT_PRIMARY = '#3B5BDB';
 
 /**
- * v1 → v2：主题增加样式 token（字体、字号、圆角、疏密、卡片和导航栏样式），
- * 受保护元素从「AI + 历史」改为「设置」（设置页内固定提供 AI 修改和历史入口）。
+ * v1 → v2: theme gains style tokens (fonts, sizes, border radii, density, card and navigation bar
+ * styles), protected elements change from "AI + history" to "Settings" (Settings page itself
+ * provides fixed access to AI modifications and history).
  */
 export const migrateV1toV2: Migration = (config) => {
   const theme = config.theme as { primaryColor: string; mode: string };
@@ -25,7 +27,7 @@ export const migrateV1toV2: Migration = (config) => {
     else if (floating.length < 3) floating.push('settings');
     else floating[floating.length - 1] = 'settings';
   }
-  // v2 的页面可以有图标；首页补上首页图标，其他页面使用导航栏的默认图标。
+  // v2 pages can have icons; home page gets a home icon added, other pages use the navigation bar's default icon.
   const pages = (config.pages as { id: string; icon?: string }[]).map((p) =>
     p.id === 'home' && p.icon === undefined ? { ...p, icon: 'home' } : p,
   );
@@ -45,14 +47,14 @@ export const migrateV1toV2: Migration = (config) => {
   };
 };
 
-/** v2 → v3：新增数据表结构 collections（记录本身不在配置里）。 */
+/** v2 → v3: add data table structure collections (records themselves are not stored in the config). */
 export const migrateV2toV3: Migration = (config) => ({
   ...config,
   schemaVersion: 3,
   collections: [],
 });
 
-/** v3 → v4：新增图片组件、emoji 图标和富文本；已有数据不需要改动，只提升版本号。 */
+/** v3 → v4: add image component, emoji icons, and rich text; existing data requires no changes, only the version number is incremented. */
 export const migrateV3toV4: Migration = (config) => ({ ...config, schemaVersion: 4 });
 
 interface V4Step {
@@ -62,10 +64,11 @@ interface V4Step {
 }
 
 /**
- * v4 → v5：工作流步骤之间改为传递有类型的值（D-060）。
+ * v4 → v5: workflow steps now pass typed values between each other (D-060).
  * - pdf.selectFiles {min, max} → in.files {accept: 'pdf', min, max}
- * - ui.askFileName {defaultTemplate} + file.save {nameTemplate} → file.rename（每次运行时问）+ file.save {}
- * - 只有 file.save {nameTemplate}（已去掉询问）→ file.rename {template} + file.save {}
+ * - ui.askFileName {defaultTemplate} + file.save {nameTemplate} → file.rename (ask on each run) +
+ * file.save {}
+ * - only file.save {nameTemplate} (prompt removed) → file.rename {template} + file.save {}
  */
 export const migrateV4toV5: Migration = (config) => {
   const workflows = (config.workflows as { steps: V4Step[] }[]).map((wf) => {
@@ -107,70 +110,78 @@ export const migrateV4toV5: Migration = (config) => {
   return { ...config, schemaVersion: 5, workflows };
 };
 
-/** v5 → v6：主题新增第三色、深色模式颜色、页面背景和六种卡片样式；已有数据不需要改动，只提升版本号。 */
+/** v5 → v6: theme gains third color, dark mode colors, page background, and six card styles; existing data requires no changes, only the version number is incremented. */
 export const migrateV5toV6: Migration = (config) => ({ ...config, schemaVersion: 6 });
 
 /**
- * v6 → v7：文件列表可以只列一大类文件（image/*、video/*、audio/*），图标多了 video 和 audio（D-140）；
- * 已有数据不需要改动，只提升版本号。
+ * v6 → v7: file lists can filter by major file category (image/*, video/*, audio/*), icons added
+ * for video and audio (D-140); existing data requires no changes, only the version number is
+ * incremented.
  */
 export const migrateV6toV7: Migration = (config) => ({ ...config, schemaVersion: 7 });
 
 /**
- * v7 → v8：数据表新增附件（file）和公式（formula）字段，快捷操作可以「记一笔」（D-187、D-188）；
- * 已有数据不需要改动，只提升版本号。
+ * v7 → v8: data tables gain attachment (file) and formula fields, quick actions can "log an
+ * expense" (D-187, D-188); existing data requires no changes, only the version number is
+ * incremented.
  */
 export const migrateV7toV8: Migration = (config) => ({ ...config, schemaVersion: 8 });
 
-/** v8 → v9：新增工具宫格组件 toolGrid，图标多了 translate 和 note（D-181）；已有数据不需要改动，只提升版本号。 */
+/** v8 → v9: add tool grid component toolGrid, icons added for translate and note (D-181); existing data requires no changes, only the version number is incremented. */
 export const migrateV8toV9: Migration = (config) => ({ ...config, schemaVersion: 9 });
 
-/** v9 → v10：新增文件选择入口；保持老用户页面原样。 */
+/** v9 → v10: add file selection trigger; keep legacy user pages as-is. */
 export const migrateV9toV10: Migration = (config) => ({ ...config, schemaVersion: 10 });
 
-/** v10 → v11：允许分类系统入口，保持老用户的首页原样。 */
+/** v10 → v11: allow category system entry, keep legacy users' home page as-is. */
 export const migrateV10toV11: Migration = (config) => ({ ...config, schemaVersion: 11 });
 
 /**
- * v11 → v12：入口卡片和快捷操作可以选样子，按钮可以带图标，主题多了图标底色，新增快捷操作列表组件（D-230）；
- * 已有数据不需要改动，只提升版本号。
+ * v11 → v12: entry cards and quick actions can have styles selected, buttons can carry icons,
+ * theme gains icon background color, add quick action list component (D-230); existing data
+ * requires no changes, only the version number is incremented.
  */
 export const migrateV11toV12: Migration = (config) => ({ ...config, schemaVersion: 12 });
 
-/** v12 → v13：统计组件可以按单选字段分组（D-248）；已有数据不需要改动，只提升版本号。 */
+/** v12 → v13: statistics component can group by single-select fields (D-248); existing data requires no changes, only the version number is incremented. */
 export const migrateV12toV13: Migration = (config) => ({ ...config, schemaVersion: 13 });
 
-/** v13 → v14：新增图表组件 chart（D-249）；已有数据不需要改动，只提升版本号。 */
+/** v13 → v14: add chart component chart (D-249); existing data requires no changes, only the version number is incremented. */
 export const migrateV13toV14: Migration = (config) => ({ ...config, schemaVersion: 14 });
 
-/** v14 → v15：数据表新增引用字段 link（D-250）；已有数据不需要改动，只提升版本号。 */
+/** v14 → v15: data tables gain reference field link (D-250); existing data requires no changes, only the version number is incremented. */
 export const migrateV14toV15: Migration = (config) => ({ ...config, schemaVersion: 15 });
 
-/** v15 → v16：新增提醒 reminders（D-251，可以不写，不写就是没有提醒）；只提升版本号。 */
+/** v15 → v16: add reminders reminders (D-251, optional, absence means no reminders); only increment the version number. */
 export const migrateV15toV16: Migration = (config) => ({ ...config, schemaVersion: 16 });
 
 /**
- * v16 → v17：按钮和快捷入口可以打开一个快捷操作 workflow:<id>（D-256，改了已有组件的结构，按 D-254 提升）；
- * 已有数据不需要改动，只提升版本号。
+ * v16 → v17: buttons and quick entries can open a quick action workflow:<id> (D-256, modified
+ * existing component structure, incremented per D-254); existing data requires no changes, only
+ * the version number is incremented.
  */
 export const migrateV16toV17: Migration = (config) => ({ ...config, schemaVersion: 17 });
 
 /**
- * v17 → v18：卡片类组件的 style 和页面可以有图片背景 backdrop（D-258，改了已有结构，按 D-254 提升）；
- * 已有数据不需要改动，只提升版本号。
+ * v17 → v18: card components style and pages can have image backgrounds backdrop (D-258, modified
+ * existing structure, incremented per D-254); existing data requires no changes, only the version
+ * number is incremented.
  */
 export const migrateV17toV18: Migration = (config) => ({ ...config, schemaVersion: 18 });
 
 /**
- * v18 → v19：快捷操作可以放到手机桌面 homeScreen（D-271，改了已有结构，按 D-254 提升）；
- * 已有的快捷操作都不在桌面上，不需要改动，只提升版本号。
+ * v18 → v19: quick actions can be placed on the phone homeScreen (D-271, modified existing
+ * structure, incremented per D-254); existing quick actions are not on the desktop, require no
+ * changes, only increment the version number.
  */
 export const migrateV18toV19: Migration = (config) => ({ ...config, schemaVersion: 19 });
 
 /**
- * v19 → v20：识别文字的语言可以选「自动」（D-278，改了已有动作的参数，按 D-254 提升）。
- * 文字识别工具装进来的两个快捷操作（ocr-photos、ocr-scan）存的是步骤副本，以前每次运行都问语言；
- * 只有和旧版生成的一模一样（用户没改过）时，把识别那一步改成自动、不再问。用户改过的不动。
+ * v19 → v20: text recognition language can be set to "automatic" (D-278, modified action
+ * parameters, incremented per D-254). The two quick actions installed by the text recognition
+ * tool (ocr-photos, ocr-scan) store step copies that previously prompted for language on every
+ * run; only when identical to legacy generated ones (unmodified by user), change the recognition
+ * step to automatic and stop prompting. User-modified ones remain untouched.
  */
 const OLD_OCR_STEPS: Record<string, (lang: string) => unknown[]> = {
   'ocr-photos': (lang) => [
@@ -211,102 +222,117 @@ export const migrateV19toV20: Migration = (config) => {
 };
 
 /**
- * v20 → v21：字段多了时间、日期时间、时长三种类型（D-279），公式能用新函数、引用别的公式、最长 500 字
- * （D-280、D-281）。已有的字段和公式都还是合法的，只提升版本号。
+ * v20 → v21: fields gain three types: time, datetime, duration (D-279); formulas support new
+ * functions, reference other formulas, up to 500 characters (D-280, D-281). Existing fields and
+ * formulas remain valid, only increment the version number.
  */
 export const migrateV20toV21: Migration = (config) => ({ ...config, schemaVersion: 21 });
 
 /**
- * v21 → v22：统计有按顺序的聚合（连续天数等，D-284），时间段多了几种（D-285），配置可以有 calendar
- * （一天、一周从什么时候开始，D-286）；没有 calendar 就是原来的 0 点、周一，已有数据不需要改动，只提升版本号。
+ * v21 → v22: statistics gain sequential aggregations (consecutive days, etc., D-284), time ranges
+ * expanded (D-285), config can have calendar (start of day/week, D-286); absence of calendar
+ * defaults to original midnight and Monday, existing data requires no changes, only increment the
+ * version number.
  */
 export const migrateV21toV22: Migration = (config) => ({ ...config, schemaVersion: 22 });
 
 /**
- * v22 → v23：字段多了查找、汇总、上一条三种类型（D-287–D-289），值都是算出来的、不存进记录。
- * 已有的字段都还是合法的，只提升版本号。
+ * v22 → v23: fields gain lookup, rollup, previous types (D-287–D-289), values are computed
+ * on-the-fly and not stored in records. Existing fields remain valid, only increment the version
+ * number.
  */
 export const migrateV22toV23: Migration = (config) => ({ ...config, schemaVersion: 23 });
 
 /**
- * v23 → v24：字段多了日程（schedule，D-292、D-293），筛选多了 due（D-294）。已有的字段和筛选都还是合法的，
- * 只提升版本号。
+ * v23 → v24: fields gain schedule (D-292, D-293), filters gain due (D-294). Existing fields and
+ * filters remain valid, only increment the version number.
  */
 export const migrateV23toV24: Migration = (config) => ({ ...config, schemaVersion: 24 });
 
 /**
- * v24 → v25：按钮多了 action、target 可以不写，记录列表多了 rowActions（一键记录操作，D-300–D-304）。
- * 已有的按钮都有 target，仍然合法，只提升版本号。
+ * v24 → v25: buttons gain optional action and target, record lists gain rowActions (one-tap
+ * record operations, D-300–D-304). Existing buttons have targets and remain valid, only increment
+ * the version number.
  */
 export const migrateV24toV25: Migration = (config) => ({ ...config, schemaVersion: 25 });
 
 /**
- * v25 → v26：记录列表多了月历外观和右侧字段的显示格式（D-305、D-306），统计多了目标和「和上一段比」
- * （D-307、D-308）。都是新的可选属性，已有配置照样合法，只提升版本号。
+ * v25 → v26: record lists gain monthly calendar view and right-side field display formats (D-305,
+ * D-306), statistics gain targets and period-over-period comparison (D-307, D-308). All are new
+ * optional properties, existing configs remain valid, only increment the version number.
  */
 export const migrateV25toV26: Migration = (config) => ({ ...config, schemaVersion: 26 });
 
 /**
- * v26 → v27：记录列表多了大圆块 tiles 和看板 board 两种外观、看板分栏用的 groupField（D-311–D-314）。
- * 都是新的可选值，已有配置照样合法，只提升版本号。
+ * v26 → v27: record lists gain tiles and board views along with groupField for board columns
+ * (D-311–D-314). All are new optional values, existing configs remain valid, only increment the
+ * version number.
  */
 export const migrateV26toV27: Migration = (config) => ({ ...config, schemaVersion: 27 });
 
 /**
- * v27 → v28：提醒多了按记录的日程排的 scheduleField 和它的 unless、done、snoozeMinutes（D-316–D-318）。
- * 都是新的可选值，已有配置照样合法，只提升版本号。
+ * v27 → v28: reminders gain record schedule-based scheduleField along with its unless, done, and
+ * snoozeMinutes (D-316–D-318). All are new optional values, existing configs remain valid, only
+ * increment the version number.
  */
 export const migrateV27toV28: Migration = (config) => ({ ...config, schemaVersion: 28 });
 
 /**
- * v28 → v29：统计和图表可以按引用字段分组（D-336），统计可以减去另一个合计（minus，D-337），
- * 一键操作的新建可以打开表单（form，D-338）。都是新的可选值，只提升版本号。
+ * v28 → v29: statistics and charts can group by reference fields (D-336), statistics can subtract
+ * another sum (minus, D-337), one-tap action creation can open a form (form, D-338). All are new
+ * optional values, only increment the version number.
  */
 export const migrateV28toV29: Migration = (config) => ({ ...config, schemaVersion: 29 });
 
 /**
- * v29 → v30：日程的「一次」和 countEarly（D-340、D-341）、给一条记录用的页面（recordOf、recordList.opens、
- * "$record"，D-342）、快速添加表单的预设值和 smartDate（D-343、D-344）。都是新的可选值，只提升版本号。
+ * v29 → v30: schedule "once" and countEarly (D-340, D-341), record-specific pages (recordOf,
+ * recordList.opens, "$record", D-342), quick add form preset values and smartDate (D-343, D-344).
+ * All are new optional values, only increment the version number.
  */
 export const migrateV29toV30: Migration = (config) => ({ ...config, schemaVersion: 30 });
 
 /**
- * v30 → v31：日程规则的钟点（D-346）、记录列表分段（groupBy、groupUnit、showEmpty，D-347）、月历认日程
- * （D-348）、就地添加（addHere，D-349）。都是新的可选值，只提升版本号。
+ * v30 → v31: schedule rule hours (D-346), record list sections (groupBy, groupUnit, showEmpty,
+ * D-347), calendar schedule recognition (D-348), in-place addition (addHere, D-349). All are new
+ * optional values, only increment the version number.
  */
 export const migrateV30toV31: Migration = (config) => ({ ...config, schemaVersion: 31 });
 
 /**
- * v31 → v32：看板按引用字段分栏和 groupFilter（D-351）、快速添加表单的 sheet 模式（D-352）。都是新的可选值，
- * 只提升版本号。
+ * v31 → v32: board columns by reference field and groupFilter (D-351), quick add form sheet mode
+ * (D-352). All are new optional values, only increment the version number.
  */
 export const migrateV31toV32: Migration = (config) => ({ ...config, schemaVersion: 32 });
 
 /**
- * v32 → v33：多了文件房间的布局 desk（D-358）。是新的可选值，已有配置照样合法，只提升版本号。
+ * v32 → v33: add file desk layout desk (D-358). A new optional value, existing configs remain
+ * valid, only increment the version number.
  */
 export const migrateV32toV33: Migration = (config) => ({ ...config, schemaVersion: 33 });
 
 /**
- * v33 → v34：「数据 · 容器 · 工具」（D-368，创始人 2026-10-30 定）：collections → data.tables，
- * pages → containers.pages（组件 → 块：look / show / source / tools / opens），workflows 和 reminders → tools，
- * shell → nav，tools → packages，desk → containers.desk。ID 不改；见 migrate-v34.ts。
+ * v33 → v34: "Data · Containers · Tools" (D-368, decided by founder 2026-10-30): collections →
+ * data.tables, pages → containers.pages (components → blocks: look / show / source / tools /
+ * opens), workflows and reminders → tools, shell → nav, tools → packages, desk → containers.desk.
+ * IDs unchanged; see migrate-v34.ts.
  */
 export const migrateV33toV34: Migration = (config) => migrateShapeV33toV34(config);
 
-/** v34 → v35：表上多了可选的 readAttachments（D-397）。是新的可选值，只提升版本号。 */
+/** v34 → v35: tables gain optional readAttachments (D-397). A new optional value, only increment the version number. */
 export const migrateV34toV35: Migration = (config) => ({ ...config, schemaVersion: 35 });
 
-/** v35 → v36：主题颜色多了可选的 surfaceText（D-409）。是新的可选值，只提升版本号。 */
+/** v35 -> v36: theme colors now support an optional surfaceText (D-409). This is a new optional value, only bumping the schema version. */
 export const migrateV35toV36: Migration = (config) => ({ ...config, schemaVersion: 36 });
 
-/** v36 → v37：金额字段多了可选的 currencyField（D-429），表上多了可选的 prefillRules（D-421），文字字段多了可选的 format（D-422），块多了可选的 showIf，记录块的 show 多了可选的 browse（D-424），print.records 多了可选的 attachments（D-425），表上多了可选的 recordRow，块的 tools 多了 as: "list"，single 多了可选的 tools，第一步可以收容器交的值（D-428），块多了可选的 pin（页面固定区，D-430），browse 多了可选的 pin（D-431）、filter（D-433），多了字段类型 tags（D-432）和外观 dial（D-434），browse 多了可选的 period（D-437），图表的 source 多了可选的 compare（D-439）和 period、数字块的 source 多了可选的 period、多了外观 period（D-440）。是新的可选值，只提升版本号。 */
+/** v36 -> v37: amount fields now support an optional currencyField (D-429), tables now support optional prefillRules (D-421), text fields now support an optional format (D-422), blocks now support optional showIf, record block show now supports optional browse (D-424), print.records now supports optional attachments (D-425), tables now support optional recordRow, block tools now support as: "list", single now supports optional tools, step 1 can receive values passed from containers (D-428), blocks now support optional pin (pinned section on page, D-430), browse now supports optional pin (D-431), filter (D-433), added field type tags (D-432) and presentation dial (D-434), browse now supports optional period (D-437), chart source now supports optional compare (D-439) and period, numeric block source now supports optional period, and added presentation period (D-440). These are new optional values, only bumping the schema version. */
 export const migrateV36toV37: Migration = (config) => ({ ...config, schemaVersion: 37 });
 
 /**
- * v37 → v38：按钮的 variant 多了 "row"（一整行：图标、名字、箭头，和设置页的按钮一样，D-483）。
- * 首页的「工具箱」入口（打开工具箱页、描边的按钮）原来画成描边按钮，改成 "row"。
- * 只认这一种：打开工具箱页、没有工具、variant 是 outline 的按钮；别的按钮不动。
+ * v37 -> v38: button variant now supports "row" (full width: icon, name, arrow, matching the
+ * settings page buttons, D-483). The home screen "Toolbox" trigger (opening the toolbox page,
+ * outlined button) was previously rendered as an outlined button and is now changed to "row".
+ * Only matches this specific button: opens toolbox page, no tools, outline variant; other buttons
+ * remain untouched.
  */
 export const migrateV37toV38: Migration = (config) => {
   const rowIfToolbox = (block: unknown): unknown => {
@@ -337,16 +363,18 @@ export const migrateV37toV38: Migration = (config) => {
   };
 };
 
-/** v38 → v39：nav 多了可选的 apps，页面、表、快捷操作多了可选的 app（D-485）。是新的可选值，只提升版本号。 */
+/** v38 -> v39: nav now supports optional apps, and pages, tables, and quick actions now support an optional app (D-485). These are new optional values, only bumping the schema version. */
 export const migrateV38toV39: Migration = (config) => ({ ...config, schemaVersion: 39 });
 
 /**
- * v39 → v40：单选字段多了可选的 multiple（可以选多个），default 可以是几个选项 ID（D-607）。是新的可选值，
- * 只提升版本号；记录里存着的一个选项 ID 在改成多选后读成一项，不改写。
+ * v39 -> v40: single-choice fields now support an optional multiple (allowing multiple
+ * selections), and default can be a list of option IDs (D-607). These are new optional values,
+ * only bumping the schema version; a single option ID stored in existing records is read as a
+ * single item without rewriting.
  */
 export const migrateV39toV40: Migration = (config) => ({ ...config, schemaVersion: 40 });
 
-/** MIGRATIONS[n] 把 schemaVersion n 升级到 n + 1。 */
+/** MIGRATIONS[n] upgrades schemaVersion n to n + 1. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1toV2,
   2: migrateV2toV3,

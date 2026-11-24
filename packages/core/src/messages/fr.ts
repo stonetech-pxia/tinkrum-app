@@ -1,5 +1,6 @@
-// 法语文案。键和 en.ts 完全一致（MessageTable）；单数写法（0 和 1 都用单数）在 frSingular，键和 enSingular 一致。
-// 术语：记录 = entrée，数据表 = tableau，Tinkrum 的设置页 = Paramètres，录音 = enregistrement。
+// French copy. Keys match en.ts exactly (MessageTable); singular forms (using singular for both 0
+// and 1) are in frSingular, with keys matching enSingular. Terminology: record = entrée, table =
+// tableau, Tinkrum settings page = Paramètres, recording = enregistrement.
 import type { MessageTable, SingularTable } from './en';
 
 export const fr: MessageTable = {
@@ -37,7 +38,7 @@ export const fr: MessageTable = {
   sharePhotoSummary: '{n} photos',
   loading: 'Chargement…',
 
-  // 修改流程
+  // Modification workflow
   changeTitle: 'Modifier cette application',
   changeHint:
     'Décrivez ce que vous voulez modifier. Vous verrez un aperçu avant toute modification.',
@@ -70,7 +71,7 @@ export const fr: MessageTable = {
   undoSummary: 'Annuler',
   undoneBanner: 'Retour à l’état d’avant',
 
-  // 改动记录（D-112）
+  // Change history (D-112)
   historyTitle: 'Historique des modifications',
   current: 'État actuel',
   restoreThis: 'Revenir à ce moment',
@@ -86,7 +87,7 @@ export const fr: MessageTable = {
   dateToday: 'Aujourd’hui à {time}',
   dateYesterday: 'Hier à {time}',
 
-  // 工具目录
+  // Tool catalog
   toolsTitle: 'Outils',
   install: 'Ajouter',
   open: 'Ouvrir',
@@ -99,7 +100,7 @@ export const fr: MessageTable = {
   uninstallTitle: 'Retirer {name} ?',
   removeCardSummary: '{name} retiré de l’accueil',
   addCardSummary: 'Ajouter {name} à l’accueil',
-  // 下载的工具（D-177）
+  // Downloaded tools (D-177)
   toolDownloadSize: 'À télécharger : {size}',
   toolDownloading: 'Téléchargement en cours…',
   toolNeedsAppUpdate: 'Nécessite une version plus récente de cette app',
@@ -118,7 +119,7 @@ export const fr: MessageTable = {
   toolDeleteAdded:
     'Cet outil est encore ajouté. Retirez-le d’abord dans « Outils », puis supprimez-le ici.',
 
-  // 设置
+  // Settings
   settingsTitle: 'Paramètres',
   thisApp: 'Cette app',
   general: 'Général',
@@ -139,20 +140,20 @@ export const fr: MessageTable = {
   aiEngineMock: 'Règles intégrées (hors ligne)',
   aiEngineByok: 'Ma propre clé API ({model})',
 
-  // AI 设置
+  // AI Settings
   aiSettingsTitle: 'Tink',
   aiModeQuestion: 'Ce que Tink utilise pour modifier cette app',
   aiModeMock: 'Règles intégrées',
   aiModeMockNote: 'Hors ligne et gratuit. Ne comprend qu’un nombre fixe de formulations.',
   aiModeServer: 'Serveur Tinkrum',
   aiModeServerNote: 'Le modèle est appelé via un serveur.',
-  // 测试期服务器保存请求（D-240）：只在用 Tinkrum 服务器时显示。
+  // Server storage note during testing (D-240): displayed only when using the Tinkrum server.
   aiServerStoredNote:
     'Pendant la bêta, ce que vous dites à Tink et la configuration de l’application sont enregistrés pour améliorer Tinkrum. Les fichiers et les entrées ne sont jamais envoyés.',
   aiModeByok: 'Clé API',
   aiModeByokNote:
     'Votre propre clé, connectée directement à Claude ou à un service compatible. L’usage est facturé sur votre compte.',
-  // 自带 key 的两种 provider（D-241）
+  // Two providers supporting BYOK (Bring Your Own Key) (D-241)
   byokProviderLabel: 'Fournisseur',
   byokSentNote:
     'Quand vous demandez une modification, ce que vous dites et la structure de l’application vont à {host}. Pas vos fichiers ni vos entrées.',
@@ -209,7 +210,7 @@ export const fr: MessageTable = {
   about: 'À propos',
   aboutValue: 'Prototype Tinkrum · AGPL-3.0 · schéma v{schema} · version #{revision}',
 
-  // 页面组件
+  // Page components
   noFiles: 'Les fichiers numérisés ou enregistrés apparaîtront ici',
   filesAll: 'Tout',
   filesAllTitle: 'Tous les fichiers',
@@ -312,7 +313,7 @@ export const fr: MessageTable = {
   updateTool: 'Mettre à jour',
   updateSummary: '{name} mis à jour',
 
-  // 运行页面
+  // Run page
   runTitle: 'Exécuter',
   runCancel: 'Arrêter',
   runProgress: '{done} sur {total}',
@@ -362,7 +363,7 @@ export const fr: MessageTable = {
   packDeleteWithLanguages:
     'Ses {count} langues sont aussi supprimées. Vous pourrez les retélécharger au besoin.',
 
-  // 图片与链接
+  // Images and links
   imagePlaceholder: 'Touchez pour choisir une photo',
   imageTitle: 'Image',
   imageMissing: 'Cette image n’est pas sur cet appareil. Touchez pour en choisir une autre.',
@@ -435,7 +436,7 @@ export const fr: MessageTable = {
   listToolAll: 'Les {n} entrées de cette liste',
   listToolFound: 'Seulement les {n} entrées trouvées',
 
-  // 用户数据
+  // User data
   noRecords: 'Aucune entrée pour l’instant',
   today: 'Aujourd’hui',
   yesterday: 'Hier',
@@ -602,7 +603,7 @@ export const fr: MessageTable = {
     'Cette entrée a été supprimée, ou cette page s’ouvre depuis une entrée d’une liste.',
   recordPageEdit: 'Modifier cette entrée',
   pageMissing: 'Cette page n’existe plus.',
-  // Paramètres → Données : export de la configuration, mémoire de pré-remplissage (D-244)
+  // Settings -> Data: config export, prefill memory (D-244)
   appConfigTitle: 'Configuration de l’app',
   appConfigHint:
     'Pages, structure des tableaux, actions rapides et rappels, dans un seul fichier. Vos entrées et vos fichiers n’y sont pas.',
@@ -689,7 +690,7 @@ export const fr: MessageTable = {
     'Ce fichier n’est pas une mémoire de pré-remplissage exportée par Tinkrum. Rien n’a été restauré.',
   prefillMemoryRestored: '{count} mises en page restaurées.',
   prefillMemoryPicks: '{count} suggestions choisies mémorisées',
-  // Formulaire de nouvelle entrée : valeurs proposées à partir des pièces jointes (D-394)
+  // New entry form: suggested values from attachments (D-394)
   suggestionFill: 'Remplir « {field} » avec {value}',
   heardFilled: 'D’après ce que vous avez dit',
   suggestionsWorking: 'Recherche de valeurs dans les pièces jointes…',
@@ -697,7 +698,7 @@ export const fr: MessageTable = {
     'Pour proposer des valeurs tirées des pièces jointes, un téléchargement unique est nécessaire.',
   suggestionsDownload: 'Proposer des valeurs',
 
-  // 直接编辑（长按一块、调整顺序）
+  // Direct edit (long-press a block, adjust order)
   editText: 'Modifier le texte',
   editColor: 'Couleur',
   editAlign: 'Alignement',
@@ -749,7 +750,7 @@ export const fr: MessageTable = {
     'Les {count} éléments qu’il contient seront aussi supprimés. « Annuler » abandonne toute la modification ; après enregistrement, vous pourrez encore l’annuler.',
   deleteDataMessage:
     'Vos entrées sont conservées (Paramètres → Données). « Annuler » abandonne toute la modification ; après enregistrement, vous pourrez encore l’annuler.',
-  // AI 只改 App（D-113、D-124–D-130）
+  // AI only changes the app (D-113, D-124–D-130)
   readyTitle: 'Votre action rapide est prête',
   readyRunNow: 'L’utiliser maintenant',
   readyLater: 'Pas maintenant',
@@ -784,7 +785,7 @@ export const fr: MessageTable = {
   habitNo: 'Non merci',
   habitMade: '« {name} » ajouté à l’accueil',
 
-  // ---- 翻译（D-170–D-176）：错误说明拼进「不支持这个步骤：…」/「需要的内容没有下载好：…」 ----
+  // ---- Translation (D-170–D-176): Error descriptions interpolated into "Unsupported step: ..." / "Required content not downloaded: ..." ----
   translateNeedsFullApp:
     'Traduire (disponible dans la version complète de Tinkrum, pas dans cet aperçu)',
   translateOsTooOld: 'Traduire (nécessite iOS 18 ou une version ultérieure)',
@@ -803,7 +804,7 @@ export const fr: MessageTable = {
     'Il vous sera à nouveau proposé de le télécharger la prochaine fois que vous traduirez cette langue.',
   translateNote:
     'Traduit sur l’appareil : utile pour comprendre le sens. Pour les documents officiels, faites appel à un traducteur professionnel.',
-  // ---- 视频、音频和压缩 PDF（D-140–D-148）。音频工具的文字请另起一块，方便合并。----
+  // ---- Video, audio, and PDF compression (D-140–D-148). Place text for audio tools in a separate section for easy merging. ----
   runPercent: '{done}%',
   runError_needsFullApp:
     'Les vidéos et les fichiers audio ne peuvent être traités que dans la version complète de Tinkrum, pas dans cet aperçu.',
@@ -855,7 +856,7 @@ export const fr: MessageTable = {
     'À {target}, « {name} » serait trop flou pour être regardé. Il faut au moins {mb} Mo, ou le couper plus court d’abord.',
   runError_interrupted:
     'Tinkrum est passé en arrière-plan, le traitement n’a donc pas abouti. Restez dans Tinkrum et appuyez sur « Relancer ».',
-  // 长任务切到后台也继续（D-160–D-162）：运行页的提示，Android 通知栏的进度和完成通知。
+  // Long-running tasks continue when switched to background (D-160–D-162): Run page prompts, Android notification bar progress and completion notifications.
   runCanLeave:
     'Vous pouvez passer à une autre application ; Tinkrum continue de travailler en arrière-plan.',
   runStayInMorph: 'Restez dans Tinkrum pendant le traitement.',
@@ -883,7 +884,7 @@ export const fr: MessageTable = {
   sharedVideos: '{n} vidéos',
   sharedAudio: '{n} fichiers audio',
 
-  // AI 修改的草稿（D-190）
+  // AI modification draft (D-190)
   draftDropped:
     'L’app a changé depuis que vous avez quitté le brouillon ; {n} étapes ne correspondent plus et ont été supprimées.',
   draftFirstStep:
@@ -913,8 +914,8 @@ export const fr: MessageTable = {
   wantCardsChip: 'Je veux enregistrer des cartes de visite',
   draftRenderFailed: 'La dernière modification n’a pas pu s’afficher, elle a donc été annulée.',
 
-  // 功能和外观分开改（D-191）
-  // 工具检查补救后还有问题（AGENT_PLAN §3.6）：只提醒。
+  // Separate changes for features and look (D-191). Remaining issues after tool checks and
+  // remediation (AGENT_PLAN §3.6): warning only.
   planCheckParams:
     'Une valeur ou une langue demandée n’a peut-être pas été reprise dans l’action rapide. Vérifiez ses réglages avant de l’utiliser.',
   planCheckTools:
@@ -988,11 +989,11 @@ export const fr: MessageTable = {
   tableReadyWhere:
     'Les entrées restent sur cet appareil. Vous pouvez aussi voir le tableau dans « Paramètres → Données ».',
 
-  // 新手引导（D-149）
+  // Newcomer onboarding (D-149)
   guideSkip: 'Passer',
   guideNext: 'Suivant',
   guideStart: 'Démarrer',
-  // 划屏介绍：每页一张图配一句话。
+  // Swipe introduction: one image and one sentence per page.
   guideIntro1: 'Transformez vos documents papier en PDF, Word ou Excel bien nets.',
   guideIntro1Sub: 'Gratuit, sans pub. Les fichiers sont traités uniquement sur votre téléphone.',
   guideIntro2: 'Numérisez, ouvrez un fichier ou dites-le : tout va dans vos petites apps.',
@@ -1030,7 +1031,7 @@ export const fr: MessageTable = {
   guideTinkDone: 'C’est prêt ! Si vous voulez changer quelque chose, dites-le-moi.',
   guideGotIt: 'J’ai compris',
   guideLater: 'Plus tard',
-  // 引导第 3 步：样板 App（D-260）。
+  // Onboarding step 3: Sample apps (D-260).
   guideSamplesTitle: 'Étape 3',
   guideSamplesBody:
     'Vous pouvez aussi faire de Tinkrum votre propre app. Choisissez-en une pour essayer.',
@@ -1041,14 +1042,14 @@ export const fr: MessageTable = {
   sampleReadyDismiss: 'Compris',
   sampleFailed: 'Impossible d’ajouter cette app modèle. Essayez-en une autre.',
   sampleContinuePrompt: 'En partant de « {name} », modifier ceci : ',
-  // ---- 音频工具（D-150–D-156，音频会话）----
+  // ---- Audio tools (D-150–D-156, audio session) ----
   runError_audioTooSmall:
     'À {target}, la voix de « {name} » serait trop difficile à entendre. Il faut au moins {mb} Mo, ou la couper plus court d’abord.',
   runError_noAudio: '« {name} » n’a pas de son.',
-  // ---- 格式转换的缺口（D-183–D-186）----
+  // ---- Format conversion gaps (D-183–D-186) ----
   runError_formatUnsupported:
     '« {name} » est un fichier {format} que ce téléphone ne peut pas ouvrir. Convertissez-le d’abord en MP4 sur un ordinateur.',
-  // ---- 需求回收（D-189）----
+  // ---- Requirement backlog (D-189) ----
   needSend: 'Dites-nous que vous en avez besoin',
   needRetry: 'Non envoyé. Réessayez',
   needSent:
@@ -1057,7 +1058,7 @@ export const fr: MessageTable = {
   needsSettingTitle: 'Proposer d’envoyer les demandes que Tink ne sait pas traiter',
   needsSettingNote:
     'Ajoute un bouton sous la réponse. La phrase n’est envoyée que si vous le touchez.',
-  // ---- 记一笔、附件和公式字段（D-187、D-188）----
+  // ---- Quick entry, attachment, and formula fields (D-187, D-188) ----
   attachmentMissing: 'Le fichier a été supprimé',
   removeAttachment: 'Retirer',
   attachmentAdd: 'Ajouter des photos ou des fichiers',
@@ -1065,7 +1066,7 @@ export const fr: MessageTable = {
   attachmentMoveUp: 'Monter',
   attachmentMoveDown: 'Descendre',
   attachmentsFull: '{n} fichiers au maximum',
-  // ---- 附件的「…」和放回记录（D-395）----
+  // ---- Attachment menu ("...") and returning records (D-395) ----
   attachmentMore: 'Plus d’options pour « {name} »',
   deskBackTitle: 'Revenir à l’entrée',
   deskBackMessage: 'Comment ajouter le fichier du bureau à cette entrée ?',
@@ -1089,7 +1090,7 @@ export const fr: MessageTable = {
   speechDownloadFailed: 'le modèle vocal pour {lang}',
   speechNote:
     'Reconnaissance effectuée sur cet appareil : des mots peuvent être erronés, surtout en cas de bruit ou d’accent. Vérifiez le texte.',
-  // ---- 文字转语音（D-270）：错误说明拼进「不支持这个步骤：…」----
+  // ---- Text-to-speech (D-270): Error descriptions interpolated into "Unsupported step: ..." ----
   speakNoVoice:
     'lecture à voix haute ({lang}) : ce téléphone n’a pas de voix pour cette langue ; ajoutez-en une dans les réglages du téléphone (iPhone : Accessibilité → Contenu énoncé → Voix ; Android : Synthèse vocale)',
   speakNotDownloaded:
@@ -1116,23 +1117,23 @@ export const fr: MessageTable = {
   recordDiscardTitle: 'Supprimer cet enregistrement ?',
   recordDiscard: 'Supprimer',
   recordKeep: 'Continuer l’enregistrement',
-  // 按条件筛选（D-242）
+  // Filter by condition (D-242): None of the {count} files meet the conditions of "Keep only"
   runError_noneMatched:
     'Aucun des {count} fichiers ne remplit les conditions de « Filtrer les fichiers ».',
-  // 分组后各出一份（D-243）
+  // Separate exports per group (D-243)
   groupUndated: 'Sans date',
 
-  // 命名用识别出的文字（D-244）
+  // Naming using recognized text (D-244)
   runError_needsRecognition:
     'Ce nom de fichier utilise du texte reconnu dans le fichier, et cet appareil ne peut pas reconnaître le texte lui-même. Utilisez l’app Tinkrum complète, ou retirez cette partie du nom.',
-  // 统计按选项分组（D-248）
+  // Statistics grouped by option (D-248)
   statNoChoice: 'Non renseigné',
-  // 图表（D-249）
+  // Chart (D-249)
   describeCallout: 'carte d’alerte « {v0} »',
   describeChart: 'graphique « {v0} »',
-  // D-254：更新的 App 加的组件，这个版本不认识，原样保留。
+  // D-254: Content from a newer version of the app not recognized by this version, preserved as-is.
   describeUnknownComponent: 'contenu d’une version plus récente de cette app',
-  // v34 修改说明（describe.ts）
+  // v34 modification description (describe.ts)
   v34descDeskAddAbove: 'Ajouter {v0} au-dessus de l’aperçu sur le bureau',
   v34descDeskAddBelow: 'Ajouter {v0} sous l’aperçu sur le bureau',
   v34descDeskRemove: 'Retirer {v0} du bureau',
@@ -1180,7 +1181,7 @@ export const fr: MessageTable = {
   periodRangeText: 'du {start} au {end}',
   compare_page: 'Précédent : {value}',
   chartShare: '{value} ({percent})',
-  // 表和表之间引用（D-250）
+  // Inter-table references (D-250)
   linkDeleted: 'Entrée supprimée',
   linkNone: 'Aucun lien',
   linkChoose: 'Choisir…',
@@ -1188,11 +1189,11 @@ export const fr: MessageTable = {
   linkNew: 'Ajouter une entrée dans « {name} »',
   linkClear: 'Retirer le lien',
   linkEmptyTable: '« {name} » ne contient encore aucune entrée.',
-  // 提醒（D-251）
+  // Reminder (D-251): "{title}" ({when})
   describeAddReminder: 'Ajouter le rappel « {title} » ({when})',
   describeUpdateReminder: 'Modifier le rappel « {title} »',
   describeRemoveReminder: 'Retirer le rappel « {title} »',
-  // 手机桌面（D-271）
+  // Home Screen (D-271)
   describeHomeScreenOn:
     'Mettre « {name} » sur l’écran d’accueil du téléphone : appuyez longuement sur l’icône Tinkrum pour la voir',
   describeHomeScreenOff: 'Retirer « {name} » de l’écran d’accueil du téléphone',
@@ -1275,12 +1276,12 @@ export const fr: MessageTable = {
   reminderRemove: 'Retirer',
   reminderOpenTitle: 'Depuis votre rappel',
   reminderOpenRun: 'Démarrer',
-  // D-256：按钮、快捷入口打开的快捷操作（只摆出来，用户点「开始」才运行）。
+  // D-256: Quick action opened by a button or quick entry (only displayed; runs only when the user taps "Start").
   openQuickActionTitle: 'Action rapide',
   openQuickActionMissing: 'Cette action rapide n’est plus dans l’app.',
   reminderOpenMissing: 'L’action rapide de ce rappel n’est plus dans l’app.',
   remindersRowHint: '{n} rappels',
-  // 样板 App（D-260）：放不下时不套用，说明原因。
+  // Sample app (D-260): Not applied when there is insufficient space; explains the reason.
   sampleTooManyTables:
     '« {name} » a besoin de nouveaux tableaux, mais l’app approche de la limite de 20. Supprimez les tableaux inutiles, puis réessayez.',
   sampleTooManyPages:
@@ -1292,7 +1293,7 @@ export const fr: MessageTable = {
   sampleHomeFull:
     '« {name} » a besoin d’une place sur l’accueil, mais il est plein. Retirez un élément de l’accueil, puis réessayez.',
 
-  // ==== 从界面代码里抽出来的文案（键名是「文件_英文开头_哈希」） ====
+  // // ==== Copy extracted from interface code (key format: "file_englishPrefix_hash") ====
   planner_This_request_can_t_be_handled_Try_desc_04270:
     'Cette demande ne peut pas être traitée. Essayez de décrire comment vous voulez modifier l’application.',
   prompt_English_fafbe: 'French',
@@ -1723,7 +1724,7 @@ export const fr: MessageTable = {
   _kind__Category_not_found_5faf2: 'Catégorie introuvable',
   _id__This_quick_action_no_longer_exists_35f5a: 'Cette action rapide n’existe plus.',
 
-  // ==== 其他文案 ====
+  // // ==== Other copy ====
   retry: 'Réessayer',
   sharedFilesReceived: '{n} fichiers reçus',
   workflowFromTool:
@@ -1758,7 +1759,7 @@ export const fr: MessageTable = {
     'Mettre à jour l’outil {tool} : ajoute {names} ; vos modifications sont conservées',
   separatorList: ', ',
   separatorComma: ', ',
-  // 按顺序的聚合（D-284）
+  // Sequential aggregation (D-284)
   seqDays: '{n} jours',
   seqWeeks: '{n} semaines',
   seqMonths: '{n} mois',
@@ -1766,7 +1767,7 @@ export const fr: MessageTable = {
   seqToday: 'Aujourd’hui',
   seqDaysAgo: 'Il y a {n} jours',
   seqAvgDays: '{n} jours en moyenne',
-  // 一天、一周从什么时候开始（D-286）
+  // When a day or week starts (D-286)
   describeDayStart: 'Une journée commence à {hour} h',
   describeRecordRow: '« {name} » : modifier les boutons en haut de la page de l’entrée',
   describeEntryForm: '« {name} » : modifier les sections du formulaire de l’entrée',
@@ -1806,7 +1807,7 @@ export const fr: MessageTable = {
     'Les périodes de deux semaines (par exemple de paie) commencent en début de semaine. Pour choisir leur premier jour, demandez à Tink.',
   separatorSemicolon: ' ; ',
 
-  // 扫描件转 Excel（D-272）
+  // Scan to Excel (D-272)
   runError_tableUnsupported:
     'Cet appareil ne sait pas encore lire les grilles dans cette langue. Choisissez une autre langue pour « Convertir en classeur Excel ».',
   resultTablesMissing:
@@ -1831,7 +1832,7 @@ export const fr: MessageTable = {
   tableEmpty: 'Rien n’a été reconnu sur cette page.',
   tableReadOnly:
     'Cette page compte plus de {max} cellules : ici, elle peut seulement être consultée. Pour la modifier, ouvrez le fichier dans une autre application.',
-  // 扫描件转 Word（D-328）
+  // Scan to Word (D-328)
   runError_wordUnsupported:
     'Cet appareil ne sait pas encore lire les documents dans cette langue. Choisissez une autre langue pour « Convertir en document Word ».',
   wordFileName: 'Document {date}',
@@ -1847,7 +1848,7 @@ export const fr: MessageTable = {
   wordHideKeyboard: 'Masquer le clavier',
   wordDeleteTable: 'Supprimer le tableau',
   wordEmpty: 'Rien n’a été reconnu.',
-  // 日程（D-292–D-296）
+  // Schedule (D-292–D-296)
   scheduleDaily: 'Tous les jours',
   scheduleWeekdays: 'Chaque semaine : {days}',
   scheduleTimesWeek: '{n} fois par semaine',
@@ -1922,7 +1923,7 @@ export const fr: MessageTable = {
   recordActionTooMany: 'Au plus {max} entrées peuvent changer à la fois ; cela en modifierait {n}.',
   recordActionGone: 'Cette entrée a été supprimée.',
   recordUndoFailed: 'Cette entrée a été modifiée depuis : rien n’a été annulé.',
-  // 勾上盖掉了原来有的值（D-617）：取消只会清空，所以这一次有撤销。
+  // Ticked. Replaced an existing value (D-617): Unchecking only clears, so this operation is undoable.
   recordCheckOverwrote: 'Coché. Une valeur déjà saisie a été remplacée.',
   recordCreateAllConfirm: 'Cela crée {n} entrées dans « {table} ».',
   recordCreateAllConfirmButton: 'Créer',
@@ -1937,7 +1938,7 @@ export const fr: MessageTable = {
   recordPickMax: '{max} au plus à la fois.',
   recordPickEmpty: '« {table} » n’a pas encore d’entrées. Ajoutez-en d’abord là-bas.',
   recordUndoBulkFailed: 'Certaines de ces entrées ont été modifiées depuis : rien n’a été annulé.',
-  // 月历、显示格式、统计的目标和比较（D-305–D-308）
+  // Calendar, display format, statistic targets and comparisons (D-305–D-308)
   statPercent: '{value} %',
   calendarPrevWeek: 'Semaine précédente',
   calendarNextWeek: 'Semaine suivante',
@@ -1972,7 +1973,7 @@ export const fr: MessageTable = {
   calendarDayEmpty: 'Aucune entrée ce jour-là.',
   elapsedRunning: 'En cours depuis {time}',
   progressOfGoal: '{value} / {goal}',
-  // 打卡格（D-610）
+  // Check-in grid (D-610)
   gridCellLabel: '{row}, {column} : {n} entrées',
   gridRange: '{from} – {to}',
   gridCellTitle: '{row} · {column}',
@@ -2010,7 +2011,7 @@ export const fr: MessageTable = {
   boardColumnEmpty: 'Aucune entrée dans cette colonne',
   boardCardHint:
     'Touchez pour ouvrir ou déplacer dans une autre colonne. Maintenez pour faire glisser.',
-  // Widgets de l’écran d’accueil (D-321–D-325).
+  // Home Screen widgets (D-321–D-325).
   widgetAdd: 'Ajouter à l’écran d’accueil',
   widgetRemove: 'Retirer de l’écran d’accueil',
   widgetUnsupportedTitle: 'Ce composant ne peut pas encore aller sur l’écran d’accueil',
@@ -2029,7 +2030,7 @@ export const fr: MessageTable = {
     'Cet écran d’accueil ne permet pas d’ajouter un widget depuis Tinkrum. Maintenez le doigt sur l’écran d’accueil, choisissez Widgets et ajoutez Tinkrum.',
   widgetDone: '{n} appuis du widget enregistrés',
   widgetSkipped: '{n} appuis sur le widget n’ont pas été enregistrés, car la page a changé',
-  // 文件房间（D-357–D-360）。
+  // File desk workspace (D-357–D-360).
   deskPlace: 'Poser sur le bureau',
   deskPlaceAbout: 'Modifiez outil par outil, voyez chaque changement, annulez à tout moment',
   deskGone: 'Ce bureau a été vidé.',
@@ -2087,7 +2088,7 @@ export const fr: MessageTable = {
   deskStorageAbout:
     'Fichiers en cours de modification et leurs versions (les 20 dernières, 500 Mo au plus).',
   deskStale: 'Inutilisé depuis {n} jours, vous pouvez le vider',
-  // 收件页面「存成记录」（D-392）。
+  // Inbox "Save as an entry" (D-392).
   shareRecord: 'Enregistrer comme entrée',
   shareRecordAbout: 'Rangez les fichiers dans un tableau et remplissez le reste vous-même',
   shareRecordChoose: 'Choisir',
@@ -2128,7 +2129,7 @@ export const fr: MessageTable = {
     'Tink ne voit pas le fichier, seulement les champs de ce tableau. Le tableau est créé d’abord.',
   shareRecordTooMany: 'Une entrée contient au plus {n} fichiers : seuls les {n} premiers y vont.',
   shareRecordNewTable: 'Ajouter le tableau « {name} »',
-  // 表格文件的行导进表（D-574）：「设置 → 数据」，系统层。
+  // Importing table rows into a table (D-574): "Settings -> Data", system layer.
   importEntries: 'Importer des entrées depuis un fichier',
   importTitle: 'Importer des entrées',
   importIntro:

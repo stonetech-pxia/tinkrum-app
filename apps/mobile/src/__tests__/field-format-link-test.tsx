@@ -14,8 +14,9 @@ import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 文字字段的 format（D-422）和记录页顶部的按钮（D-423）：电话、短信、邮箱直接打开，网址先问，分享 vCard 点了才做；
-// 键盘跟着变；保存不查格式。
+// Text field formats (D-422) and record page top buttons (D-423): phone numbers, SMS, and emails
+// open directly, URLs prompt first, vCard sharing runs on tap; keyboard adapts accordingly; saves
+// without format validation.
 
 const contacts: Collection = {
   id: 'contacts',
@@ -26,7 +27,7 @@ const contacts: Collection = {
     { id: 'mail', name: '邮箱', type: 'text', format: 'email' },
     { id: 'site', name: '网站', type: 'text', format: 'url' },
   ],
-  // D-428：有哪些按钮由配置决定。
+  // D-428: available buttons are determined by configuration.
   recordRow: [
     { tool: 'record-call', field: 'tel' },
     { tool: 'record-message', field: 'tel' },
@@ -60,7 +61,7 @@ const seed = (locale: Locale, registry: Registry) => {
 
 async function openRecord(values?: Record<string, string>) {
   const repo = new MemoryWorkspaceRepo();
-  // 看过引导了：首页不再跳走。
+  // Guide has been viewed: home screen no longer skips away.
   await repo.setMeta('guide', 'done');
   await act(() => useGuide.getState().load(repo));
   if (values)
@@ -72,7 +73,7 @@ async function openRecord(values?: Record<string, string>) {
       updatedAt: 1,
     });
   const app = await renderToolsApp(repo, undefined, { locale: 'zh', seed });
-  // renderRouter 换成了假的计时器：先等首页画完，再打开记录页。
+  // renderRouter replaced with a fake timer: wait for the home screen to finish drawing before opening the record page.
   await act(async () => {
     jest.advanceTimersByTime(200);
     await Promise.resolve();
@@ -84,7 +85,7 @@ async function openRecord(values?: Record<string, string>) {
     }),
   );
   await screen.findByTestId('editor-save');
-  // 已有的记录读完才有值。
+  // Existing records only have values after reading completes.
   if (values) await waitFor(() => expect(screen.getByTestId('editor-name')).toBeTruthy());
   await act(async () => {});
   return { repo, files: app.files };
@@ -135,7 +136,7 @@ describe('no data yet', () => {
       autoCapitalize: 'none',
       autoCorrect: false,
     });
-    // 没有 format 的文字字段照旧。
+    // Text fields without a format remain unchanged.
     const plain = screen.getByTestId('editor-name').props;
     expect(plain.keyboardType).toBe('default');
     expect(plain.autoCapitalize).toBeUndefined();
@@ -156,7 +157,7 @@ const actionIds = () =>
   screen.queryAllByTestId(/^record-action-/).map((b) => String(b.props.testID).slice(14));
 
 describe('with data', () => {
-  // 真机（三星）：保存表单时系统问「要将登录信息保存至智能密码管家吗」，记录的字段不是登录信息。
+  // Real device (Samsung): when saving a form, the system asks "Do you want to save login info to Smart Password Manager?", but record fields are not login information.
   it('record fields tell the system not to offer saving them as a login', async () => {
     await openRecord();
     for (const id of ['editor-name', 'editor-tel', 'editor-mail', 'editor-site'])
@@ -181,7 +182,7 @@ describe('with data', () => {
     walk(screen.toJSON());
     expect(ids.indexOf('record-actions')).toBeGreaterThanOrEqual(0);
     expect(ids.indexOf('record-actions')).toBeLessThan(ids.indexOf('editor-name'));
-    // D-422 那一行不再有。
+    // The row from D-422 is no longer present.
     expect(screen.queryByTestId('editor-tel-link')).toBeNull();
   });
 

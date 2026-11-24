@@ -4,8 +4,9 @@ import { reminderWhen } from './describe';
 import type { Collection, Locale, Reminder, WorkspaceConfig } from './schema';
 import { workspace } from './test-helpers';
 
-// 提醒的说明文字要说出什么时候不响（D-564）：带 unless 的每天、每周提醒（D-563）和按记录排的提醒（D-317）。
-// 只出现配置里的名字（表名），不出现记录的内容。
+// Reminder description text must state when it does not trigger (D-564): daily/weekly reminders
+// with unless clauses (D-563) and record-based reminders (D-317). Uses configuration names (table
+// names) only, without record contents.
 
 const expenses: Collection = {
   id: 'expenses',

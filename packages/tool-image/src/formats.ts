@@ -1,4 +1,4 @@
-// 输出格式。只输出 JPEG / PNG / WebP，从不输出 HEIC（很多平台打不开）。
+// Output formats. Only output JPEG / PNG / WebP, never HEIC (unsupported on many platforms).
 
 export const OUTPUT_FORMATS = ['jpeg', 'png', 'webp'] as const;
 
@@ -12,12 +12,12 @@ const MIME: Record<OutputFormat, string> = {
 
 const EXT: Record<OutputFormat, string> = { jpeg: 'jpg', png: 'png', webp: 'webp' };
 
-/** 去掉参数并转小写，如 "Image/JPEG; q=1" → "image/jpeg"。 */
+/** Remove parameters and lowercase, e.g., "Image/JPEG; q=1" -> "image/jpeg". */
 function normalize(mime: string): string {
   return (mime.split(';')[0] ?? '').trim().toLowerCase();
 }
 
-/** MIME 对应的输出格式；不是可输出的格式（如 HEIC、GIF）时返回 null。 */
+/** Output format corresponding to MIME; returns null when not an outputable format (such as HEIC, GIF). */
 export function formatOfMime(mime: string): OutputFormat | null {
   switch (normalize(mime)) {
     case 'image/jpeg':
@@ -41,7 +41,7 @@ export function mimeOfFormat(format: OutputFormat): string {
   return MIME[format];
 }
 
-/** 任意图片类型（含 HEIC、GIF 等只能输入的格式）。 */
+/** Any image type (including input-only formats like HEIC, GIF, etc.). */
 export function isImageMime(mime: string): boolean {
   return /^image\/[a-z0-9.+-]+$/.test(normalize(mime));
 }

@@ -3,7 +3,7 @@ import { mediaKindOf, type PlanAbout } from '@morph/core';
 import { mimeOf } from '../runtime/actions/helpers';
 import type { IncomingShare } from './incoming';
 
-/** 发给 AI 的只有分享文件的类型和个数（D-124），没有文件名、大小和内容。 */
+/** Only the shared file types and count are sent to the AI (D-124), without file names, sizes, or content. */
 export function sharedAbout(share: IncomingShare): Extract<PlanAbout, { kind: 'shared' }> {
   let images = 0;
   let pdfs = 0;

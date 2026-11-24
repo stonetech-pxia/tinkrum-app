@@ -1,5 +1,6 @@
-# 本地 Expo 模块（D-084）：用 iOS 自带的 Vision / VisionKit / Core Image 做扫描，
-# 文字识别用 PP-OCRv6（D-269，ONNX Runtime 跑模型，MIT；Vision 只认 PP-OCRv6 不认的语言）。
+# Local Expo module (D-084): uses iOS built-in Vision / VisionKit / Core Image for scanning, and
+# PP-OCRv6 for text recognition (D-269, running model via ONNX Runtime, MIT; Vision is used only for
+# languages not recognized by PP-OCRv6).
 
 Pod::Spec.new do |s|
   s.name           = 'MorphVision'
@@ -17,7 +18,7 @@ Pod::Spec.new do |s|
   s.dependency 'ExpoModulesCore'
   s.dependency 'onnxruntime-objc', '1.30.0'
   s.frameworks = 'Vision', 'VisionKit', 'CoreImage', 'ImageIO', 'PDFKit'
-  # DataDetection 是 iOS 26 才有的（预填用的日期和金额识别）：弱链接，更早的系统上不加载，退回 NSDataDetector。
+  # DataDetection is available starting from iOS 26 (date and amount recognition for prefilling): weakly linked, not loaded on earlier systems, falling back to NSDataDetector.
   s.weak_frameworks = 'DataDetection'
 
   s.source_files = '**/*.{h,m,swift}'

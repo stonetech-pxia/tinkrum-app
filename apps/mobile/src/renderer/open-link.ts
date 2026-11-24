@@ -3,7 +3,7 @@ import { Alert, Linking } from 'react-native';
 
 import { t } from '../i18n';
 
-/** 打开 App 外的网址前先问，写明目标地址（D-044）。open 是用户点了「打开」才调用。 */
+/** Ask before opening URLs outside the app, specifying the target address (D-044). open is called only after the user taps "Open". */
 export function confirmOpenLink(locale: Locale, url: string, open: () => void): void {
   Alert.alert(
     t(locale, 'openLinkTitle'),
@@ -16,8 +16,11 @@ export function confirmOpenLink(locale: Locale, url: string, open: () => void): 
 }
 
 /**
- * 打电话、发短信、发邮件、打开网站的步骤（D-428，原来是记录页上写死的按钮，D-422）。电话、邮箱交给系统的拨号和写信页面，什么都没发出去，直接打开；
- * 网址先问。不写数据。不用 canOpenURL（要声明白名单）：打不开时说一句（没有电话或邮件 App 的设备）。
+ * Steps for phone calls, SMS, emails, and website links (D-428, formerly hardcoded buttons on the
+ * record page, D-422). Phone and email are handed over to the system's dialer and mail composer
+ * pages without sending anything out; URLs are asked first. No data is written. Do not use
+ * canOpenURL (which requires declaring a whitelist): show a message if it fails (on devices
+ * without a phone or email app).
  */
 export function openFieldLink(link: FieldLink, locale: Locale): void {
   const open = () =>

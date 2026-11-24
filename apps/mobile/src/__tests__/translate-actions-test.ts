@@ -16,8 +16,9 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, FakeTranslator, FakeVision, makePdf } from '../test-utils/fake-files';
 
-// 翻译（D-170）：系统翻译换成 FakeTranslator（按文字猜语言，译文是「[目标语言] 原文」）。
-// iOS 要下载时系统自己弹窗（假的不给大小）；Android 给出大小，由 App 先问用户（D-064、D-112）。
+// Translation (D-170): system translator replaced by FakeTranslator (guesses language from text,
+// translation is "[target language] original"). On iOS, system prompts when downloading (fake
+// doesn't provide size); on Android, provides size and app prompts the user first (D-064, D-112).
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -91,7 +92,7 @@ describe('translate.text', () => {
       status: 'succeeded',
       value: {
         type: 'text',
-        // 英文的两行接成一句再翻；日期原样保留；本来就是中文的一段不翻。
+        // Join two English lines into a single sentence before translating; preserve dates as-is; do not translate paragraphs that are already Chinese.
         text: '[zh-Hans] Dear Tenant,\n\n[zh-Hans] Your lease will expire on April 15, 2026.\n\n2026-04-15\n\n请于月底前回复。',
       },
     });
@@ -153,7 +154,7 @@ describe('translate.text', () => {
   });
 
   it('iOS: explains the system download first, then downloads before translating', async () => {
-    // 创始人 2026-10-31：苹果语言包下载太久，先说明（a），翻译前先把语言包下好（b）。
+    // Founder 2026-10-31: Apple language pack download takes too long, explain first (a), download language pack before translating (b).
     const ok = setup(toolWorkflow('translate-typed'), { text: 'Hello', to: 'ja' });
     ok.translator.missing = new Set(['ja']);
     expect((await ok.run()).status).toBe('succeeded');
@@ -166,7 +167,7 @@ describe('translate.text', () => {
     expect(order).toEqual(['prepare', 'translate']);
     expect(ok.translator.calls.find((c) => c.method === 'prepare')!.args).toEqual(['en', 'ja']);
 
-    // 在我们的说明里点了取消：不下载也不翻译。
+    // Cancelled in our prompt: neither download nor translate.
     const no = setup(toolWorkflow('translate-typed'), { text: 'Hello', to: 'ja' }, false);
     no.translator.missing = new Set(['ja']);
     expect((await no.run()).status).toBe('cancelled');
@@ -174,7 +175,7 @@ describe('translate.text', () => {
       no.translator.calls.some((c) => c.method === 'prepare' || c.method === 'translate'),
     ).toBe(false);
 
-    // 在系统的下载弹窗里取消。
+    // Cancelled in system download dialog.
     const sys = setup(toolWorkflow('translate-typed'), { text: 'Hello', to: 'ja' });
     sys.translator.missing = new Set(['ja']);
     sys.translator.failWith = 'cancelled';

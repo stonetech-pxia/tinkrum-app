@@ -1,5 +1,7 @@
-// graphics 套件：图片、印章、条形码、示意图和图表（识别 + 版面模型那条路；数字 PDF 也会经过原生绘图）。
-// 图里的标注字本来就该留在图里：这类页的通用「字都在」检查把 recall 放低到只差图里那些字。
+// graphics suite: images, stamps, barcodes, diagrams, and charts (recognition + layout model
+// approach; digital PDFs also go through native rendering). Annotation text in figures should
+// naturally stay in the figure: the generic "all text present" check for such pages lowers recall
+// to tolerate just the text inside the figures.
 import {
   heading,
   images,
@@ -185,7 +187,7 @@ export const GRAPHICS: Case[] = [
     what: 'Catalog page with nine ruled picture cards and no image-model proposals: the pictures used to be lost; each card keeps its picture and its editable label. Neighbouring picture boxes overlapped by a few pixels, so the middle picture of every row was taken out of the row and written on its own above it.',
     checks: [
       images({ min: 9, max: 9 }),
-      // 相邻两张图的框互相压了 4–6 像素：中间那张被拿出这一排，单独放在左右两张上面，三排图成了六排。
+      // Frames of two adjacent images overlap by 4-6 pixels: the middle image is pulled out of this row and placed individually above the left and right ones, turning three rows of images into six.
       picturesInRows(),
       imagesSideBySide(3),
       times('Trail backpack 28 L', 2),

@@ -1,21 +1,23 @@
 import { z } from 'zod';
 
-// 画出来的图标（D-625）：配置顶层的 icons 是一份图标库，每个图标只有 SVG 的路径数据（几何形状），
-// 不收整份 SVG（脚本、外部链接、样式会破坏底线 1、13 和 §3）。用的地方写 "my:<id>"。
-// 画布固定 24×24，左上角是原点；默认用一种颜色按 even-odd 填满，stroke: true 时只画线（2 宽，圆头圆角）。
-// 颜色总是跟着用它的地方（和自带图形的 9 个图标一样）。
+// Drawn icons (D-625): The top-level icons configuration is an icon library where each icon
+// contains only SVG path data (geometric shapes), rejecting full SVGs (scripts, external links, and
+// styles violate invariants 1, 13, and §3). Referenced as "my:<id>". The canvas is fixed at 24x24
+// with the top-left as the origin; it is filled by default with a single color using the even-odd
+// rule. When stroke: true is set, only strokes are drawn (width 2, rounded caps and joins). The
+// color always follows its usage context (like the 9 built-in graphics).
 
-/** 图标库里的 ID。 */
+/** ID in the icon library. */
 export const DRAWN_ICON_ID = /^[a-z][a-z0-9-]{0,23}$/;
-/** 引用画出来的图标的前缀：icon 写 "my:<id>"。 */
+/** Prefix for referencing drawn icons: write icons as "my:<id>". */
 export const DRAWN_ICON_PREFIX = 'my:';
-/** 一份配置最多几个画出来的图标。 */
+/** Maximum number of drawn icons per configuration. */
 export const MAX_DRAWN_ICONS = 40;
-/** 一个图标最多几条路径（猫爪这样的图形就有 5 块；大小由下面的字符数管）。 */
+/** Maximum number of paths per icon (shapes like cat paws have 5 parts; size is governed by the character count below). */
 export const MAX_DRAWN_ICON_PATHS = 8;
-/** 一个图标所有路径加起来最多几个字符。 */
+/** Maximum total character count across all paths in an icon. */
 export const MAX_DRAWN_ICON_CHARS = 1500;
-/** 画布边长。 */
+/** Canvas side length. */
 export const DRAWN_ICON_CANVAS = 24;
 
 export const DrawnIconIdSchema = z
@@ -24,24 +26,26 @@ export const DrawnIconIdSchema = z
 
 const REF = new RegExp(`^${DRAWN_ICON_PREFIX}${DRAWN_ICON_ID.source.slice(1, -1)}$`);
 
-/** 是不是 "my:<id>" 形式的图标值。 */
+/** Check whether a value is an icon reference in the form "my:<id>". */
 export const isDrawnIconRef = (value: unknown): value is `my:${string}` =>
   typeof value === 'string' && REF.test(value);
 
-/** "my:<id>" 里的 id；不是这种写法返回 null。 */
+/** Extract the id from "my:<id>"; returns null if not in this format. */
 export const drawnIconId = (value: unknown): string | null =>
   isDrawnIconRef(value) ? value.slice(DRAWN_ICON_PREFIX.length) : null;
 
-// ---- 路径数据的语法（SVG path 的子集）----
+// ---- Path data syntax (SVG path subset) ----
 
-/** 每个命令一段要几个数。 */
+/** Number of arguments required per command segment. */
 const ARGS: Record<string, number> = { m: 2, l: 2, h: 1, v: 1, c: 6, s: 4, q: 4, t: 2, a: 7, z: 0 };
 const NUMBER = /[+-]?(?:\d+(?:\.\d*)?|\.\d+)/y;
 const SEPARATOR = /[\s,]/;
 
 /**
- * 路径数据有什么问题；没问题返回 null。只认 M L H V C S Q T A Z（大小写）、普通的数（没有指数）、空格和逗号；
- * 必须以 M / m 开头；每个命令的数要够（A 一段 7 个，第 4、5 个是 0 或 1 的标志）；和 SVG 一样可以省略重复的命令。
+ * Validates path data and returns a problem description, or null if valid. Only recognizes M, L,
+ * H, V, C, S, Q, T, A, Z (case-insensitive), ordinary numbers (without exponents), spaces, and
+ * commas; must start with M/m; each command must have sufficient arguments (7 for A, with the 4th
+ * and 5th being 0 or 1 flags); repetitive commands can be omitted as in SVG.
  */
 export function pathDataProblem(d: string): string | null {
   let i = 0;
@@ -73,7 +77,7 @@ export function pathDataProblem(d: string): string | null {
     if (count === undefined) return unexpected();
     i++;
     if (count === 0) continue;
-    // 至少一段，后面紧跟着数就是同一个命令再来一段。
+    // At least one segment, with subsequent numbers immediately following for repeated segments of the same command.
     do {
       for (let k = 0; k < count; k++) {
         skip();
@@ -85,7 +89,7 @@ export function pathDataProblem(d: string): string | null {
           return `${command}: argument ${k + 1} must be the flag 0 or 1`;
         }
         if (readNumber()) continue;
-        // 数不够：到了结尾或下一个命令；别的字符是不认识的。
+        // Insufficient arguments: reached the end or the next command; unrecognized characters.
         if (i >= d.length || ARGS[d[i]!.toLowerCase()] !== undefined)
           return `${command} needs ${count} numbers per segment`;
         return unexpected();
@@ -95,15 +99,15 @@ export function pathDataProblem(d: string): string | null {
   }
 }
 
-/** 一个画出来的图标。 */
+/** A drawn icon. */
 export const DrawnIconSchema = z.strictObject({
   paths: z.array(z.string()).min(1).max(MAX_DRAWN_ICON_PATHS),
-  /** 只画线（2 宽，圆头圆角），什么都不填；不写是按 even-odd 填满。 */
+  /** Draws lines only (width 2, rounded caps and joins) with no fill; unconfigured defaults to even-odd fill. */
   stroke: z.literal(true).optional(),
 });
 export type DrawnIcon = z.infer<typeof DrawnIconSchema>;
 
-/** 一个图标的问题（每条一句，说出是哪个图标）。 */
+/** Issues for a single icon (one per line, specifying which icon). */
 export function drawnIconProblems(id: string, icon: DrawnIcon): string[] {
   const problems: string[] = [];
   icon.paths.forEach((d, n) => {
@@ -118,7 +122,7 @@ export function drawnIconProblems(id: string, icon: DrawnIcon): string[] {
   return problems;
 }
 
-/** 配置顶层的图标库。 */
+/** Top-level icon library configuration. */
 export const DrawnIconsSchema = z
   .record(DrawnIconIdSchema, DrawnIconSchema)
   .superRefine((icons, ctx) => {
@@ -134,7 +138,7 @@ export const DrawnIconsSchema = z
   });
 export type DrawnIcons = z.infer<typeof DrawnIconsSchema>;
 
-/** 修改里的图标库（setTheme 的 icons）：写了就加上或换掉，null 去掉。 */
+/** Icon library patch (icons in setTheme): if specified, adds or replaces icons; null removes them. */
 export const DrawnIconsPatchSchema = z
   .record(DrawnIconIdSchema, DrawnIconSchema.nullable())
   .superRefine((icons, ctx) => {
@@ -148,8 +152,9 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /**
- * 内容里每一处 "my:<id>" 图标（键名是 icon 的地方，哪一层都算）：id 和在哪（路径里有 id 的一层用 id）。
- * 顶层的 icons（图标库本身）不算。
+ * Every "my:<id>" icon reference in the content (where the key name is icon, at any nesting
+ * level): returns the id and location (uses the id-containing layer in the path). Top-level icons
+ * (the icon library itself) are excluded.
  */
 export function drawnIconUses(content: unknown): { id: string; where: string }[] {
   const out: { id: string; where: string }[] = [];
@@ -176,7 +181,7 @@ export function drawnIconUses(content: unknown): { id: string; where: string }[]
   return out;
 }
 
-/** 把内容里 "my:<旧 id>" 换成 "my:<新 id>"（导入 App 文件时 ID 撞了改名用）；返回新的一份。 */
+/** Replaces "my:<old id>" with "my:<new id>" in the content (used for renaming when IDs clash during App file import); returns a new copy. */
 export function renameDrawnIcons<T>(content: T, map: ReadonlyMap<string, string>): T {
   if (map.size === 0) return content;
   const walk = (node: unknown): unknown => {

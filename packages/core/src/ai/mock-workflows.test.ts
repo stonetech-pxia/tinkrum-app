@@ -13,7 +13,7 @@ import { WORKFLOW_PRESETS, presetWorkflow } from '../workflows/presets';
 import { createMockAIProvider } from './mock';
 import type { Plan } from './types';
 
-// 工作流句式（docs/MOCK_AI_PHRASES.md W1–W8）。
+// Workflow sentence patterns (docs/MOCK_AI_PHRASES.md W1–W8).
 
 const ai = createMockAIProvider();
 const now = new Date(2026, 9, 22, 9, 0);
@@ -33,7 +33,7 @@ const withVisa = () =>
   apply(workspace('zh', { withPdf: true }), [
     { op: 'addTool', tool: presetWorkflow(WORKFLOW_PRESETS[0]!, 'zh', 'visa-photo') },
   ]);
-/** 首页上运行这个快捷操作的块（look action）。 */
+/** Home screen block running this quick action (look action). */
 const runs = (c: Component, id: string) =>
   isKnownComponent(c) && c.look === 'action' && c.tools.some((u) => 'tool' in u && u.tool === id);
 const actions = (c: WorkspaceConfig, id: string) =>
@@ -48,7 +48,7 @@ describe('mock AI — workflows', () => {
     expect(lines[0]).toContain('新建快捷操作「签证 / 证件照」（现成的）');
     const en = await change('Add the scan a document preset', workspace('en'), 'en');
     expect(quickActionsOf(en.after).at(-1)!.preset).toBe('scan-document');
-    // AI 修改页「可以试试」里的英文例句。
+    // English example sentences in the AI edit page "You can try" section.
     const example = await change('Add the visa photo workflow', workspace('en'), 'en');
     expect(quickActionsOf(example.after).at(-1)!.preset).toBe('visa-photo');
     expect(await plan('添加签证照片工作流', withVisa())).toMatchObject({
@@ -94,7 +94,7 @@ describe('mock AI — workflows', () => {
       kind: 'reject',
       message: '「存到相册」接不上前一步（类型不对或参数不完整）。',
     });
-    // 只有「分享」：第一步收文件，由记录的附件字段交（D-442），不再因为没有输入步骤被拒绝。
+    // "Share" only: step one receives files, handed off via the record's attachment field (D-442), avoiding rejection due to missing input steps.
     expect(await plan('新建工作流：分享', workspace('zh'))).toMatchObject({ kind: 'ops' });
   });
 
@@ -104,13 +104,13 @@ describe('mock AI — workflows', () => {
 
     const placed = await change('把签证照片放到首页', withVisa());
     expect(placed.after.containers.pages[0]!.blocks.some((c) => runs(c, 'visa-photo'))).toBe(true);
-    // 还没添加的预设：一句话里先添加再放上去。
+    // Presets not yet added: add to workspace first, then place on home screen in a single sentence.
     const fresh = await change('把扫描文档放到首页', workspace('zh'));
     expect(quickActionsOf(fresh.after).at(-1)!.preset).toBe('scan-document');
 
     const removed = await change('删除签证照片工作流', placed.after);
     expect(quickActionsOf(removed.after).some((w) => w.id === 'visa-photo')).toBe(false);
-    // visa-photo 是内设快捷操作的 ID：删掉副本就回到内设的，首页卡片继续指向内设的（D-259）。
+    // `visa-photo` is the ID of the built-in quick action: deleting the copy reverts to the built-in one, and home screen cards continue pointing to the built-in one (D-259).
     expect(
       removed.after.containers.pages[0]!.blocks.filter((c) => runs(c, 'visa-photo')),
     ).toHaveLength(1);
@@ -151,7 +151,7 @@ describe('mock AI — workflows', () => {
     expect(actions(en.after, quickActionsOf(en.after).at(-1)!.id).at(-1)).toBe('out.saveToFolder');
     const added = await change('在签证照片最后加一步存到 Google Drive', withVisa());
     expect(actions(added.after, 'visa-photo').at(-1)).toBe('out.saveToFolder');
-    // 只有分享面板和文件夹选择器，没有「自动发给某个人」。
+    // Only share panel and folder picker, without "automatically send to a specific person".
     expect(await plan('新建工作流：选照片，自动发给张三', workspace('zh'))).toMatchObject({
       kind: 'reject',
     });
@@ -183,7 +183,7 @@ describe('mock AI — workflows', () => {
     expect(await plan('我这个月花了多少', workspace('zh'))).toMatchObject({ reason: 'userData' });
   });
 
-  it('W12–W14 videos and PDF compression: 「压到 N MB」 follows what the quick action holds', async () => {
+  it('W12–W14 videos and PDF compression: "compress to N MB" follows what the quick action holds', async () => {
     const { after } = await change('新建一个快捷操作：选视频，压到 50MB，分享', workspace('zh'));
     const wf = quickActionsOf(after).at(-1)!;
     expect(wf.steps.map((s) => [s.action, s.params])).toEqual([
@@ -191,7 +191,7 @@ describe('mock AI — workflows', () => {
       ['video.compress', { by: 'size', maxMB: 50, quality: '720p' }],
       ['out.share', {}],
     ]);
-    // 往已有的视频快捷操作里加「压到 N MB」也是压视频；改大小改的是视频的 MB。
+    // Adding a step to an existing video quick action ("compress to 10MB") is also video compression; resizing modifies the video's target file size in MB.
     const added = await change(`在「${wf.name}」里加一步：压到 10MB`, after);
     expect(actions(added.after, wf.id)).toEqual([
       'in.videos',
@@ -212,7 +212,7 @@ describe('mock AI — workflows', () => {
       action: 'pdf.compress',
       params: { maxMB: 0.5, whenTooBig: 'ask' },
     });
-    // 照片照旧压图片。
+    // Photos are compressed as images as usual.
     const photos = await change('新建一个快捷操作：选照片，压到 1MB', workspace('zh'));
     expect(quickActionsOf(photos.after).at(-1)!.steps[1]).toMatchObject({
       action: 'image.compress',
@@ -221,7 +221,7 @@ describe('mock AI — workflows', () => {
   });
 });
 
-// 手机桌面（HS，D-271）：「放到桌面」是手机桌面，「放到首页」仍是首页。
+// Home screen (HS, D-271): "put on desktop" refers to the home screen, while "put on home" still refers to the home page.
 describe('mock AI — home screen', () => {
   const on = (c: WorkspaceConfig) => c.nav.phoneHomeScreen ?? [];
 
@@ -260,7 +260,7 @@ describe('mock AI — home screen', () => {
     const p = await plan('把整理页面放到桌面', full);
     expect(p).toMatchObject({ kind: 'reject', reason: 'unknown' });
     expect(p.kind === 'reject' && p.message).toContain('最多放 4 个');
-    // 先拿掉一个就能放。
+    // Removing the visa photo from the desktop first allows placing the organizing page there.
     const { after } = await change('把签证照片从桌面拿掉，把整理页面放到桌面', full);
     expect(on(after).sort()).toEqual(['pdf-arrange', 'pdf-compress', 'pdf-merge', 'pdf-split']);
   });

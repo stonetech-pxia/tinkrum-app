@@ -10,8 +10,9 @@ import { FakeBackup, PICKED } from '../test-utils/fake-backup';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 「设置 → 数据 → 备份和恢复」（D-600）：新用户（没有数据）、有数据、各种出错和取消。
-// 原生 zip 在这里是替身（FakeBackup），界面、确认、状态都是真的。
+// "Settings -> Data -> Backup and Restore" (D-600): new users (no data), with data, various errors
+// and cancellations. Native zip is mocked here (FakeBackup), while UI, confirmations, and states
+// are real.
 
 let disk: FakeBackup;
 let mockService: BackupService;
@@ -42,7 +43,7 @@ async function start(locale: 'zh' | 'en' | 'fr' = 'zh') {
   return { ...app, files };
 }
 
-/** 下一个弹窗：按指定的按钮，并把标题和内容交回来。 */
+/** Next popup: press the specified button and return the title and content. */
 function answerNext(label: string) {
   const asked: { title?: string | null; message?: string | null } = {};
   jest.spyOn(Alert, 'alert').mockImplementationOnce((title, message, buttons?: AlertButton[]) => {
@@ -59,15 +60,15 @@ async function flush() {
 
 afterEach(() => jest.restoreAllMocks());
 
-describe('备份和恢复：新用户（还没有什么数据）', () => {
+describe('Backup and Restore: new user (no data yet)', () => {
   it('shows both actions, and export says the file is not encrypted before it does anything', async () => {
     await start();
     expect(screen.getByTestId('backup-export')).toBeOnTheScreen();
     expect(screen.getByTestId('backup-restore')).toBeOnTheScreen();
-    // 打开页面什么都不做（底线 15）：不扫、不写、不删。
+    // Opening page does nothing (invariant 15): no scanning, no writing, no deleting.
     expect(disk.calls).toEqual([]);
     expect(disk.removed).toEqual([]);
-    // 先问；不确认就什么都不做。
+    // Prompt first; do nothing without confirmation.
     const asked = answerNext('取消');
     await fireEvent.press(screen.getByTestId('backup-export'));
     await flush();
@@ -82,12 +83,12 @@ describe('备份和恢复：新用户（还没有什么数据）', () => {
     await fireEvent.press(screen.getByTestId('backup-export'));
     await flush();
     expect(screen.getByTestId('backup-ready')).toHaveTextContent(/tinkrum-backup-2026-11-20\.zip/);
-    // 复制进文件夹的是这个缓存里的压缩包（替身磁盘里的文件在 FakeFiles 里也放一份）。
+    // The archive copied into the folder is this cached zip (a copy of files in mock disk is also placed in FakeFiles).
     files.disk.set(useBackupStatus.getState().exported!.uri, new Uint8Array(3));
     await fireEvent.press(screen.getByTestId('backup-save-folder'));
     await flush();
     expect(screen.getByTestId('backup-saved')).toHaveTextContent(/MorphOut/);
-    // 每次都让用户选文件夹，不用记住的那个。
+    // Prompt the user to select a folder every time, without remembering the previously used one.
     expect(files.folderPicks).toBe(1);
     await fireEvent.press(screen.getByTestId('backup-share'));
     await flush();
@@ -114,7 +115,7 @@ describe('备份和恢复：新用户（还没有什么数据）', () => {
   });
 });
 
-describe('备份和恢复：有数据时恢复', () => {
+describe('Backup and Restore: restoring when data exists', () => {
   it('reads the archive in place (no copy into the cache), asks with the date and size, then replaces everything', async () => {
     const { files } = await start();
     disk.addArchive();
@@ -226,7 +227,7 @@ describe('备份和恢复：有数据时恢复', () => {
   });
 });
 
-describe('恢复之后的撤销提示', () => {
+describe('Undo prompt after restore', () => {
   it('Undo on the banner goes back to the earlier data, and the earlier data is still there when the banner closes', async () => {
     const { files, store } = await start();
     disk.addArchive();
@@ -252,7 +253,7 @@ describe('恢复之后的撤销提示', () => {
   });
 });
 
-describe('恢复之后的撤销提示：时长', () => {
+describe('Undo prompt after restore: duration', () => {
   it('stays longer than an ordinary undo banner, then goes', async () => {
     const { store } = await start();
     await act(() => router.replace('/'));
@@ -271,10 +272,10 @@ describe('恢复之后的撤销提示：时长', () => {
   });
 });
 
-describe('备份和恢复：法语', () => {
+describe('Backup and Restore: French', () => {
   it('shows the French copy for the card, the question and the refusals', async () => {
     const { files } = await start('fr');
-    // 标题是数据页上那一行的名字，也是这一页导航栏上的标题（D-615）。
+    // Title is the name of that row on the data page, as well as the title on this page's navigation bar (D-615).
     expect(screen.getByTestId('data-backup', { includeHiddenElements: true })).toHaveTextContent(
       /sauvegarde et restauration/i,
     );
@@ -297,7 +298,7 @@ describe('备份和恢复：法语', () => {
     await fireEvent.press(screen.getByTestId('backup-restore'));
     await flush();
     expect(confirm.title).toBe('Remplacer tout le contenu de Tinkrum ?');
-    // 1 entrée (singulier), la date et la taille.
+    // 1 entry (singular), the date, and the size.
     expect(confirm.message).toMatch(/contient 1 entrée \(environ/);
   });
 });

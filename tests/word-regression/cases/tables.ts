@@ -1,5 +1,6 @@
-// tables 套件：带线表格的识别和结构（一张表的边界、表头、合并格、该不该当表），
-// 没有线的表格和按行对齐（一项的名称和金额在同一排）。
+// tables suite: recognition and structure of lined tables (boundaries of a table, headers, merged
+// cells, whether it should be treated as a table), borderless tables, and row-aligned items (where
+// item name and amount are on the same row).
 import {
   apart,
   custom,
@@ -20,18 +21,18 @@ import {
 import type { Case } from '../lib/case';
 import { sizeOf } from '../lib/layout-checks';
 
-/** docx 里每张最外层表的 w:tblPr（按文档顺序；嵌套的表也算）。 */
+/** w:tblPr of each outermost table in docx (in document order; nested tables are also counted). */
 const tblPrs = (xml: string) =>
   [...xml.matchAll(/<w:tblPr>([\s\S]*?)<\/w:tblPr>/g)].map((m) => m[1]!);
 
-/** docx 里每一格（w:tc）的 XML 片段和它的字。 */
+/** XML snippet of every cell (w:tc) in docx and its text content. */
 const tcs = (xml: string) =>
   [...xml.matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map((m) => ({
     xml: m[1]!,
     text: [...m[1]!.matchAll(/<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g)].map((t) => t[1]).join(''),
   }));
 
-/** 编辑页里某张表中含这处文字的格。 */
+/** The cell containing this text within a specific table in the editor view. */
 const cellWith = (c: Converted, text: string) => {
   for (const l of leaves(c.doc)) {
     if (l.leaf.kind !== 'table') continue;
@@ -41,7 +42,7 @@ const cellWith = (c: Converted, text: string) => {
   return null;
 };
 
-/** 每个词都完整地在某一段里（没有被列线切成两格）。 */
+/** Each word appears fully within a single paragraph (not split into two cells by column lines). */
 const wordsWhole = (...words: string[]): Check[] => words.map((w) => together(w));
 
 export const TABLES: Case[] = [
@@ -56,7 +57,7 @@ export const TABLES: Case[] = [
       differentTables('Count started', 'Differences 3'),
       differentTables('Steel brackets', 'Rhône Express'),
       notInTable('Carrier returns'),
-      // 列数按每排的格子数：整页共用列线（D-272），上面网格的列线也算在这张表的 gridCol 里，格子跨过去。
+      // Number of columns based on the cell count per row: page-wide shared column lines (D-272); column lines of the upper grid are also included in this table's gridCol, and cells span across them.
       table({ containing: ['Carrier', 'Savoie Logistique'], rows: 4 }),
       custom('the three-line table has 3 cells in every row', (c) => {
         const t = leaves(c.doc)
@@ -146,7 +147,7 @@ export const TABLES: Case[] = [
     suite: 'tables',
     fix: 'ca14ef0b · D-532',
     what: 'A certificate inside a decorative double frame: the frame used to be read as a small sparse table, squeezing the title and text into tiny cells.',
-    // 圆章剪成图片，章里的两个词不在 Word 的字里。
+    // Circular stamps are cropped as images, and the two words inside the stamp are not in the Word text layer.
     recall: 0.95,
     checks: [
       noTables(),
@@ -191,7 +192,7 @@ export const TABLES: Case[] = [
     fix: '0d784e7c · D-501 ① ②',
     what: 'A scanned payslip whose tables have dark header bands with white text, column lines starting below the band, and a summary table joined under the detail table by its own band: the band used to be discarded with its column lines, and the two tables merged into one with a mixed grid.',
     checks: [
-      // 底条里的白字表头现在成了表上面的一排段落（修的时候也是这样），这里不考。
+      // White text headers inside bottom bars now become a row of paragraphs above the table (consistent with the fix), and are not tested here.
       inRow('Old-age pension', '2 977.96', '6.9000', '205.48', '255.50'),
       inRow('Gross pay', 'Total deductions', 'Taxable income', 'Net pay'),
       inRow('324.90', '2 712.33', '2 653.06'),
@@ -265,7 +266,7 @@ export const TABLES: Case[] = [
         const pr = tblPrs(c.xml)[0];
         if (!pr) return 'no table';
         const ind = Number(/<w:tblInd w:w="(-?\d+)"/.exec(pr)?.[1] ?? 0);
-        // 原件：小票表格左边在 66 mm，正文左边 15 mm，差约 2900 twips。
+        // Original: receipt table left margin is at 66 mm, body left margin is 15 mm, a difference of about 2900 twips.
         if (ind < 2000) return `tblInd ${ind}`;
         const grid = c.xml.slice(c.xml.indexOf(pr));
         const cols = /<w:tblGrid>([\s\S]*?)<\/w:tblGrid>/.exec(grid)?.[1] ?? '';
@@ -300,7 +301,7 @@ export const TABLES: Case[] = [
     suite: 'tables',
     fix: '261a67d4, 18b816a7 · D-533, D-534',
     what: 'A landscape invoice printed rotated 90° on the page: its data table used to come out as vertical crops on a portrait page; it must stay editable text in the source direction on a landscape page.',
-    // 表外的竖排字照旧剪成图片（D-533），这些字不在 Word 的文字里。
+    // Vertical text outside tables is still cropped as images (D-533), and these characters are not in the Word text.
     recall: 0.5,
     checks: [
       table({ containing: ['Printer ink', 'Storage boxes', '170.10'] }),
@@ -426,7 +427,7 @@ export const TABLES: Case[] = [
     suite: 'tables',
     fix: 'fd28491f; EU sample 020',
     what: 'Scanned utility-bill table drawn with dashed rules and a doubled dashed line under the header: OCR reads the dashes of the double rule as "==" text (with a stray letter), which ended up in the header cells or as a junk row between the header and the first item.',
-    // 识别把挨着的「0,00」「23」读成一行「0,0023」，表把它按列线分开：多出来的是这些，不是重复。
+    // Recognition read adjacent "0.00" and "23" as a single line "0.0023"; the table separates them along column lines: these are extra items, not duplicates.
     extra: 0.03,
     checks: [
       table({ containing: ['Składnik opłat', 'Netto', 'Brutto', 'abonament'], minRows: 8 }),

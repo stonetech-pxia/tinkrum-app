@@ -8,7 +8,7 @@ import { PackStore } from '../packs/store';
 import { MemoryPackFs, bundlePack, sha256, text } from '../test-utils/memory-packs';
 import { acceptNextAlert, renderToolsApp } from '../test-utils/render-app';
 
-// 工作流的界面旅程（T7）：设置 → 快捷操作 → 内设的直接运行；编辑参数、每次运行时问、加步骤 → 保存（一个版本）→ 撤销。
+// Workflow interface journey (T7): Settings -> Quick Actions -> Run built-in preset directly; edit parameters, ask on each run, add steps -> Save (a version) -> Undo.
 
 const NO_PAGES: string[] = [];
 
@@ -27,7 +27,7 @@ const visa = (store: Awaited<ReturnType<typeof renderToolsApp>>['store']) =>
 describe('workflow journeys (UI)', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  // D-510：PDF 预览随 App 打包，用到它的内设不再写「首次使用需要下载一些内容」；没带时照旧写。
+  // D-510: PDF preview is bundled with the App; presets using it no longer display "First-time use requires downloading some content"; display it as usual when absent.
   it.each([
     [false, true],
     [true, false],
@@ -49,7 +49,7 @@ describe('workflow journeys (UI)', () => {
       };
       if (inApp) bundlePack(fs, pdfview, () => body);
       const store = new PackStore(fs, sha256, (id) => (id === 'pdfview' ? pdfview : packById(id)));
-      // activePages 要每次返回同一个数组（useSyncExternalStore）。
+      // activePages must return the same array on every call (useSyncExternalStore).
       const bridge = {
         subscribe: () => () => undefined,
         activePages: () => NO_PAGES,
@@ -62,9 +62,9 @@ describe('workflow journeys (UI)', () => {
       if (says) {
         await waitFor(() => expect(card).toHaveTextContent(note));
       } else {
-        // 读完已装的扩展包（这时从 App 里复制了一份）以后也不写。
+        // After reading installed packs (which copied a copy from the App), do not write again.
         await waitFor(() => expect(fs.files.has('pdfview/6.4.299/ready.json')).toBe(true));
-        // renderRouter 用假的计时器：只把排着的 Promise 走完。
+        // renderRouter uses fake timers: only flush pending Promises.
         for (let i = 0; i < 3; i++) await act(async () => undefined);
         expect(card).not.toHaveTextContent(note);
       }
@@ -101,14 +101,14 @@ describe('workflow journeys (UI)', () => {
     const before = store.getState().head!.id;
     await fireEvent.press(screen.getByTestId('workflow-edit-visa-photo'));
     expect(await screen.findByTestId('workflow-editor')).toBeTruthy();
-    // 内设的本来就是原样，没有「恢复原样」；也不能删除。
+    // Built-in presets are already in their original state, so there is no "Restore original"; they also cannot be deleted.
     expect(screen.queryByTestId('workflow-reset')).toBeNull();
     expect(screen.queryByTestId('workflow-delete')).toBeNull();
-    // 改名、把大小改成 200 KB、规格不再每次都问。
+    // Rename, change size to 200 KB, and no longer prompt for specifications every time.
     await fireEvent.changeText(screen.getByTestId('workflow-name'), '美签照片');
     await fireEvent.changeText(screen.getByTestId('step-1-maxKB'), '200');
     await fireEvent.press(screen.getByTestId('step-1-ask-spec'));
-    // 在最后加一步「分享」。
+    // Add a "Share" step at the end.
     await fireEvent.press(screen.getByTestId('step-insert-3'));
     expect(await screen.findByTestId('step-picker')).toBeTruthy();
     expect(screen.queryByTestId('step-pick-in.photos')).toBeNull();
@@ -116,7 +116,7 @@ describe('workflow journeys (UI)', () => {
     await fireEvent.press(screen.getByTestId('workflow-save'));
 
     const wf = visa(store)!;
-    // 用同一个 ID：内设时用过的次数接着算。
+    // Use the same ID: continue counting usage frequency for presets.
     expect(wf.id).toBe('visa-photo');
     expect(wf.name).toBe('美签照片');
     expect(wf.steps[1]).toMatchObject({
@@ -130,7 +130,7 @@ describe('workflow journeys (UI)', () => {
     });
     expect(await screen.findByTestId('workflow-reset')).toBeTruthy();
 
-    // 提示条上的「撤销」回到编辑之前：又是内设的那个。
+    // "Undo" on the banner reverts to before editing: back to the preset state.
     await fireEvent.press(await screen.findByText('撤销'));
     expect(visa(store)).toBeUndefined();
     await waitFor(() =>
@@ -142,7 +142,7 @@ describe('workflow journeys (UI)', () => {
   it('keeps steps that do not fit from being saved, and can put a built-in on Home', async () => {
     const { store } = await openWorkflows();
     await fireEvent.press(screen.getByTestId('workflow-edit-email-photos'));
-    // 把「选照片」移到第二步：输入只能是第一步（第一步收文件的由记录的附件字段交，D-442），不能保存。
+    // Move "Select photo" to the second step: input can only be the first step (the first step receives files via the record's attachment field, D-442), cannot save.
     await fireEvent.press(await screen.findByTestId('step-down-0'));
     expect(screen.getByTestId('step-problem-1')).toBeTruthy();
     expect(screen.getByTestId('workflow-save').props.accessibilityState?.disabled).toBe(true);
@@ -151,7 +151,7 @@ describe('workflow journeys (UI)', () => {
 
     const before = store.getState().head!.id;
     await fireEvent.press(screen.getByTestId('workflow-to-home'));
-    // 首页的入口要指向配置里的快捷操作：一起存进去，一个版本。
+    // Home screen entry point must point to the quick action in the config: saved together, single version.
     expect(store.getState().head!.id).toBe(before + 1);
     expect(quickActionsOf(store.getState().config!).some((w) => w.id === 'email-photos')).toBe(
       true,
@@ -172,7 +172,7 @@ describe('workflow journeys (UI)', () => {
     await fireEvent.press(await screen.findByTestId('workflow-duplicate'));
     const copy = quickActionsOf(store.getState().config!).find((w) => w.preset === 'email-photos')!;
     expect(copy.id).not.toBe('email-photos');
-    // 内设的那个还在。
+    // The preset one is still there.
     await fireEvent.press(await screen.findByText('撤销'));
     expect(quickActionsOf(store.getState().config!)).toHaveLength(0);
   });

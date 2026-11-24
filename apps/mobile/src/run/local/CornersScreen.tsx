@@ -16,10 +16,12 @@ import { t } from '../../i18n';
 import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 
-// 扫描的四个角（TOOLS_DESIGN §4 corners）：显示扫描包找到的纸张边框，用户逐张确认或拖动四个角。
-// 找不到时给一个内缩的默认框。坐标一律用原图像素；拖乱（交叉）的框不能提交。
+// The four corners of the scan (TOOLS_DESIGN §4 corners): displays the paper boundary found by the
+// scanning pack, allowing the user to confirm or drag the four corners one by one. Falls back to an
+// inset default box when none can be found. Coordinates are always in original image pixels;
+// dragged/crossed-over boxes cannot be submitted.
 
-/** 手指离角多近算按住了这个角（屏幕点）。 */
+/** Proximity threshold (screen points) for considering a corner to be held/grabbed. */
 const GRAB = 44;
 
 type Size = { width: number; height: number };

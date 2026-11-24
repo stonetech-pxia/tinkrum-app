@@ -12,8 +12,10 @@ import type { Collection, WorkspaceConfig } from './schema';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 清单的勾也能顺带记下点什么（D-617，创始人 2026-11-21「做前三个」）：勾上时 also 设这一条的一两个字段（例如完成日期 = 今天），
-// 取消时把它们清空。点一下最多 3 处、都在这一条（底线 11）；只有 set，没有新建、别的表、加减。
+// Checklists can also log something when checked (D-617, founder 2021-11-21 "do the first three"):
+// when checked, also set one or two fields of this entry (e.g., completion date = today), and clear
+// them when unchecked. At most 3 changes per tap, all on this entry (invariant 11); only set, no
+// creation, no other tables, no additions/subtractions.
 
 const tasks: Collection = {
   id: 'tasks',
@@ -70,7 +72,7 @@ describe('a check box can also record a date (D-617)', () => {
   it('ticking done also sets completed: the checklist accepts it', () => {
     expect(ToolUseSchema.safeParse(tick).success).toBe(true);
     expect(problems([checklist(tick)])).toBe('');
-    // 两处也行（一共 3 处）。
+    // Two changes are also fine (3 changes in total).
     expect(
       problems([
         checklist({
@@ -94,7 +96,7 @@ describe('a check box can also record a date (D-617)', () => {
       expect(problems([checklist({ ...tick, also })]), JSON.stringify(also)).toMatch(
         /a check's also can only set fields of this entry/,
       );
-    // 别的表、第三处：写法本身就不行。
+    // Other tables, third change: the syntax itself is invalid.
     expect(
       ToolUseSchema.safeParse({
         ...tick,
@@ -126,7 +128,7 @@ describe('a check box can also record a date (D-617)', () => {
     expect(
       problems([checklist({ ...tick, also: [{ do: 'set', field: 'done', value: true }] })]),
     ).toMatch(/changes done twice/);
-    // 字段的值照常检查。
+    // Field values are checked as usual.
     expect(
       problems([checklist({ ...tick, also: [{ do: 'set', field: 'completed', value: 'now' }] })]),
     ).toMatch(/completed/);
@@ -172,9 +174,9 @@ describe('a check box can also record a date (D-617)', () => {
     const unticked = checkInput(use, tasks, after, ctx);
     expect(unticked).toEqual({ done: false, completed: '' });
     const back = prepareRecordValues(tasks, unticked!, after, NOW);
-    // 回到勾之前的样子（没勾的勾选框存 false，日期不再存）。
+    // Restore to the state before checking (unchecked checkboxes store false, date is no longer stored).
     expect(back.ok && back.values).toEqual({ title: 'A', done: false, due: '2026-11-20' });
-    // 一个勾选框的 also 取消时存 false。
+    // The also action of a checkbox stores false when unchecked.
     const flagged = {
       ...tick,
       also: [{ do: 'set', field: 'flag', value: true }],
@@ -190,9 +192,9 @@ describe('a check box can also record a date (D-617)', () => {
     const after = { ...before, done: true, completed: '2026-11-18' };
     expect(checkOverwrites(use, before, after)).toBe(true);
     expect(checkOverwrites(use, { ...before, completed: null }, after)).toBe(false);
-    // 原来就是今天：没有丢掉什么。
+    // Already today: nothing is lost.
     expect(checkOverwrites(use, { ...before, completed: '2026-11-18' }, after)).toBe(false);
-    // 取消只是清空勾上时写的值：再勾一下就回来。
+    // Unchecking only clears the value written when checked: checking again brings it back.
     expect(checkOverwrites(use, after, { ...after, done: false, completed: null })).toBe(false);
   });
 

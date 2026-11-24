@@ -30,8 +30,10 @@ import {
 } from './define';
 
 /**
- * 右侧字段的显示格式（D-306）：elapsed = 从这个日期时间（或创建时间）到现在、或到 until，没有 until 的值时每秒在走；
- * progress = 这个数值和目标（固定数或这条记录的另一个数字类字段）的比例，画成环（默认）或条。
+ * Display format for right-side fields (D-306): elapsed = time elapsed from this datetime (or
+ * creation time) until now, or until until, ticking every second when until is absent; progress =
+ * ratio of this value to a target (fixed number or another number field in this record), rendered
+ * as a ring (default) or bar.
  */
 export const TrailingFormatSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('elapsed'), until: IdSchema.optional() }),
@@ -43,9 +45,11 @@ export const TrailingFormatSchema = z.discriminatedUnion('kind', [
 ]);
 
 /**
- * 打卡格（D-610）横着的时间：unit 一列是一天、一周或一个月，by 是这张表的一个日期或日期时间字段（不写是第一个日期字段，
- * 没有就是第一个日期时间字段），last 是几列（和图表一样，不写是 7 天、8 周、6 个月；最后一列是今天所在的那一段）。
- * 一周从哪天开始跟着「设置 → 日期」（data.calendar.weekStart）。只给 look grid。
+ * Horizontal time axis for habit/check-in grid (D-610): unit makes each column a day, week, or
+ * month; by is a date or datetime field from this table (defaults to the first date field, or
+ * first datetime field if none); last is the number of columns (same as charts, defaults to 7
+ * days, 8 weeks, 6 months; last column is the period containing today). Week start day follows
+ * "Settings -> Date" (data.calendar.weekStart). Applies to look grid only.
  */
 export const GridAcrossSchema = z.strictObject({
   unit: z.enum(GROUP_UNITS),
@@ -54,30 +58,33 @@ export const GridAcrossSchema = z.strictObject({
 });
 export type GridAcross = z.infer<typeof GridAcrossSchema>;
 
-/** 记录块读什么：一张表，筛选、排序、条数，可以分组（每组一段 / 一栏 / 一天）。limit 是每段 / 每栏最多几条。 */
+/** What record block reads: a table, filter, sort, limit, and optional grouping (group per section / column / day). limit is the maximum number of items per section / column. */
 export const RecordSourceSchema = z.strictObject({
   table: IdSchema,
   filter: filterSchema().optional(),
   sort: SortKeysSchema.optional(),
   /**
-   * 跟着页面上的时间范围（D-561，和数字卡、图表的一样，D-440）：同一页要有一个 period 块；筛选里的 inPeriod 不再用，
-   * 按选的范围、用那个 inPeriod 的日期字段（没有就是表里第一个日期字段）筛。月历和带 show.browse.period 的列表不行。
+   * Follows the page time range (D-561, same as number cards and charts, D-440): requires a
+   * period block on the same page; inPeriod in filters is no longer used, filtering by the
+   * selected range using that period's date field (falls back to the first date field in the
+   * table). Incompatible with calendars and lists with show.browse.period.
    */
   period: z.literal('page').optional(),
   /**
-   * 跟着页面上的一排选项（D-573）：同一页要有一个 choices 块，读的是同一张表；只算这个字段是选中那一项的记录
-   * （「全部」不加条件）。按同一个字段分组的不行。
+   * Follows the page-level option tabs (D-573): the page must have a choices block reading the
+   * same table; calculates only records where this field matches the selected item ("All" adds no
+   * condition). Grouping by the same field is not allowed.
    */
   choice: z.literal('page').optional(),
-  // 不写时 30 条（模型偶尔漏写，不该因此拒绝整份修改）。
+  // Defaults to 30 items when omitted (models occasionally omit it; an entire modification should not be rejected for this).
   limit: z.number().int().min(1).max(100).default(30),
   group: GroupingSchema.optional(),
-  /** 打卡格（D-610）横着的时间：每一列一天、一周或一个月。只给 look grid。 */
+  /** Horizontal time axis for check-in grid (D-610): each column is a day, week, or month. Applies to look grid only. */
   across: GridAcrossSchema.optional(),
 });
 export type RecordSource = z.infer<typeof RecordSourceSchema>;
 
-/** 每一条的记录卡片（重复嵌套，D-369 Q4）：固定的槽位。 */
+/** Record card for each entry (repeated nesting, D-369 Q4): fixed slots. */
 const SlotsSchema = z.strictObject({
   span: z.enum(['month', 'week']).optional(),
   day: z
@@ -85,21 +92,25 @@ const SlotsSchema = z.strictObject({
     .optional(),
   title: FieldRefSchema,
   subtitles: z.array(FieldRefSchema).max(2).optional(),
-  /** 显示在右侧的字段，例如金额。 */
+  /** Field displayed on the right, e.g., amount. */
   trailing: FieldRefSchema.optional(),
   format: TrailingFormatSchema.optional(),
-  /** 按这个单选字段上色：月历给每天上色（这一天最后一条的选项），别的外观在标题前画一个小圆点（D-541）。 */
+  /** Color by this single-select field: calendars color each day (option of the last entry of the day), other appearances draw a small dot before the title (D-541). */
   color: IdSchema.optional(),
-  /** 满足这些条件（并且，≤3）的那几条，右侧的值（没有右侧字段时是标题）用警示色（D-541）。 */
+  /** Items satisfying these conditions (AND, <=3) have their right-side values (or title if no right-side field) rendered in alert color (D-541). */
   highlight: z.array(ConditionSchema).min(1).max(3).optional(),
-  /** 表格（D-539）第一列 title 之后的列；不写时是副标题和右侧字段。 */
+  /** Columns following the title column in tables (D-539); defaults to subtitle and right-side field when omitted. */
   columns: z.array(FieldRefSchema).min(1).max(7).optional(),
   emptyText: boundedText(1, 80).optional(),
   /**
-   * 用户在列表上临时找、换着看（D-424，只有 list、cards、checklist）：search 有搜索框，sort、group 是能换的字段。
-   * 换了只在这个块画着的时候有效，离开就回到 source 的排序和分组，什么都不写（底线 15）。
-   * filter：单选、标签字段，一排可点的值，一次选一个（创始人 2026-11-04 定）。pin：搜索框和这几排固定在页面上方。
-   * 有 browse 时 source.limit 是每次显示几条，滚到底再显示下一批（没有 browse 的 limit 是硬上限）。
+   * Temporary search and switching views for users in lists (D-424, list, cards, and checklist
+   * only): search provides a search box; sort and group are switchable fields. Changes apply only
+   * while rendering this block and reset to source sorting and grouping upon leaving, storing
+   * nothing (invariant 15). filter: single-select or tag fields, a row of clickable values,
+   * selectable one at a time (decided by founder 2026-11-04). pin: fixes the search box and these
+   * rows at the top of the page. When browse is present, source.limit is the batch size per
+   * render, loading the next batch upon scrolling to the bottom (limit without browse is a hard
+   * cap).
    */
   browse: z
     .strictObject({
@@ -107,7 +118,7 @@ const SlotsSchema = z.strictObject({
       sort: z.array(FieldRefSchema).min(1).max(6).optional(),
       group: z.array(FieldRefSchema).min(1).max(6).optional(),
       filter: z.array(IdSchema).min(1).max(3).optional(),
-      /** 一排「全部 / 本周 / 本月 / 本年」，按这个日期字段（或 createdAt、updatedAt）切换（D-437）。 */
+      /** A row of "All / This Week / This Month / This Year", toggled by this date field (or createdAt, updatedAt) (D-437). */
       period: FieldRefSchema.optional(),
       pin: z.literal(true).optional(),
     })
@@ -117,9 +128,9 @@ const SlotsSchema = z.strictObject({
 const shape = {
   source: RecordSourceSchema,
   show: SlotsSchema,
-  /** 每一条上的工具（≤3 个按钮 + 勾 / 点一下 / 拖动 / 就地添加）和列表上方的按钮（≤3，D-428），检查在 record-ops.ts。 */
+  /** Tools on each entry (<=3 buttons + check / tap / drag / inline add) and buttons above the list (<=3, D-428), checked in record-ops.ts. */
   tools: z.array(ToolUseSchema).min(1).max(8).optional(),
-  /** 点一条打开这个页面（D-342，page.of 是这张表），不写是编辑页。 */
+  /** Tap an entry to open this page (D-342, page.of is this table), defaults to the edit page when omitted. */
   opens: IdSchema.optional(),
 };
 
@@ -159,10 +170,10 @@ const refs = {
   'source.filter': { to: 'filter' },
 } as const;
 
-/** 列表上能换着分组的字段：分段能用的，加上文字（按公司分，每个不同的值一段，D-424）。 */
+/** Fields available for group switching in lists: groupable types plus text (grouped by company, with each distinct value forming a section, D-424). */
 const BROWSE_GROUP_TYPES: readonly string[] = [...GROUP_BY_TYPES, 'text'];
 
-/** 每种记录外观自己的要求（v33 靠 check 拦的，v34 写进各自的 look 里，规则 E6）。 */
+/** Requirements specific to each record appearance (handled by check bar in v33, written into respective looks in v34, rule E6). */
 function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
   const { collection, config } = ctx;
   const problems: string[] = [];
@@ -198,7 +209,7 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
       if (pinned.length > 1)
         problems.push(`page ${ctx.page.id} can pin the search of only one list`);
     }
-    // 能一直往下加载的列表要在滚动的中间，固定不住。
+    // Lists with infinite loading must be in the middle of scrolling and cannot be fixed in place.
     if (c.pin !== undefined)
       problems.push('a list with show.browse scrolls in the middle of the page: no pin');
     for (const id of browse.sort ?? []) {
@@ -332,11 +343,15 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
 }
 
 /**
- * 打卡格（D-610）自己的要求：行是 source.group.by（单选的每个选项，或引用的那张表的每一条，和看板一样可以用 group.filter
- * 先筛那张表、showEmpty 列出没有记录的行），列是 source.across（日期或日期时间字段，不写用第一个）。格子里的值是条数，
- * 有 show.trailing（数字类字段）时是它的合计；show.format progress 的 goal 是固定数，或者行的那张表的数字字段（每个习惯
- * 自己的目标），不用 show.trailing。工具只有点一下：最多一个 {do: "create", values: "$here"}（填这一行、这一天）和一个
- * {do: "remove"}（格子里正好一条时把它移到「最近删除」）；没有 when、also，标签可以不写（读屏说的是这一格）。
+ * Requirements specific to check-in grid (D-610): rows are source.group.by (each option of a
+ * single-select, or each entry of the referenced table; like Kanban, group.filter can pre-filter
+ * that table, showEmpty lists rows without records), columns are source.across (date or datetime
+ * field, defaults to the first). Cell values are counts, or sums when show.trailing (number
+ * field) is present; show.format progress goal is a fixed number or a number field from the row's
+ * table (per-habit goal), without using show.trailing. Tools support tap only: at most one {do:
+ * "create", values: "$here"} (fills this row and day) and one {do: "remove"} (moves to "Recently
+ * Deleted" when exactly one entry is in the cell); no when, also, and label can be omitted
+ * (screen reader reads the cell position).
  */
 function gridProblems(c: RecordBlock, ctx: CheckContext, byType: string | undefined): string[] {
   const { collection, config } = ctx;
@@ -347,7 +362,7 @@ function gridProblems(c: RecordBlock, ctx: CheckContext, byType: string | undefi
     problems.push(
       'a grid needs source.group.by set to a choice or link field (one row per option or per linked entry)',
     );
-  // 多选字段（D-607）一条会在几行里，点掉一格就从几行一起删了：行只用单选或引用。
+  // Multi-select fields (D-607) would span multiple rows; unchecking a cell deletes it across all those rows simultaneously: rows use single-select or relation only.
   const byField = group?.by === undefined ? undefined : table.fields.find((f) => f.id === group.by);
   if (byField?.type === 'choice' && byField.multiple)
     problems.push(
@@ -408,8 +423,9 @@ function gridProblems(c: RecordBlock, ctx: CheckContext, byType: string | undefi
 }
 
 /**
- * 六种记录块共用的写法（提示词里写一次，每种外观的 ai.doc 只写自己的部分）。
- * limit 是每段 / 每栏 / 每天最多几条。
+ * Shared syntax across the six record block types (written once in prompt, each appearance's
+ * ai.doc writes its own section). limit is the maximum number of items per section / column /
+ * day.
  */
 export const RECORD_LOOK_DOC =
   'source {table, filter?, sort? {field, direction: "asc"|"desc"} or a list of 1-3 of them (sorted by the first, ties by the next: "by priority, then due date"), period?: "page" (follows the period block of the page, rule 56; not on a calendar), choice?: "page" (follows the choices block of the page, rule 65), limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (a choice field: a dot in the colour of its option; on a calendar the day colour), highlight? (1-3 conditions like filter: matching entries show trailing, or the title, in the warning colour, e.g. over budget), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools? (createAll only as the addHere with pick: true, rule 70), opens? (a page for one entry, rule 48)';
@@ -467,7 +483,7 @@ const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
     open: true,
     max: 4,
   },
-  // 表格的格子只读（D-539）：没有每行的按钮。createAll 只是下面「添加」的勾选新建（D-616）。
+  // Table cells are read-only (D-539): no per-row buttons. createAll is simply the checkbox creation under "Add" (D-616).
   table: {
     as: ['addHere', 'list'],
     do: ['create', 'createAll'],
@@ -475,7 +491,7 @@ const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
     open: true,
     max: 4,
   },
-  // 图片墙（D-540）只有图片和标题：没有每张的按钮。
+  // Gallery (D-540) has images and titles only: no per-item buttons.
   gallery: {
     as: ['addHere', 'list'],
     do: ['create', 'createAll'],
@@ -483,7 +499,7 @@ const META: Record<RecordLook, NonNullable<LookMeta['tools']>> = {
     open: true,
     max: 4,
   },
-  // 打卡格（D-610）：只有点格子，在这一格加一条（$here）或删掉格子里唯一的那一条。
+  // Check-in grid (D-610): tap cells only, to add an entry in that cell ($here) or remove the sole entry in that cell.
   grid: { as: ['tap'], do: ['create', 'remove'], max: 2 },
 };
 

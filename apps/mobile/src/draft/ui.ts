@@ -1,13 +1,13 @@
 import type { PlanAbout } from '@morph/core';
 import { create } from 'zustand';
 
-// 草稿模式的界面状态（D-190），外壳和推入的页面共用：聊天框开着没有、最新一步的回复收起没有。
+// UI state for draft mode (D-190), shared by the shell and the pushed page: whether the chat box is open and whether the latest step's reply is collapsed.
 
 interface DraftUiState {
   chatOpen: boolean;
-  /** 从哪一页右上角的入口打开的聊天框（D-406）：这一次聊天里说的话默认改它。 */
+  /** The top-right entry point of the page from which the chat box was opened (D-406): speech in this chat session defaults to modifying it. */
   chatAbout: PlanAbout | null;
-  /** 收起了回复的那一步（changeRequestId）；最新一步不是它时显示最新一步的回复。null = 再打开。 */
+  /** The step (changeRequestId) where the reply is collapsed; displays the latest step's reply when the latest step is not this one. null = reopen. */
   seenStep: number | null;
   setChatOpen(open: boolean, about?: PlanAbout): void;
   markSeen(changeRequestId: number | null): void;

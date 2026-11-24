@@ -32,12 +32,13 @@ import {
   upperAmount,
 } from './zh-rules';
 
-// 不用模型时每个字段的候选（D-394 的规则打分 + 算术 + 中文规则 + 值记忆），以及哪些字段代码有把握、不用问模型。
+// Candidates for each field when not using the model (D-394 rule scoring + arithmetic + Chinese rules + value memory), as well as fields where code is certain and does not need to ask the model.
 
 /**
- * 代码有把握的门槛（第一个候选的分 ≥ top，且比第二个高 ≥ gap）。测量时两折交叉定的、取更严的
- * （per-field/hybrid/plan.json，真实小票上这些格子 96% 对）；合计在 D-403 的规则上重新量过，放到
- * 3.5（D-404）。没列的字段从不算有把握。
+ * Confidence threshold for code (score of first candidate ≥ top, and difference from second ≥
+ * gap). Determined by two-fold cross-validation, taking the stricter one
+ * (per-field/hybrid/plan.json, these cells are 96% correct on real receipts); totals re-measured
+ * using D-403 rules, set to 3.5 (D-404). Unlisted fields are never considered confident.
  */
 const SURE: Partial<Record<ConceptId, { top: number; gap: number }>> = {
   amount: { top: 3.5, gap: 1 },
@@ -48,7 +49,7 @@ const SURE: Partial<Record<ConceptId, { top: number; gap: number }>> = {
   tax: { top: 2.5, gap: 0 },
   destination: { top: 0, gap: 0 },
 };
-/** 规则一个候选都没有时，这些字段多半就是没有（单据上不一定印），不问模型。 */
+/** When rules yield no candidates, these fields are mostly absent (not necessarily printed on the document) and are not asked of the model. */
 const EMPTY_IS_SURE: ReadonlySet<ConceptId> = new Set([
   'number',
   'tax',
@@ -58,46 +59,48 @@ const EMPTY_IS_SURE: ReadonlySet<ConceptId> = new Set([
 ]);
 
 /**
- * 自由填写的字段：单据上没有它的值，问模型只会得到地址、电话这类没用的候选
- * （iOS 模拟器上 2026-11-01 看到的；D-394 也不给这种字段列候选）。
+ * Freely filled fields: documents lack their values, and asking the model only yields useless
+ * candidates like addresses or phone numbers (observed on iOS simulator on 2026-11-01; D-394 also
+ * avoids listing candidates for such fields).
  */
 export const FREE_NOTE = /^(备注|附注|说明|notes?|remarks?|comments?|remarques?|commentaires?)$/i;
 
 export interface FieldPlan {
   field: Field;
-  /** 代码给的候选（好的在前），还没算值记忆。 */
+  /** Candidates provided by code (best first), before value memory. */
   code: ValueSuggestion[];
-  /** 这张表存过、这次文字里也有的值。 */
+  /** A value previously saved in this table that also appears in the current text. */
   remembered: ValueSuggestion | null;
-  /** 二维码里写明的值（D-423）：排在最前面，也不用问模型。 */
+  /** Values explicitly stated in QR codes (D-423): placed at the very front, no need to ask the model. */
   fromCode: ValueSuggestion[];
-  /** 代码拿不准，要问模型。 */
+  /** Whether code is uncertain and needs to ask the model. */
   ask: boolean;
-  /** 问了模型也让规则的候选排在前面（中文单据的合计，模型常挑小计，D-404）。 */
+  /** Keep rule candidates at the front even if the model is asked (for Chinese receipt totals, the model often picks subtotal, D-404). */
   codeFirst: boolean;
 }
 
 const CARD_NO_ASK = new Set<ConceptId>(['phone', 'email', 'website', 'address']);
 
 export interface DocumentPlan {
-  /** 用哪组规则：问模型和核对模型的答案时要一样。 */
+  /** Which rule set to use: must be consistent when asking the model and verifying the model's answer. */
   kind: DocumentKind;
-  /** 整份文字，一排一个（按页接起来）。 */
+  /** Full text, one row per line (concatenated across pages). */
   rows: string[];
   fields: FieldPlan[];
-  /** 不是规则打分给的值（算术、值记忆、模型）在哪一排；找不到时没有，不记。 */
+  /** Row index where a value not given by rule scoring (arithmetic, value memory, model) was found; missing if not found, not recorded. */
   pickOf(value: string): ValueSuggestion['pick'];
 }
 
-/** 这张表哪些字段用值记忆：店名、公司（别的字段的值换一张单据就不同了）。 */
+/** Which fields in this table use value memory: store name, company (values of other fields change across documents). */
 export const usesValueMemory = (f: Field) => {
   const c = conceptOf(f);
   return (f.type === 'text' || f.type === 'note') && (c === 'merchant' || c === 'company');
 };
 
 /**
- * 从这张表已有的记录现查值记忆（字段 ID → 存过的值）。底线 14：不另存值；记录只读。
- * 每条记录的 values 是用户自己存的，不发给云端 AI（底线 2）。
+ * Query value memory from existing records in this table (field ID → saved value). Invariant 14:
+ * values are not stored separately; records are read-only. The values in each record were saved
+ * by the user themselves and are never sent to the cloud AI (invariant 2).
  */
 export function knownValues(
   fields: readonly Field[],
@@ -120,7 +123,7 @@ const HAS_CJK = /[㐀-鿿]/;
 const LOWER = (t: string) => t.normalize('NFKC').toLowerCase();
 const ESCAPE = /[.*+?^${}()|[\]\\]/g;
 
-/** 存过的值是不是原样出现在这一排：英文、数字要整个词（空格可以多可以少）；中文要整排，或者足够长（2、3 个字太容易是别的名字的开头）。 */
+/** Whether a saved value appears verbatim in this row: English and numbers require whole words (spacing can vary); Chinese requires the entire row or sufficient length (2-3 characters are too easily the start of another name). */
 function rowHasValue(value: string, row: string): boolean {
   const sq = squash(value);
   if (sq.length < 2) return false;
@@ -132,7 +135,7 @@ function rowHasValue(value: string, row: string): boolean {
   return new RegExp(`(^|[^\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`, 'u').test(LOWER(row));
 }
 
-/** 这次文字里（在同一排上）原样出现的、最长的存过的值。 */
+/** The longest saved value appearing verbatim in the current text (on the same row). */
 function rememberedValue(
   known: readonly string[] | undefined,
   rows: readonly string[],
@@ -148,8 +151,10 @@ const withPick = (value: string, pick: ValueSuggestion['pick']): ValueSuggestion
 });
 
 /**
- * 酒店账单：全文最晚的日期（有效期那种排不算）。一段文字分不清日月时只按语言先给的那个读法算，
- * 不在两种读法里取较晚的；最晚的恰好是这种日期时标出来。
+ * Hotel bills: latest date in the entire text (validity-style rows are excluded). When text
+ * cannot distinguish day and month, reads strictly according to the language's primary format,
+ * without choosing the later of two interpretations; highlights when the latest date happens to
+ * be of this validity type.
  */
 function latestDate(
   rows: readonly string[],
@@ -161,7 +166,7 @@ function latestDate(
     const dates = ruleCandidates(row, locale).filter((c) => c.kind === 'date');
     const seen = new Set<number>();
     for (const c of dates) {
-      // 「Time printed : 28-OCT-20」这类打印日期不进最晚日期。
+      // Printed dates like "Time printed : 28-OCT-20" are excluded from latest dates.
       if (receiptRules() && PRINT_WORD_LEFT.test(row.slice(Math.max(0, c.start - 30), c.start)))
         continue;
       if (seen.has(c.start)) continue;
@@ -174,15 +179,16 @@ function latestDate(
   return best;
 }
 
-/** 两个候选算不算同一个值。 */
+/** Whether two candidates count as the same value. */
 export const sameValue = (f: Field, a: string, b: string) =>
   f.type === 'money' || f.type === 'number'
     ? Math.abs(Number(a) - Number(b)) < 0.005
     : squash(a) === squash(b);
 
 /**
- * 这个日期（YYYY-MM-DD）在这一排里是不是只有有效期、退货期限这类日期：它左边 30 个字符里有 BAD_DATE_ROW 或
- * 「有效期、return by、refund」之类的词。排里认不出这个值时按整排判断。
+ * Whether this date (YYYY-MM-DD) in this row is exclusively a validity or return deadline date:
+ * its preceding 30 characters contain BAD_DATE_ROW or terms like "validity, return by, refund".
+ * Evaluated per row if the value is not recognizable within the row.
  */
 function badLeft(row: string, value: string, locale: Locale): boolean {
   const hits = ruleCandidates(row, locale).filter((c) => c.kind === 'date' && c.value === value);
@@ -193,7 +199,7 @@ function badLeft(row: string, value: string, locale: Locale): boolean {
   });
 }
 
-/** 附件里的二维码读出来的值（字段 ID → 值）：先读到的码在前，别的文字不算（D-423）。 */
+/** Values read from QR codes in attachments (field ID → value): earlier codes appear first, other text is ignored (D-423). */
 function codeValues(input: SuggestInput): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   for (const text of input.codes ?? []) {
@@ -205,7 +211,7 @@ function codeValues(input: SuggestInput): Record<string, string[]> {
   return out;
 }
 
-/** 标签后面只有一处原文的值（同一处的几种读法算一处）；有不同的值时分不清，不算。 */
+/** Only one occurrence of a raw value exists after the label (different readings of the same occurrence count as one); ambiguous when different values exist, so not counted. */
 function valuesAfterLabel(
   field: Field,
   key: string,
@@ -223,9 +229,9 @@ function valuesAfterLabel(
   return new Set(hits.map((o) => o.raw.trim())).size === 1 ? hits : [];
 }
 
-/** 这份单据的规则结果和计划。 */
+/** Rule results and plan for this document. */
 export function planDocument(input: SuggestInput): DocumentPlan {
-  // 解析日期、金额的规则要知道币种、整份文字和「现在」；算完把上下文清掉，别让下一份文档用到这一份的。
+  // Date and amount parsing rules require currency, full text, and "now"; clears context after calculation to prevent the next document from using the current one's context.
   setDocContext(input);
   try {
     return planDocumentInner(input);
@@ -247,7 +253,7 @@ function planDocumentInner(input: SuggestInput): DocumentPlan {
   const occurrences = pages.flatMap((p) => p.occ);
   const coded = cardRules() ? codeValues(input) : {};
 
-  // 不是规则打分给的值：记下它在哪一排（点了以后记忆用，D-394），标签用那一处的。
+  // For values not given by rule scoring: record their row index (for memory usage after tapping, D-394), and use the label from that location.
   const pickOf = (value: string): ValueSuggestion['pick'] => {
     const sq = squash(value);
     const hit =
@@ -266,12 +272,12 @@ function planDocumentInner(input: SuggestInput): DocumentPlan {
     return undefined;
   };
   const fromCode = (field: Field, value: string): ValueSuggestion =>
-    // 单选的值是选项 ID，不在文字里：没有位置可记（D-405）。
+    // Choice values are option IDs and do not exist in text: no position to record (D-405).
     field.type === 'choice' ? { value, score: 0 } : withPick(value, pickOf(value));
 
   const fields = input.fields.map((field): FieldPlan => {
     const concept = conceptOf(field);
-    // 分类（单选）：票面写了选项名，或词表有把握，就不问模型（D-405）。
+    // Categories (choice): if option name is written on the ticket or vocabulary confidence is high, do not ask the model (D-405).
     const category = field.type === 'choice' && concept === 'category';
     let list = scored[field.id] ?? [];
     if (
@@ -279,17 +285,17 @@ function planDocumentInner(input: SuggestInput): DocumentPlan {
       (concept === 'website' ||
         concept === 'jobTitle' ||
         concept === 'name' ||
-        // 公司栏更严一点：还要有电话、邮箱或网站，行也不能多。
+        // Stricter criteria for company column: must also have phone, email, or website, and row count cannot be excessive.
         (concept === 'company' && cardLike(analyzeCard(input.pages), true)))
     )
       list = cardCandidates(concept, input.pages);
     let code: string | null | undefined;
     const noDecimals = hasNoDecimals(field);
     const extras: string[] = [];
-    // 排在打分第一个后面的算术结果（见下）。
+    // Arithmetic results appearing after the first scored candidate (see below).
     const second: string[] = [];
     if (concept === 'issueDate') {
-      // 有效期、退货期限、印制那排的日期不算。
+      // Dates on validity, return deadline, and print rows are excluded.
       list = list.filter((s) =>
         rows.some((r) =>
           receiptRules()
@@ -299,14 +305,14 @@ function planDocumentInner(input: SuggestInput): DocumentPlan {
       );
       if (hotel) {
         const latest = latestDate(rows, input.locale);
-        // 最晚的那个分不清日月：不算有把握，候选的先后交给规则打分（按语言）。
+        // When the latest date has ambiguous day/month: not considered confident, candidate ordering is left to rule scoring (by language).
         if (latest && !latest.ambiguous) {
           code = latest.value;
           extras.push(latest.value);
         }
       }
     } else if (concept === 'number') {
-      // 流水号、社保号、公司号、地址那排的不要；NO 前缀去掉。
+      // Exclude rows for serial numbers, social security numbers, company numbers, and addresses; strip NO prefix.
       list = list
         .filter((s) => !rows.some((r) => squash(r).includes(squash(s.value)) && NOT_NO.test(r)))
         .map((s) => ({ ...s, value: stripNoPrefix(s.value) }));
@@ -321,8 +327,11 @@ function planDocumentInner(input: SuggestInput): DocumentPlan {
       }
       const chain = amountChain(rows, noDecimals, input.locale);
       if (chain) {
-        // 算术只靠明细求和（不是付款减找零）得出、规则打分里又没有这个数，而打分第一个的标签分 ≥ 3
-        // （标签明明白白写着合计）时，算术结果排第二，不抢第一个：错位的排版里「找零 7.00」会被当成总额。
+        // When arithmetic is derived solely from line-item summation (not payment minus change),
+        // the arithmetic result is absent from rule scoring, and the first scored candidate has a
+        // label score ≥ 3 (label explicitly states total), place the arithmetic result second
+        // rather than preempting the first: in misaligned layouts, "Change 7.00" might otherwise be
+        // treated as the total.
         if (
           receiptRules() &&
           chain.how !== 'payMinusChange' &&
@@ -357,7 +366,7 @@ function planDocumentInner(input: SuggestInput): DocumentPlan {
     }
     if (code === undefined && category && field.type === 'choice')
       code = categoryByCode(field, rows) ?? undefined;
-    // 这是金额的货币（D-429）：票面写了什么货币。只进候选，用户点了才填。
+    // This is the amount currency (D-429): currency printed on the ticket. Added to candidates only, filled only when tapped by the user.
     if (
       code === undefined &&
       field.type === 'choice' &&
@@ -365,7 +374,7 @@ function planDocumentInner(input: SuggestInput): DocumentPlan {
     )
       code = currencyInText(field, rows) ?? undefined;
     if (code === undefined && !top && concept && EMPTY_IS_SURE.has(concept)) {
-      // 文字里有单号的键名、代码又取不到值时是没把握，不是没有：要问模型。
+      // When text contains document number key names but code cannot extract a value, it indicates uncertainty rather than absence: must ask the model.
       if (concept !== 'number' || !mayHaveNumber(rows)) code = null;
     }
 
@@ -373,8 +382,9 @@ function planDocumentInner(input: SuggestInput): DocumentPlan {
     const add = (s: ValueSuggestion) => {
       if (!merged.some((m) => sameValue(field, m.value, s.value))) merged.push(s);
     };
-    // 学过的标签（最近点的在前）和字段名本身：文件上一字不差时旁边的值排第一。用户否定过的不算；
-    // 收据、名片表用测量过的专门规则，不走这里。
+    // Learned labels (most recently tapped first) and field names: values adjacent to exact file
+    // matches rank first. Disregarded if rejected by user; receipt and business card tables use
+    // specialized measured rules rather than this flow.
     const pickNow = input.picks?.[field.id];
     const learned = input.rules ? [] : learnedLabels(pickNow);
     const trusted = input.rules
@@ -425,24 +435,26 @@ function planDocumentInner(input: SuggestInput): DocumentPlan {
 
     const memory = usesValueMemory(field) ? rememberedValue(input.known?.[field.id], rows) : null;
     const remembered = memory ? fromCode(field, memory) : null;
-    // 文件上写明了这个标签：排在存过的值前面。
+    // When an exact match for the label is written on the file: rank it before the saved value.
     if (exact.length > 0 && remembered) merged.splice(exact.length, 0, remembered);
     return {
       field,
       code: merged,
       remembered: exact.length > 0 ? null : remembered,
-      // 不带 pick：二维码的值不在文字的版面里，点了也不记位置。
+      // Without pick: QR code values do not reside in text layout, so tapping them does not record a position.
       fromCode: (coded[field.id] ?? []).map((value) => ({ value, score: 0 })),
-      // 单选字段只有分类问模型（D-405），别的交给规则；不能填的字段（附件、勾选……）规则也不给候选。
-      // 标签旁边的值排第一就不用问模型；只有这一个候选时还问：标签学错了，正确的值才不会点不到。
+      // Choice fields only ask the model for categories (D-405), leaving others to rules;
+      // unfillable fields (attachments, checkboxes...) receive no candidates from rules. Values
+      // next to labels rank first without needing to ask the model; still ask when there is only a
+      // single candidate: prevents mislearned labels from making the correct value untappable.
       ask:
         (exact.length === 0 || merged.length < 2) &&
         !coded[field.id]?.length &&
         code === undefined &&
         !(concept === null && (field.type === 'note' || FREE_NOTE.test(field.name.trim()))) &&
-        // 店名的分数看不出对错，模型又换不对第一个，有候选就不为它加载模型（D-404）。
+        // If merchant name score is ambiguous and the model keeps getting the first one wrong, do not load the model for it if candidates exist (D-404).
         !(concept === 'merchant' && merged.length > 0) &&
-        // 名片上电话、邮箱、网址、地址问模型只会多出错的候选，不问。
+        // Asking the model for phone numbers, emails, websites, or addresses on a business card only yields more erroneous candidates, so do not ask it.
         !(cardRules() && concept !== null && CARD_NO_ASK.has(concept)) &&
         ((category && field.type === 'choice' && canAskCategory(field)) ||
           field.type === 'money' ||
@@ -459,7 +471,7 @@ function planDocumentInner(input: SuggestInput): DocumentPlan {
   return { rows, fields, pickOf, kind: ctx.kind };
 }
 
-/** 一个字段最后给的候选：值记忆 → 模型 → 代码，去重，最多 3 个。 */
+/** Final candidates given for a field: value memory -> model -> code, deduplicated, up to 3. */
 export function mergedSuggestions(
   plan: FieldPlan,
   model: readonly string[],

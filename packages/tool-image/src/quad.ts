@@ -1,7 +1,8 @@
 import type { Size } from './geometry';
 
-// 扫描用的四边形：纸张的四个角（原图像素坐标）。找边由扫描包完成，这里只做和平台无关的几何计算，
-// 供四角调整界面和透视矫正共用。
+// Quadrilateral for scanning: four corners of the paper (original image pixel coordinates). Edge
+// finding is done by the scan package, while this performs platform-independent geometric
+// calculations shared by the four-corner adjustment UI and perspective correction.
 
 export interface Point {
   x: number;
@@ -18,7 +19,7 @@ export interface Quad {
 export const QUAD_CORNERS = ['tl', 'tr', 'br', 'bl'] as const;
 export type QuadCorner = (typeof QUAD_CORNERS)[number];
 
-/** 找不到纸张时的默认框：四边各向内缩一点。 */
+/** Default box when paper cannot be found: each edge is inset slightly inward. */
 export function defaultQuad(size: Size, inset = 0.06): Quad {
   const x0 = size.width * inset;
   const y0 = size.height * inset;
@@ -32,7 +33,7 @@ export function scaleQuad(q: Quad, k: number): Quad {
   return { tl: s(q.tl), tr: s(q.tr), br: s(q.br), bl: s(q.bl) };
 }
 
-/** 把每个角限制在图片范围内。 */
+/** Clamp each corner within the image bounds. */
 export function clampQuad(q: Quad, size: Size): Quad {
   const c = (p: Point) => ({
     x: Math.min(Math.max(0, p.x), size.width),
@@ -41,14 +42,14 @@ export function clampQuad(q: Quad, size: Size): Quad {
   return { tl: c(q.tl), tr: c(q.tr), br: c(q.br), bl: c(q.bl) };
 }
 
-/** 任意顺序的四个点 → 左上、右上、右下、左下（x+y 最小的是左上，最大的是右下）。 */
+/** Four points in arbitrary order → top-left, top-right, bottom-right, bottom-left (the one with minimum x+y is top-left, maximum is bottom-right). */
 export function orderQuad(points: readonly Point[]): Quad {
   if (points.length !== 4) throw new Error('a quad needs 4 points');
   const bySum = [...points].sort((a, b) => a.x + a.y - (b.x + b.y));
   const tl = bySum[0]!;
   const br = bySum[3]!;
   const [p, q] = [bySum[1]!, bySum[2]!];
-  // 剩下两个点里，y - x 小的在右上。
+  // Between the remaining two points, the one with smaller y - x is top-right.
   const [tr, bl] = p.y - p.x < q.y - q.x ? [p, q] : [q, p];
   return { tl, tr, br, bl };
 }
@@ -56,7 +57,7 @@ export function orderQuad(points: readonly Point[]): Quad {
 const cross = (o: Point, a: Point, b: Point) =>
   (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
-/** 四边形是凸的、按顺时针排列、面积不为零（拖乱了的角不能用来矫正）。 */
+/** Quadrilateral is convex, ordered clockwise, and has non-zero area (disarranged corners cannot be used for correction). */
 export function isConvexQuad(q: Quad, minArea = 1): boolean {
   const pts = [q.tl, q.tr, q.br, q.bl];
   for (let i = 0; i < 4; i++) {
@@ -78,7 +79,7 @@ export function quadArea(q: Quad): number {
 
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
-/** 拉正后的输出尺寸：对边取较长的一条，长边不超过 maxSide。 */
+/** Output dimensions after rectification: take the longer of opposite sides, with the long side not exceeding maxSide. */
 export function warpSize(q: Quad, maxSide: number): Size {
   const width = Math.max(dist(q.tl, q.tr), dist(q.bl, q.br));
   const height = Math.max(dist(q.tl, q.bl), dist(q.tr, q.br));

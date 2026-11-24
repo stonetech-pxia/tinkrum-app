@@ -51,7 +51,7 @@ it('only extracts recognized import links; never changes unrelated routes or sha
 
 it('gives the chat a link only when it is short enough to survive being pasted', () => {
   expect(chatAppLink('{"name":"small"}')).toBe(appLink('{"name":"small"}'));
-  // 随机内容压不小：压缩后一定超过上限。
+  // Random content does not compress well: guaranteed to exceed the limit after compression.
   let seed = 7;
   const noise = Array.from({ length: 20000 }, () => {
     seed = (seed * 1103515245 + 12345) % 2147483648;

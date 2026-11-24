@@ -1,23 +1,22 @@
-// 启动兜底（体检 6.6，D-621）：连续几次没能正常打开（闪退、启动出错）
-// 就先显示兜底页。计数存在数据库外面的一个小文件里，是 App 自己的记账，不是用户数据（创始人 2026-11-22：
-// 不算违反底线 16）。读写失败一律当没有计数，绝不挡启动。
+// Counter file; reads and writes are both synchronous: in the event of an immediate crash, this
+// startup is already recorded.
 
-/** 计数文件；读写都是同步的：紧接着闪退时，这次启动也已经记上。 */
+/** Counter file; reads and writes are both synchronous: in the event of an immediate crash, this startup is already recorded. */
 export interface AttemptStore {
   read(): string | null;
   write(text: string): void;
 }
 
 export interface Attempts {
-  /** 连续几次启动没走到「正常」。 */
+  /** Number of consecutive startup failures to reach "normal". */
   failures: number;
-  /** 最后一次让 App 停下来的错误（给兜底页显示、由用户自己分享）。 */
+  /** Last error that caused the app to halt (for display on the rescue page, shared by the user). */
   lastError?: string;
 }
 
-/** 连续失败这么多次，下一次打开先进兜底页。 */
+/** Number of consecutive failures before advancing to the rescue page on the next open. */
 export const RESCUE_AFTER = 2;
-/** 主页正常显示这么久才算这次启动成功。 */
+/** Duration the home page must display normally to consider this startup successful. */
 export const HEALTHY_AFTER_MS = 5000;
 const MAX_ERROR = 2000;
 
@@ -43,30 +42,30 @@ function save(store: AttemptStore, attempts: Attempts) {
   try {
     store.write(JSON.stringify(attempts));
   } catch {
-    // 写不进去：这次不计数，照常启动。
+    // Write failure: skip counting this time and start normally.
   }
 }
 
-/** 一次前台启动开始：返回这次之前的情况，并先把这一次记成失败（走到正常时再清掉）。 */
+/** A foreground startup begins: returns prior status and pre-records this attempt as a failure (cleared when normal is reached). */
 export function startAttempt(store: AttemptStore): Attempts {
   const before = readAttempts(store);
   save(store, { ...before, failures: before.failures + 1 });
   return before;
 }
 
-/** 这次启动走到了正常的主页：从零数起。 */
+/** This startup reached the normal home page: reset count from zero. */
 export function markHealthy(store: AttemptStore) {
   save(store, { failures: 0 });
 }
 
-/** 给人看、给用户分享的错误文字：消息和调用栈，限长。 */
+/** Error text for human viewing and user sharing: message and stack trace, length-limited. */
 export const errorText = (error: unknown) =>
   (error instanceof Error ? `${error.message}\n${error.stack ?? ''}`.trim() : String(error)).slice(
     0,
     MAX_ERROR,
   );
 
-/** 记下让 App 停下来的错误（全局错误处理和兜底门的错误边界里调用）。 */
+/** Record the error that caused the app to halt (called in global error handling and rescue gate error boundaries). */
 export function recordFatal(store: AttemptStore, error: unknown) {
   save(store, { ...readAttempts(store), lastError: errorText(error) });
 }

@@ -1,8 +1,8 @@
 import { AI_RETURN_TTL, aiReturnIsActive, attachReturnStore, useAiReturn } from '@/ai/return';
 import { MemoryAttemptStore } from '@/test-utils/memory-attempts';
 
-// 「等 AI 结果」的标记在 Android 杀掉进程后还在（体检后补：D-638）。
-// 「重启」= 清掉内存里的标记，再接上同一个文件。
+// The "waiting for AI result" flag persists after Android kills the process (supplemented after
+// health check: D-638). "Restart" = clears the in-memory flag, then re-attaches to the same file.
 
 const restart = (store: MemoryAttemptStore, now?: number) => {
   useAiReturn.setState({ pending: null });
@@ -15,7 +15,7 @@ it('keeps the mark across a process restart, and a dismissal across it too', () 
   const started = useAiReturn.getState().start('setup', Date.now());
   restart(file);
   expect(useAiReturn.getState().pending).toEqual(started);
-  // 之后的新标记 ID 不会和读回来的重复，旧导入结束时不会关掉新卡片。
+  // Subsequent new flag IDs will not duplicate the loaded ones, and closing the old import will not dismiss the new card.
   const later = useAiReturn.getState().start('new', Date.now());
   expect(later.id).toBeGreaterThan(started.id);
   useAiReturn.getState().dismiss(started.id);

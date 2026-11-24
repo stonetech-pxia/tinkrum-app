@@ -1,9 +1,11 @@
 import type { Locale } from './schema';
 
-// 从一段文字里取出固定几种内容（D-244）：命名模板的 {ocr:规则} / {qr:规则} 和「提取文字」动作共用，
-// 「记一笔」预填（prefill/）也用这里的日期和数字写法。
-// 规则只能从这里选，不接受用户或 AI 写的正则；文字只在本机处理，AI 只能看到规则的名字。
-// 不用后行断言（Hermes 的老版本不支持），前面的边界用捕获组处理。
+// Extracts specific fixed content types from text (D-244): shared between naming templates
+// ({ocr:rule} / {qr:rule}), the "extract text" action, and prefill logic for "log an expense".
+// Rules must be selected from this list; user- or AI-written regexes are not accepted. Text is
+// processed strictly on-device, and the AI only sees rule names. Avoids lookbehind assertions
+// (unsupported in older Hermes versions), handling preceding boundaries with capture groups
+// instead.
 
 export const TEXT_RULES = [
   'firstLine',
@@ -17,7 +19,7 @@ export const TEXT_RULES = [
 ] as const;
 export type TextRule = (typeof TEXT_RULES)[number];
 
-/** 「提取」能取出全部的几种（第一行、发票号、金额只有一个，不在这里）。 */
+/** The types of information that can be extracted (first line, invoice number, and amount are unique and handled separately). */
 export const EXTRACT_KINDS = ['phone', 'email', 'url', 'number', 'date'] as const;
 export type ExtractKind = (typeof EXTRACT_KINDS)[number];
 
@@ -35,8 +37,10 @@ const YMD = /(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?/g;
 const DMY = /(?:^|[^\d])(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?!\d)/g;
 
 /**
- * 文字里的日期，统一成 YYYY-MM-DD。年在前的（2026-10-22、2026/10/22、2026年10月22日）直接读；
- * 年在后的（22/10/2026、10/22/2026）看哪一位大于 12，分不出来时英文按月在前、其他语言按日在前。
+ * Normalize dates in text to YYYY-MM-DD. For year-first formats (2026-10-22, 2026/10/22,
+ * 2026-10-22 with year/month/day characters), parse directly; for year-last formats (22/10/2026,
+ * 10/22/2026), check which part is greater than 12. If ambiguous, default to month-first for
+ * English and day-first for other locales.
  */
 function dates(text: string, locale: Locale): { at: number; value: string }[] {
   const found: { at: number; value: string }[] = [];
@@ -55,10 +59,10 @@ function dates(text: string, locale: Locale): { at: number; value: string }[] {
   return found.sort((x, y) => x.at - y.at);
 }
 
-// 手机号：国际格式（+ 开头）、中国手机号、常见的分段写法（01 23 45 67 89、(415) 555-0100）。
+// Phone numbers: international format (starting with +), Chinese phone numbers, common grouping formats (01 23 45 67 89, (415) 555-0100).
 const PHONE_INTL = /\+\d[\d\s\-().]{6,18}\d/g;
 const PHONE_CN = /(?:^|[^\d])(1[3-9]\d{9})(?!\d)/g;
-// 本地写法要有分隔（空格、点、横线）或括号：一串连着的数字多半是单号、发票号，不当电话。前面是字母、横线时也不算（INV-2026-0042）。
+// Local phone number formats require separators (spaces, dots, hyphens) or parentheses: a continuous string of digits is usually a serial or invoice number rather than a phone number. Excludes numbers preceded by letters or hyphens (INV-2026-0042).
 const PHONE_LOCAL = /(?:^|[^\w+\-/.])(\(?\d{2,4}\)?(?:[\s.-]\d{2,4}){1,4})(?![\d])/g;
 
 const digitsOnly = (s: string) => s.replace(/[^\d+]/g, '');
@@ -77,7 +81,7 @@ function phones(text: string): { at: number; value: string }[] {
   for (const m of text.matchAll(PHONE_INTL)) add(m.index, m[0]);
   for (const m of text.matchAll(PHONE_CN)) add(m.index + m[0].indexOf(m[1]!), m[1]!);
   for (const m of text.matchAll(PHONE_LOCAL)) {
-    // 日期（2026-10-22）不是电话。
+    // The date (2026-10-22) is not a phone number.
     const raw = m[1]!;
     if (/^\d{4}[-./]\d{1,2}[-./]\d{1,2}$/.test(raw)) continue;
     add(m.index + m[0].indexOf(raw), raw);
@@ -96,8 +100,10 @@ function all(pattern: RegExp, text: string, clean = (s: string) => s) {
 const trimUrl = (s: string) => s.replace(/[.,;:!?)\]}>]+$/, '');
 
 /**
- * 数字统一成 1234.56：逗号和点都有时后出现的是小数点；只有一种分隔符时，出现不止一次或后面正好 3 位数
- * 是千位分隔（1,234、1.234.567），否则是小数点（12,5、3.50）。
+ * Normalizes numbers to 1234.56: if both commas and periods appear, the rightmost one is the
+ * decimal separator; if only one separator type appears, multiple occurrences or exactly 3
+ * trailing digits indicate a thousand separator (1,234, 1.234.567), otherwise it is a decimal
+ * separator (12,5, 3.50).
  */
 export function normalizeNumber(raw: string): string {
   const s = raw.replace(/[\u00a0\u202f ]/g, '');
@@ -127,7 +133,7 @@ const firstLine = (text: string) =>
     .find((l) => l.length > 0)
     ?.slice(0, 40) ?? null;
 
-/** 按规则取第一个；没有时返回 null。 */
+/** Extracts the first match according to the rule; returns null if none found. */
 export function extractFirst(text: string, rule: TextRule, locale: Locale): string | null {
   switch (rule) {
     case 'firstLine':
@@ -139,7 +145,7 @@ export function extractFirst(text: string, rule: TextRule, locale: Locale): stri
     case 'amount': {
       const m = TOTAL.exec(text);
       if (m) return normalizeNumber(m[1]!.trim());
-      // 没有「合计」之类的字：取带两位小数的数里最大的那个。
+      // No keywords like "total": picks the largest number with two decimal places.
       const money = extractAll(text, 'number', locale)
         .filter((n) => /\.\d{2}$/.test(n))
         .sort((a, b) => Number(b) - Number(a));
@@ -150,7 +156,7 @@ export function extractFirst(text: string, rule: TextRule, locale: Locale): stri
   }
 }
 
-/** 按种类取出全部（按出现顺序，去掉重复）。 */
+/** Extracts all matches of a given type (in order of appearance, with duplicates removed). */
 export function extractAll(text: string, kind: ExtractKind, locale: Locale): string[] {
   const found =
     kind === 'date'

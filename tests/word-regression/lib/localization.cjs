@@ -1,3 +1,3 @@
-// Node 里跑 App 代码时替代 expo-localization：语言由用例参数给定，不读系统语言。
+// Replaces expo-localization when running app code in Node: the language is given by the test case parameters rather than reading the system language.
 exports.getLocales = () => [{ languageTag: 'en-US', languageCode: 'en' }];
 exports.getCalendars = () => [{ timeZone: 'UTC' }];

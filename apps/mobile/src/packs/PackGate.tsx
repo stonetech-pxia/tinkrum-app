@@ -8,11 +8,14 @@ import type { Palette } from '../renderer/theme';
 import { formatBytes } from '../run/ResultView';
 import type { PackStore } from './store';
 
-// 需要扩展包时的确认框（D-064）：显示名称、用途、大小，建议用 Wi-Fi。只有用户点「下载」才会下载；
-// 必需的不下载则本次运行取消；可选的（D-274，例如扫描的展平模型）可以不勾，不下载也照样做。
-// 一次运行要的都列在一个框里、一次下载（D-299）。AI 和工作流都不能自己触发下载。
+// Confirmation dialog when a pack is needed (D-064): displays name, purpose, size, and Wi-Fi
+// recommendation. Download occurs only when the user taps "Download"; for required packs, canceling
+// the download cancels the current run; optional packs (D-274, e.g., scan flattening model) can be
+// unchecked and the operation proceeds without downloading them. All required packs for a single
+// run are listed in one dialog and downloaded together (D-299). Neither AI nor workflows can
+// trigger downloads autonomously.
 
-/** 一个扩展包自己的文件大小（不含依赖）。 */
+/** An individual pack's file size excluding dependencies. */
 const ownSize = (id: string) => packById(id)?.files.reduce((sum, f) => sum + f.size, 0) ?? 0;
 
 export function PackGate({
@@ -23,14 +26,14 @@ export function PackGate({
   locale,
   onDone,
 }: {
-  /** 要下载的扩展包（调用方已去掉装好的）；optional：不下载这一步也照样做。 */
+  /** Packs to download (caller has already filtered out installed ones); optional: step proceeds even if not downloaded. */
   needs: readonly PackNeed[];
-  /** 文件处理包一次问完（D-456）：换标题和说明，按钮是「以后再说」，每一项不写「不下载也能继续」。 */
+  /** File bundle offer all-at-once (D-456): change title and description, button says "Remind me later", and individual items do not state "can continue without downloading". */
   bundle?: boolean;
   store: PackStore;
   palette: Palette;
   locale: Locale;
-  /** 下载完：没下载的可选扩展包；null 表示必需的没下载（取消运行）。 */
+  /** After download: optional packs that were not downloaded; null indicates a required pack was not downloaded (canceling execution). */
   onDone: (left: string[] | null) => void;
 }) {
   const zh = locale === 'zh';
@@ -39,9 +42,9 @@ export function PackGate({
   const [error, setError] = useState<string | null>(null);
   const [have, setHave] = useState<Set<string> | null>(null);
   const [left, setLeft] = useState<string[]>([]);
-  // 点了「后台下载」：提示框关了，下载接着做，做完由 store 通知（外壳弹一条提示）。
+  // Tapping "Download in background": dialog closes, download continues in background, and the store notifies upon completion (shell pops a notification).
   const background = useRef(false);
-  // 同一次运行接着问下一个扩展包时提示框不会重新挂载，上一个的进度、错误和勾选要清掉。
+  // When prompting for the next pack in the same run, the dialog does not remount; progress, errors, and checkbox states from the previous one must be cleared.
   const [shownFor, setShownFor] = useState(key);
   if (shownFor !== key) {
     setShownFor(key);
@@ -50,7 +53,7 @@ export function PackGate({
     setLeft([]);
   }
 
-  // 大小要扣掉已安装的依赖；还没装的依赖（语言包要先有文字识别包）一起算、一起说明。
+  // Sizes must deduct installed dependencies; uninstalled dependencies (e.g., language packs requiring OCR packs) are calculated and explained together.
   useEffect(() => {
     void store.installed().then((list) => setHave(new Set(list.map((p) => p.id))));
   }, [store, key]);
@@ -58,7 +61,7 @@ export function PackGate({
   const chosen = needs.filter((n) => !left.includes(n.pack));
   const missingDeps = (id: string) =>
     (packById(id)?.requires ?? []).filter((d) => have !== null && !have.has(d));
-  // 列出来的一行只算它自己和没列出来的依赖，不重复算。
+  // A listed row counts only itself and unlisted dependencies without double counting.
   const unlistedDeps = (id: string) =>
     missingDeps(id).filter((d) => !needs.some((n) => n.pack === d));
   const toFetch = new Set(chosen.flatMap((n) => [...missingDeps(n.pack), n.pack]));
@@ -125,7 +128,7 @@ export function PackGate({
       backdropLabel={t(locale, 'close')}
       testID="pack-gate"
       style={[styles.dialog, { backgroundColor: palette.surface, borderRadius: palette.radius }]}>
-      {/* 第一次用到时的提示（D-112）：不出现「扩展包」这个词，只说要下载多少、之后能离线用。 */}
+      {/* First-use prompt (D-112): avoids the word "pack", stating only the download size and offline availability. */}
       {text(
         'title',
         t(locale, bundle ? 'packBundleTitle' : 'PackGate_First_use_needs_a_download_3c1d7', {
@@ -153,7 +156,7 @@ export function PackGate({
               {localize(pack.name, locale)}
               {have === null ? '' : ` · ${formatBytes(size, locale)}`}
             </Text>
-            {/* 一次问完时只列名字和大小（D-456）。 */}
+            {/* When prompting all at once, list only names and sizes (D-456). */}
             {bundle ? null : text('body', about, { fontSize: 13 })}
             {optional && !bundle
               ? text('body', t(locale, 'packOptionalHint'), { fontSize: 13 })
@@ -189,7 +192,7 @@ export function PackGate({
           </View>
         );
       })}
-      {/* 一次问完时不列许可证，装好后在「设置 → 已下载内容」里看（D-456）。 */}
+      {/* When prompting all at once, licenses are omitted; view them after installation under "Settings → Downloaded Content" (D-456). */}
       {bundle
         ? null
         : text('body', t(locale, 'PackGate_License_ff05c', { v0: licenses.join('; ') }), {
@@ -227,7 +230,7 @@ export function PackGate({
           <Pressable
             testID="pack-background"
             onPress={() => {
-              // 这次运行照取消处理（必需的不运行，可选的不带它继续）；下完以后用户自己再来一次。
+              // Treat this run as canceled (required packs not run, optional packs continued without them); the user can trigger it again after download completes.
               background.current = true;
               onDone(anyRequired ? null : needs.map((n) => n.pack));
             }}

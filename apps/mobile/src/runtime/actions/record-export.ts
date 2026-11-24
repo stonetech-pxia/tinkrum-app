@@ -15,7 +15,7 @@ import { baseName, extOf, freshName, type RunServices } from './helpers';
 
 type Ctx = Parameters<ActionImpl<RunServices>>[2];
 
-/** Excel 带附件：只复制，保持每条记录和文件名的对应；所有类型都可带走，不转换成图片。 */
+/** Excel with attachments: copy only, preserving the correspondence between each record and filename; all types can be carried over without converting to images. */
 export async function copyExcelAttachments(
   ctx: Ctx,
   table: Collection,

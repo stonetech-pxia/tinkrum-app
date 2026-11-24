@@ -10,8 +10,9 @@ import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/cont
 const HOURS = [0, 1, 2, 3, 4, 5, 6];
 
 /**
- * 「设置 → 日期」（D-286）：一天从几点开始、一周从周几开始。每次改都生成一个可撤销的版本（和提醒一样）。
- * 两周一段的起算日只显示，由 AI 修改（要说哪一天，这里不放日期选择）。
+ * 'Settings -> Calendar' (D-286): day start hour, week start day. Generates an undoable version
+ * on every change (like reminders). Bi-weekly period start dates are display-only and modified by
+ * the AI (must specify a day; no date picker here).
  */
 export default function CalendarRoute() {
   const { locale } = useWorkspaceContext();

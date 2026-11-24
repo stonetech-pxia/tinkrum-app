@@ -20,8 +20,9 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, makePdf } from '../test-utils/fake-files';
 
-// T6：拼图、打码、水印、证件照、相纸、ZIP、二维码、文字转 PDF、用记录生成 PDF。
-// Skia 合成和 expo-print 换成记录调用的假实现；排版、ZIP、二维码用真实的库。
+// T6: collage, pixelation, watermarks, ID photos, photo prints, ZIP, QR codes, text to PDF,
+// record-to-PDF generation. Skia composition and expo-print are replaced with mock implementations
+// invoked by records; layout, ZIP, and QR codes use real libraries.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -116,13 +117,13 @@ describe('stitch and grid', () => {
     short.files.nextPhotos = [1, 2, 3].map((i) => short.files.offerImage(`s${i}.png`, 1290, 2796));
     expect(items(await short.run())).toHaveLength(1);
     const [only] = short.files.composed;
-    // 3 张 1290×2796 合计 8388 高，超过 8192：宽度收窄到 1259，拼成一张。
+    // Three 1290x2796 images total 8388 height, exceeding 8192: width narrowed to 1259, combined into a single image.
     expect(only!.canvas).toMatchObject({ width: 1259, background: '#FFFFFF' });
     expect(only!.canvas.height).toBeLessThanOrEqual(8192);
     expect(dsts(only!.ops)).toHaveLength(3);
 
     const long = setup(toolWorkflow('image', 'image-stitch'));
-    // 10 张：收窄到 720 也放不下，分成两张。
+    // 10 photos: narrowed down to 720 but still too large, split into two.
     long.files.nextPhotos = Array.from({ length: 10 }, (_, i) =>
       long.files.offerImage(`s${i + 1}.png`, 1290, 2796),
     );
@@ -145,7 +146,7 @@ describe('stitch and grid', () => {
     expect(grid!.canvas.width).toBe(2400);
     const images = grid!.ops.filter((o) => o.kind === 'image');
     expect(images).toHaveLength(3);
-    // 横图居中裁成正方形。
+    // Center-crop landscape image into a square.
     expect(images[0]!.kind === 'image' && images[0]!.src).toEqual({
       x: 500,
       y: 0,
@@ -230,7 +231,7 @@ describe('ID photos', () => {
       ops: { crop: frame, resize: { width: 600, height: 600 } },
     });
 
-    // 只降质量、不缩小像素；做不到时说清楚最小能到多少。
+    // Only reduce quality, do not downscale pixels; if not possible, state the minimum achievable.
     const tight = setup(
       toolWorkflow('image', 'image-idphoto'),
       { spec: 'cn-visa', maxKB: 10 },
@@ -311,7 +312,7 @@ describe('QR codes and text', () => {
     const photo = read.files.offerImage('shot.png', 400, 400, 'image/png');
     read.files.nextPhotos = [photo];
     read.files.pixels.set(
-      // 选中的照片会复制进本次运行，按复制后的地址查。
+      // Selected photos are copied into the current run; look up by the copied path.
       'runs/',
       qrToRgba(qrMatrix('WIFI:S:Home;T:WPA;P:secret;;'), { scale: 4 }),
     );
@@ -394,7 +395,7 @@ describe('QR codes and text', () => {
 
 describe('text to Word', () => {
   const toWord = () => mine([{ id: 'word', action: 'text.toDocx', params: {} }]);
-  // 和容器交的一样：文字加上字段名（record-row.ts）。
+  // Same as container submission: text plus field name (record-row.ts).
   const handed = (text: string): RunValue => ({ type: 'text', text, name: '备注' });
 
   it('turns the text a record hands over into a .docx that holds the original text, paragraph by paragraph', async () => {
@@ -493,7 +494,7 @@ describe('records to PDF', () => {
     expect(html).toContain('&lt;午饭&gt;');
     expect(html).not.toContain('九月的');
     expect(html).toContain('¥42.50');
-    // 按日期从早到晚。
+    // Ordered by date from earliest to latest.
     expect(html.indexOf('2026-10-01')).toBeLessThan(html.indexOf('2026-10-05'));
   });
 

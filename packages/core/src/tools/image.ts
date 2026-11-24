@@ -7,22 +7,23 @@ import type { ToolDefinition } from '../registry';
 import type { Locale, Workflow } from '../schema';
 import type { ActionDefinition, ParamField } from '../workflow/contract';
 
-// 内置图片工具的清单。像素处理在 App 里由 expo-image-manipulator 完成，
-// 纯算法（压到目标大小的搜索、尺寸计算、EXIF）在 packages/tool-image。
+// Manifest of built-in image tools. Pixel processing in the app is done by expo-image-manipulator,
+// while pure algorithms (target size search, dimension calculation, EXIF) reside in
+// packages/tool-image.
 
 export const IMAGE_TOOL_ID = 'image';
 export const IMAGE_PAGE_ID = 'tool-image';
 
 export const IMAGE_FORMATS = ['jpeg', 'png', 'webp'] as const;
 
-/** 证件照底色（D-252）：keep 不换；常用颜色有固定的色值，custom 用参数 color。 */
+/** ID photo background colors (D-252): keep leaves it unchanged; common colors have fixed color values, and custom uses the color parameter. */
 export const ID_PHOTO_BACKGROUNDS = ['keep', 'white', 'blue', 'red', 'gray', 'custom'] as const;
 export const ID_PHOTO_BACKGROUND_COLORS: Record<string, string> = {
   white: '#FFFFFF',
-  // 国内证件照常用的蓝底、红底。
+  // Blue and red backgrounds commonly used for official ID photos in China.
   blue: '#438EDB',
   red: '#FF0000',
-  // 英国护照等要的浅灰。
+  // Light gray required for UK passports, etc.
   gray: '#E6E6E6',
 };
 
@@ -240,7 +241,7 @@ export const IMAGE_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -360,7 +361,7 @@ export const IMAGE_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -426,7 +427,7 @@ export const IMAGE_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -461,7 +462,7 @@ export const IMAGE_ACTIONS: readonly ActionDefinition[] = [
     ],
     local: 'crop',
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [{ match: /^(?:裁剪|裁切)$|^crop$/i, step: () => ({ params: { aspect: 'free' } }) }],
   },
   {
@@ -520,7 +521,7 @@ export const IMAGE_ACTIONS: readonly ActionDefinition[] = [
     params: z.strictObject({}),
     fields: [],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match:
@@ -530,7 +531,7 @@ export const IMAGE_ACTIONS: readonly ActionDefinition[] = [
   },
 ];
 
-/** 证件照规格（像素和备注在 packages/tool-image 的 ID_PHOTO_SPECS，App 测试检查两边一致）。 */
+/** ID photo specifications (pixel dimensions and notes are in ID_PHOTO_SPECS within packages/tool-image; app tests verify both sides match). */
 export const ID_PHOTO_CHOICES = [
   {
     id: 'us-passport',
@@ -592,7 +593,7 @@ export const ID_PHOTO_CHOICES = [
 ] as const;
 const ID_PHOTO_IDS = ID_PHOTO_CHOICES.map((c) => c.id) as [string, ...string[]];
 
-/** 冲印相纸（英寸）。 */
+/** Print paper sizes (inches). */
 export const PRINT_SHEETS = ['4x6', '5x7', 'a4', 'letter'] as const;
 
 const backgroundField: ParamField = {
@@ -617,7 +618,7 @@ const gapField: ParamField = {
 export const WATERMARK_COLORS = ['#FFFFFF', '#000000', '#868E96', '#C92A2A'] as const;
 const WATERMARK_CORNERS = ['bottomRight', 'bottomLeft', 'topRight', 'topLeft', 'center'] as const;
 
-/** T6：拼图、打码、水印、证件照（Skia 在 App 里绘制，排版计算在 packages/tool-image）。 */
+/** T6: image composition, mosaic, watermark, ID photos (rendered via Skia in the app, layout calculation in packages/tool-image). */
 export const IMAGE_COMPOSE_ACTIONS: readonly ActionDefinition[] = [
   {
     id: 'image.stitch',
@@ -658,7 +659,7 @@ export const IMAGE_COMPOSE_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match: /^拼(?:成)?长图$|^stitch(?: into a long image)?$/i,
@@ -669,7 +670,7 @@ export const IMAGE_COMPOSE_ACTIONS: readonly ActionDefinition[] = [
     ],
   },
   {
-    // D-184：iOS 用系统 ImageIO 写 GIF，Android 用 morph-media 里自己写的编码器（GifEncoder.kt）。
+    // D-184: iOS uses system ImageIO to write GIFs, while Android uses a custom encoder written in morph-media (GifEncoder.kt).
     id: 'image.toGif',
     ai: '"Make an animated GIF from photos" → in.photos then this.',
     label: { en: 'Make an animated GIF', zh: '做成动图', fr: 'Créer un GIF animé' },
@@ -726,9 +727,9 @@ export const IMAGE_COMPOSE_ACTIONS: readonly ActionDefinition[] = [
       },
     ],
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
-      // 动图（D-184）：默认是几张图片做成动图；跟在视频后面时换成视频转 GIF（fitToPrevious）。
+      // Animated image (D-184): by default creates an animation from multiple images; when following a video, changes to video-to-GIF (fitToPrevious).
       {
         match:
           /^(?:转成|做成|变成|生成|转)\s*(?:gif|动图)(?:\s*动图)?$|^(?:make|turn (?:it |them )?into|convert (?:it |them )?to) (?:an? )?(?:animated )?gif$/i,
@@ -821,7 +822,7 @@ export const IMAGE_COMPOSE_ACTIONS: readonly ActionDefinition[] = [
     ],
     local: 'redact',
     requires: [],
-    // 内置规则认的步骤说法（D-265）。
+    // Step descriptions recognized by built-in rules (D-265).
     phrases: [
       {
         match: /^打码$|^(?:redact|hide (?:private )?parts)$/i,
@@ -921,7 +922,7 @@ export const IMAGE_COMPOSE_ACTIONS: readonly ActionDefinition[] = [
   },
   {
     id: 'image.idPhoto',
-    // 提示词里只关于这个动作的规则。
+    // Rules in the prompt specifically regarding this action.
     aiRules: [
       {
         n: 36,
@@ -940,7 +941,7 @@ export const IMAGE_COMPOSE_ACTIONS: readonly ActionDefinition[] = [
       .strictObject({
         spec: z.enum(ID_PHOTO_IDS),
         maxKB: z.number().int().min(0).max(5000),
-        /** D-252：换底色（不写 = 不换）和自动框脸（不写 = 不框）。 */
+        /** D-252: background color replacement (omitted = keep) and auto face framing (omitted = disabled). */
         background: z.enum(ID_PHOTO_BACKGROUNDS).optional(),
         color: z
           .string()
@@ -1047,7 +1048,7 @@ export const IMAGE_COMPOSE_ACTIONS: readonly ActionDefinition[] = [
   },
 ];
 
-/** 单功能工作流：选照片 + 这一个动作（D-061）。 */
+/** Single-feature workflow: select photo + this single action (D-061). */
 function single(
   locale: Locale,
   action: string,
@@ -1096,7 +1097,7 @@ export function imageWorkflows(locale: Locale): Workflow[] {
     single(locale, 'image.convert', ['Convert format', '转格式'], { format: 'jpeg', quality: 85 }, [
       'format',
     ]),
-    // D-184：iPhone 照片（HEIC）转 JPG。功能和「转格式」一样，单独一个名字好找；每次问从相册还是「文件」选。
+    // D-184: convert iPhone photos (HEIC) to JPG. Functions the same as format conversion, but given a separate name for easy discovery; prompts whether to select from the photo library or Files each time.
     {
       id: 'image-heic',
       kind: 'quickAction',

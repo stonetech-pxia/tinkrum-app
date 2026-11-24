@@ -26,8 +26,10 @@ import { shownConfig } from '../workspace/store';
 import { FakeFiles, TINY_JPEG } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 页面右上角的 AI 入口（D-406）：除了设置（含子页面）、改动记录和 AI 页，每一页都有；
-// 从入口进 AI 页时说明现在修改的是哪一页，发给 AI 的只有 ID（底线 1、2）。
+// AI entry point in the top right corner of pages (D-406): present on every page except Settings
+// (including sub-pages), Change history, and the AI page; when entering the AI page from this entry
+// point, explains which page is currently being modified, sending only the ID to the AI (invariants
+// 1, 2).
 
 const seed: Parameters<typeof renderToolsApp>[2] = {
   seed: (locale, registry) => {
@@ -53,7 +55,7 @@ async function renderDesk() {
 const render = (locale: 'zh' | 'en' | 'fr' = 'zh') =>
   renderToolsApp(new MemoryWorkspaceRepo(), new FakeFiles(), { ...seed, locale });
 
-/** 从入口进 AI 页，说一句话，返回 AI 收到的 about。 */
+/** Enter the AI page from the entry point, say a message, and return the about content received by the AI. */
 async function aboutSent(
   store: Awaited<ReturnType<typeof render>>['store'],
 ): Promise<PlanAbout | undefined> {
@@ -98,7 +100,7 @@ describe('the AI entry at the top right of a page (D-406)', () => {
     await act(() => router.push({ pathname: '/page/[pageId]', params: { pageId: 'budget' } }));
     expect(await aboutSent(store)).toEqual({ kind: 'page', pageId: 'budget' });
     expect(screen.getByTestId('change-about')).toHaveTextContent(/现在修改：「记账」页面/);
-    // 风格选择器留着：换风格不只对快捷操作、收件页面才有。
+    // Keep the style selector: style switching is not restricted solely to quick actions and inbox pages.
     expect(screen.getByTestId('change-pick-style')).toBeTruthy();
   });
 
@@ -187,7 +189,7 @@ describe('the AI entry at the top right of a page (D-406)', () => {
       ).toMatchObject({ kind: 'drafted' });
     });
     expect(store.getState().config!.containers.desk).toBeUndefined();
-    // 已保存的配置没变，桌面上已经是草稿的样子。
+    // Saved configuration is unchanged; the desk already reflects the draft state.
     expect(shownConfig(store.getState())!.containers.desk?.toolbar).toBe('top');
     expect(screen.getByTestId('draft-edit')).toBeTruthy();
     await fireEvent.press(
@@ -234,7 +236,7 @@ describe('the AI entry at the top right of a page (D-406)', () => {
     );
     expect(await screen.findByTestId('run-screen')).toBeTruthy();
     expect(screen.queryByTestId('page-ai')).toBeNull();
-    // 没有选文件：运行结束（取消）。
+    // No file selected: execution ends (canceled).
     await waitFor(() => expect(screen.getByTestId('page-ai')).toBeTruthy(), { timeout: 5000 });
   });
 
@@ -274,8 +276,10 @@ describe('the AI entry at the top right of a page (D-406)', () => {
   });
 });
 
-// D-611：在一个子 App 里，AI 页可以把这个 App 交给别的 AI App 改：App 文件（只有结构）和提示词一起交给分享面板，
-// 从哪一页进来的写进提示词。主页提供做新 App 和改整份设置两个入口。
+// D-611: Within a sub-app, the AI page can hand this app over to another AI app for modification:
+// app files (structure only) and the prompt are passed to the share sheet, noting which page it was
+// opened from. The home screen provides two entry points: creating a new app and modifying the
+// entire setup.
 describe('hand the app to another AI app (D-611)', () => {
   const walletText = readFileSync(
     join(__dirname, '../../../../packages/core/src/fixtures/portal-apps/tinkrum-app-wallet.json'),
@@ -314,7 +318,7 @@ describe('hand the app to another AI app (D-611)', () => {
     ]);
     const sent = JSON.parse(shared!.files[0]!.text) as { app: { id: string }; tables: unknown[] };
     expect(sent.app.id).toBe('wallet');
-    // Claude 收到多个文件时会丢掉分享的文字：提示词在 tinkrum-request.md 里，文字只指一下它。
+    // Claude drops shared text when receiving multiple files: the prompt resides in tinkrum-request.md, and the text merely points to it.
     expect(shared!.text).toBe('请先阅读附件 tinkrum-request.md，并照它去做。');
     expect(shared!.text).not.toContain('把标题改成我的钱包');
     expect(shared!.request).toContain('tinkrum-app-guide.md');

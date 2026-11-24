@@ -20,8 +20,9 @@ import { FakeFiles } from '../test-utils/fake-files';
 import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
-// 记一笔（D-187）：快捷操作运行时按数据表填一条记录，文件存成 Tinkrum 的文件放进附件字段，
-// 文字放进长文本字段；记录直接写进本机的数据表。
+// Log an entry (D-187): quick action runtime fills a record according to the table, stores files as
+// Tinkrum files into attachment fields, text into long text fields; records are written directly to
+// the on-device data table.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -92,7 +93,7 @@ function setup(workflow: Workflow, answers: Answer[], collections = [expenses]) 
   return { files, repo, opened, run };
 }
 
-/** 同一个快捷操作，每个文件记一条（D-397 的 each）。 */
+/** Same quick action, one entry per file (D-397 each). */
 const eachWorkflow: Workflow = {
   ...receiptWorkflow,
   id: 'each',
@@ -117,7 +118,7 @@ describe('out.addRecord', () => {
     const assets = await repo.listAssets();
     expect(assets.map((a) => a.name).sort()).toEqual(['IMG_1.jpg', 'IMG_2.jpg']);
     const ids = assets.map((a) => a.id).sort();
-    // 只开一张表单，打开时文件已经是用户文件、已经在附件里（表单才能读它们，给候选）。
+    // Only open one form, files are already user files upon opening and are in attachments (so the form can read them and provide candidates).
     expect(opened).toHaveLength(1);
     expect(opened[0]).toMatchObject({ index: 0, total: 1 });
     expect([...(opened[0]!.prefill.receipt as string[])].sort()).toEqual(ids);
@@ -127,7 +128,7 @@ describe('out.addRecord', () => {
     expect([...(records[0]!.values.receipt as string[])].sort()).toEqual(ids);
     expect(await repo.hasGrant('workflow:receipts', assets[0]!.id)).toBe(true);
     if (result.status === 'succeeded') expect(result.saved).toHaveLength(2);
-    // 文件原样交给下一步。
+    // Pass files as-is to the next step.
     expect(files.shared).toHaveLength(2);
   });
 
@@ -311,7 +312,7 @@ describe('the record form', () => {
     return { onDone, repo, files };
   }
 
-  /** 这一步已经存好的文件（真实的用户文件，和 out.addRecord 打开表单时一样）。 */
+  /** Files already stored in this step (real user files, same as when out.addRecord opens the form). */
   async function withFile(repo: MemoryWorkspaceRepo, id: string, name: string) {
     await repo.addAsset({
       id,
@@ -460,7 +461,7 @@ describe('the prompt before saving a similar record (D-426)', () => {
   it('each: true, one form per file: the second form sees what the first just saved', async () => {
     const alert = spyAlert();
     const repo = new MemoryWorkspaceRepo();
-    // 第一张表单存好（out.addRecord 存完才开下一张）：表里已经有这一条。
+    // First form saved (out.addRecord only opens the next after saving): table already contains this entry.
     const first = await renderForm(repo);
     await press();
     expect(alert).not.toHaveBeenCalled();

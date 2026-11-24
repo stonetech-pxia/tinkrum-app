@@ -30,7 +30,7 @@ const issuesOf = (config: WorkspaceConfig) => {
   return r.ok ? [] : r.issues.map((i) => i.message);
 };
 
-// ---- 测试用的一份配置：任务、项目两张表，一个任务页 ----
+// ---- Test configuration: tasks and projects tables, one tasks page ----
 
 const projects: Collection = {
   id: 'projects',
@@ -176,7 +176,7 @@ describe('applyOps', () => {
   });
 });
 
-// ---- 数据 ----
+// ---- Data ----
 
 describe('addData', () => {
   it('adds a table, then a field at an index', () => {
@@ -310,12 +310,12 @@ describe('removeData', () => {
     if (!result.ok) return;
     const c = result.config;
     expect(c.data.tables[1]!.fields.map((f) => f.id)).not.toContain('done');
-    // 勾的工具没了：清单退成列表，另一个按钮留着。
+    // Checklist tool removed: checklist falls back to a list, and the other button is retained.
     expect(block(c, 'tasks-page', 'checks')).toMatchObject({
       look: 'list',
       tools: [{ as: 'button', do: 'set', field: 'status' }],
     });
-    // 「全部重来」写的就是这个字段：按钮跟着移除。
+    // "Start over" is mapped to this field: button is removed accordingly.
     expect(block(c, 'tasks-page', 'reset')).toBeUndefined();
     expect(result.notes).toEqual([{ kind: 'removedRecordActions', count: 2 }]);
     expect(issuesOf(c)).toEqual([]);
@@ -329,7 +329,7 @@ describe('removeData', () => {
       look: 'checklist',
       tools: [{ as: 'check', field: 'done' }],
     });
-    // 拖动没了，看板只能看（它的分栏字段也没了，校验器会让 AI 一起改）。
+    // Dragging is removed, board becomes view-only (its grouping field is also removed, and the validator will make the AI modify it together).
     expect(block(result.config, 'tasks-page', 'board')).not.toHaveProperty('tools');
     expect(result.notes).toEqual([{ kind: 'removedRecordActions', count: 2 }]);
   });
@@ -387,9 +387,9 @@ describe('removeData', () => {
     expect(block(c, 'home', 'new-task')).toBeUndefined();
     expect(block(c, 'tasks-page', 'by-project')).not.toHaveProperty('tools');
     expect(result.notes).toEqual([
-      // form、checklist、board、number（点数）、number（剩下）
+      // form, checklist, board, number (points), number (remaining)
       { kind: 'removedDataComponents', table: 'tasks', count: 5 },
-      // 「全部重来」「新任务」两个按钮，项目列表上的「加任务」
+      // "Start over" and "New task" buttons, plus "Add task" on the project list
       { kind: 'removedRecordActions', count: 3 },
     ]);
   });
@@ -452,7 +452,7 @@ describe('moveData', () => {
   });
 });
 
-// ---- 容器 ----
+// ---- Containers ----
 
 describe('addContainer', () => {
   it('adds a page with blocks, and a block at an index or into a group', () => {
@@ -756,7 +756,7 @@ describe('updateContainer', () => {
     const pdf2 = [{ items: [{ action: 'pdf.compress' }] }];
     const merged = apply(config, [{ op: 'updateContainer', desk: { tools: { pdf: pdf2 } } }]);
     expect(merged.containers.desk).toEqual({ strip: false, tools: { pdf: pdf2, image } });
-    // null 让一种文件回到默认工具栏；整个 tools 写 null 让每种都回到默认。
+    // null resets a file type to the default toolbar; setting tools to null resets all types to default.
     const one = apply(merged, [{ op: 'updateContainer', desk: { tools: { pdf: null } } }]);
     expect(one.containers.desk).toEqual({ strip: false, tools: { image } });
     const last = apply(one, [{ op: 'updateContainer', desk: { tools: { image: null } } }]);
@@ -921,7 +921,7 @@ describe('moveContainer', () => {
   });
 });
 
-// ---- 工具 ----
+// ---- Tools ----
 
 const myAction: QuickAction = {
   id: 'share-it',
@@ -1173,7 +1173,7 @@ describe('moveTool', () => {
   });
 });
 
-// ---- 主题 ----
+// ---- Theme ----
 
 describe('setTheme', () => {
   it('writes surfaceText, clears it with null, and preset and reset both clear it (D-409)', () => {
@@ -1274,7 +1274,7 @@ describe('setTheme', () => {
   });
 });
 
-// ---- 工具包 ----
+// ---- Tool packages ----
 
 describe('setPackage', () => {
   it('add: page, quick actions and a home entry before "Add tools"', () => {
@@ -1386,7 +1386,7 @@ describe('setPackage', () => {
     if (!result.ok) return;
     const after = result.after;
     expect(after.packages[0]!.version).toBe(registry.tools.get('pdf')!.version);
-    // 用户改过的合并流程（固定文件名）不变。
+    // The user-modified merge pipeline (fixed filename) remains unchanged.
     expect(after.tools[0]).toEqual(old.after.tools[0]);
     expect(after.tools.map((w) => w.id)).toContain('pdf-split');
     const pdf = page(after, 'tool-pdf');

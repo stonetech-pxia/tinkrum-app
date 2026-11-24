@@ -8,7 +8,7 @@ import { DEFAULT_MODEL, MODELS } from '@morph/planner';
 import { createBatchRelay, createSdkRelay } from './claude-provider';
 import type { Price, Relay } from './server';
 
-// 读取仓库根目录的 .env（见 docs/API_KEY_SETUP.md）。key 只进入进程环境，从不打印。
+// Read `.env` from repository root (see `docs/API_KEY_SETUP.md`). Key enters process environment only, never printed.
 export function loadRootEnv(): void {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
   const file = resolve(root, '.env');
@@ -19,21 +19,21 @@ const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 type Effort = (typeof EFFORTS)[number];
 
 export interface RelayRuntime {
-  /** 没配置 ANTHROPIC_API_KEY 时为 null。 */
+  /** Null when `ANTHROPIC_API_KEY` is not configured. */
   relay: Relay | null;
   model: string;
   price: Price;
-  /** 一次转发模型最多输出的 token；服务器按它给在途请求预留费用（R03）。 */
+  /** Maximum output tokens per model forwarding; server reserves fees for in-flight requests based on this (R03). */
   maxOutputTokens: number;
 }
 
-/** batch 只给评测用：请求走批处理 API（见 createBatchRelay）。 */
+/** Batch is for evaluation use only: requests go through Batch API (see `createBatchRelay`). */
 export function createRelayRuntime(
   env: NodeJS.ProcessEnv,
   { batch = false }: { batch?: boolean } = {},
 ): RelayRuntime {
   const model = env.MORPH_AI_MODEL?.trim() || DEFAULT_MODEL;
-  // 限额按金额算，所以只能用已知价格的模型。
+  // Limits are calculated by amount, so only models with known prices can be used.
   const price = MODELS.find((m) => m.id === model)?.price;
   if (!price) throw new Error(`不知道 ${model} 的价格，请在 packages/planner/src/models.ts 里加上`);
   const apiKey = env.ANTHROPIC_API_KEY?.trim();

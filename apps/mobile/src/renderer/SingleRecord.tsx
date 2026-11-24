@@ -30,15 +30,17 @@ import { openEditor } from './open-row';
 import { cardColors } from './theme';
 import { Button, Card } from './ui';
 
-// 一张表的一条记录（最早加的那条，D-424）：几个字段、「编辑」，可以加这条记录的 vCard 二维码。
-// source.record（D-558）：给一条记录用的页面上是打开的那一条（画的时候 "$record" 已换成它的 ID）。
-// 附件字段里的图片画成图（D-558），别的文件照旧是一行字。
-// 二维码画的时候现算，不存（底线 14）；看的时候什么都不写（底线 15）。
+// A single entry in a table (the earliest added one, D-424): displays several fields, "Edit", and
+// an option to generate a vCard QR code for this entry. source.record (D-558): on a page dedicated
+// to a single entry, this refers to the opened entry (with "$record" replaced by its ID during
+// rendering). Images in attachment fields are rendered as pictures (D-558), while other files
+// remain as text lines. QR codes are computed on the fly and not stored (invariant 14); displays
+// nothing when viewing (invariant 15).
 
-/** 手机屏幕上还扫得出来的最大边长（模块数）：再大就太密了，只写一句说明。 */
+/** Maximum side length in modules that can still be scanned on a mobile screen: larger values make it too dense, so only a descriptive note is displayed. */
 const MAX_QR_MODULES = 105;
 const QR_SIDE = 240;
-/** 附件里的图片画多大（正方形，按显示的大小解码）。 */
+/** Render size for images in attachments (square, decoded according to display size). */
 const PICTURE_SIDE = 132;
 
 function qrImage(text: string): string | null {
@@ -52,7 +54,7 @@ function qrImage(text: string): string | null {
       binary += String.fromCharCode(...bytes.subarray(i, i + 0x1000));
     return `data:image/png;base64,${btoa(binary)}`;
   } catch {
-    // 内容超过二维码的容量。
+    // Content exceeds the capacity of the QR code.
     return null;
   }
 }
@@ -80,19 +82,19 @@ export function SingleRecord({
   const vcard =
     block.show.qr && collection && record ? recordToVCard(collection.fields, record.values) : null;
   const qr = useMemo(() => (vcard ? qrImage(vcard) : null), [vcard]);
-  // 块上的工具（D-428）：点了才把这一条交给它。
+  // Tools on the block (D-428): passes this entry to the tool only when tapped.
   const { run, elements } = useHandedRun(palette);
   const use = block.tools?.[0];
   const tool =
     use && isToolRefUse(use)
       ? findWorkflowTarget(quickActionsOf(env.config), use.tool, locale)
       : undefined;
-  // 第一步收文件的快捷操作（D-442）：交这一条记录第一个附件字段里它收的那些文件，读到了才有按钮。
+  // Quick action for receiving files in the first step (D-442): passes files received in the first attachment field of this entry; button is only enabled when files are successfully read.
   const { registry } = useWorkspaceContext();
   const takesFiles = tool !== undefined && handedInput(tool.steps, registry) === 'files';
   const fileIds =
     takesFiles && collection && record ? attachmentIdsOfRecords(collection, [record]) : [];
-  // 显示的附件字段里的文件：读到是图片的画成图。
+  // Files in the displayed attachment fields: renders files detected as images as pictures.
   const shownFiles = (collection && record ? block.show.fields : []).flatMap((id) =>
     collection?.fields.some((f) => f.id === id && f.type === 'file')
       ? attachmentIds(record!.values[id]).map((file) => ({ field: id, file }))

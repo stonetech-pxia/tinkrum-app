@@ -23,8 +23,9 @@ import {
   makePdf,
 } from '../test-utils/fake-files';
 
-// 文字转语音（D-270）：系统朗读换成 FakeSpeaker（每个字 0.1 秒，写一个 24 kHz 单声道 WAV），
-// 转 M4A 换成 FakeMedia。检查分段、选声音、语速、格式、错误说明、取消和预设快捷操作。
+// Text-to-speech (D-270): system speech replaced with FakeSpeaker (0.1s per word, outputs 24 kHz
+// mono WAV), M4A conversion replaced with FakeMedia. Checks chunking, voice selection, speech rate,
+// format, error descriptions, cancellation, and preset quick actions.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 
@@ -41,7 +42,7 @@ function toolWorkflow(id: string): Workflow {
   return quickActionsOf(result.config).find((w) => w.id === id)!;
 }
 
-/** 选 PDF → 提取文字 → 朗读：手打的文字最多 5000 字，长文字从 PDF 来。 */
+/** Select PDF -> Extract text -> Speak: manually typed text up to 5000 chars, long text comes from PDF. */
 const fromPdf: Workflow = {
   kind: 'quickAction',
   id: 'pdf-speak',
@@ -116,7 +117,7 @@ function setup(
   return { files, media, speaker, translator, packs, signal, run };
 }
 
-/** 文字从一个 PDF 里来（选 PDF → 提取文字 → 朗读）。 */
+/** Text comes from a PDF (Select PDF -> Extract text -> Speak). */
 async function withPdf(text: string) {
   const env = setup(fromPdf);
   env.packs.pages = [text];
@@ -134,7 +135,7 @@ function audioOf(result: RunResult) {
 const failure = (result: RunResult) =>
   result.status === 'failed' ? { code: result.error.code, detail: result.error.detail } : result;
 
-/** 「不支持这个步骤：…」里拼进去的说明。 */
+/** Explanation interpolated in "Unsupported step: ...". */
 const actionText = (result: ReturnType<typeof failure>) =>
   'detail' in result ? String(result.detail.action) : '';
 
@@ -149,14 +150,14 @@ describe('audio.fromText', () => {
       rate: 1,
     });
     expect(speaker.calls[0]!.relPath).toMatch(/\.wav$/);
-    // 转 M4A 的是刚读出来的 WAV：单声道，人声的码率。
+    // M4A conversion uses the newly read WAV: mono, vocal bitrate.
     expect(media.audioEncodes).toHaveLength(1);
     expect(media.audioEncodes[0]).toMatchObject({ format: 'm4a', channels: 1 });
     expect(media.audioEncodes[0]!.uri).toMatch(/\.wav$/);
     expect(media.audioEncodes[0]!.bitrateKbps).toBeLessThanOrEqual(96);
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ ext: 'm4a', mimeType: 'audio/mp4' });
-    // FakeSpeaker 每个字 0.1 秒（段落之间的空行也算）。
+    // FakeSpeaker takes 0.1 seconds per word (including blank lines between paragraphs).
     expect(items[0]!.durationMs).toBe(speaker.calls[0]!.segments.join('').length * 100);
   });
 
@@ -216,7 +217,7 @@ describe('audio.fromText', () => {
   });
 
   it('says when the phone has no text-to-speech engine', async () => {
-    // 法语界面：认不出的拉丁字母文字按法文读。
+    // French locale: unrecognized Latin alphabet text is read according to French pronunciation.
     const { speaker, run } = setup(typed(), 'Bonjour.', { locale: 'fr' });
     speaker.statuses['fr-FR'] = 'noEngine';
     const result = failure(await run());

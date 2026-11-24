@@ -1,7 +1,9 @@
 import { RECORD_REF, type Component } from './schema';
 
-// 给一条记录用的页面（D-342）：配置里写的是 "$record"，打开页面时在本机换成那条记录的 ID。
-// 只换块里正好等于 "$record" 的值（source 筛选的 value、就地工具的预设值和 when），别的不动；AI 看不到 ID（D-042）。
+// Page for a single record (D-342): config writes "$record", which is replaced on the device with
+// that record's ID when opening the page. Only replaces values in blocks that exactly equal
+// "$record" (source filter value, preset value of inline tools, and when), leaving everything else
+// unchanged; AI cannot see IDs (D-042).
 
 function bind(value: unknown, recordId: string): unknown {
   if (value === RECORD_REF) return recordId;
@@ -14,7 +16,7 @@ function bind(value: unknown, recordId: string): unknown {
   return value;
 }
 
-/** 块（连同分组里的子块）里的 "$record" 换成这条记录的 ID（渲染时用，配置本身不变）。 */
+/** Replaces "$record" in blocks (along with sub-blocks in groups) with this record's ID (used during rendering; config itself remains unchanged). */
 export function bindRecord<C extends Component>(component: C, recordId: string): C {
   return bind(component, recordId) as C;
 }

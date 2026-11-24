@@ -5,7 +5,7 @@ import type { Op } from './ops';
 import type { Collection, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// 表格外观（D-539）：表头是字段名，每条一行，第一列（title）固定，其余列是 show.columns（不写时用副标题和右侧字段）。
+// Table view (D-539): header is field names, one row per item, first column (title) fixed, remaining columns are show.columns (falls back to subtitle and right-side fields when omitted).
 
 const ctx = { registry, locale: 'en' as const, now: new Date(0) };
 

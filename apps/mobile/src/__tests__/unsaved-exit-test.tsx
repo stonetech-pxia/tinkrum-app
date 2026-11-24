@@ -12,8 +12,9 @@ import { deskTool } from '../test-utils/desk-toolbar';
 import { FakeFiles, TINY_JPEG } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 2026-11-06 模拟器测试：新记录表单填了字、桌上加了水印 / 改了格子，返回就悄悄没了。
-// 现在有没保存的改动时先问「放弃修改？」；保存过的、没改过的直接走。桌面不留着（D-462）。
+// 2026-11-06 simulator test: new record form filled with text, watermark added to desk / grid
+// modified, backing out quietly discarded it. Now, when there are unsaved changes, first prompt
+// "Discard changes?"; saved or unmodified changes exit directly. Desk is not retained (D-462).
 
 const seed = (locale: Locale, registry: Registry) => {
   const r = applyOps(

@@ -1,12 +1,14 @@
 import { lineShareIn, type LayoutRegion } from './layout';
 import type { Box, OcrBox, RgbaImage } from './types';
 
-// Word 的整图归属：图注或足够强的图形像素作证、没有正文/数据表冲突，再保护其中的文字和线条。
-// 这是构建时的临时计划；不改版面模型阈值，也不写进文档或工作表格式。
+// Word figure attribution: captions or sufficiently strong graphical pixel evidence, combined with
+// absence of body text/data table conflicts, protect text and lines within figures. This is a
+// build-time temporary plan; it does not alter layout model thresholds or get written into
+// document/worksheet formats.
 const captionStart = /^(?:fig(?:ure)?\.?\s*\d+[\s:：.)]|[图圖]\s*\d+[\s:：.、])/iu;
 const captionLabels = new Set(['figure_title', 'chart_title']);
 const area = (b: Box) => b.width * b.height;
-/** 没有图注的图最多占整页的这么多（封面的大照片约六成，NIST 封面插图 0.54）。 */
+/** Figures without captions occupy at most this fraction of the page (large cover photos are about 60%, NIST cover illustrations 0.54). */
 const FIGURE_MAX_PAGE_SHARE = 0.8;
 const overlap = (a: Box, b: Box) =>
   Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) *
@@ -28,7 +30,7 @@ export interface WordFigure {
   caption?: OcrBox;
 }
 
-/** 原始模型图框加像素/文字证据；弱图框和正文、表格冲突仍留在原有路径。 */
+/** Combine raw model figure boxes with pixel/text evidence; weak boxes conflicting with body text and tables remain on their original paths. */
 export function planWordFigures(
   image: RgbaImage,
   lines: readonly OcrBox[],
@@ -55,7 +57,7 @@ export function planWordFigures(
             0.6 * Math.min(b.width, l.width) * l.height,
       )
       .sort((a, c) => a.y - c.y)[0];
-    // 图片/表格冲突需要另行判定上下文；不能凭图注就把数据表截图。
+    // Image/table conflicts require separate context determination; data table crops cannot be generated based solely on captions.
     if (
       regions.some(
         (t) => t.kind === 'table' && overlap(t.box, b) >= 0.5 * Math.min(area(t.box), area(b)),
@@ -63,19 +65,21 @@ export function planWordFigures(
     )
       continue;
     const inside = lines.filter((l) => l !== caption && lineShareIn(l, b) >= 0.5);
-    // 没有图注、几乎盖满整页的「图」是整页本身（封面的照片底和色块），不是一张图：
-    // 接管了就把页上所有的字一起吞掉（EU 样本 036 封面，一个字都没留下）。页上没有字时照旧当整图。
+    // A "figure" without a caption that covers nearly the entire page is the page itself (cover
+    // photo background and color blocks), not a single figure: taking over would swallow all text
+    // on the page (EU sample 036 cover, leaving zero text). When a page contains no text, treat it
+    // as a full-page figure as usual.
     if (!caption && inside.length && area(b) > FIGURE_MAX_PAGE_SHARE * image.width * image.height)
       continue;
-    // 无图注的大色块也可能是多格表单；不能把大量短字段当成示意图标签。
+    // Uncaptioned large color blocks may also be multi-cell forms; a large number of short fields cannot be treated as illustration labels.
     if (
       !caption &&
       (inside.length > 12 || inside.reduce((n, l) => n + [...l.text.trim()].length, 0) > 100)
     )
       continue;
-    // 宽正文行是强冲突证据，即使模型声称是图片也不接管。
+    // Wide body text lines are strong conflict evidence; do not take over even if the model claims it is an image.
     if (inside.some((l) => l.width >= 0.6 * b.width && [...l.text.trim()].length >= 15)) continue;
-    // 图形证据来自 OCR 框之外的原图像素；稀疏箭头可以很少，但只有文字的框仍不接管。
+    // Graphical evidence comes from original pixels outside OCR boxes; sparse arrows can be minimal, but boxes containing only text are still not taken over.
     const step = Math.max(1, Math.round(Math.max(b.width, b.height) / 180));
     let ink = 0,
       samples = 0;
@@ -104,7 +108,7 @@ export function planWordFigures(
       }
     }
     if (!samples || ink / samples < 0.02) continue;
-    // 没有图注、弱类融合或大幅插图需要更强的像素证据；只有短字加细框线的表单不能接管。
+    // Uncaptioned, weakly fused, or large illustrations require stronger pixel evidence; forms with only short text and thin frame lines cannot be taken over.
     if ((!caption || r.fused || area(b) > 0.5 * image.width * image.height) && ink / samples < 0.12)
       continue;
     let box = { ...b };
@@ -123,7 +127,7 @@ export function planWordFigures(
       }
       box = union(box, l);
     }
-    // 不扩进图注，也不允许两个图争同一块内容。
+    // Do not expand into captions, nor allow two figures to contend for the same content.
     if (
       conflict ||
       (caption && box.y + box.height + 0.3 * h > caption.y) ||
@@ -138,10 +142,10 @@ export function planWordFigures(
 export const figureOwns = (line: Box, figures: readonly WordFigure[]): boolean =>
   figures.some((f) => lineShareIn(line, f.box) >= 0.5);
 
-/** 算作线的深色（和找线的绝对门槛一样，0.75 的亮度）。 */
+/** Darkness threshold considered as a line (same absolute threshold for line finding, 0.75 brightness). */
 const RULE_INK = 191;
 
-/** 找线、无框表、条形码只看工作副本；原图仍用于字体测量和最终裁图。 */
+/** Line finding, unbordered tables, and barcodes inspect only the working copy; original images are still used for font measurement and final cropping. */
 export function figureWorkingImage(
   image: RgbaImage,
   figures: readonly WordFigure[],
@@ -155,9 +159,11 @@ export function figureWorkingImage(
     const i = (y * width + x) * 4;
     return (src[i]! * 299 + src[i + 1]! * 587 + src[i + 2]! * 114) / 1000 < RULE_INK;
   };
-  // 图框外两边紧挨着都是深色的细细一排（一列）：是穿过图框的表格线（PDF 里的标志图框压过了表头那一格的
-  // 上下边，EU 样本 090），不抹，不然这一格和下面的格连成一块、整张表的合并格都散了。
-  // 两边都是深色的一大片（图压在色块上）不算线，照样抹。
+  // Dark strips (columns) immediately adjacent to both sides of a figure box: these are table
+  // gridlines passing through the figure box (PDF logo bounding box crossing the top/bottom borders
+  // of the header cell, EU sample 090), which must not be erased; otherwise, this cell merges with
+  // cells below, disrupting the merged cells of the entire table. Large dark areas on both sides
+  // (figures resting on color blocks) are not considered lines and are erased as usual.
   const run = Math.max(3, Math.round(0.5 * h));
   const thin = Math.max(3, Math.round(0.25 * h));
   const through = (ink: (k: number) => boolean) => {

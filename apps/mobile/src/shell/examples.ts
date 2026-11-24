@@ -2,8 +2,9 @@ import { localize, type Locale, type PlanAbout } from '@morph/core';
 
 import type { AIMode } from '../ai/settings';
 
-// 从一个快捷操作或收件页面打开时（D-124）输入框里提示的例子。内置规则只认带「这个」的固定句式，
-// ChangeScreen 会先用内置规则试一遍，只留下它真能做的句子。
+// Examples suggested in the input box when opened from a quick action or inbox page (D-124).
+// Built-in rules only recognize fixed sentence patterns containing "this", and ChangeScreen first
+// tests sentences with built-in rules, keeping only those it can actually execute.
 
 const ABOUT_WORKFLOW: Record<'mock' | 'ai', Record<Locale, readonly string[]>> = {
   mock: {
@@ -54,7 +55,7 @@ const OFFLINE_SHARED: Record<Locale, readonly string[]> = {
   fr: ['Create a quick action: choose photos, convert to JPG, remove location, zip, share'],
 };
 
-/** 放到首页、拼长图这类例子只在说得通时给（已经在首页、只有一张照片时不给）。 */
+/** Examples such as placing on the home screen or stitching long images are provided only when sensible (omitted when already on the home screen or when there is only a single photo). */
 const ON_HOME = /首页|home page|accueil/i;
 const STITCH = /拼成|stitch|image verticale/i;
 

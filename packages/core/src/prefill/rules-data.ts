@@ -1,14 +1,14 @@
-// 票据预填规则的词表（逻辑在 rules.ts、rules-text.ts；D-403）。词表在任何界面语言下都生效，App 不知道票据来自哪国。
+// Glossaries for receipt prefill rules (logic in rules.ts, rules-text.ts; D-403). Glossaries apply in all interface languages; the app does not know which country a receipt is from.
 
-// ---- 合计：日语、土耳其语 ----
+// ---- Totals: Japanese, Turkish ----
 export const EXTRA_AMOUNT_KEYWORDS = ['合計', 'toplam', 'genel toplam', 'toplm'];
 export const EXTRA_AMOUNT_EXCLUDE = ['小計', 'お預り', 'お預かり', 'お釣り', 'topkdv'];
-/** 整标签（去标点后）等于这些词才排除。 */
-// 不是翻译对：先放进常量，免得 check-locales 把这两个词当成「中文 + 英文名称对」。
+/** Not a translation pair: put into constants first to prevent check-locales from treating these two words as a 'Chinese + English name pair'. */
+// Not a translation pair: put into constants first to prevent check-locales from treating these two words as 'Chinese + English name pair'.
 const CASH_JA = '現金';
 export const AMOUNT_EXCLUDE_EXACT = [CASH_JA, 'nakit'];
 
-// ---- 税额词：日语、加拿大 HST、西语 ----
+// ---- Tax words: Japanese, Canadian HST, Spanish ----
 export const EXTRA_TAX_KEYWORDS = [
   '消費税',
   '消费税',
@@ -26,7 +26,7 @@ export const EXTRA_TAX_KEYWORDS = [
   'impuesto',
 ];
 
-// ---- 「含税合计」、数量和税额行不是合计；税字样 ----
+// ---- 'Total incl. tax', quantity, and tax rows are not totals; tax keywords ----
 export const TAX_INCLUDED = /incl|inc\.|included|inclusive|with\s*tax|ttc|税込|含税/i;
 export const TOTAL_WORD = /total|合计|总计|合計|總計/i;
 export const AMOUNT_EXCLUDE_QTY_TAX = [
@@ -42,23 +42,23 @@ export const AMOUNT_EXCLUDE_QTY_TAX = [
 ];
 export const TAX_LABEL_WORD = /tax|vat|gst|hst|iva|税/i;
 
-// ---- 只剩 VAT、GST 这几个字母的税额标签（去掉前缀后）----
+// ---- Tax labels consisting solely of VAT, GST letters (after removing prefix) ----
 export const COMPACT_TAX = new Set(['vat', 'uat', 'gst', 'hst', 'tax', 'iva']);
 export const COMPACT_TAX_PREFIX = ['sales', 'total', 'item', 'inclusive'];
 
-// ---- 日月顺序：没有别的线索时，这些币种日在前；美元要有 $ 或 AM/PM 才月在前 ----
+// ---- Day-month order: when no other clues exist, these currencies have day first; USD requires $ or AM/PM for month first ----
 export const DMY_FIRST_CURRENCY = ['EGP', 'TRY', 'BRL'];
 export const MDY_IF_US_MARKER_CURRENCY = ['USD'];
 export const US_MARKER = /\$|\b[AP]\.?M\b/i;
 
-// ---- 日期左边出现这些词，说明是有效期、退货期限，不是开票日 ----
+// ---- When these words appear to the left of a date, it indicates validity period or return deadline, not invoice date ----
 export const NOT_ISSUE_DATE_LEFT =
   /有効期限|有効期間|有効|失効|までに取得|まで有効|return(?:s)?\s*(?:by|with|until|thru)|\bthru\b|through|last day|refund|exchange/i;
 
-// ---- 「Printed」打印日期的标签 ----
+// ---- 'Printed' date label ----
 export const PRINT_WORD = /print/i;
 
-// ---- 标题行（单据名）----
+// ---- Title row (document name) ----
 export const TITLE_WORDS_LATIN = [
   'tax invoice',
   'invoice',
@@ -97,7 +97,7 @@ export const TITLE_WORDS_CJK = [
   '小票',
 ];
 
-// ---- 店名前缀、标签 ----
+// ---- Store name prefix, labels ----
 export const MERCHANT_PREFIX = [
   'welcome to ',
   'thank you for ordering from ',
@@ -115,7 +115,7 @@ export const MERCHANT_LABEL = [
   '店名',
 ];
 
-// ---- 公司后缀 ----
+// ---- Company suffixes ----
 export const COMPANY_SUFFIX_LATIN = [
   'llc',
   'l.l.c',
@@ -134,8 +134,8 @@ export const COMPANY_SUFFIX_LATIN = [
 ];
 export const COMPANY_SUFFIX_CJK = ['株式会社', '(株)', '（株）', '有限会社'];
 
-// ======== 西方语言合计、税额词（法、西、德、意，带葡、荷）========
-// 词表在任何界面语言下都生效（App 不知道票据来自哪国）。
+// ---- Western language total and tax keywords (French, Spanish, German, Italian, with Portuguese, Dutch) ----
+// Glossaries apply in all interface languages (the app does not know which country the receipt is from).
 export const WEST_AMOUNT_KEYWORDS = [
   // fr
   'total ttc',
@@ -194,7 +194,7 @@ export const WEST_AMOUNT_KEYWORDS = [
   'totaal bedrag',
 ];
 export const WEST_AMOUNT_EXCLUDE = [
-  // fr：付款、找零、税前
+  // fr: payment, change, net of tax
   'montant remis',
   'remis',
   'rendu',
@@ -283,18 +283,18 @@ export const WEST_TAX_EXCLUDE = [
   'totaal',
 ];
 
-// ======== 日月顺序：欧元、英镑、增值税字样、GST ========
-/** 表的币种是这些时，年在后的数字日期日在前（欧元区、英国；合成数据 EUR 442/442、GBP 152/152 日在前）。 */
+// ---- Day-month order: EUR, GBP, VAT keywords, GST ----
+/** When table currency is these, numeric dates with year at the end have day first (Eurozone, UK; synthetic data EUR 442/442, GBP 152/152 have day first). */
 export const DMY_TABLE_CURRENCY = ['EUR', 'GBP'];
-/** 文字里出现这些货币写法，票据多半来自日在前的国家（wild+restaurant 里 25/25 日在前）。 */
+/** When these currency notations appear in text, the receipt is likely from a country with day-first dates (25/25 in wild+restaurant have day first). */
 export const DMY_TEXT_CURRENCY = /€|£|\bEUR\b|\bGBP\b/;
-/** 增值税字样（VAT、TVA、MwSt、IVA、BTW）；同一份文字里有 $ 的不算（美国发票也写 VAT）。 */
+/** VAT keywords (VAT, TVA, MwSt, IVA, I.V.A, BTW, USt); ignored if $ is present in the same text (US invoices also write VAT). */
 export const VAT_WORD = /(^|[^A-Za-z])(?:VAT|TVA|MwSt|IVA|I\.V\.A|BTW|USt)(?![A-Za-z])/i;
-/** 有 GST 又没有 HST、PST、QST（加拿大省税）：多半是澳、新、印、新加坡的票据，日在前。 */
+/** Has GST but lacks HST, PST, QST (Canadian provincial taxes): likely a bill from Australia, New Zealand, India, or Singapore, where the day comes first. */
 export const GST_WORD = /(^|[^A-Za-z])GST(?![A-Za-z])/;
 export const CANADA_TAX_WORD = /(^|[^A-Za-z])(?:HST|PST|QST|TVQ)(?![A-Za-z])/;
 
-// ======== 月份名（去掉重音、小写后查）========
+// ======== Month names (lookup after removing accents and lowercasing) ========
 const M = (m: number, ...names: string[]): [string, number][] => names.map((n) => [n, m]);
 export const MONTHS_WEST: Record<string, number> = Object.fromEntries([
   ...M(
@@ -369,11 +369,11 @@ export const MONTHS_WEST: Record<string, number> = Object.fromEntries([
     'dezembro',
   ),
 ]);
-/** 酒店账单取最晚日期时，这些字样后面的日期是打印日期，不算。 */
+/** When getting the latest date on a hotel bill, dates following these keywords are print dates and should be ignored. */
 export const PRINT_WORD_LEFT = /print|imprim|gedruckt|stampa|impres/i;
 
-// ======== 店名：发票和小票分开 ========
-/** 发票上才常见的词（英、法、西、德、意）；不同的词出现 ≥ 2 个才算发票。 */
+// ======== Merchant name: separate invoices and receipts ========
+/** Terms common only on invoices (English, French, Spanish, German, Italian); counted as an invoice only if at least 2 different terms appear. */
 export const INVOICE_TERMS: RegExp[] = [
   /bill(?:ed)?\s*to/,
   /sold\s*to/,
@@ -411,7 +411,7 @@ export const INVOICE_TERMS: RegExp[] = [
   /condizioni\s*di\s*pagamento/,
 ];
 export const INVOICE_MIN_TERMS = 2;
-/** 发票上开票方的标签（只在发票里加）。 */
+/** Seller labels on invoices (added only for invoices). */
 export const SELLER_KEYWORDS = [
   'remit to',
   'payable to',
@@ -432,7 +432,7 @@ export const SELLER_KEYWORDS = [
   'fornitore',
   'emittente',
 ];
-/** 收票方的标签（发票里当排除）。 */
+/** Buyer labels (excluded on invoices). */
 export const BUYER_EXCLUDE = [
   'bill to',
   'sold to',
@@ -455,7 +455,7 @@ export const BUYER_EXCLUDE = [
   'spedire a',
 ];
 export const SELLER_WEIGHT = 1;
-/** 标签里开票方词前面允许出现的词（Please remit to、Invoice send remittance to）。 */
+/** Words permitted before seller terms in labels (e.g., 'Please remit to', 'Invoice send remittance to'). */
 export const SELLER_PREFIX = [
   'please',
   'send',
@@ -469,7 +469,7 @@ export const SELLER_PREFIX = [
   'remittance',
 ];
 
-// ======== 开票日期：这些词出现在标签里的日期不是开票日（开始、结束、期间、收到、送达……）========
+// ======== Issue date: dates with these terms in their labels are not issue dates (start, end, period, received, delivered...) ========
 export const NOT_ISSUE_DATE_LABEL = [
   'start',
   'starting',
@@ -532,11 +532,13 @@ export const NOT_ISSUE_DATE_LABEL = [
   'valido',
 ];
 
-// ======== 税字样：整份文字里一个都没有，就说明这张票没写税，没有标签的数不当税额 ========
-// 拉丁、西里尔字母的词要整词匹配（taxi、relax 不算）；中日韩、泰、阿拉伯文不用空格分词，
-// 税字样常常粘在别的字上（「消费税」「الضريبة」），按子串匹配。多认几个词只会少扣一分，不会多给候选。
+// ======== Tax terms: if none appear in the entire text, the bill has no tax indicated; unlabeled numbers are not treated as tax amounts ========
+// Latin and Cyrillic alphabets require whole-word matching (excluding words like "taxi" or
+// "relax"); CJK, Thai, and Arabic do not use space tokenization, and tax-related terms are often
+// attached to other words (e.g., "consumption tax", Arabic "tax"), so substring matching is used.
+// Recognizing extra words only reduces score by one at most, never adds extra candidates.
 const TAX_WORDS_SPACED = [
-  // en / fr / es / de / it / nl / pt（葡语 icms 是巴西的商品流通税）
+  // en / fr / es / de / it / nl / pt (Portuguese 'icms' is Brazil's merchandise circulation tax)
   'tax',
   'taxes',
   'taxe',
@@ -565,8 +567,8 @@ const TAX_WORDS_SPACED = [
   'imposto',
   'impostos',
   'icms',
-  // 土耳其语（verg[iİı] 是因为大写的 İ 在不区分大小写时对不上 i）、波兰语、俄语、
-  // 马来、印尼语、北欧、捷克、匈牙利、芬兰、希腊语
+  // Turkish ('verg[iİı]' is because uppercase 'İ' does not match 'i' case-insensitively), Polish,
+  // Russian, Malay, Indonesian, Nordic languages, Czech, Hungarian, Finnish, Greek
   'kdv',
   'topkdv',
   'verg[iİı]',
@@ -588,10 +590,10 @@ const TAX_WORDS_SPACED = [
   'φπα',
 ];
 const TAX_WORDS_UNSPACED = [
-  // 中文（含繁体）、日文：消费税、税額、税込、稅
+  // Chinese (including Traditional) and Japanese: consumption tax, tax amount, tax-included, tax
   '税',
   '稅',
-  // 韩文：부가세、부가가치세、세금、세액、소비세、과세、면세
+  // Korean: value-added tax, value-added tax (full), tax, tax amount, consumption tax, taxation, tax exemption
   '부가세',
   '부가가치세',
   '세금',
@@ -599,12 +601,12 @@ const TAX_WORDS_UNSPACED = [
   '소비세',
   '과세',
   '면세',
-  // 阿拉伯文：ضريبة（带「ال」也认）、ضرائب、ض.ق.م（增值税简写）、القيمة المضافة
+  // Arabic: tax (ضريبة, including with definite article 'ال'), taxes (ضرائب), VAT abbreviation (ض.ق.م), value-added tax (القيمة المضافة)
   'ضريب',
   'ضرائب',
   'ض\\.?\\s?ق\\.?\\s?م',
   'قيمة\\s+مضافة',
-  // 泰文、越南文、希伯来文
+  // Thai, Vietnamese, Hebrew
   'ภาษี',
   'thuế',
   'מע["״]?מ',

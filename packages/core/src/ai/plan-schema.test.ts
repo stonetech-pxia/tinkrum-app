@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { PlanSchema } from './types';
 
-// 说明文字太长不该让整份合法的修改作废（D14）：截断，别的限制照旧。
+// An explanation text that is too long should not invalidate the entire legal change (D14): truncate it, and keep other restrictions as they are.
 
 const ops = [{ op: 'setTheme', mode: 'dark' }];
 const parse = (extra: object) => PlanSchema.safeParse({ kind: 'ops', ops, ...extra });
@@ -31,7 +31,7 @@ describe('PlanSchema notes', () => {
   });
 });
 
-describe('搭建计划（规则 53）', () => {
+describe('build plan (rule 53)', () => {
   const steps = (n: number) =>
     Array.from({ length: n }, (_, i) => ({
       id: `s${i}`,
@@ -46,7 +46,7 @@ describe('搭建计划（规则 53）', () => {
     ...over,
   });
 
-  it('2 到 8 步，种类合法，request 不是空的', () => {
+  it('2 to 8 steps, valid kinds, request is not empty', () => {
     expect(PlanSchema.safeParse(build()).success).toBe(true);
     expect(PlanSchema.safeParse(build({ steps: steps(8) })).success).toBe(true);
     expect(PlanSchema.safeParse(build({ steps: steps(1) })).success).toBe(false);
@@ -61,7 +61,7 @@ describe('搭建计划（规则 53）', () => {
     ).toBe(false);
   });
 
-  it('步骤的 id 不能重复，也不能带操作：计划只是文字（底线 6）', () => {
+  it('Step IDs cannot be duplicated or carry operations: the plan is text only (invariant 6)', () => {
     expect(PlanSchema.safeParse(build({ steps: [steps(1)[0], steps(1)[0]] })).success).toBe(false);
     expect(
       PlanSchema.safeParse(build({ steps: [{ ...steps(1)[0], ops: [] }, steps(2)[1]] })).success,

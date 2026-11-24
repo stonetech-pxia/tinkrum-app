@@ -13,7 +13,7 @@ import { recordsToSheet } from './records-sheet';
 import type { Collection } from './schema';
 import type { DataRecord } from './data';
 
-// 标签字段和列表的筛选、搜索（创始人 2026-11-04 定）：没有记录、有记录、边界（0 个标签、1000 条、搜到没显示的字段、筛选加搜索）。
+// Tag fields and list filtering/search (specified by founder 2026-11-04): no records, with records, edge cases (0 tags, 1,000 entries, searching unshown fields, filter combined with search).
 
 const table: Collection = {
   id: 'contacts',
@@ -180,7 +180,7 @@ describe('browsePeriod (D-437)', () => {
       createdAt,
       updatedAt: createdAt,
     }) as DataRecord;
-  // 2026-10-28 是周三；周一开始的一周是 10-26 到 11-01。
+  // 2026-10-28 is Wednesday; the week starting Monday is 10-26 to 11-01.
   const now = new Date(2026, 9, 28, 12);
   const all = [
     r('today', '2026-10-28'),

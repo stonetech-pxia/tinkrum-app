@@ -19,7 +19,7 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { SQLiteWorkspaceRepo } from '../storage/sqlite';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 阶段 C2（方案 P7）：月历外观（D-305）、右侧字段的 elapsed / progress（D-306）、统计的目标和比较（D-307、D-308）。
+// Stage C2 (Scheme P7): monthly calendar view (D-305), elapsed/progress for right-hand fields (D-306), statistics targets and comparison (D-307, D-308).
 
 const tables: Collection[] = [
   {
@@ -109,7 +109,7 @@ const put = async (repo: MemoryWorkspaceRepo, collectionId: string, values: obje
 };
 
 const today = () => localDate(new Date());
-/** 这个月另一天（1 号，今天是 1 号时用 2 号）。 */
+/** Another day of this month (the 1st, or the 2nd if today is the 1st). */
 const otherDay = () => {
   const d = new Date();
   return localDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() === 1 ? 2 : 1));
@@ -130,7 +130,7 @@ it('days show entries in the color of their mood; tapping a day lists its entrie
   await put(repo, 'mood', { date: otherDay(), feel: 'bad', note: '下雨' });
   await put(repo, 'mood', { date: otherDay(), feel: 'good', note: '晴天' });
   await put(repo, 'mood', { date: today(), note: '还没选' });
-  // 很久以前的记录：这个月不读它。
+  // Record from long ago: do not read it for this month.
   await put(repo, 'mood', { date: '2001-01-01', feel: 'good', note: '旧的' });
   const listAll = jest.spyOn(repo, 'listRecords');
   await renderToolsApp(repo, undefined, { seed: seedWith(calendar) });
@@ -142,7 +142,7 @@ it('days show entries in the color of their mood; tapping a day lists its entrie
   expect(await screen.findByText('晴天')).toBeTruthy();
   expect(screen.getByText('下雨')).toBeTruthy();
   expect(screen.queryByText('还没选')).toBeNull();
-  // 图例列出选项和「未选」。
+  // Legend lists options and "Unselected".
   expect(screen.getAllByText('开心').length).toBeGreaterThan(0);
   expect(screen.getAllByText('未选').length).toBeGreaterThan(0);
   expect(listAll).not.toHaveBeenCalledWith('mood');
@@ -162,7 +162,7 @@ it('moves to the previous month and back to today', async () => {
   expect(await screen.findByText(monthTitle(today().slice(0, 7), 'fr'))).toBeTruthy();
 });
 
-// 算出来的日期也能当月历的日子（D-550）：开始日期在上个月，到期日在这个月；看月历什么都不写。
+// A computed date can also serve as a calendar day (D-550): start date in the previous month, due date in this month; calendar view displays nothing.
 it('a calendar by a computed date shows each entry on its computed day', async () => {
   const repo = new MemoryWorkspaceRepo();
   const contracts: Collection = {
@@ -247,7 +247,7 @@ it('progress against another field of the entry', async () => {
   });
   expect(await screen.findByText('6 / 8')).toBeTruthy();
   expect(screen.getAllByTestId(/^progress-ring-/)).toHaveLength(1);
-  // 没有目标的那条照常显示数值。
+  // The item without a target displays its numeric value as usual.
   expect(screen.getByText('3')).toBeTruthy();
 });
 
@@ -316,7 +316,7 @@ it('a grouped stat compares each option with the same days last month', async ()
     }),
   });
   expect(await screen.findByText('↑ 50%')).toBeTruthy();
-  // 交通上月同期是 0：只写「增加」。
+  // Traffic in the same period last month is 0: write only "Increase".
   expect(screen.getByText('↑ 增加')).toBeTruthy();
 });
 

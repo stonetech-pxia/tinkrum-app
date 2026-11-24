@@ -2,7 +2,7 @@ import type { Workflow } from '@morph/core';
 
 import type { WorkspaceRepo } from '../storage/types';
 
-// 顺序、配置和一次交接共同确定一条成功接力；只记本机，不作为 AI 上下文。
+// Order, configuration, and a single handoff jointly determine a successful handoff; recorded locally only, not used as AI context.
 const key = (first: string, second: string) =>
   `chain:${encodeURIComponent(first)}:${encodeURIComponent(second)}`;
 export const sameWorkflow = (a: Workflow, b: Workflow) => JSON.stringify(a) === JSON.stringify(b);
@@ -11,7 +11,7 @@ interface ChainRecord {
   signature: string;
   count: number;
   transfer: string;
-  /** 用户已经合成过或者点了「不用了」：这两个快捷操作不改，就不再提。 */
+  /** User has already synthesized or clicked "No thanks": these two quick actions are not modified and will not be suggested again. */
   dismissed?: boolean;
 }
 
@@ -36,12 +36,12 @@ async function readChain(
     )
       return parsed as ChainRecord;
   } catch {
-    /* 旧统计损坏时从头记，不影响处理文件。 */
+    /* Record from scratch when old statistics are corrupted, without affecting file processing. */
   }
   return null;
 }
 
-/** 同一批结果重复运行第二段不增加次数；任一配置变化后重新累计。 */
+/** Running the second segment repeatedly on the same batch of results does not increase the count; re-accumulates after any configuration change. */
 export async function recordChain(
   repo: Pick<WorkspaceRepo, 'getMeta' | 'setMeta'>,
   first: Workflow,
@@ -62,7 +62,7 @@ export async function recordChain(
   return count >= 2 && !dismissed;
 }
 
-/** 合成过或者点了「不用了」：同样的两个快捷操作不再提议（任何一个改过之后重新算）。 */
+/** Synthesized or clicked "No thanks": the same two quick actions will no longer be suggested (re-calculated after any changes to either). */
 export async function dismissChain(
   repo: Pick<WorkspaceRepo, 'getMeta' | 'setMeta'>,
   first: Workflow,

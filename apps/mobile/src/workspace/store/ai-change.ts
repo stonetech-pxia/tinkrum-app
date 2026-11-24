@@ -39,25 +39,27 @@ import type {
   WorkspaceState,
 } from './types';
 
-// AI 修改页和草稿聊天框说的一句话（D-191、D-411）：功能类直接保存成一个 AI 版本，外观类进草稿，
-// 一个计划两样都有时各走各的（D-419）；每句都带上工具清单（D-414）；「接着改」的预设（next）；大工程先出计划（D-415，步骤的执行在 build.ts）。
+// A single sentence from AI modification page and draft chat box (D-191, D-411): feature category
+// saved directly as an AI version, appearance category enters draft, when a plan has both they each
+// follow their own path (D-419); each sentence includes tool checklist (D-414); "continue editing"
+// preset (next); large projects produce a plan first (D-415, step execution in build.ts).
 
 export const NEXT_META_KEY = 'next';
 export const SUGGEST_META_KEY = 'suggest';
 
-/** 搭建计划的一步（D-415）。 */
+/** A step in the build plan (D-415). */
 export interface StepTurn {
   step: NonNullable<PlanSession['step']>;
-  /** 清单里对应的项；不给时按句子找。 */
+  /** Corresponding item in checklist; when omitted, find by sentence. */
   itemId?: string;
-  /** 模型回来时用户已经点了停止：不应用，当作没发生。 */
+  /** User clicked stop when model returns: do not apply, treat as if it never happened. */
   stillWanted: () => boolean;
 }
 
-/** 模型回来时用户已经点了停止。 */
+/** Error thrown when user clicks stop while model returns. */
 export class StepStopped extends Error {}
 
-/** 存着的建议（JSON 数组）；坏了或没有就是空的。 */
+/** Stored suggestions (JSON array); empty if corrupted or missing. */
 export function parseSuggest(stored: string | null): string[] {
   try {
     const v: unknown = stored ? JSON.parse(stored) : [];
@@ -81,8 +83,8 @@ export function createAIChange(
 ) {
   const { deps, repo, registry, locale, set, get, msg, reload, failedPlan, addedBy } = k;
 
-  /** 新建的快捷操作默认在首页放入口；用户说了不要放、或者是给分享进来的文件做的（D-124），就不放。 */
-  /** 在 app 里改（D-485）：检查范围。草稿里重放已检查过的操作不再查。 */
+  /** New quick actions place their entry point on the home screen by default; if the user says not to place it, or if it's made for files shared into the app (D-124), it is not placed. */
+  /** Editing in app (D-485): check scope. Do not re-check already checked operations when replaying in draft. */
   const scopeOf = (origin: { appId?: string }) =>
     origin.appId ? { scope: { appId: origin.appId } } : {};
 
@@ -111,7 +113,7 @@ export function createAIChange(
     return full.ok ? { ops: withEntry, prepared: full } : { ops, prepared };
   }
 
-  /** 聊天框里没变成一步的结果记成一条回复（D-207）。 */
+  /** Results in chat box that did not turn into a step are recorded as a reply (D-207). */
   function replyFor(
     input: string,
     result: ChangeResult,
@@ -133,7 +135,7 @@ export function createAIChange(
           examples: [],
         };
       case 'applied':
-        // 这句话已经生效（D-411）：说清做了什么，剩下的外观（next）可以点一下接着说。
+        // This sentence has taken effect (D-411): explains what was done, remaining appearance items (next) can be clicked to continue.
         return {
           input,
           kind: 'functionApplied',
@@ -165,7 +167,7 @@ export function createAIChange(
     originIn: DraftOrigin,
     inChat: boolean,
     stepTurn?: StepTurn,
-    /** 发给模型的句子和记下来的不一样时（「把这些补上」，D-418）。 */
+    /** When the sentence sent to the model differs from the recorded one ("fill these in", D-418). */
     forModel?: string,
   ): Promise<ChangeResult> {
     const { config, head } = get();
@@ -175,13 +177,13 @@ export function createAIChange(
       let current = get().draft;
       if (current && !current.open) current = rebaseDraft(current);
       const base = current?.steps.at(-1)?.config ?? config;
-      // 在哪个 app 里改（D-485）：草稿已经有的沿用草稿的；新开始的看现在在哪个 app 里。
+      // Which app the modification is in (D-485): drafts inherit existing ones; new starts check current app.
       const appId = current ? current.origin.appId : (originIn.appId ?? get().appId ?? undefined);
       const origin: DraftOrigin = { ...originIn, ...(appId ? { appId } : {}) };
-      // 草稿里接着说的话沿用开始时的上下文：「这个」还是那个快捷操作（D-124）。
+      // Follow starting context for subsequent sentences in draft: "this" still refers to that quick action (D-124).
       const about = origin.about ?? current?.origin.about;
       await session.markStart(base);
-      // 工具清单一起带上（D-414）：目标、还差什么、最近说过的话，用户不用每次都从头说。
+      // Include tool checklist together (D-414): goal, remaining gaps, recent conversation, so the user doesn't have to repeat from scratch every time.
       const planned = planSession(get().session, {
         current: input,
         ...(stepTurn ? { step: stepTurn.step } : {}),
@@ -196,7 +198,7 @@ export function createAIChange(
         ...(planned ? { session: planned } : {}),
       });
       if (stepTurn && !stepTurn.stillWanted()) throw new StepStopped();
-      /** 这一句没做成：记进清单（上一轮的话模型下一句看得到，清单里的那一项标 failed）。 */
+      /** This sentence failed: recorded in checklist (next sentence from model sees previous round's talk, that item in checklist marked failed). */
       const notDone = (reply: string, reason: string) =>
         session.record(
           {
@@ -214,19 +216,19 @@ export function createAIChange(
         await notDone('the reply was not valid', msg('sessionInvalid'));
         return { kind: 'invalid', issues: parsed.error.issues.map((i) => i.message) };
       }
-      // 在 app 里（D-485）：没写 app 的风格、新页面、表、快捷操作都是这个 app 的，写进操作里（草稿重新套用不带范围）。
+      // In-app (D-485): unassigned app styles, new pages, tables, and quick actions all belong to this app, written into operations (draft re-application does not carry scope).
       const plan =
         appId && parsed.data.kind === 'ops'
           ? { ...parsed.data, ops: opsForApp(parsed.data.ops, appId) }
           : parsed.data;
       if (plan.kind === 'build') {
-        // 已经在做计划的一步了：不能再出一份（规划器已经发回去过一次，别的 AI 也可能这样）。
+        // Already executing a plan step: cannot output another one (planner already sent back once, other AIs might do this too).
         if (stepTurn) {
           await failedPlan(input, plan, 'a plan inside a step');
           await notDone('a plan inside a step', msg('sessionInvalid'));
           return { kind: 'invalid', issues: [msg('buildFailedInvalid')] };
         }
-        // 先给用户看，点「开始」才做（底线 16）。
+        // Show to user first, execute only when "Start" is clicked (invariant 16).
         await showBuild({
           summary: plan.summary,
           steps: plan.steps.map((step) => ({ ...step, status: 'todo' })),
@@ -251,7 +253,7 @@ export function createAIChange(
         };
       }
       if (plan.kind === 'restorePrevious') {
-        // 计划的一步不能是「撤销」：撤掉的是用户没说要撤的东西。
+        // A plan step cannot be "undo": what gets undone is something the user did not say to undo.
         if (stepTurn) return { kind: 'invalid', issues: [msg('buildFailedInvalid')] };
         if (current && current.steps.length > 1) {
           set({ draft: current });
@@ -275,10 +277,11 @@ export function createAIChange(
         await notDone(prepared.issues.join('; '), msg('sessionInvalid'));
         return { kind: 'invalid', issues: prepared.issues };
       }
-      // 建议的下一步（D-355）：给了新的就换掉；没给就只去掉刚说的这一句（点了的那条），其余留着。
+      // Suggested next step (D-355): Replace if a new one is given; if none is given, remove only the newly mentioned sentence (the tapped one) and keep the rest.
       await saveSuggest(plan.suggest ?? get().suggest.filter((x) => x !== input));
-      // 功能先做（D-191）：直接应用到正式的版本，不进草稿；草稿里只改外观。
-      // 草稿聊天框里说的也一样，做完草稿套到新版本上，接着开着（D-411）。
+      // Feature first (D-191): Apply directly to the official version without entering the draft;
+      // only modify the appearance in the draft. The same applies to what is said in the draft chat
+      // box: after the draft is completed, apply it to the new version and keep it open (D-411).
       const first = functionFirst(base, plan.ops, ctx);
       if (first.kind === 'function') {
         return await applyFunction(
@@ -290,7 +293,7 @@ export function createAIChange(
           stepTurn,
         );
       }
-      // 外观：新建或接着改草稿（D-190）。
+      // Appearance: Create new or continue modifying the draft (D-190).
       const { ops, prepared: after } = withHomeEntries(
         base,
         plan.ops,
@@ -317,7 +320,7 @@ export function createAIChange(
         steps: [...(current?.steps ?? []), step],
         replies: current?.replies ?? [],
         origin: current?.origin ?? origin,
-        // 搭建时草稿先不打开（D-415）：做完了用户点「看看外观」再看，中间不要闪来闪去。
+        // Do not open the draft during building (D-415): After completion, the user taps "View appearance" to view it, avoiding flashing back and forth in the middle.
         open: !stepTurn,
       };
       set({ draft, editing: null });
@@ -339,7 +342,7 @@ export function createAIChange(
     }
   }
 
-  /** 这一句做成了：代码判断相关的工具能不能用（D-414），模型说了不算。 */
+  /** This sentence is done: Code determines whether related tools can be used (D-414), the model does not have the final say. */
   async function recordDone({
     input,
     lines,
@@ -357,7 +360,7 @@ export function createAIChange(
     before: WorkspaceConfig;
     after: WorkspaceConfig;
     later: boolean;
-    /** 一个计划两样都有（D-419）：功能的版本号和外观那一步都记下，撤销和退一步都找得到这一句。 */
+    /** Both in one plan (D-419): Record both the feature version number and the appearance step so that both undo and step-back can locate this sentence. */
     refs: { cr: number } | { rev: number } | { cr: number; rev: number };
     next?: string | null;
     stepTurn: StepTurn | undefined;
@@ -378,8 +381,10 @@ export function createAIChange(
   }
 
   /**
-   * 外观进草稿（D-419）：先把已有的草稿套到刚生效的版本上，这批外观在上面合法就接成一步（不再问模型）；
-   * 不合法返回 null，什么都不加。搭建时草稿先不打开（D-415），做完了用户点「看看外观」再看。
+   * Appearance enters draft (D-419): First apply the existing draft to the newly active version,
+   * and if this batch of appearances is valid on top of it, connect them into a single step
+   * (without asking the model again); if invalid, return null and add nothing. Do not open the
+   * draft during building (D-415); after completion, the user taps "View appearance" to view it.
    */
   async function deferredIntoDraft(
     input: string,
@@ -427,10 +432,13 @@ export function createAIChange(
   }
 
   /**
-   * 功能类修改直接保存成一个 AI 版本（D-191），顶部照常「已改好 · 撤销」。这句话里剩下的外观直接进草稿
-   * （D-419，不再问模型）；套不上时才变成「接着改」的预设，并告诉用户这部分没做。模型给的 next 照旧。
-   * 草稿还在：从 AI 修改页说的，草稿先离开，打开时重新套上；从草稿聊天框说的（stayInDraft），马上套上，
-   * 草稿接着开着（D-411）。
+   * Feature-class modifications are saved directly as an AI version (D-191), with "Modified ·
+   * Undo" at the top as usual. The remaining appearances in this sentence directly enter the
+   * draft (D-419, without asking the model again); only when they cannot be applied do they turn
+   * into a preset for "Continue editing", and inform the user that this part was not done. The
+   * model's given next remains as usual. Draft remains: When spoken from the AI modification
+   * page, the draft is left first and reapplied upon opening; when spoken from the draft chat box
+   * (stayInDraft), it is applied immediately and the draft remains open (D-411).
    */
   async function applyFunction(
     input: string,
@@ -446,7 +454,7 @@ export function createAIChange(
     let wanted = first.ops;
     let cleanup: Op[] = [];
     let prepared = prepareOps(config!, wanted, ctx);
-    // 善后的操作改的页面、块只在草稿里（D-413）：正式版本上跳过，草稿套上时再做。
+    // The pages and blocks modified by cleanup operations are only in the draft (D-413): skipped on the official version, and performed when the draft is applied.
     if (!prepared.ok && draft) {
       const split = splitDraftOnlyOps(config!, wanted, ctx);
       const kept = split ? prepareOps(config!, split.kept, ctx) : null;
@@ -458,7 +466,7 @@ export function createAIChange(
     }
     if (!prepared.ok) {
       await failedPlan(input, first.ops, `${prepared.stage}: ${prepared.issues.join('; ')}`);
-      // 在草稿的样子上说的：要用到草稿里的东西（D-413）。用户点了才应用草稿（底线 7、16）。
+      // Spoken on the appearance of the draft: Needs to use items in the draft (D-413). The user must tap to apply the draft (Invariants 7, 16).
       if (draft)
         return {
           kind: 'needsDraft',
@@ -502,7 +510,7 @@ export function createAIChange(
         summary,
       });
       revisionId = revision.id;
-      // 上一个还没等到渲染确认就又来一个（搭建的一步接一步、应用草稿并继续）：上一个已经在历史里了，算保存好。
+      // Another one comes before the previous one waits for render confirmation (step-by-step building, apply draft and continue): The previous one is already in history and considered successfully saved.
       const waiting = k.render.pending;
       if (waiting)
         await repo.updateChangeRequest(waiting.changeRequestId, {
@@ -514,7 +522,7 @@ export function createAIChange(
         revisionId: revision.id,
         undoTo: head!.id,
         summary,
-        // 搭建时不是每一步都弹「已改好 · 撤销」（D-415）：做完了在计划上说。
+        // Do not pop up "Modified · Undo" at every step during building (D-415): State it on the plan when finished.
         ...(stepTurn ? { quiet: true } : {}),
       };
     } catch (e) {
@@ -525,13 +533,13 @@ export function createAIChange(
     }
     if (draft?.open && !stayInDraft && !hasDeferred)
       set({ draft: { ...draft, open: false }, toast: null });
-    // 被移除的工具失去文件授权；文件本身保留（§7G）。
+    // Removed tools lose file authorization; files themselves are retained (§7G).
     const remaining = new Set(after.after.packages.map((t) => t.id));
     for (const tool of config!.packages) {
       if (!remaining.has(tool.id)) await repo.revokeToolGrants(tool.id);
     }
     await reload();
-    // 用户在草稿这一步的回复里看到功能已经生效；AI 的说明也放这里（说的是整句话）。
+    // The user sees that the feature has taken effect in the response at this draft step; the AI's explanation is also placed here (referring to the whole sentence).
     const lookStep = hasDeferred
       ? await deferredIntoDraft(
           input,
@@ -550,7 +558,7 @@ export function createAIChange(
     set({ next });
     await repo.setMeta(NEXT_META_KEY, next ?? '');
     const notDoneNote = msg('deferredLookNotDone');
-    // 搭建时清单和下一句（next）会接着做，不用多一条提示；聊天框里回复就说了。
+    // During building, the checklist and next will continue to execute, so an extra prompt is not needed; the chat reply already states it.
     if (lookNotDone && !stepTurn && !stayInDraft) set({ draftNotice: notDoneNote });
     const shown = get().draft?.steps.at(-1)?.config ?? after.after;
     await recordDone({
@@ -571,7 +579,7 @@ export function createAIChange(
         focusPageId: focusPage(first.deferred, lookStep.config),
       };
     const applied = addedBy(config!, after.after, origin);
-    // 没做成时 AI 的说明不能留：它可能说外观已经好了。
+    // When not successfully completed, the AI's explanation cannot be kept: it might state that the appearance is already ready.
     const notes = lookNotDone ? [notDoneNote] : plan.notes;
     return {
       kind: 'applied',
@@ -596,7 +604,7 @@ export function createAIChange(
     change: (input, planner = deps.provider, origin = {}) =>
       aiChange(input, planner, origin, false),
 
-    // 用户点一次发一次（底线 16）；没问题或正在做时什么都不发，也不循环。
+    // Sent once per user tap (Invariant 16); nothing is sent when there are no issues or while in progress, nor does it loop.
     async fixProblems() {
       const { session: s, draft, config, next, busy } = get();
       const shown = draft?.steps.at(-1)?.config ?? config;

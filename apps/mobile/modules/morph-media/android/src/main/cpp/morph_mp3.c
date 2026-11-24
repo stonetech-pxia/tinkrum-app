@@ -1,4 +1,4 @@
-// MP3 编码的 JNI（D-183）：Mp3Encoder.kt 交来交错的 16 位 PCM，LAME 编成 MP3 帧交回去，写文件在 Kotlin 里。
+// JNI for MP3 encoding (D-183): Mp3Encoder.kt passes interleaved 16-bit PCM, LAME encodes them into MP3 frames and returns them, and file writing is handled in Kotlin.
 #include <jni.h>
 #include <stdint.h>
 
@@ -6,7 +6,7 @@
 
 #define EXPORT __attribute__((visibility("default")))
 
-/** 返回编码器句柄；参数不被 LAME 接受时返回 0。quality 用 LAME 的 2（好，比默认的 5 慢一点）。 */
+/** Returns the encoder handle; returns 0 if parameters are not accepted by LAME. Quality uses LAME's 2 (good, slightly slower than the default 5). */
 EXPORT JNIEXPORT jlong JNICALL
 Java_expo_modules_morphmedia_Mp3Encoder_nativeInit(JNIEnv *env, jclass cls, jint sampleRate, jint channels,
                                                    jint kbps) {
@@ -24,7 +24,7 @@ Java_expo_modules_morphmedia_Mp3Encoder_nativeInit(JNIEnv *env, jclass cls, jint
   return (jlong)(intptr_t)lame;
 }
 
-/** frames 帧交错样本 → MP3 字节，返回写进 out 的字节数（负数是 LAME 的错误码）。 */
+/** frames frames of interleaved samples -> MP3 bytes, returns the number of bytes written to out (negative values are LAME error codes). */
 EXPORT JNIEXPORT jint JNICALL
 Java_expo_modules_morphmedia_Mp3Encoder_nativeEncode(JNIEnv *env, jclass cls, jlong handle, jshortArray pcm,
                                                      jint frames, jbyteArray out) {
@@ -40,7 +40,7 @@ Java_expo_modules_morphmedia_Mp3Encoder_nativeEncode(JNIEnv *env, jclass cls, jl
   return written;
 }
 
-/** 编码器里剩下的样本 → 最后几帧，返回字节数。 */
+/** Remaining samples in the encoder -> final few frames, returns the byte count. */
 EXPORT JNIEXPORT jint JNICALL
 Java_expo_modules_morphmedia_Mp3Encoder_nativeFlush(JNIEnv *env, jclass cls, jlong handle, jbyteArray out) {
   lame_t lame = (lame_t)(intptr_t)handle;

@@ -11,7 +11,7 @@ import {
   type ServerOptions,
 } from './server';
 
-// 价格设成每百万 token 1 美元：输出 10000 token 正好 $0.01，方便算限额。
+// Set price to $1 per million tokens: 10,000 output tokens equals exactly $0.01, convenient for limit calculations.
 const defaults: ServerOptions = {
   relay: null,
   model: 'claude-haiku-5-5',
@@ -65,7 +65,7 @@ describe('model relay (D-193)', () => {
   const b = { 'x-morph-device': 'device-bbbb' };
 
   it('takes a big config: a 128 000 character request in Chinese fits in the body limit (D7)', async () => {
-    // 中文每个字 3 个字节：提示词、第一条请求、修正消息都到上限，加上模型回复。
+    // 3 bytes per Chinese character: prompts, first request, and fix messages all reach the limit, plus the model response.
     const { post, seen } = make();
     const big = '配'.repeat(128_000);
     const body = {
@@ -122,7 +122,7 @@ describe('model relay (D-193)', () => {
   });
 
   it('a planner repairing twice stays in the shape the relay accepts (AGENT_PLAN §3.6)', async () => {
-    // 不合 JSON → 合法但新增 blocker → 补好。真模型回复带思考块，Relay 原样给 App。
+    // Non-JSON -> valid but introduces new blocker -> fixed. Real model response includes thought blocks; Relay passes them through to the app as-is.
     const tables = [
       {
         op: 'addData',
@@ -280,15 +280,15 @@ describe('model relay (D-193)', () => {
     expect(await (await post(first, a)).json()).toEqual({ error: 'blocked' });
     expect((await post(first, b)).status).toBe(200);
     expect(logs[0]).toMatchObject({ offPlan: true });
-    // 模型拒答不算。
+    // Model refusals do not count.
     const refusals = make(async () => reply('', { stopReason: 'refusal' }), { offPlanLimit: 1 });
     expect((await refusals.post(first, a)).status).toBe(200);
     expect((await refusals.post(first, a)).status).toBe(200);
   });
 
-  // R03：限额要在并发请求下也成立——准入检查和登记之间不能有 await，在途的请求要先预留费用。
+  // R03: limits must hold under concurrent requests as well—no `await` between admission check and registration, in-flight requests must reserve fees beforehand.
   describe('limits hold for concurrent requests', () => {
-    /** 模型调用停住，直到 open()；这样请求都「在途」。 */
+    /** Model call pauses until `open()`; this keeps requests "in-flight". */
     const held = () => {
       let open!: () => void;
       const gate = new Promise<void>((resolve) => (open = resolve));
@@ -318,7 +318,7 @@ describe('model relay (D-193)', () => {
     it('counts what is still in flight against the daily limits, so a burst cannot overshoot by much', async () => {
       const { gate, open } = held();
       let calls = 0;
-      // 每个请求最多花 $0.01（输出 10000 token）；设备一天 $0.025：在途的三个就用完了额度。
+      // Each request costs at most $0.01 (10,000 output tokens); device limit $0.025: three in-flight requests exhaust the quota.
       const { post } = make(
         async () => {
           calls++;
@@ -333,7 +333,7 @@ describe('model relay (D-193)', () => {
       open();
       const rejected = (await Promise.all(all)).filter((r) => r.status === 429);
       expect(rejected).toHaveLength(7);
-      // 都做完了、花了 $0.03：今天这台设备用完了。
+      // All completed, spent $0.03: today's device quota is exhausted.
       expect(await (await post(first, a)).json()).toEqual({ error: 'daily_limit' });
     });
 
@@ -381,7 +381,7 @@ describe('model relay (D-193)', () => {
         async () => {
           const mine = n++;
           await relays[mine]?.gate;
-          // 昨天的花了 $0.01；今天的没花钱。
+          // Yesterday's spent $0.01; today's spent nothing.
           return mine === 0
             ? reply(PLAN)
             : reply(PLAN, {
@@ -400,7 +400,7 @@ describe('model relay (D-193)', () => {
       await today;
       first1.open();
       await yesterday;
-      // 昨天那笔费用记在昨天：今天这台设备还没花钱，照常转发。
+      // Yesterday's cost is recorded on yesterday: today's device has spent nothing, forwards normally.
       expect((await post(first, a)).status).toBe(200);
     });
   });
@@ -434,9 +434,9 @@ describe('model relay (D-193)', () => {
       },
     ]);
     expect(JSON.stringify(saved)).not.toContain('device-aaaa');
-    // 日志照旧不记内容。
+    // Logs continue not to record content as before.
     expect(JSON.stringify(logs)).not.toContain('You plan');
-    // 平台和版本格式不对就不存，请求照常转发。
+    // Platform and version formats incorrect, do not store, request forwards normally.
     await post(first, { ...a, 'x-morph-platform': 'windows', 'x-morph-version': 'no spaces!' });
     expect(saved[1]).not.toHaveProperty('platform');
     expect(saved[1]).not.toHaveProperty('appVersion');

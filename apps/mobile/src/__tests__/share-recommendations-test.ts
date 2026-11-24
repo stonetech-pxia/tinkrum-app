@@ -24,7 +24,7 @@ describe('inbox recommendations', () => {
       usage(['x', 20, 1], ['y', 10, 1], ['z', 5, 1]),
       'zh',
     );
-    // 三个用过但个数不对的不算「用过的够了」：能运行的还要补上来，而且排在灰卡片前面。
+    // Used items with incorrect counts do not count as "enough used items": runnable ones must be added back and sorted before gray cards.
     const ids = result.recommended.map((r) => r.wf.id);
     expect(ids[0]).toBe('own');
     expect(result.recommended.filter((r) => r.fit.ok).length).toBeGreaterThan(0);
@@ -97,7 +97,7 @@ describe('inbox recommendations', () => {
       usage(['few', 1, 1], ['wrong', 10, 2]),
       'zh',
     ).all;
-    // 用过但个数不对的照样列出来（灰掉、说明原因），但先保证前面有 3 个能运行的。
+    // Used items with incorrect counts are still listed (grayed out with reasons explained), but ensure 3 runnable ones appear first.
     expect(used.slice(0, 3).every((x) => x.fit.ok)).toBe(true);
     expect(used[3]).toMatchObject({ wf: { id: 'few' }, fit: { reason: 'tooFew' } });
     expect(used.some((x) => x.wf.id === 'wrong')).toBe(false);
@@ -125,10 +125,10 @@ describe('inbox recommendations', () => {
       'sign-return',
       'combine-documents',
       'foreign-pdf',
-      // 不在 D-237 清单里、但接得上 PDF 的内设快捷操作跟在后面（D-270）。
+      // Built-in quick actions not in the D-237 list that can accept PDFs follow behind (D-270).
       'pdf-to-audio',
     ]);
-    // 自己做的没用过的仍排在内设的前面；用过的按次数排在最前。
+    // Custom unused items still rank ahead of built-in ones; used items are sorted by usage count at the very top.
     expect(
       shareRecommendations([wf('own'), wf('used')], infos, usage(['used', 1, 1]), 'zh')
         .recommended.slice(0, 3)

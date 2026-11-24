@@ -13,47 +13,50 @@ import { shortDate } from './schedule';
 import type { Collection, Condition, Grouping, Locale } from './schema';
 import { dateFieldOf } from './sequence';
 
-// 打卡格（D-610，创始人 2026-11-20 定）：一张表的记录排成「行 × 时间列」，每一格是这一行在这一天（周、月）的记录。
-// 行和看板、分段一样来自 source.group（单选的每个选项，或引用的那张表的每一条，listGroups）；列和图表一样是最近几段
-// （periodStarts，最后一列是今天所在的那一段，一周从哪天开始跟着 data.calendar）。
-// 纯逻辑：哪几列、哪几行、每格有哪几条、点一下做什么、在这一格新建时填什么。数字每次画的时候算，不存（底线 14），
-// 看、翻页什么都不写（底线 15）；写在用户点了以后由 App 做（record-actions.ts）。
+// Check-in grid (D-610, decided by founder 2026-11-20): table records arranged as rows × time
+// columns, each cell representing the record for that row on that day (week, month). Rows come from
+// source.group (each radio option, or each entry of referenced table, listGroups) just like kanban
+// and sections; columns are the recent segments like charts (periodStarts, last column is the
+// segment containing today, week start day follows data.calendar). Pure logic: which columns, which
+// rows, which entries per cell, action on tap, initial values when creating in a cell. Numbers
+// calculated on render, not stored (Invariant 14); viewing and paging write nothing (Invariant 15);
+// writes are performed by App after user tap (record-actions.ts).
 
-/** 一列：一天、一周或一个月。 */
+/** A column: a day, week, or month. */
 export interface GridColumn {
-  /** 开始那天（YYYY-MM-DD），也是列的键。 */
+  /** Start day (YYYY-MM-DD), also the column key. */
   key: string;
-  /** 开始和结束的天数（含）。 */
+  /** Start and end day counts (inclusive). */
   start: number;
   end: number;
-  /** 表头：一天是星期几（短），一周是开始那天，一个月是月份（短）。 */
+  /** Header label: day of week (short) for days, start date for weeks, month (short) for months. */
   label: string;
-  /** 表头第二行：一天的几号。 */
+  /** Second row of the table header: day number of the month. */
   detail?: string;
-  /** 完整的说法（读屏、打开格子时的标题）。 */
+  /** Full description (used for screen readers, title when opening a cell). */
   title: string;
-  /** 今天在这一列里。 */
+  /** Today falls within this column. */
   current: boolean;
-  /** 整列都在今天之后（不能点）。 */
+  /** The entire column is in the future (non-clickable). */
   future: boolean;
 }
 
-/** 一行：一个选项或被引用的一条。 */
+/** A single row: either an option or a referenced entry. */
 export interface GridRow {
   key: string;
   label: string;
-  /** 在这一行新建时分组字段写什么：选项 ID 或被引用那条的 ID。 */
+  /** Value for the grouping field when creating a new entry in this row: option ID or the ID of the referenced entry. */
   value: string;
-  /** 每一列的记录（和 columns 一一对应）。 */
+  /** Records for each column (corresponding 1:1 with columns). */
   cells: DataRecord[][];
-  /** show.format progress 的目标：固定数，或这一行（被引用的那条）的数字字段；没有时为 undefined。 */
+  /** Target for show.format progress: a fixed number, or a numeric field of this row (the referenced entry); undefined if none. */
   goal?: number;
 }
 
 export interface GridRead {
-  /** 分行的字段（source.group.by）。 */
+  /** Field used for row grouping (source.group.by). */
   by: string;
-  /** 分列的日期或日期时间字段（source.across.by，不写是第一个日期字段，没有就第一个日期时间字段）。 */
+  /** Date or datetime field used for column splitting (source.across.by; defaults to the first date field, falling back to the first datetime field). */
   date: string;
   columns: GridColumn[];
   rows: GridRow[];
@@ -69,8 +72,11 @@ function format(day: number, locale: Locale, options: Intl.DateTimeFormatOptions
 }
 
 /**
- * 最近几列（从早到晚），和图表的时间分组同一种算法：不写 last 是 7 天、8 周、6 个月，最多 31 列。page 往前翻几页
- * （一页 = last 列，0 是最近的一页）；只往前翻，所以最近一页的最后一列是今天所在的那一段，后面没有列。
+ * Recent columns (from earliest to latest), using the same algorithm as chart time grouping: if
+ * last is omitted, defaults to 7 days, 8 weeks, or 6 months, up to a maximum of 31 columns. page
+ * specifies how many pages to go back (one page = last columns, where 0 is the most recent page);
+ * navigation only goes backward, so the last column of the latest page is the interval containing
+ * today, with no subsequent columns.
  */
 export function gridColumns(
   across: GridAcross,
@@ -115,7 +121,7 @@ export function gridColumns(
   });
 }
 
-/** 表头上这一页的范围：第一列的第一天到最后一列的最后一天（不是今年的带年份）。 */
+/** Range of the current page on the table header: from the first day of the first column to the last day of the last column (without year if it is the current year). */
 export function gridRange(
   columns: readonly Pick<GridColumn, 'start' | 'end'>[],
   now: Date,
@@ -129,14 +135,18 @@ export function gridRange(
   });
 }
 
-/** 分列用的字段：source.across.by，不写是第一个日期字段，没有就第一个日期时间字段。 */
+/** Field used for column splitting: source.across.by; defaults to the first date field, falling back to the first datetime field. */
 export const gridDateField = (view: Collection, across: GridAcross): string =>
   across.by ?? dateFieldOf(view, undefined);
 
 /**
- * 打卡格读出来的样子。records 是这张表筛选过的记录（算好的）；linked 是按引用分行时被引用的表（已经按 group.filter 筛过）。
- * 行和分段一样：选项的顺序，或被引用的每条按创建时间从旧到新；showEmpty 时没有记录的行也列出。
- * 没有行值的、指向不在行里的那条的记录不显示（格子只有行 × 列）。分行字段不是单选或引用时为 undefined。
+ * Rendered appearance of a check-in cell. records contains filtered records for this table
+ * (pre-calculated); linked contains the referenced table grouped by reference (already filtered
+ * by group.filter). Rows behave like sections: ordered by option or by creation time (oldest to
+ * newest) for referenced items; when showEmpty is enabled, rows with no records are also listed.
+ * Records lacking row values or pointing to entries outside the rows are not displayed (cells
+ * consist strictly of rows × columns). Returns undefined if the row grouping field is neither a
+ * single-select nor a reference.
  */
 export function gridRead(
   records: readonly DataRecord[],
@@ -206,7 +216,7 @@ export function gridRead(
   };
 }
 
-/** 一格显示的数：有 show.trailing（数字类字段）时是它的合计，没有是几条。 */
+/** Value displayed in a cell: total sum when show.trailing is present (numeric fields), or the record count otherwise. */
 export function gridCellValue(
   cell: readonly DataRecord[],
   view: Collection,
@@ -217,8 +227,12 @@ export function gridCellValue(
 }
 
 /**
- * 点一格做什么（D-610）：今天以后的格子不能点；有 remove 时正好一条就把它移到「最近删除」（带撤销），两条以上列出
- * 这一格的记录（不一次删几条）；其余有 create 就在这一格加一条（没有 remove 时就是多记一次）；什么工具都没有时有记录就列出。
+ * Behavior when tapping a cell (D-610): cells in the future are not clickable; when remove is
+ * present and there is exactly one record, it is moved to "Recently Deleted" (with undo); if
+ * there are two or more records, the cell's records are listed (never deleting multiple records
+ * at once); otherwise, if create is present, a new record is added to this cell (equivalent to
+ * logging another entry when remove is absent); if no tools are available and records exist, they
+ * are listed.
  */
 export type GridTap = 'create' | 'remove' | 'open' | 'none';
 
@@ -237,9 +251,11 @@ export function gridTap(
 }
 
 /**
- * 在一格新建（values "$here"）时填什么：列表筛选里的等于条件（filterPresets），这一行的值，和这一列的日子。
- * 日期字段：今天所在的那一列是今天，别的列是它的第一天；日期时间字段：今天所在的那一列是现在，别的列是那一天中午 12 点
- * （一天从几点开始最晚是 6 点，中午总落在这一天里）。
+ * Values populated when creating a new record in a cell (values "$here"): equal conditions from
+ * list filtering (filterPresets), the row's value, and the column's date. Date field: today's
+ * column uses today, other columns use their first day; datetime field: today's column uses the
+ * current time, other columns use 12:00 PM on that day (days begin at a configured start hour, at
+ * latest 6 AM, so noon always falls within that day).
  */
 export function gridHereValues(
   view: Collection,

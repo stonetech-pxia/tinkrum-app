@@ -5,9 +5,12 @@ import { join } from 'path';
 import { PackBridge } from '../packs/bridge';
 import { PDFJS_POLYFILLS } from '../packs/pages/common';
 
-// 扩展包页面（隐藏的 WebView）挂在根视图上。iOS 全屏弹出（UIModalPresentationFullScreen）时会把底下的
-// 视图拿出窗口，WebView 不在窗口里，系统就把它的网页进程挂起：PDF 预览、整理页面、签名一直「装载」
-// （2026-10-31 iPhone 真机：页面里的计时器一次都没跑，pdf.js 画到一半停住）。安卓的弹窗是单独的窗口，不受影响。
+// Extension pack pages (hidden WebViews) are attached to the root view. On iOS, full-screen modal
+// presentations (UIModalPresentationFullScreen) remove the underlying view from the window
+// hierarchy, taking the WebView out of the window, which causes the system to suspend its web
+// process: PDF preview, organization pages, and signatures stay permanently "Loading" (2026-10-31
+// iPhone real device: timers in the page never ran once, pdf.js rendering halted halfway). Android
+// dialogs are separate windows and remain unaffected.
 
 const SRC = join(__dirname, '..');
 
@@ -19,8 +22,8 @@ function tsxFiles(dir: string): string[] {
   });
 }
 
-describe('iOS 上扩展包页面不被弹出的页面挡出窗口', () => {
-  it('不透明的 Modal 都用 overFullScreen（底下的视图留在窗口里）', () => {
+describe('Extension pack pages are not pushed out of the window by modal presentations on iOS', () => {
+  it('Opaque modals use overFullScreen (keeping underlying views in the window)', () => {
     const bad: string[] = [];
     for (const file of tsxFiles(SRC)) {
       const text = readFileSync(file, 'utf8');
@@ -35,7 +38,7 @@ describe('iOS 上扩展包页面不被弹出的页面挡出窗口', () => {
     expect(bad).toEqual([]);
   });
 
-  it('路由不用 fullScreenModal', () => {
+  it('Routes do not use fullScreenModal', () => {
     const bad = tsxFiles(SRC).filter((file) =>
       /presentation:\s*'fullScreenModal'/.test(readFileSync(file, 'utf8')),
     );
@@ -43,14 +46,14 @@ describe('iOS 上扩展包页面不被弹出的页面挡出窗口', () => {
   });
 });
 
-describe('网页进程被系统结束', () => {
+describe('Web process terminated by system', () => {
   const files = {
     packFile: async () => '',
     isInstalled: async () => true,
     runFile: async () => '',
   };
 
-  it('正在等的调用马上失败，下次调用重新打开页面', async () => {
+  it('Pending calls fail immediately, next call re-opens the page', async () => {
     const bridge = new PackBridge(files);
     const posted: string[] = [];
     bridge.attach('pdfview', { postMessage: (m) => posted.push(m) });
@@ -61,7 +64,7 @@ describe('网页进程被系统结束', () => {
     expect(posted).toHaveLength(1);
     bridge.processGone('pdfview');
     await expect(call).rejects.toThrow('page stopped');
-    // 页面卸下，等下次调用再挂上（重新加载）。
+    // Page unmounted, re-attached (reloaded) on next invocation.
     expect(bridge.activePages()).toEqual([]);
 
     const again = bridge.call('pdfview', 'ping', {});
@@ -76,16 +79,18 @@ describe('网页进程被系统结束', () => {
   });
 });
 
-describe('扩展包页面所在的视图重新渲染', () => {
+describe('View containing the extension pack page re-renders', () => {
   const files = {
     packFile: async () => '',
     isInstalled: async () => true,
     runFile: async () => '',
   };
 
-  // React 每次重新渲染（例如运行页面关闭时 close 了别的页面）都会先用 null、再用同一个 WebView 调一次 ref。
-  // 页面还在用时不算掉线：下一次调用直接发，不能再等一个不会再来的 ready（真机上 PDF 预览一直转圈、30 秒后失败）。
-  it('同一个 WebView 先 null 再挂上，页面仍是就绪的', async () => {
+  // Re-rendering the same WebView with null and then re-attaching keeps the page ready: Being in
+  // use prevents disconnection; the next invocation sends directly without awaiting a ready state
+  // that will never arrive again (on real devices, PDF preview kept spinning and failed after 30
+  // seconds).
+  it('Re-attaching the same WebView after null leaves the page ready', async () => {
     const bridge = new PackBridge(files);
     const posted: string[] = [];
     const webview = { postMessage: (m: string) => posted.push(m) };
@@ -108,7 +113,7 @@ describe('扩展包页面所在的视图重新渲染', () => {
     await expect(second).rejects.toThrow('page stopped');
   });
 
-  it('页面真的卸下（不再在用）之后，下次调用要重新等 ready', async () => {
+  it('After page is truly unmounted (no longer in use), next call must re-await ready', async () => {
     const bridge = new PackBridge(files);
     const posted: string[] = [];
     const webview = { postMessage: (m: string) => posted.push(m) };
@@ -133,10 +138,11 @@ describe('扩展包页面所在的视图重新渲染', () => {
   });
 });
 
-describe('pdf.js 读文字在 iOS WebView 上', () => {
-  // iOS 的 WebView 里 ReadableStream 不能 for await 遍历，pdf.js 的 getTextContent 报
-  // 「undefined is not a function (near '...t of e...')」（2026-10-31 iPhone 真机）。
-  it('补丁让 ReadableStream 可以 for await 遍历', async () => {
+describe('pdf.js text reading on iOS WebView', () => {
+  // Patch enables ReadableStream for..await iteration: ReadableStreams cannot be for..await
+  // iterated in iOS WebViews, causing pdf.js getTextContent to throw "undefined is not a function
+  // (near '...t of e...')" (2026-10-31 iPhone real device).
+  it('Patch enables ReadableStream for..await iteration', async () => {
     const proto = ReadableStream.prototype as unknown as Record<symbol, unknown>;
     const original = proto[Symbol.asyncIterator];
     delete proto[Symbol.asyncIterator];

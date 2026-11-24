@@ -4,8 +4,10 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { openPicker, put } from '../test-utils/pick-fixtures';
 
-// 勾选新建（D-616）一次最多勾 MAX_CREATE_ALL 条（200，D-567）。在测试里把上限换成 3，看勾满以后别的勾不上、
-// 说一句上限；取消一个又能勾。上限本身是 200 由 core 的 invariants.test.ts 守着。
+// Check-to-create (D-616) allows checking at most MAX_CREATE_ALL items (200, D-567) at a time. In
+// tests, limit is changed to 3 to verify that after reaching the limit, other items cannot be
+// checked and an upper limit message is shown; unchecking one allows checking again. The limit of
+// 200 itself is guarded by core's invariants.test.ts.
 jest.mock('@morph/core', () => ({ ...jest.requireActual('@morph/core'), MAX_CREATE_ALL: 3 }));
 
 it('stops at the cap: the other rows can’t be checked and the hint says so', async () => {

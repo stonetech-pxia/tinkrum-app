@@ -2,32 +2,34 @@ import { strToU8, zipSync, type Zippable } from 'fflate';
 
 import type { Box, CellAlign, TableBlock, TableCell, TableDoc, TablePage } from './types';
 
-// 写 xlsx（D-272）：自己写 XML，用 fflate 的同步 API 打包（Hermes 没有 Worker，也没有 Node 的 stream）。
-// 每页一张工作表；字符串放 sharedStrings（Numbers 和 WPS 对它的支持比 inlineStr 稳）；
-// 样式按需要生成：表格格（细边框、自动换行、靠上）、表外的文字（自动换行、无边框）、数字（表格格加数字格式），
-// 再按对齐（左、居中、右；没有时是「常规」）分开。
+// Write xlsx (D-272): write XML manually, packaged using fflate's synchronous API (Hermes lacks Web
+// Workers and Node streams). One worksheet per page; strings placed in sharedStrings (Numbers and
+// WPS support it more reliably than inlineStr); generate styles on demand: table cells (thin
+// borders, wrap text, top alignment), non-table text (wrap text, no borders), numbers (table cells
+// with number formats), separated further by alignment (left, center, right; defaults to general
+// when unspecified).
 
 const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const PKG_REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
 const HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 
-/** 一格最多 32767 个字符（Excel 的上限）。 */
+/** Maximum of 32,767 characters per cell (Excel's upper limit). */
 const MAX_CELL_CHARS = 32767;
-/** 原图的整页宽度大约等于这么多个字符宽（Excel 的列宽单位）。 */
+/** Total page width of the original image is approximately equivalent to this many character widths (Excel column width unit). */
 const PAGE_CHARS = 110;
-/** 一行字的高度（磅，11 号字）。 */
+/** Height of a line of text in points (11 pt font). */
 export const LINE_POINTS = 15;
-/** Excel 的行高上限（磅）；超过时它会说文件坏了。 */
+/** Excel's upper limit for row height in points; exceeding this causes corruption errors when opening the file. */
 const MAX_ROW_POINTS = 409;
-/** 没写字号的格子（老文件、编辑页加的）用的字号：xlsx 默认字体是 11 磅 Calibri。 */
+/** Font size used for cells without a specified font size (legacy files, added in editor view): xlsx default font is 11 pt Calibri. */
 export const DEFAULT_FONT_SIZE = 11;
-/** 一个字符宽（Excel 列宽的单位）大约这么多像素（Calibri 11 的数字宽）。 */
+/** Width of a single character in Excel column width units is approximately this many pixels (digit width for Calibri 11). */
 const CHAR_PIXELS = 7;
 const EMU_PER_PIXEL = 9525;
 const EMU_PER_POINT = 12700;
 
-/** XML 里不允许的字符（控制字符、FFFE / FFFF、落单的代理项）去掉，换行统一成 \n。 */
+/** Remove characters not allowed in XML (control characters, FFFE/FFFF, lone surrogates), and normalize newlines to \\n. */
 export function cleanXmlText(text: string): string {
   const s = text.replace(/\r\n?/g, '\n');
   let out = '';
@@ -55,7 +57,7 @@ export const escapeXml = (text: string) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
-/** 列号（从 0 开始）→ 列字母：0 → A，25 → Z，26 → AA。 */
+/** Column index (0-based) -> column letters: 0 -> A, 25 -> Z, 26 -> AA. */
 export function columnName(index: number): string {
   let n = index + 1;
   let out = '';
@@ -70,8 +72,9 @@ export function columnName(index: number): string {
 const ref = (row: number, col: number) => `${columnName(col)}${row + 1}`;
 
 /**
- * 工作表名：去掉 Excel 不允许的 []:*?/\ 和控制字符，首尾的单引号也去掉，最长 31 个字符；
- * 空了用 Sheet N，和前面的重名（不分大小写）时加「 (2)」。
+ * Worksheet name: strip characters disallowed by Excel ([]:*?/\\) and control characters, trim
+ * leading and trailing single quotes, maximum 31 characters; defaults to Sheet N if empty,
+ * appending " (2)" if it conflicts with a preceding name (case-insensitive).
  */
 export function sheetName(name: string, index: number, taken: ReadonlySet<string>): string {
   let base = cleanXmlText(name)
@@ -90,8 +93,10 @@ export function sheetName(name: string, index: number, taken: ReadonlySet<string
 }
 
 /**
- * 纯数字写成数字类型（Excel 里能直接求和）：1234、1,234.56、-5、12%。
- * 以 0 开头的（电话、编号）、超过 15 位的、日期和别的都按文字写。format 是 Excel 的数字格式（保留千分位、小数位、百分号）。
+ * Pure numbers are written as numeric types (enabling direct summation in Excel): 1234, 1,234.56,
+ * -5, 12%. Numbers starting with 0 (phone numbers, IDs), exceeding 15 digits, dates, and others
+ * are written as text. format is the Excel number format (retaining thousands separators, decimal
+ * places, percentages).
  */
 export function cellNumber(text: string): { value: number; format: string } | null {
   const m = /^([-−])?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?(%)?$/.exec(text.trim());
@@ -110,7 +115,7 @@ export function cellNumber(text: string): { value: number; format: string } | nu
   return { value, format };
 }
 
-/** Excel 自带的数字格式编号；别的自己定义（164 起）。 */
+/** Excel's built-in number format IDs; others are custom-defined (starting from 164). */
 const BUILT_IN_FORMATS: Record<string, number> = {
   General: 0,
   '0': 1,
@@ -119,7 +124,7 @@ const BUILT_IN_FORMATS: Record<string, number> = {
   '#,##0.00': 4,
   '0%': 9,
   '0.00%': 10,
-  // 日期、时间（外来的 xlsx 读进来的，D-509）：写回自带的编号，Excel 按手机、电脑的地区显示短日期。
+  // Dates and times (read from external xlsx, D-509): write back using built-in IDs so Excel displays short dates according to the mobile or desktop locale.
   'mm-dd-yy': 14,
   'd-mmm-yy': 15,
   'd-mmm': 16,
@@ -134,7 +139,7 @@ const BUILT_IN_FORMATS: Record<string, number> = {
   'mmss.0': 47,
 };
 
-/** 估一段文字在 width 个字符宽的格子里占几行（中日韩文字算两个字符宽）。编辑页也用它估行高。 */
+/** Estimate how many lines a text snippet occupies in a cell of width characters (CJK characters count as two character widths). Also used by the editor view to estimate row heights. */
 export function lineCount(text: string, width: number): number {
   const avail = Math.max(1, width - 1);
   let lines = 0;
@@ -148,18 +153,18 @@ export function lineCount(text: string, width: number): number {
 }
 
 interface StyleKey {
-  /** 表格格：细边框；表外的文字没有边框。 */
+  /** Table cell: thin borders; non-table text has no borders. */
   border: boolean;
-  /** 数字格式；文字没有（文字自动换行，数字不换）。 */
+  /** Number format; text has none (text wraps automatically, numbers do not). */
   format?: string;
   align?: CellAlign;
-  /** 字号（磅）和粗体（D-521）；11 磅不加粗是默认字体。 */
+  /** Font size in points and bold status (D-521); 11 pt non-bold is the default font. */
   size?: number;
   bold?: boolean;
 }
 
 interface Styles {
-  /** 样式编号（cellXfs 里的下标）；0 是默认样式。 */
+  /** Style ID (index in cellXfs); 0 is the default style. */
   style(key: StyleKey): number;
   xml(): string;
 }
@@ -262,7 +267,7 @@ function createSharedStrings(): SharedStrings {
   };
 }
 
-/** 这一页要写出的块：识别范围是「仅表格内容」时不写表外的文字，但这一页一张表都没有时照样写（D-272）。 */
+/** Blocks to write out for this page: when recognition scope is "table content only", non-table text is omitted, but written anyway if the page contains zero tables (D-272). */
 export function pageBlocks(page: TablePage, scope: TableDoc['scope']) {
   const hasTable = page.blocks.some((b) => b.kind === 'table');
   return scope === 'tables' && hasTable
@@ -270,20 +275,20 @@ export function pageBlocks(page: TablePage, scope: TableDoc['scope']) {
     : page.blocks;
 }
 
-/** 识别范围是「仅表格内容」、但没有找到表格的页（从 1 开始）。 */
+/** Pages (1-indexed) where the recognition scope is "table content only" but no tables were found. */
 export function pagesWithoutTables(doc: TableDoc): number[] {
   if (doc.scope !== 'tables') return [];
   return doc.pages.flatMap((p, i) => (p.blocks.some((b) => b.kind === 'table') ? [] : [i + 1]));
 }
 
-/** 一张工作表的列宽（字符）：整页共用的列（D-272），原图像素按页宽换算。 */
+/** Column widths (characters) for a worksheet: shared columns across the entire page (D-272), converted from original image pixels based on page width. */
 export function sheetColumns(page: TablePage): number[] {
   const toChars = (px: number) =>
     Math.round(Math.min(120, Math.max(4, (px / Math.max(1, page.width)) * PAGE_CHARS)) * 10) / 10;
   return page.colWidths.map(toChars);
 }
 
-/** 工作表上的一格（合并格子只有左上角）：表格里的格子记着是哪张表的第几格，表外的文字、图片记着是第几块。 */
+/** A cell on the worksheet (merged cells only have it on the top-left): table cells record which table and cell index they correspond to, while non-table text and images record their block index. */
 export interface SheetCell {
   row: number;
   col: number;
@@ -291,42 +296,44 @@ export interface SheetCell {
   colSpan: number;
   text: string;
   align?: CellAlign;
-  /** 在 page.blocks 里的下标。 */
+  /** Index in page.blocks. */
   block: number;
-  /** 表格格子在 table.cells 里的下标；表外的文字、图片没有。 */
+  /** Index of the table cell in table.cells; non-table text and images do not have this. */
   cell?: number;
-  /** 表格格子在它那张表里是第几行（并排的两张表共用工作表的行，rows[].tableRow 只记第一张）。 */
+  /** Row index of the table cell within its table (side-by-side tables share worksheet rows, rows[].tableRow records only the first table). */
   tableRow?: number;
   write?: TableCell['write'];
-  /** 字号（磅）和粗体（D-521）；没有时是 11 磅。 */
+  /** Font size in points and bold status (D-521); defaults to 11 pt when absent. */
   size?: number;
   bold?: boolean;
-  /** 这一格是一张图片（D-520）：src 是图片的地址（还没剪出来时没有）；width、height 是它在工作表上的大小（磅）；text 是空的。 */
+  /** This cell represents an image (D-520): src is the image URL (absent before cropping); width and height are its dimensions on the worksheet in points; text is empty. */
   image?: { src?: string; width: number; height: number };
 }
 
-/** 一页排到工作表上的样子：编辑页照着它画，写 xlsx 也照着它写，两边一样。 */
+/** How a page is laid out on a worksheet: the edit page renders according to it, and writing xlsx also follows it, so both sides match. */
 export interface SheetLayout {
-  /** 列宽（Excel 的字符宽）。 */
+  /** Column width (Excel character width). */
   colWidths: number[];
   /**
-   * 每一行：估的行数（按这一行里字最多的格子算）、行高（磅，按字号）、属于哪一块（空行是 null；
-   * 并排的几块共用的行记第一块）、是那张表的第几行。
+   * Each row: estimated line count (calculated from the cell with the most characters in this
+   * row), row height (points, based on font size), which block it belongs to (blank rows are
+   * null; rows shared by side-by-side blocks are attributed to the first block), and the row
+   * index in that table.
    */
   rows: { lines: number; points: number; block: number | null; tableRow?: number }[];
   cells: SheetCell[];
 }
 
-/** 一行字的行高（磅）：和 11 磅配 15 磅的比例一样。 */
+/** Line height for a line of text (points): matches the ratio of 11 pt to 15 pt. */
 const linePoints = (size: number) =>
   Math.round(((size * LINE_POINTS) / DEFAULT_FONT_SIZE) * 10) / 10;
 
-/** 估一段文字在 width 个字符宽的格子里占几行；字号小于 11 磅时一行放得下更多的字。 */
+/** Estimate how many lines a piece of text occupies in a cell of width characters; when font size is less than 11 pt, more characters fit in a single line. */
 export function lineCountAt(text: string, width: number, size = DEFAULT_FONT_SIZE): number {
   return lineCount(text, (width * DEFAULT_FONT_SIZE) / size);
 }
 
-/** 一张图片在工作表上的大小（磅）：宽是它占的几列的宽，高按原图里框的长宽比。 */
+/** Size of an image on the worksheet (points): width is the width of the columns it spans, and height follows the aspect ratio of the original image box. */
 export function imageSizePoints(colWidths: readonly number[], col: number, cols: number, box: Box) {
   let chars = 0;
   for (let c = col; c < col + cols; c++) chars += colWidths[c] ?? 8;
@@ -335,10 +342,15 @@ export function imageSizePoints(colWidths: readonly number[], col: number, cols:
 }
 
 /**
- * 一页排成工作表：块按顺序往下排，块和块之间空隙超过 1.5 倍行高时空一行（大致保留原来的间距）；
- * 整页一套列（D-272），表格从它的第一列（TableBlock.col）开始；表外的文字每段一行，没有列范围时从第一列合并到最后一列。
- * 同一个 band（D-522）的块从同一行起：左栏、右栏、旁边的图片各排各的列，每一栏的块在栏里从上往下排，
- * 一带排完以后下一块从最长的一栏的下面开始。图片（D-520）占的行数按它的大小排，字号（D-521）定行高。
+ * Layout a page as a worksheet: blocks are laid out downwards in order; if the gap between blocks
+ * exceeds 1.5 times the line height, leave a blank line (roughly preserving original spacing); a
+ * single set of columns per page (D-272), with tables starting from their first column
+ * (TableBlock.col); text outside tables has one paragraph per line, spanning from the first
+ * column to the last column when there is no column range. Blocks in the same band (D-522) start
+ * from the same row: left column, right column, and adjacent images are laid out in their
+ * respective columns, blocks within each column are laid out top-down, and after a band finishes,
+ * the next block starts below the longest column. Images (D-520) occupy rows according to their
+ * size, and font size (D-521) determines row height.
  */
 export function layoutSheet(page: TablePage, scope: TableDoc['scope']): SheetLayout {
   const blocks = pageBlocks(page, scope);
@@ -350,14 +362,14 @@ export function layoutSheet(page: TablePage, scope: TableDoc['scope']): SheetLay
     while (rows.length <= row) rows.push({ lines: 1, points: LINE_POINTS, block: null });
     if (block !== null && rows[row]!.block === null) rows[row]!.block = block;
   };
-  /** 一行的高度只增不减。 */
+  /** Row height only increases and never decreases. */
   const grow = (row: number, lines: number, points: number) => {
     const r = rows[row]!;
     r.lines = Math.max(r.lines, lines);
     r.points = Math.max(r.points, points);
   };
   let prevBottom: number | null = null;
-  // 一带：从哪一行起、每一列下一个空行、每一列上一块的下边（原图像素）。
+  // Band: starting row, next blank row for each column, bottom edge of the previous block in each column (original image pixels).
   interface Band {
     id: number;
     start: number;
@@ -376,7 +388,7 @@ export function layoutSheet(page: TablePage, scope: TableDoc['scope']): SheetLay
     const bandId = block.band;
     let start: number;
     if (bandId !== undefined && band?.id === bandId) {
-      // 同一带里的块：在自己这一栏里接着上一块往下排，栏里的段落之间空隙大时空一行。
+      // Blocks in the same band: laid out downwards following the previous block within their own column, leaving a blank line if the gap between paragraphs in the column is large.
       start = Math.max(...band.next.slice(col0, col0 + cols));
       const above = Math.max(...band.bottom.slice(col0, col0 + cols).map((b) => b ?? -Infinity));
       if (start > band.start && block.box.y - above > 1.5 * page.lineHeight) start++;
@@ -403,8 +415,9 @@ export function layoutSheet(page: TablePage, scope: TableDoc['scope']): SheetLay
       for (let c = col0; c < col0 + cols; c++) width += colWidths[c] ?? 8;
       const size = block.size ?? bodySize;
       const lines = lineCountAt(text, width, size);
-      // 并排的一带里的文字（旁边是表、图片、别的栏）不撑高行，不然旁边那张表的行被撑得很高：
-      // 往下合并几行，高度够放下它的字。
+      // Text in a side-by-side band (alongside tables, images, or other columns) does not stretch
+      // row height, otherwise the row of the adjacent table would be stretched too tall: merge
+      // several rows downwards so the height is sufficient to hold its text.
       if (bandId !== undefined) {
         used = Math.max(1, Math.ceil((lines * linePoints(size)) / LINE_POINTS - 1e-6));
         ensure(start + used - 1, index);
@@ -472,18 +485,18 @@ export function layoutSheet(page: TablePage, scope: TableDoc['scope']): SheetLay
   return { colWidths, rows, cells };
 }
 
-/** 写进 xlsx 的图片：JPG（或 PNG）字节和像素大小（和 docx 里的 DocxImage 一样）。 */
+/** Image written into xlsx: JPG (or PNG) bytes and pixel dimensions (same as DocxImage in docx). */
 export interface XlsxImage {
   bytes: Uint8Array;
   width: number;
   height: number;
 }
 
-/** 图片文件的格式（看开头的字节）：PNG；别的按 JPG。 */
+/** Image file format (checked via magic bytes): PNG; others default to JPG. */
 const imageType = (bytes: Uint8Array): 'png' | 'jpg' =>
   bytes[0] === 0x89 && bytes[1] === 0x50 ? 'png' : 'jpg';
 
-/** 一张工作表里要放的图片：左上角在哪一格、大小（磅）、是整个文件里的第几张图片文件。 */
+/** Image to be placed on a worksheet: top-left cell location, size (points), and index of the image file in the entire file. */
 interface SheetPicture {
   row: number;
   col: number;
@@ -506,7 +519,7 @@ function sheetXml(
   const pictures: SheetPicture[] = [];
   for (const cell of layout.cells) {
     if (cell.image) {
-      // 图片锚在它左上角那一格；没有剪出来、读不到的图片不写。
+      // Images are anchored to their top-left cell; uncropped or unreadable images are omitted.
       const image = cell.image.src ? images.get(cell.image.src) : undefined;
       if (image) {
         let at = media.indexOf(image.bytes);
@@ -522,7 +535,7 @@ function sheetXml(
       continue;
     }
     const table = cell.cell !== undefined;
-    // 外来的 xlsx 读进来的表（D-509）不画边框。
+    // Tables imported from external xlsx (D-509) do not draw borders.
     const plain = table && (page.blocks[cell.block] as TableBlock).borderless === true;
     const at = ref(cell.row, cell.col);
     const number =
@@ -550,7 +563,7 @@ function sheetXml(
     if (cell.rowSpan > 1 || cell.colSpan > 1) {
       merges.push(`${at}:${ref(cell.row + cell.rowSpan - 1, cell.col + cell.colSpan - 1)}`);
     }
-    // 合并区域盖住的表格格子也要写（带边框样式），否则合并后的格子只有左上角有边框。
+    // Table cells covered by merged regions must also be written (with border styles), otherwise merged cells will only have borders on their top-left cell.
     if (!table) continue;
     for (let dr = 0; dr < cell.rowSpan; dr++) {
       for (let dc = 0; dc < cell.colSpan; dc++) {
@@ -588,7 +601,7 @@ function sheetXml(
   return { xml, pictures };
 }
 
-/** 一张工作表的图片放置（drawing 部分）：每张图锚在左上角那一格，大小按磅；rId 对应 drawing 的关系文件。 */
+/** Image placement for a worksheet (drawing section): each image is anchored to its top-left cell, with size in points; rId corresponds to the drawing relationship file. */
 function drawingXml(pictures: readonly SheetPicture[]): string {
   const anchors = pictures
     .map((p, i) => {
@@ -615,7 +628,8 @@ function drawingXml(pictures: readonly SheetPicture[]): string {
 }
 
 /**
- * TableDoc → xlsx 文件的字节。images 按图片块的 src 给剪好的图片字节（D-520）；没有的图片块跳过。
+ * TableDoc bytes for xlsx file. images provides pre-cropped image bytes per image block src
+ * (D-520); missing image blocks are skipped.
  */
 export function writeXlsx(
   doc: TableDoc,
@@ -629,7 +643,7 @@ export function writeXlsx(
     taken.add(name.toLowerCase());
     return name;
   });
-  // 至少要有一张工作表。
+  // There must be at least one worksheet.
   const pages = doc.pages.length
     ? doc.pages
     : [
@@ -648,7 +662,7 @@ export function writeXlsx(
   const built = pages.map((p) => sheetXml(p, doc.scope, styles, strings, images, media));
   const sheets = built.map((b) => b.xml);
   const n = sheets.length;
-  // 有图片的工作表：sheetN.xml 的关系文件指向 drawingM.xml，它再指向 media 里的图片。
+  // Worksheets with images: the relationship file for sheetN.xml points to drawingM.xml, which in turn points to the image in media.
   const drawn = built.flatMap((b, i) => (b.pictures.length ? [{ sheet: i + 1, ...b }] : []));
   const mediaExt = media.map(imageType);
   const files: Zippable = {
@@ -743,11 +757,11 @@ export function writeXlsx(
   return zipSync(files, { level: 6 });
 }
 
-/** 记录导出的一格（core 的 recordsToSheet 给的，D-427）。 */
+/** Exported record cell value (provided by core's recordsToSheet, D-427). */
 export type RowValue =
   { kind: 'text'; text: string } | { kind: 'number'; value: number; format: string; text: string };
 
-/** 列宽（字符）：够最长的内容，不窄于 8、不宽于 40。 */
+/** Column widths (characters): sufficient for the longest content, not narrower than 8 and not wider than 40. */
 function rowColumns(rows: readonly (readonly RowValue[])[]): number[] {
   const cols = Math.max(1, ...rows.map((r) => r.length));
   return Array.from({ length: cols }, (_, c) => {
@@ -756,7 +770,7 @@ function rowColumns(rows: readonly (readonly RowValue[])[]): number[] {
       const text = row[c]?.text;
       if (!text) continue;
       for (const line of text.split('\n')) {
-        // lineCount 在宽 2 的格子里每个单位一行：等于这段文字的字符宽。
+        // lineCount places each unit on a line in a cell of width 2: equals the character width of this text.
         width = Math.max(width, lineCount(line, 2) + 2);
         if (width >= 40) return 40;
       }
@@ -766,8 +780,9 @@ function rowColumns(rows: readonly (readonly RowValue[])[]): number[] {
 }
 
 /**
- * 一张工作表的 xlsx（记录导出，D-427）：每一格写成什么由调用方定，不猜。
- * 文字一律是共享字符串（t="s"），文件里没有公式：OCR 出来的「=SUM(A1)」「+33 1…」打开还是文字。
+ * xlsx for a single worksheet (record export, D-427): cell formatting is determined by the
+ * caller, not guessed. Text is always shared strings (t="s"), and files contain no formulas: OCR
+ * output like "=SUM(A1)" or "+33 1..." remains text when opened.
  */
 export function writeRowsXlsx(name: string, rows: readonly (readonly RowValue[])[]): Uint8Array {
   const widths = rowColumns(rows);
@@ -791,7 +806,7 @@ export function writeRowsXlsx(name: string, rows: readonly (readonly RowValue[])
       {
         name,
         source: '',
-        // 宽度 = 字符数：sheetColumns 按 宽 / 页宽 × 110 换算。
+        // Width = number of characters: sheetColumns converts using width / page width × 110.
         width: PAGE_CHARS,
         height: rows.length,
         lineHeight: 1,

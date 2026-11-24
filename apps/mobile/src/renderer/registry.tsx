@@ -66,16 +66,17 @@ import { ToolGrid } from './ToolGrid';
 import { Button, Card, IconTile, ListRow } from './ui';
 import { WorkflowRunner } from './WorkflowRunner';
 
-// 白名单渲染器（§5.2、§7A）：配置中的每种组件类型对应这里的一个真实组件。
-// 配置只提供数据，不包含任何可执行内容。组件的结构定义在 core 的 components/，新增组件见 docs/COMPONENTS.md。
+// Whitelist renderer (§5.2, §7A): Each component type in the config corresponds to a real component
+// here. The config only provides data and contains no executable content. Component structures are
+// defined in core's components/; for adding new components, see docs/COMPONENTS.md.
 
-/** 画一个组件。按函数调用（不是 React 组件），所以不能用 hook；要用 hook 的放进自己的组件里。 */
+/** Render a component. Called as a function (not a React component), so hooks cannot be used; put logic needing hooks into your own component. */
 export type Renderer<T extends ComponentType> = (
   component: ComponentOf<T>,
   env: RenderEnv,
 ) => ReactNode;
 
-/** 打开按钮、快捷入口的目标。草稿里（D-190）快捷操作打不开：打开后就能运行，草稿能看不能用。 */
+/** Target for open buttons and quick action entries. Quick actions cannot be executed inside a draft (D-190): they can be run after opening, whereas a draft can be viewed but not used. */
 const open = (env: RenderEnv, target: OpenTarget) =>
   env.locked && toolTargetId(target) !== null ? env.locked() : env.navigate(target);
 
@@ -124,14 +125,14 @@ export const RENDERERS: { [T in ComponentType]: Renderer<T> } = {
       align={alignOf(c)}
     />
   ),
-  // 入口（v34 合并 shortcut、catalogLink、toolCard、fileSlot）：按 opens 分。
+  // Entry point (v34 merged shortcut, catalogLink, toolCard, and fileSlot): categorized by opens.
   entry: (c, env) => {
     const kind = entryKind(c);
     if (kind === 'file') return <FileSlot component={c} env={env} />;
     const packageId = packageTargetId(c.opens);
     if (packageId !== null)
       return <ToolCard toolId={packageId} look={c.show?.shape} style={c.style} env={env} />;
-    // 打开 app 的入口（D-485）：名字、图标没写就按 app 现取。
+    // App opening entry point (D-485): if name or icon is omitted, derive them dynamically from the app.
     const appId = appTargetId(c.opens);
     const app = appId !== null ? env.config.nav.apps?.find((a) => a.id === appId) : undefined;
     const show = {
@@ -180,7 +181,7 @@ export const RENDERERS: { [T in ComponentType]: Renderer<T> } = {
         style={c.style?.align === 'center' ? styles.centerSelf : undefined}
       />
     ) : c.show.variant === 'row' ? (
-      // 一整行（D-483）：和设置页的按钮一样，图标块、名字、右边箭头。
+      // A full row (D-483): like settings page buttons, consisting of an icon block, name, and right arrow.
       <ListRow
         palette={env.palette}
         icon={c.show.icon}
@@ -251,7 +252,7 @@ export const RENDERERS: { [T in ComponentType]: Renderer<T> } = {
   ),
   spacer: (c) => <View style={{ height: { small: 4, medium: 16, large: 32 }[c.show.size] }} />,
   group: (c, env) => <Group component={c} env={env} />,
-  // 月历（D-305）只读一个月的记录，大圆块（D-311）和看板（D-313）画法不同，都是单独的组件。
+  // Calendar (D-305) reads records for only one month; large blocks (D-311) and boards (D-313) have different rendering logic and are separate components.
   list: (c, env) => <ToolList block={c} env={env} />,
   cards: (c, env) => <ToolList block={c} env={env} />,
   checklist: (c, env) => <ToolList block={c} env={env} />,
@@ -261,7 +262,7 @@ export const RENDERERS: { [T in ComponentType]: Renderer<T> } = {
     <MonthCalendar block={c} env={env} tone={c.style?.tone} componentId={c.id} />
   ),
   tiles: (c, env) => <Tiles block={c} env={env} tone={c.style?.tone} />,
-  // 打卡格（D-610）：行 × 时间列，点格子加一条或删掉唯一的那一条。
+  // Check-in grid (D-610): rows × time columns, tap a cell to add a record or delete the unique existing record.
   grid: (c, env) => <Grid block={c} env={env} tone={c.style?.tone} />,
   board: (c, env) => <Board block={c} env={env} tone={c.style?.tone} />,
   form: (c, env) => <RecordForm block={c} env={env} tone={c.style?.tone} />,
@@ -294,16 +295,17 @@ export const RENDERERS: { [T in ComponentType]: Renderer<T> } = {
   choices: (c, env) => <ChoiceBar block={c} env={env} />,
 };
 
-/** 打开相册还是打开文件（picker 的 tools[0]）。 */
+/** Whether to open the photo library or files (picker's tools[0]). */
 const pickToolOf = (c: ComponentOf<'picker'>) => {
   const use = c.tools[0];
   return use && isToolRefUse(use) ? use.tool : undefined;
 };
 
 /**
- * 直接放在页面背景上的块（D-409）；其余的块内容都在卡片上，用卡片配色画。
- * 块里还有压在页面上的标题的（列表分段、月历当天、工具格标题），自己用 onPage 换回来。
- * library 是系统页面（WorkflowsScreen）的内容，和系统页面用同一份配色。
+ * Blocks placed directly on the page background (D-409); all other block contents reside inside
+ * cards, rendered with card color schemes. For blocks that also have page-overlay titles (list
+ * sections, calendar current day, tool grid titles), use onPage to switch back. library is the
+ * content of the system page (WorkflowsScreen) and shares the same color scheme as system pages.
  */
 const PAGE_LOOKS: ReadonlySet<ComponentType> = new Set<ComponentType>([
   'header',
@@ -318,7 +320,7 @@ const PAGE_LOOKS: ReadonlySet<ComponentType> = new Set<ComponentType>([
   'dial',
 ]);
 
-/** 列表、卡片、清单：列表上方的工具（D-428）在 ListTools 里，这样 data.tsx 不依赖运行（记录表单也用 data.tsx）。 */
+/** List, card, checklist: tools above the list (D-428) are in ListTools so data.tsx does not depend on runtime (record forms also use data.tsx). */
 function ToolList({ block, env }: { block: RecordBlock; env: RenderEnv }) {
   const tools = block.tools?.filter((u) => u.as === 'list') ?? [];
   return (
@@ -352,7 +354,7 @@ export function ComponentView({ component, env }: { component: Component; env: R
   );
 }
 
-/** 组件上的文字（标题、按钮文字等）是内置文字时跟着界面语言显示，用户写的不换；只在显示时换，不写配置。 */
+/** When texts on components (titles, button text, etc.) are built-in texts, they follow the interface language; user-written texts are not replaced. Translation happens only at display time and is not written to the config. */
 function withBuiltinTexts<C extends Component>(component: C, env: RenderEnv): C {
   const show = (component as { show?: Record<string, unknown> }).show;
   if (!show) return component;
@@ -366,10 +368,12 @@ function withBuiltinTexts<C extends Component>(component: C, env: RenderEnv): C 
   return changed ? { ...component, show: next } : component;
 }
 
-/** 更新的 App 加的组件（D-254）：配置里原样保留，这里只说明要更新 App 才能显示。 */
+/** Components added in newer app versions (D-254): preserved as-is in the config, with a note here indicating that the app must be updated to display them. */
 /**
- * 提示卡（D-580）：和「提示」同样的卡片和字样，文字里的 {count}、{sum:字段} 按本机的记录算（不存），
- * 卡片里最多两个按钮：一个做一键记录，一个打开页面。还没算完时不画，不会闪一下。
+ * Callout card (D-580): uses the same card style and text as "Tip", evaluating placeholders like
+ * {count} and {sum:field} in text based on local records (not stored). Contains at most two
+ * buttons: one for one-tap logging, one for opening a page. Not rendered until calculation is
+ * complete, avoiding flashes.
  */
 function CalloutCard({ c, env }: { c: ComponentOf<'callout'>; env: RenderEnv }) {
   const palette = onPicture(env.palette, c.style?.backdrop);
@@ -466,7 +470,7 @@ function Group({ component, env }: { component: ComponentOf<'group'>; env: Rende
   const { palette } = env;
   const children = component.children.filter((c) => !c.hidden);
   const { layout, title, fold } = component.show;
-  // 可以收起（D-578）：一开始收着还是开着由配置定，之后点标题来回；状态只在画着的时候有，不存（底线 15）。
+  // Collapsible (D-578): whether it starts collapsed or expanded is determined by the config, and subsequently toggled by tapping the title; state exists only while rendered and is not persisted (invariant 15).
   const [open, setOpen] = useState(fold !== 'closed');
   const item = (c: Component, column?: { index: number; of: number }) => (
     <Item
@@ -550,8 +554,9 @@ function Group({ component, env }: { component: ComponentOf<'group'>; env: Rende
 }
 
 /**
- * 页面上的一个组件。可编辑的页面里，长按打开它的操作面板（D-052）；
- * 组件内部可点按的部分通过 env.onLongPress 同样响应长按，松手时不会再触发点按。
+ * A component on the page. In editable pages, long-pressing opens its action panel (D-052); inner
+ * tappable parts of components also respond to long-press via env.onLongPress, preventing tap
+ * events from triggering on release.
  */
 export function Item({
   component,
@@ -574,7 +579,7 @@ export function Item({
   );
 }
 
-/** 按一张表有没有记录决定画不画（D-424）。只读；还没读完时不画，不会闪一下。 */
+/** Determine whether to render based on whether a table has records (D-424). Read-only; not rendered while loading, avoiding flashes. */
 export function WhenRecords({ showIf, children }: { showIf: ShowIf; children: ReactNode }) {
   const records = useRecords(showIf.table);
   if (records === null) return null;
@@ -582,8 +587,9 @@ export function WhenRecords({ showIf, children }: { showIf: ShowIf; children: Re
 }
 
 /**
- * 带筛选的显示条件（D-579）：只数符合筛选的记录，用算好的值（汇总、查找），所以和数字块、列表读同一份。
- * 只读；还没算完时不画，不会闪一下。
+ * Display condition with filters (D-579): counts only records matching the filters using
+ * pre-calculated values (aggregations, lookups), sharing the data source with number blocks and
+ * lists. Read-only; not rendered while calculating, avoiding flashes.
  */
 function WhenMatching({
   showIf,
@@ -611,7 +617,7 @@ function ShownItem({
   env: RenderEnv;
   style?: StyleProp<ViewStyle> | undefined;
 }) {
-  // D-342：只在画的时候换 "$record"，编辑和长按面板仍用配置里原来的组件。
+  // D-342: Substitute "$record" only during rendering; editing and long-press panels continue to use the original component from the config.
   const shown = env.recordId ? bindRecord(component, env.recordId) : component;
   if (env.focus) {
     return (
@@ -635,7 +641,7 @@ function ShownItem({
       style={style}
       accessible={false}
       onLongPress={open}
-      // 这层只为长按；点卡片的空白处相当于点页面空白，收键盘（卡片里的按钮自己先响应）。
+      // This layer is for long press only; tapping empty space on the card is equivalent to tapping empty space on the page, dismissing the keyboard (buttons inside the card respond first).
       onPress={() => Keyboard.dismiss()}
       delayLongPress={LONG_PRESS_MS}>
       <ComponentView component={shown} env={{ ...env, onLongPress: open }} />

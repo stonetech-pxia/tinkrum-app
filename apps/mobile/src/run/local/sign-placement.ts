@@ -1,17 +1,20 @@
 import { clamp } from '@morph/core';
-// 签名放在页面上哪里、多大（页面比例坐标，左上角为原点）。
-// 2026-11-09 用户测试：原来默认放在右下角、宽度是页宽的 32%，A4 上约 80 磅高，合同里一行才十几磅，一放就压住两行；
-// 只能拖，不能点一下放到那一行上。现在点哪一行就放在哪一行上，没自己挑大小时高度照那一行字定。
+// Placement position and size of the signature on the page (page proportional coordinates, top-left
+// origin). 2026-11-09 user testing: previously defaulted to bottom-right with a width of 32% of
+// page width, about 80 pt high on A4, whereas contract lines are only about a dozen points high,
+// causing it to cover two lines immediately; users could only drag and could not tap to place it on
+// a specific line. Now, tapping a line places it on that line, and unless a size was explicitly
+// chosen, the height is determined by that line of text.
 
 type Size = { width: number; height: number };
 
 export interface SignPlacement {
   place: { x: number; y: number; width: number };
-  /** 开始拖时的位置（PanResponder 的 dx 是从按下算起的累计值）。 */
+  /** Position at the start of drag (PanResponder's dx is the accumulated value from the initial press). */
   start: { x: number; y: number };
-  /** 页面在屏幕上的大小。 */
+  /** Size of the page on screen. */
   size: Size;
-  /** 用户自己挑过 S / M / L：以后点到别处也不再按那一行改大小。 */
+  /** User has manually selected S / M / L: subsequent taps elsewhere will no longer resize based on that line. */
   sized: boolean;
 }
 
@@ -20,14 +23,14 @@ export type SignAction =
   | { type: 'move'; dx: number; dy: number }
   | { type: 'size'; width: number }
   | { type: 'layout'; width: number; height: number }
-  /** 选好签名（知道了宽高比）或换了一页：回到默认大小和位置。 */
+  /** Signature selected (aspect ratio known) or page changed: returns to default size and position. */
   | { type: 'reset' }
-  /** 点在页面上（屏幕点）；lineHeight 是点附近那一行字的高（原图点），没认出字时不给。 */
+  /** Tap on the page (screen points); lineHeight is the height of the line of text near the point (original image points), omitted if text is unrecognized. */
   | { type: 'tap'; x: number; y: number; lineHeight?: number };
 
-/** 没认出字时当作正文行高：短边的 1.9%（约 11 磅的字）× 1.3。 */
+/** Fallback body line height when text is not recognized: 1.9% of the short side (approx. 11 pt font) × 1.3. */
 const bodyLineHeight = (page: Size) => Math.min(page.width, page.height) * 0.019 * 1.3;
-/** 签名大约两行半高（签名比字大一些，但不压到上下两行）。 */
+/** Signatures are approximately two and a half lines tall (slightly larger than text, but without overlapping adjacent lines). */
 const SIGNATURE_LINES = 2.5;
 
 function widthFor(lineHeight: number, page: Size, aspect: number): number {
@@ -80,7 +83,7 @@ export function reducePlacement(
         ? place.width
         : widthFor(action.lineHeight ?? bodyLineHeight(page), page, aspect);
       const height = (width * page.width) / aspect / page.height;
-      // 左边从手指的地方开始，底边落在点的那一行上。
+      // Left edge starts at the finger position, baseline lands on the target text line.
       return {
         ...state,
         place: {

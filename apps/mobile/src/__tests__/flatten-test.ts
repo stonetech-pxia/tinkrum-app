@@ -7,9 +7,9 @@ import {
   type FlattenNative,
 } from '../runtime/flatten';
 
-// 扫描展平（D-274）的流程：模型和 Skia 换成假的，检查调用顺序、临时文件、精修的开关和失败时的清理。
+// Pipeline of scan flattening (D-274): model and Skia mocked, checks call order, temporary files, retouching switches, and cleanup on failure.
 
-/** UVDoc 输出一张「不弯」的网格：输出点就是补边后图上同样位置的点。 */
+/** UVDoc outputs a "straightened" grid: output points correspond to the exact same positions on the padded image. */
 function identityGrid(): Float32Array {
   const g = new Float32Array(2 * 45 * 31);
   for (let y = 0; y < 45; y++) {
@@ -41,7 +41,7 @@ function setup(options: { dewarp?: boolean; ppocr?: boolean; shape?: number[] } 
     },
     async ocrDetect(input, width, height, output) {
       calls.push(`ocrDetect ${width}×${height}`);
-      // 8 条横向的文字行。
+      // 8 horizontal text lines.
       const prob = new Uint8Array(width * height);
       for (let k = 0; k < 8; k++) {
         const y0 = 60 + k * 80;
@@ -95,12 +95,12 @@ describe('page flattening (D-274)', () => {
     expect(calls).toEqual([
       'modelRun uvdoc.onnx 1×3×712×488',
       'ocrLoad det.onnx rec.onnx',
-      // 找文字行的小图：长边 1280，32 的倍数。
+      // Small image for text line detection: long side 1280, multiple of 32.
       'ocrDetect 896×1280',
       'dispose',
     ]);
     expect(rendered).toEqual([{ width: 896, height: 1280 }]);
-    // 最后一次画的是原大小（网格的顶点铺满整页）。
+    // Last drawn at original size (grid vertices fill the entire page).
     const last = meshes.at(-1)!;
     expect(Math.max(...last.positions.filter((_, i) => i % 2 === 0))).toBe(1700);
     expect(Math.max(...last.positions.filter((_, i) => i % 2 === 1))).toBe(2400);

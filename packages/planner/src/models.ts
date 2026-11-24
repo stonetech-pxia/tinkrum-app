@@ -1,10 +1,10 @@
 import type { Localized } from '@morph/core';
 
-// 可选模型与价格（美元 / 百万 token）。价格以官方定价页为准：
+// Optional models and pricing (USD per million tokens). Pricing is based on the official pricing page:
 // https://platform.claude.com/docs/en/about-claude/pricing
-// costPerChange 来自 2026-10-22 评测集实测的平均值（系统提示词已缓存）。
+// costPerChange is derived from the average measured in the 2026-10-22 evaluation set (system prompt is cached).
 
-// 默认 Haiku（P-010，创始人 2026-10-23 定）：评测和 Opus 一样全部通过，价格约为 1/25。
+// Default Haiku (P-010, decided by founder 2026-10-23): passes all evaluations just like Opus, at about 1/25th the price.
 export const DEFAULT_MODEL = 'claude-haiku-5-5';
 
 export interface ModelInfo {
@@ -47,5 +47,5 @@ export const MODELS: readonly ModelInfo[] = [
   },
 ];
 
-/** 服务端拒答回退（refusal fallback）：Haiku 5.5 不支持，其余当前模型默认开启。 */
+/** Server refusal fallback: not supported by Haiku 5.5, enabled by default for other current models. */
 export const supportsServerFallback = (model: string) => /^claude-(opus|sonnet|fable)-/.test(model);

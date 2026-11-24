@@ -7,8 +7,9 @@ import { PackStore } from '../packs/store';
 import { makePalette } from '../renderer/theme';
 import { MemoryPackFs, manifests, sha256 } from '../test-utils/memory-packs';
 
-// 第一次用到需要下载的功能时的提示（D-112）：说要下载多少、之后能离线用，不出现「扩展包」。
-// 一次运行要的都在一个提示里（D-299）。
+// Prompt when first using a feature requiring download (D-112): State download size and offline
+// availability, avoid mentioning "extension packs". All requirements for a single run fit in one
+// prompt (D-299).
 
 async function setup(needs: PackNeed[]) {
   const fs = new MemoryPackFs();
@@ -42,7 +43,7 @@ const size = (...ids: string[]) =>
   );
 
 describe('first-use download prompt', () => {
-  // 取消键下载时也在，等它等不到下载结束；要等 onDone。
+  // Cancel button remains present during download; waiting does not block until download completion; must wait for onDone.
   it('says how much to download and that it works offline afterwards', async () => {
     await setup([{ pack: 'pdfview', optional: false }]);
     expect(await screen.findByText(/^首次使用需下载 \d+(\.\d)? (KB|MB)$/)).toBeTruthy();
@@ -53,14 +54,14 @@ describe('first-use download prompt', () => {
   it('says the step goes on without the download when it is optional (D-274)', async () => {
     const { done } = await setup([{ pack: 'pdfview', optional: true }]);
     expect(await screen.findByText(/不下载也能继续/)).toBeTruthy();
-    // 取消键写成「不下载，继续」，不让人以为会取消整个快捷操作。
+    // Cancel button labeled "Don't download, continue" to avoid implying the entire quick action is cancelled.
     expect(screen.getByTestId('pack-cancel')).toHaveTextContent('不下载，继续');
     await fireEvent.press(screen.getByTestId('pack-cancel'));
     expect(done).toEqual([['pdfview']]);
   });
 
   it('lists everything a quick action needs in one prompt with the total size (D-299)', async () => {
-    // 新用户「拍表格转 Excel」：找边、展平（可选）、认字，一次说清楚，不连着弹三次。
+    // New user "Scan table to Excel": Find edges, flatten (optional), recognize text, stated clearly in one go without popping up three times consecutively.
     const { done } = await setup([
       { pack: 'scan', optional: false },
       { pack: 'dewarp', optional: true },
@@ -74,11 +75,11 @@ describe('first-use download prompt', () => {
         exact: false,
       });
     }
-    // 可选的可以不勾，总大小跟着变；必需的不能不勾。
+    // Optional items can be unchecked, total size updates accordingly; required items cannot be unchecked.
     expect(screen.queryByTestId('pack-include-scan')).toBeNull();
     await fireEvent.press(screen.getByTestId('pack-include-dewarp'));
     expect(await screen.findByText(`首次使用需下载 ${size('scan', 'ppocr')}`)).toBeTruthy();
-    // 有必需的时取消就是不运行。
+    // When required items exist, canceling aborts execution.
     expect(screen.getByTestId('pack-cancel')).toHaveTextContent('取消');
     await fireEvent.press(screen.getByTestId('pack-cancel'));
     expect(done).toEqual([null]);
@@ -107,8 +108,10 @@ describe('first-use download prompt', () => {
   });
 
   it('asks again for the next download when one run needs two (scan, then flattening)', async () => {
-    // 同一个运行页里先下载一个、再问下一个时，提示框没有重新挂载：不能停在上一个的「下载中」，
-    // 要重新显示下载键（手机上卡在满格进度条、只能选「不下载，继续」）。
+    // When downloading one item and then prompting for the next within the same run view, the
+    // prompt box does not remount: Avoid getting stuck in the previous "Downloading" state,
+    // re-display the download button (on mobile, getting stuck on a full progress bar forced
+    // selecting "Don't download, continue").
     const { done, view, gate } = await setup([{ pack: 'ocr', optional: true }]);
     await fireEvent.press(await screen.findByTestId('pack-download'));
     await waitFor(() => expect(done).toEqual([[]]));
@@ -117,7 +120,7 @@ describe('first-use download prompt', () => {
   });
 
   it('lets a running download go on in the background and tells when it is done', async () => {
-    // 下载很慢：用户点「后台下载」，提示框关掉、这次运行取消，下载继续；下完通知一次，不再调 onDone。
+    // Slow download: User taps "Download in background", prompt closes, current run is cancelled, download continues; notify once upon completion, without calling onDone.
     const fs = new MemoryPackFs();
     const lookup = await manifests(fs);
     let release!: () => void;

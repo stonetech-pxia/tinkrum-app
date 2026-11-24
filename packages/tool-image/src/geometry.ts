@@ -1,5 +1,5 @@
 import { clamp } from '@morph/core/math';
-// 尺寸与裁剪的纯计算。结果都是整数像素，App 直接交给 expo-image-manipulator。
+// Pure calculations for dimensions and cropping. Results are integer pixels, handed directly by the app to expo-image-manipulator.
 
 export interface Size {
   width: number;
@@ -26,7 +26,7 @@ function assertPositive(...values: number[]): void {
   for (const v of values) if (!(v > 0) || !Number.isFinite(v)) throw new RangeError(String(v));
 }
 
-/** 只缩放不裁剪：保持宽高比，默认不放大。 */
+/** Scale only without cropping: maintain aspect ratio, do not upscale by default. */
 export function resizeDimensions(
   size: Size,
   spec: ResizeSpec,
@@ -53,7 +53,7 @@ export function resizeDimensions(
       factor = spec.percent / 100;
       break;
     case 'fit':
-      // 完整放进框内，不裁剪；结果可能有一边小于框。
+      // Fit completely into the box without cropping; result may have one side smaller than the box.
       assertPositive(spec.width, spec.height);
       factor = Math.min(spec.width / width, spec.height / height);
       break;
@@ -65,7 +65,7 @@ export function resizeDimensions(
   };
 }
 
-/** 居中、按 aspect（宽/高）能取到的最大裁剪框。 */
+/** Maximum crop box obtainable centered, according to aspect (width/height). */
 export function centeredCropForAspect(size: Size, aspect: number): Rect {
   assertPositive(size.width, size.height, aspect);
   let width = size.width;
@@ -81,8 +81,9 @@ export function centeredCropForAspect(size: Size, aspect: number): Rect {
 }
 
 /**
- * 把裁剪框收回图片内，最小边 16px（图片更小时以图片为准）。
- * 给定 aspect 时保持中心和大致面积，换算成该比例；取整后比例可能差 1px。
+ * Clamp crop box inside the image, minimum side 16px (use image dimensions as base when smaller).
+ * When aspect is given, maintain center and approximate area, converting to that ratio; rounded
+ * ratio may differ by 1px.
  */
 export function clampCrop(rect: Rect, size: Size, { aspect }: { aspect?: number } = {}): Rect {
   assertPositive(size.width, size.height);
@@ -95,7 +96,7 @@ export function clampCrop(rect: Rect, size: Size, { aspect }: { aspect?: number 
     const max = centeredCropForAspect(size, aspect);
     width = Math.sqrt(width * height * aspect);
     height = width / aspect;
-    // 先放大到最小边，再缩到图片能容纳的最大比例框。
+    // First upscale to minimum side, then downscale to maximum proportional box the image can accommodate.
     const grow = Math.max(1, minW / width, minH / height);
     const shrink = Math.min(1, max.width / (width * grow), max.height / (height * grow));
     width = clamp(Math.round(width * grow * shrink), 1, max.width);
@@ -116,13 +117,13 @@ export function clampCrop(rect: Rect, size: Size, { aspect }: { aspect?: number 
 
 export interface CropPlan {
   crop: Rect;
-  /** 裁剪后需要缩放到的尺寸；已经等于输出尺寸时为 null。 */
+  /** Target dimensions to scale to after cropping; null when already equal to output dimensions. */
   resize: Size | null;
-  /** 裁剪框小于输出尺寸，需要放大（证件照提示"原图分辨率不足"）。 */
+  /** Crop box is smaller than output dimensions, requiring upscaling (id photo prompt "original image resolution insufficient"). */
   upscale: boolean;
 }
 
-/** 把"裁剪框 → 固定输出尺寸"翻译成先裁剪再缩放两步。 */
+/** Translate "crop box -> fixed output size" into two steps: crop first, then scale. */
 export function cropToOutput(rect: Rect, output: Size): CropPlan {
   const same = rect.width === output.width && rect.height === output.height;
   return {
@@ -132,25 +133,26 @@ export function cropToOutput(rect: Rect, output: Size): CropPlan {
   };
 }
 
-/** iOS WebView canvas 最多约 1678 万像素；超过时等比缩小到上限内。 */
+/** iOS WebView canvas supports at most approx. 16.78M pixels; scale down proportionally within upper limit when exceeded. */
 export function capPixels(size: Size, maxPixels = 16_777_216): Size {
   assertPositive(size.width, size.height, maxPixels);
   if (size.width * size.height <= maxPixels) return { width: size.width, height: size.height };
   const f = Math.sqrt(maxPixels / (size.width * size.height));
   let width = Math.max(1, Math.floor(size.width * f));
   let height = Math.max(1, Math.floor(size.height * f));
-  // 极细长图：一边被钳到 1px 后，另一边按上限重算。
+  // Extremely slender image: once one side is clamped to 1px, recalculate the other side according to the limit.
   width = Math.max(1, Math.min(width, Math.floor(maxPixels / height)));
   height = Math.max(1, Math.min(height, Math.floor(maxPixels / width)));
   return { width, height };
 }
 
-/** GPU 离屏画布单边上限：iOS 模拟器的 Metal 纹理是 8192（真机 16384），按小的算。 */
+/** GPU offscreen canvas single-side limit: iOS simulator Metal texture limit is 8192 (real device 16384), calculated based on the smaller one. */
 export const MAX_SURFACE_SIDE = 8192;
 
 /**
- * 离屏画布放不下时整体缩小的比例（≤ 1）：单边不超过 MAX_SURFACE_SIDE，总像素不超过 1677 万。
- * 超过 Metal 上限会让 App 直接崩溃，所以每次离屏绘制前都要先算。
+ * Ratio (<= 1) to scale down overall when offscreen canvas cannot fit: single side not exceeding
+ * MAX_SURFACE_SIDE, total pixels not exceeding 16.77M. Exceeding the Metal limit causes the app
+ * to crash directly, so it must be calculated before every offscreen draw.
  */
 export function surfaceScale(size: Size, maxPixels = 16_777_216): number {
   assertPositive(size.width, size.height, maxPixels);

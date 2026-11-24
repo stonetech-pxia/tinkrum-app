@@ -1,5 +1,6 @@
-// 版式检查：直接读 docx 的 XML 看字号、下划线、缩进、段前距、纸张、格子宽和图片大小。
-// 尽量比关系（两段字号之比、两段缩进之差、放不放得下一行），不钉死具体数值。
+// Layout checks: directly read docx XML to inspect font size, underline, indentation, space before
+// paragraphs, paper size, cell widths, and image sizes. Prefer relative relationships (ratio of two
+// font sizes, difference of two indents, whether a line fits) over fixed numerical values.
 import { norm, type Check, type Converted } from './checks';
 
 const decodeXml = (s: string) =>
@@ -10,7 +11,7 @@ const decodeXml = (s: string) =>
     .replace(/&apos;/g, "'")
     .replace(/&amp;/g, '&');
 
-/** docx 里的一段：最内层的 w:p（不含嵌套段），at 是它在 document.xml 里的位置。 */
+/** A paragraph in docx: the innermost w:p (without nested paragraphs), at is its position in document.xml. */
 export interface XmlPara {
   xml: string;
   text: string;
@@ -19,7 +20,7 @@ export interface XmlPara {
 
 const cache = new WeakMap<Converted, XmlPara[]>();
 
-/** 所有最内层的段，按文档顺序。 */
+/** All innermost paragraphs in document order. */
 export function xmlParas(c: Converted): XmlPara[] {
   let out = cache.get(c);
   if (out) return out;
@@ -34,7 +35,7 @@ export function xmlParas(c: Converted): XmlPara[] {
   return out;
 }
 
-/** 含这处文字的第一段。 */
+/** The first paragraph containing this text. */
 export function xmlPara(c: Converted, text: string): XmlPara | undefined {
   return xmlParas(c).find((p) => norm(p.text).includes(norm(text)));
 }
@@ -50,11 +51,11 @@ const runsOf = (p: XmlPara) =>
     }))
     .filter((r) => r.text.trim());
 
-/** 段里有字的 run 的字号（磅）；没写 w:sz 的是 NaN。 */
+/** Font sizes (in points) of runs containing text within the paragraph; NaN if w:sz is not specified. */
 export const runSizes = (p: XmlPara): number[] =>
   runsOf(p).map((r) => Number(/<w:sz w:val="(\d+)"/.exec(r.xml)?.[1]) / 2);
 
-/** 段的字号：字最多的那个字号（磅）。 */
+/** Paragraph font size: the font size with the most characters (in points). */
 export function paraSize(p: XmlPara): number {
   const chars = new Map<number, number>();
   for (const r of runsOf(p)) {
@@ -64,7 +65,7 @@ export function paraSize(p: XmlPara): number {
   return [...chars].sort((a, b) => b[1] - a[1])[0]?.[0] ?? NaN;
 }
 
-/** 这处文字的字号（磅）：含它的 run 的字号；跨了几个 run 时按含它的段的字号。 */
+/** Font size of this text (in points): font size of the run containing it; when spanning multiple runs, based on the font size of the paragraph containing it. */
 export function sizeOf(c: Converted, text: string): number {
   for (const p of xmlParas(c)) {
     if (!norm(p.text).includes(norm(text))) continue;
@@ -74,20 +75,20 @@ export function sizeOf(c: Converted, text: string): number {
   return NaN;
 }
 
-/** 每个有字的 run 都有这个属性（如 '<w:u w:val="single"/>'、'<w:b/>'）。 */
+/** Every text-containing run has this property (e.g., '<w:u w:val="single"/>', '<w:b/>'). */
 export const allRuns = (p: XmlPara, prop: RegExp) => runsOf(p).every((r) => prop.test(r.xml));
-/** 有字的 run 里有一个带这个属性。 */
+/** At least one text-containing run has this property. */
 export const anyRun = (p: XmlPara, prop: RegExp) => runsOf(p).some((r) => prop.test(r.xml));
 
 const pPrNumber = (p: XmlPara, re: RegExp) => Number(re.exec(pPrOf(p))?.[1] ?? 0);
-/** 左缩进（twip），没写是 0。 */
+/** Left indent (in twips), 0 if unspecified. */
 export const indentLeft = (p: XmlPara) => pPrNumber(p, /<w:ind\b[^>]*\bw:left="(-?[\d.]+)"/);
-/** 段前距（twip），没写是 0。 */
+/** Space before paragraph (in twips), 0 if unspecified. */
 export const spaceBefore = (p: XmlPara) => pPrNumber(p, /<w:spacing\b[^>]*\bw:before="(\d+)"/);
-/** 对齐（w:jc），没写是 left。 */
+/** Alignment (w:jc), 'left' if unspecified. */
 export const jcOf = (p: XmlPara) => /<w:jc w:val="(\w+)"/.exec(pPrOf(p))?.[1] ?? 'left';
 
-/** 段所在的最内层表格格子的宽（twip，w:tcW）；不在表格里时 undefined。 */
+/** Width of the innermost table cell containing the paragraph (in twips, w:tcW); undefined when not in a table. */
 export function cellWidth(c: Converted, p: XmlPara): number | undefined {
   const open: number[] = [];
   for (const m of c.xml.slice(0, p.at).matchAll(/<(\/?)w:tc>/g)) {
@@ -99,7 +100,7 @@ export function cellWidth(c: Converted, p: XmlPara): number | undefined {
   return Number(/<w:tcW w:w="(\d+)"/.exec(c.xml.slice(start, p.at))?.[1]);
 }
 
-/** 每一节的纸张（twip）和页边距。 */
+/** Paper size (in twips) and page margins for each section. */
 export function sections(c: Converted) {
   return [...c.xml.matchAll(/<w:sectPr>[\s\S]*?<\/w:sectPr>/g)].map((m) => {
     const n = (re: RegExp) => Number(re.exec(m[0])?.[1] ?? 0);
@@ -114,7 +115,7 @@ export function sections(c: Converted) {
   });
 }
 
-/** 文字流里的图片（不算衬在字下面的底图）：wp:extent 的宽高（磅），按文档顺序。 */
+/** Images in the text flow (excluding background images behind text): width and height of wp:extent (in points), in document order. */
 export function pictures(c: Converted) {
   return [...c.xml.matchAll(/<w:drawing>([\s\S]*?)<\/w:drawing>/g)]
     .filter((m) => !/behindDoc="1"/.test(m[1]!))
@@ -124,7 +125,7 @@ export function pictures(c: Converted) {
     });
 }
 
-/** Arial 里 ASCII 字符的宽（千分之一字号，32–126）。 */
+/** Widths of ASCII characters in Arial (in units of 1/1000 of the font size, 32–126). */
 const ARIAL = [
   278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556,
   556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667,
@@ -133,7 +134,7 @@ const ARIAL = [
   222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584,
 ];
 
-/** 一段字在 Arial 里有多少个字号宽：带重音的字母按不带的算，中日韩的字和全角符号算 1，其他算 0.556。 */
+/** How many font-size widths a string of text occupies in Arial: accented letters are counted as unaccented, CJK characters and full-width symbols count as 1, others count as 0.556. */
 export function arialEm(text: string): number {
   let em = 0;
   for (const ch of text.normalize('NFD')) {
@@ -146,12 +147,12 @@ export function arialEm(text: string): number {
   return em;
 }
 
-/** 所有表格格子左右的边距（twip，docx.ts 的 CELL_PAD × 2）。 */
+/** Left and right margins for all table cells (in twips, CELL_PAD × 2 in docx.ts). */
 const CELL_PADDING = 160;
-/** Arial Bold 比常规体宽这么多（大致）。 */
+/** Arial Bold is wider than regular weight by approximately this factor. */
 const BOLD_WIDER = 1.07;
 
-/** 这一段在 Word 里能放在一行：段所在的格子（或页面内容区）减去边距和缩进，放得下 Arial 量出的字宽。 */
+/** This paragraph fits on a single line in Word: the cell (or page content area) width minus margins and indentation can accommodate the text width measured in Arial. */
 export const fitsOneLine = (text: string): Check => ({
   name: `${JSON.stringify(text)} fits on one line`,
   run(c) {
@@ -171,7 +172,7 @@ export const fitsOneLine = (text: string): Check => ({
   },
 });
 
-/** a 的字号 ÷ b 的字号在 ratio 的 ±tol（相对）以内。 */
+/** The font size of a divided by the font size of b is within ±tol (relative) of ratio. */
 export const sizeRatio = (a: string, b: string, ratio: number, tol = 0.1): Check => ({
   name: `size of ${JSON.stringify(a)} / ${JSON.stringify(b)} ≈ ${ratio} ±${tol * 100}%`,
   run(c) {
@@ -184,7 +185,7 @@ export const sizeRatio = (a: string, b: string, ratio: number, tol = 0.1): Check
   },
 });
 
-/** 这几段（各自所有的 run）字号一样。 */
+/** These text blocks (each and all of their runs) have the same font size. */
 export const sameSize = (...texts: string[]): Check => ({
   name: `same size ${texts.map((t) => JSON.stringify(t)).join(', ')}`,
   run(c) {

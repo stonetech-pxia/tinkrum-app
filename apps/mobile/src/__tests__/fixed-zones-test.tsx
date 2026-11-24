@@ -7,7 +7,7 @@ import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 页面的固定区、分组列表的加载更多、引用字段选择器的搜索、已有标签（创始人 2026-11-04 定）。
+// Fixed zones of pages, load more for grouped lists, search for reference field selectors, existing tags (set by founder 2026-11-04).
 
 const TEAMS: Op = {
   op: 'addData',
@@ -158,7 +158,7 @@ describe('load more', () => {
     await open([list({ sort: ['name'], group: ['co'] })], records);
     await fireEvent.press(await screen.findByTestId('browse-group-co'));
     expect(rows()).toBe(2);
-    // 第二段还没到，标题也不画（滚到底才接着往下）。
+    // Second segment not reached yet, title not rendered either (renders downward only upon scrolling to bottom).
     expect(screen.queryByText('B')).toBeNull();
     await end(1000, 1200);
     expect(rows()).toBe(4);

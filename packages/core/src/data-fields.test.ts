@@ -14,7 +14,7 @@ import type { Collection, WorkspaceConfig } from './schema';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 附件和公式字段（D-187、D-188）。
+// Attachment and formula fields (D-187, D-188).
 
 const orders: Collection = {
   id: 'orders',
@@ -99,7 +99,7 @@ describe('attachment fields', () => {
     expect(formatRef(old, orders, 'receipt', 'zh')).toBe('1 个附件');
     expect(formatRef(old, orders, 'receipt', 'en')).toBe('1 attachment');
     expect(formatRef(old, orders, 'receipt', 'fr')).toBe('1 pièce jointe');
-    // 改别的字段时，旧的单个 ID 也写成一组。
+    // When modifying other fields, older single IDs are also formatted as a group.
     const updated = prepareRecordValues(orders, { item: '笔' }, old.values, now);
     expect(updated.ok && updated.values.receipt).toEqual(['asset-123']);
     const single = prepareRecordValues(orders, { receipt: 'asset-9' }, null, now);
@@ -114,7 +114,7 @@ describe('attachment fields', () => {
       ok: false,
       issues: [{ fieldId: 'receipt', code: 'tooLong' }],
     });
-    // 读的时候宽容：多出来的、坏的 ID 不显示。
+    // Lenient reading: extra or corrupted IDs are not displayed.
     expect(
       recordValue(record('r', { receipt: [...ids, 'a20', 'bad id'] }), orders, 'receipt'),
     ).toEqual(ids);

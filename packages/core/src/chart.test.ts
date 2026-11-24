@@ -39,7 +39,7 @@ const rec = (id: string, values: Record<string, unknown>, createdAt = 0): DataRe
   createdAt,
   updatedAt: createdAt,
 });
-// 2026-10-22 是星期四。
+// 2026-10-22 is Thursday.
 const now = new Date(2026, 9, 22, 15);
 const records = [
   rec('a', { amount: 10, category: 'food', date: '2026-10-22' }),
@@ -223,7 +223,7 @@ describe('chart validation', () => {
         filter: [{ field: 'date', op: 'inPeriod', value: 'thisYear' }],
       }),
     ).toBe(false);
-    // 别的筛选可以。
+    // Other filters are permitted.
     expect(
       check({ compare: 'previous', filter: [{ field: 'category', op: 'is', value: 'food' }] }),
     ).toBe(true);
@@ -238,8 +238,8 @@ describe('chartSeries with the previous period (D-439)', () => {
   } as const;
   const more = [
     ...records,
-    rec('p1', { amount: 1000, date: '2026-05-31' }), // 上上期，哪一期都不算
-    rec('p2', { amount: 40, date: '2026-06-01' }), // 上一期第一天
+    rec('p1', { amount: 1000, date: '2026-05-31' }), // Two periods ago, excluded from all period calculations
+    rec('p2', { amount: 40, date: '2026-06-01' }), // First day of the previous period
     rec('p3', { amount: 3, date: '2026-07-15' }),
     rec('p4', { amount: 8, date: '2026-07-31' }),
   ];
@@ -313,7 +313,7 @@ describe('chartSeries over a page range (D-440)', () => {
   const spec = { aggregate: 'sum', field: 'amount', group: { unit: 'month', last: 3 } } as const;
 
   it('one point per day for a week, future days at 0, records outside left out', () => {
-    // now 是 2026-10-22（周四）；本周是 10-19 到 10-25。
+    // now is 2026-10-22 (Thursday); the current week spans 10-19 to 10-25.
     const points = chartSeries(records, expenses, spec, now, '-', undefined, undefined, false, {
       start: '2026-10-19',
       end: '2026-10-25',
@@ -351,7 +351,7 @@ describe('chartSeries over a page range (D-440)', () => {
       false,
       { start: '2026-11-01', end: '2026-12-31' },
     );
-    // 范围超过一个月、不到半年：按周；第一周从 10-26 起，但 10-31 在范围外不算。
+    // Range spans between one month and six months: grouped by week; the first week starts from 10-26, but 10-31 falls outside the range and is excluded.
     expect(points[0]).toMatchObject({ key: '2026-10-26', value: 0 });
     expect(points[1]).toMatchObject({ key: '2026-11-02', value: 6 });
   });

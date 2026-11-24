@@ -57,15 +57,19 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-// 视频和音频的 Android 实现（D-141）：和 iOS 的 JS 接口相同。
-// - probe：MediaExtractor（编码、码率、采样率、HDR）+ MediaMetadataRetriever（时长、宽高、方向）。
-// - transcode：Media3 Transformer，H.264 + AAC 写 MP4，指定码率；缩小用 Presentation，限帧率用
-//   FrameDropEffect，HDR 用 OpenGL 转成普通画面。
-// - trim：Transformer 的剪切优化（只重新编码开头一小段，其余原样搬过去）。
+// Android implementation for video and audio (D-141): same JS interface as iOS.
+// - probe: MediaExtractor (codec, bitrate, sample rate, HDR) + MediaMetadataRetriever (duration,
+// width, height, orientation).
+// - transcode: Media3 Transformer, H.264 + AAC writing MP4, specified bitrate; scaling uses
+// Presentation, frame rate limiting uses FrameDropEffect, HDR uses OpenGL to convert to standard
+// video.
+// - trim: Transformer's trim optimization (re-encodes only a small segment at the start, copies the
+// rest as-is).
 // - thumbnails：MediaMetadataRetriever。
-// - GIF（D-184）：视频按帧率用 MediaMetadataRetriever 取画面，图片用 BitmapFactory 读（按 EXIF 摆正），
-//   自己写的 GifEncoder 编码（系统没有 GIF 编码器）。
-// 全部在本机处理，不联网。分享进来的 content:// 地址直接读，不复制。
+// - GIF (D-184): extracts frames using MediaMetadataRetriever for video, reads images using
+// BitmapFactory (oriented via EXIF), and encodes using our own GifEncoder (the system lacks a GIF
+// encoder). All processed on-device without network. Reads content:// URIs shared in directly
+// without copying.
 
 class MediaUnsupportedException(detail: String?) :
   CodedException("ERR_MEDIA_UNSUPPORTED", "This media can't be opened: $detail", null)
@@ -85,13 +89,15 @@ class MorphMediaModule : Module() {
 
   private val main = Handler(Looper.getMainLooper())
 
-  /** 正在进行的任务（只在主线程读写）。 */
+  /** Ongoing tasks (read/written on the main thread only). */
   private val jobs = mutableMapOf<String, Transformer>()
   private val cancelled = mutableSetOf<String>()
-  // 进行中的 Transformer 任务的 Promise 和输出文件：Transformer.cancel() 之后不一定会回调监听器，
-  // 取消时由这里结束 Promise，JS 那边才不会一直等。谁先从这里取走谁负责结束（只结束一次）。
+  // Promises and output files of in-progress Transformer tasks: Transformer.cancel() does not
+  // always invoke listeners; when cancelled, ending the promise here prevents the JS side from
+  // waiting indefinitely. Whichever thread claims it from here is responsible for finishing it
+  // (finishing exactly once).
   private val pending = mutableMapOf<String, Pair<Promise, File>>()
-  /** 在后台线程里跑的任务（写 WAV）：取消标记。 */
+  /** Tasks running on background threads (writing WAV): cancellation flag. */
   private val threadJobs = ConcurrentHashMap<String, AtomicBoolean>()
 
   override fun definition() = ModuleDefinition {
@@ -161,7 +167,7 @@ class MorphMediaModule : Module() {
           AudioVolume.prepare(context, Uri.parse(uri), wave, automatic, db, flag, (probe(Uri.parse(uri))["durationMs"] as? Number)?.toDouble() ?: 0.0) { sendProgress(jobId, it) }
           if (flag.get()) throw MediaCancelledException()
           main.post {
-            // 中间的 WAV 要等后面的异步编码用完，结束时（成功或失败）再删。
+            // Intermediate WAV must wait for subsequent asynchronous encoding to finish, and is deleted upon completion (success or failure).
             val done = promise.deletingAfter(wave)
             try {
               if (flag.get()) throw MediaCancelledException()
@@ -223,7 +229,7 @@ class MorphMediaModule : Module() {
           AudioDenoise.prepare(context, Uri.parse(uri), wave, flag, (probe(Uri.parse(uri))["durationMs"] as? Number)?.toDouble() ?: 0.0) { sendProgress(jobId, it) }
           if (flag.get()) throw MediaCancelledException()
           main.post {
-            // 中间的 WAV 要等后面的异步编码用完，结束时（成功或失败）再删。
+            // Intermediate WAV must wait for subsequent asynchronous encoding to finish, and is deleted upon completion (success or failure).
             val done = promise.deletingAfter(wave)
             try {
               if (flag.get()) throw MediaCancelledException()
@@ -257,8 +263,10 @@ class MorphMediaModule : Module() {
         return@AsyncFunction
       }
       val source = Uri.parse(uri)
-      // 先在后台读格式：手机没有能按原尺寸编码这种格式（例如 HEVC）的编码器时，Transformer 会
-      // 悄悄退到很小的分辨率（模拟器实测 1080×1920 的 HEVC 变成 270×480），这时改用 H.264。
+      // First reads format in the background: when the phone lacks an encoder capable of encoding
+      // that format at native size (e.g., HEVC), Transformer silently falls back to a very small
+      // resolution (emulator tests show 1080x1920 HEVC becoming 270x480), in which case we switch
+      // to H.264.
       thread {
         val info = try {
           probe(source)
@@ -276,7 +284,7 @@ class MorphMediaModule : Module() {
                 .build()
             )
             .build()
-          // 不改编码、不加效果：只重新编码开头到第一个关键帧的一小段，其余原样搬过去。
+          // No re-encoding, no added effects: re-encodes only the segment from the start to the first keyframe, copying the rest as-is.
           val builder = Transformer.Builder(context).experimentalSetTrimOptimizationEnabled(true)
           val codec = (info["videoCodec"] as? String)?.let { "video/$it" }
           val width = (info["width"] as? Int) ?: 0
@@ -316,7 +324,7 @@ class MorphMediaModule : Module() {
       }
     }
 
-    // 音频（D-153、D-155，音频会话）：几段接成一段（Media3 的一个序列）、波形（自己解码）。
+    // Audio (D-153, D-155, audio sessions): concatenating multiple segments into one (a Media3 sequence), waveforms (decoded manually).
     AsyncFunction("concat") {
       jobId: String, uris: List<String>, output: String, options: Map<String, Any?>, promise: Promise ->
       try {
@@ -353,7 +361,7 @@ class MorphMediaModule : Module() {
       }
     }
 
-    // 动图（D-184）：在后台线程里取画面、编码，可以取消。
+    // Animations (D-184): frame extraction and encoding on a background thread, cancellable.
     AsyncFunction("videoGif") {
       jobId: String, uri: String, output: String, options: Map<String, Double>, promise: Promise ->
       gifJob(jobId, File(Uri.parse(output).path!!), promise) { flag, out ->
@@ -382,9 +390,9 @@ class MorphMediaModule : Module() {
     }
   }
 
-  // ---- 任务 ----
+  // ---- Tasks ----
 
-  /** 在主线程开始导出，轮询进度，完成后读一遍输出文件的信息。 */
+  /** Starts export on the main thread, polls progress, and reads output file info upon completion. */
   private fun run(
     jobId: String,
     transformer: Transformer,
@@ -473,7 +481,7 @@ class MorphMediaModule : Module() {
       val (transformer, base) = buildTranscode(Uri.parse(uri), baseOptions)
       val videoItem = base.sequences.first().editedMediaItems.first()
       val volume = ChannelMixingAudioProcessor()
-      // 1–8 个声道都要有矩阵，否则 5.1 的原声会让导出失败。
+      // Must have a matrix for 1-8 channels, otherwise 5.1 native audio will cause export to fail.
       for (channels in 1..8) volume.putChannelMixingMatrix(ChannelMixingMatrix.createForConstantGain(channels, channels).scaleBy(originalVolume / 100f))
       val editedVideo = videoItem.buildUpon().setEffects(Effects(listOf(volume), videoItem.effects.videoEffects)).build()
       val videoSequence = if (originalVolume == 0f) EditedMediaItemSequence.withVideoFrom(listOf(editedVideo))
@@ -521,7 +529,7 @@ class MorphMediaModule : Module() {
         effects.add(SpeedChangeEffect(speed))
         audioProcessors.add(SonicAudioProcessor().apply { setSpeed(speed); setPitch(speed) })
       }
-      // JS 只在要缩小时才给 maxShortSide（不放大）；H.264 要偶数。
+      // JS provides maxShortSide only when downscaling is required (no upscale); H.264 requires even dimensions.
       (video["maxShortSide"] as? Number)?.toInt()?.let { shortSide ->
         effects.add(Presentation.createForShortSide(shortSide / 2 * 2))
       }
@@ -534,7 +542,7 @@ class MorphMediaModule : Module() {
         effects.add(Presentation.createForAspectRatio(ratio, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP))
       }
       (video["rotationDegrees"] as? Number)?.toFloat()?.let { degrees ->
-        // Media3 正数为逆时针，界面的角度为顺时针。
+        // Media3 uses positive numbers for counterclockwise, whereas the UI angle is clockwise.
         effects.add(ScaleAndRotateTransformation.Builder().setRotationDegrees(-degrees).build())
       }
       val width = (video["width"] as? Number)?.toInt()
@@ -552,9 +560,9 @@ class MorphMediaModule : Module() {
       if (dropAudio) EditedMediaItemSequence.withVideoFrom(items)
       else EditedMediaItemSequence.withAudioAndVideoFrom(items)
     )
-      // 有的片段没有声音：Media3 自动给这些片段补静音。
+      // .experimentalSetForceAudioTrack(!dropAudio && uris.size > 1)
       .experimentalSetForceAudioTrack(!dropAudio && uris.size > 1)
-      // 普通画面（BT.709）：HDR 视频在这里转换，否则发到别处会发灰或过暗。
+      // Standard video (BT.709): HDR video is converted here, otherwise it will appear grey or underexposed when sent elsewhere.
       .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
       .build()
 
@@ -578,14 +586,14 @@ class MorphMediaModule : Module() {
     return transformer to composition
   }
 
-  // ---- 音频 ----
+  // ---- Audio ----
 
-  /** 去掉画面、统一声道和采样率（几段接起来时格式要一样；AAC 低码率要单声道、低采样率）。 */
+  /** Removes video, standardizes channels and sample rates (formats must match when concatenating segments; low-bitrate AAC requires mono and low sample rate). */
   private fun audioItem(item: MediaItem, audio: Map<String, Any?>): EditedMediaItem {
     val processors = mutableListOf<AudioProcessor>()
     (audio["channels"] as? Number)?.toInt()?.let { channels ->
       val mix = ChannelMixingAudioProcessor()
-      // Media3 只有单声道、立体声之间的默认混音（3 声道以上会抛异常）。
+      // Media3 only has default mixing between mono and stereo (throws an exception for 3+ channels).
       for (input in 1..2) mix.putChannelMixingMatrix(ChannelMixingMatrix.createForConstantGain(input, channels))
       processors += mix
     }
@@ -608,13 +616,14 @@ class MorphMediaModule : Module() {
     return Transformer.Builder(context)
       .setAudioMimeType(MimeTypes.AUDIO_AAC)
       .setEncoderFactory(encoders.build())
-      // 默认的 InAppMp4Muxer 在文件头给索引预留约 400 KB：两段语音备忘合成 250 KB 的声音、文件却有
-      // 650 KB，压到 2 MB 也总是第一次超标。系统的 MediaMuxer 不预留。
+      // Default InAppMp4Muxer reserves about 400 KB for the index in the file header: two voice
+      // memos synthesized into a 250 KB audio result in a 650 KB file, and compressing to 2 MB
+      // always exceeds the threshold on the first try. System MediaMuxer does not reserve this.
       .setMuxerFactory(FrameworkMuxer.Factory())
       .build()
   }
 
-  /** 只要声音：M4A 用 Media3（AAC，写 MP4 容器），WAV 和 MP3（D-183，LAME）自己解码再写。 */
+  /** Audio only: M4A uses Media3 (AAC, writing MP4 container), while WAV and MP3 (D-183, LAME) are decoded and written manually. */
   @Suppress("UNCHECKED_CAST")
   private fun transcodeAudio(jobId: String, uri: Uri, output: File, options: Map<String, Any?>, promise: Promise) {
     val container = options["container"] as? String ?: "m4a"
@@ -690,7 +699,7 @@ class MorphMediaModule : Module() {
     }
   }
 
-  /** 有没有硬件或软件编码器能按这个尺寸（横竖都试）编码这种格式。 */
+  /** Checks whether any hardware or software encoder can encode this format at this size (trying both landscape and portrait). */
   private fun canEncode(mime: String, width: Int, height: Int): Boolean {
     if (width <= 0 || height <= 0) return true
     return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.any { info ->
@@ -766,7 +775,7 @@ class MorphMediaModule : Module() {
         info["height"] = if (turned) w else h
         info["rotation"] = rotation
         if (info["videoBitrateKbps"] == null) {
-          // 读不到视频码率时用整个文件的码率减去声音。
+          // If video bitrate cannot be read, use the file bitrate minus the audio bitrate.
           val total = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toDoubleOrNull()
           if (total != null) {
             val audioKbps = (info["audioBitrateKbps"] as? Double) ?: 0.0
@@ -846,7 +855,7 @@ class MorphMediaModule : Module() {
     return pixels
   }
 
-  /** 视频 → GIF：从头到尾按 fps 取画面（已摆正，宽度不超过 width）；长度由调用方先检查。 */
+  /** Video -> GIF: Extract frames at given fps from start to end (oriented correctly, width not exceeding width); length is checked beforehand by the caller. */
   private fun videoGif(
     jobId: String, uri: Uri, output: File, options: Map<String, Double>, flag: AtomicBoolean,
   ): Map<String, Any?> {
@@ -872,7 +881,7 @@ class MorphMediaModule : Module() {
             retriever.getFrameAtTime(us, MediaMetadataRetriever.OPTION_CLOSEST)
           }) ?: if (i == 0) throw MediaUnsupportedException("frame") else continue
           if (encoder == null) {
-            // 画布按第一帧定（竖视频按宽度缩）。
+            // Canvas is determined by the first frame (vertical videos are scaled by width).
             val k = min(1.0, maxWidth.toDouble() / frame.width)
             width = max(1, (frame.width * k).roundToInt())
             height = max(1, (frame.height * k).roundToInt())
@@ -895,7 +904,7 @@ class MorphMediaModule : Module() {
     }
   }
 
-  /** 读一张图片：长边缩到 maxSide 左右（先按 2 的倍数抽样再精确缩），按 EXIF 摆正。 */
+  /** Read an image: Scale long side to around maxSide (first downsample by powers of 2 then precise scale), orient correctly using EXIF. */
   private fun loadImage(uri: Uri, maxSide: Int): Bitmap {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
@@ -926,7 +935,7 @@ class MorphMediaModule : Module() {
     return out
   }
 
-  /** 图片 → GIF：画布是第一张（长边缩到 maxSide），每张按比例放进画布居中，空的地方白色。 */
+  /** Images -> GIF: Canvas is the first image (long side scaled to maxSide), each image is centered and scaled proportionally within the canvas, with empty areas filled with white. */
   private fun imagesGif(
     jobId: String, uris: List<Uri>, output: File, options: Map<String, Double>, flag: AtomicBoolean,
   ): Map<String, Any?> {
@@ -999,7 +1008,7 @@ class MorphMediaModule : Module() {
   }
 }
 
-/** 结束（成功或失败）时先删掉 file 再把结果交出去：给音量、降噪的中间 WAV 用。 */
+/** Delete file upon completion (success or failure) before returning the result: used for volume and denoising intermediate WAVs. */
 private fun Promise.deletingAfter(file: File): Promise {
   val inner = this
   return object : Promise {

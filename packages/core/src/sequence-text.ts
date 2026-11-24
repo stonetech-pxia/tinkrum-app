@@ -6,12 +6,12 @@ import {
   type StreakUnit,
 } from './schema-primitives';
 
-// 按顺序的聚合（D-284）显示成什么字：统计和汇总字段（D-288）共用。不依赖记录的读法，字段定义也能直接用。
+// Display text for sequential aggregates (D-284): shared by statistics and summary fields (D-288). Does not depend on record reader implementation; field definitions can use it directly.
 
 export const isSequenceAggregate = (a: string): a is SequenceAggregate =>
   (SEQUENCE_AGGREGATES as readonly string[]).includes(a);
 
-/** 统计里显示的文字（带单位，单复数按 isSingular）；没有值时是「—」。 */
+/** Text displayed in statistics (with units, singular/plural determined by isSingular); displays "—" when there is no value. */
 export function sequenceText(
   aggregate: SequenceAggregate,
   unit: StreakUnit | undefined,

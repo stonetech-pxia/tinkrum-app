@@ -2,9 +2,12 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { SQLiteWorkspaceRepo, migrateDatabase } from '../storage/sqlite';
 
-// Node 自带的 node:sqlite 跑真实的 SQL（外键开着），包成和 App 里 expo-sqlite 一样的接口。
-// 事务是真的：BEGIN / COMMIT / ROLLBACK，回调抛错就整个回滚；和 expo-sqlite 的独占事务一样一个接一个排队。
-// 测「失败时全部保持原样」的写入（R06、R09 等）一定要用它，不要用直接调回调的假事务。
+// Node's built-in node:sqlite running real SQL (foreign keys enabled), wrapped in the same
+// interface as expo-sqlite in the app. Transactions are real: BEGIN / COMMIT / ROLLBACK, callback
+// throwing an error rolls back the entire transaction; queued one after another just like
+// expo-sqlite's exclusive transactions. Must be used for testing writes that "remain completely
+// unchanged on failure" (R06, R09, etc.), rather than fake transactions that directly invoke
+// callbacks.
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { DatabaseSync } = require('node:sqlite') as {
@@ -19,7 +22,7 @@ const { DatabaseSync } = require('node:sqlite') as {
   };
 };
 
-/** path 不给就是内存数据库；给了就是真的文件（有 -wal、-shm，整体导出的测试要用）。 */
+/** When path is omitted, creates an in-memory database; when provided, creates a real file (with -wal, -shm, required for full export testing). */
 export function nodeSqlite(path = ':memory:'): SQLiteDatabase {
   const db = new DatabaseSync(path);
   let queue: Promise<unknown> = Promise.resolve();

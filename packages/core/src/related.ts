@@ -24,21 +24,27 @@ import {
 } from './schema';
 import { isSequenceAggregate, sequenceValue } from './sequence';
 
-// 查找、汇总、上一条（D-287–D-291）：这三种字段的值由别的记录算出来，不存进记录、不能填，只在本机算
-// （记录从不发给 AI，D-042、D-113）。
-// - expandCollection：把它们换成它们显示的那种字段（查找金额就是金额字段），显示、筛选、排序、公式、
-//   统计和图表就都照那种字段的定义走，不用另写一套。
-// - computeRecords：把算出来的值放进记录的副本（按表建一次索引：引用字段 → 记录，不是每条都扫整张表）。
-// - relatedProblems：字段定义的检查，包括不能绕回自己、最多叠 MAX_RELATED_DEPTH 层。
+// Lookups, rollups, and previous entries can be chained up to a maximum depth (D-290): a lookup
+// through a rollup counts as two levels.
+// - Lookup, rollup, previous (D-287–D-291): Values of these three field types are computed from
+// other records, are not stored in records, cannot be filled manually, and are computed locally
+// only (records are never sent to AI, D-042, D-113).
+// - expandCollection: Replaces them with the type of field they display (e.g., looking up an amount
+// becomes an amount field), so display, filtering, sorting, formulas, statistics, and charts follow
+// that field definition directly without needing a separate implementation.
+// - computeRecords: Places computed values into a record copy (indexed by table once: reference
+// field → record, rather than scanning the entire table for every entry).
+// - relatedProblems: Field definition checks, including preventing self-references and exceeding
+// MAX_RELATED_DEPTH.
 
-/** 查找、汇总、上一条最多叠几层（D-290）：查找一个汇总算两层。 */
+/** Maximum nesting depth for lookups, rollups, and previous entries (D-290): a lookup through a rollup counts as two levels. */
 export const MAX_RELATED_DEPTH = 3;
 
 type Computed = FieldOf<'lookup' | 'rollup' | 'previous'>;
 const isComputed = (f: Field): f is Computed =>
   f.type === 'lookup' || f.type === 'rollup' || f.type === 'previous';
 
-/** 一个字段：哪张表的哪个字段。 */
+/** A field reference: specific table and field. */
 interface Ref {
   collectionId: string;
   fieldId: string;
@@ -48,31 +54,33 @@ const refKey = (r: Ref) => `${r.collectionId}.${r.fieldId}`;
 const tableOf = (collections: readonly Collection[], id: string) =>
   collections.find((c) => c.id === id);
 
-/** 引用字段指向的表。 */
+/** The table pointed to by a reference field. */
 function linkTarget(collections: readonly Collection[], collection: Collection, linkId: string) {
   const link = fieldOf(collection, linkId);
   return link?.type === 'link' ? tableOf(collections, link.table) : undefined;
 }
 
-/** 写了的日期，没写就是第一个日期字段，再没有就是第一个日期时间字段、创建时间（同统计和图表）。 */
+/** Explicitly specified date; if not specified, uses the first date field, failing that the first date-time field, and finally the creation time (same as statistics and charts). */
 const dateOr = (collection: Collection, date: string | undefined): string =>
   date ??
   collection.fields.find((f) => f.type === 'date')?.id ??
   collection.fields.find((f) => f.type === 'datetime')?.id ??
   'createdAt';
 
-/** 汇总按哪个日期算（latest、按日子的聚合）：days.date，默认同上。 */
+/** Date used for rollup calculation (latest, daily aggregation): days.date, defaults to the above. */
 const rollupDate = (source: Collection, f: FieldOf<'rollup'>) => dateOr(source, f.days?.date);
 
-/** 上一条按哪个日期排。 */
+/** Date ordering used for the previous entry. */
 const previousDate = (collection: Collection, f: FieldOf<'previous'>) => dateOr(collection, f.date);
 
-/** 汇总要满足的条件（v34：v33 的 period 迁移成了 filter 里的一条 inPeriod）。 */
+/** Conditions that a rollup must satisfy (v34: v33 period migrated to an inPeriod condition in the filter). */
 const rollupConditions = (f: FieldOf<'rollup'>): Condition[] => f.filter ?? [];
 
 /**
- * 一个字段直接用到哪些字段（同一张表或别的表）：查循环、算层数、决定先算哪个都用它。
- * hop：这一步是查找、汇总或上一条（算一层）；公式用同一张表的字段，不算层。
+ * Fields directly used by a field (in the same table or another table): used for cycle detection,
+ * depth calculation, and determining computation order. Hop: this step is a lookup, rollup, or
+ * previous (counts as one level); formulas use fields within the same table and do not count
+ * towards depth.
  */
 function depsOf(
   collections: readonly Collection[],
@@ -120,8 +128,10 @@ function depsOf(
       };
     }
     case 'schedule': {
-      // 日程的「做过的日子」来自 lastDone，它可能是同一张表的汇总（D-293）：筛选、公式或别的汇总读这个
-      // 日程之前，要先把那个汇总算出来、把它的来源表读进来。日程自己不算一层。
+      // Schedule's "completed dates" come from lastDone, which might be a rollup in the same table
+      // (D-293): before filtering, formulas, or other rollups read this schedule, that rollup must
+      // be computed first and its source table loaded. The schedule itself does not count as a
+      // level.
       const lastDone = field.lastDone;
       return { refs: lastDone && !isSystemField(lastDone) ? [here(lastDone)] : [], hop: false };
     }
@@ -136,9 +146,9 @@ function fieldAt(collections: readonly Collection[], ref: Ref) {
   return c && f ? { collection: c, field: f } : undefined;
 }
 
-// ---- 换成它显示的那种字段 ----
+// ---- Replace with its displayed field type ----
 
-/** 换个 ID 和名字，去掉 required、default（算出来的值不用填）。 */
+/** Change ID and name, remove required and default constraints (computed values do not need manual entry). */
 function renamed(src: Field, as: Field): Field {
   const copy: Record<string, unknown> = { ...src, id: as.id, name: as.name };
   delete copy.required;
@@ -146,9 +156,9 @@ function renamed(src: Field, as: Field): Field {
   return copy as Field;
 }
 
-/** 公式存不了，取到的是它算出来的数字：换成数字或金额字段。 */
+/** Formulas cannot be stored; what is retrieved is their computed number: replace with a number or amount field. */
 function asStored(f: Field): Field {
-  // 算出来的日期（D-542）取到的是日期。
+  // Computed dates (D-542) resolve to a date type.
   if (f.type === 'dateOffset') return { id: f.id, name: f.name, type: 'date' };
   if (f.type !== 'formula') return f;
   return f.currency
@@ -157,8 +167,9 @@ function asStored(f: Field): Field {
 }
 
 /**
- * 计算字段显示成哪种字段；定义对不上（引用的表或字段没了、绕回自己、太深）时为 undefined，
- * 这时保留它自己（只能看有没有值，显示为空）。
+ * The displayed field type for a computed field; returns undefined if definitions are mismatched
+ * (referenced table or field missing, self-reference, too deep), in which case it keeps its own
+ * field (value can only be checked for presence, displays as empty).
  */
 function viewField(
   collections: readonly Collection[],
@@ -198,7 +209,7 @@ function viewField(
       }
       const src = field.field && valueOf({ collectionId: source.id, fieldId: field.field });
       if (!src || !NUMERIC_FIELD_TYPES.includes(src.type)) return undefined;
-      // 评分的合计、平均不再是 1–5 的评分。
+      // Ratings sums and averages are no longer 1–5 ratings.
       if (src.type === 'rating') return { id: field.id, name: field.name, type: 'number' };
       return renamed(src, field);
     }
@@ -208,8 +219,10 @@ function viewField(
 const expanded = new WeakMap<readonly Collection[], Map<string, Collection>>();
 
 /**
- * 这张表的字段里，查找、汇总、上一条换成它们显示的那种字段（ID 和名字不变），给显示、筛选、排序、
- * 公式、统计和图表用。写记录（prepareRecordValues）和表单仍然用原来的表。同一份 collections 结果不变。
+ * Among the fields of this table, replace lookups, rollups, and previous fields with the field
+ * types they display (keeping ID and name unchanged) for use in display, filtering, sorting,
+ * formulas, statistics, and charts. Writing records (prepareRecordValues) and forms still use the
+ * original table. The collections structure remains identical.
  */
 export function expandCollection(
   collections: readonly Collection[],
@@ -231,7 +244,7 @@ export function expandCollection(
   return result;
 }
 
-/** 算这张表要读哪些表的记录（它自己在最前面）：查找指向的表、汇总的来源表，一层层往下。 */
+/** Determine which tables' records need to be read for this table (itself first): lookup target tables, rollup source tables, layer by layer downwards. */
 export function relatedCollectionIds(
   collections: readonly Collection[],
   collection: Collection,
@@ -252,9 +265,9 @@ export function relatedCollectionIds(
   return [...tables];
 }
 
-// ---- 算值 ----
+// ---- Compute values ----
 
-/** 排序用的日期：系统字段是时间戳，日期、日期时间是文字（同一个字段之间比）。 */
+/** Date used for sorting: system fields are timestamps, date and date-time are strings (compared between the same field). */
 function dateKey(r: DataRecord, view: Collection, ref: string, now: Date, cal: Calendar) {
   if (isSystemField(ref)) return r[ref];
   const v = recordValue(r, view, ref, now, cal);
@@ -265,9 +278,10 @@ const byDate = <T extends { key: number | string; record: DataRecord }>(a: T, b:
   a.key < b.key ? -1 : a.key > b.key ? 1 : a.record.createdAt - b.record.createdAt;
 
 /**
- * 一张表的记录，查找、汇总、上一条的值算好放进去（副本，不改 records 里的记录）。records 是表 ID →
- * 没删的记录，要包括 relatedCollectionIds 列出的表。日期和「今天」按 now 和 cal（D-286）。
- * 记录里这几种字段原来存着的值（改字段类型之前留下的）一律不用。
+ * Compute and populate values for lookups, rollups, and previous fields in a table's records
+ * (copy, does not modify records in-place). records is table ID → undeleted records, including
+ * tables listed in relatedCollectionIds. Dates and "today" follow now and cal (D-286). Stored
+ * values for these field types in records (leftover before field type change) are ignored.
  */
 export function computeRecords(
   collections: readonly Collection[],
@@ -306,7 +320,7 @@ export function computeRecords(
     if (!map) byId.set(id, (map = new Map(rows(id).map((r) => [r.id, r]))));
     return map.get(recordId);
   };
-  /** 引用字段 → 指向每条记录的那些记录（每张表、每个引用字段建一次）。 */
+  /** Reference field → records pointing to each entry (indexed once per table and reference field). */
   const linkIndex = (id: string, linkId: string) => {
     const key = `${id}.${linkId}`;
     let index = indexes.get(key);
@@ -354,7 +368,7 @@ export function computeRecords(
               conditions.every((cond) => matchesCondition(x, sv, cond, now, cal)),
             );
           put(r, f.id, rollupValue(f, linked, sv, dateRef, now, cal));
-          // 日程的「上次完成」指向这个汇总时要用全部日子（D-293）。
+          // All dates must be used when a schedule's "last completed" points to this rollup (D-293).
           const days = linked.flatMap((x) => {
             const day = recordDay(x, sv, dateRef, now, cal);
             const n = day === undefined ? undefined : dayNumber(day);
@@ -393,7 +407,7 @@ export function computeRecords(
     }
   };
 
-  /** 先算它用到的，再算它自己；绕回来的（校验挡住了，旧数据里可能有）不再往下走，值为空。 */
+  /** Compute dependencies first, then the field itself; circular references (caught by validation, though legacy data might have them) halt traversal, resulting in an empty value. */
   const ensure = (ref: Ref) => {
     const key = refKey(ref);
     if (done.has(key) || active.has(key)) return;
@@ -410,8 +424,9 @@ export function computeRecords(
 }
 
 /**
- * 读出要用到的那些表的记录（listRecords 只给没删的），算好这张表的记录，连同显示用的表（D-291）。
- * App 的列表、统计、图表、记录页、导出 CSV 和快捷操作「读记录」共用。
+ * Load records of required tables (listRecords only returns undeleted ones), compute records for
+ * this table, along with the view tables (D-291). Shared by app lists, statistics, charts, record
+ * pages, CSV export, and quick action "read records".
  */
 export async function loadComputedRecords(
   listRecords: (collectionId: string) => Promise<DataRecord[]>,
@@ -430,8 +445,10 @@ export async function loadComputedRecords(
 }
 
 /**
- * 「最新」的那一条的 ref 字段的值（汇总的 latest、数字块的 latest 共用一份，D-618）：按 dateRef 那个日期（日期字段、
- * 日期时间字段或创建时间）最新的；同一天的后建的算新；没有日期或 ref 没有值的不算。records 是算好的记录，view 是换过的表。
+ * Value of the ref field for the "latest" entry (shared by rollup latest and number block latest,
+ * D-618): latest according to the dateRef date (date field, date-time field, or creation time);
+ * ties broken by later creation time; entries without a date or without a ref value are excluded.
+ * records are computed records, view is the transformed table.
  */
 export function latestValue(
   records: readonly DataRecord[],
@@ -452,11 +469,11 @@ export function latestValue(
   return best?.value;
 }
 
-/** 汇总和数字块的 latest 按哪个日期算：写了的（days.date），没写是存的表里第一个日期字段、日期时间字段、创建时间。 */
+/** Date used for rollup and number block latest calculations: explicit date (days.date) if specified, otherwise the first date field, date-time field, or creation time in the stored table. */
 export const latestDate = (table: Collection, date: string | undefined): string =>
   dateOr(table, date);
 
-/** 一条记录的汇总值：没有可用的值时为 undefined（求和是 0、计数是 0、连续是 0）。 */
+/** Rollup value for a single record: undefined when no valid value is available (sum is 0, count is 0, streak is 0). */
 function rollupValue(
   f: FieldOf<'rollup'>,
   linked: readonly DataRecord[],
@@ -476,16 +493,16 @@ function rollupValue(
     case 'latest':
       return latestValue(linked, source, f.field ?? dateRef, dateRef, now, cal);
     default:
-      // 日期 = days.date（默认同 rollupDate），unit、perUnit、skip 也在 days 里。
+      // Date = days.date (defaults to rollupDate), unit, perUnit, and skip are also in days.
       return sequenceValue(linked, source, f.aggregate, f.days, now, cal).value ?? undefined;
   }
 }
 
-// ---- 检查（D-290）----
+// ---- Checks (D-290) ----
 
 const DATE_TYPES: readonly string[] = ['date', 'datetime'];
 
-/** 字段定义的问题（文字会发给 AI）：先看定义本身，没问题再看会不会绕回自己、叠得太深。 */
+/** Field definition issues (text sent to AI): first check definition validity, then check for circular references and excessive nesting depth. */
 export function relatedProblems(
   field: Field,
   { config, collection }: FieldCheckContext,
@@ -493,7 +510,7 @@ export function relatedProblems(
   if (!isComputed(field)) return [];
   const collections = config.data.tables;
   const problems = shapeProblems(collections, collection, field);
-  // D-429：货币跟着每条记录走，算出来的字段带不过来。
+  // D-429: Currency follows each record and cannot be carried over by computed fields.
   if (
     problems.length === 0 &&
     hasRecordCurrency(
@@ -541,7 +558,7 @@ function shapeProblems(
       if (link?.type !== 'link')
         return [`via ${field.via} must be a link field of ${collection.id}`];
       const target = tableOf(collections, link.table);
-      // 引用的表不存在：引用字段自己会报。
+      // Referenced table does not exist: the reference field itself will report an error.
       if (!target) return [];
       return fieldOf(target, field.field) ? [] : [missing(target, field.field)];
     }
@@ -555,7 +572,7 @@ function shapeProblems(
           problems.push(
             `within ${field.within} must be a choice or link field of ${collection.id}`,
           );
-        // 多选（D-607）：一条记录在几组里，「同一组的上一条」说不清。
+        // Multiple choice (D-607): an entry belongs to multiple groups, making "previous in the same group" ambiguous.
         else if (isMultipleChoice(g))
           problems.push(`within ${field.within} ${MULTIPLE_CHOICE_NOT_ONE}`);
       }
@@ -617,7 +634,7 @@ function rollupProblems(
   return problems;
 }
 
-/** 从 start 出发沿着用到的字段走，能回到自己时返回那一圈（表.字段），否则 null。 */
+/** Starting from start and following referenced fields, returns the cycle path (table.field) if it can return to itself, otherwise null. */
 function loopOf(collections: readonly Collection[], start: Ref): string[] | null {
   const seen = new Set<string>();
   const walk = (ref: Ref, path: string[]): string[] | null => {
@@ -636,7 +653,7 @@ function loopOf(collections: readonly Collection[], start: Ref): string[] | null
   return walk(start, [refKey(start)]);
 }
 
-/** 叠得最深的一串查找、汇总、上一条（表.字段，从 ref 开始）。 */
+/** The deepest chain of lookups, rollups, and previous fields (table.field, starting from ref). */
 function chainOf(
   collections: readonly Collection[],
   ref: Ref,

@@ -4,8 +4,9 @@ import { screen } from 'expo-router/testing-library';
 import { FakeMedia, FakeSpeech } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 音频工具的界面旅程（D-150–D-156）：工具页 → 录音 → 结果页；语音转文字的结果和说明；
-// 剪一段的波形和铃声说明；压小音频的运行时询问。
+// UI journey for audio tools (D-150–D-156): tool page -> recording -> result page; speech-to-text
+// results and descriptions; waveform and ringtone description for trimming; runtime prompts for
+// audio compression.
 
 const MB = 1024 * 1024;
 
@@ -28,7 +29,7 @@ describe('audio journeys (UI)', () => {
     expect(
       await screen.findByText('全部在本机处理，不会上传。识别出的文字可能有错字，请核对。'),
     ).toBeTruthy();
-    // 录音机写出的文件（假的 expo-audio 的地址）。
+    // File written by the recorder (fake expo-audio address).
     files.disk.set('file:///cache/ExpoAudio/recording.m4a', new Uint8Array(4000));
     files.videos.set('file:///cache/ExpoAudio/recording.m4a', {
       kind: 'audio',
@@ -42,14 +43,14 @@ describe('audio journeys (UI)', () => {
     expect(await screen.findByText('锁屏后会继续录。录完点「完成」。')).toBeTruthy();
     expect(screen.getByTestId('local-done')).toBeDisabled();
     await fireEvent.press(screen.getByLabelText('开始录音'));
-    // 假的录音机每 0.2 秒走 1 秒。
+    // Fake recorder advances by 1 second every 0.2 seconds.
     await waitFor(() => expect(screen.getByTestId('record-time')).not.toHaveTextContent('0:00'));
     await fireEvent.press(screen.getByLabelText('暂停'));
     expect(screen.getByLabelText('继续录')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('继续录'));
     await fireEvent.press(screen.getByTestId('local-done'));
 
-    // 录音按开始录的时间命名（运行页用的是真实时间）。
+    // Name recordings by start time (run page uses real time).
     expect(
       await screen.findByTestId(
         /^result-item-录音 \d{4}-\d\d-\d\d_\d\d\.\d\d\.m4a$/,
@@ -82,7 +83,7 @@ describe('audio journeys (UI)', () => {
     files.speech = speech;
     files.nextPick = [files.offerAudio('会议.m4a', { size: 1 * MB })];
     await fireEvent.press(screen.getByTestId('run-audio-transcribe'));
-    // 运行时问来源（默认从文件选）和语言（默认普通话）。
+    // Prompt for source at runtime (defaults to selecting from file) and language (defaults to Mandarin).
     await fireEvent.press(await screen.findByTestId('prompt-ok'));
     await fireEvent.press(await screen.findByTestId('prompt-ok'));
     expect(await screen.findByText('明天上午九点在三楼开会。', {}, { timeout: 3000 })).toBeTruthy();

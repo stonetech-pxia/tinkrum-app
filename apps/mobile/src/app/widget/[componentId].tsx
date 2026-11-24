@@ -14,9 +14,10 @@ import { useNavigate } from '@/shell/navigation';
 import { useCalendar, useWorkspace } from '@/workspace/context';
 
 /**
- * 点了桌面小组件（D-321）：打开组件所在的页面；按钮打开它指向的地方，打开表单的「添加」按钮打开新记录的表单
- * （预设值先填好，Q6）。这一页本身不显示，
- * 先退回去，再像点了页面上的入口一样打开。组件已经不在了就停在首页。
+ * Tapped a home screen widget (D-321): open page where component resides; buttons open their
+ * target, form "Add" buttons open new record form (preset values filled in first, Q6). This page
+ * itself is not displayed; first go back, then open like a page entry point tap. If widget no
+ * longer exists, stay on home screen.
  */
 export default function WidgetRoute() {
   const { componentId } = useLocalSearchParams<{ componentId: string }>();

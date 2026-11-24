@@ -50,13 +50,13 @@ import { closeButtonOption, stackScreenOptions } from './header';
 import { NeedButton } from './NeedButton';
 import { StylePicker } from './StylePicker';
 
-/** 风格选择器填进去的原句由内置规则生成计划，不调用设置里的 AI（D-095）；新手引导的句子也是（D-149）。 */
+/** Original sentences filled into the style selector generate plans using built-in rules without calling AI in settings (D-095); onboarding tutorial sentences do the same (D-149). */
 const presetPlanner = createMockAIProvider();
 
-/** 引导的句子打进输入框的速度：每个字的间隔，整句最多约 1.4 秒。 */
+/** Typing speed of tutorial sentences into the input box: character interval, with the whole sentence taking at most about 1.4 seconds. */
 const typeDelay = (length: number) => Math.min(45, 1400 / Math.max(length, 1));
 
-/** 规划的每个阶段在 Tink 旁边说的话（D-448）：每个阶段两句，打开 AI 页时随机选一组；还没报阶段时是 start。 */
+/** Speech bubbles next to Tink for each planning stage (D-448): two sentences per stage, randomly choosing a group when the AI page opens; shows "start" before stage reporting begins. */
 const PROGRESS_TEXT: Record<PlanProgress | 'start', readonly [StringKey, StringKey]> = {
   start: ['tinkThinking', 'tinkThinking2'],
   full: ['tinkProgressFull', 'tinkProgressFull2'],
@@ -68,14 +68,17 @@ const PROGRESS_TEXT: Record<PlanProgress | 'start', readonly [StringKey, StringK
   fixing: ['tinkProgressFixing', 'tinkProgressFixing2'],
 };
 
-/** 输入框下面最多几个例子（不算「换个风格」）。 */
+/** Maximum number of examples below the input box (excluding "Change style"). */
 
 /**
- * AI 修改入口（§4、D-190、D-191）：一个带发送箭头的输入框和几个例子。
- * 改外观：AI 处理完，页面关掉，直接进入草稿模式：App 换成改完后的样子，能看不能用，
- * 底部「修改 / 退一步 / 应用 / 离开」；已经有草稿时，新的一句接着改这份草稿，也可以继续或删除它。
- * 改功能（快捷操作、工具、数据表）：直接应用（可以撤销），打开「做好了」页面马上试用；
- * 这句话里剩下的外观变成一条「接着改」，在「做好了」页面上，也是这里的第一个例子。
+ * AI modification entry point (§4, D-190, D-191): an input box with a send arrow and a few
+ * examples. Look changes: after AI processing, the page closes, directly entering draft mode: app
+ * changes to the modified look, viewable but not interactive, with bottom buttons "Modify / Step
+ * back / Apply / Leave"; when a draft already exists, a new sentence continues modifying that
+ * draft, which can also be continued or deleted. Feature changes (quick actions, tools, tables):
+ * applied directly (undoable), opening the "Ready" page for immediate testing; remaining look
+ * changes from the sentence become a "Continue modifying" item on the "Ready" page and the first
+ * example here.
  */
 
 export function ChangeScreen() {
@@ -100,12 +103,12 @@ export function ChangeScreen() {
   const openDraft = useWorkspace((s) => s.openDraft);
   const deleteDraft = useWorkspace((s) => s.deleteDraft);
   const showInShell = useWorkspace((s) => s.showInShell);
-  // 在 App 里打开 Tink 页就用这个 App 的风格（D-485）；风格选择器也标这个 App 现在的风格。
+  // Opening the Tink page within an app uses that app's style (D-485); the style selector also indicates the app's current style.
   const appId = useWorkspace((s) => s.appId);
   const theme = appViewOf(config, appId).theme;
   const palette = usePalette(theme);
   const aiMode = useAISettings((s) => s.mode);
-  // 从一个快捷操作（「让 AI 改这个」）或收件页面打开时带上的上下文（D-124）。
+  // Context carried when opened from a quick action ("Ask AI to modify this") or inbox page (D-124).
   const params = useLocalSearchParams<{
     workflow?: string;
     first?: string;
@@ -114,26 +117,27 @@ export function ChangeScreen() {
     guide?: string;
     next?: string;
     text?: string;
-    /** 从页面右上角的入口打开（D-406，aboutParams）。 */
+    /** Opened from the top-right entry of a page (D-406, aboutParams). */
     page?: string;
     table?: string;
     screen?: string;
     desk?: string;
   }>();
-  // 从新手引导第 1 步打开（D-149、D-231）：句子打进输入框后停下，用户自己点发送；
-  // 发送后直接生效，不进草稿。
+  // Opened from onboarding step 1 (D-149, D-231): sentence types into the input box and stops, the
+  // user taps send manually; takes effect immediately upon sending, without entering a draft.
   const [guide] = useState(() =>
     guideText(params.guide, locale) !== null ? params.guide : undefined,
   );
-  // 点了「接着改」（D-191）：那句话自动打进输入框，用设置里的 AI 处理。
-  // 引导的句子三种语言都用内置规则（D-449，改 D-228）。
+  // Tapped "Continue modifying" (D-191): that sentence automatically types into the input box and
+  // is processed using the AI in settings. Tutorial sentences use built-in rules across all three
+  // languages (D-449, revising D-228).
   const [auto] = useState(() => guideText(guide, locale) ?? (params.next ? next : null));
   const propose = useWorkspace((s) => s.propose);
   const confirm = useWorkspace((s) => s.confirm);
   const setGuideStage = useGuide((s) => s.setStage);
   const [typing, setTyping] = useState(() => auto !== null);
   const share = useIncoming((s) => s.share);
-  // 打开这一页时是哪一批（分享的、App 里选的、上一次的结果）：之后又分享进来一批，卡片上的说法也不变。
+  // Batch source when opening this page (shared, selected in app, previous result): even if another batch is shared in later, the card text remains unchanged.
   const [source] = useState(() => share?.source);
   const [about] = useState<PlanAbout | undefined>(() => {
     if (
@@ -148,7 +152,7 @@ export function ChangeScreen() {
     return aboutFromParams(params, config);
   });
   const place = aboutPlace(about, config, locale);
-  // 子 App 带上页面上下文；主页和未归属的页面则提供新 App / 整份设置两个入口。
+  // Sub-apps carry page context; the home screen and unassigned pages provide two entry points: new app / full setup.
   const handoff = useMemo(() => {
     const from =
       about?.kind === 'page'
@@ -189,8 +193,9 @@ export function ChangeScreen() {
             c.tools.some((u) => 'tool' in u && u.tool === about.workflowId),
         ),
     );
-  // 有上下文时输入框里提示的例子（D-124）；内置规则只留它真的认得的句子，所以先试一遍。
-  // 页面上不再列出预设的句子（D-233），只留「换个风格」。
+  // Examples suggested in the input box when context is present (D-124); built-in rules keep only
+  // sentences they truly recognize, so a test run is performed first. Preset sentences are no
+  // longer listed on the page (D-233), leaving only "Change style".
   const [examples, setExamples] = useState<readonly string[]>(() =>
     !about || aiMode === 'mock'
       ? []
@@ -208,18 +213,18 @@ export function ChangeScreen() {
     return () => {
       live = false;
     };
-    // 只在打开时算一次。
+    // Evaluated only once upon opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 别处带来的一句话（样板、快捷操作的类别、合并卡片）先填进输入框。
+  // Pre-filling the input box with a sentence brought from elsewhere (sample app, quick action category, merged card).
   const [input, setInput] = useState(() => (auto ? '' : (params.text ?? '')));
-  // 计划关掉后输入框重新出现时，键盘不要自己弹出来挡住页面。
+  // When the input box reappears after closing the plan, the keyboard should not auto-popup and block the page.
   const [focusInput, setFocusInput] = useState(() => Boolean(params.text) && !auto);
   const [prefillSelection, setPrefillSelection] = useState(() =>
     !auto && params.text ? { start: params.text.length, end: params.text.length } : undefined,
   );
-  /** 风格选择器最近填进去的句子；用户改过输入框后就不再相等，交给设置里的 AI。 */
+  /** Recently filled sentences in the style selector; once the user modifies the input box, they are no longer equal, deferring to the AI in settings. */
   const [presetText, setPresetText] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<
     | Extract<DraftResult, { kind: 'rejected' | 'invalid' }>
@@ -227,13 +232,15 @@ export function ChangeScreen() {
     | null
   >(null);
   const [stylesOpen, setStylesOpen] = useState(false);
-  /** 被拒绝的那句话（需求回收，D-189）。 */
+  /** The sentence that was rejected (requirement recycling, D-189). */
   const [asked, setAsked] = useState('');
 
   /**
-   * 关掉这个页面，回到草稿：从外壳或页面打开的回到原处（页面也显示草稿）；从运行页面、收件页面、
-   * 「做好了」页面打开的（有上下文）一起关掉，因为草稿模式不在它们里面。
-   * 从页面右上角的入口打开的回到原处（D-406）；原处显示不了草稿的（记录表单、快捷操作列表）进了草稿才一起关掉。
+   * Close this page and return to draft: opened from shell or page returns to origin (page also
+   * displays draft); opened from run page, inbox page, or "Ready" page (with context) close
+   * together because draft mode is not inside them. Opened from the top-right page entry returns
+   * to origin (D-406); origins unable to display drafts (record forms, quick action lists) close
+   * together only after entering the draft.
    */
   function leave(drafted = false) {
     const backToPlace =
@@ -248,13 +255,14 @@ export function ChangeScreen() {
   async function submit(text: string, offline = text.trim() === presetText) {
     if (!text.trim() || busy) return;
     setFeedback(null);
-    // 「撤销」会立即回到上一个版本、可能换主题：先把这个页面的导航栏固定住。Android 上带「关闭」
-    // 按钮的导航栏在这时更新会崩（react-native-screens：child already has a parent）。
+    // "Undo" immediately returns to the previous version and may change themes: first lock down
+    // this navigation bar. Updating the navigation bar with a close button on Android during this
+    // crashes (`react-native-screens`: child already has a parent).
     navigation.setOptions({ ...stackScreenOptions(palette), ...closeButtonOption(palette) });
     if (guide) {
-      // 顶部不出「已改好 · 撤销」（D-239）；回到首页显示第 2 步。
+      // Do not show "Modified · Undo" at the top (D-239); return to home and display step 2.
       const proposed = await propose(text.trim(), offline ? presetPlanner : undefined);
-      // 重新看引导时首页已经有这两个按钮：第 1 步算做完了。
+      // When re-reading the tutorial, home already has these two buttons: step 1 is considered complete.
       const already = proposed.kind === 'rejected' && proposed.reason === 'noChange';
       if (!already && (proposed.kind === 'rejected' || proposed.kind === 'invalid')) {
         setFeedback(proposed);
@@ -273,7 +281,7 @@ export function ChangeScreen() {
     afterResult(result);
   }
 
-  /** 一句话的结果：说明留在这一页，计划留在这一页；生效了或进草稿才离开。 */
+  /** Result of a single sentence: explanations stay on this page, and the plan stays on this page; leaves only upon success or entering draft. */
   function afterResult(result: ChangeResult) {
     if (result.kind === 'build') {
       setInput('');
@@ -285,20 +293,22 @@ export function ChangeScreen() {
       setFeedback(result);
       return;
     }
-    // 进入草稿或回到 App 时显示改到的那一页（在导航栏里时）。
-    // 从页面右上角的入口来的功能修改留在原处（D-406）：草稿才要跳到改到的那一页去看。
+    // Show the modified page (when in the navigation bar) upon entering draft or returning to the
+    // app. Feature modifications from page top-right entries stay at origin (D-406): only drafts
+    // jump to the modified page to view.
     if (result.kind === 'drafted' || (result.kind === 'applied' && !place)) {
       const target = pageTarget(result.focusPageId);
       const shown = result.kind === 'drafted' ? result.step.config : store.getState().config!;
       showInShell(shown, target);
     }
     leave(result.kind === 'drafted');
-    // 功能类直接应用了（D-191）：去「做好了」页面（或回到收件页面）试用。
+    // Feature class applied directly (D-191): go to the "Ready" page (or return to inbox page) to test.
     if (result.kind === 'applied') afterApply(result.applied);
   }
 
-  // 引导和「接着改」的句子一个字一个字打进输入框：用户看到「原来可以这么说」。引导的句子停下等用户发送，
-  // 「接着改」打完自动处理。
+  // Typing tutorial and "Continue modifying" sentences character by character into the input box:
+  // user sees "it turns out you can phrase it this way". Tutorial sentences pause and wait for the
+  // user to send, while "Continue modifying" processes automatically after typing finishes.
   useEffect(() => {
     const text = auto;
     if (!text) return;
@@ -309,7 +319,7 @@ export function ChangeScreen() {
       if (shown < text.length) return;
       clearInterval(timer);
       setTyping(false);
-      // 引导的句子用内置规则（见 guide/store.ts）。
+      // Tutorial sentences use built-in rules (see guide/store.ts).
       if (guide) {
         setPresetText(text);
         return;
@@ -317,11 +327,11 @@ export function ChangeScreen() {
       void submit(text, false);
     }, typeDelay(text.length));
     return () => clearInterval(timer);
-    // 只在打开时打一次。
+    // Typed only once upon opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** 点选风格：直接用内置规则换成那个风格，进入草稿看效果（D-095）。 */
+  /** Tap to select style: directly switch to that style using built-in rules, entering draft to preview effect (D-095). */
   function pickStyle(preset: ThemePresetId) {
     const text = presetRequest(preset, locale);
     setStylesOpen(false);
@@ -342,7 +352,7 @@ export function ChangeScreen() {
     );
   }
 
-  /** 用户点的（D-413）：先确认草稿，再做等着的那一步。 */
+  /** Triggered by user (D-413): confirm draft first, then execute the pending step. */
   async function applyDraftAndContinue(
     waiting: Extract<ChangeResult, { kind: 'needsDraft' }>['waiting'],
   ) {
@@ -359,8 +369,9 @@ export function ChangeScreen() {
   }
 
   /**
-   * 「把这些补上」（D-418）：和说一句话一样，结果走同样的路。搭建结果的面板上补好了就留在面板上，
-   * 看得到问题少了；外观在面板的「看看外观」里。
+   * "Fill these in" (D-418): same path as a single sentence input, results follow the same flow.
+   * Stays on the build result panel after filling so the reduction in issues is visible; look
+   * preview is under "View look" in the panel.
    */
   async function fix() {
     setFeedback(null);
@@ -372,7 +383,7 @@ export function ChangeScreen() {
     afterResult(result);
   }
 
-  /** 做完了，去看草稿（D-415）：外观走现有的草稿确认。 */
+  /** Finished, view draft (D-415): look goes through existing draft confirmation. */
   function seeBuiltLook() {
     openDraft();
     void endBuild();
@@ -380,14 +391,14 @@ export function ChangeScreen() {
   }
 
   const sub = [palette.font('body', 15), { color: palette.muted }];
-  // 计划开着时这一页只有它；停下了可以接着说别的。
+  // Only this page is shown while the plan is active; once stopped, other things can be discussed.
   const planBusy = build !== null && build.phase !== 'paused';
-  // 还差什么（D-414）：计划里的步骤已经在计划上了，「接着改」已经是下面的第一个例子。
+  // What is still missing (D-414): steps in the plan are already on the plan, and "Continue modifying" is already the first example below.
   const stillOpen = openItems(session).filter(
     (item) => item.text !== next && !(build && item.id.startsWith('b-')),
   );
   const doneCount = session.items.filter((item) => item.status === 'done').length;
-  // 这个会话新增、用户确认草稿后会看到的问题（D-418）。计划开着时在计划面板上算；「接着改」等着做页面时不算。
+  // Issues added in this session that the user will see after confirming the draft (D-418). Counted on the plan panel when plan is active; not counted when "Continue modifying" is waiting to execute the page.
   const shownConfig = draft?.steps.at(-1)?.config ?? config;
   const problems = useMemo(
     () => (build ? [] : sessionProblems(session, shownConfig, registry, { later: Boolean(next) })),
@@ -473,7 +484,7 @@ export function ChangeScreen() {
           </Card>
         ) : null}
 
-        {/* 输入框：左边一个闪光图标、柔和阴影，和划屏介绍最后一页的对话框一样。 */}
+        {/* Input box: a sparkle icon on the left, soft shadow, same as the dialog on the last page of swipe-through introduction. */}
         {planBusy ? null : (
           <View
             style={[
@@ -507,7 +518,7 @@ export function ChangeScreen() {
                 style={[styles.input, palette.font('body', 16), { color: palette.text }]}
               />
             </View>
-            {/* 发送按钮就是 Tink（D-448）：发出去以后它动起来，旁边一句短话说规划走到哪一步。 */}
+            {/* The send button is Tink (D-448): animates after sending, accompanied by a short phrase indicating planning progress. */}
             <View style={styles.sendRow}>
               {busy ? (
                 <Text
@@ -538,7 +549,7 @@ export function ChangeScreen() {
           </View>
         )}
 
-        {/* 测试期服务器保存请求（D-240）：中英文新手引导用内置规则，不经过服务器；法语引导经过（D-228）。 */}
+        {/* Test-period server save request (D-240): Chinese and English onboarding tutorials use built-in rules without passing through server; French tutorial passes through server (D-228). */}
         {!planBusy && aiMode === 'server' && !guide ? (
           <Text
             testID="change-server-stored"
@@ -578,7 +589,7 @@ export function ChangeScreen() {
                 <Text style={[palette.font('body', 15), { color: palette.text }]}>
                   {feedback.message}
                 </Text>
-                {/* 拒绝时给的例子（例如办事类请求能做成的快捷操作，D-128）：点一下填进输入框。 */}
+                {/* Examples provided upon rejection (e.g., quick actions achievable for administrative requests, D-128): tap to fill into the input box. */}
                 {feedback.examples.length > 0 ? (
                   <View style={styles.chips} testID="change-feedback-examples">
                     {feedback.examples.map((example) => (
@@ -605,7 +616,7 @@ export function ChangeScreen() {
           </Card>
         ) : null}
 
-        {/* 工具清单（D-414）：还差什么，点一项填进输入框。做没做好由代码判定。 */}
+        {/* Tool checklist (D-414): what is missing, tap an item to fill into the input box. Completion status is determined by code. */}
         {guide || planBusy || session.items.length === 0 ? null : (
           <View style={styles.session} testID="change-session">
             <View style={styles.sessionHead}>
@@ -672,7 +683,7 @@ export function ChangeScreen() {
 
         {guide || planBusy ? null : (
           <View style={styles.chips} testID="change-examples">
-            {/* 「接着改」是用户自己那句话剩下的部分（D-191），不是预设的句子。 */}
+            {/* "Continue modifying" is the remaining part of the user's own sentence (D-191), not a preset sentence. */}
             {next && !auto ? (
               <Pill
                 testID="change-next"
@@ -681,7 +692,7 @@ export function ChangeScreen() {
                 onPress={() => setInput(next)}
               />
             ) : null}
-            {/* AI 建议的下一步（D-355）：上一次修改时 AI 给的，点了填进输入框。 */}
+            {/* AI suggested next step (D-355): provided by AI during the last modification, tap to fill into the input box. */}
             {suggest.map((text, i) => (
               <Pill
                 key={text}
@@ -691,7 +702,7 @@ export function ChangeScreen() {
                 onPress={() => setInput(text)}
               />
             ))}
-            {/* 两个预设句子（不通过模型）：点了填进输入框，发送时用内置规则套整套样板。 */}
+            {/* Two preset sentences (bypassing model): tap to fill into input box, uses built-in rules to apply entire template upon sending. */}
             {about && !place
               ? null
               : (
@@ -753,7 +764,7 @@ export function ChangeScreen() {
         ) : null}
       </ScrollView>
 
-      {/* 「换个风格」：从底部弹出风格选择（D-095），选了直接进入草稿看效果。 */}
+      {/* "Change style": pops up style selection from bottom (D-095), selecting directly enters draft to preview effect. */}
       <BottomSheet
         palette={palette}
         locale={locale}
@@ -784,7 +795,7 @@ export function ChangeScreen() {
   );
 }
 
-/** 「2 张照片和 1 个 PDF」：分享进来的文件的类型和个数。 */
+/** "2 photos and 1 PDF": type and count of files shared in. */
 function sharedWhat(
   about: Extract<PlanAbout, { kind: 'shared' }>,
   locale: 'en' | 'zh' | 'fr',
@@ -818,7 +829,7 @@ const styles = StyleSheet.create({
   },
   session: { gap: 8 },
   sessionHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  // 窄屏或文案长（法语）时按钮换到下一行。
+  // Buttons wrap to next line on narrow screens or long copy (French).
   fix: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
   fixText: { flex: 1, minWidth: 120 },
   sessionItem: { borderRadius: 12, paddingVertical: 8, gap: 2 },

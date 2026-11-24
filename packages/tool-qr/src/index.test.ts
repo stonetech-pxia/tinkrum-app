@@ -19,7 +19,7 @@ const SAMPLES = [
 ];
 const LEVELS: QrEcc[] = ['L', 'M', 'Q', 'H'];
 
-/** 绕中心旋转（最近邻采样），外面填白色。 */
+/** Rotate around the center (nearest-neighbor sampling), filling the exterior with white. */
 function rotate(image: RgbaImage, degrees: number): RgbaImage {
   const { width, height, data } = image;
   const out = new Uint8Array(data.length).fill(255);
@@ -44,7 +44,7 @@ describe('qrMatrix', () => {
     expect(m.size).toBe(21);
     expect(m.modules).toHaveLength(21 * 21);
     expect(m.modules.every((v) => v === 0 || v === 1)).toBe(true);
-    // 左上角定位图案：7×7 外框是深色。
+    // Top-left alignment pattern: 7×7 outer frame is dark.
     expect(m.modules[0]).toBe(1);
     expect(m.modules[6]).toBe(1);
     expect(m.modules[6 * 21]).toBe(1);
@@ -54,10 +54,10 @@ describe('qrMatrix', () => {
     expect(() => qrMatrix('')).toThrow(QrError);
     expect(() => qrMatrix('')).toThrow(expect.objectContaining({ code: 'empty' }));
     expect(() => qrMatrix('a'.repeat(1001))).toThrow(expect.objectContaining({ code: 'tooLong' }));
-    // 1000 个汉字（3000 字节）超出二维码最大容量。
+    // 1000 Chinese characters (3000 bytes) exceed the maximum QR code capacity.
     expect(() => qrMatrix('码'.repeat(1000))).toThrow(expect.objectContaining({ code: 'tooLong' }));
     expect(qrMatrix('a'.repeat(1000), { ecc: 'H' }).size).toBeGreaterThan(100);
-    // 按字符数而不是 UTF-16 长度计算：600 个 emoji 是 1200 个 UTF-16 单元，但只有 600 个字符。
+    // Calculated by character count rather than UTF-16 length: 600 emojis are 1200 UTF-16 units, but only 600 characters.
     expect(qrMatrix('😀'.repeat(600), { ecc: 'L' }).size).toBeGreaterThan(150);
   });
 });
@@ -70,7 +70,7 @@ describe('qrToRgba', () => {
     expect(img.height).toBe(img.width);
     expect(img.data).toHaveLength(img.width * img.height * 4);
     expect(Array.from(img.data.subarray(0, 4))).toEqual([255, 255, 255, 0x88]);
-    // 第一个深色模块在留白之后：(2*3, 2*3)。
+    // The first dark module is after the quiet zone: (2*3, 2*3).
     const i = (6 * img.width + 6) * 4;
     expect(Array.from(img.data.subarray(i, i + 4))).toEqual([0x12, 0x34, 0x56, 255]);
   });
@@ -122,7 +122,7 @@ describe('downscaleRgba', () => {
   it('keeps small images and box-averages large ones', () => {
     const img = { width: 4, height: 2, data: new Uint8Array(4 * 2 * 4) };
     expect(downscaleRgba(img, 4)).toBe(img);
-    // 左半黑、右半白，缩成 2×1 后各自保持纯色；交界处平均。
+    // Left half black, right half white; scaled down to 2×1, each maintaining solid color; averaged at the boundary.
     for (let y = 0; y < 2; y++) {
       for (let x = 0; x < 4; x++)
         img.data.set(x < 2 ? [0, 0, 0, 255] : [200, 200, 200, 255], (y * 4 + x) * 4);
@@ -146,7 +146,7 @@ describe('Wi-Fi QR codes (D-199)', () => {
     expect(wifiText({ ...net, security: 'none', password: 'ignored' })).toBe(
       'WIFI:T:nopass;S:Home;;',
     );
-    // 能做成二维码再读回来。
+    // Can be encoded into a QR code and decoded back successfully.
     const image = qrToRgba(qrMatrix(wifiText(net)), { scale: 6 });
     expect(decodeQr(image)).toBe('WIFI:T:WPA;S:Home;P:secret123;;');
   });

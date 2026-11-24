@@ -3,24 +3,26 @@ import type { Registry } from '@morph/core';
 import type { Complete, Completion } from './planner';
 import { systemPromptFor } from './prompt';
 
-// 「Morph 服务器」模式的传输层（D-193）：提示词、校验和修正都在 App 里，和「自带 key」一样；
-// 服务器只加上 key、转发给 Claude，不认识 schema、工具和提示词，所以 App 升级时服务器不用跟着改。
+// Transport layer for "Morph server" mode (D-193): prompts, validation, and corrections happen
+// entirely in the app, same as "self-provided key"; the server only attaches the key and forwards
+// to Claude, without understanding schemas, tools, or prompts, so the server doesn't need updates
+// when the app upgrades.
 
 export interface RelayCompleterOptions {
   baseUrl: string;
   registry: Registry;
-  /** 打包进 App 的客户端令牌（D-132）；不是秘密。 */
+  /** Client token bundled into the app (D-132); not a secret. */
   clientToken?: string | undefined;
-  /** 用于服务器按设备限额。 */
+  /** Used for server-side rate limiting per device. */
   deviceId?: (() => Promise<string | null>) | undefined;
-  /** 测试期服务器随请求保存（D-240）。 */
+  /** Platform saved with requests during testing period (D-240). */
   platform?: 'ios' | 'android' | undefined;
   appVersion?: string | undefined;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
 }
 
-/** 服务器拒绝或连不上。code 是服务器返回的 error（rate_limited、daily_limit 等），或 network / timeout。 */
+/** Server rejection or connection failure. code is the error returned by the server (rate_limited, daily_limit, etc.), or network / timeout. */
 export class RelayError extends Error {
   constructor(
     readonly code: string,

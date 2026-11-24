@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import type { SecretStore } from './settings';
 
-// 只在本机解锁时可读，且不随备份迁移到其他设备。
+// Readable only when the device is unlocked and does not migrate to other devices with backups.
 const OPTIONS = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 
 export const secureSecretStore: SecretStore = {
@@ -12,7 +12,7 @@ export const secureSecretStore: SecretStore = {
   delete: (key) => SecureStore.deleteItemAsync(key, OPTIONS),
 };
 
-// 只用于 Morph 服务器按设备限额（D-132）：首次使用时随机生成，不含任何设备信息。
+// Used only for Morph server rate limiting per device (D-132): randomly generated on first use, contains no device information.
 let deviceId: Promise<string | null> | undefined;
 export function getDeviceId(): Promise<string | null> {
   deviceId ??= (async () => {

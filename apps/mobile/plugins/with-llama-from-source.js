@@ -1,8 +1,9 @@
 const { withGradleProperties } = require('expo/config-plugins');
 
-// Android 上 llama.rn 从源码编译：预编译的库会把提示词的 token 写进 logcat，能还原成识别出的文字（底线 1、2）。
-// 补丁在 patches/llama.rn+0.12.9.patch；iOS 不受这个开关影响。
-// 这样编译后 Gradle 默认的 2 GB 不够 R8 用（OutOfMemoryError），所以一起调大。
+// Build llama.rn from source on Android: prebuilt libraries write prompt tokens to logcat, which
+// can be reverse-engineered to recover recognized text (invariants 1, 2). Patch located at
+// patches/llama.rn+0.12.9.patch; iOS is unaffected by this flag. Such compilation causes Gradle's
+// default 2 GB to be insufficient for R8 (OutOfMemoryError), so both are increased together.
 module.exports = (config) =>
   withGradleProperties(config, (next) => {
     const set = {

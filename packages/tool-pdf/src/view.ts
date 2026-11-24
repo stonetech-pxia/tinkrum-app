@@ -1,8 +1,9 @@
 import { type Degrees, type PDFPage, degrees } from 'pdf-lib';
 
-// 页面的“用户视角”几何：PDF 页面可带 /Rotate，阅读器按顺时针旋转后显示。
-// 这里统一用视图坐标（左下角为原点、y 向上，即用户看到的方向）排版，
-// 再换算回 PDF 用户空间，使文字和图片在旋转过的页面上依然正着显示。
+// "User-perspective" geometry of a page: PDF pages may have /Rotate, displayed by readers after
+// clockwise rotation. Here, view coordinates (bottom-left origin, y upwards, i.e., the direction
+// seen by the user) are used uniformly for layout, then converted back to PDF user space so text
+// and images appear upright on rotated pages.
 
 export type Rotation = 0 | 90 | 180 | 270;
 
@@ -11,11 +12,11 @@ export function normalizeRotation(angle: number): Rotation {
 }
 
 export interface PageView {
-  /** 用户看到的宽高（90° / 270° 时与 CropBox 宽高互换）。 */
+  /** Dimensions seen by the user (swapped with CropBox dimensions at 90° / 270°). */
   width: number;
   height: number;
   rotation: Rotation;
-  /** 可见区域（CropBox，缺省为 MediaBox）。 */
+  /** Visible area (CropBox, defaults to MediaBox). */
   box: { x: number; y: number; width: number; height: number };
 }
 
@@ -31,7 +32,7 @@ export function pageView(page: PDFPage): PageView {
   };
 }
 
-/** 视图坐标 → PDF 用户空间坐标（即绕页面逆时针旋转 rotation 度再平移）。 */
+/** View coordinates → PDF user space coordinates (i.e., rotated counter-clockwise by rotation degrees around the page center, then translated). */
 export function toPdfPoint(view: PageView, p: number, q: number): { x: number; y: number } {
   const { x, y, width: w, height: h } = view.box;
   switch (view.rotation) {
@@ -47,8 +48,8 @@ export function toPdfPoint(view: PageView, p: number, q: number): { x: number; y
 }
 
 /**
- * 视图中的矩形（左下角 p, q，宽 w、高 h，绕中心逆时针转 angle 度）
- * → pdf-lib drawText / drawImage 需要的原点和旋转角。
+ * Rectangle in view (bottom-left at p, q, width w, height h, rotated counter-clockwise by angle
+ * degrees around the center) → origin and rotation angle needed by pdf-lib drawText / drawImage.
  */
 export function placeBox(
   view: PageView,

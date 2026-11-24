@@ -11,13 +11,14 @@ import { createDefaultWorkspace } from './defaults';
 import type { WorkspaceConfig } from './schema';
 import { registry } from './test-helpers';
 
-// 导出的文件带一份「用到了什么」（D-556）：导出时从内容和登记表算出来，不存进本机的配置；
-// 导入时和这个版本认识的比，缺什么准确地说出来。没有这一份的文件和以前一样。
+// Exported files include a "dependencies" manifest (D-556): Calculated from content and registries
+// at export time, not stored in local config; upon import, compares against known versions and
+// precisely reports any missing items. Files without this manifest behave as before.
 
 const NOW = new Date(2026, 10, 16);
 const PORTAL = join(__dirname, 'fixtures', 'portal-apps');
 
-/** 用到 D-537–D-552 加的东西的一份配置：表格样子、画廊、算出来的日期、往后 7 天、多选一、标红、列。 */
+/** A configuration utilizing features added in D-537–D-552: table layout, galleries, computed dates, next 7 days, single choice, red highlight, columns. */
 function rich(): WorkspaceConfig {
   const ops: Op[] = [
     {
@@ -114,7 +115,7 @@ describe('what a file uses (D-556)', () => {
         'showColorAnyLook',
       ]),
     );
-    // 排好序、不重复，文件每次一样。
+    // Sorted and deduplicated, producing identical results across runs.
     for (const list of Object.values(uses)) expect(list).toEqual([...new Set(list)].sort());
   });
 
@@ -142,7 +143,7 @@ describe('what a file uses (D-556)', () => {
     const whole = JSON.parse(appConfigFile(config, NOW)) as Record<string, unknown>;
     expect(whole.uses).toEqual(usesOf(config));
     expect((whole.config as Record<string, unknown>).uses).toBeUndefined();
-    // 读的地方照旧读得出来（外层多一个键不影响）。
+    // Can still be successfully parsed by the reader (an extra outer-level key does not affect it).
     expect(readAppFile(JSON.stringify(app))).not.toBeNull();
     expect(parseAppConfigFile(JSON.stringify(whole)).ok).toBe(true);
   });
@@ -184,7 +185,7 @@ describe('what a file uses (D-556)', () => {
   });
 });
 
-/** 一页上的几个块（不用是有效的配置：usesOf 只看形状）。 */
+/** Several blocks on a single page (does not need to be a valid config: usesOf only inspects structure). */
 const pageWith = (...blocks: object[]) => ({ containers: { pages: [{ id: 'p', blocks }] } });
 
 describe('features added in batch 1 (D-557–D-563)', () => {

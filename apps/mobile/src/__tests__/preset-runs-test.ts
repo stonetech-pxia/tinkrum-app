@@ -13,8 +13,9 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, TINY_JPEG, makePdf, makePng } from '../test-utils/fake-files';
 
-// 预设工作流从头跑到尾（T7）：平台、本地界面和扩展包页面换成假的，动作用真实实现。
-// 预设不要求安装工具（用户工作流），所以这里不安装任何工具。
+// Preset workflow runs from start to finish (T7): platform, local interface, and pack pages are
+// mocked, while actions use real implementations. Presets do not require installing tools (user
+// workflows), so no tools are installed here.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const preset = (id: string) =>

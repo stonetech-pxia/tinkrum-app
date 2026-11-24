@@ -13,7 +13,7 @@ import { FakeFiles, FakeVision, TINY_JPEG, makePdf } from '../test-utils/fake-fi
 import { MemoryPackFs, bundlePack, sha256, text } from '../test-utils/memory-packs';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 文件处理包一次问完（D-456）：扫描完、分享或打开文件后问一次，一起下载；运行时不再为可选的弹框。
+// File processing bundle asked once (D-456): asked once after scanning, sharing, or opening a file, downloaded together; no optional popups at runtime anymore.
 
 const NO_PAGES: string[] = [];
 
@@ -26,8 +26,9 @@ async function packStore(installed: string[] = []) {
 }
 
 /**
- * 新装的 App（D-510）：documentDirectory/packs 是空的，App 里带着这个平台的扩展包。真实清单的哈希对不上
- * 测试里的内容，所以每个扩展包换成一个小文件的清单（ID 和版本不变）。
+ * Fresh install of App (D-510): documentDirectory/packs is empty, app includes the platform's
+ * extension pack. Real manifest hash does not match test content, so each extension pack is
+ * replaced with a small file manifest (ID and version unchanged).
  */
 async function freshInstall(platform: 'ios' | 'android') {
   const fs = new MemoryPackFs();
@@ -80,11 +81,11 @@ describe('which packs the file bundle lists (D-456)', () => {
     expect(await fileBundleMissing(files, await packStore())).toContain('scan');
   });
 
-  // D-510：新用户不再看到「下载文件工具」：这一组都随 App 打包。
+  // D-510: New users no longer see "Download File Tool": this group comes bundled with the app.
   it('lists nothing on a fresh install: the file tools come with the app (D-510)', async () => {
     const iphone = await freshInstall('ios');
     expect(await fileBundleMissing(phone(), iphone.store)).toEqual([]);
-    // Android 不能自己找纸边；没有 Google Play 服务时也没有文档相机，要拉正照片的扫描包，也带着。
+    // Android cannot auto-find paper edges; document camera also absent without Google Play services, scan correction package is also bundled.
     for (const documentCamera of [true, false]) {
       const android = await freshInstall('android');
       const files = phone({ documentCamera, canFindPaper: false });
@@ -158,7 +159,7 @@ describe('the one-time prompt after opening a file (D-456)', () => {
     expect(screen.queryByTestId('pack-gate')).toBeNull();
     expect(screen.queryByText(/^下载文件工具/)).toBeNull();
     expect(fs.downloads).toEqual([]);
-    // 没问就不记「问过了」：以后清单换了新版本时还能问一次。
+    // Not asked, so not recorded as "asked": can ask again when the manifest is updated in the future.
     expect(await repo.getMeta(FILE_BUNDLE_ASKED)).toBeNull();
   });
 
@@ -169,11 +170,11 @@ describe('the one-time prompt after opening a file (D-456)', () => {
     expect(await screen.findByText(/^下载文件工具/)).toBeTruthy();
     for (const id of ['ppocr', 'pdfview', 'dewarp', 'layout'])
       expect(screen.getByTestId(`pack-item-${id}`)).toBeTruthy();
-    // 每一项都能取消勾选，不写「不下载也能继续」。
+    // Every item can be unchecked, without writing "continue without downloading".
     expect(screen.getByTestId('pack-include-ppocr')).toBeTruthy();
     expect(screen.queryByText(/不下载也能继续/)).toBeNull();
     expect(screen.queryByText(/许可证/)).toBeNull();
-    // 打开页面不写数据（底线 15）：点了才记下问过。
+    // Opening the page does not write data (invariant 15): recorded as asked only upon tapping.
     expect(await repo.getMeta(FILE_BUNDLE_ASKED)).toBeNull();
     expect(screen.getByTestId('pack-cancel')).toHaveTextContent('以后再说');
     await fireEvent.press(screen.getByTestId('pack-cancel'));
@@ -188,7 +189,7 @@ describe('the one-time prompt after opening a file (D-456)', () => {
     expect(screen.queryByTestId('pack-gate')).toBeNull();
   });
 
-  // 模拟器上发现（2026-11-06）：在这个框里下载好「PDF 预览」后，预览页还说要下载，再点又问一次。
+  // Observed on simulator (2026-11-06): after downloading "PDF Preview" in this box, preview page still prompts to download, tapping again asks once more.
   it('the PDF preview behind it starts showing pages once the bundle is downloaded', async () => {
     const fs = new MemoryPackFs();
     const lookup = new Map<string, PackManifest>();

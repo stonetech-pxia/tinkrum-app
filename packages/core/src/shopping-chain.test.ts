@@ -6,11 +6,12 @@ import { computeRecords, expandCollection } from './related';
 import { readRecords } from './source';
 import type { Collection } from './schema';
 
-// 买菜清单这条链（D-616 第二部分，只验证不改）：菜谱的汇总数本周计划了几次 → 用料查找这个次数 → 公式 用量 × 次数 →
-// 食材的汇总把用料的这个公式加起来 = 本周每样食材一共要多少。表和 side-session-notes/pick-create-2026-11-21 的
-// meals.tinkrum-app.json 一样。
+// The grocery list chain (D-616 second part, validation only without changes): recipe summary count
+// planned times this week -> ingredient lookup this count -> formula quantity x count -> ingredient
+// summary adds up this ingredient formula = total amount of each ingredient needed this week.
+// Tables are identical to meals.tinkrum-app.json in side-session-notes/pick-create-2026-11-21.
 process.env.TZ = 'Europe/Paris';
-// 2026-11-18 是星期三；默认一周从星期一开始，本周是 11-16 到 11-22。
+// 2026-11-18 is Wednesday; by default a week starts on Monday, so this week is 11-16 to 11-22.
 const now = new Date(2026, 10, 18, 9, 0);
 
 const tables: Collection[] = [
@@ -108,14 +109,14 @@ describe('shopping list: this week’s total per ingredient (D-616 part 2)', () 
         rec('i3', 'meals-items', { recipe: 'pancakes', ingredient: 'milk', amount: 300 }),
         rec('i4', 'meals-items', { recipe: 'omelette', ingredient: 'egg', amount: 3 }),
         rec('i5', 'meals-items', { recipe: 'soup', ingredient: 'leek', amount: 2 }),
-        // 还没填用量的一条：不算进去。
+        // One without quantity filled yet: not included.
         rec('i6', 'meals-items', { recipe: 'omelette', ingredient: 'milk' }),
       ],
     ],
     [
       'meals-plan',
       [
-        // 本周：松饼两次、煎蛋一次；汤只在上周。
+        // This week: pancakes twice, omelette once; soup was only last week.
         rec('p1', 'meals-plan', { recipe: 'pancakes', day: '2026-11-16' }),
         rec('p2', 'meals-plan', { recipe: 'pancakes', day: '2026-11-21' }),
         rec('p3', 'meals-plan', { recipe: 'omelette', day: '2026-11-18' }),
@@ -123,7 +124,7 @@ describe('shopping list: this week’s total per ingredient (D-616 part 2)', () 
       ],
     ],
   ]);
-  // 显示出来的值（公式在读的时候算，recordValue）。
+  // Displayed value (formulas are evaluated on read, recordValue).
   const value = (table: string, id: string, field: string) => {
     const view = expandCollection(
       tables,
@@ -148,7 +149,7 @@ describe('shopping list: this week’s total per ingredient (D-616 part 2)', () 
 
   it('step 4: an ingredient sums what this week needs', () => {
     expect(value('meals-ingredients', 'flour', 'week')).toBe(400);
-    // 松饼 2 × 2 + 煎蛋 3 × 1。
+    // Pancakes 2 x 2 + omelette 3 x 1.
     expect(value('meals-ingredients', 'egg', 'week')).toBe(7);
     expect(value('meals-ingredients', 'milk', 'week')).toBe(600);
     expect(value('meals-ingredients', 'leek', 'week')).toBe(0);

@@ -1,10 +1,14 @@
 import { DEFAULT_CALENDAR, dateOfDayNumber, weekStartOf, type Calendar } from './calendar';
 import { ScheduleRuleSchema, type ScheduleRule } from './schedule';
 
-// 在用户打的一行字里找一个日期 / 时间 / 重复的说法（「周五下午3点交报告」「every month on the 1st」
-// 「demain à 15h」）。纯规则，在手机上跑，不是 AI，也不发给任何地方。中、英、法三种说法不看界面语言，
-// 都认。只认一处：开始得最早的那处，同一位置取最长的；挨着的日期和时间（中间只有空格、「的」、at、à）
-// 合成一处。一切按传进来的 today（天数）和 cal.weekStart 算，不读时钟。
+// Finds a date / time / recurrence phrase in a single line typed by the user (e.g. a Chinese
+// weekday+time phrase, "every month on the 1st", or a French "tomorrow at 15h" phrase). Pure rules
+// running on-device — not AI, and sends nothing anywhere. Recognizes Chinese, English, and French
+// phrases regardless of UI language. Matches only one span: the earliest starting one, taking the
+// longest match at the same position; adjacent date and time spans (separated only by spaces, the
+// Chinese possessive particle U+7684, "at", or French "a" with grave accent) are merged into one.
+// Everything is computed from the passed-in today (day count) and cal.weekStart without reading the
+// system clock.
 
 export type DatePhraseValue =
   | { kind: 'date'; date: string; time?: string }
@@ -17,7 +21,7 @@ export interface DatePhrase {
   value: DatePhraseValue;
 }
 
-/** 一处匹配的结果：日期（天数）、时间（HH:mm）、重复规则，三者之一（算不出的日子是 undefined，丢掉）。 */
+/** Result of a single match: date (day offset), time (HH:mm), or recurrence rule, exactly one of the three (uncomputable dates are undefined and discarded). */
 interface Found {
   date?: number | undefined;
   time?: string | undefined;
@@ -33,16 +37,16 @@ interface Ctx {
   y: number;
   m: number;
   d: number;
-  /** 今天星期几：1 = 周一 … 7 = 周日。 */
+  /** Day of week today: 1 = Monday … 7 = Sunday. */
   wd: number;
   norm: string;
   at: number;
 }
 type Rule = [RegExp, (g: RegExpExecArray, c: Ctx) => Found | undefined];
 
-// ---- 词表 ----
+// ---- Vocabulary tables ----
 
-/** 「一组, 一组」→ 词 → 第几组（从 first 起）：每组里的词同义。 */
+/** "group, group" → word → group index (starting from first): words in the same group are synonyms. */
 function table(groups: string, first = 1): Record<string, number> {
   const out: Record<string, number> = {};
   groups.split(',').forEach((g, i) =>
@@ -62,7 +66,7 @@ const EN_WEEKDAY = table(
   'monday mon, tuesday tues tue, wednesday wed, thursday thurs thur thu, friday fri, saturday sat, sunday sun',
 );
 const FR_WEEKDAY = table('lundi, mardi, mercredi, jeudi, vendredi, samedi, dimanche');
-// 英文、法文的月份（法文已去掉重音）。
+// English and French months (French accents removed).
 const MONTHS = table(
   'january jan janvier janv, february feb fevrier fevr fev, march mar mars, april apr avril avr, may mai, ' +
     'june jun juin, july jul juillet juil, august aug aout, september sept sep septembre, ' +
@@ -70,7 +74,7 @@ const MONTHS = table(
 );
 const PERIODS = '凌晨|早上|早晨|清晨|上午|中午|下午|傍晚|晚上|夜里';
 
-/** 长的写在前面，免得 sept 抢了 septembre。 */
+/** Longer entries first, so that "sept" does not preempt "septembre". */
 const alt = (words: Record<string, number>) =>
   Object.keys(words)
     .sort((a, b) => b.length - a.length)
@@ -84,9 +88,9 @@ const EN_DAY = `(?:${alt(EN_WEEKDAY)})s?`;
 const FR_DAY = `(?:${alt(FR_WEEKDAY)})s?`;
 const re = (src: string) => new RegExp(src, 'g');
 
-// ---- 数字、日子、钟点 ----
+// ---- Numbers, Days, Hours ----
 
-/** 阿拉伯数字、one…ten / un…dix、一…三十一。认不出时 undefined。 */
+/** Arabic numerals, one…ten / un…dix, one…thirty-one in Chinese. Returns undefined if unparsable. */
 function num(s: string | undefined): number | undefined {
   if (s === undefined) return undefined;
   if (/^\d+$/.test(s)) return Number(s);
@@ -107,14 +111,14 @@ function num(s: string | undefined): number | undefined {
   return tens === undefined || ones === undefined ? undefined : tens * 10 + ones;
 }
 
-/** 年月日 → 天数；不存在的日子（2 月 30 日）为 undefined。 */
+/** Year, month, day → day offset; returns undefined for non-existent dates (e.g., February 30). */
 function mk(y: number, m: number, d: number): number | undefined {
   const t = Date.UTC(y, m - 1, d);
   const dt = new Date(t);
   return d >= 1 && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? t / 86_400_000 : undefined;
 }
 
-/** 某月某日：没写年份时是今年的，已经过了就是明年的。 */
+/** Month and day: defaults to current year if year is omitted, or next year if the date has already passed. */
 function monthDay(
   c: Ctx,
   m: number | undefined,
@@ -127,7 +131,7 @@ function monthDay(
   return { date: n !== undefined && n < c.today ? mk(c.y + 1, m, d) : n };
 }
 
-/** 只说了几号：这个月的，已经过了（或这个月没有这天）就往后找。 */
+/** Day-only specification: current month, searching forward if it has already passed (or does not exist this month). */
 function dayOnly(c: Ctx, d: number | undefined): Found | undefined {
   if (d === undefined || d < 1 || d > 31) return undefined;
   for (let k = 0; k < 3; k++) {
@@ -137,20 +141,20 @@ function dayOnly(c: Ctx, d: number | undefined): Found | undefined {
   return undefined;
 }
 
-/** 接下来的那个星期几（今天就是的话是今天）。 */
+/** The upcoming weekday (returns today if today is that weekday). */
 const coming = (c: Ctx, wd: number) => c.today + ((wd - c.wd + 7) % 7);
-/** 这周（k = 1 下周，-1 上周）的星期几，周从 cal.weekStart 算起。 */
+/** Weekday of this week (k = 1 for next week, -1 for last week), with weeks starting from cal.weekStart. */
 const inWeek = (c: Ctx, wd: number, k = 0) =>
   weekStartOf(c.today, c.cal) + ((wd - (c.cal.weekStart === 'monday' ? 1 : 7) + 7) % 7) + 7 * k;
 const thisWeekend = (c: Ctx) => (c.wd === 7 ? c.today : coming(c, 6));
 const firstOfNextMonth = (c: Ctx) => (c.m === 12 ? mk(c.y + 1, 1, 1) : mk(c.y, c.m + 1, 1));
 
-/** HH:mm；25 点、61 分这种不算时间。 */
+/** HH:mm; times like 25 o'clock or 61 minutes are invalid. */
 function hm(h: number | undefined, min = 0): Found | undefined {
   if (h === undefined || h < 0 || h > 23 || min < 0 || min > 59) return undefined;
   return { time: `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}` };
 }
-/** 下午 / 晚上的 1–11 点加 12；中午 1–5 点加 12；晚上 12 点是 0 点。 */
+/** Adds 12 hours for afternoon / evening 1–11, or midday 1–5; 12 midnight is hour 0. */
 function zhHour(period: string | undefined, h: number | undefined): number | undefined {
   if (h === undefined || period === undefined) return h;
   if (/下午|傍晚|晚上|夜里/.test(period) && h >= 1 && h <= 11) return h + 12;
@@ -167,9 +171,9 @@ function ampm(
   return hm((h % 12) + (p === 'p' ? 12 : 0), Number(min ?? 0));
 }
 
-// ---- 重复规则 ----
+// ---- Recurrence rules ----
 
-/** 只放过 ScheduleRuleSchema 认的规则。 */
+/** Only accepts rules recognized by ScheduleRuleSchema. */
 function rule(r: ScheduleRule): Found | undefined {
   return ScheduleRuleSchema.safeParse(r).success ? { rule: r } : undefined;
 }
@@ -184,14 +188,14 @@ const interval = (n: number | undefined) =>
       ? rule({ repeat: 'daily' })
       : rule({ repeat: 'interval', every: n });
 function yearly(month: number | undefined, day: number | undefined): Found | undefined {
-  // 闰年里有的日子都算（每年 2 月 29 日）。
+  // All valid dates in leap years are included (February 29 annually).
   if (month === undefined || day === undefined || mk(2000, month, day) === undefined)
     return undefined;
   return rule({ repeat: 'yearly', month, day });
 }
 const WORKDAYS = [1, 2, 3, 4, 5];
 
-/** 「一三五」「一到五」「周一和周三」里的星期几。 */
+/** Weekdays expressed in Chinese shorthand like "135", "1-to-5", or "Monday and Wednesday". */
 function zhDays(s: string): number[] {
   const out: number[] = [];
   let range = false;
@@ -206,14 +210,14 @@ function zhDays(s: string): number[] {
   }
   return out;
 }
-/** 「mon/wed/fri」「lundis et jeudis」里的星期几。 */
+/** Weekdays expressed in English/French like "mon/wed/fri" or "lundis et jeudis". */
 function wordDays(s: string, table: Record<string, number>): number[] {
   return (s.match(/[a-z]+/g) ?? [])
     .map((w) => table[w] ?? table[w.replace(/s$/, '')])
     .filter((n): n is number => n !== undefined);
 }
 
-// ---- 规则表（在去掉重音、小写过的文字上匹配） ----
+// ---- Rule table (matched against accent-folded, lowercased text) ----
 
 const ZH_REL: Record<string, number> = {
   大后天: 3,
@@ -228,7 +232,7 @@ const EN_REL: Record<string, number> = { tomorrow: 1, tmr: 1, tmrw: 1, today: 0,
 const FR_REL: Record<string, number> = { "aujourd'hui": 0, aujourdhui: 0, demain: 1, hier: -1 };
 
 const RULES: Rule[] = [
-  // 时间
+  // Time
   [
     re(`(${PERIODS})?${N}点钟?(?:(半)|(一刻)|(三刻)|${N}分?)?`),
     (g, c) => {
@@ -251,7 +255,7 @@ const RULES: Rule[] = [
     (g) => hm(num(g[1]), Number(g[2] ?? 0)),
   ],
 
-  // 日期：中文
+  // Date: Chinese
   [re(alt(ZH_REL)), (g, c) => ({ date: c.today + ZH_REL[g[0]]! })],
   [
     re(`${N}天(?:以后|之后|后)`),
@@ -280,7 +284,7 @@ const RULES: Rule[] = [
     },
   ],
   [re(`(?:(\\d{4})年)?${N}月${N}[日号]`), (g, c) => monthDay(c, num(g[2]), num(g[3]), num(g[1]))],
-  // 只说几号：「日」只跟阿拉伯数字（「一日三餐」不算），「3号线」「2号楼」不算。
+  // Day-of-month only: the Chinese day suffix (U+65E5) only follows Arabic digits (four-character idioms are excluded), and transit/building patterns like "Line 3" or "Building 2" are excluded.
   [
     re(`(?:${N}号|(\\d{1,2})日)(?![楼线房门床位车])`),
     (g, c) => (c.norm.charAt(c.at - 1) === '月' ? undefined : dayOnly(c, num(g[1] ?? g[2]))),
@@ -290,7 +294,7 @@ const RULES: Rule[] = [
     (g) => ({ date: mk(Number(g[1]), Number(g[2]), Number(g[3])) }),
   ],
 
-  // 日期：英文
+  // Date: English
   [re('(?:the\\s+)?day\\s+after\\s+tomorrow'), (g, c) => ({ date: c.today + 2 })],
   [re(alt(EN_REL)), (g, c) => ({ date: c.today + EN_REL[g[0]]! })],
   [re(`in\\s+${WN}\\s+days?`), (g, c) => ({ date: c.today + num(g[1])! })],
@@ -300,8 +304,9 @@ const RULES: Rule[] = [
     (g, c) => ({ date: g[1] ? inWeek(c, 6, 1) : thisWeekend(c) }),
   ],
   [re('next\\s+month'), (g, c) => ({ date: firstOfNextMonth(c) })],
-  // 「next friday」是下周的周五（同「下周五」）；「this / on friday」和光说「friday」是接下来的那个。
-  // 三个字母的缩写（sun、sat、wed 是常见词）只跟在 next / this / on 后面才算。
+  // "next friday" is the Friday of next week (same as "next week Friday"); "this / on friday" and
+  // bare "friday" refer to the upcoming one. Three-letter abbreviations (sun, sat, wed are common
+  // words) are only recognized when preceded by next / this / on.
   [
     re(
       `(?:(next|this|on)\\s+)?(${Object.keys(EN_WEEKDAY)
@@ -332,7 +337,7 @@ const RULES: Rule[] = [
   ],
   [re('(?:on\\s+)?the\\s+(\\d{1,2})(?:st|nd|rd|th)'), (g, c) => dayOnly(c, num(g[1]))],
 
-  // 日期：法文。「lundi prochain」是今天之后的下一个周一；「ce lundi」和光说「lundi」是接下来的那个。
+  // Date: French. "lundi prochain" is the next Monday after today; "ce lundi" and bare "lundi" refer to the upcoming one.
   [re('apres[-\\s]demain'), (g, c) => ({ date: c.today + 2 })],
   [re(alt(FR_REL)), (g, c) => ({ date: c.today + FR_REL[g[0]]! })],
   [re(`dans\\s+${WN}\\s+jours?`), (g, c) => ({ date: c.today + num(g[1])! })],
@@ -347,7 +352,7 @@ const RULES: Rule[] = [
     },
   ],
 
-  // 重复：中文
+  // Recurrence: Chinese
   [re('每[天日]'), () => rule({ repeat: 'daily' })],
   [re('(?:每个?)?工作日'), () => weekdays(WORKDAYS)],
   [re('每个?(?:周|星期|礼拜)末'), () => weekdays([6, 7])],
@@ -367,7 +372,7 @@ const RULES: Rule[] = [
     (g, c) => (g[1] ? yearly(num(g[1]), num(g[2])) : yearly(c.m, c.d)),
   ],
 
-  // 重复：英文
+  // Recurrence: English
   [re('every\\s*day|daily'), () => rule({ repeat: 'daily' })],
   [re('every\\s+(?:other|second)\\s+day'), () => interval(2)],
   [re(`every\\s+${WN}\\s+days`), (g) => interval(num(g[1]))],
@@ -402,7 +407,7 @@ const RULES: Rule[] = [
   ],
   [re('every\\s+year|yearly|annually'), (g, c) => yearly(c.m, c.d)],
 
-  // 重复：法文
+  // Recurrence: French
   [re('tous\\s+les\\s+jours|chaque\\s+jour|quotidiennement'), () => rule({ repeat: 'daily' })],
   [
     re(
@@ -438,7 +443,7 @@ const RULES: Rule[] = [
   [re('tous\\s+les\\s+ans|chaque\\s+annee|annuellement'), (g, c) => yearly(c.m, c.d)],
 ];
 
-// ---- 匹配 ----
+// ---- Matching ----
 
 const FOLD: Record<string, string> = {
   à: 'a',
@@ -459,7 +464,7 @@ const FOLD: Record<string, string> = {
   '’': "'",
   ʼ: "'",
 };
-/** 小写、去掉法文重音，长度不变（下标和原文一一对应）。不用 normalize，Hermes 上不一定可靠。 */
+/** Lowercases and removes French accents while preserving length (character indices correspond 1:1 with the original text). Avoids normalize, which may be unreliable on Hermes. */
 function fold(text: string): string {
   let out = '';
   for (let i = 0; i < text.length; i++) {
@@ -473,7 +478,7 @@ function fold(text: string): string {
 
 const WORD = /[a-z0-9]/;
 const ZH_NUM = /[零〇一二两三四五六七八九十]/;
-/** 不在更长的词里：「sundayschool」「Monday.com」不算，「today's」算；中文数字前面不能再接中文数字。 */
+/** Not inside longer words: "sundayschool" and "Monday.com" are excluded, while "today's" is included; Chinese numbers cannot be directly followed by another Chinese number. */
 function bounded(s: string, start: number, end: number): boolean {
   const first = s.charAt(start);
   const before = s.charAt(start - 1);
@@ -509,14 +514,14 @@ export function findDatePhrase(
     for (let g = regex.exec(norm); g; g = regex.exec(norm)) {
       const start = g.index;
       const end = start + g[0].length;
-      regex.lastIndex = start + 1; // 每个位置都试一次，被拒的匹配不挡住后面的
+      regex.lastIndex = start + 1; // Try every position; a rejected match does not block subsequent ones.
       if (end === start || !bounded(norm, start, end)) continue;
       const found = read(g, { ...base, at: start });
       if (found && (found.date !== undefined || found.time !== undefined || found.rule))
         parts.push({ start, end, ...found });
     }
   }
-  // 日期 / 重复和挨着的时间合成一处（时间在后面优先，也可以在前面：「3pm tomorrow」）。
+  // Combine date/recurrence and adjacent time into one place (time at the end takes precedence, but can also be at the beginning: "3pm tomorrow").
   const gap = (a: number, b: number) => a <= b && /^[\s,，的]*$/.test(norm.slice(a, b));
   const earliestLongest = (a: Part, b: Part) => a.start - b.start || b.end - a.end;
   const times = parts.filter((p) => p.time !== undefined).sort(earliestLongest);
@@ -546,7 +551,7 @@ export function findDatePhrase(
 }
 
 const CJK = /[\u3000-\u9fff\uff00-\uffef]/;
-/** 去掉这一处，连带它留下的「在」「at」「à」「le」「on」、多余的空格和两头的标点。 */
+/** Remove this occurrence, along with the accompanying prepositions ("in", "at", "à", "le", "on"), redundant spaces, and surrounding punctuation. */
 export function withoutPhrase(text: string, phrase: DatePhrase): string {
   const before = text
     .slice(0, phrase.start)

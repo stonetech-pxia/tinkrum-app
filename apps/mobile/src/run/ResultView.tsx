@@ -19,25 +19,26 @@ import { FileViewer } from '../share/FileViewer';
 import { MediaRow } from './MediaRow';
 import { canEditTable, canEditWord } from './office-items';
 
-// 结果预览（TOOLS_DESIGN §3）：图片缩略图、PDF 页数和大小、文字全文（只在本机显示）。
-// 结果页始终提供保存、分享、存到文件夹、存到相册（图片）、打印（PDF / 图片）、复制（文字）。
+// Result preview (TOOLS_DESIGN §3): image thumbnails, PDF page count and size, full text (displayed
+// locally only). Results page always provides Save, Share, Save to folder, Save to album (images),
+// Print (PDF / images), Copy (text).
 
 export const formatBytes = (bytes: number, locale: Locale = 'en') => formatFileSize(bytes, locale);
 
 export interface ResultActions {
   save(): Promise<void>;
   share(): Promise<void>;
-  /** choose：换一个文件夹（否则存到记住的文件夹）。返回文件夹名，用户取消时返回 null（按钮不显示「已存」）。 */
+  /** choose: change to a different folder (otherwise save to remembered folder). Returns folder name, returns null if user cancels (button does not show "Saved"). */
   saveToFolder(choose: boolean): Promise<string | null>;
-  /** 记住的文件夹的名字（D-123）。 */
+  /** Name of the remembered folder (D-123). */
   rememberedFolder(): string | null;
   saveToPhotos(): Promise<void>;
   print(): Promise<void>;
   copy(): Promise<void>;
   continueProcessing?(): Promise<void>;
-  /** 用系统预览打开一个结果文件（PDF 等，D-277）；图片在 App 里全屏看。 */
+  /** Open a result file (PDF, etc.) using system preview (D-277); images viewed full-screen within the app. */
   preview?(item: RunItem): Promise<void>;
-  /** 转 Excel、转 Word 的结果：放到桌上改（D-366，代替原来的「查看和编辑」）。 */
+  /** Conversion results for Excel, Word: place on desk for editing (D-366, replacing original "View and edit"). */
   putOnDesk?(item: RunItem): Promise<void>;
 }
 
@@ -50,7 +51,7 @@ function ItemRow({
   item: RunItem;
   palette: Palette;
   locale: Locale;
-  /** 点缩略图或这一行：全屏看图，其他文件用系统预览（D-277）。 */
+  /** Tap thumbnail or this row: view image full-screen, other files use system preview (D-277). */
   onOpen?: () => void;
 }) {
   const image = item.mimeType.startsWith('image/');
@@ -116,13 +117,13 @@ export function ResultView({
   palette: Palette;
   locale: Locale;
   actions: ResultActions;
-  /** 输入文件的总大小；结果变小了（压缩、缩小）时显示「原来 X，现在 Y」。 */
+  /** Total size of input files; displays "was X, now Y" when the result becomes smaller (compressed, scaled down). */
   inputSize?: number;
 }) {
   const [done, setDone] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [folder, setFolder] = useState(() => actions.rememberedFolder());
-  /** 全屏看的那一张（结果里所有图片中的序号）。 */
+  /** The card viewed in full screen (sequence number among all images in the results). */
   const [viewing, setViewing] = useState<number | null>(null);
   const act = (key: string, fn: () => Promise<void | boolean>) => async () => {
     setError(null);
@@ -153,7 +154,7 @@ export function ResultView({
     />
   );
 
-  // 存到记住的文件夹，或换一个（D-123）；两个按钮共用「已存」状态。
+  // Save to the remembered folder, or switch to another (D-123); both buttons share the "saved" state.
   const folderPill = (key: 'folder' | 'folderChange', choose: boolean) => (
     <Pill
       key={key}
@@ -172,7 +173,7 @@ export function ResultView({
         void act('folder', async () => {
           const name = await actions.saveToFolder(choose);
           if (name === null) {
-            // 取消了：记住的文件夹可能已经不在了（被删、授权被收回），按钮跟着更新。
+            // Cancelled: the remembered folder may no longer exist (deleted, authorization revoked), so the button updates accordingly.
             setFolder(actions.rememberedFolder());
             return false;
           }
@@ -204,7 +205,7 @@ export function ResultView({
   }
 
   if (value.type === 'records') {
-    // 记录只用来生成 PDF；工作流停在这里时只显示条数。
+    // Records are only used to generate PDFs; when the workflow stops here, only the count is displayed.
     return (
       <Card palette={palette} testID="run-result">
         <Text style={[palette.font('body', 15), { color: palette.text }]}>
@@ -217,14 +218,14 @@ export function ResultView({
   const items = value.items;
   const allSaved = items.every((i) => i.assetId);
   const images = items.every((i) => i.mimeType.startsWith('image/'));
-  // 存到相册：图片和视频（D-140）。
+  // Save to photo library: images and videos (D-140).
   const photos = items.every((i) => {
     const kind = mediaKindOf(i.mimeType, i.ext);
     return kind === 'image' || kind === 'video';
   });
   const printable = images || items.every((i) => i.mimeType === 'application/pdf');
   const outputSize = totalSize(value);
-  // 全屏看图：结果里的全部图片，左右滑（D-277）。
+  // Full-screen image view: all images in the results, swipe left and right (D-277).
   const viewable = items
     .filter((i) => mediaKindOf(i.mimeType, i.ext) === 'image')
     .map((i) => ({ uri: i.uri, kind: 'image' as const }));
@@ -249,7 +250,7 @@ export function ResultView({
                   : undefined
             }
           />
-          {/* 转 Excel 的结果（D-272）：没找到带线表格的页按全部内容输出了，说一声；可以放到桌上改。 */}
+          {/* Excel conversion result (D-272): pages without lined tables were output as full content, notify the user; can be placed on the desk to edit. */}
           {canEditTable(item) && item.tableDoc!.pagesWithoutTables?.length ? (
             <Text
               testID="result-tables-missing"

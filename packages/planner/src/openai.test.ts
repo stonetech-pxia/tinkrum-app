@@ -13,7 +13,7 @@ import {
 import { createClaudePlanner, parseJson } from './planner';
 import { buildSystemPrompt } from './prompt';
 
-// OpenAI 兼容接口（D-241）：请求形状、回复解析、错误分类、地址校验，以及和 Claude 共用的校验和修正。
+// OpenAI-compatible interface (D-241): request shape, response parsing, error classification, address validation, and validation/correction shared with Claude.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const ctx = { config: createDefaultWorkspace('zh'), registry, locale: 'zh' as const };
@@ -74,7 +74,7 @@ describe('OpenAI-compatible transport', () => {
         { role: 'user', content: 'hi' },
       ],
     });
-    // Anthropic 专用的参数不发。
+    // Do not send Anthropic-specific parameters.
     expect(String(init.body)).not.toMatch(/cache_control|output_config|fallbacks|anthropic/);
     expect(String(init.body)).not.toContain(KEY);
   });
@@ -151,7 +151,7 @@ describe('OpenAI-compatible transport', () => {
     );
     expect(err).toBeInstanceOf(AIHttpError);
     expect(err).toMatchObject({ kind, status });
-    // 有的 provider 会把 key 原样写进错误信息；我们的错误只有状态码和分类。
+    // Some providers include the key verbatim in error messages; our errors contain only the status code and category.
     expect(String((err as Error).message)).not.toContain(KEY);
     expect(JSON.stringify(err)).not.toContain(KEY);
   });
@@ -190,7 +190,7 @@ describe('planner with an OpenAI-compatible model', () => {
       'assistant',
       'user',
     ]);
-    // 上一轮回复以字符串发回，不是 Anthropic 的内容块。
+    // The previous round's response is sent back as a string, not as Anthropic content blocks.
     expect(second.messages[2].content).toBe(`Sure! Here is the plan:\n${bad}`);
     expect(second.messages[3].content).toContain('rejected by the app');
   });

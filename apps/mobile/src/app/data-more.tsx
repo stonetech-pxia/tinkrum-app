@@ -6,8 +6,9 @@ import { LocalModelCard } from '@/packs/LocalModelCard';
 import { Card, ListRow, Pill, SectionLabel } from '@/renderer/ui';
 
 /**
- * 「数据 → 更多」（D-614）：用得少的放这里。导出 App 设计（整份配置）；填写记忆的导出、从文件恢复、清空（D-244）；
- * 本机模型（D-396）；已下载内容。系统层，AI 不能修改（底线 8）。
+ * 'Data -> More' (D-614): lesser-used items placed here. Export app design (entire config);
+ * export form memory, restore from file, clear (D-244); on-device model (D-396); downloaded
+ * content. System layer, cannot be modified by AI (invariant 8).
  */
 export default function DataMoreRoute() {
   const data = useDataOverview();

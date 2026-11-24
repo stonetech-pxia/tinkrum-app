@@ -18,7 +18,7 @@ interface WorkspaceContextValue {
   store: WorkspaceStore;
   registry: Registry;
   locale: Locale;
-  /** 工作流执行与文件列表使用的存储和平台文件能力。 */
+  /** Storage and platform file capabilities used by workflow execution and file lists. */
   repo: WorkspaceRepo;
   files: FilePlatform;
 }
@@ -46,8 +46,9 @@ export function useWorkspace<T>(selector: (state: WorkspaceState) => T): T {
 }
 
 /**
- * 在某个 App 里打开的页面（设置、Tink、记录页……）都用这个 App 的风格，顶栏和内容一致（D-485）。
- * 不在 App 里就是主页的风格。config 不传就用已保存的那份。
+ * Pages opened within a certain app (Settings, Tink, record page...) use that app's style, with
+ * header matching content (D-485). When not in an app, use home page style. If config is omitted,
+ * use the saved one.
  */
 export function useAppTheme(config?: WorkspaceConfig): Theme {
   const appId = useWorkspace((s) => s.appId);
@@ -55,7 +56,7 @@ export function useAppTheme(config?: WorkspaceConfig): Theme {
   return appViewOf(config ?? saved, appId).theme;
 }
 
-/** 一天、一周从什么时候开始（D-286）：按天、按周归类的计算都用它。 */
+/** When a day or week begins (D-286): used for all day-based and week-based categorization calculations. */
 export function useCalendar(): Calendar {
   const settings = useWorkspace((s) => s.config?.data.calendar);
   return useMemo(() => calendarOf({ data: { tables: [], calendar: settings } }), [settings]);

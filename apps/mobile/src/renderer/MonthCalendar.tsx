@@ -42,15 +42,19 @@ import { UiIcon } from './Icon';
 import { onPage } from './theme';
 import { Card } from './ui';
 
-// 记录列表的月历外观（D-305）：一个月的格子，每天按记录条数分深浅，或者按一个单选字段上色（这一天最后一条的
-// 选项）；左右翻月，点某一天在下面列出当天的记录（和普通列表一样的行，点记录打开编辑页）。
-// 只读显示的月份或周范围，跨日记录按重叠读取（useMonthRecords）。格子至少 44 高、日期 16 号字；今天加粗并在数字下面画一道主色的线，
-// 选中的那天有一圈文字色的框，深色模式下颜色从同一套分类色的深色版里取。
+// Calendar appearance for record lists (D-305): a grid of a month, with each day shaded by record
+// count or colored by a single-select field (using the option of the last entry of the day);
+// supports flipping months left and right, and tapping a day lists that day's records below (in
+// standard list rows, tapping a record opens the editor). Reads only the displayed month or week
+// range, reading cross-day records by overlap (useMonthRecords). Cells are at least 44 high with
+// 16pt date numbers; today's date is bolded with a primary-color underline beneath the number, the
+// selected day has a text-color border, and dark mode colors are derived from the dark variant of
+// the same palette.
 
-/** 深浅四档：表面色往主色混多少。 */
+/** Four shade levels: how much surface color is blended into primary color. */
 const HEAT = [0, 0.2, 0.4, 0.65, 0.9];
 
-/** 填色上的文字：黑白里对比度高的那个。 */
+/** Text on fill: whichever has higher contrast between black and white. */
 const readable = (fill: string) =>
   contrast(fill, '#FFFFFF') >= contrast(fill, '#111111') ? '#FFFFFF' : '#111111';
 
@@ -89,7 +93,7 @@ export function MonthCalendar({
   const rows = useRecordRows(block, env, tone, collection, view);
   const router = useRouter();
   if (!collection || !view || !rows) return null;
-  // 在选中的那天添加（D-349）：日期字段填这天，日程是「一次，这天」；日期时间、系统字段不预设。
+  // Add on selected day (D-349): date field populates this day, schedule is "one-time, this day"; datetime and system fields are not prefilled.
   const dateType = view.fields.find((f) => f.id === dateRef)?.type;
   const dayPreset = (day: number): Record<string, unknown> => {
     const date = dateOfDayNumber(day);
@@ -98,7 +102,7 @@ export function MonthCalendar({
     return {};
   };
 
-  // 跟着页面上的一排选项（D-573）：只显示选中那一项的记录，在某天添加时也预设成它。
+  // Follows the row of options on the page (D-573): displays only records for the selected option, and pre-fills it when adding on a given day.
   const filter = followedFilter(block.source, env.pageChoice);
   const matched = filterRecords(records ?? [], view, filter, now, cal);
   const { days, max } = monthDays(
@@ -116,7 +120,7 @@ export function MonthCalendar({
   );
   const color = block.show.color ? view.fields.find((f) => f.id === block.show.color) : undefined;
   const options = color?.type === 'choice' ? color.options : [];
-  // 选项写了颜色的用它的颜色（D-568），没写的按顺序用分类色（和饼图一样，第 8 个起和「未选」一起用中性灰）。
+  // Options with specified colors use their color (D-568), unassigned ones use category colors sequentially (same as pie chart, starting from 8th alongside "Unselected" using neutral grey).
   const colorOfOption = (id: string | null) => {
     const i = id === null ? -1 : options.findIndex((o) => o.id === id);
     return optionColor(options[i], i, palette.dark, options);

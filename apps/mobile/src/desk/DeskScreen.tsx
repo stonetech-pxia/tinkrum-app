@@ -80,20 +80,24 @@ import { useDeskEdit } from './useDeskEdit';
 import { WordEditor } from './WordEditor';
 import { useRunHost } from './useRunHost';
 
-// 文件房间（file-room DESIGN §4，D-360）：中间是桌上文件的大预览，底部（或顶部）一排工具。
-// 用一个工具或一个快捷操作，结果成为桌上的新版本，顶部能撤销、重做；「完成」里保存、分享或清空桌面。
-// 布局来自配置（WorkspaceConfig.desk，D-358），没写的用默认（预览居中、工具栏在底部）。
-// 工具作用到桌上和正在看的这份同一种的全部文件（多选在 R6）。文件只在本机，AI 看不到。
-// 转 Excel、转 Word 的结果在桌上就是编辑器（R2，D-366）：选中东西时工具栏收起、换成编辑层；连续的编辑在
-// 用工具、打开「完成」、离开、切文件、App 进后台时合成一个版本，顶部只有一组撤销（useDeskEdit）。
+// File room (file-room DESIGN §4, D-360): center features a large preview of desk files, with a row
+// of tools at the bottom (or top). Using a tool or quick action produces a new version on the desk,
+// with undo/redo at the top; "Done" saves, shares, or clears the desk. Layout comes from config
+// (WorkspaceConfig.desk, D-358), defaulting to centered preview and bottom toolbar if unspecified.
+// Tools apply to all files of the same kind as the currently viewed one (multi-select in R6). Files
+// remain local and are invisible to the AI. Results of Excel/Word conversions act as editors on the
+// desk (R2, D-366): selecting items tucks away the toolbar and switches to the editing layer;
+// continuous edits are synthesized into a single version when using tools, opening "Done", leaving,
+// switching files, or moving the app to the background, presenting a single set of undo controls at
+// the top (useDeskEdit).
 
-/** 现在的时间（毫秒）：放在组件外面，只在点了以后的处理里用。 */
+/** Current time in milliseconds: placed outside the component, used only in post-tap handlers. */
 const nowMs = () => Date.now();
 
-/** 预览占屏幕高度的比例（布局 preview 不是 fill 时）。 */
+/** Preview height ratio relative to screen (when layout preview is not fill). */
 const PREVIEW_SHARE = { large: 0.62, medium: 0.45 } as const;
 
-/** 草稿的四个按钮占的高度（不算底部安全区）。 */
+/** Height occupied by the four draft buttons (excluding bottom safe area). */
 const DRAFT_BAR_SPACE = 84;
 
 interface Busy {
@@ -105,7 +109,7 @@ interface Busy {
 
 export function DeskScreen({ deskId }: { deskId: string }) {
   const { repo, files, registry, locale } = useWorkspaceContext();
-  // 草稿模式里显示草稿（D-190）：AI 改的工具栏和布局在这里看（D-406）。
+  // Displays drafts in draft mode (D-190): AI-modified toolbars and layouts are viewed here (D-406).
   const config = useWorkspace(shownConfig)!;
   const revisionId = useWorkspace((s) => s.head!.id);
   const bumpAssets = useWorkspace((s) => s.bumpAssets);
@@ -130,17 +134,18 @@ export function DeskScreen({ deskId }: { deskId: string }) {
   const [panel, setPanel] = useState<(AskRequest & { entry: ToolEntry }) | null>(null);
   const [sheet, setSheet] = useState(false);
   const [saved, setSaved] = useState(false);
-  // 存到手机（复制进「文件」App 里选的文件夹）：存进了哪个文件夹。
+  // Saved to phone (copied to the selected folder in the Files app): target folder destination.
   const [folderSaved, setFolderSaved] = useState<string | null>(null);
   const [selecting, setSelecting] = useState(false);
   const signal = useRef({ cancelled: false });
   const alive = useRef(true);
-  /** 清空了桌面：离开时不再合上编辑。 */
+  /** Desk cleared: skip closing edits upon departure. */
   const cleared = useRef(false);
-  /** 说过外来的文件重新生成时哪些格式不留（D-509）：这个桌面只说一次。 */
+  /** Notified about unsupported formats when regenerating external files (D-509): logged once per desk session. */
   const toldRebuilt = useRef(false);
-  // 桌面不留着（D-462，取代「先留在桌上」）：离开就清掉；要留下的在「完成」里保存或分享。
-  // 有没保存的改动时，离开前先问「放弃修改？」（见下面的 beforeRemove）。
+  // Desk is not retained (D-462, superseding "keep on desk initially"): cleared upon leaving; items
+  // to keep must be saved or shared via "Done". When there are unsaved changes, prompts "Discard
+  // changes?" before leaving (see beforeRemove below).
   useEffect(
     () => () => {
       if (cleared.current) return;
@@ -149,13 +154,13 @@ export function DeskScreen({ deskId }: { deskId: string }) {
     },
     [files, deskId],
   );
-  /** 保存时桌上是第几个版本：之后没再改过就不用问「放弃修改？」。 */
+  /** Version number on the desk when saved: if unmodified afterwards, prompts for "Discard changes?" can be skipped. */
   const [savedAt, setSavedAt] = useState(0);
 
   useEffect(() => {
     alive.current = true;
     void loadDesk(files, deskId)
-      // 上次没合上的编辑（App 被关掉）合成一个版本。
+      // Synthesize unclosed edits from the previous session (app terminated) into a single version.
       .then((d) => (d ? recoverEditDraft(files, d, Date.now()) : null))
       .then(
         (d) => {
@@ -175,7 +180,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
   const list = desk && desk !== 'gone' ? currentFiles(desk) : [];
   const shown = list.find((f) => f.id === shownId) ?? list[0] ?? null;
   const kind = shown ? deskKindOf(shown) : 'other';
-  // 工具作用到和正在看的这份同一种的全部文件（例如 5 张照片一起转成一个 PDF）。
+  // Targets match all files of the same kind as the current view when shown (e.g., combining 5 photos into a single PDF).
   const targets = shown ? list.filter((f) => deskKindOf(f) === kind) : [];
   const tools = useMemo(
     () =>
@@ -186,7 +191,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
         quickActionsOf(config),
         locale,
       ),
-    // targets 跟着 list 和 kind 变。
+    // Targets depend on list and kind changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [kind, layout.tools, registry, config.tools, locale, list],
   );
@@ -201,7 +206,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
       setShownId(fileId);
     },
   });
-  // 离开房间、App 进后台时合上编辑（用最新的 edit：它的 seal 只读 ref）。
+  // Synthesizes edits upon leaving the room or moving app to background (using latest edit: its seal is a read-only ref).
   const editRef = useRef(edit);
   useEffect(() => {
     editRef.current = edit;
@@ -215,14 +220,14 @@ export function DeskScreen({ deskId }: { deskId: string }) {
       if (!cleared.current) void editRef.current.seal();
     };
   }, []);
-  // 返回（按钮、手势）时有没保存的改动：先问「放弃修改？」（2026-11-06 测试：加了水印、改了格子，返回就悄悄没了）。
+  // Unsaved changes when going back (via button or gesture): prompts "Discard changes?" first (2026-11-06 test: watermark added, cells edited, going back silently discarded them).
   const leave = useConfirmLeave(
     desk !== null && desk !== 'gone' && (edit.dirty || desk.current !== savedAt),
     'deskDiscardMessage',
     locale,
   );
   const onSelecting = useCallback((on: boolean) => setSelecting(on), []);
-  // 键盘开着时导航栏在键盘下面，底部不用再让出它的高度。
+  // Navigation bar sits below the keyboard when open, eliminating the need to reserve bottom height.
   const [keyboard, setKeyboard] = useState(false);
   useEffect(() => {
     const subs = [
@@ -308,7 +313,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
         if (!alive.current) return;
         if (commit.desk !== current) {
           setDesk(commit.desk);
-          // 看新出来的第一份（转换、拆分的结果）。
+          // View the newly generated first item (result of conversion or splitting).
           const fresh = currentFiles(commit.desk).find((f) => !before.has(f.id));
           if (fresh) setShownId(fresh.id);
         }
@@ -326,7 +331,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
     }
   }
 
-  /** 合上编辑以后桌上现在的、和正在看的同一种的文件（工具作用到它们）。 */
+  /** Current desk files of the same kind as the currently viewed one after sealing edits (tools apply to them). */
   async function sealedTargets(): Promise<DeskFile[]> {
     const d = (await edit.seal()) ?? deskRef.current;
     return d ? currentFiles(d).filter((f) => deskKindOf(f) === kind) : [];
@@ -334,9 +339,9 @@ export function DeskScreen({ deskId }: { deskId: string }) {
 
   async function press(entry: ToolEntry) {
     if (busy) return;
-    // 草稿模式里能看不能用（D-190）。
+    // View-only in draft mode (D-190).
     if (locked) return locked();
-    // 用别的工具、保存、分享前先把编辑合成一个版本（§11.2）。
+    // Synthesize edits into a single version before using other tools, saving, or sharing (§11.2).
     const on = await sealedTargets();
     if (entry.room === 'share') return void act(shareAll);
     if (entry.room === 'save') return void act(save);
@@ -352,8 +357,9 @@ export function DeskScreen({ deskId }: { deskId: string }) {
     const preset = item.preset ? action.presets?.find((p) => p.id === item.preset) : undefined;
     const params = preset ? { ...preset.values } : initialParams(action);
     const keys = deskToolAsks(action);
-    // 有要问的参数、又不是要亲手操作的工具：先弹出参数面板，点「应用」才跑（跑完才知道结果，D-360）。
-    // 参数都不用问的（识别类，D-278）直接跑（D-363）。
+    // When there are parameters to prompt for and it is not a manual tool: pops up the parameter
+    // panel first, executing only upon tapping "Apply" (results are unknown until execution
+    // finishes, D-360). Parameterless tools (recognition category, D-278) run immediately (D-363).
     if (!preset && !action.local && keys.length > 0) {
       setPanel({
         entry,
@@ -386,8 +392,10 @@ export function DeskScreen({ deskId }: { deskId: string }) {
     }));
 
   /**
-   * 要存、要分享的文件里有改过的外来 docx / xlsx（重新生成的，D-509）：第一次先用一句话说清哪些格式不留，
-   * 点「继续」才做，点「取消」什么都不做。没改过的外来文件存的是原件的副本，不用说。
+   * Files to save or share contain modified external docx / xlsx files (regenerated, D-509):
+   * explains which formats are dropped on the first occurrence via a prompt, proceeding only upon
+   * tapping "Continue", while "Cancel" does nothing. Unmodified external files save copies of
+   * their originals without requiring a prompt.
    */
   function confirmRebuilt(list: readonly DeskFile[]): Promise<boolean> {
     const kinds = new Set(
@@ -417,12 +425,12 @@ export function DeskScreen({ deskId }: { deskId: string }) {
     });
   }
 
-  /** 分享桌上的文件（工具栏、「完成」里的「分享」）。 */
+  /** Share desk files (toolbar / "Share" in "Done"). */
   async function shareAll() {
     if (await confirmRebuilt(nowFiles())) await files.shareUris(items());
   }
 
-  /** 存成用户文件；转 Excel、转 Word 的结果带着中间格式和原图，以后还能放回桌上改（D-367）。 */
+  /** Save as user files; Excel and Word conversion results retain intermediate formats and original images so they can be re-edited on the desk later (D-367). */
   async function save() {
     const d = deskRef.current;
     if (!d) return;
@@ -437,9 +445,10 @@ export function DeskScreen({ deskId }: { deskId: string }) {
   }
 
   /**
-   * 存到手机：每次让用户在「文件」App 里选文件夹，复制进去（D-120）；取消时什么都不变。
-   * 改过的外来 docx / xlsx 和保存、分享一样先说一句哪些格式不留（D-509）。
-   * 存好了也算保存过：之后没再改，离开就不再问「放弃修改？」（D-512）。
+   * Save to phone: each time, let the user pick a folder in the Files app and copy the file into
+   * it (D-120); on cancel, nothing changes. For edited external docx / xlsx, warn beforehand
+   * about which formats are not kept, just like saving and sharing (D-509). Once saved, it counts
+   * as saved: if not modified further, leaving no longer prompts with "Discard changes?" (D-512).
    */
   async function saveToPhone() {
     if (!(await confirmRebuilt(nowFiles()))) return;
@@ -465,8 +474,10 @@ export function DeskScreen({ deskId }: { deskId: string }) {
   }
 
   /**
-   * 「用原图」（D-467）：从这一页的原图上剪下 box（原图像素）那一块，存成临时文件；合上编辑时搬进桌面。
-   * 认字那张图和原图大小不一定一样，按比例换算。
+   * "Use original image" (D-467): crop the box area (in original image pixels) from the original
+   * image of this page, and save it as a temp file; move it into the desk when closing the
+   * editor. The OCR image and the original image may have different dimensions, scale
+   * proportionally.
    */
   async function cropOriginal(page: DocPage, box: Box): Promise<string | null> {
     const current = deskRef.current;
@@ -508,8 +519,10 @@ export function DeskScreen({ deskId }: { deskId: string }) {
     );
 
   /**
-   * 从记录的附件放上来的桌面（D-395）：「完成」每次都问「加成新附件」还是「替换原件」；取消时照常打开「完成」，
-   * 记录不变。附件满了只能替换。表单已经关掉时就是普通的桌面。
+   * Desk populated from a record's attachment (D-395): "Done" always asks whether to "Add as new
+   * attachment" or "Replace original"; on cancel, opens "Done" as usual, record unchanged. If
+   * attachments are full, only replacement is allowed. When the form is already closed, it acts
+   * as a normal desk.
    */
   function finish() {
     const back = deskReturnOf(deskId);
@@ -542,7 +555,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
     );
   }
 
-  /** 桌上的文件存成用户文件交回表单（还要用户点保存），然后清掉这个桌面、回到表单。 */
+  /** Save files on the desk as user files and return them to the form (still requires the user to tap save), then clear this desk and return to the form. */
   async function giveBack(back: DeskReturn, mode: DeskReturnMode) {
     const d = deskRef.current;
     if (!d) return;
@@ -552,7 +565,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
       newId: newAssetId,
     });
     bumpAssets();
-    // 表单在这期间关掉了：刚存的文件没人用，删掉；桌面留着。
+    // The form closed in the meantime: the newly saved file is unused, delete it; keep the desk.
     if (!back.deliver(mode, fresh)) {
       await deleteUserFiles(fresh, repo, files);
       return;
@@ -615,13 +628,13 @@ export function DeskScreen({ deskId }: { deskId: string }) {
     </View>
   );
 
-  // 顶部只有一组撤销（§10 第 4 题）：编辑没合上时一步步退编辑，否则退整个版本。
+  // Top bar has only one set of undo (§10 question 4): when the editor is open, step through edits; otherwise, undo the whole version.
   const editHistory = edit.session?.history;
-  // 页面上刚改的字还没合成一步时（D-465）也能撤销。
+  // Allow undo even when freshly typed text on the page has not yet been merged into a single step (D-465).
   const editUndo = (editHistory?.past.length ?? 0) > 0 || edit.dirty;
   const editRedo = (editHistory?.future.length ?? 0) > 0;
   const showToolbar = !selecting;
-  // 底部工具栏不在时（选中了东西换成编辑层、工具栏在顶部），房间最下面让出系统导航栏（三星真机，2026-10-30）。
+  // When the bottom toolbar is absent (content selected and switched to edit layer, toolbar at the top), leave room at the very bottom of the view for the system navigation bar (Samsung real device, 2026-10-30).
   const bottomInset =
     (layout.toolbar !== 'bottom' || !showToolbar) && !keyboard ? insets.bottom : 0;
   const preview = !shown ? null : shown.source && edit.session !== null ? (
@@ -652,7 +665,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
       />
     )
   ) : (
-    // D-488：图片、PDF 的大预览放在圆角的「纸张卡片」里（和预览页一样）：外层给阴影，里层裁圆角。
+    // D-488: Large previews for images and PDFs are placed inside a rounded "paper card" (same as the preview page): outer layer gets a shadow, inner layer is clipped with rounded corners.
     <View
       style={[styles.paper, palette.cardStyle(palette.surface), { borderRadius: palette.radius }]}>
       <View style={[styles.paperClip, { borderRadius: Math.max(0, palette.radius - 2) }]}>
@@ -669,8 +682,9 @@ export function DeskScreen({ deskId }: { deskId: string }) {
   );
 
   return (
-    // Android 也要 padding：全屏页面的窗口不跟着键盘缩小，三星键盘会盖住编辑输入框（同 AskPanel）。
-    // 窗口真的缩小了时，键盘不再和页面重叠，padding 是 0。
+    // Android also needs padding: full-screen pages do not shrink with the keyboard, Samsung
+    // keyboard covers editing input fields (same as AskPanel). When the window actually shrinks,
+    // the keyboard no longer overlaps the page, and padding is 0.
     <KeyboardAvoidingView
       testID="desk-screen"
       behavior="padding"
@@ -775,7 +789,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
         <ScrollView
           horizontal
           testID="desk-strip"
-          // 一行普通高度（横向 ScrollView 默认 flexGrow: 1，会被撑开）。
+          // Single row normal height (horizontal ScrollView defaults to flexGrow: 1, which would cause it to be stretched).
           style={styles.bar}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.strip}>
@@ -807,7 +821,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
       {layout.preview === 'fill' ? null : <View style={styles.flex} />}
       {layout.toolbar === 'bottom' && showToolbar ? toolbar : null}
       {bottomInset > 0 ? <View testID="desk-bottom-inset" style={{ height: bottomInset }} /> : null}
-      {/* 草稿的四个按钮不盖住工具栏：工具栏就是要看的东西。 */}
+      {/* The four draft buttons do not obscure the toolbar: the toolbar is what needs to be seen. */}
       {inDraft ? <View style={{ height: DRAFT_BAR_SPACE + insets.bottom }} /> : null}
 
       {panel ? (
@@ -821,7 +835,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
             const p = panel;
             setPanel(null);
             if (answer) {
-              // 密码不在参数结构里，跑的时候执行器会再问（D-194）。
+              // Passwords are not included in the parameters structure, the executor will prompt for them again at runtime (D-194).
               const params = { ...p.params, ...answer };
               for (const f of p.action.fields) if (f.kind === 'secret') delete params[f.key];
               applyTool(p.action.id, params);
@@ -954,7 +968,7 @@ export function DeskScreen({ deskId }: { deskId: string }) {
       ) : null}
       {inDraft ? (
         <>
-          {/* 顶栏高 56（和上面的 header 一样），Tink 在撤销、重做、完成三个按钮左边：约离右边 190。 */}
+          {/* Top bar height is 56 (same as the header above), Tink is to the left of the undo, redo, and finish buttons: about 190 from the right. */}
           <DraftBar
             palette={palette}
             bottom={insets.bottom + 12}
@@ -969,8 +983,8 @@ export function DeskScreen({ deskId }: { deskId: string }) {
 }
 
 /**
- * 顶栏的按钮（D-488）：返回和撤销、重做是浅色圆底的小按钮，「完成」是主色实心的药丸（主操作）。
- * text 是显示的字；disabled 时变淡。
+ * Top bar buttons (D-488): back, undo, and redo are light circular small buttons, "Finish" is a
+ * primary-color filled pill (primary action). text is the displayed label; dims when disabled.
  */
 function HeaderButton({
   id,
@@ -988,9 +1002,9 @@ function HeaderButton({
   onPress: () => void;
   disabled?: boolean;
   bold?: boolean;
-  /** 主操作：主色实心。 */
+  /** Primary action: primary-color filled. */
   primary?: boolean;
-  /** 读屏的名字（text 是符号时用）。 */
+  /** Screen reader label (used when text is a symbol). */
   label?: string;
 }) {
   return (
@@ -1046,7 +1060,7 @@ function SheetRow({
   );
 }
 
-/** 跑工具时盖在预览上：这一步的名字、进度、停止。 */
+/** Overlay on the preview when running a tool: name of this step, progress, stop. */
 function BusyCover({
   busy,
   palette,
@@ -1099,7 +1113,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    // 和页面栈的导航栏（预览页用的）一样高，从预览页进桌面时顶栏不跳。
+    // Same height as the page stack navigation bar (used by the preview page), preventing the top bar from jumping when entering the desk from the preview page.
     minHeight: Platform.OS === 'ios' ? 44 : 56,
   },
   headerButton: {

@@ -15,7 +15,7 @@ import type { AssetRecord } from '../storage/types';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 「设置 → 存储空间」（D-264）：列出 Tinkrum 保存的全部文件、用在哪里，能删单个文件、一键清理没在用的。
+// "Settings -> Storage" (D-264): list all files saved by Tinkrum and their usages, allow deleting individual files or cleaning up unused ones in one tap.
 
 const receipts: Collection = {
   id: 'expenses',
@@ -95,7 +95,7 @@ async function withFiles() {
     createdAt: 2,
     updatedAt: 2,
   });
-  // 删掉的记录在「最近删除」里，它的文件还算在用。
+  // Deleted records are in "Recently Deleted", their files are still counted as in use.
   await repo.deleteRecord('r2', Date.now());
   return { repo, files };
 }
@@ -107,7 +107,7 @@ async function openStorage(repo: MemoryWorkspaceRepo, files: FakeFiles, locale: 
   return app;
 }
 
-/** 系统弹窗：依次点名字为 labels 的按钮（每个弹窗一个）。 */
+/** System popups: tap buttons named labels sequentially (one per popup). */
 function pressInAlerts(...labels: string[]) {
   const spy = jest.spyOn(Alert, 'alert');
   for (const label of labels)
@@ -161,14 +161,14 @@ describe('storage page (D-264)', () => {
     );
     expect(files.disk.has('assets/orphan/换掉的照片.jpg')).toBe(false);
     expect(files.disk.has('assets/result/压缩后.mp4')).toBe(true);
-    // 没有可清理的了。
+    // Nothing available to clean up.
     expect(screen.queryByTestId('storage-cleanup')).toBeNull();
   });
 
   it('a file only older versions use counts as unused, and says so', async () => {
     const { repo, files } = await withFiles();
     const { store } = await openStorage(repo, files);
-    // 文件入口换成另一个文件：旧文件只在旧版本里用到。
+    // File entry point changed to another file: old file is only used in old versions.
     await act(async () => {
       const result = await store.getState().proposeOps(
         [

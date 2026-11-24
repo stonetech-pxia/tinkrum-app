@@ -10,8 +10,10 @@ import { FieldSchema, fieldDefinition, type Collection, type WorkspaceConfig } f
 import { registry } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// D-570（创始人 2026-11-16 决定 ①）：记录表单交给配置，只开四样：分段、条件显示（只看这一条自己的字段）、
-// 字段下面的提示、数字的范围。保存、删除、附件、候选值仍归内核。
+// D-570 (Founder decision 2026-11-16 ①): Delegated entry form configuration, restricting it to four
+// features: sections, conditional display (evaluating only the current record's own fields),
+// field-level hints, and numeric ranges. Saving, deletion, attachments, and candidate values remain
+// core responsibilities.
 
 const NOW = new Date(2026, 10, 16, 12);
 
@@ -100,7 +102,7 @@ describe('sections (D-570)', () => {
     expect(
       at([{ fields: ['note'], when: [{ field: 'invoice', op: 'contains', value: 'x' }] }]),
     ).toMatch(/contains needs a text field/);
-    // 最多 3 个条件。
+    // Maximum of 3 conditions.
     const four = Array.from({ length: 4 }, () => ({ field: 'invoice', op: 'is', value: true }));
     expect(at([{ fields: ['note'], when: four }])).not.toBe('');
   });
@@ -201,7 +203,7 @@ describe('ranges (D-570)', () => {
     expect(readValue(orders.fields[1]!, 0)).toBe(0);
     const r = prepare({ item: 'Chair' }, stored);
     expect(r.ok && r.values).toEqual({ item: 'Chair', qty: 0 });
-    // 改它的时候才查。
+    // Checked only upon modification.
     expect(issuesOf(prepare({ qty: -1 }, stored))).toEqual([
       { fieldId: 'qty', code: 'tooSmall', limit: 1 },
     ]);

@@ -3,7 +3,7 @@ import { getDeviceLocale, formatWhen } from '../i18n';
 
 jest.mock('expo-localization', () => ({ getLocales: jest.fn(() => []) }));
 
-// 改动记录里的时间（D-112）：今天 / 昨天，更早的显示日期；不显示秒。
+// Time in change history (D-112): today / yesterday, earlier shows date; seconds are not shown.
 
 describe('formatWhen', () => {
   const now = new Date(2026, 9, 23, 18, 5);

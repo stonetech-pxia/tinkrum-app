@@ -1,7 +1,8 @@
 import { unzipSync, zipSync, type UnzipFileInfo, type Zippable } from 'fflate';
 
-// ZIP 打包与解压（T1）。只依赖字节数组；fflate 只用同步 API（异步 API 需要 Worker，
-// Hermes 没有），因此同一份代码在手机上运行，也能在 Node 中用真实 ZIP 测试。
+// ZIP archiving and extraction (T1). Depends only on byte arrays; fflate uses synchronous APIs only
+// (asynchronous APIs require Workers, which Hermes lacks), allowing identical code to run on mobile
+// and be tested with real ZIPs in Node.
 
 export type ArchiveErrorCode = 'unreadable' | 'tooManyEntries' | 'tooLarge' | 'encrypted' | 'empty';
 
@@ -15,13 +16,13 @@ export class ArchiveError extends Error {
 }
 
 export interface ArchiveLimits {
-  /** 最多文件数（目录和系统垃圾文件不计）。 */
+  /** Maximum number of files (directories and system junk files excluded). */
   maxEntries: number;
-  /** 所有文件解压后的总字节数上限。 */
+  /** Upper limit on total uncompressed bytes across all files. */
   maxTotalBytes: number;
-  /** 单个文件解压后的字节数上限。 */
+  /** Upper limit on uncompressed bytes for a single file. */
   maxFileBytes: number;
-  /** 解压后 / 压缩后 的比例上限，防 zip 炸弹；只对超过 1 MB 的文件检查。 */
+  /** Upper limit on uncompressed-to-compressed ratio to prevent zip bombs; checked only for files exceeding 1 MB. */
   maxRatio: number;
 }
 
@@ -76,7 +77,7 @@ const MIME_TYPES: Record<string, string> = {
   mov: 'video/quicktime',
 };
 
-// 本身已经压缩过的格式，再压缩只浪费时间，直接存储（level 0）。
+// Formats already compressed; further compression is a waste of time, so store directly (level 0).
 const STORED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'pdf', 'zip']);
 
 function extensionOf(name: string): string {
@@ -89,8 +90,9 @@ export function mimeTypeOfName(name: string): string {
 }
 
 /**
- * 把任意名字变成安全的单层文件名：去掉控制字符，`/` `\` 换成 `_`，
- * 连续的点压成一个（不可能再出现 `..`），去掉首尾空白和结尾的点。保留中文等 UTF-8 字符。
+ * Sanitize arbitrary names into safe single-level filenames: strip control characters, replace
+ * `/` and `\\` with `_`, collapse consecutive dots (preventing `..`), trim leading/trailing
+ * whitespace and trailing dots. Preserves Chinese and other UTF-8 characters.
  */
 export function sanitizeName(name: string): string {
   const cleaned = name
@@ -102,7 +104,7 @@ export function sanitizeName(name: string): string {
   return cleaned === '' || cleaned === '.' ? 'file' : cleaned;
 }
 
-/** 大小写不敏感地去重：`photo.jpg` 已存在时得到 `photo-2.jpg`、`photo-3.jpg`…… */
+/** Case-insensitive deduplication: when `photo.jpg` already exists, produces `photo-2.jpg`, `photo-3.jpg`, etc. */
 function uniqueName(name: string, taken: Set<string>): string {
   const dot = name.lastIndexOf('.');
   const stem = dot > 0 ? name.slice(0, dot) : name;
@@ -117,7 +119,7 @@ function resolveLimits(limits: Partial<ArchiveLimits> | undefined): ArchiveLimit
   return { ...DEFAULT_LIMITS, ...limits };
 }
 
-/** 把文件打成一个 ZIP。文件名会被清理并去重，已压缩格式只存储不压缩。 */
+/** Pack files into a ZIP. File names are sanitized and deduplicated; already compressed formats are stored without recompression. */
 export function createZip(
   entries: readonly ArchiveInput[],
   { level = 6, limits }: CreateZipOptions = {},
@@ -125,7 +127,7 @@ export function createZip(
   const max = resolveLimits(limits);
   if (entries.length === 0) throw new ArchiveError('empty');
   if (entries.length > max.maxEntries) throw new ArchiveError('tooManyEntries');
-  // 用无原型对象，避免名为 `__proto__` 的文件被吞掉。
+  // Use a prototype-less object to prevent files named `__proto__` from being swallowed.
   const files = Object.create(null) as Zippable;
   const taken = new Set<string>();
   let total = 0;
@@ -143,8 +145,9 @@ const u16 = (d: Uint8Array, i: number) => (d[i] ?? 0) | ((d[i + 1] ?? 0) << 8);
 const u32 = (d: Uint8Array, i: number) => (u16(d, i) | (u16(d, i + 2) << 16)) >>> 0;
 
 /**
- * 按中央目录顺序读出每个条目的通用标志位（fflate 的 filter 不提供它）。
- * 只读不解压；结构异常时返回 null，交给 fflate 自己报错。
+ * Read general purpose flags for each entry in central directory order (fflate's filter does not
+ * provide them). Read-only without decompression; returns null on structural anomalies, letting
+ * fflate throw its own error.
  */
 function readEntryFlags(data: Uint8Array): number[] | null {
   let e = data.length - 22;
@@ -155,7 +158,7 @@ function readEntryFlags(data: Uint8Array): number[] | null {
   if (e < 0) return null;
   let count = u16(data, e + 8);
   let offset = u32(data, e + 16);
-  // ZIP64：真正的条目数和偏移在 ZIP64 结尾记录里（只取低 32 位，100 MB 上限内足够）。
+  // ZIP64: True entry count and offset reside in the ZIP64 end record (only lower 32 bits are taken, which is sufficient within the 100 MB limit).
   if (e >= 20 && u32(data, e - 20) === 0x07064b50) {
     const z = u32(data, e - 12);
     if (u32(data, z) === 0x06064b50) {
@@ -172,7 +175,7 @@ function readEntryFlags(data: Uint8Array): number[] | null {
   return flags;
 }
 
-/** 目录、`__MACOSX/` 和 `.DS_Store` 不算用户文件。 */
+/** Directories, `__MACOSX/`, and `.DS_Store` do not count as user files. */
 function isJunk(path: string): boolean {
   const parts = path.split('/');
   const base = parts[parts.length - 1] ?? '';
@@ -180,9 +183,11 @@ function isJunk(path: string): boolean {
 }
 
 /**
- * 解开 ZIP，返回扁平的文件列表（只保留文件名，丢掉目录层级，因此不可能路径穿越）。
- * 所有上限在解压前用中央目录里声明的大小检查；fflate 按声明大小分配输出，
- * 实际数据更大也写不出界。未标记 UTF-8 的文件名按 Latin-1 解码（如 GBK 中文名会乱码）。
+ * Extract ZIP, returning a flat file list (keeping only file names and dropping directory
+ * hierarchies, making path traversal impossible). All limits are checked before extraction using
+ * the sizes declared in the central directory; fflate allocates output based on declared sizes,
+ * so actual larger data cannot write out of bounds. File names not marked as UTF-8 are decoded
+ * using Latin-1 (e.g., GBK Chinese names will be garbled).
  */
 export function extractZip(bytes: Uint8Array, { limits }: ExtractZipOptions = {}): ArchiveEntry[] {
   const max = resolveLimits(limits);
@@ -194,7 +199,7 @@ export function extractZip(bytes: Uint8Array, { limits }: ExtractZipOptions = {}
     index++;
     const path = file.name.replace(/\\/g, '/');
     if (isJunk(path)) return false;
-    // 第 0 位：加密；99：AES 加密的压缩方式。
+    // Bit 0: encrypted; 99: AES encrypted compression method.
     if (((flags?.[index] ?? 0) & 1) !== 0 || file.compression === 99) {
       throw new ArchiveError('encrypted', file.name);
     }
@@ -219,7 +224,7 @@ export function extractZip(bytes: Uint8Array, { limits }: ExtractZipOptions = {}
 
   const taken = new Set<string>();
   const result: ArchiveEntry[] = [];
-  // 同一路径在 ZIP 里重复出现时 fflate 只保留最后一份，这里也只输出一次。
+  // When the same path appears repeatedly in the ZIP, fflate keeps only the last one; only one is output here as well.
   for (const path of new Set(order)) {
     const data = files[path];
     if (!data) continue;

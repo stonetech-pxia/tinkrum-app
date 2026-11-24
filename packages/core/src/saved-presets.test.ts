@@ -26,7 +26,7 @@ const FILE_B = 'filebbbb02';
 const FILE_C = 'filecccc03';
 const FILE_D = 'filedddd04';
 
-/** 配置里指向用户文件的四处都填上（文件位、分组里的图片、卡片的图片背景、页面的图片背景）。 */
+/** Populate all four locations in the configuration that point to user files (file slot, group images, card image backgrounds, page image backgrounds). */
 function withFiles(): WorkspaceConfig {
   const ops: Op[] = [
     {
@@ -112,28 +112,28 @@ describe('saved presets (D-410)', () => {
         show?: { asset?: string | null };
         style?: { backdrop?: { overlay: string; assetId?: string } };
       };
-    // 文件位和图片还在，只是空的；图片背景还开着，没有图片。
+    // File slot and image are still present but empty; image background is still enabled, without an image.
     expect(block('slot').opens).toEqual({ file: null });
     expect(block('pic').show!.asset).toBeNull();
     expect(block('note').style!.backdrop).toEqual({ overlay: 'light' });
     expect(home.backdrop).toEqual({ overlay: 'strong' });
-    // 整个 App 都在：表结构、页面、主题、工具。
+    // The entire app is present: table schemas, pages, theme, tools.
     expect(snap.data.tables.map((t) => t.id)).toEqual(config.data.tables.map((t) => t.id));
     expect(snap.theme).toEqual(config.theme);
     expect(snap.tools).toEqual(config.tools);
-    // 没有悬空的引用，能通过校验（底线 18）。
+    // No dangling references, passes validation (invariant 18).
     expect(validateWorkspace(snap, registry).ok).toBe(true);
-    // 原来的配置没被改。
+    // Original configuration remains unmodified.
     expect(JSON.stringify(config)).toBe(text);
   });
 
-  it('old presets are upgraded before they are applied (底线 12)', () => {
+  it('old presets are upgraded before they are applied (invariant 12)', () => {
     const prepared = preparePreset(V4_FIXED_NAME, registry);
     expect(prepared.ok).toBe(true);
     if (prepared.ok) expect(prepared.after.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 
-  it('applying clears file references again, whatever the stored copy holds (底线 3、18)', () => {
+  it('applying clears file references again, whatever the stored copy holds (invariants 3 and 18)', () => {
     const prepared = preparePreset(JSON.parse(JSON.stringify(withFiles())), registry);
     expect(prepared.ok).toBe(true);
     if (prepared.ok) expect(JSON.stringify(prepared.after)).not.toContain(FILE_A);
@@ -152,7 +152,7 @@ describe('saved presets (D-410)', () => {
     expect(lines[0]).toContain('极简');
     expect(lines.join('\n')).toContain('笔记');
     expect(lines.join('\n')).toMatch(/记录/);
-    // 现在选好的文件位和图片不会跟过来，要说清楚。
+    // Previously selected file slots and images do not carry over; this must be stated clearly.
     expect(lines.join('\n')).toContain('重新选');
 
     const plain = createDefaultWorkspace('zh');
@@ -161,7 +161,7 @@ describe('saved presets (D-410)', () => {
   });
 });
 
-// 「我的预设 → 从文件导入」：门户下载的预设文件存成一个新预设，应用时才生效。
+// "My Presets → Import from File": A preset file downloaded from the portal is stored as a new preset and takes effect only when applied.
 describe('imported presets', () => {
   const file = (config: unknown = withFiles()) =>
     appConfigFile(config as WorkspaceConfig, new Date());
@@ -188,11 +188,11 @@ describe('imported presets', () => {
     expect(Array.from(next)).toHaveLength(MAX_PRESET_NAME);
     expect(next.endsWith(' 2')).toBe(true);
     expect(next).not.toBe(base);
-    // 比较不分大小写：列表里看起来是同一个名字。
+    // Case-insensitive comparison: they look like the same name in the list.
     expect(importedPresetName('Receipts.json', ['receipts'], fallback)).toBe('Receipts 2');
   });
 
-  it('turns an exported file into a preset with no reference to a user file (底线 3)', () => {
+  it('turns an exported file into a preset with no reference to a user file (invariant 3)', () => {
     const result = importedPreset(file(), '我的收据.json', ['别的'], fallback, registry);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -203,7 +203,7 @@ describe('imported presets', () => {
     expect(validateWorkspace(result.config, registry).ok).toBe(true);
   });
 
-  it('upgrades an old file to the current version before it is stored (底线 12)', () => {
+  it('upgrades an old file to the current version before it is stored (invariant 12)', () => {
     const result = importedPreset(file(V4_FIXED_NAME), 'old.json', [], fallback, registry);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.config.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
@@ -220,7 +220,7 @@ describe('imported presets', () => {
     });
   });
 
-  it('refuses a configuration that points at things that are not there, with the reasons (底线 18)', () => {
+  it('refuses a configuration that points at things that are not there, with the reasons (invariant 18)', () => {
     const broken = JSON.parse(JSON.stringify(createDefaultWorkspace('zh'))) as WorkspaceConfig;
     broken.containers.pages[0]!.blocks = [
       {

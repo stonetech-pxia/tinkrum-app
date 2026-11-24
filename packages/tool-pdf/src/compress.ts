@@ -13,26 +13,28 @@ import {
 
 import { type MergeResult, PdfError, loadPdf } from './core';
 
-// 压缩 PDF（D-145）：只重新压缩里面的图片，文字、链接、表格都保留。
-// 图片的解码和编码由 App 的系统编码器完成（缩小 + 降质量，输出 JPEG），这里只负责
-// 找出能处理的图片、把它们变成编码器认识的 JPEG / PNG，以及把新的 JPEG 换回去。
+// Compress PDF (D-145): only re-compress internal images; text, links, and tables are preserved.
+// Image decoding and encoding are handled by the app's system encoder (downscaling + quality
+// reduction, outputting JPEG); this module is only responsible for identifying processable images,
+// turning them into JPEGs/PNGs recognized by the encoder, and swapping the new JPEGs back in.
 //
-// 能处理的：DCTDecode（数据本身就是 JPEG）；FlateDecode 的 8 位 RGB / 灰度图（补成 PNG）。
-// 跳过：黑白扫描（JBIG2 / CCITT，本来就小）、JPEG 2000、CMYK、索引色、带 /Decode 的、
-// 用作别的图片遮罩的（SMask / Mask）、很小的图。
+// Processable: DCTDecode (data itself is JPEG); FlateDecode 8-bit RGB / grayscale images (padded to
+// PNG). Skipped: black-and-white scans (JBIG2 / CCITT, already small), JPEG 2000, CMYK, indexed
+// color, images with /Decode, images used as masks for other images (SMask / Mask), and very small
+// images.
 
-/** 比这还小的图片不值得重新编码。 */
+/** Images smaller than this are not worth re-encoding. */
 const MIN_PIXELS = 64 * 64;
 const MIN_STORED_BYTES = 8 * 1024;
 
 export interface PdfPicture {
-  /** 在这份 PDF 里的编号（换图时用）。 */
+  /** ID in this PDF (used when replacing images). */
   id: number;
   width: number;
   height: number;
-  /** PDF 里现在占多少字节。 */
+  /** Current byte size occupied in the PDF. */
   storedBytes: number;
-  /** 交给系统编码器的原图：JPEG 原样，Flate 图补成 PNG。用到时才生成，省内存。 */
+  /** Original image provided to the system encoder: JPEG as-is, Flate image padded to PNG. Generated on demand to save memory. */
   source(): { kind: 'jpeg' | 'png'; bytes: Uint8Array };
 }
 
@@ -46,9 +48,9 @@ export interface PdfReplacement {
 export interface PdfCompressor {
   originalBytes: number;
   pictures: readonly PdfPicture[];
-  /** 不是这些图片的部分大约占多少字节（估计压缩后的大小用）。 */
+  /** Approximate byte size of the parts that are not these images (used for estimating compressed size). */
   otherBytes: number;
-  /** 换上新图片后保存。只换比原来小的。 */
+  /** Save after replacing with new images. Only replaces images smaller than the original. */
   build(replacements: ReadonlyMap<number, PdfReplacement>): Promise<Uint8Array>;
 }
 
@@ -64,7 +66,7 @@ function lookupNumber(doc: PDFDocument, value: PDFObject | undefined): number | 
   return resolved instanceof PDFNumber ? resolved.asNumber() : undefined;
 }
 
-/** 颜色空间的通道数：只认 RGB 和灰度（DeviceRGB / DeviceGray / CalRGB / CalGray / ICCBased N=3 或 1）。 */
+/** Number of color space channels: recognizes only RGB and grayscale (DeviceRGB / DeviceGray / CalRGB / CalGray / ICCBased N=3 or 1). */
 function channels(doc: PDFDocument, value: PDFObject | undefined): 1 | 3 | null {
   const cs = value instanceof PDFRef ? doc.context.lookup(value) : value;
   if (cs instanceof PDFName) {
@@ -89,7 +91,7 @@ function channels(doc: PDFDocument, value: PDFObject | undefined): 1 | 3 | null 
   return null;
 }
 
-/** 只有一个滤镜时返回它的名字；没有滤镜返回 ''；多个滤镜返回 null（不处理）。 */
+/** Returns filter name if there is only a single filter; '' if no filter; null if multiple filters (not handled). */
 function singleFilter(doc: PDFDocument, dict: PDFDict): string | null {
   const filter = dict.get(name('Filter'));
   if (filter === undefined) return '';
@@ -138,7 +140,7 @@ function chunk(type: string, data: Uint8Array): Uint8Array[] {
   return [u32(data.length), t, data, u32(crc32([t, data]))];
 }
 
-/** rows：每行前面带一个 PNG 滤镜字节的像素数据。 */
+/** rows: pixel data with a PNG filter byte preceding each row. */
 function makePng(width: number, height: number, gray: boolean, rows: Uint8Array): Uint8Array {
   const ihdr = new Uint8Array(13);
   ihdr.set(u32(width), 0);
@@ -160,7 +162,7 @@ function makePng(width: number, height: number, gray: boolean, rows: Uint8Array)
   return out;
 }
 
-/** Flate 解出来的像素 → 带滤镜字节的 PNG 行。PNG 预测器（≥ 10）的数据本来就是这个格式。 */
+/** Pixels decoded from Flate → PNG rows with filter bytes. Data from PNG predictors (≥ 10) is already in this format. */
 function pngRows(
   data: Uint8Array,
   width: number,
@@ -178,7 +180,7 @@ function pngRows(
   return rows;
 }
 
-/** 用作别的图片遮罩的图片：不能换成 JPEG。 */
+/** Images used as masks for other images: cannot be converted to JPEG. */
 function maskRefs(doc: PDFDocument): Set<string> {
   const refs = new Set<string>();
   for (const [, obj] of doc.context.enumerateIndirectObjects()) {
@@ -191,7 +193,7 @@ function maskRefs(doc: PDFDocument): Set<string> {
   return refs;
 }
 
-/** 打开一份 PDF，找出能重新压缩的图片。加密或损坏时抛出 PdfError。 */
+/** Open a PDF and identify images that can be re-compressed. Throws PdfError if encrypted or corrupted. */
 export async function openForCompression(
   bytes: Uint8Array,
   fileName?: string,
@@ -258,7 +260,7 @@ export async function openForCompression(
         dict.set(name('Width'), PDFNumber.of(next.width));
         dict.set(name('Height'), PDFNumber.of(next.height));
         dict.set(name('BitsPerComponent'), PDFNumber.of(8));
-        // 系统编码器输出的是 RGB JPEG；原来的 ICC 描述文件不再适用。
+        // System encoder outputs RGB JPEG; original ICC profile no longer applies.
         dict.set(name('ColorSpace'), name('DeviceRGB'));
         dict.delete(name('Length'));
         doc.context.assign(ref, PDFRawStream.of(dict, next.bytes));
@@ -269,8 +271,9 @@ export async function openForCompression(
 }
 
 /**
- * 把每页的图片按原来的纸张大小（pt）排成新的 PDF（「转成图片」的退路）。
- * 图片铺满整页，文字不能再选中，链接和表格也没有了。
+ * Layout each page's image into a new PDF according to original paper size (pt) (fallback for
+ * "Convert to images"). Images fill the page entirely, text is no longer selectable, and links
+ * and tables are lost.
  */
 export async function picturePagesPdf(
   pages: readonly { jpeg: Uint8Array; width: number; height: number }[],

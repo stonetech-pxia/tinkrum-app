@@ -38,35 +38,36 @@ import { DialHost, type DialSlots } from './Dial';
 import { Item, WhenRecords } from './registry';
 import type { Palette } from './theme';
 
-// 页面渲染：把页面上的组件按顺序排好，每种组件怎么画见 registry.tsx（RENDERERS）。
+// Page rendering: arranges components on a page in order; see registry.tsx (RENDERERS) for how each component is rendered.
 
 export interface RenderEnv {
   config: WorkspaceConfig;
   palette: Palette;
   locale: Locale;
   registry: Registry;
-  /** 预览时为 false：组件只展示，不响应点击。 */
+  /** False during preview: components are display-only and do not respond to clicks. */
   interactive: boolean;
-  /** 打开一个页面、系统入口或快捷操作（按钮、快捷入口、工具卡片使用；快捷操作只打开，D-256）。 */
+  /** Opens a page, system entry, or quick action (used by buttons, shortcuts, and tool cards; quick actions only open, D-256). */
   navigate: (target: OpenTarget) => void;
-  /** 在横排或网格的格子里：卡片改为图标在上、文字在下。 */
+  /** Inside a horizontal row or grid cell: changes cards to display icons above and text below. */
   inCell?: boolean;
-  /** 在网格的第几列（从 0 开始）、一共几列：靠边的块贴着页面边距（D-454）。 */
+  /** Indicates the column index (starting from 0) and total column count in a grid: edge blocks align with page margins (D-454). */
   cellColumn?: { index: number; of: number };
-  /** 画在页面下方固定区：入口画成和浮动按钮同一个样子的按钮（D-437）。 */
+  /** Rendered in the fixed bottom zone of the page: entries are drawn as buttons matching the floating action button style (D-437). */
   inBottomZone?: boolean;
-  /** 页面上选的时间范围（D-440）：页面有 period 块时才有；图表和数字卡的 source.period 是 "page" 时按它画。状态只在页面上，什么都不写。 */
+  /** Time range selected on the page (D-440): present only when the page contains a period block; charts and metric cards render according to this when source.period is "page". State is restricted to the page and is not persisted. */
   pageRange?: { choice: PageChoice; set: (choice: PageChoice) => void };
   /**
-   * 页面上的一排选项（D-573）：页面有 choices 块时才有；读同一张表、source.choice 是 "page" 的块只显示 option 那一项
-   * 的记录（null = 全部）。状态只在页面上，什么都不写。
+   * Row of options on the page (D-573): present only when the page contains a choices block;
+   * blocks reading the same table with source.choice set to "page" display only records matching
+   * the selected option (null = all). State is restricted to the page and is not persisted.
    */
   pageChoice?: PageChoiceState & { set: (option: string | null) => void };
-  /** 正在渲染的页面（图片组件更换照片时要用）。 */
+  /** The page currently being rendered (used when a picture component changes its photo). */
   pageId?: string;
-  /** 可以直接编辑的页面：长按组件时打开它的操作面板（D-052）。预览和系统页面没有。 */
+  /** Pages that can be edited directly: opens their action panel when long-pressing a component (D-052). Not present in preview and system pages. */
   edit?: (componentId: string) => void;
-  /** 单组件编辑保留正常页面布局，只给选中项加工具栏。 */
+  /** Single-component editing preserves the normal page layout, adding a toolbar only to the selected item. */
   focus?: {
     selectedId: string | null;
     onEdit: (id: string) => void;
@@ -76,42 +77,43 @@ export interface RenderEnv {
   parentDrag?: PanGesture;
   focusWithinSelected?: boolean;
   focusWithinDimmed?: boolean;
-  /** 当前组件的长按操作：组件里可点按的部分（卡片、按钮、列表行）也要响应长按。 */
+  /** Long-press action for the current component: tappable parts within components (cards, buttons, list rows) must also respond to long presses. */
   onLongPress?: () => void;
   /**
-   * 草稿模式（D-190）：能看不能用。设置时，打开页面照常，但运行、记录、选图片、打开文件等
-   * 会真的做事的操作改为调用它（提示「应用之后才能用」）。
+   * Draft mode (D-190): viewable but not usable. During setup, opening pages works normally, but
+   * actions that perform real work (running, recording, picking images, opening files) call this
+   * instead (with a prompt: "Available after applying").
    */
   locked?: () => void;
-  /** 给一条记录用的页面（D-342）：组件里的 "$record" 换成这条记录的 ID 再画。 */
+  /** Page dedicated to a single record (D-342): renders by replacing "$record" in components with this record's ID. */
   recordId?: string;
-  /** 页面滚到底过几次：能往下加载的列表每次多显示一页（创始人 2026-11-04 定）。 */
+  /** Number of times the page was scrolled to the bottom: lists that can load more display one extra page each time (decided by the founder 2026-11-04). */
   pageEnd?: number;
-  /** 状态放在页面上的那个列表（搜索画在固定区，或者浮动按钮要拿它选出的记录）。 */
+  /** The list whose state is kept on the page (search rendered in a fixed area, or floating button needs to pick records from it). */
   pageBrowse?: BrowseSelection;
-  /** 分开的浮动按钮（它的状态在页面上，DialHost）。 */
+  /** Separate floating buttons (their state is on the page, DialHost). */
   dial?: DialSlots;
 }
 
-/** 多靠近页面底部算滚到底。 */
+/** Proximity to the bottom of the page considered scrolled to the bottom. */
 const PAGE_END_MARGIN = 240;
 
 interface PageViewProps {
   page: Page;
   env: RenderEnv;
   bottomInset?: number;
-  /** 下方固定区要让开多高（导航栏、浮动按钮）；不写时用 bottomInset。 */
+  /** How much clearance the bottom fixed area needs (navigation bar, floating button); defaults to bottomInset when omitted. */
   zoneInset?: number;
-  /** 额外的滚动设置（编辑后重新挂载时恢复滚动位置）。 */
+  /** Additional scroll settings (restores scroll position when remounted after editing). */
   scroll?: ScrollViewProps;
 }
 
-/** 换了页面（导航栏上切换）从头开始：用户在列表上临时的搜索、排序、筛选离开就没有了，什么都不写（底线 15）。 */
+/** Page switching (toggling on the navigation bar) starts from the top: temporary searches, sorting, and filters set by the user on the list are discarded upon leaving, per invariant 15. */
 export function PageView(props: PageViewProps) {
   return <PageBody key={props.page.id} {...props} />;
 }
 
-/** 状态放在页面上的列表（useBrowseSelection 是 hook，所以是单独的组件）。 */
+/** List with state kept on the page (useBrowseSelection is a hook, so it is a separate component). */
 function BrowseHost({
   block,
   env,
@@ -126,18 +128,18 @@ function BrowseHost({
 }
 
 function PageBody({ page, env, bottomInset = 0, zoneInset, scroll }: PageViewProps) {
-  // 整页的背景图片（D-258）：图片上的文字一律用正文色，组件浮在上面。
+  // Full-page background image (D-258): text on the image always uses the primary text color, with components floating above it.
   const picture = page.backdrop?.assetId ? page.backdrop : undefined;
   const palette = onPicture(env.palette, picture);
   const [pageEnd, setPageEnd] = useState(0);
   const [bottomHeight, setBottomHeight] = useState(0);
-  // 页面上选的时间范围（D-440）：有 period 块时，用户点的在这里；块的选项被改掉了就回到默认的。
+  // Time range selected on the page (D-440): when a period block exists, the user's selection is stored here; reverts to default if the block's options are modified.
   const periodBlock = pagePeriod(page);
   const [pickedRange, setPickedRange] = useState<PageChoice | null>(null);
   const pageRange = periodBlock
     ? { choice: resolveChoice(periodBlock, pickedRange), set: setPickedRange }
     : undefined;
-  // 页面上的一排选项（D-573）：用户点的在这里（undefined = 还没点过，null = 全部）；选项被改掉了就回到默认的。
+  // Row of options on the page (D-573): the user's choice is stored here (undefined = not yet clicked, null = all); reverts to default if the options are modified.
   const choicesBlock = pageChoices(page);
   const [pickedOption, setPickedOption] = useState<string | null | undefined>(undefined);
   const pageChoice = choicesBlock
@@ -160,18 +162,18 @@ function PageBody({ page, env, bottomInset = 0, zoneInset, scroll }: PageViewPro
     ...(pageRange ? { pageRange } : {}),
     ...(pageChoice ? { pageChoice } : {}),
   };
-  // 单组件编辑时固定区照常排在内容里（拖动、工具栏都在滚动的内容上），位置和配置里的顺序一样。
+  // During single-component editing, the fixed area is laid out normally within the content (dragging and toolbars are on the scrolling content), maintaining the same position and order as in the config.
   const editing = !!env.focus?.selectedId;
   const zones = pageZones(page);
   const hasZones = !editing && (zones.top.length > 0 || zones.bottom.length > 0);
-  // D-352：底部弹出的添加框是右下角的浮动「+」，不跟着内容滚动。
+  // D-352: The bottom-sheet add form is a bottom-right floating "+", which does not scroll with the content.
   const floats = (c: Component) => c.look === 'form' && c.show.mode === 'sheet';
   const floating = page.blocks.filter((c) => !c.hidden && floats(c));
   const inScroll = editing ? page.blocks.filter((c) => !c.hidden) : zones.middle;
   const host = pageBrowseHost(page);
   const dial = pageDial(page) as BlockOf<'dial'> | undefined;
 
-  // 滚到底：内容每变一次高最多算一次；页面放得下还没铺满时（内容变高了还在底部）接着算，直到铺满或者没有更多。
+  // Scrolled to bottom: height changes count at most once per content change; continues counting while the page fits but is not yet fully filled (content height increases while still at the bottom), until filled or no more content remains.
   const tracksEnd = page.blocks.some(
     (c) => (c as { show?: { browse?: unknown } }).show?.browse !== undefined,
   );
@@ -224,18 +226,18 @@ function PageBody({ page, env, bottomInset = 0, zoneInset, scroll }: PageViewPro
         ref={(view) => env.focus?.drag?.attachScroll(view)}
         {...scroll}
         {...endTracking}
-        // 渐变背景画在外层容器上（和状态栏区域连成一片），页面本身透明。
+        // Gradient background drawn on the outer container (melding with the status bar area), with the page itself being transparent.
         style={palette.hasBackdrop || picture ? undefined : { backgroundColor: palette.background }}
-        // 数据表单：键盘弹出时可以直接点选项和按钮，并自动把输入框滚到键盘上方。
+        // Data form: allows directly tapping options and buttons when the keyboard pops up, and automatically scrolls the input box above the keyboard.
         keyboardShouldPersistTaps="handled"
-        // 拖动页面收键盘；点空白收键盘（下面的 page-blank）。
+        // Dismiss keyboard on drag; dismiss keyboard on tapping empty space (page-blank below).
         keyboardDismissMode="on-drag"
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={{
           flexGrow: 1,
           padding: palette.pad,
           gap: palette.gap,
-          // 有浮动的「+」时多留出它的高度，最下面的内容不被盖住（D-352）。下方固定区在滚动区外面，导航栏由它让开。
+          // Reserve extra height when a floating "+" is present so the bottom-most content is not obscured (D-352). The bottom fixed area is outside the scrolling region, and the navigation bar clears space for it.
           paddingBottom:
             24 +
             (hasZones && zones.bottom.length > 0 ? 0 : bottomInset) +
@@ -285,7 +287,7 @@ function PageBody({ page, env, bottomInset = 0, zoneInset, scroll }: PageViewPro
       </ScrollView>
     );
     const drag = env.focus?.drag;
-    // 背景图片画在滚动内容后面，不跟着滚动。
+    // Background image is drawn behind the scrolling content and does not scroll with it.
     const fill = picture ? (
       <BackdropFill backdrop={picture} color={palette.background} palette={palette} />
     ) : null;
@@ -401,7 +403,7 @@ function PageBody({ page, env, bottomInset = 0, zoneInset, scroll }: PageViewPro
       layout(selection, undefined, null)
     );
   if (!host) return withDial(undefined);
-  // D-342：给一条记录用的页面上，筛选里的 "$record" 换成这条记录。
+  // D-342: On a page dedicated to a record, "$record" in filters is replaced with this record.
   const block = (env.recordId ? bindRecord(host, env.recordId) : host) as RecordBlock;
   return (
     <BrowseHost block={block} env={pageEnv}>
@@ -411,8 +413,10 @@ function PageBody({ page, env, bottomInset = 0, zoneInset, scroll }: PageViewPro
 }
 
 /**
- * 相邻的两个以上运行卡片排成两列宫格（D-108），例如工具页上的十几个功能；单独一个保持整张卡片。
- * 只影响显示，配置里仍是一个个组件，AI 和编辑模式看到的结构不变。
+ * Two or more adjacent run cards are arranged in a two-column grid (D-108), such as dozens of
+ * functions on the tools page; a single one remains a full card. Affects display only; still
+ * individual components in the config, keeping the structure seen by the AI and edit mode
+ * unchanged.
  */
 function runnerGrid(components: readonly Component[]): (Component | Component[])[] {
   const blocks: (Component | Component[])[] = [];
@@ -425,7 +429,7 @@ function runnerGrid(components: readonly Component[]): (Component | Component[])
     run = [];
   };
   for (const c of components) {
-    // 指定了 row / card 的不进宫格；指定了 tile 的单独一个也放进宫格（D-230）。
+    // Components specifying row or card do not enter the grid; a single component specifying tile is placed into the grid (D-230).
     if (c.look === 'action' && c.show?.shape !== 'row' && c.show?.shape !== 'card') run.push(c);
     else {
       flush();

@@ -16,7 +16,7 @@ import { TOAST_MS, TOAST_UNDO_MS } from '../shell/Toast';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { acceptNextAlert, renderToolsApp } from '../test-utils/render-app';
 
-// 真实走查（REPORT3 最后一节）里发现的界面问题。
+// UI issues discovered during actual walkthrough (REPORT3 final section).
 
 const tasksTable: Op = {
   op: 'addData',
@@ -71,8 +71,8 @@ async function changeApp(store: Awaited<ReturnType<typeof app>>['store'], ops: O
 
 const green: Op[] = [{ op: 'setTheme', primaryColor: '#336699' }];
 
-describe('版本提示条浮在内容上', () => {
-  it('不占布局：绝对定位，出现和消失都不改变内容位置', async () => {
+describe('Version notification banner floats over content', () => {
+  it('Does not occupy layout: absolute positioning; appearance and disappearance do not change content position', async () => {
     const { store } = await app([taskList]);
     await act(() => changeApp(store, green));
     const banner = await screen.findByTestId('banner');
@@ -80,8 +80,8 @@ describe('版本提示条浮在内容上', () => {
   });
 });
 
-describe('提示条的撤销', () => {
-  it('应用预设后立刻撤销：版本回去，提示「已回到」', async () => {
+describe('Notification banner undo', () => {
+  it('Undo immediately after applying preset: version reverts, prompts "Reverted to"', async () => {
     const repo = new MemoryWorkspaceRepo();
     const { store } = await app([], [], repo);
     await act(async () => {
@@ -98,7 +98,7 @@ describe('提示条的撤销', () => {
     expect(await screen.findByTestId('banner')).toHaveTextContent(/已回到/);
   });
 
-  it('手指按在「撤销」上时不会到时间消失，松手照样撤销', async () => {
+  it('Holding finger on "Undo" prevents timeout disappearance; lifting finger still triggers undo', async () => {
     const { store } = await app();
     const before = store.getState().config!.theme.primaryColor;
     await act(() => changeApp(store, green));
@@ -116,7 +116,7 @@ describe('提示条的撤销', () => {
     await waitFor(() => expect(store.getState().config!.theme.primaryColor).toBe(before));
   });
 
-  it('手指滑开没撤销：提示条照常到时间消失', async () => {
+  it('Sliding finger away without undoing: notification banner disappears on schedule', async () => {
     const { store } = await app();
     await act(() => changeApp(store, green));
     const undo = await screen.findByTestId('banner-undo');
@@ -132,7 +132,7 @@ describe('提示条的撤销', () => {
     expect(store.getState().config!.theme.primaryColor).toBe('#336699');
   });
 
-  it('撤销做不到时要说，不能悄悄消失', async () => {
+  it('When undo is not possible, state so rather than quietly disappearing', async () => {
     const repo = new MemoryWorkspaceRepo();
     const { store } = await app([], [], repo);
     await act(() => changeApp(store, green));
@@ -143,7 +143,7 @@ describe('提示条的撤销', () => {
     expect(store.getState().banner?.message).toMatch(/改动记录/);
   });
 
-  it('连点两下只撤销一次，不报冲突', async () => {
+  it('Double-tapping triggers undo only once without reporting a conflict', async () => {
     const { store } = await app();
     const before = store.getState().config!.theme.primaryColor;
     await act(() => changeApp(store, green));
@@ -155,8 +155,8 @@ describe('提示条的撤销', () => {
   });
 });
 
-describe('记录提示会自己消失', () => {
-  it('普通提示几秒后消失，切页面时也一样', async () => {
+describe('Record notifications disappear on their own', () => {
+  it('Normal notifications disappear after a few seconds, including when switching pages', async () => {
     const { store } = await app();
     jest.useFakeTimers();
     try {
@@ -172,7 +172,7 @@ describe('记录提示会自己消失', () => {
     }
   });
 
-  it('带撤销的提示留得更久，但也有明确的时长；时间内点撤销照样放回去', async () => {
+  it('Notifications with undo stay longer, but also have a definite duration; tapping undo within the time limit still restores it', async () => {
     const repo = new MemoryWorkspaceRepo();
     await repo.insertRecord({
       id: 'r1aaaaaa',
@@ -203,7 +203,7 @@ describe('记录提示会自己消失', () => {
     expect(store.getState().toast).toBeNull();
   });
 
-  it('带撤销的提示到时间也消失', async () => {
+  it('Notifications with undo also disappear upon timeout', async () => {
     const { store } = await app();
     jest.useFakeTimers();
     try {
@@ -218,7 +218,7 @@ describe('记录提示会自己消失', () => {
   });
 });
 
-describe('页面表单的键盘', () => {
+describe('Page form keyboard', () => {
   let dismiss: jest.SpyInstance;
   beforeEach(() => {
     dismiss = jest.spyOn(Keyboard, 'dismiss');
@@ -226,7 +226,7 @@ describe('页面表单的键盘', () => {
   });
   afterEach(() => dismiss.mockRestore());
 
-  it('必填空着时键盘上的对勾只收键盘，不报必填；点保存才校验', async () => {
+  it('When required fields are empty, the checkmark on the keyboard only dismisses the keyboard without reporting required errors; saving triggers validation', async () => {
     const repo = new MemoryWorkspaceRepo();
     await app([inlineForm], [], repo);
     await fireEvent(await screen.findByTestId('form-quick-title'), 'submitEditing');
@@ -237,7 +237,7 @@ describe('页面表单的键盘', () => {
     expect(await repo.listRecords('tasks')).toEqual([]);
   });
 
-  it('写了内容时对勾照旧保存，键盘留着接着写', async () => {
+  it('When content is filled, the checkmark saves as usual and the keyboard remains open for further editing', async () => {
     const repo = new MemoryWorkspaceRepo();
     const { store } = await app([inlineForm], [], repo);
     await fireEvent.changeText(await screen.findByTestId('form-quick-title'), '买牛奶');
@@ -247,22 +247,22 @@ describe('页面表单的键盘', () => {
     expect(dismiss).not.toHaveBeenCalled();
   });
 
-  it('点页面空白收键盘，拖动页面也收', async () => {
+  it('Tapping blank areas on the page dismisses the keyboard, as does dragging the page', async () => {
     await app([inlineForm]);
     await fireEvent.press(await screen.findByTestId('page-blank'));
     expect(dismiss).toHaveBeenCalled();
     expect(screen.getByTestId('editable-scroll').props.keyboardDismissMode).toBe('on-drag');
   });
 
-  it('点卡片的空白处也收键盘（长按那层接住了点按，走查时点空白无效就是这个原因）', async () => {
+  it('Tapping blank areas on cards also dismisses the keyboard (the long-press layer intercepts taps; this is why tapping blank areas during walkthrough was ineffective)', async () => {
     await app([inlineForm]);
     await fireEvent.press(await screen.findByTestId('component-quick'));
     expect(dismiss).toHaveBeenCalled();
   });
 });
 
-describe('新记录看不到时要说', () => {
-  it('这张表没有页面读：提示能接着改', async () => {
+describe('Prompt when new records are not visible', () => {
+  it('This table has no readable page: prompt allows continuing edits', async () => {
     const { store } = await app();
     await act(async () => router.push('/record/tasks'));
     await fireEvent.changeText(await screen.findByTestId('editor-title'), '买牛奶');
@@ -274,7 +274,7 @@ describe('新记录看不到时要说', () => {
     expect(store.getState().toast).toBeNull();
   });
 
-  it('有列表在读：不提示', async () => {
+  it('A list is currently readable: do not prompt', async () => {
     const { store } = await app([taskList]);
     await act(async () => router.push('/record/tasks'));
     await fireEvent.changeText(await screen.findByTestId('editor-title'), '买牛奶');
@@ -283,7 +283,7 @@ describe('新记录看不到时要说', () => {
     expect(store.getState().toast).toBeNull();
   });
 
-  it('改已有的记录：不提示', async () => {
+  it('Editing an existing record: do not prompt', async () => {
     const repo = new MemoryWorkspaceRepo();
     await repo.insertRecord({
       id: 'r1aaaaaa',
@@ -301,7 +301,7 @@ describe('新记录看不到时要说', () => {
     expect(store.getState().toast).toBeNull();
   });
 
-  it('法语：提示是法语', async () => {
+  it('French: prompt is in French', async () => {
     await renderToolsApp(new MemoryWorkspaceRepo(), undefined, { locale: 'fr', seed: seed() });
     await act(async () => router.push('/record/tasks'));
     await fireEvent.changeText(await screen.findByTestId('editor-title'), 'Lait');

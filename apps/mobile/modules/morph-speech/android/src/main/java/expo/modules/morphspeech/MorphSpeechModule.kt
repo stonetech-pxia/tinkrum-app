@@ -15,8 +15,10 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
-// 语音转文字的 Android 实现（D-151）：系统不能识别音频文件，用编进 App 的 whisper.cpp 在本机识别，
-// 模型来自下载内容（JS 传模型文件的地址进来）。和 iOS 的 JS 接口相同。识别出的文字只返回给 App，不写日志。
+// Android implementation of speech-to-text (D-151): when the system cannot recognize an audio file,
+// it uses the bundled whisper.cpp on the device for local recognition, with models coming from
+// downloads (JS passes the model file path). Same JS interface as iOS. Recognized text is returned
+// only to the app and is not logged.
 
 class SpeechException(code: String, message: String) : CodedException(code, message, null)
 
@@ -29,7 +31,7 @@ class TranscribeOptions : Record {
   @Field val timed: Boolean = false
 }
 
-/** 一次交给 whisper 的声音最长 5 分钟（约 19 MB），在最后 20 秒里最安静的地方切开。 */
+/** Maximum length of audio fed to whisper at once is 5 minutes (approx. 19 MB), cut at the quietest point in the final 20 seconds. */
 private const val CHUNK_SAMPLES = 300 * WHISPER_RATE
 private const val SEARCH_SAMPLES = 20 * WHISPER_RATE
 private const val QUIET_WINDOW = WHISPER_RATE * 3 / 10
@@ -50,7 +52,7 @@ class MorphSpeechModule : Module() {
 
     AsyncFunction("supportedLanguages") { WhisperNative.languages().toList() }
 
-    // 模型由下载内容管理：whisper 认识的语言都算「已经有了」。
+    // Models are managed via downloads: all languages recognized by whisper count as 'already available'.
     AsyncFunction("languageStatus") { language: String ->
       if (WhisperNative.languages().contains(language)) "installed" else "unsupported"
     }
@@ -80,7 +82,7 @@ class MorphSpeechModule : Module() {
       handles[taskId]?.let { WhisperNative.cancel(it) }
     }
 
-    // 边读边算 SHA-256，一次 1 MB。
+    // Computes SHA-256 while reading, 1 MB at a time.
     AsyncFunction("sha256File") { uri: String, promise: Promise ->
       thread(name = "morph-sha256") {
         try {
@@ -116,7 +118,7 @@ class MorphSpeechModule : Module() {
       val decoder = AudioDecoder(context, Uri.parse(uri))
       val pending = FloatBuffer()
       val segments = mutableListOf<Map<String, Any>>()
-      /** 已经识别完的声音有多少个样本（下一段的时间从这里算起）。 */
+      /** Number of audio samples already transcribed (next segment's time starts from here). */
       var offset = 0L
       val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
 
@@ -127,7 +129,7 @@ class MorphSpeechModule : Module() {
       fun run(count: Int) {
         if (flag.get()) throw cancelledError()
         val total = (decoder.durationUs * WHISPER_RATE / 1_000_000).coerceAtLeast(offset + count)
-        // whisper 的进度回调在它自己的线程上：这里每半秒看一次，换算成整个文件的进度。
+        // Whisper's progress callback runs on its own thread: here we check every half second and convert it to overall file progress.
         val done = AtomicBoolean(false)
         val ticker = thread(name = "morph-speech-progress") {
           while (!done.get()) {
@@ -167,7 +169,7 @@ class MorphSpeechModule : Module() {
         }
       }
       if (flag.get()) throw cancelledError()
-      // 短于 0.1 秒的尾巴不识别。
+      // Tails shorter than 0.1 seconds are not transcribed.
       if (pending.size > WHISPER_RATE / 10) run(pending.size)
       val durationMs = maxOf(decoder.durationUs / 1000, (offset + pending.size) * 1000 / WHISPER_RATE)
       if (durationMs <= 0) throw UnreadableAudio("empty")

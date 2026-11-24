@@ -13,8 +13,9 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 单选可以选多个（D-607）：表单里点几项存成列表；列表上按选项顺序显示名字；分段里一条算进它选的每一项；
-// 改成多选以前存的一项照样显示，编辑时还在。
+// Single choice can select multiple (D-607): selecting items in form saves as a list; names
+// displayed in order on list; segmented view counts entry toward each selected item; previously
+// saved single item displayed correctly before multi-choice change and still present when editing.
 
 const meals: Collection = {
   id: 'meals',
@@ -80,7 +81,7 @@ it('a new user picks several options in the form and the entry stores them in op
   await fireEvent.press(screen.getByTestId('editor-days-thu'));
   await fireEvent.press(screen.getByTestId('editor-days-mon'));
   await fireEvent.press(screen.getByTestId('editor-days-tue'));
-  // 再点一次去掉。
+  // Tap again to remove.
   await fireEvent.press(screen.getByTestId('editor-days-tue'));
   expect(screen.getByTestId('editor-days-mon')).toBeChecked();
   expect(screen.getByTestId('editor-days-tue')).not.toBeChecked();
@@ -95,7 +96,7 @@ it('with data: rows show the labels in option order; sections count an entry in 
   await put(repo, 'soup', { name: 'Soup', days: ['thu', 'mon'] }, 1);
   await put(repo, 'salad', { name: 'Salad', days: ['mon', 'tue', 'thu'] }, 2);
   await put(repo, 'toast', { name: 'Toast' }, 3);
-  // 一个后来删掉的选项：不显示，不算。
+  // An option deleted later: not displayed, not counted.
   await put(repo, 'stew', { name: 'Stew', days: ['gone', 'tue'] }, 4);
   await renderToolsApp(repo, undefined, {
     locale: 'en',

@@ -4,13 +4,15 @@ import { openDatabaseAsync } from 'expo-sqlite';
 import MorphShare from '../../modules/morph-share';
 import { SQLiteWorkspaceRepo, migrateDatabase } from './sqlite';
 
-// 打开本机数据库（只打开一次）：界面启动和提醒按钮的后台处理（D-318）共用一个。
+// Open the local database (opened only once): shared between app startup and the notification button background handler (D-318).
 
 let opened: Promise<SQLiteWorkspaceRepo> | null = null;
 
-// 系统备份里不放 Tinkrum 的数据（D-599）。iOS：每次启动把 Documents（数据库在它的 SQLite/ 里，文件副本、
-// 下载的工具和扩展包也在里面）和 App Group 共享目录（小组件的画面和点按、分享进来的副本）标成不备份，
-// 标在目录上，里面的东西都跟着不备份。Android 不走这里：app.json 里关掉了 allowBackup。
+// Exclude Tinkrum data from system backups (D-599). iOS: Mark Documents (where the database resides
+// under SQLite/, along with file copies, downloaded tools, and extension packs) and App Group
+// shared directories (widget layouts, touches, and incoming shared copies) as do-not-back-up on the
+// directory itself, so all contents inherit it. Android does not use this: allowBackup is disabled
+// in app.json.
 async function excludeStorageFromBackup(): Promise<void> {
   const dirs = [Paths.document, ...Object.values(Paths.appleSharedContainers ?? {})];
   await MorphShare?.excludeFromBackup?.(dirs.map((dir) => dir.uri));
@@ -18,7 +20,7 @@ async function excludeStorageFromBackup(): Promise<void> {
 
 export function openRepo(): Promise<SQLiteWorkspaceRepo> {
   opened ??= (async () => {
-    // 标不上不挡启动。
+    // Failure to set the backup exclusion attribute must not block startup.
     await excludeStorageFromBackup().catch(() => undefined);
     const db = await openDatabaseAsync('morph.db');
     await migrateDatabase(db);
@@ -30,7 +32,7 @@ export function openRepo(): Promise<SQLiteWorkspaceRepo> {
   return opened;
 }
 
-/** 关掉数据库并忘掉打开的那个（整体恢复换数据目录之前，D-600）；下一次 openRepo 会重新打开。 */
+/** Close the database and forget the open instance (before full restore / data directory switch, D-600); the next openRepo will reopen it. */
 export async function closeRepo(): Promise<void> {
   const current = opened;
   opened = null;

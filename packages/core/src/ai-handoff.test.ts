@@ -63,7 +63,7 @@ it('names the attachments and also gives dated links to read them when an app ca
       });
       expect(attached).toContain('tinkrum-app-guide.md');
       expect(attached).toContain('tinkrum-app-patterns.md');
-      // Gemini 看得见附件却读不了指南和 patterns（真机 2026-11-24）：附件打不开时给带日期的网址当退路。
+      // Gemini can see attachments but cannot read guides and patterns (on-device 2026-11-24): provides a dated URL as a fallback when attachments cannot be opened.
       expect(attached).toContain('tinkrum-app-guide.md?v=20261123');
       expect(attached).toContain('tinkrum-app-patterns.md?v=20261123');
       expect(attached.indexOf('tinkrum-app-guide.md')).toBeLessThan(attached.indexOf('https://'));

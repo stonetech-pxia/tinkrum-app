@@ -13,10 +13,12 @@ import { t } from '../i18n';
 import type { RenderEnv } from './components';
 import { onPage } from './theme';
 
-// 时间范围（D-440）：一排小块，点一个，同一页里跟着它的图表和数字卡都按它画；多一个「自定义」时点了选起止日期。
-// 选了什么只放在页面的状态里（RenderEnv.pageRange），什么都不写（底线 15）。
+// Time range (D-440): a row of chips where tapping one applies it to charts and metric cards
+// following it on the same page; when an extra "Custom" chip is present, tapping it opens date
+// range picker. Selection is stored solely in page state (RenderEnv.pageRange), with no writes
+// (Invariant 15).
 
-/** 页面上现在选的：状态里的，没有或者已经不在选项里（刚被改掉）就回到默认的那个。 */
+/** Currently selected on page: from state, or falls back to default if missing or no longer in options (recently changed). */
 export function resolveChoice(block: BlockOf<'period'>, picked: PageChoice | null): PageChoice {
   const { options, custom } = block.show;
   if (picked && 'period' in picked && options.includes(picked.period)) return picked;
@@ -100,7 +102,7 @@ export function PeriodBar({ block, env }: { block: BlockOf<'period'>; env: Rende
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
-        {/* 正在选自定义日期时只亮「自定义」，不然两个一起亮。 */}
+        {/* Highlights only "Custom" when selecting custom date, otherwise highlights both. */}
         {block.show.options.map((p) =>
           chip(p, t(locale, LABELS[p]), !editing && 'period' in choice && choice.period === p, () =>
             state?.set({ period: p }),

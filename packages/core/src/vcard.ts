@@ -4,9 +4,11 @@ import { conceptOf } from './prefill/concepts';
 import { withDocKind } from './prefill/doc-context';
 import type { Field } from './schema';
 
-// 名片的两种文字（D-423）：记录 → vCard 3.0；扫到的 vCard / MeCard / 网址 → 字段的候选。纯函数，只在本机。
-// 姓名、职位、公司、地址按字段是什么（conceptOf，和名片表同一份词典），电话、邮箱、网址按 format。
-// 不写照片、备注、分组；值对不上 format 的不写（点不了的电话也拨不了），网址只可能是 http(s)。
+// Business card text formats (D-423): record → vCard 3.0; scanned vCard / MeCard / URL → field
+// candidates. Pure function, local only. Name, title, company, address mapped by field semantics
+// (conceptOf, shares dictionary with business card table); phone, email, URL mapped by format.
+// Photos, notes, and groups are excluded; values mismatching formats are excluded (unclickable
+// phones cannot be dialed), URLs restricted to http(s).
 
 type Slot = 'name' | 'title' | 'company' | 'address' | TextFormat;
 
@@ -23,14 +25,14 @@ const SLOT_OF_CONCEPT: Readonly<Record<string, Slot>> = {
 function slotOf(field: Field): Slot | null {
   if (field.type === 'text' && field.format) return field.format;
   if (field.type !== 'text' && field.type !== 'note') return null;
-  // 职位、网址两个概念只在名片规则下认（D-421）。
+  // Position and URL concepts are only recognized under business card rules (D-421).
   const concept = withDocKind('card', () => conceptOf(field));
   return concept === null ? null : (SLOT_OF_CONCEPT[concept] ?? null);
 }
 
-// ---- 记录 → vCard ----
+// ---- Record → vCard ----
 
-/** 换行统一成 \n，别的控制字符去掉。 */
+/** Normalize all newlines to \\n and strip other control characters. */
 function tidy(value: string): string {
   return value
     .replace(/\r\n?|[\u2028\u2029]/g, '\n')
@@ -40,7 +42,7 @@ function tidy(value: string): string {
     .trim();
 }
 
-/** RFC 2426 的转义。换行变成字面的 \n，所以值里的换行造不出新的一行（例如假的 TEL）。 */
+/** RFC 2426 escaping. Newlines become literal \\n so that newlines in values cannot generate new lines (e.g., forged TEL attributes). */
 const escapeValue = (value: string) =>
   value.replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
 
@@ -49,7 +51,7 @@ const utf8Bytes = (ch: string) => {
   return cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
 };
 
-/** 一行不超过 75 个字节（RFC 2425），续行以空格开头；不会把一个字切成两半。 */
+/** Lines do not exceed 75 bytes (RFC 2425), continuation lines start with a space; words are never split in half. */
 function fold(line: string): string {
   const out: string[] = [];
   let current = '';
@@ -68,7 +70,7 @@ function fold(line: string): string {
   return out.join('\r\n');
 }
 
-/** N 是必须的：有空格时最后一段算姓（Maria Garcia），没有空格（中文）整个放在姓那一格。 */
+/** N is required: when spaces exist, the last segment is the family name (Maria Garcia); without spaces (Chinese), the entire name is placed in the family name field. */
 function structuredName(name: string): string {
   const parts = name.split(/\s+/);
   const family = parts.pop()!;
@@ -76,8 +78,9 @@ function structuredName(name: string): string {
 }
 
 /**
- * 一条记录的 vCard 3.0（CRLF、UTF-8 文字）。这张表没有名片内容（姓名、公司、电话、邮箱……都空）时是 null。
- * FN 必须有：没有姓名时用公司、邮箱或电话。
+ * vCard 3.0 for a single record (CRLF, UTF-8 text). Returns null if the table has no business
+ * card content (name, company, phone, email, etc. are all empty). FN is required: falls back to
+ * company, email, or phone if name is missing.
  */
 export function recordToVCard(
   fields: readonly Field[],
@@ -115,7 +118,7 @@ export function recordToVCard(
   return lines.map(fold).join('\r\n') + '\r\n';
 }
 
-/** 几条记录合成一个 .vcf 的文字；没有一条有名片内容时是空的。 */
+/** Combine multiple records into a single .vcf text string; empty if none of the records contain business card content. */
 export function recordsToVCard(
   fields: readonly Field[],
   records: readonly { values: Readonly<Record<string, unknown>> }[],
@@ -123,7 +126,7 @@ export function recordsToVCard(
   return records.flatMap((r) => recordToVCard(fields, r.values) ?? []).join('');
 }
 
-// ---- 扫到的文字 → 字段的候选 ----
+// ---- Scanned text → field candidates ----
 
 export interface ContactCode {
   name?: string;
@@ -135,10 +138,10 @@ export interface ContactCode {
   urls: string[];
 }
 
-/** 字段放不下的值（文字字段最多 200 字）不算；一种最多留几个值。 */
+/** Values exceeding field capacity (text fields max 200 chars) are discarded; limit the maximum number of values per type. */
 const MAX_VALUE = 200;
 const MAX_VALUES = 5;
-/** 二维码最多约 3 KB，多的不是名片。 */
+/** QR codes are at most ~3 KB; anything larger is not a business card. */
 const MAX_TEXT = 8000;
 
 const oneLine = (value: string) => tidy(value).replace(/\s*\n\s*/g, ' ');
@@ -166,14 +169,14 @@ function setAddress(code: ContactCode, parts: readonly string[]): void {
 
 const HAS_CJK = /[\u3400-\u9fff]/;
 
-/** 姓和名接起来：中文不加空格、姓在前，别的名在前。 */
+/** Concatenate family and given names: no spaces and family name first for Chinese, given name first for others. */
 function fullName(family: string, given: string): string {
   return HAS_CJK.test(family + given)
     ? family + given
     : [given, family].filter((s) => s.trim()).join(' ');
 }
 
-/** 按没有转义的 sep 切开，去掉转义（\n 是换行）。 */
+/** Split by unescaped separator, removing escapes (\\n is a newline). */
 function splitEscaped(raw: string, sep: string): string[] {
   const out: string[] = [];
   let current = '';
@@ -191,7 +194,7 @@ function splitEscaped(raw: string, sep: string): string[] {
   return out;
 }
 
-/** 这一行参数和值之间的冒号（引号里的不算）。 */
+/** Colon separating parameters and value on this line (excluding those inside quotes). */
 function valueColon(line: string): number {
   let quoted = false;
   for (let i = 0; i < line.length; i++) {
@@ -210,9 +213,9 @@ function parseVCard(text: string): ContactCode {
     const colon = valueColon(line);
     if (colon < 0) continue;
     const [property, ...params] = line.slice(0, colon).split(';');
-    // 分组前缀（item1.TEL）去掉。
+    // Remove group prefixes (item1.TEL).
     const key = property!.replace(/^[^.]*\./, '').toUpperCase();
-    // 编码过的值（vCard 2.1 的 QP、照片的 BASE64）不解。
+    // Ignore encoded values (vCard 2.1 QP, photo BASE64).
     if (/QUOTED-PRINTABLE|BASE64|ENCODING=B/i.test(params.join(';'))) continue;
     const raw = line.slice(colon + 1);
     const parts = splitEscaped(raw, ';');
@@ -250,7 +253,7 @@ function parseMeCard(text: string): ContactCode {
   return code;
 }
 
-/** MeCard 按没有转义的分号切开，转义留给后面（值里还要按逗号切）。 */
+/** Split MeCard by unescaped semicolons, preserving escapes for later processing (values are further split by commas). */
 function splitRaw(text: string): string[] {
   const out: string[] = [];
   let current = '';
@@ -274,8 +277,9 @@ const hasContent = (c: ContactCode) =>
   c.phones.length + c.emails.length + c.urls.length > 0;
 
 /**
- * 二维码里的文字：vCard、MeCard 读出字段；网址只算网站（创始人 2026-11-04）；别的都是 null，
- * 名片照常按文字读。这里只认文字，什么都不打开。
+ * Text inside QR codes: extract fields from vCard and MeCard; URLs count only as websites
+ * (founder 2026-11-04); all else returns null, and business cards are read as regular text.
+ * Recognizes text only, does not open anything.
  */
 export function parseContactCode(text: string): ContactCode | null {
   const code = text.replace(/^\uFEFF/, '').trim();
@@ -290,7 +294,7 @@ export function parseContactCode(text: string): ContactCode | null {
   return hasContent(parsed) ? parsed : null;
 }
 
-/** 这张表每个字段从二维码得到的值（字段 ID → 值）。只有文字和长文本字段。 */
+/** Values obtained from QR codes for each field in this table (field ID → value). Text and long text fields only. */
 export function contactCodeValues(
   fields: readonly Field[],
   code: ContactCode,

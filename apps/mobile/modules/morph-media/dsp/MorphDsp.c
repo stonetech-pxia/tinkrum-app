@@ -27,7 +27,7 @@ double morph_meter_lufs(MorphMeter *m) {
 double morph_meter_peak(MorphMeter *m) {
   double peak = 0;
   if (!m) return peak;
-  /* 真峰值（4 倍过采样）：之后还要编码成 AAC，采样峰值留 -1 dB 余量也可能在解码后削波。 */
+  /* True peak (4x oversampling): since it will be encoded to AAC afterwards, leaving a -1 dB headroom for sample peaks may still cause clipping after decoding. */
   for (unsigned int c = 0; c < m->channels; c++) { double p = 0; ebur128_true_peak(m->state, c, &p); if (p > peak) peak = p; }
   return peak;
 }

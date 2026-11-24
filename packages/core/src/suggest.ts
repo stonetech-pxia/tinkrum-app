@@ -1,6 +1,6 @@
 import { ID_PATTERN } from './schema-primitives';
 
-// 报错里的改法（D-597）：别的 AI 写的 App 文件不对时，告诉它「是不是想写 X」「这个 id 改成 Y」，照着就能改。
+// Fixes in error messages (D-597): when App files written by other AIs are incorrect, tell it "Did you mean to write X" or "Change this id to Y" so it can be fixed directly.
 
 const normal = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -20,8 +20,9 @@ function distance(a: string, b: string): number {
 }
 
 /**
- * 候选里最像 value 的一个：只差大小写和符号、一个是另一个的开头（至少 3 个字），或者只差一两个字。
- * 都不像就不猜：猜错了比不说更误事。
+ * The candidate most similar to value: differing only in case and symbols, one being a prefix of
+ * the other (at least 3 characters), or differing by only one or two characters. If none are
+ * similar, do not guess: guessing wrong is more misleading than saying nothing.
  */
 export function closest(value: string, candidates: Iterable<string>): string | undefined {
   const v = normal(value);
@@ -48,13 +49,13 @@ export function closest(value: string, candidates: Iterable<string>): string | u
   return best;
 }
 
-/** 「（是不是想写 "x"？）」，猜不出来是空字符串。 */
+/** "(Did you mean "x"?)", returns empty string if no guess can be made. */
 export function didYouMean(value: string, candidates: Iterable<string>, show = JSON.stringify) {
   const guess = closest(value, candidates);
   return guess === undefined ? '' : ` (did you mean ${show(guess)}?)`;
 }
 
-/** 把写错的 id 改成合法的写法：opening_balance → opening-balance，dueDate → due-date。改不出来（全是中文）返回 undefined。 */
+/** Convert incorrect IDs into valid formats: opening_balance → opening-balance, dueDate → due-date. Returns undefined if it cannot be converted (e.g., entirely Chinese). */
 export function idFrom(value: string): string | undefined {
   const id = value
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')

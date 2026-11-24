@@ -7,7 +7,7 @@ import type { Locale, WorkspaceConfig } from './schema';
 import { registry, v33Fixture, workspace } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// D-254：更新的 App 加的外观（look），这个版本不认识。读取时原样保留、保存时写回；AI 不能新加或改动它们。
+// D-254: A look introduced by a newer app version that this version does not recognize. Preserved as-is on read and written back on save; the AI cannot add or modify them.
 
 const calendar = {
   id: 'cal',
@@ -18,7 +18,7 @@ const calendar = {
 };
 const inGroup = { id: 'map', look: 'map', show: { zoom: 3 }, hidden: true };
 
-/** 一份更新的 App 存下来的配置：首页上有一个不认识的组件，分组里还有一个。 */
+/** A configuration saved by a newer app version: contains an unrecognized component on the Home Screen and another inside a group. */
 function stored(locale: Locale = 'en'): unknown {
   const config = JSON.parse(JSON.stringify(workspace(locale))) as {
     containers: { pages: { blocks: unknown[] }[] };

@@ -1,6 +1,8 @@
-// 给别的 AI 自检用的命令行脚本（D-594）：node tinkrum-check.js app.json。和 App 导入、网站检查页是同一套检查
-// （checkAppFileText），打包成一个不依赖别的文件的脚本，AI 在自己的代码环境里跑，不联网。
-// 输出第一行是 OK / NOT OK，退出码 0 = 能导入，1 = 有问题，2 = 用法不对。
+// A CLI script for other AIs to perform self-checks (D-594): node tinkrum-check.js app.json. Uses
+// the same check suite as app import and website check pages (checkAppFileText), packaged into a
+// self-contained dependency-free script for AIs to run in their code environment without network
+// access. The first line of output is OK / NOT OK, exit code 0 = importable, 1 = has issues, 2 =
+// incorrect usage.
 import { readFileSync } from 'node:fs';
 
 import {
@@ -52,7 +54,7 @@ function main(): number {
     console.log('It imports, but these parts will not work yet; fix them too:');
     for (const w of check.warnings) console.log(`- ${w}`);
   }
-  // 设计建议（D-602）：能导入，用起来可以更顺手。照做，除非用户要的就是这样。
+  // Design hints (D-602): importable, but can be made smoother to use. Follow these unless the user explicitly requested otherwise.
   if (check.hints.length > 0) {
     console.log(
       'Suggestions to make the app easier to use; apply them unless the person asked for it this way:',

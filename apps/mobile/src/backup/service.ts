@@ -11,15 +11,21 @@ import {
   type BackupManifest,
 } from './manifest';
 
-// 整体导出和恢复的流程（D-600）。原生的 zip 读写、文件系统、数据库、重建界面状态都从 BackupEnv 进来
-// （真的实现在 env.ts，测试里换成替身），所以这里只有规则：
-// - 导出：数据库用 VACUUM INTO 取一份一致的拷贝（WAL 里没写回的也在内），和用户文件一起流式写成一个 zip，放在缓存里，
-//   交给用户选地方（保存到文件夹 / 分享）；用户拿走（或关掉）后删掉缓存里的这份。
-// - 恢复：先检查（是 zip、有说明、目录对、版本不比这个 App 新、空间够），用户确认后解到 Documents/.restore/staging/，
-//   再检查里面的数据库（完整性、升级、有当前版本），全部通过才动手：旧数据整个挪进 .restore/previous/（改名，不复制），
-//   新数据挪进去，重开数据库、重建界面状态并读回来确认。任何一步出错都把旧数据挪回来。成功后旧数据留着，
-//   直到撤销提示不再出现，再删掉；撤销是同样的对换。
-// 取消：只在解压和导出的写文件阶段可以取消（原生在下一块数据处停下，删掉没写完的文件）；换目录的几步很快，不能取消。
+// Overall export and restore pipeline (D-600). Native zip read/write, file system, database, and UI
+// state reconstruction all come through BackupEnv (actual implementation in env.ts, replaced with
+// mock in tests), so only rules reside here:
+// - Export: take a consistent database copy using VACUUM INTO (including unwritten WAL entries),
+// stream-write it along with user files into a zip stored in cache, let user choose destination
+// (save to folder / share); delete cached file after user takes it (or dismisses).
+// - Restore: check first (is zip, has manifest, correct directories, version not newer than this
+// app, sufficient space), after user confirmation extract to Documents/.restore/staging/, check
+// internal database (integrity, migration, has current version), proceed only if all checks pass:
+// move old data entirely into .restore/previous/ (rename, do not copy), move new data in, reopen
+// database, rebuild UI state and read back to confirm. If any step fails, move old data back. On
+// success, keep old data until undo banner disappears, then delete; undo uses the same swap.
+// Cancellation: allowed only during decompression and export file-writing phases (native stops at
+// next data chunk, deletes unfinished files); directory switching steps are fast and cannot be
+// cancelled.
 
 export type BackupErrorKind =
   'notBackup' | 'damaged' | 'newer' | 'noSpace' | 'cancelled' | 'switchFailed' | 'failed';
@@ -39,7 +45,7 @@ export interface ArchiveProgress {
   total: number;
 }
 
-/** 原生模块 MorphArchive 里用到的部分（modules/morph-archive/index.ts）。 */
+/** Parts used from MorphArchive native module (modules/morph-archive/index.ts). */
 export interface ArchiveNative {
   scanTree(uris: readonly string[]): Promise<{ files: number; bytes: number }>;
   createArchive(
@@ -61,7 +67,7 @@ export interface ArchiveNative {
 }
 
 export interface LiveDb {
-  /** 把数据库存成一份一致的拷贝到 dest（file:// 地址，文件必须还不存在）。 */
+  /** Save a consistent database copy to dest (file:// URI, file must not exist yet). */
   snapshotTo(dest: string): Promise<void>;
   info(): Promise<{ userVersion: number; schemaVersion: number | null; records: number }>;
 }
@@ -69,7 +75,7 @@ export interface LiveDb {
 export interface StagedDb {
   integrityOk(): Promise<boolean>;
   userVersion(): Promise<number>;
-  /** 把数据库结构升级到这个 App 的版本（底线 12）。 */
+  /** Upgrade database schema to match this app version (invariant 12). */
   migrate(): Promise<void>;
   head(): Promise<{ id: number; schemaVersion: number } | null>;
   close(): Promise<void>;
@@ -84,21 +90,21 @@ export interface BackupEnv {
     freeSpace(): number;
     removeFile(uri: string): void;
   };
-  /** 都是 file:// 地址，结尾带 /。 */
+  /** Both are file:// URIs ending with /. */
   roots: { documents: string; cache: string };
   db: {
     live: LiveDb;
     openStaged(dirUri: string): Promise<StagedDb>;
-    /** 这个 App 能打开的数据库版本（user_version）和配置版本。 */
+    /** Database version (user_version) and config version supported by this app. */
     maxUserVersion: number;
     maxSchemaVersion: number;
   };
   runtime: {
-    /** 关掉正在用的数据库（换目录之前）。 */
+    /** Close active database (before directory switch). */
     release(): Promise<void>;
-    /** 重开数据库、重建界面状态并读回来；读不回来就抛错。expectHeadId：读出来的当前版本必须是这个（没有因为读不懂退回旧版本）。 */
+    /** Reopens database, rebuilds interface state, and reads back; throws if unable to read. expectHeadId: the version read back must be this one (ensuring no fallback to an older version due to unreadable data). */
     reload(expectHeadId?: number): Promise<void>;
-    /** 恢复或撤销做完之后：回到主页，显示带「撤销」的提示（恢复）或一句话（撤销，撤销失败）。 */
+    /** After restoration or undo completes: returns to home page, displaying a banner with "Undo" (for restoration) or a message (for undo / undo failure). */
     notify(kind: 'restored' | 'undone' | 'undoFailed'): void;
   };
   app: { version: string | null; platform: string };
@@ -113,9 +119,9 @@ export interface BackupStatus {
   step: BackupStep | null;
   done: number;
   total: number;
-  /** 导出做好了、等用户选地方。 */
+  /** Export is ready, waiting for user to select a location. */
   exported: { uri: string; name: string; bytes: number } | null;
-  /** 上一次出的问题（开始下一次时清掉）。 */
+  /** Previous error encountered (cleared when starting the next operation). */
   error: { kind: BackupErrorKind; needed?: number } | null;
 }
 
@@ -132,21 +138,21 @@ export const useBackupStatus = create<BackupStatus>()(() => IDLE);
 
 export interface RestorePreview {
   manifest: BackupManifest;
-  /** 解开后一共多少字节。 */
+  /** Total size in bytes after extraction. */
   bytes: number;
 }
 
-/** 留出的余量：解开的东西之外，数据库升级、临时文件还要一点。 */
+/** Reserved margin: extra space needed beyond extracted files for database upgrades and temporary files. */
 const MARGIN = 64 * 1024 * 1024;
 export const needSpace = (bytes: number) => bytes + Math.max(MARGIN, Math.floor(bytes * 0.02));
 
-/** 换目录的清单：数据库目录和四个文件目录。staged 是在压缩包里的位置，live 是在 Documents 里的名字。 */
+/** Directory swap manifest: database directory and four file directories. `staged` is the location inside the archive, `live` is the name in Documents. */
 const ITEMS = [
   { live: 'SQLite', staged: 'database' },
   ...FILE_DIRS.map((d) => ({ live: d, staged: `files/${d}` })),
 ];
 
-/** 原生错误（带 code）换成我们的种类。名字不安全、不认识的压缩方式都算「不是备份」。 */
+/** Maps native errors (with codes) to our error types. Unsafe names and unknown compression formats are treated as "not a backup". */
 export function nativeToBackupError(e: unknown): BackupError {
   if (e instanceof BackupError) return e;
   const code =
@@ -174,7 +180,7 @@ export function createBackupService(env: BackupEnv) {
   const previous = `${scratch}previous/`;
   const aside = `${scratch}discarded/`;
   const exportDir = `${env.roots.cache}backup-export/`;
-  /** 恢复之前的数据还留着、撤销提示还在（只在内存里：App 被关掉后留下的没有撤销可用，下次导出或恢复时清掉）。 */
+  /** Data before restoration is still kept and undo prompt is still active (in memory only: retained state after app shutdown cannot be undone, cleared upon next export or restore). */
   let previousKept = false;
   let undoing = false;
 
@@ -201,7 +207,7 @@ export function createBackupService(env: BackupEnv) {
     return run().finally(off);
   }
 
-  /** 恢复和导出留下的临时东西（解开一半的、对换下来的）；撤销已经用不上的恢复前数据。 */
+  /** Cleans up temporary files left by restore and export (half-extracted, swapped-out items); discards pre-restoration data no longer needed for undo. */
   async function cleanupLeftovers() {
     await env.native.removeTree(staging);
     await env.native.removeTree(aside);
@@ -209,7 +215,7 @@ export function createBackupService(env: BackupEnv) {
     await env.native.removeTree(exportDir);
   }
 
-  /** 恢复之前的数据：撤销提示不再出现时删掉。撤销进行中不动。 */
+  /** Pre-restoration data: deleted when the undo prompt disappears. Not modified while an undo is in progress. */
   async function discardPrevious() {
     if (!previousKept || undoing) return;
     previousKept = false;
@@ -228,7 +234,7 @@ export function createBackupService(env: BackupEnv) {
       const scan = await env.native.scanTree(dirs.map((d) => d.uri));
       snapshot = `${exportDir}morph.db`;
       await env.db.live.snapshotTo(snapshot);
-      // 最坏的情况：用户文件一点没压缩，再加数据库。
+      // Worst-case scenario: user files entirely uncompressed, plus the database.
       const needed = needSpace(scan.bytes + env.fs.size(snapshot));
       if (env.fs.freeSpace() < needed) throw new BackupError('noSpace', needed);
       const now = env.now();
@@ -253,24 +259,24 @@ export function createBackupService(env: BackupEnv) {
       fail(e);
       await env.native.removeTree(exportDir);
     } finally {
-      // 数据库的拷贝已经在压缩包里了，不留着。
+      // Database copy is already in the archive and is not retained.
       if (snapshot && env.fs.exists(snapshot)) {
         try {
           env.fs.removeFile(snapshot);
         } catch {
-          // 下次导出开头会清掉整个目录。
+          // Next export will clear the entire directory at the start.
         }
       }
     }
   }
 
-  /** 用户拿走了（或不要了）：删掉缓存里的压缩包。 */
+  /** User took away or discarded the export: deletes the cached archive. */
   async function discardExport(): Promise<void> {
     if (useBackupStatus.getState().phase === 'exported') set({ ...IDLE });
     await env.native.removeTree(exportDir);
   }
 
-  /** 检查压缩包能不能恢复（不改任何东西）。出问题时状态里留下原因，返回 null。 */
+  /** Checks if an archive can be restored (without modifying anything). Leaves reason in state on error and returns null. */
   async function checkArchive(uri: string): Promise<RestorePreview | null> {
     if (busy()) return null;
     begin('checking', 'prepare');
@@ -299,8 +305,9 @@ export function createBackupService(env: BackupEnv) {
   }
 
   /**
-   * 对换数据目录：live 里有的挪到 setAside，source 里有的挪进 live。每一步都记下，出错时倒着挪回去。
-   * 都是同一个卷里的改名，瞬间完成。
+   * Swaps data directories: moves items present in `live` to `setAside`, and items present in
+   * `source` into `live`. Records each step to roll back in reverse order on error. All renames
+   * within the same volume happen instantly.
    */
   async function exchange(source: (item: (typeof ITEMS)[number]) => string, setAside: string) {
     const done: { from: string; to: string }[] = [];
@@ -325,7 +332,7 @@ export function createBackupService(env: BackupEnv) {
     };
   }
 
-  /** 换完之后重开读回来；读不回来就把换的退回去，再读回旧的。 */
+  /** Reopens and reads back after swapping; rolls back the swap and reverts to the old data if reading back fails. */
   async function switchTo(
     source: (item: (typeof ITEMS)[number]) => string,
     setAside: string,
@@ -347,8 +354,9 @@ export function createBackupService(env: BackupEnv) {
   }
 
   /**
-   * 恢复。confirm：检查通过后问用户（说明里的日期和数量）；返回 false 就什么都不做。
-   * 返回 'restored'、'declined'（用户没确认）或 'failed'（原因在状态里）。
+   * Restore. confirm: prompts user after passing checks (shows date and count in description);
+   * returns false to do nothing. Returns 'restored', 'declined' (user cancelled), or 'failed'
+   * (reason in state).
    */
   async function restore(
     uri: string,
@@ -360,7 +368,7 @@ export function createBackupService(env: BackupEnv) {
     begin('restoring', 'unpack');
     try {
       await cleanupLeftovers();
-      // 新的恢复开始，上一次恢复留着的旧数据不再能撤销。
+      // New restoration begins, making old data retained from the previous restoration no longer undoable.
       await discardPrevious();
       env.fs.makeDir(scratch);
       set({ total: preview.bytes });
@@ -396,13 +404,13 @@ export function createBackupService(env: BackupEnv) {
       return 'restored';
     } catch (e) {
       fail(e);
-      // 解开的东西不再有用（换失败时挪回来的那份也一样）。
+      // Extracted items are no longer needed (same for the backup copy moved back on swap failure).
       await env.native.removeTree(staging).catch(() => undefined);
       return 'failed';
     }
   }
 
-  /** 撤销恢复：和恢复同样的对换，换回恢复之前的数据。成功后恢复进来的那份删掉。 */
+  /** Undo restore: performs the same directory swap as restore to revert to pre-restoration data. Deletes the restored copy upon success. */
   async function undoRestore(): Promise<boolean> {
     if (!previousKept || busy()) return false;
     undoing = true;
@@ -418,7 +426,7 @@ export function createBackupService(env: BackupEnv) {
       return true;
     } catch (e) {
       fail(e);
-      // 撤销的人在主页，看不到数据页上的出错说明：换一句提示告诉他。
+      // The user performing undo is on the home page and cannot see error messages on the data page: shows a different hint message instead.
       env.runtime.notify('undoFailed');
       return false;
     } finally {
@@ -426,7 +434,7 @@ export function createBackupService(env: BackupEnv) {
     }
   }
 
-  /** 取消正在做的事（只在能取消的阶段有用）。 */
+  /** Cancels the ongoing operation (only valid during cancellable stages). */
   function cancel() {
     const { phase, step } = useBackupStatus.getState();
     if (

@@ -36,13 +36,13 @@ class PcmTest {
     val input = sine(440.0, 48000, 1.0)
     val out = resampleAll(input, 48000)
     assertEquals(16000, out.size)
-    // 中间部分（避开两头的滤波器边缘）音量不变：正弦波的均方根是振幅的 0.707 倍。
+    // Volume remains unchanged in the middle section (avoiding filter edges at both ends): the RMS of a sine wave is 0.707 times its amplitude.
     assertEquals(0.5 * 0.7071, rms(out, 1000, 15000), 0.01)
   }
 
   @Test
   fun downsamplingRemovesSoundAboveTheNewNyquist() {
-    // 12 kHz 在 16 kHz 采样下会混叠成 4 kHz 的杂音，要先滤掉。
+    // 12 kHz aliases into 4 kHz noise at 16 kHz sample rate and must be filtered out first.
     val out = resampleAll(sine(12000.0, 48000, 1.0), 48000)
     assertTrue("rms ${rms(out, 1000, 15000)}", rms(out, 1000, 15000) < 0.02)
   }

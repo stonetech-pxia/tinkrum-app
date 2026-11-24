@@ -1,11 +1,15 @@
 import { packPage } from './common';
 
-// 文字识别包页面（T5）：tesseract.js 7.0.0，完全离线（调研笔记 pack-manifests §4）。
-// - tesseract.min.js 是经典脚本；worker 是一个 Blob：前置脚本 + 核心（.wasm.js，内嵌 wasm）+ worker.min.js。
-//   核心的顶层 var 定义了 TesseractCore，worker 就不会再 importScripts。
-// - worker 用全局 fetch 取语言数据：前置脚本把 self.fetch 换成「等页面送来字节」。
-// - createWorker 同步创建线程：临时包一下 window.Worker 拿到线程，把语言数据作为可转移对象送进去。
-// - 语言加载失败时 createWorker 永远不返回，所以要加超时。只用 LSTM（OEM 1），不缓存到 IndexedDB。
+// OCR pack page (T5): tesseract.js 7.0.0, fully offline (research notes pack-manifests §4).
+// - tesseract.min.js is the classic script; worker is a Blob: preamble script + core (.wasm.js,
+// embedded wasm) + worker.min.js. The core's top-level var defines TesseractCore so the worker does
+// not importScripts again.
+// - worker uses global fetch to fetch language data: preamble script replaces self.fetch with "wait
+// for the page to send bytes".
+// - createWorker synchronously creates the thread: temporarily wraps window.Worker to get the
+// thread and passes language data as a transferable object.
+// - createWorker never returns if language loading fails, so a timeout is required. Uses LSTM only
+// (OEM 1), not cached to IndexedDB.
 
 const SCRIPT = String.raw`
 let tesseractLoaded = false;
@@ -35,7 +39,7 @@ async function prepare() {
     tesseractLoaded = true;
   }
   if (!workerUrl) {
-    // 和 wasm-feature-detect 一样的 SIMD 检测字节。
+    // SIMD byte detection identical to wasm-feature-detect.
     const simd = WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11]));
     const core = await need({ pack: 'ocr', path: simd ? 'core/tesseract-core-simd-lstm.wasm.js' : 'core/tesseract-core-lstm.wasm.js' }, 'text');
     workerUrl = blobUrl(['(' + morphPrelude.toString() + ')();\n', core, '\n;\n', await need({ pack: 'ocr', path: 'worker.min.js' }, 'text')]);

@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 import MorphBackground from '../../modules/morph-background';
 import type { BackgroundPlatform } from './platform';
 
-// BackgroundPlatform 的实现：本地 Expo 模块 MorphBackground（D-160–D-163）。没有这个模块（Expo Go）时为 null。
+// Implementation of BackgroundPlatform: local Expo module MorphBackground (D-160-D-163). Null if this module is absent (Expo Go).
 
 export function expoBackground(): BackgroundPlatform | null {
   const native = MorphBackground;
@@ -22,14 +22,14 @@ export function expoBackground(): BackgroundPlatform | null {
       try {
         native.update(text, fraction);
       } catch {
-        // 通知改不了不影响任务。
+        // Failure to update notification does not affect the task.
       }
     },
     end: (done) => {
       try {
         native.end(done);
       } catch {
-        // 同上。
+        // Same as above.
       }
     },
     isForeground: () => AppState.currentState === 'active',

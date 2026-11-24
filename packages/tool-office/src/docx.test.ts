@@ -96,7 +96,7 @@ describe('writeDocx', () => {
     expect(widths.at(-1)).toBeGreaterThanOrEqual(Math.ceil(textEm('FLIGHT') * 10 * 20 + 160));
   });
   it('borrows unused width from earlier cells so a short last cell stays on one line', () => {
-    // 页脚：左边一个网址，右边贴着页边的「1/3」；整行比内容区宽，右边没空白可借，格子只有「1/3」那么宽。
+    // Footer: a URL on the left, and "1/3" flush against the right page margin; the whole row is wider than the content area, with no empty space on the right to borrow, so the cell is only as wide as "1/3".
     const footer = (last: string, lastWidth: number) => ({
       kind: 'row' as const,
       box: { x: 40, y: 1350, width: 950, height: 20 },
@@ -133,14 +133,14 @@ describe('writeDocx', () => {
       const grid = xml.match(/<w:tblGrid>.*?<\/w:tblGrid>/)![0];
       const widths = [...grid.matchAll(/w:w="(\d+)"/g)].map((m) => Number(m[1]));
       expect(widths.at(-1)).toBeGreaterThanOrEqual(Math.ceil(textEm(text) * 9 * 20 + 160));
-      // 借的只是左边没用到的宽：网址还放得下一行。
+      // Only the unused width on the left is borrowed: the URL still fits on one line.
       expect(widths[0]).toBeGreaterThanOrEqual(
         Math.ceil(textEm('http://www.example.org/atto/stampa/originario') * 9 * 20 + 160),
       );
     }
   });
   it('keeps a side-by-side row on the right half where the source has it', () => {
-    // 发票右边的「FOB | DATE D'EXPÉDITION」：左半边空着，整行不该挪到左页边。
+    // "FOB | DATE D'EXPÉDITION" on the right side of the invoice: the left half is empty, and the entire row should not be shifted to the left margin.
     const p: DocPage = {
       ...page(
         [
@@ -392,7 +392,7 @@ describe('writeDocx', () => {
           .text('word/document.xml')
           .matchAll(/w:before="(\d+)"/g),
       ].map((m) => Number(m[1]));
-    // 压掉空白也放不进一页：和旧写法一样不压，段落之间照样空开。
+    // Cannot fit into a single page even by squeezing whitespace: like the old writing style, do not squeeze, and keep spacing between paragraphs as usual.
     const spaced = befores({ width: 595.3, height: 841.9 });
     expect(spaced.length).toBeGreaterThanOrEqual(7);
     expect(spaced.every((v) => v > 0)).toBe(true);
@@ -533,7 +533,7 @@ describe('writeDocx', () => {
     const xml = unzip(writeDocx(doc)).text('word/document.xml');
     const props = [...xml.matchAll(/<w:tblPr>(.*?)<\/w:tblPr>/g)].map((m) => m[1]!);
     expect(props).toHaveLength(3);
-    // 不能只依赖默认表格样式：有的阅读器会替换成自己的默认内边距。
+    // Do not rely solely on default table styles: some readers replace them with their own default padding.
     for (const p of props)
       expect(p).toContain(
         '<w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar>',
@@ -711,7 +711,7 @@ describe('writeDocx', () => {
     const xml = unzip(writeDocx(doc)).text('word/document.xml');
     const widths = [...xml.matchAll(/<w:gridCol w:w="(\d+)"\/>/g)].map((m) => Number(m[1]));
     expect(widths[0]).toBe(Math.round((616 / 1408) * 11906));
-    // Arial 12 磅整行约 103.3 磅，再加两边各 4 磅；不能拿文字的识别框当可用栏宽。
+    // An Arial 12 pt full line is about 103.3 pt, plus 4 pt padding on each side; do not use the text recognition bounding box as the available column width.
     expect(widths[1]! - 160).toBeGreaterThanOrEqual(103.3 * 20);
     expect(widths.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(9638);
     expect(xml).toContain('>Bill to: Elena Martin</w:t>');
@@ -806,7 +806,7 @@ describe('writeDocx', () => {
     const zip = unzipSync(writeDocx(doc));
     const xml = strFromU8(zip['word/document.xml']!);
     const widths = [...xml.matchAll(/<w:gridCol w:w="(\d+)"\/>/g)].map((m) => Number(m[1]));
-    // Arial 12 pt 的 [6] 约 13.35 pt，加左右各 4 pt 的格内边距。
+    // [6] in Arial 12 pt is about 13.35 pt, plus 4 pt cell padding on each side.
     expect(widths[1]! - 160).toBeGreaterThanOrEqual(13.35 * 20);
     expect(widths.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(9638);
     expect(xml).toContain('[6]');
@@ -872,9 +872,9 @@ describe('writeDocx', () => {
       'PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"',
     );
     expect(zip.text('_rels/.rels')).toContain('Target="word/document.xml"');
-    // A4 纵向。
+    // A4 Portrait.
     expect(zip.text('word/document.xml')).toContain('<w:pgSz w:w="11906" w:h="16838"/>');
-    // 正文字号写进默认样式（半磅）。
+    // Body font size written into default style (half-points).
     expect(zip.text('word/styles.xml')).toContain('<w:sz w:val="22"/>');
   });
 
@@ -899,7 +899,7 @@ describe('writeDocx', () => {
     };
     const xml = unzip(writeDocx(doc)).text('word/document.xml');
     expect(xml).toContain('<w:pStyle w:val="Heading1"/>');
-    // 每个 run 都写字号（D-335：苹果的预览不读默认样式里的字号，一律当 12 磅）；标题是标题样式的字号。
+    // Every run writes font size (D-335: Apple's Preview does not read font sizes from default styles and treats everything as 12 pt); headings use heading style sizes.
     expect(xml).toContain(
       '<w:b/><w:bCs/><w:sz w:val="35"/><w:szCs w:val="35"/></w:rPr><w:t xml:space="preserve">Titre</w:t>',
     );
@@ -908,7 +908,7 @@ describe('writeDocx', () => {
     expect(xml).toContain('<w:spacing w:before="160"/>');
     expect(xml).toContain('A &lt; B &amp; &quot;C&quot;');
     expect(xml).toContain('<w:br/><w:t xml:space="preserve">second line</w:t>');
-    // 和正文一样大的也写正文字号；不画下划线和删除线。
+    // Runs with the same size as body text also write body font size; do not draw underlines and strikethroughs.
     expect(xml).toMatch(
       /<w:rPr><w:rFonts [^>]*\/><w:sz w:val="22"\/><w:szCs w:val="22"\/><\/w:rPr><w:t xml:space="preserve">body size<\/w:t>/,
     );
@@ -964,7 +964,7 @@ describe('writeDocx', () => {
       ],
     };
     const xml = unzip(writeDocx(doc)).text('word/document.xml');
-    // 原图宽 1000 像素按 A4 宽 11906 twip 换算。
+    // Original image width of 1000 pixels converted based on A4 width of 11906 twips.
     expect(xml).toContain('<w:gridCol w:w="1191"/><w:gridCol w:w="2381"/><w:gridCol w:w="2381"/>');
     const rows = xml.match(/<w:tr>.*?<\/w:tr>/g)!;
     expect(rows).toHaveLength(2);
@@ -1001,16 +1001,16 @@ describe('writeDocx', () => {
       [
         ...unzip(writeDocx(doc))
           .text('word/document.xml')
-          // 只数 run 上的字号（段落标记上的另算）。
+          // Count font sizes only on runs (paragraph marks are counted separately).
           .matchAll(/<w:sz w:val="(\d+)"\/><w:szCs [^>]*><\/w:rPr><w:t /g),
       ].map((m) => Number(m[1]) / 2);
-    // 整页宽的表按内容区缩小（11906 → 9638 twip，约 0.81）：10 磅的字跟着变成 8 磅。
+    // Full-page width tables are scaled down according to the content area (11906 -> 9638 twips, approx. 0.81): 10 pt text scales down to 8 pt accordingly.
     expect(sizes(table([500, 500], ['a', 'b'], 10))).toEqual([8, 8]);
-    // 窄的一列（约 48 磅宽，去掉格子边距 40 磅）放不下「MARQUEUR」：整张表一起缩到 7 磅。
+    // Narrow column (approx. 48 pt wide, minus 40 pt cell padding) cannot fit "MARQUEUR": the entire table scales down together to 7 pt.
     expect(sizes(table([100, 900], ['MARQUEUR', 'b'], 10))).toEqual([7, 7]);
-    // 再长的词也不小于 5 磅。
+    // Even longer words are not smaller than 5 pt.
     expect(sizes(table([100, 900], ['REFRIGERATEURS', 'b'], 10))).toEqual([5, 5]);
-    // 整张表最多跟着缩到 0.6 倍（14 磅的表按内容区本来是 11 磅，最多缩到 6.5 磅）；只有放不下的那一格缩到 5 磅。
+    // The entire table scales down by at most a factor of 0.6 (a 14 pt table normally becomes 11 pt based on the content area, scaling down to at most 6.5 pt); only the cell that does not fit scales down to 5 pt.
     expect(sizes(table([100, 900], ['REFRIGERATEURS', 'b'], 14))).toEqual([5, 6.5]);
   });
 
@@ -1042,8 +1042,9 @@ describe('writeDocx', () => {
     const sizes = [...xml.matchAll(/<w:sz w:val="(\d+)"\/><w:szCs [^>]*><\/w:rPr><w:t /g)].map(
       (m) => Number(m[1]) / 2,
     );
-    // 「23」那一列约 14 磅宽：旧的 8 磅格子边距占掉一大半，整张表跟着缩到 5.5 磅。
-    // 边距按格宽缩小后「23」放得下，表照常按内容区缩到 8 磅。
+    // The column for "23" is about 14 pt wide: the old 8 pt cell padding takes up a major part,
+    // causing the entire table to scale down to 5.5 pt. After the padding is scaled down with the
+    // cell width, "23" fits, and the table scales down to 8 pt as usual based on the content area.
     expect(sizes).toEqual([8, 8, 8]);
     expect(xml).toMatch(/<w:tcMar><w:left w:w="\d+" w:type="dxa"\/><w:right w:w="\d+"/);
   });
@@ -1090,9 +1091,9 @@ describe('writeDocx', () => {
     expect(xml).toMatch(
       /<w:sz w:val="20"\/><w:szCs w:val="20"\/><\/w:rPr><w:t xml:space="preserve">prose</,
     );
-    // 段落标记也写字号：空段落、空格子的行高跟着字号走，苹果的预览也按它算行高。
+    // Paragraph marks also write font size: empty paragraphs and empty cell line heights follow the font size, and Apple's Preview also calculates line height based on it.
     expect(xml).toContain('<w:pPr><w:rPr><w:sz w:val="14"/><w:szCs w:val="14"/></w:rPr></w:pPr>');
-    // 表格后面、空格子、并排行里的空段落也都带字号（没有光秃秃的 <w:p/>）。
+    // Empty paragraphs after tables, empty cells, and empty paragraphs in side-by-side rows all include font sizes (no bare <w:p/>).
     expect(xml).not.toContain('<w:p/>');
   });
 
@@ -1206,7 +1207,7 @@ describe('writeDocx', () => {
       'Id="rIdImg1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.jpg"',
     );
     const xml = zip.text('word/document.xml');
-    // 半页宽（5953 twip）→ EMU；高按图片的宽高比。
+    // Half-page width (5953 twips) -> EMUs; height based on image aspect ratio.
     expect(xml).toContain('<wp:extent cx="3780155" cy="1890078"/>');
     expect(xml.match(/<w:drawing>/g)).toHaveLength(1);
     expect(xml).toMatch(
@@ -1221,11 +1222,11 @@ describe('writeDocx', () => {
       '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Microsoft YaHei" w:cs="Arial"/>',
     );
     expect(styles).toMatch(/w:styleId="Heading1">.*<w:rPr><w:b\/><w:bCs\/>/);
-    // 字体表写明是无衬线（没有这个字体的电脑换成别的无衬线字体）。
+    // Font table specifies sans-serif (computers lacking this font fall back to another sans-serif font).
     const fonts = zip.text('word/fontTable.xml');
     expect(fonts).toContain('<w:font w:name="Microsoft YaHei"><w:altName w:val="PingFang SC"/>');
     expect(fonts).toContain('<w:family w:val="swiss"/>');
-    // 每个 run 也写字体（苹果的预览不读默认样式里的字体）。
+    // Each run also writes font (Apple's Preview does not read fonts from default styles).
     const xml = unzip(
       writeDocx({ version: 1, pages: [page([{ kind: 'paragraph', text: 'x', box }])] }),
     ).text('word/document.xml');
@@ -1238,12 +1239,12 @@ describe('writeDocx', () => {
     const xml = unzip(
       writeDocx({ version: 1, pages: [page([{ kind: 'paragraph', text: 'p', indent: 50, box }])] }),
     ).text('word/document.xml');
-    // 原图宽 1000 像素 = A4 宽 11906 twip。
+    // Original image width of 1000 pixels = A4 width of 11906 twips.
     expect(xml).toContain('<w:ind w:firstLine="595"/>');
   });
 
   it('measures left indents from the text, not from a full-bleed picture at the paper edge (EU sample 036)', () => {
-    // 满版的页眉色带从 x = 0 开始；字从左页边距（95 像素）开始，不该都往右缩进 95 像素。
+    // Full-page header color band starts at x = 0; text starts at the left page margin (95 pixels) and should not be indented right by 95 pixels.
     const band = {
       kind: 'image' as const,
       src: 'band',
@@ -1282,7 +1283,7 @@ describe('writeDocx', () => {
   });
 
   it('gives a wide wrapped paragraph the same indent as a heading on its left edge (EU sample 053)', () => {
-    // 信的正文从页边距右边 25 像素起：标题和整段正文左边对齐，正文在 Word 里本来就要折行，缩进不让给剩下的空间。
+    // Letter body starts 25 pixels to the right of the page margin: title and entire body paragraph are left-aligned; the body would naturally wrap in Word, and indentation is not yielded to the remaining space.
     const at = (x: number, y: number, width: number, height = 30) => ({ x, y, width, height });
     const long = 'Herr Beispiel arbeitete stets sorgfältig, zuverlässig und selbstständig. '.repeat(
       4,
@@ -1303,7 +1304,7 @@ describe('writeDocx', () => {
   });
 
   it('gives up the indent of wrapped paragraphs when keeping it would push a full page onto two (EU sample 038)', () => {
-    // 一页排满的说明：每段在 Word 里顶格两行、保留缩进要三行。段少时保留缩进，段多到放不下时缩进让出来。
+    // Single-page instructions: each paragraph takes two lines flush-left in Word, or three lines if keeping indentation. Keep indentation when paragraphs are few, and yield indentation when there are too many paragraphs to fit.
     let text = 'Vous devez indiquer';
     while (textEm(text) < 72) text += ' la date de début';
     const doc = (n: number): DocDoc => ({
@@ -1334,7 +1335,7 @@ describe('writeDocx', () => {
   });
 
   it('places each paragraph at its left edge and keeps the vertical gaps, as plain paragraphs (D-463)', () => {
-    // 原图宽 1000 像素 = A4 宽 11906 twip；左页边距 1134 twip = 95 像素，左缩进从那里算。
+    // Original image width of 1000 pixels = A4 width of 11906 twips; left page margin 1134 twips = 95 pixels, left indentation is calculated from there.
     const at = (x: number, y: number, width: number) => ({ x, y, width, height: 30 });
     const doc: DocDoc = {
       version: 1,
@@ -1357,21 +1358,21 @@ describe('writeDocx', () => {
     const xml = unzip(writeDocx(doc)).text('word/document.xml');
     const paras = xml.match(/<w:p>.*?<\/w:p>/g)!;
     expect(paras).toHaveLength(4);
-    // 居中的不缩进；离页边距不到一行的第一段不空。
+    // Centered paragraphs are not indented; the first paragraph taking less than a line from the page margin is not padded.
     expect(paras[0]).not.toMatch(/<w:ind |<w:spacing /);
-    // 左边 200 像素：缩进 (200 − 95) 像素；上边到上边 40 像素（476 twip）减去上一行在 Word 里的高（11 磅 × 1.28）。
+    // 200 pixels on the left: indentation (200 - 95) pixels; top distance to top 40 pixels (476 twips) minus the height of the previous line in Word (11 pt × 1.28).
     expect(paras[1]).toContain('<w:spacing w:before="190"/><w:ind w:left="1250"/>');
-    // 大段空白保留；标题不用标题样式的段前段后；下划线。
+    // Large blocks of whitespace are preserved; titles do not use heading style before/after spacing; underline.
     expect(paras[2]).toContain('<w:spacing w:before="5200" w:after="0"/>');
     expect(paras[2]).toContain('<w:u w:val="single"/>');
-    // 靠近右边的一行：缩进让出它自己的宽（多留一成），不折到下一行。
+    // A line near the right: indentation yields its own width (leaving 10% extra), without wrapping to the next line.
     expect(paras[3]).toContain(`<w:ind w:left="${Math.round((9638 - 3453 * 1.1) / 10) * 10}"/>`);
-    // 没有文本框、没有绝对定位。
+    // No text boxes, no absolute positioning.
     expect(xml).not.toMatch(/<w:framePr|<wp:anchor|<w:txbxContent/);
   });
 
   it('shrinks the gaps so that a one-page original stays one page, but not on a page of prose (D-463)', () => {
-    // 22 行字，Word 里比原图大（24 磅）：字本身放得下一页，加上原来的空白就超了。
+    // 22 lines of text, larger in Word than in the original image (24 pt): the text itself fits on a page, but adding the original whitespace exceeds it.
     const lines = (n: number, size: number): DocPage['blocks'] =>
       Array.from({ length: n }, (_, i) => ({
         kind: 'paragraph' as const,
@@ -1384,9 +1385,9 @@ describe('writeDocx', () => {
       const gaps = [...xml.matchAll(/w:before="(\d+)"/g)].reduce((n, m) => n + Number(m[1]), 0);
       return { gaps, height: gaps + blocks.length * 1.28 * size * 20 };
     };
-    // A4 的内容区高 16838 − 2 × 1134 = 14570 twip。
+    // A4 content area height is 16838 - 2 × 1134 = 14570 twips.
     expect(total(lines(22, 24), 24).height).toBeLessThanOrEqual(14570);
-    // 字本身就超过一页：空白照样保留。
+    // Text itself exceeds one page: whitespace is still preserved.
     expect(total(lines(30, 24), 24).gaps).toBeGreaterThan(0);
   });
 
@@ -1442,15 +1443,15 @@ describe('writeDocx', () => {
     const xml = unzip(writeDocx(doc)).text('word/document.xml');
     const tables = xml.match(/<w:tbl>/g)!;
     expect(tables).toHaveLength(2);
-    // 外面那张：没有边框，两列按原图宽度换算（1000 像素 = 11906 twip）。
+    // Outer table: no borders, two columns converted based on original image width (1000 pixels = 11906 twips).
     expect(xml).toMatch(
       /<w:body><w:tbl><w:tblPr><w:tblW [^>]*><w:tblBorders><w:top w:val="nil"\/>/,
     );
     expect(xml).toContain('<w:gridCol w:w="4762"/><w:gridCol w:w="4167"/>');
-    // 里面的表照常有边框，按它那一格的宽（减去左右边距）缩小：2381 → 2004。
+    // Inner table has borders as usual, scaled down according to its cell width (minus left/right padding): 2381 -> 2004.
     expect(xml).toContain('<w:gridCol w:w="2004"/><w:gridCol w:w="2004"/>');
     expect(xml).toContain('<w:top w:val="single"');
-    // 每一格以段落结尾（Word 要求）。
+    // Each cell ends with a paragraph (required by Word).
     for (const cell of xml.match(/<w:tc>(?:(?!<w:tc>)[^])*?<\/w:tc>/g)!)
       expect(cell).toMatch(/(<w:p\/>|<\/w:p>)<\/w:tc>$/);
     expect(xml).toContain('>left</w:t>');
@@ -1465,7 +1466,7 @@ describe('writeDocx', () => {
         ],
       }),
     ).text('word/document.xml');
-    // 标签一列到值的左边（300 像素），值一列占到内容区的右边（9638 - 3572）。
+    // Label column goes to the left of the value (300 pixels), value column occupies the right side of the content area (9638 - 3572).
     expect(xml).toContain('<w:gridCol w:w="3572"/><w:gridCol w:w="6066"/>');
     expect(xml).toContain('<w:tblBorders><w:top w:val="nil"/>');
     const rows = xml.match(/<w:tr>.*?<\/w:tr>/g)!;
@@ -1562,7 +1563,7 @@ describe('left alignment snap (D-473)', () => {
 });
 
 describe('OOXML element order', () => {
-  // ECMA-376 第 1 部分的顺序（只列会写到的几种）：Word 按 schema 的顺序读，顺序错了可能报「无法读取的内容」或丢掉属性。
+  // ECMA-376 Part 1 order (listing only used types): Word reads according to schema order, and incorrect order may cause "Unreadable Content" errors or lost attributes.
   const ORDER: Record<string, string[]> = {
     pPr: [
       'pStyle',
@@ -1676,7 +1677,7 @@ describe('OOXML element order', () => {
       'tblLook',
     ],
   };
-  /** 每个 w:pPr / w:rPr / w:tcPr / w:tblPr 的直接子元素，按出现的顺序。 */
+  /** Direct child elements of each w:pPr / w:rPr / w:tcPr / w:tblPr, in order of appearance. */
   const childLists = (xml: string) => {
     const out: { parent: string; children: string[] }[] = [];
     const stack: { name: string; children: string[] }[] = [];

@@ -30,7 +30,7 @@ export const fillRecord: Impl = async (input, params, ctx) => {
   if (!source || !templates) throw new RunError('invalidWorkflow');
   const collection = expandCollection(ctx.services.collections, source);
   let record = input.records[0]!;
-  // records 仍是原有的类型；多条时由用户亲手选一条，不在配置上拒绝能串的动作。
+  // records remains the existing type; when there are multiple, the user manually selects one, without rejecting chainable actions in the config.
   if (input.records.length > 1) {
     const chosen = await ctx.services.ui.open('recordPick', {
       collection,
@@ -48,7 +48,7 @@ export const fillRecord: Impl = async (input, params, ctx) => {
     return typeof value === 'string' ? value : '';
   };
   const kind = params.kind;
-  // 只从附件元数据判断哪些模板能用；内容在用户选好后才读取。
+  // Determine which templates are applicable solely from attachment metadata; contents are read only after the user makes a selection.
   const candidates: DataRecord[] = [];
   const docs = new Map<string, Awaited<ReturnType<typeof ctx.services.repo.getAsset>>>();
   for (const r of await ctx.services.repo.listRecords(templates.id)) {

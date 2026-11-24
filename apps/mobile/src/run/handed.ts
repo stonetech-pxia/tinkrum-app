@@ -1,7 +1,9 @@
 import type { HandedFiles, RunValue } from '@morph/core';
 
-// 容器交给运行页面的值（D-428）：记录内容不能放进路由参数，所以路由只带一个键，值放在内存里。
-// 只留最新的一份；App 被杀掉后键对不上，运行页面说明要从记录页或列表上点，不会空着跑。
+// Value passed by the container to the run page (D-428): record contents cannot be placed into
+// route parameters, so the route carries only a single key, with the value kept in memory. Only the
+// latest copy is retained; after the app is killed, the key mismatches, but the run page
+// instructions specify opening from the record page or list, so it will never run with empty data.
 
 let slot: { key: string; value: RunValue | HandedFiles } | null = null;
 let next = 0;

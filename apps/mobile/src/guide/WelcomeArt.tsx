@@ -5,14 +5,14 @@ import { t, type StringKey } from '../i18n';
 import { Icon, UiIcon } from '../renderer/Icon';
 import { makePalette, type Palette } from '../renderer/theme';
 
-// 划屏介绍每页上方的图（D-149）：用 View / Text 画，跟随当前主题，不用截图。
+// Illustrations at the top of each page in the onboarding slider (D-149): drawn using View / Text, follows the current theme, without using screenshots.
 
 export type WelcomeArtKind = 'scan' | 'records' | 'style';
 
-/** 「改之后」的缩略图固定用赛博霓虹：不管现在是什么风格，都看得出变化。 */
+/** "After change" thumbnail is fixed to Cyber Neon: regardless of current style, changes are clearly visible. */
 const NEON = makePalette(THEME_PRESETS.neon.theme, true);
 
-// D-592：记录有三个来源（扫描、文件、说一句，D-575），记进各自的小 App（D-485）。
+// D-592: Records have three sources (scan, file, speak a sentence, D-575), logged into their respective mini-apps (D-485).
 const SOURCES: { icon: IconName; label: StringKey }[] = [
   { icon: 'scan', label: 'guideIntroSourceScan' },
   { icon: 'document', label: 'guideIntroSourceFile' },
@@ -43,7 +43,7 @@ export function WelcomeArt({
   }
 }
 
-/** 扫描：取景框里的一页纸。 */
+/** Scan: a page of paper inside the viewfinder. */
 function ScanArt({ palette, locale }: { palette: Palette; locale: Locale }) {
   const corner = { borderColor: palette.primary };
   return (
@@ -75,7 +75,7 @@ function ScanArt({ palette, locale }: { palette: Palette; locale: Locale }) {
   );
 }
 
-/** 记录：扫描、文件、说一句三个来源，下面是几个小 App。 */
+/** Records: three sources (scan, file, speak a sentence), followed by several mini-apps below. */
 function RecordsArt({ palette, locale }: { palette: Palette; locale: Locale }) {
   return (
     <View style={styles.art} testID="welcome-art-records">
@@ -124,8 +124,9 @@ function RecordsArt({ palette, locale }: { palette: Palette; locale: Locale }) {
 }
 
 /**
- * 加功能、换样子（D-592）：改之前（当前风格）→ 一句话 → 改之后（霓虹，最上面多了一张提醒卡片）。
- * 一张图里同时看得到功能多了一个、样子变了。
+ * Add features, change appearance (D-592): Before change (current style) -> A sentence -> After
+ * change (neon, with an extra reminder card at the top). Both the added feature and the changed
+ * appearance can be seen in a single image.
  */
 function StyleArt({ palette, locale }: { palette: Palette; locale: Locale }) {
   const title = t(locale, 'guideIntroMiniTitle');
@@ -150,7 +151,7 @@ function StyleArt({ palette, locale }: { palette: Palette; locale: Locale }) {
   );
 }
 
-/** 迷你手机界面：标题、（提醒卡片、）待办卡片、数字卡片、按钮、导航栏，颜色全部来自 p。 */
+/** Mini phone UI: title, (reminder card,) todo card, number card, buttons, navigation bar, with all colors coming from p. */
 function MiniPhone({
   p,
   frame,
@@ -219,7 +220,7 @@ function MiniPhone({
 }
 
 function miniCard(p: Palette): ViewStyle {
-  // 自定义卡片（D-624）换掉了发光，样张也不画发光。
+  // Custom cards (D-624) replaced the glow effect, and sample illustrations also do not render glow.
   const glow = p.theme.cardStyle === 'glow' && !p.theme.card;
   return {
     backgroundColor: p.surface,

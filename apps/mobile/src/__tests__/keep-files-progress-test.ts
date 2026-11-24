@@ -2,7 +2,7 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { keepIncomingFiles } from '../storage/keep-files';
 import { FakeFiles, TINY_JPEG } from '../test-utils/fake-files';
 
-// 2026-11-06 模拟器测试：一次打开 23 张照片，存进文档库要好几秒，屏幕灰着没有进度。
+// 2026-11-06 simulator test: opening 23 photos at once takes several seconds to save into the document library, and the screen is grayed out with no progress indicator.
 describe('keepIncomingFiles progress', () => {
   it('reports each saved file, ending at the total', async () => {
     const files = new FakeFiles();

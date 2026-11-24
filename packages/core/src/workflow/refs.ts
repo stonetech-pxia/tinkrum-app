@@ -3,31 +3,33 @@ import type { Collection, QuickAction, WorkspaceConfig } from '../schema';
 import { handedValueType } from './check';
 import { outputTypeOf, type ValueType } from './contract';
 
-// 步骤参数里引用配置的地方（CHAIN_AUDIT A3，创始人 2026-10-31）。动作目录的 ParamField.kind 就是声明：
-// collection = 一张表的 ID；fields = 一张表的字段 ID 列表（同一步有 collection 参数时是那张表，
-// 否则是传进来的记录所在的表）。检查（validate.ts）和删表、删字段时的清理（ops.ts）对所有动作都一样，
-// 加一个用到表或字段的动作只要在目录里声明，不用改这两处。
+// Where configuration is referenced in step parameters (CHAIN_AUDIT A3, founder 2026-10-31).
+// ParamField.kind in action directories is the declaration: collection = ID of a table; fields =
+// list of field IDs in a table (that table when the current step has a collection parameter,
+// otherwise the table containing the incoming record). Checks (validate.ts) and cleanup during
+// table/field deletion (ops.ts) are identical for all actions; any action using tables or fields
+// only needs to declare it in the directory without modifying these two places.
 
-/** 记录自带的字段，不在表结构里。 */
+/** Built-in record fields, not part of the table schema. */
 const BUILT_IN_FIELDS = new Set(['createdAt', 'updatedAt']);
 
 export interface StepRef {
-  /** 第几步。 */
+  /** Step index. */
   index: number;
-  /** 参数名。 */
+  /** Parameter name. */
   key: string;
   table: string;
-  /** 引用字段时：字段 ID（记录自带的 createdAt / updatedAt 不算）。 */
+  /** When referencing a field: field ID (built-in createdAt / updatedAt excluded). */
   field?: string;
-  /** collection 参数声明了 receives：这一步把传进来的值存进这张表。 */
+  /** Collection parameter declares receives: this step stores the incoming value into this table. */
   receives?: ValueType | null;
 }
 
-/** 一个快捷操作的步骤参数引用的表和字段。 */
+/** Tables and fields referenced by a quick action's step parameters. */
 export function stepRefs(wf: QuickAction, registry: Registry): StepRef[] {
   const refs: StepRef[] = [];
   let value: ValueType | null = handedValueType(wf.steps, registry);
-  // 传进来的记录所在的表（读取记录那一步定下，原样往下传的步骤保持）。
+  // Table containing the incoming record (established by the read-record step and preserved down the chain).
   let recordsTable: string | null = null;
   for (const [index, step] of wf.steps.entries()) {
     const action = registry.actions.get(step.action);
@@ -62,8 +64,9 @@ export function stepRefs(wf: QuickAction, registry: Registry): StepRef[] {
 }
 
 /**
- * 步骤引用的表要存在、字段要是那张表的（D-042）；把值存进表的步骤（记一笔，D-187），表里要有放它的字段：
- * 文字要有长文本或文字字段，文件要有附件字段。
+ * Tables referenced by steps must exist, and fields must belong to that table (D-042); steps
+ * storing values into tables (log an entry, D-187) must have appropriate fields: text requires
+ * long text or text fields, files require attachment fields.
  */
 export function stepRefProblems(
   wf: QuickAction,
@@ -127,7 +130,7 @@ export function stepRefProblems(
   return problems;
 }
 
-/** 把值存进表的步骤：表里缺放这个值的字段时，说缺什么；不缺（或这一步不存值）时为 null。 */
+/** Steps storing values into tables: describe what field is missing when the table lacks one for this value; null when complete (or if this step does not store values). */
 export function missingPlace(
   table: Collection,
   value: ValueType | null | undefined,
@@ -142,7 +145,7 @@ export function missingPlace(
     : 'an attachment (file) field for the files';
 }
 
-/** 入口必须给出快捷操作绑定的表。 */
+/** Entry points must provide the table bound to the quick action. */
 export function handedRecordProblems(
   wf: QuickAction,
   tableId: string | undefined,

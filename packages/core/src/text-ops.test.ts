@@ -8,7 +8,7 @@ import { replaceText, splitOrJoinLines, tidyText, extractText } from './text-ops
 import { BUILTIN_TOOLS } from './tools';
 import { REDACTED_TEXT, redactForAI } from './workflow/redact';
 
-// OCR 出来的文字常见的样子：行尾空格、全角空格、连续空行、Windows 换行。
+// Typical OCR output artifacts: trailing spaces, full-width spaces, consecutive blank lines, Windows line endings.
 const OCR = '  合同编号  A-17 \r\n\r\n\r\n甲方：　张三  \r\n\t乙方： 李四\r\n\r\n';
 
 describe('tidyText', () => {

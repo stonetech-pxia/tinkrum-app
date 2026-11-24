@@ -5,7 +5,7 @@ import { renderNameTemplate } from '../naming';
 import type { Locale } from '../schema';
 import { paramUnitLabel, type ActionDefinition, type ParamField } from './contract';
 
-// 把参数值写成用户看得懂的话（修改说明、工作流卡片、编辑页共用）。
+// Format parameter values into human-readable text (shared by change descriptions, workflow cards, and edit pages).
 
 export function formatParamValue(
   field: ParamField,
@@ -32,7 +32,7 @@ export function formatParamValue(
         : `${template}${t(locale, 'format_e_g_248d5', { v0: example })}`;
     }
     case 'number': {
-      // 法语的小数点是逗号（0,5）。
+      // French decimal separator is a comma (0,5).
       const shown =
         locale === 'fr' && typeof value === 'number'
           ? formatNumber(value, undefined, 'fr')
@@ -44,7 +44,7 @@ export function formatParamValue(
   }
 }
 
-/** 一组参数的说明：「目标大小 200 KB、格式 JPEG」。只列出 fields 里有、并且显示条件成立的参数。 */
+/** Description of a set of parameters: "Target size 200 KB, Format JPEG". List only parameters that exist in fields and whose display conditions are met. */
 export function describeParams(
   action: ActionDefinition,
   params: Record<string, unknown>,
@@ -58,14 +58,14 @@ export function describeParams(
     if (!(field.key in params)) continue;
     if (field.showIf && !field.showIf.equals.includes(params[field.showIf.key] as never)) continue;
     const value = field.private ? t(locale, 'format_your_text_6c667') : params[field.key];
-    // 0 有特别意思的（例如「不超过 0 MB」其实是不限大小）：只写那句话。
+    // When 0 has a special meaning (e.g., "at most 0 MB" actually means unlimited size): output only that phrase.
     if (field.zeroMeans && value === 0) {
       parts.push(localize(field.zeroMeans, locale));
       continue;
     }
     const label = localize(field.label, locale);
     const shown = formatParamValue(field, value, locale, now);
-    // 选项的名字自成一句（「Ask me」），接在标签后面要加冒号，不然读成半句话。
+    // Option names form their own sentence ("Ask me"); when appended after a label, a colon is required to avoid reading like half a sentence.
     parts.push(
       field.kind === 'choice'
         ? t(locale, 'format_choice', { label, value: shown })
@@ -75,7 +75,7 @@ export function describeParams(
   return parts.join(t(locale, 'separatorList'));
 }
 
-/** 步骤在列表里的名字：动作可以按参数换说法（选照片的来源是相机时叫「拍照」）。 */
+/** Step name in lists: actions can adapt their wording based on parameters (e.g., calling it "Take photo" when the photo source is the camera). */
 export function stepLabel(
   action: ActionDefinition | undefined,
   params: Record<string, unknown> | undefined,

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <!-- 通知频道（系统设置里看得到）。 -->
+  <!-- Notification channel (visible in system settings). -->
   <string name="morph_background_channel_work">Processing</string>
   <string name="morph_background_channel_work_description">Shows progress while Tinkrum processes a video or recording.</string>
   <string name="morph_background_channel_done">Finished</string>

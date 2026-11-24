@@ -16,15 +16,15 @@ import {
 import { createRelayRuntime, loadRootEnv } from '../src/config';
 import { createApp } from '../src/server';
 
-// 用评测集（packages/core/src/ai/eval-cases.ts）衡量真实模型。会产生 API 费用。
-// 用法：npm run eval -- --model claude-haiku-5-5 [--cases A1,C1] [--effort low] [--transport http] [--batch]
-//   默认（relay）：和「Morph 服务器」模式完全一样——App 的转发传输层 → 本进程里的 /v1/complete → Claude（D-193）。
-//   --transport http：App 内「自带 key」模式的 HTTP 传输层，直接调用 Claude。
-//   --batch：所有用例同时跑，请求攒成批走批处理 API。半价，但每一轮要等几分钟到几小时；
-//     修复请求是下一批。批处理 API 不接受 fallbacks，所以没有拒答回退。只能配 relay 传输。
-//   --verbose：失败时打印模型给出的计划。计划里的 notes（D-110）总是打印。
-//   --route：按需加载（route.ts 的路由）。默认和 App 一样关着，每次都发完整的提示词。
-//   --dump <文件>：把每个用例的计划（含通过的）和结果写成 JSON，给提示词路由的测试取「需要哪些部分」。
+// Measure real models using the evaluation set (`packages/core/src/ai/eval-cases.ts`). Incurs API
+// costs. Usage: `npm run eval -- --model claude-haiku-5-5 [--cases A1,C1] [--effort low]
+// [--transport http] [--batch]`
+//    Default (relay): Behaves identically to "Morph Server" mode — App forwarding transport layer -> `/v1/complete` in this process -> Claude (D-193).
+//    `--transport http`: In-app "bring your own key" HTTP transport layer, calling Claude directly.
+//    `--batch`: Run all test cases concurrently, batching requests through the Batch API. Half-price, but each round takes from several minutes to hours; failure requests are processed in the next batch. The Batch API does not accept fallbacks, so there is no refusal fallback. Only compatible with relay transport.
+//    `--verbose`: Print the plan provided by the model upon failure. Plan notes (D-110) are always printed.
+//    `--route`: On-demand loading (routing via `route.ts`). Disabled by default, matching the app behavior, sending full prompts every time.
+//    `--dump <file>`: Write each test case's plan (including passing ones) and results as JSON to supply "required sections" for prompt routing tests.
 
 const { values } = parseArgs({
   options: {
@@ -78,7 +78,7 @@ const complete =
     : createRelayCompleter({
         baseUrl: 'http://relay.test',
         registry,
-        // 一批最长 24 小时。
+        // Up to 24 hours per batch.
         timeoutMs: batch ? 24 * 60 * 60_000 : 120_000,
         fetchImpl: ((url: string, init?: RequestInit) => server.request(url, init)) as typeof fetch,
       });
@@ -88,7 +88,7 @@ const now = new Date();
 let passed = 0;
 const failures: string[] = [];
 const dumped: Record<string, { pass: boolean; plans: unknown[]; routes: string[] }> = {};
-// 每种路由的请求数和 token（输入含缓存写入，另记缓存读取）。
+// Request count and token counts (input includes cache writes, with cache reads tracked separately) for each route type.
 const byRoute = new Map<string, { calls: number; input: number; cacheRead: number }>();
 
 console.log(
@@ -96,7 +96,7 @@ console.log(
 );
 
 async function runCase(c: (typeof cases)[number]): Promise<string> {
-  // 每个用例一个 planner，批处理时用例同时跑，请求次数也能分开数。
+  // One planner per test case; during batch execution, test cases run concurrently while request counts are tracked independently.
   let calls = 0;
   const routes: string[] = [];
   const provider = createClaudePlanner({
@@ -158,7 +158,7 @@ const total = completions.reduce(
   { input: 0, output: 0, cacheRead: 0 },
 );
 const price = MODELS.find((m) => m.id === runtime.model)?.price;
-// 批处理半价。
+// Batch processing is half-price.
 const cost = price
   ? ((total.input * price.input + total.output * price.output + total.cacheRead * price.cacheRead) /
       1_000_000) *

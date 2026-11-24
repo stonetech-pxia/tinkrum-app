@@ -1,6 +1,8 @@
-// 把任意 PDF / 图片用 App 的转 Word 动作转一遍（现场识别，不用记录），画出来和原页并排看。
-// 用法：npx tsx tests/word-regression/convert.ts --out <目录> [--lang eng] [--pages 1,2] <文件…>
-// 文件名后面可以带 #页码（从 1 起，逗号分开）只转这几页、@语言 指定这个文件的识别语言，例如 invoice.pdf#1,3@deu。
+// Convert any PDF/image using the app's Word conversion action (on-device recognition, no
+// recording), and render it side-by-side with the original page for inspection. Usage: npx tsx
+// tests/word-regression/convert.ts --out <directory> [--lang eng] [--pages 1,2] <files...>
+// Filenames can be appended with #page-number (1-indexed, comma-separated) to convert only those
+// pages, or @lang to specify the recognition language for that file, e.g. invoice.pdf#1,3@deu.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 

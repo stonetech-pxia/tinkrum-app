@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { registry } from './test-helpers';
 
-// 录音步骤的 autoStart（D-587）：只在现在录音时才有意义；不写和以前一样。
+// autoStart for recording steps (D-587): only meaningful when recording now; omitting it behaves as before.
 
 const params = (p: Record<string, unknown>) =>
   registry.actions.get('in.audio')!.params.safeParse(p);

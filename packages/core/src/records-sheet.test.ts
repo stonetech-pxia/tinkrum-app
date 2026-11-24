@@ -4,7 +4,7 @@ import { recordsToCsv, type DataRecord } from './data';
 import { recordsToSheet } from './records-sheet';
 import type { Collection } from './schema';
 
-// D-427：列和 CSV 一样；真的数字和日期，别的是文字。
+// D-427: Columns same as CSV; true numbers and dates, everything else as text.
 
 const table: Collection = {
   id: 't',
@@ -52,7 +52,7 @@ describe('recordsToSheet', () => {
   it('has the same columns as the CSV export', () => {
     const [header] = recordsToSheet(table, [full], 'en', links);
     const csvHeader = recordsToCsv(table, [full], 'en', links).split('\r\n')[0]!.replace(/^﻿/, '');
-    // 金额格子只有数字，货币写在表头（D-429）；别的和 CSV 一样。
+    // Amount cells contain numbers only, currency is written in the header (D-429); everything else is the same as CSV.
     expect(header!.map((c) => c.text).join(',')).toBe(csvHeader.replace('Cost', 'Cost (EUR)'));
     expect(header!.every((c) => c.kind === 'text')).toBe(true);
   });
@@ -61,7 +61,7 @@ describe('recordsToSheet', () => {
     const row = recordsToSheet(table, [full], 'en', links)[1]!;
     expect(row[1]).toMatchObject({ kind: 'number', value: 12.5, format: '#,##0.00' });
     expect(row[2]).toMatchObject({ kind: 'number', value: 3 });
-    // 2026-11-03 = 46329（Excel 的序号）。
+    // 2026-11-03 = 46329 (Excel serial number).
     expect(row[3]).toMatchObject({ kind: 'number', value: 46329, format: 'yyyy-mm-dd' });
     expect(row[4]).toMatchObject({ kind: 'number', format: 'yyyy-mm-dd hh:mm' });
     expect((row[4] as { value: number }).value).toBeCloseTo(46329 + 14.5 / 24, 6);

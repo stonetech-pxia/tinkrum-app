@@ -23,8 +23,10 @@ import type { BrowseSelection } from './data';
 import { Icon, UiIcon } from './Icon';
 import { onSurface } from './theme';
 
-// 分开的浮动按钮（创始人 2026-11-04 定）：左边主按钮点了就做，右边的箭头展开其余的，点外面收起。
-// 展开、收起只是页面的显示，什么都不写（底线 15）；每一项只有用户点了才运行（底线 9、10、16）。
+// Separate floating buttons (decided by founder 2026-11-04): the left primary button executes on
+// tap, the right arrow expands the rest, and tapping outside collapses them. Expanding and
+// collapsing are purely page display states and write nothing (invariant 15); each item runs only
+// when tapped by the user (invariants 9, 10, 16).
 
 interface DialItem {
   use: ToolUse;
@@ -33,7 +35,7 @@ interface DialItem {
   workflow?: Workflow;
 }
 
-/** 现在能点的项。快捷操作不在了的不显示；交列表记录的，列表没有记录时不显示（D-428）。 */
+/** Currently runnable items. Disappeared quick actions are not shown; for those providing list records, they are hidden when the list has no records (D-428). */
 function dialItems(
   block: BlockOf<'dial'>,
   env: RenderEnv,
@@ -64,8 +66,9 @@ export interface DialSlots {
 }
 
 /**
- * 页面上一直挂着（分享面板还在用文件时不能收走，useHandedRun）。按钮画在下方的固定区（DialButton），
- * 展开的那层盖在整个页面上（overlay，页面放在最后面）。
+ * Persistently mounted on the page (cannot be removed when the share panel still uses files,
+ * useHandedRun). Buttons are rendered in the bottom fixed area (DialButton), and the expanded
+ * layer covers the entire page (overlay, with the page placed at the very back).
  */
 export function DialHost({
   block,
@@ -77,7 +80,7 @@ export function DialHost({
   block: BlockOf<'dial'>;
   env: RenderEnv;
   selection: BrowseSelection | undefined;
-  /** 下方固定区有多高：展开的项排在它上面。 */
+  /** Height of the bottom fixed area: expanded items are arranged above it. */
   bottom: number;
   children: (slots: DialSlots, overlay: ReactNode) => ReactNode;
 }) {
@@ -133,7 +136,7 @@ export function DialHost({
                     style={[palette.font('bodyBold', 14), { color: card.text }]}>
                     {item.label}
                   </Text>
-                  {/* 交多少条写清楚（底线 17）：筛选、搜索之后的全部，不截到一页。 */}
+                  {/* Clearly specify how many entries are passed (invariant 17): all entries after filtering and searching, without capping at a single page. */}
                   {item.use.as === 'list' && selection ? (
                     <Text
                       testID="dial-item-count"
@@ -159,7 +162,7 @@ export function DialHost({
   return <>{children({ items, open, toggle, press }, overlay)}</>;
 }
 
-/** 下方固定区里的按钮。没有 slots（编辑页面、预览）时只画样子，点了没有反应。 */
+/** Buttons in the bottom fixed area. When slots are absent (edit page, preview), renders only appearance with no tap response. */
 export function DialButton({ block, env }: { block: BlockOf<'dial'>; env: RenderEnv }) {
   const { palette, locale } = env;
   const slots = env.dial;
@@ -202,8 +205,10 @@ export function DialButton({ block, env }: { block: BlockOf<'dial'>; env: Render
 }
 
 /**
- * 下方固定区里的入口（例如「开销」）：和浮动按钮同高、同样是胶囊、同一个主色（D-437）。
- * 以前入口是白底的一行、浮动按钮是红色的胶囊，并排时高矮和样子都对不上。
+ * Entry in the bottom fixed area (e.g., "Expenses"): same height as the floating button, also a
+ * pill, with the same primary color (D-437). Previously, entries were a white-background row
+ * while floating buttons were red pills, resulting in mismatched heights and appearances when
+ * placed side by side.
  */
 export function BottomPill({
   env,

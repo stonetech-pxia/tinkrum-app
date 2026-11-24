@@ -21,7 +21,7 @@ class WavTest {
   private fun wav(name: String, data: ByteArray, rate: Int = 24000, channels: Int = 1, dataSize: Long = data.size.toLong()): File =
     tmp.newFile(name).apply { writeBytes(Wav.header(channels, rate, 16, dataSize) + data) }
 
-  /** 有的引擎在 fmt 和 data 之间写一个 LIST 块。 */
+  /** Some engines write a LIST chunk between fmt and data. */
   private fun wavWithList(name: String, data: ByteArray): File {
     val plain = Wav.header(1, 24000, 16, data.size.toLong())
     val list = "LIST".toByteArray() + byteArrayOf(3, 0, 0, 0) + "abc".toByteArray() + byteArrayOf(0)

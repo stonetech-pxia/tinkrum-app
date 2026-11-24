@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 
 /**
- * 关联字段里「新加一条」（D-546）：关联输入框打开那张表的新记录页（带上自己的 token），
- * 用户存好以后，新记录页把记录 ID 交回来，输入框选上它。只在内存里，不写数据；没存就离开什么都不交。
+ * In relation fields, "Add new" (D-546): opens the new record page for that table in the relation
+ * input (passing its own token). After the user saves, the new record page passes back the record
+ * ID, and the input selects it. Memory-only, no data written; if left without saving, passes
+ * nothing back.
  */
 export const useLinkPick = create<{ picked: { token: string; id: string } | null }>(() => ({
   picked: null,

@@ -1,5 +1,7 @@
-// 防倒退检查：每个用例写几条「转出来应该是这样」的断言，查转出的 DocDoc（编辑页用的那份）和 docx 本身。
-// 文字比较前统一规范化（小写、去掉空白和大部分标点、全角转半角），所以断言里写原文里看得到的字就行。
+// Regression checks: write several assertions for each case about what the conversion output should
+// look like, verifying the generated DocDoc (used by the editor) and the docx itself. Text is
+// normalized before comparison (lowercased, whitespace and most punctuation stripped, full-width
+// characters converted to half-width), so assertions can just use text visible in the original.
 import JSZip from 'jszip';
 
 import type {
@@ -16,13 +18,13 @@ export const norm = (s: string) =>
     .toLowerCase()
     .replace(/[\s '’"“”«».,:;!?·•_\-–—()[\]{}|/\\*]+/g, '');
 
-/** docx 里的一段（w:p），按文档顺序；表格里的段记下是第几张表、第几行第几格。 */
+/** A paragraph (w:p) in docx, in document order; paragraphs inside tables record their table index, row index, and cell index. */
 export interface DocxPara {
   text: string;
   table?: { index: number; row: number; col: number };
-  /** 嵌套在文本框（w:txbxContent）里。 */
+  /** Nested inside a text box (w:txbxContent). */
   textbox?: boolean;
-  /** 这一段 w:pPr 里的 w:jc 值。 */
+  /** w:jc value in w:pPr of this paragraph. */
   jc?: string;
 }
 
@@ -88,7 +90,7 @@ const decodeXml = (s: string) =>
     .replace(/&apos;/g, "'")
     .replace(/&amp;/g, '&');
 
-/** docx 里的一个媒体文件：路径和开头几个字节（看真实格式）。 */
+/** A media file in docx: path and first few bytes (for format verification). */
 export interface DocxMedia {
   name: string;
   head: number[];
@@ -98,13 +100,13 @@ export interface Converted {
   doc: DocDoc;
   paras: DocxPara[];
   xml: string;
-  /** word/media/ 里的文件（旧的调用方可以不给）。 */
+  /** Files in word/media/ (optional for legacy callers). */
   media?: DocxMedia[];
-  /** [Content_Types].xml 的原文。 */
+  /** Raw content of [Content_Types].xml. */
   contentTypes?: string;
-  /** 识别出的所有行（一页一页按识别顺序）。 */
+  /** All recognized lines (page by page in recognition order). */
   ocr: string[];
-  /** 识别出的行和它们的框（page 是识别用的图的大小，和编辑页的像素坐标一样时才能拿来比位置）。 */
+  /** Recognized lines and their bounding boxes (page matches the image size used for recognition, position can be compared only when matching pixel coordinates of the editor view). */
   ocrBoxes?: {
     text: string;
     x: number;
@@ -117,11 +119,11 @@ export interface Converted {
 
 export interface Check {
   name: string;
-  /** 通过时 null，否则是说明哪里不对的一句话。 */
+  /** null on success, otherwise a sentence explaining what went wrong. */
   run(c: Converted): string | null;
 }
 
-/** 叶子块，按页、按块的顺序；并排行里的块记下是哪一行、第几格。 */
+/** Leaf blocks, in page and block order; blocks inside side-by-side layouts record their row and cell indices. */
 export function leaves(doc: DocDoc) {
   const out: { leaf: DocLeaf; page: number; row?: { block: DocBlock; cell: number } }[] = [];
   doc.pages.forEach((p: DocPage, page) => {
@@ -146,7 +148,7 @@ const leafText = (b: DocLeaf): string =>
         ? tableText(b)
         : '';
 
-/** docx 的全文（段与段之间换行），规范化前。 */
+/** Full text of the docx (newlines between paragraphs), before normalization. */
 const fullText = (c: Converted) => c.paras.map((p) => p.text).join('\n');
 
 const count = (hay: string, needle: string) => {
@@ -158,9 +160,9 @@ const count = (hay: string, needle: string) => {
 const paraIndex = (c: Converted, text: string) =>
   c.paras.findIndex((p) => norm(p.text).includes(norm(text)));
 
-// ── 断言 ───────────────────────────────────────────────
+// ── Assertions ───────────────────────────────────────────────
 
-/** 这些字在 docx 里按这个顺序出现（各出现一次以上；跨段、跨表格都算）。 */
+/** These texts appear in docx in this exact order (each appearing at least once; spanning paragraphs or tables is allowed). */
 export const order = (...texts: string[]): Check => ({
   name: `order ${texts.map((t) => JSON.stringify(t)).join(' < ')}`,
   run(c) {
@@ -177,7 +179,7 @@ export const order = (...texts: string[]): Check => ({
   },
 });
 
-/** 这几处文字在 docx 的同一段（同一个 w:p）里。 */
+/** These text snippets are in the same paragraph (the same w:p) in docx. */
 export const together = (...texts: string[]): Check => ({
   name: `same paragraph ${texts.map((t) => JSON.stringify(t)).join(' + ')}`,
   run(c) {
@@ -187,7 +189,7 @@ export const together = (...texts: string[]): Check => ({
   },
 });
 
-/** 这几处文字分在不同的段里（没有哪一段同时含两处）。 */
+/** These text snippets are in different paragraphs (no single paragraph contains both). */
 export const apart = (a: string, b: string): Check => ({
   name: `separate paragraphs ${JSON.stringify(a)} / ${JSON.stringify(b)}`,
   run(c) {
@@ -198,7 +200,7 @@ export const apart = (a: string, b: string): Check => ({
   },
 });
 
-/** 这处文字在 docx 里正好出现 n 次（防重复、防丢）。 */
+/** This text appears exactly n times in docx (prevents duplicates and missing content). */
 export const times = (text: string, n: number): Check => ({
   name: `${JSON.stringify(text)} appears ${n}×`,
   run(c) {
@@ -208,7 +210,7 @@ export const times = (text: string, n: number): Check => ({
 });
 
 export interface TableShape {
-  /** 表里要有的字（每处落在某一格里）。 */
+  /** Text required to be present in the table (each falling within some cell). */
   containing?: string[];
   rows?: number;
   cols?: number;
@@ -216,7 +218,7 @@ export interface TableShape {
   minCols?: number;
   maxRows?: number;
   maxCols?: number;
-  /** 某一格（从 0 数）的字。 */
+  /** Text of a specific cell (0-indexed). */
   cells?: { row: number; col: number; text: string }[];
 }
 
@@ -252,7 +254,7 @@ const tablesOf = (c: Converted) =>
     .map((l) => l.leaf)
     .filter((b): b is DocTable => b.kind === 'table');
 
-/** 有一张这样的表（编辑页里的表格，不是并排的版式行）。 */
+/** A table with this shape exists (tables in the editor view, not side-by-side layout rows). */
 export const table = (want: TableShape): Check => ({
   name: `table ${JSON.stringify(want)}`,
   run(c) {
@@ -262,7 +264,7 @@ export const table = (want: TableShape): Check => ({
   },
 });
 
-/** 有一张表的某一排从左到右依次有这几处文字，每处在不同的格里（一项的名称和金额在同一排）。 */
+/** A table row has these texts from left to right, each in a different cell (the item's name and amount are in the same row). */
 export const inRow = (...texts: string[]): Check => ({
   name: `one table row ${texts.map((t) => JSON.stringify(t)).join(' | ')}`,
   run(c) {
@@ -287,7 +289,7 @@ export const inRow = (...texts: string[]): Check => ({
   },
 });
 
-/** a、b 各在一张表里，但不是同一张（两张原本分开的表没有被接成一张）。 */
+/** a and b are each in a table, but not the same table (two originally separate tables were not joined into one). */
 export const differentTables = (a: string, b: string): Check => ({
   name: `different tables ${JSON.stringify(a)} / ${JSON.stringify(b)}`,
   run(c) {
@@ -300,7 +302,7 @@ export const differentTables = (a: string, b: string): Check => ({
   },
 });
 
-/** 这处文字不在任何表格里（是正文段落）。 */
+/** This text is not inside any table (it is a body paragraph). */
 export const notInTable = (text: string): Check => ({
   name: `${JSON.stringify(text)} is not in a table`,
   run(c) {
@@ -309,7 +311,7 @@ export const notInTable = (text: string): Check => ({
   },
 });
 
-/** 整页没有表格。 */
+/** The entire page has no tables. */
 export const noTables = (): Check => ({
   name: 'no tables',
   run(c) {
@@ -318,7 +320,7 @@ export const noTables = (): Check => ({
   },
 });
 
-/** 图片块（不算整页的底图）数在范围里；src 要剪出来了。 */
+/** The number of image blocks (excluding the full-page background image) is within the range; src needs to be cropped out. */
 export const images = (range: { min?: number; max?: number }): Check => ({
   name: `images ${JSON.stringify(range)}`,
   run(c) {
@@ -333,7 +335,7 @@ export const images = (range: { min?: number; max?: number }): Check => ({
   },
 });
 
-/** a、b 在同一个并排行里的不同格（左右两栏、标签和值并排）。 */
+/** a and b are in different cells of the same side-by-side row (left/right columns, side-by-side label and value). */
 export const sideBySide = (a: string, b: string): Check => ({
   name: `side by side ${JSON.stringify(a)} | ${JSON.stringify(b)}`,
   run(c) {
@@ -348,7 +350,7 @@ export const sideBySide = (a: string, b: string): Check => ({
   },
 });
 
-/** 这处文字所在的段落（或表格）是这样对齐的。 */
+/** The paragraph (or table) containing this text has this alignment. */
 export const aligned = (text: string, align: 'left' | 'center' | 'right'): Check => ({
   name: `${JSON.stringify(text)} aligned ${align}`,
   run(c) {
@@ -359,7 +361,7 @@ export const aligned = (text: string, align: 'left' | 'center' | 'right'): Check
   },
 });
 
-/** 这处文字是标题（heading 1/2），或明确不是。 */
+/** This text is a heading (heading 1/2), or explicitly not one. */
 export const heading = (text: string, is = true): Check => ({
   name: `${JSON.stringify(text)} ${is ? 'is' : 'is not'} a heading`,
   run(c) {
@@ -370,7 +372,7 @@ export const heading = (text: string, is = true): Check => ({
   },
 });
 
-/** 这处文字是列表的一项。 */
+/** This text is a list item. */
 export const listItem = (text: string): Check => ({
   name: `${JSON.stringify(text)} is a list item`,
   run(c) {
@@ -380,7 +382,7 @@ export const listItem = (text: string): Check => ({
   },
 });
 
-/** 这处文字显示出来的编号是 n：列表项按列表的起始编号和位置算，普通段落看开头写的「n.」。 */
+/** The visible number for this text is n: list items are calculated based on the list's starting number and position, and regular paragraphs look at the leading 'n.'. */
 export const numbered = (text: string, n: number): Check => ({
   name: `${JSON.stringify(text)} is numbered ${n}`,
   run(c) {
@@ -400,8 +402,10 @@ export const numbered = (text: string, n: number): Check => ({
 });
 
 /**
- * 标签和值一对一行：每一对 [标签, 值] 在 docx 同一张表的同一行、不同格里，而且每一对各占一行
- * （整列标签挤在一格、整列值挤在另一格的并排行不算）。
+ * Labels and values are paired one per row: each [label, value] pair is in the same row and
+ * different cells of the same docx table, and each pair occupies its own row (side-by-side rows
+ * where an entire column of labels is crammed into one cell and an entire column of values into
+ * another are not included).
  */
 export const pairedRows = (...pairs: [string, string][]): Check => ({
   name: `one row per pair ${pairs.map(([a, b]) => `${JSON.stringify(a)}|${JSON.stringify(b)}`).join(', ')}`,
@@ -421,7 +425,7 @@ export const pairedRows = (...pairs: [string, string][]): Check => ({
   },
 });
 
-/** 有一段（w:p）的字正好是这些（不多不少）。 */
+/** A paragraph's (w:p) text matches these exactly (no more, no less). */
 export const exactParagraph = (text: string): Check => ({
   name: `a paragraph is exactly ${JSON.stringify(text)}`,
   run(c) {
@@ -431,7 +435,7 @@ export const exactParagraph = (text: string): Check => ({
   },
 });
 
-/** 这处文字不在并排行里（是从上到下排的一块，不是左右分栏的某一格）。 */
+/** This text is not in a side-by-side row (it is a top-to-bottom block, not a cell in a left/right split). */
 export const notInRow = (text: string): Check => ({
   name: `${JSON.stringify(text)} is not in a side-by-side row`,
   run(c) {
@@ -441,7 +445,7 @@ export const notInRow = (text: string): Check => ({
   },
 });
 
-/** docx 里含这处文字的那一段（w:p）的原始 XML。 */
+/** Raw XML of the paragraph (w:p) containing this text in docx. */
 const paraXml = (c: Converted, text: string) =>
   (c.xml.match(/<w:p[ >][\s\S]*?<\/w:p>/g) ?? []).find((p) =>
     norm(
@@ -449,7 +453,7 @@ const paraXml = (c: Converted, text: string) =>
     ).includes(norm(text)),
   );
 
-/** 含这处文字的段落有首行缩进（w:ind w:firstLine > 0）。 */
+/** The paragraph containing this text has a first-line indent (w:ind w:firstLine > 0). */
 export const firstLineIndent = (text: string): Check => ({
   name: `${JSON.stringify(text)} has a first-line indent`,
   run(c) {
@@ -460,7 +464,7 @@ export const firstLineIndent = (text: string): Check => ({
   },
 });
 
-/** 含这处文字的段落里没有强制换行（w:br），也不是编号列表（w:numPr）。 */
+/** The paragraph containing this text has no forced line breaks (w:br) and is not a numbered list (w:numPr). */
 export const flowing = (text: string): Check => ({
   name: `${JSON.stringify(text)} flows without line breaks or numbering`,
   run(c) {
@@ -472,15 +476,15 @@ export const flowing = (text: string): Check => ({
   },
 });
 
-/** 原样写的检查。 */
+/** Custom check written as-is. */
 export const custom = (name: string, run: (c: Converted) => string | null): Check => ({
   name,
   run,
 });
 
-// ── 每个用例都跑的通用检查 ─────────────────────────────
+// ── General checks run for every test case ─────────────────────────────
 
-/** 不超过这么多个字（规范化以后）的词不按子串补数。 */
+/** Words shorter than or equal to this length (after normalization) are not supplemented by substring matching. */
 const SHORT_WORD = 3;
 
 const words = (s: string) =>
@@ -492,8 +496,10 @@ const words = (s: string) =>
     .filter((w) => w.length > 1 || /\p{N}/u.test(w));
 
 /**
- * 认出的字都还在、没有多出来：识别出的词至少 minRecall 在 docx 里（按次数算），
- * docx 里多出来的同一个词不超过识别次数的 maxExtra（版式行里的重复、整段写两遍都会让这里失败）。
+ * All recognized words are still present and none are extra: at least minRecall of recognized
+ * words are in docx (by frequency), and extra occurrences of the same word in docx do not exceed
+ * maxExtra of the recognition count (repeated text in layout lines or paragraphs written twice
+ * will cause this to fail).
  */
 export function textKept(minRecall = 0.97, maxExtra = 0.02): Check {
   return {
@@ -501,7 +507,7 @@ export function textKept(minRecall = 0.97, maxExtra = 0.02): Check {
     run(c) {
       const want = new Map<string, number>();
       for (const w of c.ocr.flatMap(words)) want.set(w, (want.get(w) ?? 0) + 1);
-      // 留在图片里的字（中心在一张不是底图的图片块里的行）：图里有，Word 里没有可编辑的字不算丢。
+      // Words remaining in images (lines whose center is in an image block that is not a background): words present in the image but lacking editable text in Word are not considered lost.
       const pictured = new Map<string, number>();
       const shots = leaves(c.doc).flatMap((l) =>
         l.leaf.kind === 'image' && !l.leaf.background
@@ -523,7 +529,7 @@ export function textKept(minRecall = 0.97, maxExtra = 0.02): Check {
         if (inside) for (const w of words(line.text)) pictured.set(w, (pictured.get(w) ?? 0) + 1);
       }
       const got = new Map<string, number>();
-      // docx 里换行连字符、断词会合起来：两个识别出的词在 docx 里可能是一个词，所以按子串补数。
+      // Line-wrap hyphens and hyphenated words in docx are joined: two recognized words might be a single word in docx, so substring matching is used to compensate.
       for (const w of words(fullText(c))) got.set(w, (got.get(w) ?? 0) + 1);
       const glued = norm(fullText(c));
       const docWords = [...got.keys()];
@@ -535,8 +541,10 @@ export function textKept(minRecall = 0.97, maxExtra = 0.02): Check {
       for (const [w, n] of want) {
         total += n;
         const k = got.get(w) ?? 0;
-        // 短词（「n.a.」「2/2」「Art」）几乎总能在别的词里找到同样的几个字，子串补数会把它的丢失盖住：
-        // 只认接在 docx 某个词头上或尾巴上的（换行连字符、断词合起来的就是这样）。
+        // Short words ('n.a.', '2/2', 'Art') can almost always find the exact same letters in other
+        // words, and substring matching would mask their loss: only recognize those attached to the
+        // beginning or end of a word in docx (line-wrap hyphens and joined hyphenated words behave
+        // this way).
         const loose =
           norm(w).length <= SHORT_WORD
             ? docWords
@@ -544,7 +552,7 @@ export function textKept(minRecall = 0.97, maxExtra = 0.02): Check {
                 .reduce((sum, d) => sum + got.get(d)!, k)
             : count(glued, norm(w));
         const found = Math.min(n, k >= n ? n : Math.max(k, loose));
-        // 没找到的里面留在图片里的那几次不算。
+        // Instances that remain unfound are excused if they are left inside images.
         const excused = Math.min(n - found, pictured.get(w) ?? 0);
         total -= excused;
         kept += found;
@@ -568,11 +576,11 @@ export function textKept(minRecall = 0.97, maxExtra = 0.02): Check {
   };
 }
 
-// ── 图片、底图和原生 PDF 绘图（graphics / native 套件加的）────────────
+// ── Images, background images, and native PDF drawings (added by graphics / native suites) ────────────
 
 type Region = { x: number; y: number; width: number; height: number };
 
-/** 不算底图的图片块，带所在页的大小。 */
+/** Image blocks excluding background images, with their page dimensions. */
 const pictures = (c: Converted) =>
   leaves(c.doc).flatMap((l) =>
     l.leaf.kind === 'image' && !l.leaf.background
@@ -586,7 +594,9 @@ const coverOf = (a: Region, b: Region) =>
   Math.max(1, a.width * a.height);
 
 /**
- * 原页上这一块（按页宽、页高的比例给，0–1）被一张图片块盖住至少 min：图形整张剪下来了（没丢、没切成碎条）。
+ * This region on the original page (given as ratios of page width and height, 0–1) is covered by
+ * an image block by at least min: the graphic was cropped out in full (not lost, not cut into
+ * strips).
  */
 export const imageCovers = (region: Region, min = 0.8): Check => ({
   name: `an image covers ${JSON.stringify(region)} (≥ ${min})`,
@@ -610,7 +620,7 @@ export const imageCovers = (region: Region, min = 0.8): Check => ({
   },
 });
 
-/** 有一张至少占页宽 minWidth 的图片，在编辑页的块顺序里排在这处文字前面（图在图注、正文之前）。 */
+/** There is an image taking up at least minWidth of the page width, ordered before this text in the editing page's block sequence (the image precedes captions and body text). */
 export const imageBefore = (text: string, minWidth = 0.5): Check => ({
   name: `a wide image comes before ${JSON.stringify(text)}`,
   run(c) {
@@ -628,7 +638,7 @@ export const imageBefore = (text: string, minWidth = 0.5): Check => ({
   },
 });
 
-/** 至少 n 张图片在同一个并排行的不同格里（并排的几张图没有被上下摞起来）。 */
+/** At least n images are in different cells of the same side-by-side row (side-by-side images are not stacked vertically). */
 export const imagesSideBySide = (n = 2): Check => ({
   name: `${n} images side by side`,
   run(c) {
@@ -645,8 +655,9 @@ export const imagesSideBySide = (n = 2): Check => ({
 });
 
 /**
- * 上下范围大半重叠、左右基本不重叠的两张图（一排并排的图）都在同一个并排行的不同格里：
- * 没有哪一张被拿出这一排、单独放在上面或下面。
+ * Two images whose vertical extents largely overlap and horizontal extents barely overlap (a
+ * side-by-side row of images) are both in different cells of the same side-by-side row: neither
+ * image is pulled out of this row to be placed alone above or below.
  */
 export const picturesInRows = (): Check => ({
   name: 'pictures beside each other share one row',
@@ -670,7 +681,7 @@ export const picturesInRows = (): Check => ({
   },
 });
 
-/** 整页底图（DocImage.background）的个数在范围里。 */
+/** The number of full-page background images (DocImage.background) is within the range. */
 export const backgrounds = (range: { min?: number; max?: number }): Check => ({
   name: `background images ${JSON.stringify(range)}`,
   run(c) {
@@ -681,7 +692,7 @@ export const backgrounds = (range: { min?: number; max?: number }): Check => ({
   },
 });
 
-/** docx 里浮动在页上的图（wp:anchor）不超过 max 个、都在正文后面（behindDoc），而且不在表格格子里。 */
+/** Floating images in docx (wp:anchor) do not exceed max, are all behind text (behindDoc), and are not inside table cells. */
 export const anchoredDrawings = (max: number): Check => ({
   name: `≤ ${max} anchored drawings, behind the text and outside table cells`,
   run(c) {
@@ -695,7 +706,7 @@ export const anchoredDrawings = (max: number): Check => ({
   },
 });
 
-/** 原生 PDF 绘图剪出的图（PNG）有没有：扫描件、退回识别的页不该有。 */
+/** Presence or absence of images (PNGs) cropped from native PDF drawings: scanned or fallback-recognized pages should not have these. */
 export const nativeGraphics = (expected: boolean): Check => ({
   name: expected ? 'native PDF graphics used' : 'no native PDF graphics',
   run(c) {
@@ -713,7 +724,7 @@ const MAGIC: [string, number[]][] = [
   ['bmp', [0x42, 0x4d]],
 ];
 
-/** 每个媒体文件的扩展名和真实格式一致，[Content_Types].xml 也声明了这个扩展名（D-509）。 */
+/** The file extension and actual format of every media file match, and [Content_Types].xml also declares this extension (D-509). */
 export const mediaTypesMatch = (): Check => ({
   name: 'media extensions match their bytes and content types',
   run(c) {
@@ -738,8 +749,9 @@ const luminance = (hex: string) => {
 };
 
 /**
- * 没有看不见的字：有底色（段落或格子的 w:shd）的段落里，字的颜色和底色的对比度至少 minContrast
- * （深色字写在同样深的底色上，字在、但看不见）。
+ * No invisible text: in paragraphs with a background color (w:shd on paragraphs or cells), the
+ * contrast between the text color and background color is at least minContrast (dark text written
+ * on an equally dark background is present but invisible).
  */
 export const textVisible = (minContrast = 2): Check => ({
   name: `text contrasts with its shading (≥ ${minContrast}:1)`,

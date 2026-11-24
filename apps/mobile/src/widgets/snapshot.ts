@@ -59,18 +59,21 @@ import type {
   WidgetViews,
 } from './types';
 
-// 小组件的画面（D-321、D-322）：和页面上的组件用同一份配置、同一套算法（筛选、聚合、目标、上一段比较、
-// 排序、行操作的条件），在本机算成文字。只算正式版本（草稿不算），只算用户放到桌面的组件。
-// 每个能点的操作另外预先算好「连点 1…REPEATS 次以后」的画面，小组件点了马上换上，不用等 App 执行。
+// Widget views (D-321, D-322): shares the same configuration, algorithms (filtering, aggregation,
+// targets, previous period comparison, sorting, row action conditions), and text rendering as page
+// components on the device. Renders official versions only (drafts excluded) and only for
+// user-placed home screen components. Precalculates views for 1...REPEATS consecutive taps for each
+// interactive operation so widgets update immediately on tap without waiting for app execution.
 
-/** 每个操作预先算几次连点。 */
+/** Number of consecutive taps to precalculate per operation. */
 export const REPEATS = 4;
-/** 小组件最多画几行 / 几个圆（大尺寸）。 */
+/** Maximum number of rows/circles rendered by a widget (large size). */
 const MAX_ROWS = 7;
 const WIDGET_TILES = Math.min(8, MAX_TILES);
 
 /**
- * 组件在给一条记录用的页面上（D-342）：小组件不知道是哪一条，放不到桌面。
+ * Whether a component resides on a record-specific page (D-342): widgets cannot determine the
+ * specific record, so they cannot be placed on the home screen.
  */
 export function onRecordPage(c: Component, config: WorkspaceConfig): boolean {
   return config.containers.pages.some(
@@ -78,12 +81,12 @@ export function onRecordPage(c: Component, config: WorkspaceConfig): boolean {
   );
 }
 
-/** 能放到桌面的组件：统计、按钮、记录列表（月历和看板除外）。 */
+/** Components eligible for home screen placement: stats, buttons, and record lists (excluding calendars and kanban boards). */
 export function widgetSupported(c: Component): boolean {
   return ['list', 'cards', 'checklist', 'tiles', 'number', 'button'].includes(c.look as string);
 }
 
-/** 小组件和「编辑小组件」列表里的名字：统计、按钮用它自己的文字，列表用表名，其它用组件的说明。 */
+/** Names for widgets and "Edit Widget" lists: stats and buttons use their custom text, lists use table names, and others use component descriptions. */
 export function widgetName(
   c: Component,
   config: WorkspaceConfig,
@@ -99,7 +102,7 @@ export function widgetName(
   return componentLabel(c, config, { registry, locale, now: new Date() });
 }
 
-/** 点一下打开 App：组件所在的页面，或按钮指向的地方（由 app/widget/[componentId] 转过去）。 */
+/** Opens the app on tap: the component's page or button target (routed via app/widget/[componentId]). */
 export const componentLink = (componentId: string) =>
   `morph://widget/${encodeURIComponent(componentId)}`;
 const recordLink = (collectionId: string, recordId?: string) =>
@@ -112,7 +115,7 @@ interface Ctx {
   cal: Calendar;
   now: Date;
   records: RecordsByTable;
-  /** 收集小组件上能点的操作。 */
+  /** Collects interactive operations available on the widget. */
   ops: Record<string, WidgetOpRef>;
 }
 
@@ -121,7 +124,7 @@ const lister = (records: RecordsByTable) => async (id: string) => [...(records.g
 async function statView(c: BlockOf<'number'>, ctx: Ctx): Promise<WidgetView | null> {
   const { config, locale, cal, now } = ctx;
   const source = c.source;
-  // 和页面上的数字块同一份读法（core 的 readNumber）。
+  // Uses the same read logic as numeric blocks on pages (core's readNumber).
   const read = readNumber(source, { config, records: ctx.records, now, cal, locale });
   if (!read) return null;
   const field = source.field ? read.view.fields.find((f) => f.id === source.field) : undefined;
@@ -181,7 +184,7 @@ function buttonView(c: BlockOf<'button'>, ctx: Ctx): WidgetView {
     ctx.ops[key] = { component: c.id, hash: actionHash(action) };
     return { ...base, op: key };
   }
-  // 打开表单（预设值在 App 里填，Q6）、筛出来一起改（要先确认）、打开页面：在 App 里做。
+  // Open form (preset values filled in the app, Q6), filtered batch changes (require confirmation), and open page: executed inside the app.
   return { ...base, link: componentLink(c.id) };
 }
 
@@ -287,7 +290,7 @@ async function viewsAt(
 const startOfDay = (d: Date, plusDays = 0) =>
   new Date(d.getFullYear(), d.getMonth(), d.getDate() + plusDays);
 
-/** 一段时间（从 from 开始算）的画面和每个操作连点以后的画面。 */
+/** Renders views and post-tap states for each operation over a given time range (starting from). */
 async function stateFor(
   from: Date,
   until: Date,
@@ -311,7 +314,7 @@ async function stateFor(
       if (!write) break;
       current = applyInMemory(current, write, time, `widget-preview-${k}`);
       const next = await viewsAt(placed, names, { ...base, now: time, records: current, ops: {} });
-      // 点过的按钮下面写「已记下」。
+      // Displays "Recorded" below tapped buttons.
       for (const v of Object.values(next))
         if (v.kind === 'button' && v.op === key) v.note = t(base.locale, 'widgetAdded');
       list.push(next);
@@ -322,7 +325,7 @@ async function stateFor(
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
-// 小组件的底色跟系统的深浅色走（App 的风格可能固定浅色），所以两份都按风格的颜色直接算。
+// Widget background color follows system light/dark mode (app style may be fixed light), so both are calculated directly using style colors.
 function paletteOf(theme: Theme, dark: boolean): WidgetPalette {
   const p = resolveColors(theme, dark);
   const hex = (c: string, fallback: string) => (HEX.test(c) ? c : fallback);
@@ -339,11 +342,11 @@ export interface SnapshotInput {
   locale: Locale;
   registry: Registry;
   now: Date;
-  /** 所有表存着的记录。 */
+  /** Records stored in all tables. */
   records: RecordsByTable;
 }
 
-/** 整份画面：今天一份、明天一份（D-322）。没有放到桌面的组件时 items 为空，小组件显示怎么放。 */
+/** Full screen layout: one for today, one for tomorrow (D-322). When no widgets are placed on the desktop, items is empty, and the widget shows how to add them. */
 export async function buildWidgetSnapshot(input: SnapshotInput): Promise<WidgetSnapshot> {
   const { config, placed, locale, registry, now, records } = input;
   const cal = calendarOf(config);

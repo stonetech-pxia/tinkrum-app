@@ -18,8 +18,9 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, TINY_JPEG } from '../test-utils/fake-files';
 
-// 压缩 PDF（D-145）：先只压图片、保留文字；压不到时问用户（转成图片 / 就用现在的），
-// 或按参数直接转成图片 / 保留文字。系统编码器和 PDF 预览下载内容都换成假的。
+// Compress PDF (D-145): compress images first while preserving text; when compression is not
+// possible, ask the user (convert to images / keep as is), or convert to images / keep text
+// according to parameters. System encoder and PDF preview download content are replaced with fakes.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const MB = 1024 * 1024;
@@ -37,7 +38,7 @@ function toolWorkflow(id: string): Workflow {
   return quickActionsOf(result.config).find((w) => w.id === id)!;
 }
 
-/** TINY_JPEG 的头改成 width × height，后面补零到 bytes 字节：pdf-lib 只读头。 */
+/** Change TINY_JPEG header to width x height, and pad with zeros up to bytes: pdf-lib only reads the header. */
 function bigJpeg(width: number, height: number, bytes: number): Uint8Array {
   const out = new Uint8Array(bytes);
   out.set(TINY_JPEG);
@@ -53,7 +54,7 @@ function bigJpeg(width: number, height: number, bytes: number): Uint8Array {
   return out;
 }
 
-/** 扫描件：每页一张大 JPEG，第一页还有一行文字。 */
+/** Scanned document: a large JPEG per page, with one line of text on the first page. */
 async function scannedPdf(pages: number, jpegBytes: number): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -66,12 +67,12 @@ async function scannedPdf(pages: number, jpegBytes: number): Promise<Uint8Array>
   return doc.save();
 }
 
-/** 没有图片、但带一个大附件的 PDF：只压图片压不动。 */
+/** PDF with no images but a large attachment: compressing images alone has no effect. */
 async function bulkyPdf(bytes: number): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.addPage([595, 842]);
   doc.addPage([842, 595]);
-  // 随机字节压不小（getRandomValues 每次最多 64 KB）。
+  // Random bytes do not compress well (getRandomValues allows at most 64 KB at a time).
   const junk = new Uint8Array(bytes);
   for (let i = 0; i < bytes; i += 65536) {
     globalThis.crypto.getRandomValues(junk.subarray(i, Math.min(bytes, i + 65536)));
@@ -158,9 +159,9 @@ describe('compress PDF', () => {
     expect(item).toMatchObject({ name: 'scan', ext: 'pdf', pageCount: 3 });
     expect(bytes.length).toBeLessThanOrEqual(2 * MB);
     expect(doc.getPageCount()).toBe(3);
-    // 文字还在第一页的内容流里（没有转成图片）。
+    // Text is still in the content stream of the first page (not converted to an image).
     expect(doc.getPage(0).node.Resources()?.lookup(PDFName.of('Font'))).toBeTruthy();
-    // 2480 像素的扫描图缩到长边 2400 以内。
+    // Scanned images of 2480 pixels are scaled down so their long side is under 2400.
     expect(filters(doc).every((w) => Number(w) < 2480)).toBe(true);
     expect(questions).toEqual([]);
     expect(asked).toEqual([]);
@@ -215,7 +216,7 @@ describe('compress PDF', () => {
     files.nextPick = [files.offer('scan.pdf', await scannedPdf(3, 1_500_000))];
     const { doc } = await pdfOf(files, await run());
     expect(questions).toHaveLength(1);
-    // 保留文字时图片长边不小于约 960 像素（2400 × 0.4）。
+    // When text is preserved, the long side of the image is no less than about 960 pixels (2400 x 0.4).
     const smallest = Math.min(...files.encodes.map((e) => Math.max(e.width, e.height)));
     expect(smallest).toBeGreaterThanOrEqual(940);
     expect(doc.getPageCount()).toBe(3);

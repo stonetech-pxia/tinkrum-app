@@ -1,5 +1,7 @@
-# 本地 Expo 模块（D-170）：用 iOS 自带的 Translation 框架在本机翻译，NaturalLanguage 识别语言。
-# 只依赖 Apple 系统框架，没有第三方代码。Translation 从 iOS 18 起才有，弱链接，更早的系统上 isSupported 为 false。
+# Local Expo module (D-170): Uses native iOS Translation framework for on-device translation, and
+# NaturalLanguage for language recognition. Relies solely on Apple system frameworks with no
+# third-party code. Translation is available starting from iOS 18 (weakly linked); isSupported
+# returns false on earlier systems.
 
 Pod::Spec.new do |s|
   s.name           = 'MorphTranslate'

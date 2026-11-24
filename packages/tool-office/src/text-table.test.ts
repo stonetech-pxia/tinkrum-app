@@ -10,9 +10,12 @@ import { findBarcodes, levelLines, pageSlope } from './text-table';
 import type { LayoutRegion } from './layout';
 import type { OcrBox } from './types';
 
-// 转 Word 的通用版面修正（D-471）。小票是创始人 2026-11-06 发来的一张（Lidl，拍得有点斜、纸是弯的），
-// 识别结果是 macOS 系统识别（Vision）认出来的行（fixtures/receipt-ocr.ts，只有店名地址和价格）。
-// 以前：右边一列比左边高，被分到上一行；几列接成了一句话（「Article P.U.EUR Qté 2,76 A T Oeufs sol x12 2,76 1」）。
+// General layout correction for Word conversion (D-471). The receipt is one sent by the founder on
+// 2026-11-06 (Lidl, photographed slightly crooked, paper is curved), and recognition results are
+// lines recognized by the macOS system recognition (Vision) (fixtures/receipt-ocr.ts, containing
+// only store name, address, and prices). Previously: the right column was higher than the left,
+// incorrectly assigned to the previous row; multiple columns merged into a single sentence
+// ("Article P.U.EUR Qté 2,76 A T Oeufs sol x12 2,76 1").
 
 const receipt = RECEIPT;
 const white = (width: number, height: number) => renderPage(width, height, []);
@@ -38,7 +41,7 @@ describe('tilt (D-471)', () => {
     };
     expect(Math.abs(mid('Oeufs sol x12') - mid('2,76 A T'))).toBeLessThan(10);
     expect(Math.abs(mid('Article') - mid('2,76 A T'))).toBeGreaterThan(25);
-    // 下面纸弯得不一样：合计也和它的标签在同一排。
+    // Below, the paper curves differently: the total is also on the same row as its label.
     expect(Math.abs(mid('A payer') - mid('14,60'))).toBeLessThan(15);
   });
 
@@ -72,10 +75,10 @@ describe('tables without lines (D-471)', () => {
     const totals = rowsOf(tables[1]!);
     expect(totals).toContainEqual(['VA Taux', 'MONT.TTC MONT.TVA', 'TOTAL HT']);
     expect(totals).toContainEqual(['A 5,5%', '14,60', '0,76', '13,84']);
-    // 数字一列靠右对齐。
+    // The price column is right-aligned.
     const price = tables[0]!.table.cells.find((c) => c.text === '2,76')!;
     expect(price.align).toBe('right');
-    // 格子记着原图里的位置（原图小窗、截图核对用，D-468）。
+    // Cells record their position in the original image (for original image thumbnail and screenshot verification, D-468).
     expect(price.box).toMatchObject({ x: 427, y: 348 });
   });
 
@@ -109,7 +112,7 @@ describe('tables without lines (D-471)', () => {
     const at = (x: string) => order.findIndex((o) => o.startsWith(x));
     expect(at('Place Salvador')).toBeLessThan(at('table:Article'));
     expect(at('table:Article')).toBeLessThan(at('Enregistrez'));
-    // 店名和下面的字不再连成一块（不再是一个从页顶到页底的块）。
+    // The store name and text below no longer connect into a single block (no longer a block spanning from the top of the page to the bottom).
     expect(doc.blocks.every((b) => b.box.height < 0.8 * receipt.height)).toBe(true);
   });
 
@@ -139,7 +142,7 @@ describe('tables without lines (D-471)', () => {
 });
 
 describe('barcodes (D-471)', () => {
-  // 一行字，下面一片竖条（条形码）。
+  // A line of text with a strip of vertical bars underneath (barcode).
   const bars: Rect[] = [];
   for (let x = 100; x < 700; x += 12) bars.push({ x, y: 300, width: 5 + (x % 3), height: 120 });
   const text: Rect[] = [];
@@ -147,7 +150,7 @@ describe('barcodes (D-471)', () => {
   const image = renderPage(800, 500, [...bars, ...text]);
   const lines: OcrBox[] = [
     { text: 'Merci de votre visite', x: 100, y: 100, width: 400, height: 20 },
-    // 条形码里认出来的零星的字。
+    // Sporadic text recognized inside the barcode.
     { text: '7.00', x: 600, y: 350, width: 50, height: 20 },
   ];
 
@@ -160,15 +163,15 @@ describe('barcodes (D-471)', () => {
   });
 
   it('does not take a security pattern carrying a line of text for a barcode (EU sample 066)', () => {
-    // 同样的竖条中间夹着一行认出来的正文：那是印着字的底纹，不是条形码，字不能被当成条形码里的杂字丢掉。
+    // A line of recognized body text sandwiched between the same vertical bars: that is textured background with printed text, not a barcode, and the text must not be discarded as garbage inside the barcode.
     const words: OcrBox = { text: 'Nach: Bad Kissingen', x: 200, y: 350, width: 300, height: 20 };
     expect(findBarcodes(image, [lines[0]!, words], 20)).toEqual([]);
-    // 条形码里认出来的零星数字照旧不算。
+    // Sporadic numbers recognized inside the barcode are still ignored as before.
     expect(findBarcodes(image, lines, 20)).toHaveLength(1);
   });
 
   it('does not take a dashed connector on textured paper for a barcode next to text (D-533)', () => {
-    // 斜的虚线（流程图的回流线）每行只有几段；纸面纹理在整行平均亮度上下跳，上下几行一样。
+    // Oblique dashed lines (flowchart return lines) have only a few segments per line; paper texture jumps around the average brightness of the entire line, consistent across adjacent lines.
     const dashes: Rect[] = [];
     for (let x = 600; x < 1100; x += 14)
       dashes.push({ x, y: 140 + Math.round((x - 600) * 0.07), width: 8, height: 4 });
@@ -180,7 +183,7 @@ describe('barcodes (D-471)', () => {
           if (paper.data[o] === 255) paper.data[o] = (x * 7919) % 13 < 6 ? 238 : 254;
         }
     expect(findBarcodes(paper, [], 35, true)).toEqual([]);
-    // 真的条形码在这条路径上照样找到。
+    // Real barcodes are still found along this path.
     expect(findBarcodes(image, lines.slice(0, 1), 20, true)).toHaveLength(1);
   });
 
@@ -259,7 +262,7 @@ describe('rows kept together when no table lines are found (D-502)', () => {
     );
 
   it('a payslip body (item names far from columns of amounts) becomes one row per item', () => {
-    // 工资单的表身，表格线没认出来：左边项目名，隔着七八个行高，右边三列金额；有的项目只有一两列有数。
+    // Payslip body table, table lines not recognized: item names on the left, separated by seven or eight row heights, with three amount columns on the right; some items only have values in one or two columns.
     const items = [
       ['Salaire de base', '151.67', '12.3100', '1 867.06'],
       ['Heures supplémentaires 10 %', '17.33', '13.5410', '234.67'],
@@ -277,7 +280,7 @@ describe('rows kept together when no table lines are found (D-502)', () => {
   });
 
   it('a lab report (names far from value, unit and range columns) becomes one row per test (EU sample 098)', () => {
-    // 化验单：左边检验项目，隔得很远的右边是结果、单位、参考值三列；单位一列没有数字。
+    // Laboratory report: test items on the left, with result, unit, and reference value columns far away on the right; the unit column has no numbers.
     const items = [
       ['GOT', '23', 'U/l', '<35'],
       ['GPT', '35', 'U/l', '<45'],
@@ -296,7 +299,7 @@ describe('rows kept together when no table lines are found (D-502)', () => {
   });
 
   it('a list of labels with amounts far to the right becomes a two-column table', () => {
-    // 小票的合计：两列，隔得很远，右边是数。
+    // Receipt totals: two columns, far apart, with numbers on the right.
     const pairs = [
       ['Total', 'RM 30.91'],
       ['ROUNDING ADJUSTMENT', '-RM 0.01'],
@@ -312,8 +315,10 @@ describe('rows kept together when no table lines are found (D-502)', () => {
   });
 
   it('a two-column list does not take rows from a three-column table below it', () => {
-    // 小票（SROIE S_094 的位置，行高 20）：合计两列、金额隔得远；下面隔一行发票号，是三列的 GST 汇总，
-    // 表头「Amount  Tax」不是数，Tax 一列也隔得远。合计不能把汇总吞进一张两列的表、压成两列。
+    // Receipt (position of SROIE S_094, row height 20): total in two columns, amounts far apart;
+    // separated by a row below is the invoice number, which is a three-column GST summary where the
+    // header "Amount Tax" is not a number and the Tax column is also far apart. The total must not
+    // swallow the summary into a two-column table and compress it into two columns.
     const totals = [
       ['Sub-total', '5.90', 140],
       ['Total Sales Incl GST', '5.90', 285],
@@ -341,8 +346,10 @@ describe('rows kept together when no table lines are found (D-502)', () => {
   });
 
   it('a short summary right under a table joins it with the table’s columns', () => {
-    // 小票（SROIE S_454 的位置）：商品和合计排成三列的表，下面紧挨着 GST 汇总（表头一排、数一排），
-    // 汇总的表头横在两列之间；再下面是一行字。汇总两排接在表下面，每排三格，不散成六段。
+    // Receipt (position of SROIE S_454): items and totals arranged in a three-column table,
+    // immediately followed by the GST summary (header row, values row), with the summary header
+    // lying across the two columns; followed by a line of text. The summary rows attach below the
+    // table, three cells per row, without breaking into six segments.
     const t = (text: string, x: number, y: number, w: number): OcrBox => ({
       text,
       x,
@@ -387,7 +394,7 @@ describe('rows kept together when no table lines are found (D-502)', () => {
   });
 
   it('amounts shifted against their labels (a steep photo) are not paired up', () => {
-    // 拍得很斜：右边的数比左边的项目高了两排，最上面两个数旁边没有项目。
+    // Photographed very obliquely: numbers on the right are two rows higher than items on the left, with no items next to the top two numbers.
     const lines = [
       box('497.16', 700, 40),
       box('184.91', 700, 70),
@@ -401,10 +408,13 @@ describe('rows kept together when no table lines are found (D-502)', () => {
 });
 
 describe('an invoice’s item table with its totals under the right-hand columns (D-506)', () => {
-  // 用户测试（2026-11-09）里的文字版发票：表头和四排商品，每排下面一条很浅的细横线（找线找不到）；
-  // 表下面隔一段，右边两列是 Subtotal / VAT 20% / Total due。
-  // 以前：合计一排排只在远处的两列、左边没字，被当成「错开的数」（D-502），整张表不认；
-  // 商品名接成一段、几列数各成一段，最后一排和合计凑成一张两列的表。
+  // Text-based invoice from user testing (2026-11-09): header and four rows of items, each row
+  // underlined with a faint thin horizontal line (cannot be found by line detection); separated by
+  // a gap below the table, the right two columns contain Subtotal / VAT 20% / Total due.
+  // Previously: total rows were isolated in distant columns with no text on the left, treated as
+  // "offset numbers" (D-502), causing the entire table to fail recognition; item names merged into
+  // one segment, multi-column numbers each formed a segment, and the last row combined with the
+  // total into a two-column table.
   const page = buildDocPage({
     image: white(INVOICE.width, INVOICE.height),
     lines: INVOICE.lines,

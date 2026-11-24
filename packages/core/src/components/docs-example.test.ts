@@ -5,8 +5,10 @@ import { t } from '../messages';
 import { boundedText, IdSchema } from '../schema-base';
 import { defineLook, type LookDefinitionOf } from './define';
 
-// docs/COMPONENTS.md 第 1 步里的最小外观定义：这个文件会被类型检查和运行，所以写法不对（defineLook 的
-// 签名变了、键改了名）这里先编译不过。文档里的代码和这里保持一致；改了 defineLook，先改这里，再改文档。
+// Minimal appearance definition in docs/COMPONENTS.md step 1: this file undergoes type checking and
+// execution, so incorrect syntax (changed defineLook signature, renamed keys) will fail compilation
+// here first. Keep documentation code consistent with this file; update here first when changing
+// defineLook, then update the documentation.
 
 const shape = {
   show: z.strictObject({ title: boundedText(1, 60) }),
@@ -27,8 +29,8 @@ export const exampleComponent: LookDefinitionOf<'example', typeof shape> = defin
   example: { show: { title: 'Spending' }, source: { table: 'expenses' } },
 });
 
-describe('docs/COMPONENTS.md 的最小外观定义', () => {
-  it('生成的结构接受它的例子，拒绝多余的键', () => {
+describe('Minimal appearance definition in docs/COMPONENTS.md', () => {
+  it('Generated schema accepts valid examples and rejects extraneous keys', () => {
     const block = { id: 'x', look: 'example', ...exampleComponent.example };
     expect(exampleComponent.schema.safeParse(block).success).toBe(true);
     expect(exampleComponent.schema.safeParse({ ...block, extra: 1 }).success).toBe(false);

@@ -37,7 +37,7 @@ import { shareRecommendations } from './recommendations';
 
 const now = () => Date.now();
 
-/** 一个快捷操作在「更多」里归哪一类：先看有没有转格式，再看整理页面，再看识别、压缩这类处理。 */
+/** Category of a quick action under 'More': first check for format conversion, then organization, then processing tasks like recognition or compression. */
 function previewCategory(wf: Workflow): 'convert' | 'process' | 'manage' | 'quick' {
   const actions = wf.steps.map((st) => st.action).filter((id) => !/^(in|out)\./.test(id));
   const any = (re: RegExp) => actions.some((id) => re.test(id));
@@ -58,13 +58,18 @@ function previewCategory(wf: Workflow): 'convert' | 'process' | 'manage' | 'quic
 type Panel = 'share' | 'record' | 'more';
 
 /**
- * 一份文件的预览页（D-457）：收到一份文件（分享、选择器、扫描后继续）时直接打开，取代收件页面。
- * 它是一个容器（D-428）：只读地显示这一份文件，进来什么都不跑；底下的按钮只引用工具，点了才运行或打开——
- * 编辑 PDF 打开桌面、转 Word 运行内设的快捷操作（做完直接进 Word，返回就舍弃）、存记录和快捷操作、工具在弹出的面板里。
- * 都是 push，返回回到这一页，收到的文件还在（运行页面带 keep，不释放这一批）。
- * 文件只在本机显示，不发给 AI。由内核提供，AI 不能修改。
+ * A preview page for a file (D-457): opened directly when receiving a file (via share, picker, or
+ * post-scan continuation), replacing the inbox page. It is a container (D-428): displays the file
+ * in read-only mode and runs nothing upon entry; the buttons at the bottom only reference tools,
+ * running or opening them only when tapped -- editing a PDF opens the desk, converting to Word
+ * runs built-in quick actions (jumping straight to Word upon completion, discarding on return),
+ * saving records and quick actions, with tools presented in a pop-up panel. All navigations use
+ * push, returning back to this page with the received file still intact (the running page carries
+ * keep, preventing release of this batch). Files are displayed locally only and are never sent to
+ * the AI. Provided by core; cannot be modified by the AI.
  *
- * `index` 有值时是从多个文件的收件页面点进来看其中一个：只看，不放工具，也不管这一批的释放。
+ * When `index` has a value, it indicates viewing one file from a multi-file inbox page:
+ * view-only, without tool attachment or batch release management.
  */
 export function FilePreviewScreen({ index }: { index?: number }) {
   const { repo, files, locale } = useWorkspaceContext();
@@ -75,26 +80,26 @@ export function FilePreviewScreen({ index }: { index?: number }) {
   const insets = useSafeAreaInsets();
   const member = index !== undefined;
   const file = share?.files[index ?? 0];
-  // 分享或打开文件后，一次问完文件处理包（D-456）；问过就不再问。多个文件时收件页面已经问过。
+  // Query the file processing bundle once after sharing or opening a file (D-456); do not prompt again once queried. Already prompted by the inbox page when there are multiple files.
   const bundle = useFileBundleOffer(palette, locale);
   const fromOutside = !member && !!share && share.files.length > 0 && share.source !== 'result';
   useEffect(() => {
     if (fromOutside) bundle.offer();
-    // 每批文件只看一次。
+    // View each batch of files only once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [share?.id]);
 
-  // AI 做好新的快捷操作后回到这里（D-129）：新的排在最前面、标「刚做好」，面板直接打开让用户看到。
+  // Returned here after the AI creates a new quick action (D-129): the new one is placed at the top and tagged 'Just made', with the panel opened directly so the user can see it.
   const { made } = useLocalSearchParams<{ made?: string }>();
   const [panel, setPanel] = useState<Panel | null>(made && !member ? 'more' : null);
   const [busy, setBusy] = useState(false);
-  // 这一页放上桌的那个桌面：返回再点「编辑」继续同一个，不再每次复制一份。
+  // The desk placed onto for this page: tapping 'Edit' again returns to the same one, rather than copying a new one each time.
   const [deskId, setDeskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // 存到手机以后说一句存了哪个文件、存到哪里（D-583）。
+  // Message displayed after saving to the phone indicating which file was saved and where (D-583).
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const record = useSaveAsRecord(share?.files ?? [], () => setPanel(null));
-  // 读到使用次数之前不排推荐，同收件页面。
+  // Do not rank recommendations until usage counts are loaded, same as the inbox page.
   const [usage, setUsage] = useState<SucceededRuns | null>(null);
   useEffect(() => {
     if (member) return;
@@ -107,8 +112,10 @@ export function FilePreviewScreen({ index }: { index?: number }) {
       alive = false;
     };
   }, [repo, share?.id, member]);
-  // 离开这一页就释放收到的这一批（D-116）；运行页面和桌面是 push 上去的，这一页还在，不会提前释放。
-  // 交给 AI 时为 true：AI 的修改应用后会再打开一个预览页带着这一批，这里不删文件（同收件页面）。
+  // Releasing the received batch upon leaving this page (D-116); the running page and desk are
+  // pushed on top, so this page remains active and is not released prematurely. Set to true when
+  // handed over to the AI: AI modifications will open a new preview page carrying this batch,
+  // without deleting files here (same as the inbox page).
   const handed = useRef(false);
   useFocusEffect(
     useCallback(() => {
@@ -123,7 +130,7 @@ export function FilePreviewScreen({ index }: { index?: number }) {
     };
   }, [files, share?.id, member]);
 
-  // 存过的 Word（D-470）：按它的中间格式显示，和编辑页一样。
+  // Saved Word document (D-470): displayed according to its intermediate format, same as the editor page.
   const [wordDoc, setWordDoc] = useState<DocDoc | null>(null);
   const assetId = file?.assetId;
   useEffect(() => {
@@ -146,8 +153,10 @@ export function FilePreviewScreen({ index }: { index?: number }) {
         : null,
     [file],
   );
-  // 外来的 docx / xlsx（D-509）：读成中间格式显示；只在内存里读，什么都不写（看不改变任何东西，不变量 15）。
-  // 读好的那一份按文件地址记着：换了文件、还没读好时是「还在读」。
+  // External docx / xlsx files (D-509): read into intermediate format for display; read in memory
+  // only without writing anything (viewing changes nothing, invariant 15). The successfully read
+  // instance is tracked by file path: if the file changes or is not yet read, it is 'still
+  // reading'.
   const officeExt = file ? extOf(file.name) || extOfMime(file.mimeType) : '';
   const fileUri = file?.uri;
   const importable = !!fileUri && isImportableOffice(officeExt);
@@ -217,10 +226,10 @@ export function FilePreviewScreen({ index }: { index?: number }) {
     }
   };
 
-  /** 放到桌上改：第一次复制一份工作副本，原件和收到的这一批不动。返回回到这一页。 */
+  /** Place on desk to edit: copies a working copy on first use, leaving the original and the received batch untouched. Returns to this page on back. */
   async function edit() {
     if (busy) return;
-    // 设了密码的 docx / xlsx（D-509）：打不开，也就改不了，直接说。
+    // Password-protected docx / xlsx files (D-509): cannot be opened or edited, so report directly.
     if (office && office !== 'loading' && !office.ok && office.error === 'encrypted') {
       setError(t(locale, 'officeLocked'));
       return;
@@ -229,8 +238,9 @@ export function FilePreviewScreen({ index }: { index?: number }) {
     setError(null);
     try {
       const existing = deskId ? await loadDesk(files, deskId) : null;
-      // 文档库里存过的 xlsx / docx 带着中间格式（D-367）：放上桌还能改（2026-11-06 三星：存了 Word 再从最近文件打开、
-      // 点编辑，只剩「这个文件显示不了」，D-470）。
+      // Stored xlsx / docx files in the document library with intermediate format (D-367): can
+      // still be edited when placed on the desk (2026-11-06 Samsung: opening a saved Word file from
+      // recent files and tapping edit resulted in only 'This file cannot be displayed', D-470).
       const asset =
         !existing && file!.assetId && /\.(xlsx|docx)$/i.test(file!.name)
           ? await repo.getAsset(file!.assetId)
@@ -253,7 +263,7 @@ export function FilePreviewScreen({ index }: { index?: number }) {
     }
   }
 
-  /** 运行一个快捷操作：用这一份文件做第一步的输入；返回回到这一页。 */
+  /** Run a quick action: use this file as the input for the first step; return to this page on back. */
   function run(workflowId: string, then?: 'desk') {
     setPanel(null);
     router.push({
@@ -270,7 +280,7 @@ export function FilePreviewScreen({ index }: { index?: number }) {
   const { all } = shareRecommendations(quickActionsOf(config), [info], usage ?? new Map(), locale);
   const fitting = usage === null ? [] : all.filter(({ fit }) => fit.ok);
 
-  // D-488：底栏是浮在页面上的一条圆角面板；每个按钮的图标放在浅色圆底里，第一个（编辑）是主色实心圆。
+  // D-488: The bottom bar is a rounded panel floating on the page; each button icon is set in a light circular background, with the first one (Edit) being a solid primary-color circle.
   const button = (
     id: string,
     icon: IconName,
@@ -304,7 +314,7 @@ export function FilePreviewScreen({ index }: { index?: number }) {
     </Pressable>
   );
 
-  /** 分享、存到文件夹、存到相册、打印、系统预览：对这份文件做的事，每次都是用户点了才做（D-457）。 */
+  /** Sharing, saving to folder, saving to photo library, printing, system preview: actions performed on this file are always triggered solely by user taps (D-457). */
   const out = { uri: file.uri, name: shown.name, ext: shown.ext, mimeType: info.mimeType };
   async function act(fn: () => Promise<unknown>) {
     setError(null);
@@ -372,8 +382,8 @@ export function FilePreviewScreen({ index }: { index?: number }) {
     </>
   );
 
-  /** 「更多」里的快捷操作和工具，按做的事分成几类，一行四个（和别的文档 App 的「更多」一样）。 */
-  /** 「更多」顶上一排最常用的：签名、打印、存到文件夹、分享（参考 CamScanner）。点了才做。 */
+  /** The most frequently used items in the top row of 'More': signature, printing, save to folder, sharing (referencing CamScanner). Executed only upon tap. */
+  /** The most frequently used items in the top row of 'More': signature, printing, save to folder, sharing (referencing CamScanner). Executed only upon tap. */
   const moreTop = () => {
     const items: {
       id: string;
@@ -664,7 +674,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   empty: { flex: 1, gap: 16, justifyContent: 'center' },
   error: { paddingHorizontal: 16, paddingVertical: 6 },
-  // 浮在页面底部的一条圆角面板（D-488）：左右各留 12，圆角、阴影跟着主题的卡片。
+  // A rounded panel floating at the bottom of the page (D-488): 12 padding on left and right, with border radius and shadow matching the theme's card style.
   bar: {
     flexDirection: 'row',
     marginHorizontal: 12,

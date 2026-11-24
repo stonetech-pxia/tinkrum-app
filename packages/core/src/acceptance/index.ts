@@ -6,7 +6,7 @@ import type { Scenario } from './scenarios';
 export * from './capabilities';
 export * from './scenarios';
 
-// 个人记录能力验收的打分：配置进来，每项要求过没过，core 全过才算合格。纯函数，只读配置。
+// Scoring for personal record capability acceptance: config comes in, whether each requirement passes, core passing all is considered qualified. Pure function, read-only config.
 
 export interface RequirementScore {
   id: string;
@@ -21,11 +21,11 @@ export interface ScenarioScore {
   total: number;
   corePassed: number;
   coreTotal: number;
-  /** core 项全过。 */
+  /** All core items passed. */
   qualified: boolean;
-  /** 还没过的 core 项（按场景里的顺序）。 */
+  /** Core items not yet passed (in scenario order). */
   missingCore: string[];
-  /** 工具检查的 blocker：不影响合格，实验台据此点「把这些补上」。 */
+  /** Tool check blockers: do not affect qualification, workbench uses these to trigger "fill these in". */
   blockers: { code: string; target: string; message: string }[];
 }
 
@@ -61,8 +61,9 @@ export function scoreScenario(
 }
 
 /**
- * 用户接下来说哪一句：还没过的 core 项按顺序，一次一句；说过的先跳过，都说过了再从头说。
- * 全过了返回 null。
+ * What the user should say next: unpassed core items in order, one sentence at a time; previously
+ * spoken ones are skipped, restarts from the beginning once all spoken. Returns null if all
+ * passed.
  */
 export function nextAsk(
   scenario: Scenario,

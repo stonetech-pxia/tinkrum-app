@@ -3,8 +3,10 @@ import { create } from 'zustand';
 
 import { getDeviceLocale } from './i18n';
 
-// 界面语言（设置 → 语言）：跟随系统，或固定英文、简体中文、法语。设备级的偏好，存在本机的 app_meta 里，
-// 不属于工作空间配置，不进版本历史。改了以后外壳按新语言重建工作空间（见 _layout）。
+// UI language (Settings → Language): follows system, or fixed to English, Simplified Chinese, or
+// French. A device-level preference stored in local app_meta, not part of the workspace config, and
+// excluded from version history. When changed, the shell rebuilds the workspace using the new
+// language (see _layout).
 
 export type LanguagePreference = 'system' | Locale;
 

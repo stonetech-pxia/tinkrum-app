@@ -1,6 +1,8 @@
-// 整体导出和恢复用的 zip 读写（apps/mobile/modules/morph-archive，D-600）：iOS 的 Swift 实现单独编译，
-// 和 unzip、python 的 zipfile 互相核对（它们写的包要读得出来，恶意的包要拒绝；我们写的包它们要认）。
-// 只在 macOS 上、有 swiftc 和 python3 时跑；只在系统临时目录编译和运行。
+// ZIP read/write for overall export and recovery (apps/mobile/modules/morph-archive, D-600): iOS
+// Swift implementation compiled separately, cross-checked with unzip and Python's zipfile (packages
+// they write must be readable, malicious packages must be rejected, packages we write must be
+// recognized by them). Runs only on macOS when swiftc and python3 are available; compiles and runs
+// only in the system temporary directory.
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
@@ -51,19 +53,19 @@ patch('ok-deflate.zip', 'bad-method.zip', 10, '<H', 12)
 b = open(os.path.join(d, 'ok-deflate.zip'), 'rb').read()
 open(os.path.join(d, 'bad-truncated.zip'), 'wb').write(b[: len(b) // 2])
 open(os.path.join(d, 'bad-notzip.zip'), 'wb').write(os.urandom(5000))
-# 内容被改（存储方式，校验和对不上）
+# Content tampered (stored mode, CRC mismatch)
 w('tmp-crc.zip', [('files/hello.txt', hello)], zipfile.ZIP_STORED)
 b = bytearray(open(os.path.join(d, 'tmp-crc.zip'), 'rb').read())
 b[b.find(b'hello \xe4') + 1] ^= 0xFF
 open(os.path.join(d, 'bad-crc.zip'), 'wb').write(b)
-# 声明的大小和实际不符：写 ok 的，再把中央目录里的大小改了（第 2 条 files/hello.txt）
+# Declared size does not match actual size: write a valid archive, then alter the size in the central directory (2nd entry files/hello.txt)
 w('tmp-size.zip', [('files/hello.txt', hello)])
 for name, value in (('bad-size-lie.zip', 1000), ('bad-bomb-lie.zip', 2)):
     b = bytearray(open(os.path.join(d, 'tmp-size.zip'), 'rb').read())
     c = b.find(b'PK\x01\x02')
     struct.pack_into('<I', b, c + 24, value)
     open(os.path.join(d, name), 'wb').write(b)
-# 本地头也要对得上：bomb 那条只改中央目录，解压时会产出比声明多的字节。
+# Local header must also match: the bomb entry only alters the central directory, yielding more bytes on extraction than declared.
 `;
 
 const PY_VERIFY = String.raw`
@@ -76,7 +78,7 @@ for p in sys.argv[1:]:
     assert all(z.getinfo(n).file_size >= 0 for n in names)
 `;
 
-// Gradle 缓存里的 Kotlin 编译器和 JDK 17（没有就跳过 Kotlin 部分）。
+// Kotlin compiler and JDK 17 in Gradle cache (skip Kotlin section if missing).
 function kotlinToolchain() {
   const gradle = path.join(homedir(), '.gradle/caches/modules-2/files-2.1');
   const jdkHome = process.env.JAVA_HOME || path.join(homedir(), 'development/jdk-17/Contents/Home');
@@ -131,7 +133,7 @@ try {
   run(binary, [work, samples, ...process.argv.slice(2)]);
   const kotlin = kotlinToolchain();
   if (kotlin) {
-    // Android 的 Kotlin 实现：同一套检查，写出的包同样交给 unzip 和 python。
+    // Android Kotlin implementation: Same checks, packages produced are also verified with unzip and Python.
     const classes = path.join(dir, 'kt-classes');
     const kwork = path.join(dir, 'kt-work');
     run(kotlin.java, [

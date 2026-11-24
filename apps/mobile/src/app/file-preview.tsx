@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { FilePreviewScreen } from '@/share/FilePreviewScreen';
 
-/** 从多个文件的收件页面点进来看其中一个（D-457）：只看，不放工具。 */
+/** Viewing a single file tapped from the multi-file inbox (D-457): view-only, no tools. */
 export default function FilePreviewRoute() {
   const { index } = useLocalSearchParams<{ index?: string }>();
   return <FilePreviewScreen index={Number(index ?? 0)} />;

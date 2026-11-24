@@ -2,8 +2,9 @@ import { appLinkPayload } from '@morph/core';
 import { isShareLink } from '@/share/useIncomingShare';
 
 /**
- * iOS 的分享扩展用 morph://dataUrl=morphShareKey… 唤起 App（D-114）。这不是页面地址：
- * 冷启动时先到首页，App 已经开着时留在当前页面；收件页面由 useIncomingShare 拿到文件后再打开。
+ * The iOS sharing extension invokes the app via morph://dataUrl=morphShareKey... (D-114). This is
+ * not a page address: on cold start it goes to home first, and if the app is already open it
+ * stays on the current page; the inbox page opens files after useIncomingShare retrieves them.
  */
 export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {
   try {
@@ -11,7 +12,7 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (payload !== null) return `/open?a=${encodeURIComponent(payload)}`;
     if (isShareLink(path)) return initial ? '/' : null;
   } catch {
-    // 出错时按普通地址处理（这里抛错会让 App 崩溃）。
+    // Treat as a normal address on error (throwing here would crash the app).
   }
   return path;
 }

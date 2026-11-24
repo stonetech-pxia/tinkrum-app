@@ -4,16 +4,18 @@ import { RunError } from './workflow/engine';
 
 const MB = 1024 * 1024;
 
-/** 视频和音频：由原生模块边读边写，不进 JS 内存（D-142）。 */
+/** Video and audio files: streamed and processed via native modules without entering JS memory (D-142). */
 export const isMediaFile = (f: { name: string; mimeType?: string | null }) => {
   const kind = mediaKindOf(f.mimeType, f.name);
   return kind === 'video' || kind === 'audio';
 };
 
 /**
- * 要整份读进 JS 内存处理的文件：检查大小上限（P-006；PDF 单个 100 MB、合计 200 MB，其他 50 / 100，D-601）。选择器不一定提供大小，复制后再检查一次。
- * 视频和音频单独用 MEDIA_LIMITS：单个 4 GB、最多 10 个，不计入合计（D-142）。
- * 快捷操作和全部文件页面的合并 PDF 都走这一个函数，阈值只有一份（R04）。
+ * Files that must be loaded entirely into JS memory for processing: Check size limits (P-006;
+ * single PDF 100 MB, total 200 MB, others 50 / 100, D-601). Selectors might not provide file
+ * sizes, so check again after copying. Videos and audios use separate MEDIA_LIMITS: single 4 GB,
+ * up to 10 files, excluded from total size limits (D-142). Quick actions and merged PDFs on the
+ * all-files page both use this function, with a single set of thresholds (R04).
  */
 export function checkSizes(
   sizes: readonly { name: string; size: number | null; mimeType?: string | null }[],

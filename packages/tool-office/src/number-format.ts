@@ -1,8 +1,12 @@
-// 外来的 xlsx（D-509）里数字的显示：按单元格的数字格式把值写成表格上看到的字（编辑页、预览显示这个；
-// 存的时候写回原来的值和格式，不靠这段字）。只做常见的：常规、小数位、千分位、百分号、科学计数、
-// 货币符号和引号里的字、正负零三段、日期和时间（英文的月份名）。分数、条件格式等写成常规。
+// Number display formats from native Excel format IDs (ECMA-376 18.8.30); unlisted ones (localized
+// dates) default to date. For external xlsx files (D-509), render cell values into formatted
+// display text as seen in the spreadsheet (used in edit page and preview; when saving, write back
+// original values and formats without relying on this text). Implements common formats only:
+// General, decimal places, thousands separator, percentage, scientific notation, currency symbols
+// and quoted text, positive/negative/zero three-part formats, dates and times (English month
+// names). Fractions, conditional formatting, etc., are written as General.
 
-/** Excel 自带的格式编号 → 格式（ECMA-376 18.8.30）；没列的（各地的日期）当日期。 */
+/** Excel built-in format numbers -> format (ECMA-376 18.8.30); unlisted formats (regional dates) are treated as dates. */
 export const BUILTIN_NUMBER_FORMATS: Record<number, string> = {
   0: 'General',
   1: '0',
@@ -34,7 +38,7 @@ export const BUILTIN_NUMBER_FORMATS: Record<number, string> = {
   49: '@',
 };
 
-/** 各地的日期格式（27–36、50–58）：文件里不写格式，换成年-月-日。 */
+/** Regional date formats (27-36, 50-58): no format written in file, replaced with year-month-day. */
 export function builtinFormat(id: number): string | undefined {
   if (BUILTIN_NUMBER_FORMATS[id] !== undefined) return BUILTIN_NUMBER_FORMATS[id];
   if ((id >= 27 && id <= 36) || (id >= 50 && id <= 58)) return 'yyyy-mm-dd';
@@ -57,7 +61,7 @@ const MONTHS = [
 ];
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-/** 把引号里的字、反斜杠转义的字、[颜色] 这些去掉，只看格式本身（判断是不是日期用）。 */
+/** Strip quoted text, backslash-escaped characters, and [color] tags to inspect the format itself (used for date detection). */
 const bare = (code: string) =>
   code
     .replace(/"[^"]*"/g, '')
@@ -65,13 +69,13 @@ const bare = (code: string) =>
     .replace(/\[(?:h+|m+|s+)\]/gi, 'h')
     .replace(/\[[^\]]*\]/g, '');
 
-/** 这个格式是日期或时间。 */
+/** This format is a date or time. */
 export function isDateFormat(code: string): boolean {
   const b = bare(code.split(';')[0] ?? '');
   return /[dyhs]/i.test(b) || (/m/i.test(b) && !/[0#?]/.test(b));
 }
 
-/** 序列号 → 年月日时分秒（1900 年制有 1900-02-29 这一天的错，1904 年制从 1904-01-01 起）。 */
+/** Serial number -> year-month-day hour-minute-second (the 1900 system has a bug for 1900-02-29; the 1904 system starts from 1904-01-01). */
 function serialToParts(serial: number, date1904: boolean) {
   const days = Math.floor(serial);
   let ms: number;
@@ -122,7 +126,7 @@ function formatDate(serial: number, code: string, date1904: boolean): string {
     if (c === '[') {
       const end = code.indexOf(']', i);
       const inner = code.slice(i + 1, end < 0 ? code.length : end);
-      // [h]、[mm]、[ss]：累计的小时、分、秒。
+      // [h], [mm], [ss]: accumulated hours, minutes, and seconds.
       if (/^(h+|m+|s+)$/i.test(inner)) tokens.push({ kind: 'tok', v: `[${inner.toLowerCase()}]` });
       i = end < 0 ? code.length : end + 1;
       continue;
@@ -153,7 +157,7 @@ function formatDate(serial: number, code: string, date1904: boolean): string {
     tokens.push({ kind: 'lit', v: c });
     i++;
   }
-  // m / mm 跟在小时后面、或者在秒前面时是分钟。
+  // m / mm following hours or preceding seconds represents minutes.
   const toks = tokens.map((x, i) => ({ ...x, i }));
   const real = toks.filter((x) => x.kind === 'tok');
   const minute = new Set<number>();
@@ -197,7 +201,7 @@ function formatDate(serial: number, code: string, date1904: boolean): string {
     .join('');
 }
 
-/** 常规：最多 11 位有效数字，太大太小时用科学计数（1.23457E+11）。 */
+/** General: at most 11 significant digits; use scientific notation for very large or very small numbers (1.23457E+11). */
 export function generalNumber(value: number): string {
   if (!Number.isFinite(value)) return String(value);
   if (value === 0) return '0';
@@ -213,7 +217,7 @@ export function generalNumber(value: number): string {
 
 const group = (int: string) => int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
-/** 一段格式里数字前后的字（引号里的、转义的、货币符号）和数字本身的写法。 */
+/** Characters before and after the number in a format section (quoted text, escaped characters, currency symbols) and the number formatting itself. */
 function formatPlain(value: number, section: string): string {
   let prefix = '';
   let suffix = '';
@@ -232,7 +236,7 @@ function formatPlain(value: number, section: string): string {
     } else if (c === '[') {
       const end = section.indexOf(']', i);
       const inner = section.slice(i + 1, end < 0 ? section.length : end);
-      // [$€-40C]：货币符号；[Red]、[>100] 这些不显示。
+      // [$€-40C]: currency symbol; [Red], [>100], etc. are not displayed.
       lit = inner.startsWith('$') ? inner.slice(1).split('-')[0]! : '';
       i = end < 0 ? section.length : end + 1;
     } else if (c === '_') {
@@ -253,7 +257,7 @@ function formatPlain(value: number, section: string): string {
         i++;
       }
       if (/[0#?]/.test(c)) seenDigits = true;
-      // 百分号既算进数（乘以 100），也照样显示。
+      // Percent sign acts both as a multiplier (multiplies by 100) and is displayed normally.
       if (c === '%') {
         if (seenDigits) suffix += '%';
         else prefix += '%';
@@ -284,7 +288,7 @@ function formatPlain(value: number, section: string): string {
     const digits = (pattern.slice(sci.index + 2).match(/0/g) ?? []).length || 1;
     return `${prefix}${v < 0 ? '-' : ''}${m}E${exp < 0 ? '-' : '+'}${pad(Math.abs(exp), digits)}${suffix}`;
   }
-  // 格式末尾的逗号：除以 1000。
+  // Trailing commas in the format: divide by 1000.
   const trailing = /,+$/.exec(intPart)?.[0].length ?? 0;
   v /= 1000 ** trailing;
   const thousands = /[0#?],[0#?]/.test(intPart);
@@ -294,7 +298,7 @@ function formatPlain(value: number, section: string): string {
   if (minInt === 0 && int === '0') int = '';
   int = int.padStart(minInt, '0');
   if (thousands) int = group(int);
-  // 小数位里 # 的部分：末尾的 0 不要。
+  // The # portion in decimal places: omit trailing zeros.
   const optional = (fracPart.match(/[#?]/g) ?? []).length;
   if (optional && frac) {
     const keep = decimals - optional;
@@ -304,7 +308,7 @@ function formatPlain(value: number, section: string): string {
   return `${prefix}${v < 0 && Number(fixed) !== 0 ? '-' : ''}${number}${suffix}`;
 }
 
-/** 一个数按数字格式写成显示的字。 */
+/** Format a number into a display string using a number format. */
 export function formatNumber(value: number, code: string, date1904 = false): string {
   if (!code || /^general$/i.test(code.trim())) return generalNumber(value);
   const sections = code.split(/;(?=(?:[^"]*"[^"]*")*[^"]*$)/);
@@ -314,14 +318,14 @@ export function formatNumber(value: number, code: string, date1904 = false): str
     section = sections[1]!;
     v = -value;
   } else if (value === 0 && sections.length >= 3 && sections[2]!.trim()) section = sections[2]!;
-  // 「General」写在一段里（[Red]-General）：前后的字留着，数按常规写。
+  // "General" written within a section ([Red]-General): keep surrounding text, format the number as general.
   if (/general/i.test(bare(section))) return formatPlain(v, section.replace(/general/i, ''));
   if (isDateFormat(section)) {
-    // 负的日期、超出范围的日期 Excel 显示 ####；这里写成常规的数。
+    // Negative or out-of-range dates are displayed as #### by Excel; formatted here as a general number.
     if (value < 0 || value > 2958465) return generalNumber(value);
     return formatDate(value, section, date1904);
   }
-  // 分数（# ?/?）：写成常规。
+  // Fractions (# ?/?): formatted as general.
   if (/\?\/\?|#\/#|0\/0/.test(bare(section))) return generalNumber(value);
   return formatPlain(v, section);
 }

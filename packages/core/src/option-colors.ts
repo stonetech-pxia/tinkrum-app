@@ -1,6 +1,9 @@
-// 单选选项的颜色（D-568）：选项可以写一个有名字的颜色，而不是色值；没写的选项照旧按顺序用分类色（chart.ts）。
-// 每个颜色一浅一深：浅色界面上的那一个在 Clay 的页面底色和卡片色上、深色的在深色底上，对比度都达到
-// 主题检查用的 MIN_TEXT_CONTRAST（option-colors.test.ts）。只在这里定义一次，按值上色、月历、饼图都从这里取。
+// Single-choice option colors (D-568): options can specify a named color instead of a color value;
+// uncolored options continue to use category colors sequentially (chart.ts). Each color has a light
+// and dark variant: light variant sits on Clay page backgrounds and card colors, dark variant sits
+// on dark backgrounds, both meeting MIN_TEXT_CONTRAST required for theme checks
+// (option-colors.test.ts). Defined here once; value coloring, calendars, and pie charts all source
+// from it.
 
 export const OPTION_COLORS = {
   red: { light: '#c0352b', dark: '#ef6b5e' },
@@ -17,8 +20,10 @@ export type OptionColor = keyof typeof OPTION_COLORS;
 export const OPTION_COLOR_NAMES = Object.keys(OPTION_COLORS) as [OptionColor, ...OptionColor[]];
 
 /**
- * 分类色（chart.ts 的 CHART_COLORS，同一顺序，浅色深色一样）每一色属于哪些色系（D-571）：同一个单选字段里有选项写了
- * 某个颜色时，没写颜色的选项不拿这个色系的分类色（青绿算绿，橙红也算红，靛蓝也算蓝、紫）。
+ * Category colors (CHART_COLORS in chart.ts, matching order, identical in light/dark variants)
+ * and their respective color families (D-571): when any option in a single-choice field specifies
+ * a color, uncolored options do not use category colors from that family (teal counts as green,
+ * orange-red counts as red, indigo counts as blue and purple).
  */
 export const CHART_COLOR_FAMILIES: readonly (readonly OptionColor[])[] = [
   ['blue'],

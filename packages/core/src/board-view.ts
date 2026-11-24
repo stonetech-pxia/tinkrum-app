@@ -4,14 +4,13 @@ import type { RecordToolUse, ToolUse } from './record-ops-schema';
 import { GROUP_REF } from './schema-primitives';
 import type { Collection } from './schema';
 
-// 记录列表的两种外观（D-311–D-314）：大圆块 tiles 和看板 board。
-// 纯逻辑：圆块最多几个、看板分哪几栏、每栏有哪些记录、拖到另一栏要改成什么；App 只负责画和拖。
-// D-351：看板也可以按引用字段分栏，被引用的那张表里每条一栏（可以先筛选，例如只要这个项目的版块）。
+// Maximum display limit for large circle blocks (D-312, confirmed by founder 2026-10-30): Streaks
+// intentionally capped at 24 to fit on one screen.
 
-/** 大圆块最多显示几个（D-312，创始人 2026-10-30 确认）：Streaks 故意限 24 个，一屏能看全。 */
+/** Maximum display limit for large circle blocks (D-312, confirmed by founder 2026-10-30): Streaks intentionally capped at 24 to fit on one screen. */
 export const MAX_TILES = 24;
 
-/** 看板的一栏：一个选项（引用字段是那条记录的 ID），或 option 为 null 的「未分」（没有值，或选项已经删掉）。 */
+/** A Kanban column: an option (linked field is that record's ID), or "Unassigned" with option as null (no value, or option deleted). */
 export interface BoardColumn {
   option: string | null;
   label: string | null;
@@ -20,17 +19,19 @@ export interface BoardColumn {
 
 type BoardField = FieldOf<'choice'> | FieldOf<'link'>;
 
-/** 看板分栏用的单选或引用字段（source.group.by）；没有或类型不对时为 undefined（check 会拒绝这种配置）。 */
+/** Single-select or link field used for Kanban grouping (`source.group.by`); undefined if missing or wrong type (checks will reject such config). */
 export function boardField(collection: Collection, by: string | undefined): BoardField | undefined {
   const field = collection.fields.find((f) => f.id === by);
   return field?.type === 'choice' || field?.type === 'link' ? field : undefined;
 }
 
 /**
- * 分栏：按选项顺序每个选项一栏（引用字段：linked 里每条一栏，按创建时间从旧到新），最后是「未分」。
- * records 已经筛选、排好序；每栏最多 limit 条。「未分」在必填字段上没有记录时不显示（拖进去也存不了）；
- * 不是必填时总显示，可以拖回去清空。引用字段的栏只有 linked 里的（已经按 group.filter 筛过），指向别的记录的
- * 卡片放进「未分」。
+ * Grouping: one column per option in option order (link fields: one column per entry in linked,
+ * ordered by creation time oldest to newest), followed by "Unassigned". Records are already
+ * filtered and sorted; max limit entries per column. "Unassigned" is hidden when required field
+ * has no records (cannot store dropped items either); always shown when optional, allowing items
+ * to be dragged back to clear. Link field columns only include those in `linked` (already
+ * filtered by `group.filter`), with cards pointing to other records placed into "Unassigned".
  */
 export function boardColumns(
   field: BoardField,
@@ -50,7 +51,7 @@ export function boardColumns(
           }));
   const none: BoardColumn = { option: null, label: null, records: [] };
   for (const r of records) {
-    // 多选（D-607）：卡片在它选的每一栏里都有（这种看板不能拖，检查时拒绝拖动工具）。
+    // Multi-select (D-607): cards appear in every column they are selected in (such boards cannot be dragged; validation rejects drag tools).
     const values: unknown[] = [r.values[field.id]].flat();
     const mine = columns.filter((c) => values.includes(c.option));
     for (const column of mine.length > 0 ? mine : [none])
@@ -60,7 +61,7 @@ export function boardColumns(
   return columns;
 }
 
-/** 一张卡片可以移到哪几栏：除了它现在所在的那一栏；必填字段不能移到「未分」。 */
+/** Valid target columns for moving a card: excludes its current column; required fields cannot be moved to "Unassigned". */
 export function boardTargets(
   field: BoardField,
   columns: readonly BoardColumn[],
@@ -69,15 +70,16 @@ export function boardTargets(
   return columns.filter((c) => c.option !== from && (c.option !== null || !field.required));
 }
 
-/** 看板上的拖动工具（v34）：tools 里的 {as: "drag", do: "set"}；没有就是只能看的看板。 */
+/** Drag tool on Kanban board (v34): `{as: "drag", do: "set"}` in tools; absence indicates a read-only board. */
 export type BoardDragTool = Extract<RecordToolUse, { do: 'set' }>;
 
 export const boardDragTool = (tools: readonly ToolUse[] | undefined): BoardDragTool | undefined =>
   tools?.find((u): u is BoardDragTool => u.as === 'drag' && 'do' in u && u.do === 'set');
 
 /**
- * 拖到另一栏（或在「移到…」里选了一栏）：块上的拖动工具，"$group" 换成那一栏的值（「未分」是 null，清空），
- * 执行和撤销都走一键记录工具（D-300、D-314）。label 是那一栏的名字（提示条上显示）。
+ * Drag to another column (or selected from "Move to..."): block drag tool, replaces `"$group"`
+ * with that column's value (`null` for "Unassigned", clearing it), execution and undo both use
+ * one-tap record tools (D-300, D-314). Label is the column name (displayed in tooltip).
  */
 export function boardMoveAction(
   drag: BoardDragTool,

@@ -7,7 +7,7 @@ import { registry, workspace } from './test-helpers';
 import { WORKFLOW_PRESETS, presetWorkflow } from './workflows/presets';
 import { REDACTED_TEXT } from './workflow/redact';
 
-// 快捷操作的修改操作（T7，D-082）：新建、删除、改名、加步骤、移动步骤、整体更新（v34：addTool / updateTool / removeTool / moveTool）。
+// Quick action mutation operations (T7, D-082): create, delete, rename, add step, move step, full update (v34: addTool / updateTool / removeTool / moveTool).
 
 const ctx = { registry, locale: 'zh' as const, now: new Date(2026, 9, 22) };
 const visa = () => presetWorkflow(WORKFLOW_PRESETS[0]!, 'zh', 'visa');
@@ -55,7 +55,7 @@ describe('workflow ops', () => {
       ok: false,
       stage: 'apply',
     });
-    // 不能借 addTool 冒充工具包的快捷操作。
+    // Cannot disguise an addTool as a pack quick action.
     expect(
       prepareOps(workspace(), [{ op: 'addTool', tool: { ...visa(), package: 'pdf' } }], ctx),
     ).toMatchObject({ ok: false, stage: 'parse' });
@@ -91,7 +91,7 @@ describe('workflow ops', () => {
   });
 
   it('keeps a card on a built-in quick action when the user’s copy of it is removed (D-259)', () => {
-    // 用户改过内设的快捷操作，配置里的副本用预设 ID；删掉副本就回到内设的，卡片和按钮一样继续指向内设的（D-256）。
+    // User modified a preset quick action; the copy in the config uses the preset ID. Deleting the copy reverts to the preset, and cards and buttons continue pointing to the preset (D-256).
     const copy = presetWorkflow(WORKFLOW_PRESETS[0]!, 'zh', WORKFLOW_PRESETS[0]!.id);
     const placed = applyOps(
       workspace('zh'),
@@ -138,7 +138,7 @@ describe('workflow ops', () => {
       '「签证 / 证件照」加一步「分享」',
       '「签证 / 证件照」把「命名」移到第 4 步',
     ]);
-    // 输入动作只能是第一步。
+    // Input actions must be the first step.
     expect(
       prepareOps(withVisa(), [{ op: 'moveTool', tool: 'visa', step: 'pick', toIndex: 2 }], ctx),
     ).toMatchObject({ ok: false, stage: 'validate' });

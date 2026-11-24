@@ -4,8 +4,9 @@ import { deleteUserFiles } from '../storage/user-files';
 import { FakeFiles } from '../test-utils/fake-files';
 import { sqliteRepo } from '../test-utils/node-sqlite';
 
-// 删除用户文件（D-264）：数据库里的记录、授权和运行结果的引用一起清掉，磁盘上的目录也删掉。
-// SQLite 用 Node 自带的 node:sqlite 跑真实的 SQL（test-utils/node-sqlite.ts）。
+// Delete user files (D-264): database records, authorizations, run result references, and the disk
+// directory are all cleared together. SQLite uses Node's built-in node:sqlite to run real SQL
+// (test-utils/node-sqlite.ts).
 
 const asset = (id: string): AssetRecord => ({
   id,
@@ -36,7 +37,7 @@ describe.each([
     expect(await repo.hasGrant('workflow:x', 'gone01')).toBe(false);
     expect(await repo.hasGrant('workflow:x', 'keep01')).toBe(true);
     expect((await repo.listToolRuns(10))[0]!.outputAssetId).toBeNull();
-    // 再删一次（已经不在了）不出错。
+    // Deleting again (when already gone) does not cause an error.
     await repo.deleteAsset('gone01');
   });
 });

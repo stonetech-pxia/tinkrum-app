@@ -6,7 +6,7 @@ import type { ToolDownloads, ToolDownloadsState } from './state';
 
 const ToolDownloadsContext = createContext<ToolDownloads | null>(null);
 
-/** 没有提供下载功能时（测试、没配置的环境）：没有目录，也没有下载的工具。 */
+/** When download capability is not provided (tests, unconfigured environments): no catalog and no downloaded tools. */
 const NONE: ToolDownloads = createStore<ToolDownloadsState>()(() => ({
   configured: false,
   catalog: null,

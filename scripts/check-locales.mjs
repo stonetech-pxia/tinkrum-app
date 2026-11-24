@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
-// 过渡期可列出缺译而不阻塞；正式启用法语前移除 --allow-missing。
+// Missing translations can be listed without blocking during the transition period; remove --allow-missing before officially enabling French.
 const allowMissing = process.argv.includes('--allow-missing');
 const list = process.argv.includes('--list');
 const missing = [];
@@ -62,13 +62,13 @@ for (const file of [...filesIn('packages'), ...filesIn('apps')]) {
         const fr = props.get('fr');
         if (!fr) missing.push(location);
         else if (ts.isStringLiteralLike(en) && ts.isStringLiteralLike(fr)) {
-          if (!fr.text.trim()) errors.push(`${location}: 法语文案为空`);
+          if (!fr.text.trim()) errors.push(`${location}: French copy is empty`);
           if (placeholders(en.text) !== placeholders(fr.text))
-            errors.push(`${location}: 法语占位符不一致`);
+            errors.push(`${location}: French placeholder mismatch`);
         }
       }
     }
-    // 「zh ? '中文' : 'English'」这种写法法语界面会显示英文：界面文案要放进文案表（内置规则的 /ai/ 除外，P-037）。
+    // Expressions like `zh ? 'Chinese' : 'English'` will display English in the French interface: UI copy must be placed in the message table (except for built-in rules under /ai/, P-037).
     if (
       !file.includes('/ai/') &&
       ts.isConditionalExpression(node) &&
@@ -80,7 +80,7 @@ for (const file of [...filesIn('packages'), ...filesIn('apps')]) {
       )
     )
       errors.push(
-        `${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}: 中英三元式文案，法语会显示英文，改用文案表`,
+        `${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}: zh/en ternary copy displays English in French UI; move it to the message table`,
       );
     if (
       !file.includes('/ai/') &&
@@ -98,15 +98,15 @@ for (const file of [...filesIn('packages'), ...filesIn('apps')]) {
             `${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1} (pair: ${en})`,
           );
         else if (placeholders(en) !== placeholders(frenchPairs.get(en)))
-          errors.push(`${file}: 名称对的法语占位符不一致`);
+          errors.push(`${file}: French placeholder mismatch in name pair`);
       }
     }
     ts.forEachChild(node, visit);
   }
   visit(source);
 }
-// 文案表（packages/core/src/messages/）：三种语言的键要完全一致（TypeScript 也会查），
-// 法语不能为空、占位符要和英文一致。
+// Message table (packages/core/src/messages/): Keys must match exactly across all three languages
+// (TypeScript also checks this), French cannot be empty, and placeholders must match English.
 const MESSAGES_DIR = 'packages/core/src/messages';
 function tables(lang) {
   const file = path.join(MESSAGES_DIR, `${lang}.ts`);
@@ -145,7 +145,7 @@ for (const [enName, otherName, others, lang] of [
   const base = enTables.get(enName);
   const other = others.get(otherName);
   if (!base || !other) {
-    errors.push(`${MESSAGES_DIR}: 找不到文案表 ${enName} / ${otherName}`);
+    errors.push(`${MESSAGES_DIR}: message table not found (${enName} / ${otherName})`);
     continue;
   }
   for (const [key, { text }] of base.entries) {
@@ -156,14 +156,18 @@ for (const [enName, otherName, others, lang] of [
       continue;
     }
     const location = `${other.file}:${found.line}`;
-    if (!found.text.trim()) errors.push(`${location}: ${lang === 'fr' ? '法语' : '中文'}文案为空`);
+    if (!found.text.trim())
+      errors.push(`${location}: ${lang === 'fr' ? 'French' : 'Chinese'} copy is empty`);
     if (lang === 'fr' && placeholders(text) !== placeholders(found.text))
-      errors.push(`${location}: 法语占位符不一致`);
+      errors.push(`${location}: French placeholder mismatch`);
   }
   for (const key of other.entries.keys())
-    if (!base.entries.has(key)) errors.push(`${other.file}: ${otherName}.${key} 在英文里没有`);
+    if (!base.entries.has(key))
+      errors.push(`${other.file}: ${otherName}.${key} is missing from English`);
 }
-console.log(`本地化检查：${total} 处文案、${pairs} 处名称对，${missing.length} 处待补法语。`);
-if (list) missing.forEach((line) => console.log(`${line}: 缺少 fr`));
+console.log(
+  `Locale check: ${total} messages, ${pairs} name pairs, ${missing.length} missing French translations.`,
+);
+if (list) missing.forEach((line) => console.log(`${line}: missing fr`));
 errors.forEach((line) => console.error(line));
 if (errors.length || (!allowMissing && missing.length)) process.exitCode = 1;

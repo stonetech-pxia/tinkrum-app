@@ -10,10 +10,12 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 文件房间 R2 在三星 SM-S948B（底部手势导航条）上的布局问题（2026-10-30）：
-// 识别范围的两个按钮被撑成大竖条；选中格子后的编辑层、输入框下的按钮压在导航栏下面；键盘挡住输入框。
+// File room R2 layout issue on Samsung SM-S948B (bottom gesture navigation bar) (2026-10-30): the
+// two recognition range buttons are stretched into large vertical bars; the edit layer and input
+// box buttons after selecting cells are rendered below the navigation bar; the keyboard blocks the
+// input box.
 
-/** 底部导航栏的高度：房间底部的东西要让出这么多。 */
+/** Bottom navigation bar height: content at the bottom of the room must leave this much inset. */
 const BOTTOM = 34;
 jest.mock('react-native-safe-area-context', () => {
   const actual = jest.requireActual('react-native-safe-area-context');
@@ -24,7 +26,7 @@ jest.mock('react-native-safe-area-context', () => {
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const box = (x: number, y: number, width = 100, height = 20) => ({ x, y, width, height });
 
-/** 一页：一行表外的文字（所以有识别范围的切换），下面一张 2×2 的表。 */
+/** One page: a line of text outside the table (hence recognition range switching), followed by a 2x2 table. */
 const tableDoc = (): TableDoc => ({
   version: 3,
   scope: 'all',
@@ -83,17 +85,17 @@ async function openXlsx(names = ['明细']) {
 
 const styleOf = (id: string) => StyleSheet.flatten(screen.getByTestId(id).props.style) ?? {};
 
-describe('房间的布局（三星真机，2026-10-30）', () => {
-  it('识别范围的切换和文件条是一行普通高度的横条，不被撑开（横向 ScrollView 默认 flexGrow: 1）', async () => {
+describe('Room layout (Samsung physical device, 2026-10-30)', () => {
+  it('Recognition range switcher and file bar form a single normal-height horizontal bar without being stretched (horizontal ScrollView defaults to flexGrow: 1)', async () => {
     await openXlsx(['明细', '汇总']);
     expect(screen.getByTestId('table-scope-tables')).toBeTruthy();
     expect(styleOf('desk-strip').flexGrow).toBe(0);
     expect(styleOf('desk-scope-bar').flexGrow).toBe(0);
   });
 
-  it('选中格子、编辑时工具栏收起：底部让出导航栏的高度', async () => {
+  it('Toolbar collapses when selecting cells or editing: bottom insets by navigation bar height', async () => {
     await openXlsx();
-    // 没选中：工具栏自己让出。
+    // Not selected: toolbar makes space for itself.
     expect(screen.queryByTestId('desk-bottom-inset')).toBeNull();
     await fireEvent.press(screen.getByTestId('table-cell-1-0'));
     expect(screen.getByTestId('desk-edit-bar')).toBeTruthy();
@@ -101,7 +103,7 @@ describe('房间的布局（三星真机，2026-10-30）', () => {
     await fireEvent.press(screen.getByTestId('table-cell-1-0'));
     expect(screen.getByTestId('desk-edit-panel')).toBeTruthy();
     expect(styleOf('desk-bottom-inset').height).toBe(BOTTOM);
-    // 键盘弹出时导航栏在键盘下面：不再多让。
+    // When keyboard pops up, navigation bar stays below the keyboard: no additional inset.
     await act(() => {
       DeviceEventEmitter.emit('keyboardDidShow', {
         endCoordinates: { screenX: 0, screenY: 500, width: 400, height: 300 },
@@ -123,7 +125,7 @@ describe('房间的布局（三星真机，2026-10-30）', () => {
     );
     afterEach(() => Object.defineProperty(Platform, 'OS', { get: () => os, configurable: true }));
 
-    it('键盘弹出时房间下面让出键盘的高度，输入框在键盘上方（全屏页面的窗口不跟着键盘缩小）', async () => {
+    it('When keyboard pops up, bottom of the room leaves space for the keyboard height, placing the input box above the keyboard (full-screen page window does not shrink with the keyboard)', async () => {
       await openXlsx();
       await fireEvent.press(screen.getByTestId('table-cell-1-0'));
       await fireEvent.press(screen.getByTestId('table-cell-1-0'));

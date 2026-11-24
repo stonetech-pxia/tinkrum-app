@@ -10,7 +10,7 @@ import { presetById, presetWorkflow } from './workflows/presets';
 
 const ctx = { registry, locale: 'zh' as const, now: new Date(2026, 9, 28, 9) };
 
-/** 装了 PDF 工具、另外加了签证照片和扫描文档两个自己的快捷操作。 */
+/** Pre-installed with the PDF tool, plus two custom quick actions for visa photos and scanned documents. */
 function setup(): WorkspaceConfig {
   return apply(workspace('zh', { withPdf: true }), [
     { op: 'addTool', tool: presetWorkflow(presetById('visa-photo')!, 'zh', 'visa') },
@@ -18,7 +18,7 @@ function setup(): WorkspaceConfig {
   ]);
 }
 
-/** 长按菜单里的开关：一次放上或拿掉一个（v34 的操作写整个列表，homeScreenOp 按当时的列表算）。 */
+/** Switch in the long-press menu: adds or removes an item in a single operation (v34 operations specify the full list, while homeScreenOp calculates based on the current list). */
 type Toggle = (config: WorkspaceConfig) => Op;
 const on =
   (id: string): Toggle =>
@@ -28,7 +28,7 @@ const off =
   (id: string): Toggle =>
   (config) =>
     homeScreenOp(config, id, false);
-/** 依次打开、关掉几个开关，合成一批操作（每一个按前一个之后的配置算）。 */
+/** Toggles several switches on and off sequentially, coalescing them into a batch of operations (each calculated against the configuration resulting from the previous step). */
 function toggles(before: WorkspaceConfig, list: (Toggle | Op)[]): Op[] {
   let config = before;
   return list.map((t) => {
@@ -60,7 +60,7 @@ describe('home screen mark (D-271)', () => {
     ]);
     expect(addedToHomeScreen(before, after)).toEqual(['visa']);
     const removed = prepared(after, [off('visa')]);
-    // 拿掉最后一个后不留空列表，配置和放之前一样。
+    // Removing the last item leaves no empty list; the configuration reverts to its state before any items were added.
     expect(removed).toEqual(before);
     expect(homeScreenItems(removed)).toEqual([]);
   });
@@ -125,7 +125,7 @@ describe('home screen mark (D-271)', () => {
     const result = prepareOps(four, toggles(four, [on(fifth.id)]), ctx);
     expect(result.ok).toBe(false);
     expect(!result.ok && result.issues.join()).toMatch(/at most 4 quick actions/);
-    // 先拿掉一个，再放新的，一次修改里可以。
+    // Removing an item first and then adding a new one is permitted within a single modification.
     expect(prepareOps(four, toggles(four, [off('scan'), on(fifth.id)]), ctx).ok).toBe(true);
   });
 
@@ -150,7 +150,7 @@ describe('home screen mark (D-271)', () => {
     expect(homeScreenItems(renamed)).toEqual([
       { id: 'visa', kind: 'quickAction', title: '美签照片', icon: 'star' },
     ]);
-    // 编辑页保存（整体替换步骤）不会把它从桌面拿掉。
+    // Saving the edit page (replacing steps globally) does not remove it from the desktop.
     const saved = prepared(renamed, [
       {
         op: 'updateTool',
@@ -172,7 +172,7 @@ describe('home screen mark (D-271)', () => {
   });
 
   it('undo goes back to the version before: the item is gone again', () => {
-    // 撤销 = 恢复上一个版本的快照；菜单完全由配置算出来。
+    // Undo = restore snapshot of the previous version; menus are derived entirely from the configuration.
     const before = setup();
     const after = prepared(before, [on('visa')]);
     const restored = prepareSnapshot(JSON.parse(JSON.stringify(before)), registry);

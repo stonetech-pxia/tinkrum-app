@@ -1,4 +1,6 @@
-"""探索：固定字段优先用现有 Morph 规则，税额缺证据时丢弃模型值。"""
+"""Exploration: prioritize existing Morph rules for fixed fields, discarding model values for tax
+amounts when evidence is insufficient.
+"""
 from __future__ import annotations
 
 import json

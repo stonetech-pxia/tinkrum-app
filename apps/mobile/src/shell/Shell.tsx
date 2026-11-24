@@ -39,14 +39,15 @@ import { Toast } from './Toast';
 import { ToolsView } from './ToolsView';
 import { WorkflowsScreen } from './WorkflowsScreen';
 
-// 提示条单独放在 Banner.tsx（WorkflowsScreen 也要用，放这里会循环引用）；这里照样导出，旧的引用不用改。
+// Prompt bar placed separately in Banner.tsx (also used by WorkflowsScreen, placing it here would cause a circular dependency); exported here as before so old references do not need to change.
 export { APPLIED_BANNER_MS, Banner, DraftNotice } from './Banner';
 
 const BAR_HEIGHT = { iconLabel: 64, label: 52, icon: 56 } as const;
 
 /**
- * 外壳可以显示的目标：当前 app（或主页）的页面，和主页里的系统入口（AI 修改除外，它是单独的页面）。
- * app 里只显示它自己的页面；别的 app、主页的页面不会混进来（D-485）。
+ * Targets the shell can display: pages of the current app (or home page), and system entry points
+ * in the home page (excluding AI modify, which is a separate page). Only its own pages are
+ * displayed within an app; pages from other apps or the home page will not be mixed in (D-485).
  */
 function canShow(
   target: NavTarget | null,
@@ -60,7 +61,7 @@ function canShow(
   return page !== undefined && (page.app ?? null) === view.appId;
 }
 
-/** 外壳给页面的环境（D-190）：在草稿模式里打开页面照常，「AI 修改」打开聊天框，真的做事的操作只提示。 */
+/** Environment provided by the shell to pages (D-190): opening pages in draft mode works as usual, "AI modify" opens the chat box, and operations that actually perform actions only show prompts. */
 export function useShellEnv(): Pick<RenderEnv, 'navigate' | 'locked'> & { inDraft: boolean } {
   const { locale } = useWorkspaceContext();
   const inDraft = useWorkspace((s) => !!s.draft?.open);
@@ -73,7 +74,7 @@ export function useShellEnv(): Pick<RenderEnv, 'navigate' | 'locked'> & { inDraf
   return {
     inDraft,
     navigate: (target) => (target === 'ai' ? setChatOpen(true) : navigate(target)),
-    // 提示「应用之后才能用」；最新一步的回复会挡住提示，先收起来。
+    // Prompt "Available after application"; the reply from the latest step will block the prompt, so collapse it first.
     locked: () => {
       if (lastStep !== undefined) markSeen(lastStep);
       showToast({ message: t(locale, 'draftLocked') });
@@ -81,13 +82,13 @@ export function useShellEnv(): Pick<RenderEnv, 'navigate' | 'locked'> & { inDraf
   };
 }
 
-/** App 外壳：内容区域、按配置渲染的底部导航和浮动按钮。 */
-/** 在后台超过这么久，再回来就回到主页（D-485、D-612）。 */
+/** App shell: content area, bottom navigation rendered according to configuration, and floating buttons. */
+/** If in the background for longer than this duration, returning goes back to the home page (D-485, D-612). */
 const LEAVE_APP_AFTER_MS = 30_000;
 
 export function Shell() {
   const { registry, locale, store } = useWorkspaceContext();
-  // 草稿模式里显示草稿（D-190）。
+  // Show the draft in draft mode (D-190).
   const config = useWorkspace(shownConfig)!;
   const headId = useWorkspace((s) => s.head!.id);
   const tab = useWorkspace((s) => s.tab);
@@ -95,7 +96,7 @@ export function Shell() {
   const leaveApp = useWorkspace((s) => s.leaveApp);
   const view = appViewOf(config, appId);
   const markRendered = useWorkspace((s) => s.markRendered);
-  // 点了「后台下载」的下载结束时提示一次（用户已经去做别的事了）。
+  // Prompt once when downloads requested via "Background download" finish (the user has already gone to do other things).
   const packs = usePacks();
   const showToast = useWorkspace((s) => s.showToast);
   useEffect(
@@ -111,21 +112,24 @@ export function Shell() {
   const { navigate, locked, inDraft } = useShellEnv();
   const insets = useSafeAreaInsets();
 
-  // 在的那个 app 没有了（例如恢复到旧版本、删了 app）：回主页。
+  // The current app no longer exists (e.g., restored to an old version, app deleted): return to the home page.
   const missingApp = appId !== null && view.appId === null;
   useEffect(() => {
     if (missingApp) leaveApp();
   }, [missingApp, leaveApp]);
 
-  // 子 App 里没有「返回 Tinkrum」（D-485）：回主页只能从手机上打开 Tinkrum。离开 App 超过 30 秒再回来（点图标、
-  // 切换器）就是回到主页（D-612）；从桌面菜单、深链接直接打开某个 App 时，进入 App 发生在回来之后，留在那个 App 里。
+  // There is no "Return to Tinkrum" button within sub-apps (D-485): returning to the home page can
+  // only be done by opening Tinkrum from the phone. Leaving the app for more than 30 seconds and
+  // returning (via icon tap, app switcher) returns to the home page (D-612); when directly opening
+  // an app from the home screen menu or a deep link, entering the app occurs after returning, and
+  // the user stays within that app.
 
-  // 渲染完成（没有被 ErrorBoundary 拦截）才确认这次提交成功（§4）。
+  // Rendering completion (not intercepted by ErrorBoundary) confirms this commit succeeded (§4).
   useEffect(() => {
     void markRendered(headId);
   }, [headId, markRendered]);
 
-  // 第一次打开（或在设置里选了重新看）：先看划屏介绍（D-149）。
+  // First open (or re-watch selected in settings): view the swipe introduction first (D-149).
   const guideStage = useGuide((s) => s.stage);
   const router = useRouter();
 
@@ -136,14 +140,16 @@ export function Shell() {
       else if (state === 'active' && left !== null) {
         const { enters: since, at } = left;
         left = null;
-        // 短暂切走（看一眼别的 App、通知栏）不算离开：超过 30 秒才回主页（D-612）。
+        // Briefly switching away (glancing at another app, notification panel) does not count as leaving: returning only after more than 30 seconds goes to the home page (D-612).
         if (Date.now() - at <= LEAVE_APP_AFTER_MS) return;
-        // 打开 App 的事件（桌面菜单、深链接）比「回到前台」晚一点到，等它。
+        // App opening events (home screen menu, deep link) arrive slightly later than "returning to foreground", wait for them.
         setTimeout(() => {
           const s = store.getState();
           if (s.appId === null || s.appEnters > since) return;
-          // 有推入的页面（运行、记录表单……）说明用户正在做事：系统的权限窗口、文件和照片选择器也会让 App
-          // 进一下后台，不能把他正在做的事关掉，留在原地（D-585）。
+          // Having pushed pages (running, record form, etc.) indicates the user is working: system
+          // permission dialogs, file and photo pickers will also cause the app to enter the
+          // background briefly, so what the user is doing must not be closed; stay in place
+          // (D-585).
           if (router.canDismiss()) return;
           s.leaveApp();
         }, 700);
@@ -153,7 +159,7 @@ export function Shell() {
   }, [store, router]);
   const blurTarget = useRef<ComponentRef<typeof View>>(null);
   useEffect(() => {
-    // 外壳随版本重新挂载（例如收件页面建了一张表）时，介绍可能已经开着，不再推一次。
+    // When the shell is remounted due to a version change (e.g., inbox created a table), the introduction may already be open, so do not push it again.
     if (guideStage !== 'intro' || useGuide.getState().introOpen) return;
     useGuide.setState({ introOpen: true });
     router.push('/welcome');
@@ -170,13 +176,13 @@ export function Shell() {
     ...(locked ? { locked } : {}),
   };
   const navStyle = view.theme.navStyle;
-  // 编辑模式下隐藏导航栏和浮动按钮：先「完成」或「取消」，草稿不会在切换页面时丢失（D-054）。
+  // Hide navigation bar and floating buttons in edit mode: "Done" or "Cancel" first; drafts are not lost when switching pages (D-054).
   const barSpace = editing ? insets.bottom : BAR_HEIGHT[navStyle] + insets.bottom;
 
   let content;
   const pageId = pageIdOf(active);
   const entryAbout = shellAbout(active);
-  // 引导第 1、2 步（D-447）：Tink 的气泡浮在首页上，Tink 会动、带光圈。
+  // Guide steps 1 and 2 (D-447): Tink's speech bubble floats on the home screen, Tink animates and has a halo.
   const bubbleGuide =
     pageId === HOME_PAGE_ID &&
     (guideStage === 'look' || guideStage === 'goal') &&
@@ -185,8 +191,9 @@ export function Shell() {
   const lookGuide = bubbleGuide && guideStage === 'look';
   if (pageId !== null) {
     const page = config.containers.pages.find((p) => p.id === pageId)!;
-    // 导航栏在页面下面（不是盖在页面上），页面不用再给它留一份高度；编辑模式没有导航栏，才要让开系统的
-    // 底部区域。有浮动按钮时让开浮动按钮（bottomInset 里那 64 是给滚动内容留的）。
+    // Navigation bar is below the page (not overlaying it), so pages do not need to reserve height
+    // for it; edit mode has no navigation bar, so it must clear the system bottom area. Clear space
+    // for floating buttons when present (the 64 in bottomInset is reserved for scrollable content).
     const floatingShown = view.floating.length > 0 && !editing && !inDraft;
     const below = editing ? insets.bottom : 0;
     content = (
@@ -198,7 +205,7 @@ export function Shell() {
       />
     );
   } else if (active === 'ai') {
-    // 新 app 还没有页面，底栏里只有 Tink（D-485）。
+    // New apps do not have pages yet, so the bottom bar only contains Tink (D-485).
     content = (
       <View style={styles.empty}>
         <Text style={[palette.font('body', 15), { color: palette.caption, textAlign: 'center' }]}>
@@ -218,7 +225,7 @@ export function Shell() {
 
   return (
     <View style={[styles.root, palette.backdrop, { paddingTop: insets.top }]}>
-      {/* 右上角的 AI 入口（D-406）：这里没有导航栏，占一行，不盖住页面内容。设置和改动记录没有。 */}
+      {/* AI entry point in the upper right (D-406): no navigation bar here, takes up a single row, does not overlay page content. Settings and change history do not have it. */}
       {entryAbout && !editing ? (
         <View
           style={[
@@ -226,7 +233,7 @@ export function Shell() {
             { paddingHorizontal: palette.pad },
             bubbleGuide && styles.entryOnTop,
           ]}>
-          {/* 引导第一步（D-447）：首页上的 Tink 会动，点它和点气泡一样，打开那句话。 */}
+          {/* Guide step 1 (D-447): Tink on the home screen animates; tapping it is the same as tapping the bubble, opening that prompt. */}
           {bubbleGuide ? (
             <AIEntry
               about={entryAbout}
@@ -239,7 +246,7 @@ export function Shell() {
           )}
         </View>
       ) : null}
-      {/* Tink 那一行以下的内容包进 BlurTargetView：引导气泡出现时整片轻微虚化（Android 需要它才真模糊）。 */}
+      {/* Wrap content below the Tink row in BlurTargetView: slightly blur the entire area when the guide bubble appears (Android requires this for true blurring). */}
       <BlurTargetView ref={blurTarget} style={styles.content}>
         {appId === null && pageId === HOME_PAGE_ID && !editing && !inDraft ? (
           <AiReturnCard
@@ -255,8 +262,11 @@ export function Shell() {
         ) : null}
         <View style={styles.content}>{content}</View>
 
-        {/* 编辑模式的开关（D-053）：导航栏里的页面没有标题栏，放在左下角；编辑模式下隐藏。
-          整页入口继续关闭，长按入口单独开放（D-235，editing/entry.ts）。 */}
+        {/*
+         * Edit mode switch (D-053): pages in the navigation bar have no title bar, placed in the
+         * bottom left; hidden in edit mode. Full-page entry points remain closed, long-press
+         * entry points are opened individually (D-235, editing/entry.ts).
+         */}
         {pageId !== null && directEditEntry.pageButton && !inDraft ? (
           <Pressable
             testID={editing ? undefined : 'page-edit'}
@@ -363,11 +373,11 @@ export function Shell() {
   );
 }
 
-/** 右上角 Tink 那一行的高度（上下各 8 + 图标 24）：引导气泡从这里往下浮。 */
+/** Height of the upper right Tink row (8 top/bottom + 24 icon): guide bubble floats downward from here. */
 const ENTRY_ROW = 40;
 
 const styles = StyleSheet.create({
-  // 引导气泡出现时 Tink 那一行浮在虚化层上面，光圈不被挡住。
+  // When the guide bubble appears, the Tink row floats above the blur layer, and the halo is not blocked.
   entryOnTop: { zIndex: 2, elevation: 2 },
   entryRow: {
     flexDirection: 'row',
@@ -377,7 +387,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  // 浮在页面上的东西（右上角 Tink、编辑、浮动按钮）左右贴着页面边距 palette.pad（D-454），在用的地方写。
+  // Items floating on the page (upper right Tink, edit, floating buttons) align with the page margin palette.pad horizontally (D-454), written where used.
   floating: { position: 'absolute', gap: 10, alignItems: 'flex-end' },
   fab: {
     flexDirection: 'row',

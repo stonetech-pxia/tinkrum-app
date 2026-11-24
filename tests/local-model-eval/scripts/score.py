@@ -1,4 +1,4 @@
-"""按字段、语言、类别、难度评分；原始输出始终保留。"""
+"""Score by field, language, category, and difficulty; raw outputs are always retained."""
 from __future__ import annotations
 
 import argparse

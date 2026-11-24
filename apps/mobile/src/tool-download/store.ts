@@ -12,13 +12,14 @@ import {
   type ToolManifest,
 } from '@morph/core';
 
-// 下载的工具（D-177、D-178，docs/TOOL_DOWNLOAD_DESIGN.md §4、§5）：目录和清单存在 documentDirectory/tools/。
-//   catalog.json + catalog.sig   上次验证通过的目录（每次读出来都再验一遍签名）
-//   <id>/<version>/manifest.json  验证过的清单；ready.json 写好才算下载完成
-// 文件系统、哈希和网络由 App 注入，测试里用内存实现。
+// Downloaded tools (D-177, D-178, docs/TOOL_DOWNLOAD_DESIGN.md §4, §5): directories and manifests
+// are stored in documentDirectory/tools/. catalog.json + catalog.sig (last verified catalog,
+// signature re-verified on every read), <id>/<version>/manifest.json (verified manifest; download
+// is complete only when ready.json is written). File system, hashing, and networking are injected
+// by the app, with in-memory implementations used in tests.
 
 export interface ToolFs {
-  /** 从网络读一个文件（不写磁盘）。 */
+  /** Reads a file from the network (without writing to disk). */
   fetch(url: string): Promise<Uint8Array>;
   exists(path: string): Promise<boolean>;
   readText(path: string): Promise<string>;
@@ -35,7 +36,7 @@ export interface DownloadedTool {
   downloadedAt: number;
 }
 
-// Hermes 有 TextEncoder，但不一定有 TextDecoder：解码用 core 的 decodeUtf8。
+// Hermes has TextEncoder but not necessarily TextDecoder: decoding uses core's decodeUtf8.
 const encoder = new TextEncoder();
 
 export class ToolDownloadStore {
@@ -43,7 +44,7 @@ export class ToolDownloadStore {
     private readonly fs: ToolFs,
     private readonly sha256: Sha256,
     private readonly options: {
-      /** 目录所在的地址（不含 catalog.json）。 */
+      /** Base URL containing the catalog (excluding catalog.json). */
       baseUrl: string;
       trustedKeys: readonly string[];
       now?: () => number;
@@ -54,7 +55,7 @@ export class ToolDownloadStore {
     return this.options.now?.() ?? Date.now();
   }
 
-  /** 上次验证通过的目录；没有、或者签名对不上（被改过）时返回 null。 */
+  /** Last verified catalog; returns null if missing or if the signature is invalid (tampered with). */
   async cachedCatalog(): Promise<{ catalog: Catalog; checkedAt: number } | null> {
     if (!(await this.fs.exists('catalog.json')) || !(await this.fs.exists('catalog.sig'))) {
       return null;
@@ -75,7 +76,7 @@ export class ToolDownloadStore {
     }
   }
 
-  /** 从服务器拉目录、验签名；比上次看到的旧就拒绝（防止拿旧目录撤掉停用）。 */
+  /** Fetches the catalog from the server and verifies its signature; rejects if older than the previously seen version (prevents rolling back revocations with an old catalog). */
   async refreshCatalog(): Promise<Catalog> {
     const base = this.options.baseUrl.replace(/\/+$/, '');
     let data: Uint8Array;
@@ -103,7 +104,7 @@ export class ToolDownloadStore {
     return catalog;
   }
 
-  /** 本机已下载的工具（每个只有一个版本）。读不出来的跳过。 */
+  /** Locally downloaded tools (one version each). Skips any that cannot be read. */
   async downloaded(): Promise<DownloadedTool[]> {
     const out: DownloadedTool[] = [];
     for (const id of await this.fs.listDirs('')) {
@@ -120,7 +121,7 @@ export class ToolDownloadStore {
           ) as ToolManifest;
           out.push({ manifest, bytes: ready.bytes, downloadedAt: ready.downloadedAt });
         } catch {
-          // 坏掉的目录当作没下载。
+          // Treats a corrupted catalog as not downloaded.
         }
       }
     }
@@ -128,8 +129,9 @@ export class ToolDownloadStore {
   }
 
   /**
-   * 下载目录里的一个工具：大小和 SHA-256 要和目录一致，清单要通过 core 的检查（parseToolManifest），
-   * 不能比本机已有的版本旧。只能由用户在界面上点了才调用（D-064）。
+   * Downloads a tool from the catalog: size and SHA-256 must match the catalog, manifest must
+   * pass core checks (parseToolManifest), and it cannot be older than the locally existing
+   * version. Can only be invoked by user action in the UI (D-064).
    */
   async download(entry: CatalogEntry, registry: Registry): Promise<DownloadedTool> {
     if (entry.hostApi > HOST_API)
@@ -148,7 +150,7 @@ export class ToolDownloadStore {
     if (data.length !== entry.size) throw new ToolDownloadError('size', entry.id);
     if ((await this.sha256(data)) !== entry.sha256) throw new ToolDownloadError('hash', entry.id);
     const manifest = parseToolManifest(data, registry, entry);
-    // 先写好新版本，再删掉旧版本：中途断了，旧版本还在。
+    // Writes the new version first, then deletes the old version: if interrupted midway, the old version remains intact.
     const dir = `${entry.id}/${entry.version}`;
     await this.fs.remove(dir);
     await this.fs.writeText(`${dir}/manifest.json`, decodeUtf8(data));
@@ -163,7 +165,7 @@ export class ToolDownloadStore {
     return { manifest, bytes: data.length, downloadedAt };
   }
 
-  /** 删掉本机下载的工具（配置里已经添加的，界面上先要移除才能删）。 */
+  /** Deletes a locally downloaded tool (must be added in the config and removed from the UI first). */
   async remove(id: string): Promise<void> {
     await this.fs.remove(id);
   }

@@ -1,11 +1,11 @@
 import { escapeHtml } from '@morph/core';
-// LibreOffice 把转出的 docx 画成图，和原页并排放进一个 HTML 页面，给人看。
+// LibreOffice renders the converted docx into images, placed side-by-side with the original page in an HTML page for viewing.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 
 import { ENV, need } from './env';
 
-/** dir/out.docx → dir/render-N.png，返回文件名。 */
+/** dir/out.docx → dir/render-N.png, returning the filenames. */
 export function renderDocx(dir: string): string[] {
   if (!existsSync(`${dir}/out.docx`)) return [];
   execFileSync(
@@ -35,7 +35,7 @@ export function renderDocx(dir: string): string[] {
 export { escapeHtml } from '@morph/core';
 
 export interface Row {
-  /** 相对 index.html 的目录。 */
+  /** Directory relative to index.html. */
   dir: string;
   title: string;
   subtitle: string;

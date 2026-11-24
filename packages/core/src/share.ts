@@ -4,10 +4,11 @@ import type { Workflow } from './schema';
 import { FILE_ACCEPT, MAX_PICK } from './tools/io';
 import type { FileValueType } from './workflow/engine';
 
-// 分享到 Morph（TOOLS_DESIGN §11，D-114–D-118）：别的 App 分享进来的文件交给哪个工作流。
-// 文件只当作工作流第一步（in.photos / in.files）的输入，不改工作流的格式，AI 也看不到这些文件。
+// A file shared into Morph (TOOLS_DESIGN §11, D-114–D-118): files shared from other apps are passed
+// to the designated workflow. Files serve only as input for the workflow's first step (in.photos /
+// in.files), without modifying the workflow format, and are invisible to the AI.
 
-/** 分享进来的一个文件；mimeType 已经按扩展名补全。 */
+/** Information for a file shared into the app; mimeType is auto-completed based on extension. */
 export interface SharedFileInfo {
   name: string;
   mimeType: string;
@@ -16,7 +17,7 @@ export interface SharedFileInfo {
 
 export type ShareFit =
   | { ok: true; type: FileValueType }
-  /** 第一步不收文件（输入文字、读取记录），或者文件类型不对。 */
+  /** First step accepts no files (inputs text, reads records), or file type is incorrect. */
   | { ok: false; reason: 'type' }
   | { ok: false; reason: 'tooFew'; min: number }
   | { ok: false; reason: 'tooMany'; max: number };
@@ -27,13 +28,13 @@ const isZip = (mime: string) =>
   mime === 'application/zip' || mime === 'application/x-zip-compressed';
 const isVideo = (mime: string) => mime.startsWith('video/');
 const isAudio = (mime: string) => mime.startsWith('audio/');
-/** 视频和音频由原生模块处理，用 MEDIA_LIMITS（D-142）。 */
+/** Video and audio are processed by native modules using MEDIA_LIMITS (D-142). */
 const isMedia = (f: SharedFileInfo) => {
   const kind = mediaKindOf(f.mimeType, f.name);
   return kind === 'video' || kind === 'audio';
 };
 
-/** in.files 的 accept 收不收这个文件。 */
+/** Whether the accept filter of in.files accepts this mimeType. */
 export function acceptsSharedFile(accept: string, mimeType: string): boolean {
   switch (accept) {
     case 'pdf':
@@ -58,8 +59,8 @@ export function acceptsSharedFile(accept: string, mimeType: string): boolean {
 }
 
 /**
- * 收文件的输入动作：分享进来的文件当作它的结果时是什么类型、收不收这个文件。
- * 新的输入动作（例如以后的「选音频」）在这里加一行。
+ * File-receiving input actions: type and acceptance rules when a shared file serves as its
+ * result. Add a row here for new input actions (such as future "select audio").
  */
 const SHARE_INPUTS: Readonly<
   Record<
@@ -67,10 +68,10 @@ const SHARE_INPUTS: Readonly<
     (params: Record<string, unknown>) => { type: FileValueType; accepts(mime: string): boolean }
   >
 > = {
-  // 相册、拍照、扫描都算：分享进来的照片没有拉正，后面的找边步骤会处理。
+  // Photo library, camera, and scanning all count: shared photos are not auto-straightened, which will be handled by subsequent edge-detection steps.
   'in.photos': () => ({ type: 'images', accepts: isImage }),
   'in.videos': () => ({ type: 'video', accepts: isVideo }),
-  // 录音来源也算：分享进来的录音直接用，不打开录音界面（D-154）。
+  // Audio recording source counts: shared audio is used directly without opening the recording interface (D-154).
   'in.audio': () => ({ type: 'audio', accepts: isAudio }),
   'in.files': (params) => {
     const accept = String(params.accept);
@@ -81,7 +82,7 @@ const SHARE_INPUTS: Readonly<
   },
 };
 
-/** 分享进来的文件能不能直接当作这个输入步骤的结果（类型和个数都要对得上）。 */
+/** Whether a shared file can directly serve as the result of this input step (both type and count must match). */
 export function shareFitsInput(
   actionId: string,
   params: Record<string, unknown>,
@@ -100,7 +101,7 @@ export function shareFitsInput(
   return { ok: true, type };
 }
 
-/** 工作流能不能接这些文件：看第一步。 */
+/** Can the workflow accept these files: check the first step. */
 export function shareFit(workflow: Workflow, files: readonly SharedFileInfo[]): ShareFit {
   const first = workflow.steps[0];
   if (!first) return { ok: false, reason: 'type' };
@@ -108,8 +109,10 @@ export function shareFit(workflow: Workflow, files: readonly SharedFileInfo[]): 
 }
 
 /**
- * 大小上限（P-006）：和选择器选的文件一样：PDF 单个 100 MB、合计 200 MB，其他文件单个 50 MB、合计 100 MB，各算各的（D-601）。视频和音频单独算（D-142）：
- * 单个 4 GB、最多 10 个，不计入合计。没问题时返回 null。
+ * Size upper limit (P-006): same as files chosen by the selector: single PDF 100 MB, total 200
+ * MB; single other file 50 MB, total 100 MB; calculated independently (D-601). Video and audio
+ * are calculated separately (D-142): single 4 GB, up to 10 files, not counted towards the total.
+ * Returns null when everything is fine.
  */
 export function sharedSizeProblem(
   files: readonly SharedFileInfo[],

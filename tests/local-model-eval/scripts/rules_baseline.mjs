@@ -1,4 +1,4 @@
-// 只读取仓库里的 Morph 规则；只把结果写到评测目录（已 gitignore）。
+// Only read Morph rules in the repository; write results only to the evaluation directory (which is gitignored).
 import { readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { extractFirst } from '../../../packages/core/src/text-rules.ts';

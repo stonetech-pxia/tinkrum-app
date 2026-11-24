@@ -1,10 +1,10 @@
 import { COMMON_FIRST_NAMES, FIRST_NAMES } from './card-names-data';
 
-// 常见的名（ASCII 小写）：至少 1000 人用的、至少 100 人用的两档。姓氏试过没有增益，不用。
+// Common first names (ASCII lowercase): split into two tiers of at least 1,000 users and at least 100 users. Surnames were tested and showed no gain, so they are omitted.
 let common: Set<string> | null = null;
 let known: Set<string> | null = null;
 
-/** 这个名大约有多少人用：至少 1000 人时给 1000，至少 100 人时给 100，否则 0。 */
+/** Approximate user count for this name: 1,000 for at least 1,000 users, 100 for at least 100 users, otherwise 0. */
 export function firstCount(word: string): number {
   common ??= new Set(COMMON_FIRST_NAMES.split(' '));
   known ??= new Set(FIRST_NAMES.split(' '));

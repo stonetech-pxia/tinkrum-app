@@ -1,10 +1,13 @@
-// 读外来的 docx / xlsx（D-509）用的最小 XML 解析：只认元素、属性和文字，不处理 DTD（不解析实体定义，
-// 也就没有外部实体），CDATA 当文字，注释和处理指令跳过。纯 TS，Hermes 上也能跑（不用 DOMParser）。
-// 名字按命名空间归一：同一个命名空间不管文件里用什么前缀，都写成固定的前缀（Strict 格式的 docx
-// 用另一套命名空间地址，也归到 w:、r: 这些上），没认出的命名空间保留文件里的前缀。
+// Minimal XML parser for reading external docx / xlsx (D-509): recognizes only elements,
+// attributes, and text; does not process DTDs (does not parse entity definitions, hence no external
+// entities), treats CDATA as text, and skips comments and processing instructions. Pure TypeScript,
+// runs on Hermes (without DOMParser). Names are normalized by namespace: regardless of prefix used
+// in the file, namespaces map to fixed prefixes (Strict format docx uses a different set of
+// namespace URIs, also normalized to w:, r:, etc.), and unrecognized namespaces retain their
+// file-level prefix.
 
 export interface XmlElement {
-  /** 归一后的名字，例如 w:p、r:id；没有命名空间的就是本地名。 */
+  /** Normalized name, e.g., w:p, r:id; items without a namespace are local names. */
   name: string;
   attrs: Record<string, string>;
   children: XmlNode[];
@@ -12,7 +15,7 @@ export interface XmlElement {
 
 export type XmlNode = XmlElement | string;
 
-/** 命名空间地址 → 固定的前缀（Transitional 和 Strict 两套地址）。 */
+/** Namespace URI → fixed prefix (Transitional and Strict address sets). */
 const PREFIX_OF: Record<string, string> = {
   'http://schemas.openxmlformats.org/wordprocessingml/2006/main': 'w',
   'http://purl.oclc.org/ooxml/wordprocessingml/main': 'w',
@@ -38,7 +41,7 @@ const PREFIX_OF: Record<string, string> = {
 
 const ENTITIES: Record<string, string> = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" };
 
-/** 文字里的实体换成字；认不出的原样留着。 */
+/** Replace entities in text with characters; unrecognized ones are left as-is. */
 export function decodeEntities(text: string): string {
   if (!text.includes('&')) return text;
   return text.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (all, body: string) => {
@@ -52,9 +55,9 @@ export function decodeEntities(text: string): string {
 
 const ATTR = /([^\s=/>]+)\s*=\s*("([^"]*)"|'([^']*)')/g;
 
-/** 解析一整份 XML，返回根元素；不是 XML（没有根元素）时抛错。 */
+/** Parse a complete XML document, returning the root element; throws an error if it is not XML (has no root element). */
 export function parseXml(text: string): XmlElement {
-  // 文件开头的 BOM 不算。
+  // BOM at the start of the file is ignored.
   const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   const root: XmlElement = { name: '#root', attrs: {}, children: [] };
   const stack: { el: XmlElement; ns: Record<string, string> }[] = [{ el: root, ns: {} }];
@@ -63,7 +66,7 @@ export function parseXml(text: string): XmlElement {
   while (i < n) {
     const lt = src.indexOf('<', i);
     const end = lt < 0 ? n : lt;
-    // 只有空白的文字也留着：<w:t xml:space="preserve"> </w:t> 里的空格是字。
+    // Whitespace-only text is also retained: spaces inside <w:t xml:space="preserve"> </w:t> are significant characters.
     if (end > i && stack.length > 1)
       stack.at(-1)!.el.children.push(decodeEntities(src.slice(i, end)));
     if (lt < 0) break;
@@ -80,7 +83,7 @@ export function parseXml(text: string): XmlElement {
       continue;
     }
     if (src[lt + 1] === '?' || src[lt + 1] === '!') {
-      // 处理指令、DOCTYPE：跳过（DOCTYPE 里的实体定义不读）。
+      // Processing instructions, DOCTYPE: skipped (entity definitions in DOCTYPE are not read).
       const close = src.indexOf('>', lt + 2);
       i = close < 0 ? n : close + 1;
       continue;
@@ -137,7 +140,7 @@ export function parseXml(text: string): XmlElement {
   return top;
 }
 
-/** 标签的结束位置（属性值里的 > 不算）。 */
+/** End position of a tag ('>' inside attribute values does not count). */
 function tagEnd(src: string, from: number): number {
   let quote = '';
   for (let i = from; i < src.length; i++) {
@@ -153,20 +156,20 @@ function tagEnd(src: string, from: number): number {
 export const isElement = (node: XmlNode | undefined): node is XmlElement =>
   typeof node === 'object' && node !== null;
 
-/** 名字是 name 的第一个子元素。 */
+/** First child element whose name is name. */
 export function child(el: XmlElement | undefined, name: string): XmlElement | undefined {
   if (!el) return undefined;
   for (const c of el.children) if (isElement(c) && c.name === name) return c;
   return undefined;
 }
 
-/** 名字是 name 的所有子元素（不写名字时是所有子元素）。 */
+/** All child elements whose name is name (all child elements if name is omitted). */
 export function children(el: XmlElement | undefined, name?: string): XmlElement[] {
   if (!el) return [];
   return el.children.filter((c): c is XmlElement => isElement(c) && (!name || c.name === name));
 }
 
-/** 所有名字是 name 的后代元素（深度优先、按文件里的顺序）。 */
+/** All descendant elements whose name is name (depth-first, in file order). */
 export function descendants(el: XmlElement | undefined, name: string): XmlElement[] {
   const out: XmlElement[] = [];
   const walk = (e: XmlElement) => {
@@ -180,6 +183,6 @@ export function descendants(el: XmlElement | undefined, name: string): XmlElemen
   return out;
 }
 
-/** 元素里直接的文字（不含子元素里的）。 */
+/** Direct text inside the element (excluding text inside child elements). */
 export const ownText = (el: XmlElement | undefined) =>
   el ? el.children.filter((c): c is string => typeof c === 'string').join('') : '';

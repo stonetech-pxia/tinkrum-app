@@ -8,7 +8,7 @@ import { PacksScreen } from '@/shell/PacksScreen';
 import { useToolDownloads } from '@/tool-download/context';
 import { useWorkspace, useWorkspaceContext, useAppTheme } from '@/workspace/context';
 
-/** 「设置 → 扩展包」：已下载的扩展包和占用空间（D-064）。由内核提供，AI 不能修改。 */
+/** Settings -> Packs: downloaded extension packs and storage usage (D-064). Provided by core, cannot be modified by AI. */
 export default function PacksRoute() {
   const { locale, files, registry } = useWorkspaceContext();
   const theme = useAppTheme();

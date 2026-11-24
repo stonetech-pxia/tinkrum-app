@@ -8,8 +8,9 @@ import { PackGate } from './PackGate';
 import { usePacks } from './PackHost';
 
 /**
- * 文件处理包一次问完（D-456）：offer() 在第一次扫描完、分享或打开文件后调用；问过就不再问。
- * 用户点了下载或以后再说才记下「问过了」（底线 16：写入来自用户的操作）。
+ * File bundle offer asked all at once (D-456): offer() is called after the first scan, share, or
+ * file opening; once asked, it is not asked again. Tapping download or remind me later records
+ * that it was "asked" (invariant 16: writes originate from user actions).
  */
 export function useFileBundleOffer(
   palette: Palette,
@@ -26,7 +27,7 @@ export function useFileBundleOffer(
         if (missing.length > 0) setNeeds(missing);
       })
       .catch(() => {
-        // 读不到时这次不问，下次再说。
+        // If it cannot be read, do not ask this time and try again later.
       });
   }
 

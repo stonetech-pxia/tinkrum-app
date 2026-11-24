@@ -22,15 +22,17 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, TINY_JPEG } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 收件页面「存成记录」（D-392）：选一张有附件字段的表或一个预设表，打开新记录表单，收到的文件已经在附件里。
-// 三种状态：新用户（没有表）、有数据（已经有带附件的表和不带附件的表）、边界（两个文件、超过 20 个、没保存就返回）。
+// Inbox "Save as record" (D-392): select a table with attachment fields or a preset table, open the
+// new record form, and received files are already in attachments. Three states: new user (no
+// tables), with data (tables with and without attachments exist), edge cases (two files, over 20,
+// return without saving).
 
 afterEach(() => {
   useIncoming.getState().clear();
   useGuide.setState({ stage: null, repo: null, introOpen: false });
 });
 
-/** 有附件字段的「收据」表和没有附件字段的「账目」表（记账模版）。 */
+/** "Receipts" table with attachment field and "Expenses" table without attachment field (expense template). */
 const RECEIPTS: Op = {
   op: 'addData',
   table: {
@@ -52,7 +54,7 @@ function seeded(locale: Locale, registry: Registry): WorkspaceConfig {
   return r.config;
 }
 
-/** 引导已经走完（否则欢迎页会盖在收件页面上面）。 */
+/** Onboarding is complete (otherwise the welcome page would cover the inbox page). */
 async function render(seed?: (locale: Locale, registry: Registry) => WorkspaceConfig) {
   const repo = new MemoryWorkspaceRepo();
   await repo.setMeta('guide', 'done');
@@ -67,8 +69,8 @@ async function openShare(files: FakeFiles, names: string[], mime = 'image/jpeg')
   return picked;
 }
 
-/** 保存，等记录页关掉、回到收件页面（否则 router.back 会落到下一个测试里）。 */
-/** 一份文件在预览页的「存记录」面板里选；多份文件在收件页面的「存成记录」里选（D-457）。 */
+/** Save and wait for the record page to close and return to the inbox page (otherwise router.back will land in the next test). */
+/** A single file is selected in the preview page's "Save Record" panel; multiple files are selected in the inbox page's "Save as Record" (D-457). */
 async function openChooser() {
   await fireEvent.press(await screen.findByTestId(/^(preview-record|share-record-choose)$/));
 }
@@ -89,7 +91,7 @@ const listIds = () =>
     .queryAllByTestId(/^share-record-(table-.+|new)$/)
     .map((e) => e.props.testID as string);
 
-/** 新建表单页选一种预设。 */
+/** Select a preset on the new form page. */
 async function pickType(preset: string) {
   await fireEvent.press(await screen.findByTestId('new-table-change-type'));
   await fireEvent.press(await screen.findByTestId(`new-table-type-${preset}`));
@@ -102,7 +104,7 @@ async function saveNew() {
 }
 
 describe('recordChoices', () => {
-  it('只列有附件字段的表', () => {
+  it('Only list tables with attachment fields', () => {
     expect(recordChoices(createDefaultWorkspace('zh'))).toEqual([]);
     expect(recordChoices(seeded('fr', createRegistry(BUILTIN_TOOLS)))).toEqual([
       { kind: 'table', tableId: 'receipts', name: '收据' },
@@ -110,7 +112,7 @@ describe('recordChoices', () => {
   });
 });
 
-describe('recordChoices：像收据的文件，推荐带收据规则的表', () => {
+describe('recordChoices: files like receipts recommend tables with receipt rules', () => {
   const config = () => {
     const base = seeded('zh', createRegistry(BUILTIN_TOOLS));
     const next = applyOps(
@@ -134,13 +136,13 @@ describe('recordChoices：像收据的文件，推荐带收据规则的表', () 
     if (!next.ok) throw new Error(next.error);
     return next.config;
   };
-  it('像收据：带收据规则的表排第一并标推荐，别的表照旧在后面', () => {
+  it('Like receipts: tables with receipt rules ranked first and marked recommended, other tables follow normally', () => {
     expect(recordChoices(config(), true)).toEqual([
       { kind: 'table', tableId: 'bills', name: '收据（样板）', recommended: true },
       { kind: 'table', tableId: 'receipts', name: '收据' },
     ]);
   });
-  it('不像收据，或者没有带收据规则的表：不推荐、顺序不变', () => {
+  it('Unlike receipts, or no tables with receipt rules: not recommended, order unchanged', () => {
     expect(recordChoices(config()).map((c) => c.tableId)).toEqual(['receipts', 'bills']);
     expect(recordChoices(seeded('zh', createRegistry(BUILTIN_TOOLS)), true)).toEqual([
       { kind: 'table', tableId: 'receipts', name: '收据' },
@@ -148,11 +150,11 @@ describe('recordChoices：像收据的文件，推荐带收据规则的表', () 
   });
 });
 
-describe('预览页和收件页面 → 存成记录', () => {
-  it('新用户：选「新建表单」，选预设，点「记下」才建表，只存一条记录', async () => {
+describe('Preview page and inbox page -> Save as record', () => {
+  it('New user: select "New Form", pick preset, tap "Record" to create table, store only one record', async () => {
     const { files, repo, store } = await render();
     const [photo] = await openShare(files, ['IMG_1.jpg']);
-    // 一份文件是预览页，「存记录」是底下一排按钮里的一个，点了才弹出面板（D-457）。
+    // A single file is a preview page, where "Save Record" is one of the buttons at the bottom row, tapping it pops up the panel (D-457).
     expect(await screen.findByTestId('preview-record')).toBeTruthy();
     expect(screen.queryByTestId('share-record-list')).toBeNull();
     const before = store.getState().head!.id;
@@ -163,7 +165,7 @@ describe('预览页和收件页面 → 存成记录', () => {
     await fireEvent.press(screen.getByTestId('share-record-new'));
     expect(await screen.findByTestId('draft-attachments-file-0')).toBeTruthy();
     await pickType('purchase');
-    // 还什么都没建。
+    // Nothing has been created yet.
     expect(store.getState().config!.data.tables).toEqual([]);
     expect(store.getState().head!.id).toBe(before);
 
@@ -171,7 +173,7 @@ describe('预览页和收件页面 → 存成记录', () => {
     await saveNew();
     const config = store.getState().config!;
     expect(config.data.tables.map((c) => c.id)).toEqual(['receipts']);
-    // 选购物凭证、没改字段：建整套「收据」样板（D-479），列表页、开销页和两个快捷操作都在。
+    // Select shopping vouchers without changing fields: create the full "Receipts" sample suite (D-479), including list page, expense page, and two quick actions.
     expect(config.containers.pages.map((p) => p.id)).toEqual(
       expect.arrayContaining(['receipts', 'spending']),
     );
@@ -190,7 +192,7 @@ describe('预览页和收件页面 → 存成记录', () => {
     });
   });
 
-  it('选了购物凭证又改了表名：不用整套收据，照预设自己的页面建（D-479）', async () => {
+  it('Selected shopping vouchers and changed table name: do not use full receipt suite, build according to preset\'s own pages (D-479)', async () => {
     const { files, store } = await render();
     await openShare(files, ['IMG_1.jpg']);
     await choose('new');
@@ -205,7 +207,7 @@ describe('预览页和收件页面 → 存成记录', () => {
     expect(config.containers.pages.some((p) => p.id === 'spending')).toBe(false);
   });
 
-  it('不选预设也能建：加字段、改名、去掉字段，表名自己写', async () => {
+  it('Can build without preset: add fields, rename, remove fields, write custom table name', async () => {
     const { files, repo, store } = await render();
     await openShare(files, ['IMG_1.jpg']);
     await choose('new');
@@ -228,11 +230,11 @@ describe('预览页和收件页面 → 存成记录', () => {
     expect(table.fields.map((f) => f.name)).toEqual(['承保公司', '附件']);
     const [record] = await repo.listRecords(table.id);
     expect(record!.values['field-3']).toBe('平安');
-    // 列表显示留下来的文字字段（去掉的字段没有被页面引用，底线 18）。
+    // List displays remaining text fields (removed fields are not referenced by pages, invariant 18).
     expect(store.getState().config!.containers.pages.some((p) => p.title === '车险')).toBe(true);
   });
 
-  it('有数据：只列有附件字段的表和「新建表单」；选表不改配置，文件放进它的附件字段', async () => {
+  it('With data: list only tables with attachment fields and "New Form"; selecting a table does not change config, files are placed into its attachment field', async () => {
     const { files, repo, store } = await render(seeded);
     await openShare(files, ['IMG_1.jpg']);
     await openChooser();
@@ -248,7 +250,7 @@ describe('预览页和收件页面 → 存成记录', () => {
     expect((await repo.listRecords('receipts'))[0]!.values.photo).toEqual([asset!.id]);
   });
 
-  it('两个文件存成一条记录，两个附件按顺序', async () => {
+  it('Save two files as a single record, two attachments in order', async () => {
     const { files, repo } = await render();
     await openShare(files, ['A.jpg', 'B.jpg']);
     await choose('new');
@@ -263,9 +265,9 @@ describe('预览页和收件页面 → 存成记录', () => {
     ]);
   });
 
-  it('超过 20 个：先说明只放前 20 个，表单里正好 20 个', async () => {
+  it('Over 20: explain that only the first 20 are included, exactly 20 in the form', async () => {
     const { files, repo } = await render();
-    // 照片一次最多收 10 张，PDF 能收 50 个。
+    // Photos can be received up to 10 at a time, PDFs up to 50.
     const names = Array.from({ length: MAX_ATTACHMENTS + 2 }, (_, i) => `P${i}.pdf`);
     await openShare(files, names, 'application/pdf');
     await openChooser();
@@ -278,7 +280,7 @@ describe('预览页和收件页面 → 存成记录', () => {
     expect(await repo.listAssets()).toHaveLength(MAX_ATTACHMENTS);
   });
 
-  it('没保存就返回：不建表，不存记录，复制的文件删掉，收件的文件还在', async () => {
+  it('Return without saving: do not create table, do not save record, copied files deleted, received files remain', async () => {
     const { files, repo, store } = await render();
     const [photo] = await openShare(files, ['IMG_1.jpg']);
     await choose('new');
@@ -296,8 +298,8 @@ describe('预览页和收件页面 → 存成记录', () => {
     expect(files.disk.has(photo!.uri)).toBe(true);
   });
 
-  it('新用户还没看完介绍：记下让外壳重新挂载，文件还在，也不再推一次欢迎页', async () => {
-    // 真机上（2026-10-31）：首页推了欢迎页，收件页面盖在上面；建表后外壳按新版本重新挂载又推了一次。
+  it('New user hasn\'t finished reading introduction: recording causes shell to remount, file remains, welcome page not pushed again', async () => {
+    // On real device (2026-10-31): home screen pushed welcome page, inbox page covered it; after table creation, shell remounted with new version and pushed again.
     const repo = new MemoryWorkspaceRepo();
     await act(() => useGuide.getState().load(repo));
     expect(useGuide.getState().stage).toBe('intro');
@@ -315,7 +317,7 @@ describe('预览页和收件页面 → 存成记录', () => {
     expect(await screen.findByTestId('welcome')).toBeTruthy();
   });
 
-  it('让 Tink 改：先建表，换成记录页，AI 页只知道这张表，请求里没有文件内容', async () => {
+  it('Let Tink modify: create table first, switch to record page, AI page only knows about this table, request contains no file content', async () => {
     const { files, store } = await render();
     await openShare(files, ['IMG_1.jpg']);
     await choose('new');

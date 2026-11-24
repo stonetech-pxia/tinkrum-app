@@ -8,8 +8,9 @@ import { t } from '../../i18n';
 import type { LocalScreenProps } from '../RunScreen';
 import { LocalFrame } from './LocalFrame';
 
-// 打码（TOOLS_DESIGN §4 redact）：在图片上拖出方框盖住隐私内容，逐张确认。
-// 坐标一律用原图像素；框的内容只在本次运行里使用。
+// Redact (TOOLS_DESIGN §4 redact): drag boxes over images to cover sensitive content, confirming
+// one by one. Coordinates are always in original image pixels; boxed content is used solely for the
+// current run.
 
 type Size = { width: number; height: number };
 
@@ -17,7 +18,7 @@ interface State {
   index: number;
   boxes: Rect[][];
   box: Size;
-  /** 正在画的框：起点（原图像素）。 */
+  /** Box currently being drawn: start point (original image pixels). */
   start: { x: number; y: number } | null;
   draft: Rect | null;
 }
@@ -71,7 +72,7 @@ function reduce(state: State, action: Action, sizes: Size[]): State {
       };
     }
     case 'end': {
-      // 太小的框（手指只是点了一下）不算。
+      // Boxes that are too small (mere accidental taps) are ignored.
       const ok = state.draft && state.draft.width * scale >= 8 && state.draft.height * scale >= 8;
       const boxes = ok
         ? state.boxes.map((b, j) => (j === state.index ? [...b, state.draft!] : b))

@@ -15,8 +15,10 @@ import type { Collection, WorkspaceConfig } from './schema';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// 批量新建（D-567，创始人 2026-11-16 决定 ④）：A 表里筛出来的每一条，在 B 表里新建一条。先问，最多 200 条，
-// 引擎一条一条做（配置里没有循环），建错了能一次撤回这一批。"$row" 是来源的那一条，值可以抄它（D-565）。
+// Batch creation (D-567, founder 2026-11-16 decision ④): For every entry filtered in table A,
+// create a new entry in table B. Ask first, at most 200 entries, executed one by one by the engine
+// (no loops in config), and any errors can be undone in batch with a single undo. "$row" refers to
+// the source entry, and its values can be copied (D-565).
 process.env.TZ = 'Europe/Paris';
 const now = new Date(2026, 10, 1, 9, 0);
 
@@ -67,7 +69,7 @@ function problems(blocks: unknown[], config = base()): string {
 
 describe('bulk create (D-567)', () => {
   it('is the sixth record tool kind, with a fixed cap of 200', () => {
-    // 第七种 remove 是 D-610 加的（只给打卡格）。
+    // The seventh kind, remove, was added by D-610 (only for attendance/check-in grid cells).
     expect(RECORD_TOOL_KINDS).toEqual([
       'create',
       'set',
@@ -94,21 +96,21 @@ describe('bulk create (D-567)', () => {
     expect(problems([button({ ...monthly, filter: [{ field: 'nope', op: 'isEmpty' }] })])).toMatch(
       /nope/,
     );
-    // "$row" 是来源的那一条：引用字段要指向来源表。
+    // "$row" is the source entry: reference fields must point to the source table.
     expect(
       problems([button({ ...monthly, from: 'orders', table: 'orders', filter: undefined })]),
     ).toMatch(
       /link field orders\.customer can only be "\$row" \(this entry\) and must point at orders/,
     );
-    // 抄的是来源那一条的字段。
+    // Copies fields from the source entry.
     expect(
       problems([button({ ...monthly, values: { ...monthly.values, amount: { copy: 'nope' } } })]),
     ).toMatch(/copy nope is not a field of customers/);
-    // 必填的日期没有值：每一条都存不进去。
+    // Required date has no value: every entry fails to save.
     expect(problems([button({ ...monthly, values: { customer: '$row' } })])).toMatch(
       /required field on would be empty/,
     );
-    // 文字常量仍然不行（D-301）。
+    // Text constants are still not allowed (D-301).
     expect(problems([button({ ...monthly, values: { ...monthly.values, note: 'x' } })])).toMatch(
       /orders\.note is a text field/,
     );
@@ -125,7 +127,7 @@ describe('bulk create (D-567)', () => {
           tools: [{ as: 'button', label: 'All', ...monthly }],
         },
       ]),
-      // D-616 起列表下面能勾选新建，所以拒绝的话换成指向按钮块和勾选的写法；每一条上的按钮仍然不行。
+      // Since D-616 allows selection and creation below lists, rejection messages are updated to point to button blocks and selection syntax; buttons on individual rows are still not allowed.
     ).toMatch(/createAll on every entry a filter selects belongs on a button block/);
   });
 

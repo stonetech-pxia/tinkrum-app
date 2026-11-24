@@ -4,7 +4,7 @@ import type { Kernel } from './kernel';
 import type { createRevisions } from './revisions';
 import type { WorkspaceState } from './types';
 
-// 直接编辑（D-052–D-054、长按编辑 D-235）：操作先累积在 editing 里，点「完成」时作为一个 user 版本提交。
+// Direct editing (D-052–D-054, long-press edit D-235): Operations first accumulate in editing, and are submitted as a user version when tapping "Done".
 
 export function createEditing(
   k: Kernel,

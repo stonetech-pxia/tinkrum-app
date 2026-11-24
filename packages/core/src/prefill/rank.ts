@@ -28,36 +28,38 @@ import {
 } from './rules-text';
 import { charSim, norm, ratio } from './similarity';
 
-// 新记录表单的候选值（D-394）：每个空字段最多给 3 个候选，用户点了才填，从不自动填
-// （创始人 2026-10-31：「宁可不填，不能乱填」，两次测量都找不到 0 错的门槛）。
-// 打分照搬测量的变体 A（side-session-notes/prefill-ranking/scripts/score.py）：
-//   3·标签 + 3·记忆 + 1·唯一 + 1·合理 + 1·位置，每项 0..1。
-// 不用向量模型，全部在本机；识别出的文字、文件名和记录都不发给云端 AI。这里只有规则打分：
-// 算术、中文规则、值记忆在 code-rules.ts，本机模型（D-396）在 model.ts。
+// Candidate values for the new record form (D-394): at most 3 candidates given for each empty
+// field, filled only when the user taps, never automatically filled (founder 2026-10-31: "better
+// empty than wrong", neither measurement could find a 0-error threshold). Scoring copies variant A
+// of the measurements (side-session-notes/prefill-ranking/scripts/score.py): 3 * label + 3 * memory
+// + 1 * uniqueness + 1 * plausibility + 1 * position, each ranging from 0..1. No vector models are
+// used; everything is on-device; recognized text, file names, and records are never sent to cloud
+// AI. Only rule-based scoring is performed here: arithmetic, Chinese rules, and value memory are in
+// code-rules.ts, and the on-device model (D-396) is in model.ts.
 
-/** 这个字段学过的一个标签（统一写法，见 fieldNameKey）。 */
+/** A learned label for this field (normalized spelling, see fieldNameKey). */
 export interface LearnedLabel {
   label: string;
-  /** 这个标签后面日月分不清的日期，用户点的是哪种读法。 */
+  /** The reading chosen by the user for dates following this label where day and month are ambiguous. */
   order?: 'DMY' | 'MDY';
-  /** 这个标签出现时用户点了别的值：还留着，但不再排第一。 */
+  /** The user tapped a different value when this label appeared: retained, but no longer ranked first. */
   rejected?: true;
 }
 
-/** 用户点过的候选：这张表这个字段上次点的是哪个标签后面、页面上多高的值（不记值）。 */
+/** Candidates previously tapped by the user: which label-following position and vertical page height were tapped last time for this field in this table (does not record the value itself). */
 export interface FieldPick {
   label: string;
   relY: number;
-  /** 日月分不清的日期，用户点的是哪种读法。 */
+  /** The reading chosen by the user for ambiguous day/month dates. */
   order?: 'DMY' | 'MDY';
-  /** 这个字段学过的标签，最近点的在前。旧的记忆没有，那时算学过 label 一个。 */
+  /** Learned labels for this field, most recently tapped first. Older memory lacks this, at which point it counted as having one learned label. */
   labels?: readonly LearnedLabel[];
 }
 
-/** 每个字段最多记几个学过的标签：超出时丢掉最久没点的。 */
+/** Maximum number of learned labels remembered per field: discards the least recently tapped when exceeded. */
 export const MAX_LEARNED_LABELS = 20;
 
-/** 这个字段学过的标签，最近点的在前。 */
+/** Learned labels for this field, most recently tapped first. */
 export function learnedLabels(pick: FieldPick | undefined): readonly LearnedLabel[] {
   if (!pick) return [];
   if (pick.labels) return pick.labels;
@@ -66,8 +68,10 @@ export function learnedLabels(pick: FieldPick | undefined): readonly LearnedLabe
 }
 
 /**
- * 用户点了一个候选以后的记忆：这一处的标签记到字段下面；当时排在前面、用户没点的学过的标签不再排第一。
- * 这个值在文字里找不到位置（没有 pick）时不学新标签。什么都没变时给 undefined。
+ * Memory after the user taps a candidate: records the label at this location under the field;
+ * previously top-ranked learned labels not tapped by the user are no longer ranked first. New
+ * labels are not learned if this value cannot be located in the text (no pick). Returns undefined
+ * when nothing changes.
  */
 export function rememberPick(
   previous: FieldPick | undefined,
@@ -97,44 +101,47 @@ export function rememberPick(
 }
 
 export interface ValueSuggestion {
-  /** 表单里的写法：金额、数字是文字，日期 YYYY-MM-DD，单选是选项 ID。 */
+  /** Representation in the form: amounts and numbers are text, dates are YYYY-MM-DD, single-selects are option IDs. */
   value: string;
   score: number;
-  /** 点了以后记下来的（FieldPick）。这个值在文字里找不到位置时没有，点了也不记。 */
+  /** Recorded after a tap (FieldPick). Absent when this value cannot be located in the text, and not recorded on tap. */
   pick?: FieldPick;
-  /** 这个值是靠哪些学过的标签排到前面的。 */
+  /** Learned labels that caused this value to rank high. */
   learned?: readonly string[];
-  /** 有把握（只有说出来的话才有，D-575）：表单直接填进去，不等用户点。 */
+  /** Confident (only for spoken input, D-575): filled directly into the form without waiting for user taps. */
   sure?: boolean;
 }
 
 export interface SuggestInput {
   fields: readonly Field[];
-  /** 这张表的 prefillRules：通用规则之外再用哪组规则（D-421）。 */
+  /** prefillRules for this table: which set of rules to use in addition to general rules (D-421). */
   rules?: 'receipt' | 'card';
   pages: readonly TextPage[];
-  /** 文字是用户为这一笔说的话（语音转的文字，D-575），不是从文件读出来的：按字段类型读口语里的值，不看版面。 */
+  /** The text is what the user spoke for this entry (speech-to-text, D-575), not read from a file: reads spoken values according to field type, ignoring layout. */
   spoken?: boolean;
-  /** 识别用的语言（日月分不清时只影响先后，两种都给）。 */
+  /** Language used for recognition (when day/month is ambiguous, only affects sorting order; both are provided). */
   locale: Locale;
-  /** 这张表各字段上次点的（字段 ID → FieldPick）。 */
+  /** Last-tapped items for each field in this table (field ID -> FieldPick). */
   picks?: Readonly<Record<string, FieldPick>>;
-  /** 这张表存过的店名、公司（字段 ID → 值，现查的，见 knownValues）；原样出现在文字里就当候选。 */
+  /** Stored store names and companies for this table (field ID -> value, queried on the fly, see knownValues); treated as candidates if appearing verbatim in the text. */
   known?: Readonly<Record<string, readonly string[]>>;
-  /** 名片表（rules: card）：附件里的二维码读出来的文字（D-423）。vCard、MeCard 的值和网址排在每个字段候选的最前面。 */
+  /** Namecard table (rules: card): text read from attachments' QR codes (D-423). vCard/MeCard values and URLs are placed at the very front of each field's candidates. */
   codes?: readonly string[];
   now?: Date;
 }
 
-/** 每个字段最多几个候选。 */
+/** Maximum number of candidates per field. */
 export const MAX_SUGGESTIONS = 3;
 /**
- * 低于这个分的不显示（只有「唯一」和「合理」的一点分，标签、记忆、位置都不沾边）。在测量数据上定的：
- * 全部数据里前三中对的 99.6% 在 1.25 以上，错的少一半；真实小票（SROIE 150 张）金额前三里对的
- * 95 → 90、日期 131 → 126。门槛 1.5 时 SROIE 金额只剩 80，2.0 会丢掉单独一个没标签的日期，都不用。
+ * Scores below this are not displayed (only points for uniqueness and plausibility, with no
+ * contribution from labels, memory, or position). Determined from measurement data: 99.6% of
+ * correct top-three predictions across all data are above 1.25, halving errors; for real receipts
+ * (150 SROIE images), correct top-three amounts drop from 95 to 90, dates from 131 to 126. At a
+ * threshold of 1.5, SROIE amounts drop to just 80; 2.0 drops a standalone unlabeled date, so
+ * neither is used.
  */
 export const SUGGESTION_FLOOR = 1.25;
-/** 税额候选的最低分：税额多半有「税」字标签，没有标签的数靠巧合，不如不填。 */
+/** Minimum score for tax amount candidates: tax amounts mostly have a "tax" label; numbers without labels rely on coincidence, so it is better left blank. */
 const TAX_FLOOR = 2;
 
 const GENERIC = [
@@ -183,10 +190,15 @@ const GENERIC = [
 const isGeneric = (n: string) =>
   GENERIC.some((g) => n === g || (n.includes(g) && n.length <= g.length + 4));
 /**
- * 位置分要是 0 的字：通用的单据字样、单据名（「收据」）、「Powered by」、太短太长、数字多、网址邮箱、看起来是别的种类。
- * 不再按门牌、国家、州名字样排除地址行：测量里带地址词的行在真店名行里占 8.6%、在它上面的行里占 7.2%，分不开，直接排除是在丢真店名。
+ * Old approach (prior to D-403): still used for non-receipt documents (namecards, others). Words
+ * that receive a position score of 0: generic document labels, document names ("receipt"),
+ * "Powered by", too short/long, high digit density, URLs/emails, or appearing to be another
+ * category. Address lines are no longer excluded based on street number, country, or state
+ * patterns: measurements showed lines with address words accounted for 8.6% of real store name
+ * lines and 7.2% of lines directly above them, which cannot be separated; excluding them directly
+ * discards real store names.
  */
-// 旧的写法（D-403 之前）：不是收据的文档（名片、其他）还用它。
+// Old approach (prior to D-403): still used for non-receipt documents (namecards, others).
 const ADDRESS_OLD =
   /\b(street|st|road|rd|jalan|jln|lorong|taman|avenue|ave|rue|bd|boulevard|no|lot|blok|block)\b|[路街号巷弄区]/i;
 const ADDRESS_ONLY_OLD =
@@ -206,14 +218,14 @@ function positionZero(text: string, locale: Locale): boolean {
 }
 
 const hasLetter = /\p{L}/u;
-/** 文字字段的值：至少两个字、最多 40 个，有字母，数字不超过三成，不是「发票」「Tax invoice」这种通用字样。 */
+/** Value of a text field: at least two characters, at most 40, contains letters, digits do not exceed 30%, and is not a generic label like "Invoice" or "Tax invoice". */
 function textOk(v: string): boolean {
   const n = norm(v);
   if (n.length < 2 || v.length > 40 || !hasLetter.test(v) || isGeneric(n)) return false;
   return [...n].filter((c) => /\d/.test(c)).length <= 0.3 * n.length;
 }
 
-/** 字段要哪一种值；不给候选的字段为 null。 */
+/** The type of value required by the field; null for fields that do not provide candidates. */
 function wantOf(field: Field, concept: ConceptId | null): ValueKind | 'choice' | null {
   switch (field.type) {
     case 'money':
@@ -254,15 +266,15 @@ interface Candidate {
   occ: Occurrence[];
   order?: 'DMY' | 'MDY';
   score: number;
-  /** 没有记忆时的分：够不够格当候选。 */
+  /** Score when there is no memory: whether it qualifies as a candidate. */
   base: number;
   first: number;
-  /** 日期落在合理窗口里。 */
+  /** Date falls within the reasonable window. */
   plaus?: boolean;
 }
 
 const NO_DECIMAL_CCY = ['JPY', 'KRW', 'IDR', 'VND', 'CLP'];
-/** 整份文字里的金额都写两位小数时，合计候选里写成整数的（订单号、数量、年份）扣 1 分（分和门槛都扣）。 */
+/** When all amounts in the entire text have two decimal places, total candidates written as integers (order numbers, quantities, years) are penalized by 1 point (penalized in both score and threshold). */
 function demoteWholeNumbers(cands: Candidate[]): void {
   const live = cands.filter((c) => c.score > 0 && Number.isFinite(Number(c.value)));
   const decimalsOf = (o: Occurrence) => o.raw.replace(/[^\d.,]/g, '');
@@ -276,14 +288,14 @@ function demoteWholeNumbers(cands: Candidate[]): void {
   }
 }
 
-/** 解析日期、金额的规则要用的上下文：币种、整份文字、现在的年份、是不是发票。 */
+/** Context required by date and amount parsing rules: currency, entire text, current year, and whether it is an invoice. */
 export function setDocContext(input: SuggestInput): void {
-  // 表上写了用哪组规则（D-421）：后面每条规则查 ctx.kind；没写就只有通用规则。
+  // Rule set specified on the table (D-421): subsequent rules check ctx.kind; defaults to general rules only if unassigned.
   ctx.kind = input.rules ?? 'other';
   ctx.nowYear = (input.now ?? new Date()).getUTCFullYear();
   ctx.text = input.pages.flatMap((p) => p.lines.map((l) => l.text)).join('\n');
   ctx.invoice = receiptRules() && isInvoiceText(ctx.text);
-  // 每笔自己选货币时（D-429），字段上的货币不说明这张票是哪国的。
+  // When currencies are chosen per entry (D-429), the currency on the field does not indicate which country the receipt belongs to.
   ctx.currency = input.fields.some(hasRecordCurrency)
     ? ''
     : ((
@@ -292,14 +304,14 @@ export function setDocContext(input: SuggestInput): void {
       )?.currency ?? '');
 }
 
-/** 全部字段的候选（字段 ID → 按分从高到低，最多 3 个）。只给可以填的字段；空着的字段由调用方挑。 */
+/** Candidates for all fields (field ID -> ordered by score descending, up to 3). Provided only for fillable fields; empty fields are chosen by the caller. */
 export function suggestValues(input: SuggestInput): Record<string, ValueSuggestion[]> {
   const now = input.now ?? new Date();
   setDocContext(input);
   const pages = input.pages.map((p, i) => pageOccurrences(p, i, input.locale));
   const occ = pages.flatMap((p) => p.occ);
   const rowText = (o: Occurrence) => pages[o.page]!.rows[o.row]?.text ?? '';
-  // 只有一种读法的日期：其他日期合不合理按它们来判断（单据的日子），没有时按现在。
+  // Dates with a single reading: used to judge whether other dates are reasonable (document date), defaulting to the present if absent.
   const readings = new Map<string, number>();
   for (const o of occ)
     if (o.kind === 'date') {
@@ -318,7 +330,7 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
   for (const field of input.fields) {
     const terms = fieldTerms(field);
     const concept = terms.concept;
-    // 合计、税额、店名的词表按规则补充；「Printed」不再是开票日的排除词（打印日期另外排到最后）。
+    // Term lists for totals, tax amounts, and store names supplemented by rules; "Printed" is no longer an exclusion word for invoice dates (print dates are instead sorted last).
     const adjusted = adjustTerms(concept, terms.keywords, terms.exclude);
     const keywords = adjusted.kw;
     const exclude =
@@ -329,7 +341,7 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
     const isExcluded = (label: string) => isExcludedX(concept, label, exclude);
     const want = wantOf(field, concept);
     if (!want) continue;
-    // 合计、税额再多找两种候选：标签后面的整数，和一排「A + B = C」里的数。
+    // Find two additional candidate types for totals and tax amounts: integers following labels, and numbers in an "A + B = C" row.
     let occF = occ;
     if (receiptRules() && want === 'money' && (concept === 'amount' || concept === 'tax')) {
       const extra = [
@@ -339,8 +351,10 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
       if (extra.length) occF = occ.concat(extra);
     }
     const longAhead = concept === 'dueDate' || concept === 'signDate';
-    // 日期合不合理：落在「现在」前 10 年到后 1 年里；不在时看单据自己的其他日期（单据的日子）。
-    // 其他日期里有落在窗口里的，只拿它们当参照（避免一个打印日期、有效期把参照拉歪）。
+    // Whether a date is reasonable: falls within 10 years before to 1 year after "present";
+    // otherwise checks other dates on the document (document dates). If any other dates fall within
+    // the window, only those are used as reference (preventing a print date or expiration date from
+    // distorting the reference).
     const plausibleDate = (v: string) => {
       const t = day(v);
       if (!receiptRules()) {
@@ -359,7 +373,7 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
       return t >= Math.min(...others) - YEAR && t <= Math.max(...others) + 10 * YEAR;
     };
 
-    // 同一个值合并（金额按两位小数，日期连同读法，文字按统一写法）。
+    // Merges identical values (amounts by two decimal places, dates along with their reading style, text by normalized spelling).
     const byKey = new Map<string, Candidate>();
     for (const o of occF) {
       let value: string;
@@ -388,7 +402,7 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
         value = o.value;
         key = `${o.value}|${o.dateOrder ?? ''}`;
       } else {
-        // 电话、编号填原文的写法（带空格和括号），邮箱填小写。
+        // Fill phone numbers and numbers in their original format (with spaces and parentheses), and emails in lowercase.
         value = want === 'email' ? o.value : o.raw.trim();
         key = o.value;
       }
@@ -409,7 +423,7 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
     const pick = input.picks?.[field.id];
     const position = concept !== null && CONCEPTS[concept].position === true;
     for (const c of cands) {
-      // 每一处都在排除词后面（小计、优惠、找零）的值不给：它们明白地不是这个字段要的。
+      // Values where every occurrence follows an exclusion word (subtotal, discount, change) are omitted: they are explicitly not what the field requires.
       if (c.occ.every((o) => isExcluded(o.label))) continue;
       let L = Math.max(
         ...c.occ.map(
@@ -417,10 +431,12 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
             scoreLabel(o.label) * (receiptRules() && position && weakStore(o.label) ? 0.25 : 1),
         ),
       );
-      // 店名这类靠位置的字段：标签分不到 0.6 就当没有标签。上一排被当成标签时，一句标语和 store、shop
-      // 共享几个字母对也能拿到零点几分，再乘 3 就盖过位置分，把标语排到店名前面。
+      // Fields relying on position like store names: if the label score is below 0.6, it is treated
+      // as having no label. When a preceding row is mistaken for a label, a slogan sharing a few
+      // matching letter pairs with store/shop can also score a fraction of a point, which when
+      // multiplied by 3 overrides the position score and places the slogan before the store name.
       if (receiptRules() && position && L < 0.6) L = 0;
-      // 发票：开票方的标签（Remit to、Supplier、From…）按整词给分。
+      // Invoice: Issuer labels (Remit to, Supplier, From, etc.) are scored by whole word.
       if (ctx.invoice && position) L = Math.max(L, ...c.occ.map((o) => sellerLabelScore(o.label)));
       const U = 1 / n;
       let P = 1;
@@ -431,7 +447,7 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
       let M = 0;
       if (pick) {
         for (const o of c.occ) {
-          // 上次点的是没有标签的一排（店名）时，只认同样没有标签、又不是地址这类的排。
+          // When the last click was on an unlabeled row (store name), only consider rows that are similarly unlabeled and not addresses or the like.
           const ls =
             !pick.label && !o.label
               ? want === 'text' && positionZero(rowText(o), input.locale)
@@ -441,14 +457,14 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
                 ? charSim(o.label, pick.label)
                 : 0;
           const ps = Math.max(0, 1 - Math.abs(o.relY - pick.relY) / 0.1);
-          // 文字只靠「高度差不多」不算记得：标签一点都对不上就不给记忆分。
+          // Text alone isn't memorized based solely on similar height: if labels don't match at all, give no memory score.
           let m = want === 'text' && ls === 0 ? 0 : 0.5 * ls + 0.5 * ps;
           if (pick.order && c.order && pick.order !== c.order) m *= 0.5;
           M = Math.max(M, m);
         }
       }
       let X = 0;
-      // 没有记忆时的位置分：够不够格当候选只看这个，记忆只调整顺序（别的店点过的位置不能带来新候选）。
+      // Position score when there is no memory: whether a candidate qualifies depends only on this; memory only reorders (positions clicked for other stores cannot bring in new candidates).
       let X0 = 0;
       if (position) {
         for (const o of c.occ) {
@@ -460,18 +476,19 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
             continue;
           if (o.page === 0 && o.row < 3) X0 = Math.max(X0, (3 - o.row) / 3);
           if (pick) {
-            // 记住的位置代替「最上面三排」。
+            // Remembered position replaces 'top three rows'.
             if (!pick.label) X = Math.max(X, Math.max(0, 1 - Math.abs(o.relY - pick.relY) / 0.1));
           } else if (o.page === 0 && o.row < 3) X = Math.max(X, (3 - o.row) / 3);
         }
       }
-      // 文字字段只靠「唯一」和「合理」不够：标签、记忆、位置一样都不沾边的排不给（「备注」「事由」
-      // 下面列出店名、地址这类没用的候选，iOS 模拟器上 2026-10-31 发现）。
+      // For text fields, 'unique' and 'reasonable' are not enough: rows where labels, memory, and
+      // position are all absent are given 0 points (e.g. store names, addresses, and other useless
+      // candidates listed under 'Remarks' or 'Reason', observed on iOS Simulator 2026-10-31).
       c.score = want === 'text' && L === 0 && M === 0 && X === 0 ? 0 : 3 * L + 3 * M + U + P + X;
       c.base = want === 'text' && L === 0 && X0 === 0 ? 0 : 3 * L + U + P + X0;
       c.first = Math.min(...c.occ.map((o) => o.page * 10000 + o.row));
       if (want === 'date') c.plaus = P === 1;
-      // 整份文字里一个税字样都没有，没有标签分的税额候选多半是别的数：扣 1 分（分和门槛都扣）。
+      // When no tax keyword appears anywhere in the text, tax candidates without a label score are likely something else: penalize by 1 point (deducting from both score and threshold).
       if (receiptRules() && concept === 'tax' && L === 0 && !D.TAX_WORD.test(ctx.text)) {
         c.score -= 1;
         c.base -= 1;
@@ -482,7 +499,7 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
       const amounts = amountSet(occF);
       taxRateCheck(cands, rowText, amounts);
       taxAddCheck(cands, amounts);
-      // 分差不到 0.05 算同分，同分的税额取小的（大的多半是含税合计）。
+      // Score differences under 0.05 are treated as ties; for tied tax amounts, take the smaller one (larger ones are usually tax-inclusive totals).
       cands.sort((a, b) =>
         Math.abs(b.score - a.score) >= 0.05
           ? b.score - a.score
@@ -495,7 +512,7 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
       cands.push(...reordered);
     }
     if (receiptRules() && concept === 'issueDate') {
-      // 「Printed」打印日期排到最后。
+      // 'Printed' date rows are sorted to the end.
       const isPrint = (c: Candidate) =>
         c.occ.every((o) => {
           const row = rowText(o);
@@ -510,12 +527,12 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
       cands.length = 0;
       cands.push(...keep, ...back);
     }
-    // 税额的门槛高一些（2 分）：没有标签、也对不上税率和加法的数不当税额。
+    // Higher threshold for tax amounts (2 points): numbers without labels, tax rates, or addition proofs do not qualify as tax.
     const floor =
       receiptRules() && concept === 'tax'
         ? Math.max(SUGGESTION_FLOOR, TAX_FLOOR)
         : SUGGESTION_FLOOR;
-    // 低于门槛、但落在页面最上面四分之一、又是单独一排或带月份名的合理日期，也给。
+    // Below threshold, but if it falls in the top quarter of the page and is a standalone row or a reasonable date with a month name, accept it.
     const lowOk = (c: Candidate) =>
       receiptRules() &&
       want === 'date' &&
@@ -530,9 +547,9 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
     for (const c of cands) {
       if (list.length >= MAX_SUGGESTIONS) break;
       if (c.base < floor && !lowOk(c)) continue;
-      // 同一个值（例如两种读法里有一种和别处的日期一样）只留分最高的。
+      // For the same value (e.g., when one of two readings matches a date elsewhere), keep only the highest scoring one.
       if (list.some((s) => s.value === c.value)) continue;
-      // 记下来的那一处：标签分最高的，其次最靠上的。
+      // The recorded occurrence: highest label score first, then topmost.
       const best = [...c.occ].sort(
         (a, b) => scoreLabel(b.label) - scoreLabel(a.label) || a.page - b.page || a.row - b.row,
       )[0]!;
@@ -547,7 +564,7 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
       });
     }
     if (receiptRules() && concept === 'merchant') {
-      // 候选不到 3 个时，文字里只有一排带公司后缀（LLC、GmbH、株式会社…）的，补上它当最后一个。
+      // When there are fewer than 3 candidates, if there is a single row with a company suffix (LLC, GmbH, Inc., etc.) in the text, add it as the last candidate.
       if (list.length < 3) {
         const hits: { text: string; relY: number }[] = [];
         for (const pg of pages) for (const r of pg.rows) if (companyRow(r.text)) hits.push(r);
@@ -560,7 +577,7 @@ export function suggestValues(input: SuggestInput): Record<string, ValueSuggesti
             pick: { label: '', relY: Math.round(only.relY * 1000) / 1000 },
           });
       }
-      // 发票表头「Seller: Client:」下面一排的第一格是卖方：排第一。
+      // Invoice header 'Seller: Client:': the first cell in the row below is the seller, ranked first.
       const name = sellerClientName(pages);
       if (name && textOk(name.text)) {
         const rest = list.filter((s) => norm(s.value) !== norm(name.text));

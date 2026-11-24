@@ -1,5 +1,5 @@
-// schemaVersion 4 的真实快照（D-014 固定数据槽时期），用作迁移回归测试（§7E）。
-// 不要修改：它们代表已经存在于用户设备上的历史版本。
+// True snapshot of schemaVersion 4 (fixed data slot period D-014), used as migration regression
+// test (§7E). Do not modify: they represent historical versions already present on user devices.
 
 const theme = {
   primaryColor: '#C8623A',
@@ -50,7 +50,7 @@ const base = (steps: unknown[]) => ({
   collections: [],
 });
 
-/** 安装 PDF 后的默认流程：选文件 → 合并 → 输入文件名 → 保存。 */
+/** Default flow after installing PDF: pick file → merge → enter file name → save. */
 export const V4_DEFAULT_MERGE = base([
   { id: 'select', action: 'pdf.selectFiles', params: { min: 2, max: 20 } },
   { id: 'merge', action: 'pdf.merge', params: {} },
@@ -58,14 +58,14 @@ export const V4_DEFAULT_MERGE = base([
   { id: 'save', action: 'file.save', params: { nameTemplate: '{sourceName}-合并' } },
 ]);
 
-/** 「完成后按日期命名，不用问」：去掉了询问，保存时用固定模板。 */
+/** "Name by date on completion without asking": removes prompt, uses fixed template on save. */
 export const V4_FIXED_NAME = base([
   { id: 'select', action: 'pdf.selectFiles', params: { min: 2, max: 20 } },
   { id: 'merge', action: 'pdf.merge', params: {} },
   { id: 'save', action: 'file.save', params: { nameTemplate: '合并-{date:YYYY-MM-DD}' } },
 ]);
 
-/** 改过参数、询问时的默认名与保存模板不同。 */
+/** Default name and save template when parameters are modified and prompting. */
 export const V4_CUSTOM_ASK = base([
   { id: 'select', action: 'pdf.selectFiles', params: { min: 3, max: 5 } },
   { id: 'merge', action: 'pdf.merge', params: {} },

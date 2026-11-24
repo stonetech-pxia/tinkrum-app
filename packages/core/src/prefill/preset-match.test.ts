@@ -18,55 +18,55 @@ const doc = (...rows: string[]): TextPage[] => [
 ];
 
 describe('rankPresets', () => {
-  it('没有金额：要金额的预设排到后面，不隐藏', () => {
+  it('No amount: presets requiring amounts are sorted to the end without being hidden', () => {
     const r = rankPresets(doc('Vaccination record', 'Name: Ana', 'Dose 1: 3 March 2025'));
     expect(r.unlikely).toEqual(expect.arrayContaining(['purchase', 'bill', 'payslip']));
     expect(r.likely).toContain('vaccination');
     expect(r.likely).not.toContain('purchase');
     expect([...r.likely, ...r.unlikely]).toHaveLength(21);
   });
-  it('有金额：都留着', () => {
+  it('Has amount: keep all', () => {
     expect(rankPresets(doc('Total 48.60 €')).unlikely).toEqual([]);
     expect(rankPresets(doc('合计 2380.00元')).unlikely).toEqual([]);
   });
-  it('护照机读码排最前', () => {
+  it('Passport MRZ sorted to the very top', () => {
     expect(rankPresets(doc('P<GBRSMITH<<ANNA<MARIE<<<<<<<<')).likely[0]).toBe('identity');
   });
-  it('没有文字时什么都不排后', () => {
+  it('Nothing sorted to the end when text is empty', () => {
     expect(rankPresets([]).unlikely).toEqual([]);
   });
 });
 
-describe('rankPresets 的 folded（带合计的金额类别并进购物凭证，D-480）', () => {
-  it('有合计和金额：银行、账单、贷款、工资单、报销、税务都不给模型选，列表里还在', () => {
+describe('folded in rankPresets (amount categories with totals merged into shopping receipts, D-480)', () => {
+  it('Has totals and amounts: bank, billing, loan, payslip, expense report, and tax are excluded from model selection but remain in the list', () => {
     const r = rankPresets(doc('Total 48.60 €'));
     expect(r.folded).toEqual(['bank', 'bill', 'loan', 'payslip', 'reimbursement', 'tax']);
     expect(r.likely).toEqual(expect.arrayContaining(['bill', 'purchase', 'bank', 'payslip']));
   });
-  it('有金额但没有合计字样：不并', () => {
+  it('Has amount but no total keyword: do not merge', () => {
     expect(rankPresets(doc('Premium 45.00 €')).folded).toEqual([]);
   });
-  it('没有金额时没有 folded', () => {
+  it('No folded when amount is absent', () => {
     expect(rankPresets(doc('Dose 1: 3 March 2025')).folded).toEqual([]);
   });
 });
 
 describe('presetMatchRequest / presetAnswer', () => {
-  it('目录只有给的预设，语法只能答它们或 none', () => {
+  it('Catalog contains only provided presets, grammar must answer them or none', () => {
     const q = presetMatchRequest(doc('Hello'), ['bill', 'tax']);
     expect(q.prompt).toContain('bill: ');
     expect(q.prompt).not.toContain('payslip:');
     expect(q.grammar).toBe('root ::= "bill" | "tax" | "none"\n');
   });
-  it('none 和不在目录里的是 null', () => {
+  it('none and items outside the catalog evaluate to null', () => {
     expect(presetAnswer('bill', ['bill'])).toBe('bill');
     expect(presetAnswer('none', ['bill'])).toBeNull();
     expect(presetAnswer('tax', ['bill'])).toBeNull();
   });
 });
 
-describe('recommendPreset 的目录', () => {
-  it('有金额：目录里没有账单、贷款、报销、税务，购物凭证的说明包括它们', async () => {
+describe('Catalog for recommendPreset', () => {
+  it('Has amount: billing, loan, expense report, and tax are absent from catalog, shopping receipt description includes them', async () => {
     const prompts: string[] = [];
     const open = async () => ({
       generate: async (r: { prompt: string }) => {
@@ -92,14 +92,14 @@ describe('recommendPreset', () => {
       released.push('released');
     },
   });
-  it('答对就推荐，用完释放', async () => {
+  it('Recommend when answer is correct, release after use', async () => {
     const released: string[] = [];
     const got = await recommendPreset(async () => session('insurance', released), doc('Policy'));
     expect(got).toBe('insurance');
     await Promise.resolve();
     expect(released).toEqual(['released']);
   });
-  it('没装模型、加载失败、没有文字：都是 null', async () => {
+  it('Model not installed, loading failed, or no text: all return null', async () => {
     expect(await recommendPreset(async () => null, doc('Policy'))).toBeNull();
     expect(
       await recommendPreset(async () => {
@@ -115,8 +115,8 @@ describe('recommendPreset', () => {
   });
 });
 
-describe('rulePreset（没有本机模型时，很明显的小票也要推荐购物凭证）', () => {
-  it('英文小票', () => {
+describe('rulePreset (when no local model is present, clearly recognizable receipts should still recommend shopping receipts)', () => {
+  it('English receipt', () => {
     expect(
       rulePreset(
         doc(
@@ -132,7 +132,7 @@ describe('rulePreset（没有本机模型时，很明显的小票也要推荐购
       ),
     ).toBe('purchase');
   });
-  it('法文小票', () => {
+  it('French receipt', () => {
     expect(
       rulePreset(
         doc(
@@ -146,7 +146,7 @@ describe('rulePreset（没有本机模型时，很明显的小票也要推荐购
       ),
     ).toBe('purchase');
   });
-  it('Lidl 小票（识别带错字）', () => {
+  it('Lidl receipt (recognition with typos)', () => {
     expect(
       rulePreset(
         doc(
@@ -168,12 +168,12 @@ describe('rulePreset（没有本机模型时，很明显的小票也要推荐购
       ),
     ).toBe('purchase');
   });
-  it('中文小票', () => {
+  it('Chinese receipt', () => {
     expect(
       rulePreset(doc('永辉超市小票', '牛奶 12.50', '面包 8.00', '合计 20.50', '微信支付 20.50')),
     ).toBe('purchase');
   });
-  it('有合计金额的账单、贷款、税务、报销也用购物凭证（D-476）', () => {
+  it('Bills, loans, taxes, and reimbursements with a total amount also use shopping vouchers (D-476)', () => {
     expect(
       rulePreset(doc('Invoice 2025-03', 'Due date 1 April', 'Amount due 120.00 €', 'VAT 20.00')),
     ).toBe('purchase');
@@ -182,7 +182,7 @@ describe('rulePreset（没有本机模型时，很明显的小票也要推荐购
       'purchase',
     );
   });
-  it('带合计的银行单和工资单也用购物凭证（D-480）', () => {
+  it('Bank statements and payslips with totals also use shopping vouchers (D-480)', () => {
     expect(
       rulePreset(doc('Invoice 2025-03', 'Amount due 120.00 €', 'IBAN FR7612345678901234567890123')),
     ).toBe('purchase');
@@ -191,7 +191,7 @@ describe('rulePreset（没有本机模型时，很明显的小票也要推荐购
     ).toBe('purchase');
     expect(rulePreset(doc('工资条', '应发合计 8 000.00', '实发合计 6 512.30'))).toBe('purchase');
   });
-  it('没有金额、没有文字、合同和保单都不推荐', () => {
+  it('No amount, no text, contracts, and insurance policies are all not recommended', () => {
     expect(
       rulePreset(
         doc('SERVICE AGREEMENT', 'between Acme Ltd and Beta SARL', 'Total fee 5 000.00 €'),

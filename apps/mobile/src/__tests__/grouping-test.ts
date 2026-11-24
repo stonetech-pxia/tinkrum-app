@@ -7,7 +7,7 @@ import { startRun } from '../runtime/runner';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, makePdf } from '../test-utils/fake-files';
 
-// 分组后各出一份（D-243）：真正的 pdf-lib 和 fflate，每组一个文件。
+// Separate output per group (D-243): real pdf-lib and fflate, one file per group.
 
 const registry = createRegistry(BUILTIN_TOOLS);
 const A4 = { pageSize: 'a4', orientation: 'auto', marginMm: 10, fit: 'contain', maxMB: 0 };

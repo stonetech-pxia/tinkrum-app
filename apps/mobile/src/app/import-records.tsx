@@ -33,10 +33,14 @@ import { Toast } from '@/shell/Toast';
 import { useCalendar, useWorkspace, useWorkspaceContext } from '@/workspace/context';
 
 /**
- * 「设置 → 数据 → 从文件导入记录」（D-574，创始人 2026-11-16 决定 ⑦）：系统层的页面，不在配置里，Tink 改不了。
- * 选一个 .xlsx / .csv → 列对到字段（本机按名字提议，用户看着样例改）→ 汇总（几条进哪张表、哪些行为什么不导）→
- * 用户点「导入」才写，一个事务；之后提示条能撤销（底线 11），「设置 → 数据」里能整批删。
- * 文件只在本机读，选择器的副本读完就删，原件不动（底线 1、2、4、14）。看、换对应都不写（底线 15）。
+ * 'Settings -> Data -> Import Records from File' (D-574, founder's 2026-11-16 decision ⑦):
+ * system-layer page, not in config, cannot be modified by Tink. Select an .xlsx / .csv -> map
+ * columns to fields (proposed locally by name, modified by user viewing examples) -> summary (how
+ * many entries into which table, and why certain rows are skipped) -> writes only when user
+ * clicks 'Import' as a single transaction; followed by an undoable banner (invariant 11), and can
+ * be deleted in bulk under 'Settings -> Data'. Files are read locally only, picker copies are
+ * deleted after reading, and originals remain untouched (invariants 1, 2, 4, 14). Viewing and
+ * changing mappings do not write data (invariant 15).
  */
 
 const ERROR_KEYS = {
@@ -55,7 +59,7 @@ const REASON_KEYS = {
   tooLarge: 'importReason_tooLarge',
 } as const satisfies Record<SkippedGroup['code'], string>;
 
-/** 每列给看的样例：前三个有内容的格子。 */
+/** Sample for each column: first three cells with content. */
 const SAMPLES = 3;
 
 interface Loaded {
@@ -68,7 +72,7 @@ interface Settings {
   header: boolean;
   mapping: (string | null)[];
   orders: DateOrder[];
-  /** 这一列的日期两种读法都说得通（让用户选日在前还是月在前）。 */
+  /** Both date formats are plausible for this column (let user choose day-first or month-first). */
   ambiguous: boolean[];
 }
 
@@ -103,7 +107,7 @@ export default function ImportRecordsRoute() {
   const [plan, setPlan] = useState<ImportPlan | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
-  // 刚导入的那一批：之后在提示条上撤销了（或者在别处整批删了），这一页不能还写着「已导入」。
+  // The newly imported batch: after undoing in the prompt bar (or deleting the entire batch elsewhere), this page must no longer show "Imported".
   const [batchId, setBatchId] = useState<string | null>(null);
   const [undone, setUndone] = useState(false);
   const version = useWorkspace((s) => (table ? tableVersion(s, table) : ''));
@@ -144,7 +148,7 @@ export default function ImportRecordsRoute() {
       setLoaded({ fileName: picked.name, sheets: read.sheets });
       setSettings(settingsFor(collection!, read.sheets[0]!.rows, 0, true));
     } finally {
-      // 选择器放在 App 缓存里的副本：读完就删（成功、读不了都删）；原件和 content:// 不动（底线 4）。
+      // Copies placed in app cache: delete immediately after reading (whether successful or unreadable); originals and content:// URIs are left untouched (invariant 4).
       await files.removePickedCopies([picked.uri]).catch(() => undefined);
       setBusy(false);
     }
@@ -155,7 +159,7 @@ export default function ImportRecordsRoute() {
     setSettings(settingsFor(collection, loaded!.sheets[sheet]!.rows, sheet, header));
 
   function setField(col: number, fieldId: string | null) {
-    // 一个字段只放一列：选了别的列已经用的字段，那一列改成跳过。
+    // Only one column per field: if selecting a field already used by another column, change that other column to skip.
     const mapping = settings!.mapping.map((f, i) =>
       i === col ? fieldId : f === fieldId && fieldId !== null ? null : f,
     );
@@ -185,13 +189,13 @@ export default function ImportRecordsRoute() {
     if (!plan || !loaded) return;
     setBusy(true);
     try {
-      // 刚才看汇总到现在，别处可能又加了记录：再查一次上限。
+      // Between previewing the summary and now, records might have been added elsewhere: re-check the limit.
       const existing =
         (await repo.countRecords()).find((c) => c.collectionId === collection!.id)?.count ?? 0;
       if (importLimitProblem(plan.rows, plan.entries.length, existing)) return void review();
       const now = Date.now();
       const id = newAssetId();
-      // 按文件里的顺序：每条晚一毫秒，按新建时间排时和文件一样。
+      // In file order: each entry delayed by one millisecond, ensuring creation timestamps match the file order.
       await repo.importRecords(
         { id, collectionId: collection!.id, fileName: loaded.fileName, createdAt: now },
         plan.entries.map((e, i) => ({
@@ -412,7 +416,7 @@ export default function ImportRecordsRoute() {
   );
 }
 
-/** 一个样例格子：对到字段时显示读成的值（日期按这一列的顺序），读不出来时直说；没对上时显示原样。 */
+/** A sample cell: displays the parsed value when matched to a field (dates formatted according to column order), states clearly when parsing fails, and shows raw text when unmatched. */
 function sample(
   cell: SheetCell,
   field: Collection['fields'][number] | undefined,

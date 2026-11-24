@@ -26,8 +26,9 @@ import { focusPage, type Kernel } from './kernel';
 import type { SessionStore } from './session';
 import type { Proposal, ProposeResult, WorkspaceState } from './types';
 
-// 版本：预览 → 确认 → 原子保存 → 重新读取并渲染 → 渲染成功才算成功，失败自动回退（§4、§7D）；
-// 撤销、恢复历史版本、启动时沿历史找最后一个能用的版本。
+// Revisions: Preview -> Confirm -> Atomic save -> Re-read and render -> Success only when rendering
+// succeeds, automatic fallback on failure (§4, §7D); undo, restore historical version, traverse
+// history for the last usable version on startup.
 
 export function createRevisions(
   k: Kernel,
@@ -54,8 +55,9 @@ export function createRevisions(
   }
 
   /**
-   * 计划里的操作加上（勾选时）首页入口，算出预览要显示的内容。
-   * 首页入口加不进去（例如操作数到了上限）时当作不勾选。
+   * Operations in the plan plus home entry (when checked) compute the content to be displayed in
+   * the preview. When the home entry cannot be added (e.g., operation count reached the limit),
+   * treat as unchecked.
    */
   function withHomeEntry(
     before: WorkspaceConfig,
@@ -114,7 +116,7 @@ export function createRevisions(
       return { kind: 'invalid', issues: prepared.issues };
     }
     const parsed = ops as Op[];
-    // AI 新建的工作流不在任何页面上时，由用户决定要不要放到首页（D-109）。
+    // When an AI-created workflow is not on any page, the user decides whether to place it on the home screen (D-109).
     const homeless = source === 'ai' ? workflowsWithoutEntry(parsed, prepared.after, registry) : [];
     return recordPreview(input, ops, head, {
       kind: 'ops',
@@ -134,8 +136,9 @@ export function createRevisions(
   }
 
   /**
-   * 这份配置用到了本机没有的下载工具（换了手机、删了下载的内容）：先下载才能恢复（D-177），返回提示。
-   * 旧版本（schemaVersion < 34）先升级，再看 packages。
+   * This configuration uses downloadable tools not present locally (device switched, downloaded
+   * content deleted): must download first before restoring (D-177), returns prompt. Older
+   * versions (schemaVersion < 34) upgrade first, then check packages.
    */
   function missingTools(raw: unknown): string | null {
     const migrated = migrateWorkspace(raw);
@@ -148,7 +151,7 @@ export function createRevisions(
     return msg('restoreNeedsTool', { names });
   }
 
-  /** 换成一个保存的预设（D-410）：和恢复历史版本同一个流程，先预览，确认后生成新版本，能撤销。 */
+  /** Switch to a saved preset (D-410): Same workflow as restoring a historical version, preview first, generate new version upon confirmation, undoable. */
   async function presetProposal(
     presetId: string,
     options?: { keepFiles?: boolean },
@@ -186,8 +189,9 @@ export function createRevisions(
       });
       return { kind: 'invalid', issues: prepared.issues };
     }
-    // 整套设置从别的 AI App 交回来：文件引用在发出去时清掉了，用户自己选的文件放回同一个位置（底线 3 不变）。
-    // 从预设列表换预设照旧清空（D-410）。
+    // When the full setup is handed back from another AI app: file references were cleared upon
+    // export, and the user's selected files are restored to their original positions (invariant 3
+    // unchanged). Clearing preset lists upon switching works as usual (D-410).
     const after = keepFiles ? keepChosenFiles(config, prepared.after) : prepared.after;
     return recordPreview(input, plan, head, {
       kind: 'restore',
@@ -233,10 +237,10 @@ export function createRevisions(
     });
   }
 
-  /** 启动：读取当前版本，坏了就沿历史找最后一个能用的。 */
+  /** Startup: Read current version, traverse history for the last usable one if broken. */
   async function bootHead() {
     try {
-      // 软删除超过保留期的记录在启动时永久清除（D-037）。
+      // Soft-deleted records exceeding the retention period are permanently purged on startup (D-037).
       await repo.purgeDeletedRecords(
         deps.now().getTime() - RECORD_LIMITS.deletedRetentionDays * 24 * 60 * 60 * 1000,
       );
@@ -251,7 +255,7 @@ export function createRevisions(
         await reload();
         return;
       }
-      // 启动时沿历史向前寻找最后一个有效版本，保证不白屏（§4、§7E）。
+      // Traverse forward through history on startup to find the last valid version, ensuring no white screen (§4, §7E).
       for (
         let r: RevisionRecord | null = head;
         r;
@@ -300,7 +304,7 @@ export function createRevisions(
           onProgress: (step) => set({ planProgress: step }),
           ...(about ? { about } : {}),
         });
-        // 模型输出一律视为不可信数据（§8）。
+        // Model output is always treated as untrusted data (§8).
         const parsed = PlanSchema.safeParse(raw);
         if (!parsed.success) {
           await repo.createChangeRequest({
@@ -328,14 +332,14 @@ export function createRevisions(
             reason: plan.reason,
           };
         }
-        // 这里只有新手引导：句子都是一句话的小改，不走搭建计划（规则 53）。
+        // Only onboarding tutorial here: sentences are single-sentence minor modifications, not going through build plans (Rule 53).
         if (plan.kind === 'build') return { kind: 'invalid', issues: [msg('buildFailedInvalid')] };
         if (plan.kind === 'restorePrevious') {
           if (head.parentId === null)
             return { kind: 'rejected', message: msg('noPrevious'), examples: [] };
           return await restoreProposal(head.parentId, input);
         }
-        // 给分享进来的文件做的快捷操作在收件页面运行，首页入口默认不勾（D-124）。
+        // Quick actions made for shared files run on the inbox page, home entry unchecked by default (D-124).
         const shaped =
           about?.kind === 'shared' || about?.kind === 'chain'
             ? { ...plan, homeEntry: plan.homeEntry ?? false }
@@ -390,7 +394,7 @@ export function createRevisions(
           ...(options?.quiet ? { quiet: true } : {}),
         };
         set({ proposal: null });
-        // 被移除的工具失去文件授权；文件本身保留（§7G）。
+        // Removed tools lose file authorization; files themselves are retained (§7G).
         const remaining = new Set(proposal.after.packages.map((t) => t.id));
         for (const tool of proposal.before.packages) {
           if (!remaining.has(tool.id)) await repo.revokeToolGrants(tool.id);
@@ -426,15 +430,15 @@ export function createRevisions(
     async undo() {
       const undoTo = get().banner?.undoTo;
       if (undoTo === undefined) return;
-      // 先收起提示条：连点两下不会撤销两次（第二次会撞上版本冲突）。
+      // Dismiss banner first: double-tapping will not undo twice (the second would hit a version conflict).
       set({ banner: null });
       const result = await restoreProposal(undoTo, msg('undoSummary'));
-      // 没撤销成（例如要用的工具不在了）：要说，不能悄悄消失。改动记录里还能回去。
+      // Failed to undo (e.g., required tool no longer exists): must report, cannot disappear quietly. Can still return via change history.
       if (result.kind !== 'preview') {
         set({ banner: { kind: 'conflict', message: msg('undoFailed') } });
         return;
       }
-      // 撤销了那次功能修改，剩下的那句也就接不上了。
+      // Undoing that feature modification means the remaining sentence can no longer be connected.
       await get().clearNext();
       await get().clearSuggest();
       set({ proposal: { ...result.proposal, summary: msg('undoSummary') } });
@@ -475,8 +479,11 @@ export function createRevisions(
         set({ status: 'error', error: String(error) });
         return;
       }
-      // 回退目标：最后一次成功渲染的配置。现在的配置已经正常显示过时，出错的不是它（例如代码出错）：
-      // 不回退、不换成默认工作空间（2026-11-06 模拟器上一次这样的错误把用户的 App 清空了）；连续出错超过两次照旧停在出错页。
+      // Rollback target: configuration of the last successful render. The current configuration has
+      // already displayed normally before, so the error is not in it (e.g., code error): do not
+      // rollback, do not switch to default workspace (on 2026-11-06, such an error on the simulator
+      // wiped out the user's app); consecutive errors exceeding twice still stop at the error page
+      // as usual.
       const sameAsFailed =
         k.render.lastRendered && JSON.stringify(k.render.lastRendered) === JSON.stringify(config);
       if (sameAsFailed) {
@@ -487,7 +494,7 @@ export function createRevisions(
         k.render.lastRendered && !sameAsFailed
           ? k.render.lastRendered
           : createDefaultWorkspace(locale);
-      // 给用户看的说明不带报错原文；原文记在修改请求的 error 里。
+      // Descriptions shown to the user do not include raw error text; raw text is recorded in the change request's error.
       await commitFallback(fallback, 'rollback', msg('rolledBack'));
       if (failed) {
         await repo.updateChangeRequest(failed.changeRequestId, {

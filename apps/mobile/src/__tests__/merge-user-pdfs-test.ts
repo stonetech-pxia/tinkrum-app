@@ -5,8 +5,9 @@ import type { AssetRecord } from '../storage/types';
 import { mergeUserPdfs } from '../storage/user-files';
 import { FakeFiles, makePdf } from '../test-utils/fake-files';
 
-// R04：全部文件页面的「合并」要把选中的 PDF 整份读进内存（pdf-lib），和快捷操作一样先按
-// 单个 50 MB、合计 100 MB 的上限检查（P-006），超限在读文件之前就拒绝；原文件、已存的副本都不动。
+// R04: "Merge" on all files page must read selected PDFs entirely into memory (pdf-lib), checking
+// single 50 MB and total 100 MB limits first just like quick actions (P-006), rejecting before
+// reading files if limits are exceeded; original files and saved copies remain untouched.
 
 const MB = 1024 * 1024;
 
@@ -36,8 +37,8 @@ async function setup(sizes: number[]) {
   return { repo, files, assets, read, merge };
 }
 
-describe('文档库合并 PDF 的大小检查', () => {
-  it('正常的两个 PDF 合成一个新文件，原来的都还在', async () => {
+describe('Size check for merging PDFs in document library', () => {
+  it('Two normal PDFs merged into a new file, originals remain', async () => {
     const { repo, assets, merge } = await setup([100_000, 120_000]);
     const out = await merge();
     expect(out.name).toBe('merged.pdf');
@@ -45,7 +46,7 @@ describe('文档库合并 PDF 的大小检查', () => {
     expect(names).toEqual([...assets.map((a) => a.name), 'merged.pdf'].sort());
   });
 
-  it('单个文件超过 100 MB（PDF，D-601）：读文件之前就拒绝，什么都不写', async () => {
+  it('Single file exceeds 100 MB (PDF, D-601): rejected before reading file, nothing written', async () => {
     const { repo, read, merge } = await setup([100_000, 101 * MB]);
     await expect(merge()).rejects.toMatchObject({ code: 'tooLarge' });
     await expect(merge()).rejects.toBeInstanceOf(RunError);
@@ -53,14 +54,14 @@ describe('文档库合并 PDF 的大小检查', () => {
     expect(await repo.listAssets()).toHaveLength(2);
   });
 
-  it('每个都不超过 100 MB、合计超过 200 MB：读文件之前就拒绝', async () => {
+  it('Each under 100 MB, total exceeds 200 MB: rejected before reading files', async () => {
     const { repo, read, merge } = await setup([70 * MB, 70 * MB, 70 * MB]);
     await expect(merge()).rejects.toMatchObject({ code: 'tooLargeTotal' });
     expect(read).not.toHaveBeenCalled();
     expect(await repo.listAssets()).toHaveLength(3);
   });
 
-  it('刚好 50 MB 一个、合计不超过 100 MB 的不拦', async () => {
+  it('Exactly 50 MB each, total not exceeding 100 MB not blocked', async () => {
     const { read, merge } = await setup([50 * MB, 50 * MB]);
     await merge();
     expect(read).toHaveBeenCalledTimes(2);

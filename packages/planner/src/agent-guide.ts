@@ -16,12 +16,17 @@ import { z } from 'zod';
 import type { AgentPattern } from './agent-patterns';
 import { buildSystemPrompt } from './prompt';
 
-// 给别的 AI（Claude、ChatGPT……）看的 App 文件写法（D-593）：用户请它们生成一个 tinkrum-app 文件，再从「我的预设」
-// 导入。前面是 App 文件自己的规矩（手写），后面的参考从 Tink 的提示词按「## 」标题切出来，外观、字段、动作、风格
-// 和 Tink 用的是同一份，登记表一改两边一起变。快照测试把它写进 docs/agent/（vitest -u 更新）。
+// App file writing instructions for other AIs (D-593): users ask them to generate a tinkrum-app
+// file, then import from "My Presets". The first part is the App file's own rules (hand-written),
+// and subsequent references are sliced from Tink's prompts by "## " headings. Looks, fields,
+// actions, styles, and themes share the same definitions with Tink, so changing the registry
+// updates both sides simultaneously. Snapshot tests write this into docs/agent/ (updated with
+// vitest -u).
 
 /**
- * 提示词里的这几段放进参考（标题原样）。动作目录和快捷操作预设另放一个文件，要做快捷操作时才读（D-598）。
+ * These sections from the prompt are placed into references (headings unchanged). Action catalogs
+ * and quick action presets are in a separate file, read only when performing quick actions
+ * (D-598).
  */
 const SECTIONS = [
   'Data · containers · tools',
@@ -36,18 +41,21 @@ const SECTIONS = [
 ] as const;
 
 /**
- * Tink 的 Rules 里讲「App 能做什么、怎么写」的几条（D-604）：汇总、日程、行上的按钮、显示格式、days()、also……
- * 短版指南（D-598）把 Rules 整段去掉以后，别的 AI 不知道这些写法，能做的也做不出来，所以放进单独的规则文件。
- * 只讲 Tink 对话、草稿和整台手机（桌面、文件工作台、图片背景、风格用词）的不放。
+ * Tink's Rules regarding "what the App can do and how to write it" (D-604): aggregation,
+ * schedules, row buttons, display formats, days(), also... Since the short guide (D-598) removed
+ * the Rules section entirely, other AIs lack knowledge of these patterns and cannot implement
+ * them, hence placing them in a separate rule file. Rules specifically about Tink conversation,
+ * drafts, and the entire phone (home screen, workspace files, image backgrounds, style
+ * terminology) are omitted.
  */
 const FEATURE_RULES: ReadonlySet<number> = new Set([
   10, 13, 32, 33, 34, 35, 38, 40, 42, 43, 44, 45, 46, 47, 48, 49, 50, 55, 56, 58, 59, 60, 61, 62,
   63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 77, 78, 79,
 ]);
-/** 讲快捷操作的几条：放进动作目录。 */
+/** Quick action rules: placed in the action catalog. */
 const QUICK_ACTION_RULES: ReadonlySet<number> = new Set([15, 20, 21, 22, 28, 29, 30, 31, 54]);
 
-/** Rules 里挑出这几条（一条从「N. 」开头，到下一条之前）。 */
+/** Pick these rules from Rules (starting from "N. " up to the next rule). */
 function pickRules(rules: string, wanted: ReadonlySet<number>): string {
   const out: string[] = [];
   let keep = false;
@@ -71,7 +79,7 @@ function promptSections(registry: Registry): Map<string, string> {
   return map;
 }
 
-/** Output 一段只留对象的类型（Block、Page、Table…），Plan 和 Op 是 Tink 回话的格式。 */
+/** Output section retains only object types (Block, Page, Table...), while Plan and Op are Tink response formats. */
 function objectTypes(output: string): string {
   const from = output.indexOf('type Target');
   const to = output.indexOf('type Plan =');
@@ -80,14 +88,17 @@ function objectTypes(output: string): string {
 }
 
 const CJK = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/;
-/** 引号里的一段：英文引号、弯引号、直角引号（直角引号可能在英文引号里面，所以最后处理）。 */
+/** Quoted string segment: English quotes, curly quotes, corner brackets (corner brackets may appear inside English quotes, so they are processed last). */
 const QUOTED = String.raw`(?:"[^"\n]*"|“[^”\n]*”|「[^」\n]*」)`;
 const SEP = String.raw`(?:\s*,\s*|\s*\/\s*|\s+or\s+)`;
 
 /**
- * Tink 的提示词里有中文和法语的示例句和名字（用户会这样说），给别的 AI 的说明只要英文（创始人 2026-11-19）：
- * 带中文的引号段连同旁边的分隔符一起去掉（"打开相册" / "Open photo library" → "Open photo library"），
- * 「中文 → 例子」整对去掉，只有中文的括注去掉；去不掉的几处在 ENGLISH 里改写。测试保证结果里没有中文。
+ * Tink's prompts contain Chinese and French example sentences and names (as users would say
+ * them), but documentation for other AIs should be English only (Founder 2026-11-19): remove
+ * quoted segments with Chinese along with adjacent separators ("Open photo library" -> "Open
+ * photo library"), remove entire "Chinese → example" pairs, and remove Chinese-only parenthetical
+ * notes; rewrite any unremovable instances in ENGLISH. Tests ensure no Chinese remains in the
+ * output.
  */
 function englishOnly(text: string): string {
   const other = (m: string) => CJK.test(m) || frenchQuote(m);
@@ -95,23 +106,23 @@ function englishOnly(text: string): string {
   for (const { from, to } of ENGLISH) out = out.split(from).join(to);
   return (
     out
-      // "合并-日期" → "合并-{date}", 这样的一整对
+      // "Merge-date" → "Merge-{date}", such whole pairs
       .replace(new RegExp(`${QUOTED}\\s*→\\s*${QUOTED}(?:,\\s*)?`, 'g'), (m) =>
         other(m.slice(0, m.indexOf('→'))) ? '' : m,
       )
       .replace(new RegExp(`${SEP}${QUOTED}`, 'g'), (m) => (other(m) ? '' : m))
       .replace(new RegExp(`${QUOTED}${SEP}`, 'g'), (m) => (other(m) ? '' : m))
       .replace(new RegExp(QUOTED, 'g'), (m) => (other(m) ? '' : m))
-      // (快捷操作) 这样只有中文的括注
+      // (Quick action) such Chinese-only parenthetical notes
       .replace(/\s*\([^()\n]*\)/g, (m) => (CJK.test(m) && !/[A-Za-z]/.test(m) ? '' : m))
-      // 例子全去掉后剩下的空括号；if()、days() 这样紧跟在名字后面的不动
+      // Empty parentheses left after removing all examples; keep if() or days() tightly following names
       .replace(/ \(\s*\)/g, '')
       .replace(/\(\s*,\s*/g, '(')
       .replace(/\s*,\s*\)/g, ')')
   );
 }
 
-/** 法语的例句（"rappelle-moi …"、"jours"）：有法语字母，或者有常见的法语词。"de" 这样的语言代码太短，不算。 */
+/** French example sentences ("rappelle-moi ...", "jours"): contain French letters or common French words. Language codes like "de" are too short and not counted. */
 function frenchQuote(m: string): boolean {
   const inner = m.replace(/^["“「]|["”」]$/g, '');
   return (
@@ -122,8 +133,8 @@ function frenchQuote(m: string): boolean {
   );
 }
 
-/** 规则去不掉的地方：整句改写成英文。 */
-// 不是界面文案（不进文案表）：写成 {from, to}，免得被当成要补法语的名称对。
+/** Where rules cannot be removed: rewrite the entire sentence into English. */
+// Not interface copy (excluded from message tables): written as {from, to} to avoid being treated as French naming pairs to supplement.
 const ENGLISH: readonly { from: string; to: string }[] = [
   {
     from: 'banner image, cover, 图片, 照片, 头图, 封面, 横幅图片 or 配图, ',
@@ -155,15 +166,15 @@ const ENGLISH: readonly { from: string; to: string }[] = [
   },
 ];
 
-/** 网站上的检查页和给 AI 自检用的脚本（D-594）。 */
+/** Check page on website and self-check script for AI (D-594). */
 const MAKE_PAGE_URL = `${SITE_URL}/make`;
 const CHECK_SCRIPT_URL = `${SITE_URL}/assets/agent/tinkrum-check.js`;
-/** 动作目录（D-598）：快捷操作的步骤能用哪些动作、内置的快捷操作预设。 */
+/** Action catalog (D-598): available actions for quick action steps and built-in quick action presets. */
 const ACTIONS_FILE = 'tinkrum-app-actions.md';
 const ACTIONS_URL = `${SITE_URL}/assets/agent/${ACTIONS_FILE}`;
-/** 结构模式（D-603）：网上模板库里常见的 8 种结构（D-616 加了第 9 种），各一份完整的 App 文件。 */
+/** Structural patterns (D-603): 8 common structures in the online template library (9th added in D-616), each with a complete App file. */
 const PATTERNS_FILE = 'tinkrum-app-patterns.md';
-/** 功能规则（D-604）：Tink 的 Rules 里讲 App 能做什么的几条。 */
+/** Feature rules (D-604): several rules from Tink's Rules regarding what Apps can do. */
 const RULES_FILE = 'tinkrum-app-rules.md';
 const RULES_URL = `${SITE_URL}/assets/agent/${RULES_FILE}`;
 const PATTERNS_URL = `${SITE_URL}/assets/agent/${PATTERNS_FILE}`;
@@ -174,8 +185,8 @@ const requiredThemeKeys = () =>
     .map(([k]) => k);
 
 /**
- * App 文件的 JSON Schema。字符串的目标（page:<id>、tool:<id>、ai…）在代码里是 z.custom，JSON Schema 表达不了，
- * 写一句说明代替。
+ * JSON Schema for App files. String targets (page:<id>, tool:<id>, ai...) use z.custom in code
+ * which JSON Schema cannot express, replaced with descriptive text.
  */
 export function appFileJsonSchema(): object {
   return z.toJSONSchema(AppFileSchema, {
@@ -189,7 +200,7 @@ export function appFileJsonSchema(): object {
   });
 }
 
-/** 写给别的 AI 的说明（Markdown，英文）。example 是一份能导入的 App 文件全文。 */
+/** Instructions for other AIs (Markdown, English). example is the full text of an importable App file. */
 export function buildAgentGuide(registry: Registry, example: string): string {
   const s = promptSections(registry);
   const v = CURRENT_SCHEMA_VERSION;
@@ -315,8 +326,10 @@ ${objectTypes(s.get('Output')!)}
 }
 
 /**
- * 功能规则（D-604）：Tink 的 Rules 里讲 App 能做什么、怎么写的那几条，另放一个文件，要用时才读。补进主指南测下来
- * 没有好处（有结构模式时设计建议持平，主指南长了七成），资料又不能没有。
+ * Feature rules (D-604): rules from Tink's Rules on what Apps can do and how to write them,
+ * placed in a separate file, read only when needed. Testing showed no benefit in appending them
+ * to the main guide (design suggestions tied when patterns were present, but main guide
+ * lengthened by 70%), while documentation must still be available.
  */
 export function buildRulesDoc(registry: Registry): string {
   const s = promptSections(registry);
@@ -333,7 +346,7 @@ ${pickRules(s.get('Rules')!, FEATURE_RULES)}
 `);
 }
 
-/** 结构模式（D-603）：每种一段说明和一份完整的 App 文件，从 agent-patterns.ts 生成。 */
+/** Structural patterns (D-603): each has a description section and a complete App file, generated from agent-patterns.ts. */
 export function buildPatternsDoc(patterns: readonly AgentPattern[]): string {
   const parts = patterns.map(
     (p, i) => `## ${i + 1}. ${p.name}
@@ -365,7 +378,7 @@ How to use them:
 ${parts.join('\n')}`;
 }
 
-/** 动作目录（D-598）：快捷操作的步骤能用的动作和内置预设，从 Tink 的提示词切出来，和指南分开放。 */
+/** Action catalog (D-598): actions usable in quick action steps and built-in presets, sliced from Tink's prompt and separated from the guide. */
 export function buildActionCatalog(registry: Registry): string {
   const s = promptSections(registry);
   return englishOnly(`<!-- Generated by packages/planner/src/agent-guide.ts (npx vitest -u in packages/planner). Do not edit by hand. -->

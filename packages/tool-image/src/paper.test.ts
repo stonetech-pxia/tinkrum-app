@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { pickPaper, type GrayImage } from './paper';
 import { defaultQuad, type Quad } from './quad';
 
-// 合成的灰度图（照片的 1/10），从创始人 2026-10-29 真机测试的 20 张照片里抽出来的几种情形。
+// Synthetic grayscale image (1/10th of photo size), extracted from several scenarios in the founder's 2026-10-29 real-device tests.
 const K = 10;
 const W = 300;
 const H = 400;
@@ -21,13 +21,13 @@ function rect(img: GrayImage, x0: number, y0: number, x1: number, y1: number, v:
   for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) img.data[y * W + x] = v;
 }
 
-/** 一行行的字：短横线。 */
+/** Lines of text: short horizontal strokes. */
 function text(img: GrayImage, x0: number, y0: number, x1: number, y1: number) {
   for (let y = y0; y < y1; y += 9)
     for (let x = x0; x < x1; x += 7) rect(img, x, y, x + 4, y + 2, INK);
 }
 
-/** 带格子的表格框（线宽 2）。 */
+/** Grid table frame (line width 2). */
 function table(img: GrayImage, x0: number, y0: number, x1: number, y1: number) {
   for (const x of [x0, (x0 + x1) >> 1, x1 - 2]) rect(img, x, y0, x + 2, y1, INK);
   for (let y = y0; y < y1; y += 25) rect(img, x0, y, x1, y + 2, INK);
@@ -35,7 +35,7 @@ function table(img: GrayImage, x0: number, y0: number, x1: number, y1: number) {
   text(img, x0 + 6, y0 + 8, x1 - 6, y1 - 6);
 }
 
-/** 照片上的一个框（坐标是灰度图的，换算回原图）。 */
+/** A bounding box on the photo (coordinates are in grayscale image space, converted back to the original image). */
 function quadOf(x0: number, y0: number, x1: number, y1: number): Quad {
   return {
     tl: { x: x0 * K, y: y0 * K },
@@ -49,14 +49,14 @@ const whole = defaultQuad(size, 0);
 
 describe('pickPaper', () => {
   it('does not take a big table on a page that fills the photo for the paper', () => {
-    // 物业账单：纸占满画面，上面是字，中间一张大表格；找到的只有表格外框。
+    // Utility bill: paper fills the screen, text on top, large table in the middle; only the outer table frame is found.
     const img = canvas(PAPER);
     text(img, 20, 15, 280, 120);
     table(img, 25, 135, 275, 345);
     text(img, 20, 355, 280, 390);
     const frame = quadOf(25, 135, 275, 345);
     expect(pickPaper([frame], size, img)).toEqual(whole);
-    // 亮区域找到了贴着照片边缘的纸：用它。
+    // Found bright region of paper adhering to the photo edge: use it.
     const page = quadOf(1, 1, 299, 399);
     expect(pickPaper([frame, page], size, img)).toEqual(page);
   });
@@ -80,7 +80,7 @@ describe('pickPaper', () => {
   });
 
   it('keeps a sheet that runs off two edges of the photo', () => {
-    // 书页：上边和左边出了画面，右边和下边是深色桌面。
+    // Book page: top and left extend out of frame, right and bottom are dark desk background.
     const img = canvas(DESK);
     rect(img, 0, 0, 270, 370, PAPER);
     text(img, 15, 15, 255, 355);

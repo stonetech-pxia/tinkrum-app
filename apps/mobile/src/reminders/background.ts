@@ -9,16 +9,21 @@ import { expoReminders, reminderActionOf, setupReminderButtons } from './expo-re
 import type { ReminderAction } from './platform';
 import { runReminderAction, type ReminderActionResult } from './reminder-actions';
 
-// 提醒通知上的按钮（D-318）在 App 没开着时也要能用。这个文件在入口（index.ts）最先加载，界面还没起来就
-// 开始听按钮：
-// - iOS：按钮不打开 App，系统在后台拉起或唤醒 App，点击交给这里的监听；morph-background 一收到按钮就先
-//   要一段后台时间，处理完再还（releaseActionTime），否则写完之前 App 可能就被挂起。
-// - Android：App 在后台或没在运行时，expo-notifications 用 expo-task-manager 跑下面的后台任务（没在运行
-//   时在无界面的 JS 里跑）；App 开着时走监听。两条路可能都送到，handleReminderAction 按点击去重。
+// Reminder notification buttons (D-318) must work even when the App is not open. This file is
+// loaded first at the entry point (index.ts) to start listening for button clicks before the UI
+// mounts:
+// - iOS: buttons do not open the App; the system launches or wakes up the App in the background,
+// routing clicks to this listener; morph-background requests background time upon receiving a
+// button, processes it, and releases it (releaseActionTime), otherwise the App might be suspended
+// before writes complete.
+// - Android: when the App is in the background or not running, expo-notifications runs the
+// background task below via expo-task-manager (running in headless JS when stopped); when the App
+// is open, it goes through the event listener. Both paths may deliver events; handleReminderAction
+// deduplicates by click.
 
 const locale = getDeviceLocale();
 
-/** 提醒（D-251）的本地通知。频道名跟随界面语言。 */
+/** Local notifications for reminders (D-251). Channel name follows the interface language. */
 export const reminders = expoReminders(t(locale, 'remindersTitle'));
 
 const TASK = 'morph-reminder-buttons';
@@ -26,13 +31,13 @@ const TASK = 'morph-reminder-buttons';
 type Listener = (result: ReminderActionResult) => void;
 const listeners = new Set<Listener>();
 
-/** 界面开着时：按钮写了记录要刷新、提示一下（_layout 订阅）。 */
+/** When the UI is open: button actions write records to be refreshed and show a toast (_layout subscribes). */
 export function onReminderAction(listener: Listener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
-/** 正在处理的点击：都处理完了才还后台时间。 */
+/** Clicks currently being processed: background time is released only after all are finished. */
 let busy = 0;
 const release = () => {
   if (busy === 0) MorphBackground?.releaseActionTime();
@@ -42,7 +47,7 @@ async function run(action: ReminderAction) {
   busy++;
   try {
     const repo = await openRepo();
-    // 没做成时 runReminderAction 自己弹通知告诉用户，不会无声无息（体检 2.5）。
+    // If action fails, runReminderAction pops up a notification to inform the user rather than failing silently (Health Check 2.5).
     const result = await runReminderAction(action, {
       repo,
       platform: reminders,
@@ -63,7 +68,7 @@ defineTask<NotificationResponse>(TASK, async ({ data }) => {
 
 if (Platform.OS === 'android') registerTaskAsync(TASK).catch(() => undefined);
 setupReminderButtons(locale).catch(() => undefined);
-// App 在后台启动、却不是因为按钮（或点击已经处理完）：morph-background 先要的后台时间几秒后还掉。
+// App started in the background not due to a button (or clicks already processed): morph-background releases requested background time after a few seconds.
 setTimeout(release, 8000);
-// 打 release 包时 Expo 会在 web 上把路由先跑一遍，web 没有通知按钮，一听就抛错、打包失败。
+// When building release bundles, Expo runs routes on web first; web lacks notification buttons, causing listeners to throw and builds to fail.
 if (Platform.OS !== 'web') reminders.onAction((action) => void run(action).catch(() => undefined));

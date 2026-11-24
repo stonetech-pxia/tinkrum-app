@@ -1,4 +1,4 @@
-// text-flow 套件：段落、分栏和阅读顺序、标题、列表。
+// text-flow suite: paragraphs, columns and reading order, headings, lists.
 import {
   aligned,
   apart,
@@ -21,7 +21,7 @@ import {
 } from '../lib/checks';
 import type { Case } from '../lib/case';
 
-/** 原始 PDF 里的图留在它那一栏里、图注之前（不被挪到并排行外面、整页最后）。 */
+/** Figures in the original PDF remain in their respective column, preceding the caption (not moved outside side-by-side layouts to the very end of the page). */
 const figureInColumn = (caption: string) =>
   custom(`the figure stays in its column before ${JSON.stringify(caption)}`, (c) => {
     const ls = leaves(c.doc);
@@ -189,7 +189,7 @@ export const TEXT_FLOW: Case[] = [
     suite: 'text-flow',
     fix: 'cda9704a D-334',
     what: 'Scan with a smudge in the top-left margin that OCR reads as "00": the mark was written into the document; short real text such as "Ok" must stay.',
-    // 「00」本来就该丢掉，所以识别出的字少一个。
+    // "00" was supposed to be dropped, so recognized text has one fewer character.
     recall: 0.95,
     checks: [
       times('00', 0),
@@ -199,7 +199,7 @@ export const TEXT_FLOW: Case[] = [
           : 'missing',
       ),
       order('General Conditions', 'The tenant shall keep', 'Subletting is not permitted'),
-      // 两个短句各自成段：栏比这两行宽，「Inventory」放得下却换了行（5f61ae5e 起接成了一段）。
+      // Two short phrases form separate paragraphs: the column is wider than these two lines, and "Inventory" could fit but wrapped to a new line (joined into a single paragraph since 5f61ae5e).
       apart('Subletting is not permitted', 'Inventory checked'),
     ],
   },
@@ -234,7 +234,7 @@ export const TEXT_FLOW: Case[] = [
         const texts = leaves(c.doc).flatMap((l) =>
           l.leaf.kind === 'paragraph' ? [l.leaf.text.trim()] : [],
         );
-        // 只比字和符号的种类（识别会把「–」认成「—」、丢空格）：整段就是这一行，符号都还在。
+        // Compare only character and symbol types (recognition may misrecognize "–" as "—" or drop spaces): the entire paragraph is this single line, and all symbols are present.
         const key = (t: string) => t.replace(/\s+/g, '').replace(/[–—]/g, '-');
         const missing = want.filter((w) => !texts.some((t) => key(t) === key(w)));
         return missing.length ? `not a plain paragraph: ${missing.join(' | ')}` : null;
@@ -261,7 +261,7 @@ export const TEXT_FLOW: Case[] = [
       apart('12 rue des Tilleuls', '31000 Toulouse'),
       apart('Atelier Garance', 'Camille Rousseau'),
       apart('8 place du Marché', '69002 Lyon'),
-      // 正文照样折行接成一段。
+      // Body text continues wrapping and joins into a single paragraph as expected.
       together('mit dieser Rechnung erhalten Sie', 'an Ihren Verbrauch angepasst'),
       order('Frau', 'Erika Beispiel', 'Ahornweg 7', '04177 Leipzig'),
     ],
@@ -290,7 +290,7 @@ export const TEXT_FLOW: Case[] = [
     fix: 'faa5c6fd; EU sample 037',
     what: 'Agenda list 1–6 followed by the numbered headings "1. Délibérations" and "1. A l’unanimité": they were joined into the list and renumbered 7 and 8, which changes what the minutes say; a number that does not continue the list starts a new one.',
     lang: 'fra',
-    // Word 的自动编号不在正文里：九个编号数字算「丢了」。
+    // Word automatic numbering is not in the body text: nine numbering digits are counted as "missing".
     recall: 0.9,
     checks: [
       numbered('Ouverture de la séance', 1),
@@ -463,7 +463,7 @@ export const TEXT_FLOW: Case[] = [
     checks: [
       apart('DOMO', 'FLEXIBEL WERK'),
       order('DOMO', 'FLEXIBEL WERK', 'Omschrijving loonstrook'),
-      // 页眉是整页宽的深蓝色块时，找线估出的倾斜错成 −7°（取样排成斜格子），这张 9×3 的带线表散成小表、散段和无线的表。
+      // When the header is a full-page-width dark blue block, the tilt estimated by line detection is erroneously skewed by -7° (samples arranged in slanted grid cells), causing this 9x3 lined table to shatter into small tables, fragmented paragraphs, and unlined tables.
       table({
         rows: 9,
         cols: 3,

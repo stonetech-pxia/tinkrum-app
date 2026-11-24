@@ -5,11 +5,11 @@ import { findDatePhrase, withoutPhrase, type DatePhraseValue } from './date-phra
 import { dayNumber } from './formula';
 import { ScheduleRuleSchema } from './schedule';
 
-// 2026-10-30 是星期五。
+// 2026-10-30 is a Friday.
 const today = dayNumber('2026-10-30')!;
 const sundayWeek: Calendar = { ...DEFAULT_CALENDAR, weekStart: 'sunday' };
 
-/** 认出的那段原文和值。 */
+/** The matched substring in the original text and its value. */
 function find(text: string, cal?: Calendar): { said: string; value: DatePhraseValue } | undefined {
   const p = findDatePhrase(text, today, cal);
   return p && { said: text.slice(p.start, p.end), value: p.value };
@@ -36,7 +36,7 @@ it('pins today to a Friday', () => {
   expect(new Date(today * 86_400_000).getUTCDay()).toBe(5);
 });
 
-describe('中文日期', () => {
+describe('Chinese dates', () => {
   it.each([
     ['今天交报告', '今天', '2026-10-30'],
     ['明天交报告', '明天', '2026-10-31'],
@@ -77,7 +77,7 @@ describe('中文日期', () => {
   });
 });
 
-describe('中文时间', () => {
+describe('Chinese times', () => {
   it.each([
     ['3点开会', '3点', '03:00'],
     ['下午3点开会', '下午3点', '15:00'],
@@ -95,13 +95,13 @@ describe('中文时间', () => {
     ['十点开会', '十点', '10:00'],
   ])('%s', (text, said, t) => expect(find(text)).toEqual({ said, value: time(t) }));
 
-  it('25点 and 24:00 are not times', () => {
+  it('25 o\'clock and 24:00 are not times', () => {
     expect(find('25点')).toBeUndefined();
     expect(find('24:00')).toBeUndefined();
   });
 });
 
-describe('中文重复', () => {
+describe('Chinese recurrence', () => {
   it.each([
     ['每天背单词', '每天', { repeat: 'daily' }],
     ['每日打卡', '每日', { repeat: 'daily' }],
@@ -320,7 +320,7 @@ describe('week start and rollover', () => {
     expectDate('下周开会', '下周', '2026-11-01', undefined, sundayWeek);
     expectDate('Plan next week', 'next week', '2026-11-01', undefined, sundayWeek);
     expectDate('La semaine prochaine', 'La semaine prochaine', '2026-11-01', undefined, sundayWeek);
-    // 周日开头时「这周一」是 10-26，「下周一」是 11-02。
+    // When week starts on Sunday, "this Monday" is 10-26 and "next Monday" is 11-02.
     expectDate('这周一', '这周一', '2026-10-26', undefined, sundayWeek);
   });
 
@@ -366,7 +366,7 @@ describe('no match', () => {
     'Feb 30',
     '2026-02-30',
     'sundayschool notes',
-    // 「Monday.com」是产品名：点后面紧跟字母时算一个词，不认。
+    // "Monday.com" is a product name: punctuation immediately followed by a letter is treated as part of a word and not matched.
     'Monday.com invoice',
     'Wed a friend',
     'weekends are nice',

@@ -1,4 +1,4 @@
-// 直接测试两端共用的 C 算法；只在系统临时目录编译和运行生成的测试程序。
+// Directly test shared C algorithms for both platforms; compiles and runs generated test programs only in the system temporary directory.
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';

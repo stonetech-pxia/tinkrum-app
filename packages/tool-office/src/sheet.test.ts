@@ -14,7 +14,7 @@ import { fakeLine, glyphs, gridRects, renderPage, type Rect } from './test-helpe
 import type { ImageBlock, OcrBox, TableBlock, TableDoc, TablePage, TextBlock } from './types';
 import { DEFAULT_FONT_SIZE, layoutSheet, writeXlsx } from './xlsx';
 
-// 转 Excel 的四个缺的功能（D-520–D-523）：图片区域、表单不当网格、左右两栏、字号和粗体。
+// Four missing Excel conversion features (D-520-D-523): image regions, non-grid forms, two-column layout, and font size/boldness.
 
 const W = 1000;
 const H = 800;
@@ -27,7 +27,7 @@ const imageBlocks = (page: TablePage) =>
 const tableBlocks = (page: TablePage) =>
   page.blocks.filter((b): b is TableBlock => b.kind === 'table');
 
-/** 一排一排的字：每行 box（高 24）和文字。 */
+/** Lines of text: each with a box (height 24) and text string. */
 function lines(rows: { text: string; x: number; y: number; width?: number; height?: number }[]) {
   const ocr: OcrBox[] = [];
   const marks: Rect[] = [];
@@ -55,7 +55,7 @@ const build = (
   });
 
 describe('two text columns side by side (D-522)', () => {
-  // 左栏、右栏各四行，每行 40 像素一排；两栏之间空 200 像素。
+  // Left and right columns have four rows each, each row 40 pixels high; 200 pixels gap between the two columns.
   const rows = [0, 1, 2, 3].flatMap((i) => [
     { text: `left ${i}`, x: 100, y: 100 + 40 * i, width: 300 },
     { text: `right ${i}`, x: 600, y: 100 + 40 * i, width: 300 },
@@ -129,7 +129,7 @@ describe('figures (D-520)', () => {
     score: 0.8,
     box: { x: 100, y: 300, width: 400, height: 200 },
   };
-  // 图里有一个标注和一排像字的笔画，图外有一行字。
+  // The image contains a marker and a row of text-like strokes, with a line of text outside the image.
   const { ocr, marks } = lines([
     { text: 'Title', x: 100, y: 100, width: 200 },
     { text: 'legend', x: 300, y: 400, width: 100 },
@@ -157,7 +157,7 @@ describe('figures (D-520)', () => {
   });
 
   it('does not turn lines inside a figure into a table', () => {
-    // 图里画了一个格子（图表的网格）。
+    // A grid is drawn in the image (chart grid).
     const grid = gridRects([100, 250, 400], [320, 380, 440], { thickness: 2 });
     const page = build([...marks, ...grid], ocr, [figure]);
     expect(tableBlocks(page)).toHaveLength(0);
@@ -225,11 +225,11 @@ describe('figures (D-520)', () => {
 });
 
 describe('a form is not one big grid (D-520)', () => {
-  // 三个全宽的框（每个框里标签一行、值一行），下面一张两行三列的表，竖线都是 100、400、900。
+  // Three full-width boxes (each with a label row and a value row), followed by a two-row, three-column table below; the vertical lines are at 100, 400, and 900.
   const xs = [100, 400, 900];
   const rects: Rect[] = [];
   const rows: { text: string; x: number; y: number; width?: number }[] = [];
-  // 框的左右边是一条连着的竖线（扫描的表单里框和下面的表格连成一张网格）。
+  // The left and right edges of the boxes form a continuous vertical line (in the scanned form, the boxes and the table below merge into a single grid).
   const top = 60 + 4 * 110;
   const ys = [0, 1, 2, 3]
     .flatMap((i) => [60 + i * 110, 60 + i * 110 + 90])
@@ -287,7 +287,7 @@ describe('a form is not one big grid (D-520)', () => {
 });
 
 describe('font sizes and bold (D-521)', () => {
-  // 标题的字高 48、正文 24；正文的笔画细（宽 2）、小标题的笔画粗（宽 6）。
+  // Heading font size is 48, body is 24; body strokes are thin (width 2), subheading strokes are thick (width 6).
   const heading = (text: string, y: number, h: number, stroke: number, width: number): Rect[] => {
     const out: Rect[] = [];
     for (let s = 0; s + stroke <= width; s += stroke * 3) {
@@ -340,7 +340,7 @@ describe('font sizes and bold (D-521)', () => {
   });
 
   it('bolds a table row as a whole, not a stray cell (D-521)', () => {
-    // 带线的表 3 行 3 列：表头两格笔画粗、一格细（认得不准）；第二行只有一个数字笔画粗（噪声）；第三行都细。
+    // Lined table with 3 rows and 3 columns: two header cells have thick strokes, one cell has a thin stroke (recognition inaccurate); the second row has only a single digit with a thick stroke (noise); the third row is all thin.
     const xs = [100, 350, 600, 850];
     const ys = [100, 160, 220, 280];
     const strokes = (x: number, y: number, stroke: number): Rect[] => {
@@ -493,7 +493,7 @@ describe('editing a sheet with column-ranged text and images', () => {
     const inside = insertColumn(doc, 0, 1).pages[0]!;
     expect(inside.blocks[0]).toMatchObject({ col: 0, cols: 3 });
     expect(inside.blocks[1]).toMatchObject({ col: 3, cols: 2 });
-    // 没有列范围的文字横跨整页，不用改。
+    // Text without a column range spans the entire page and does not need to be changed.
     expect((next.blocks[2] as TextBlock).col).toBeUndefined();
   });
 

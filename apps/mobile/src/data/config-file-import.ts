@@ -3,10 +3,11 @@ import { MAX_APP_CONFIG_SIZE, type AppConfigFileProblem, type Locale } from '@mo
 import { t } from '@/i18n';
 import type { FilePlatform } from '../runtime/platform';
 
-// 「我的预设 → 从文件导入」（D-485）用：选一个 JSON 文件、读成文字、把读不了的原因翻成人话。
-// 全程在本机，不联网，文件内容不发给 AI（底线 1、2）。
+// Used by "My presets -> Import from file" (D-485): selects a JSON file, reads text, and translates
+// unreadability reasons into plain language. Entirely on-device, offline, file contents never sent
+// to AI (invariants 1, 2).
 
-/** 读不了这个文件的原因，用户看得懂的话。 */
+/** Reason why this file cannot be read, in user-friendly terms. */
 export function configFileProblemText(locale: Locale, problem: AppConfigFileProblem): string {
   switch (problem) {
     case 'tooLarge':
@@ -21,15 +22,16 @@ export function configFileProblemText(locale: Locale, problem: AppConfigFileProb
 }
 
 export type PickedConfigText =
-  /** 用户没选。 */
+  /** User did not select. */
   | { kind: 'cancelled' }
-  /** 选了，但读不了：problem 说原因。 */
+  /** Selected, but unreadable: `problem` describes the reason. */
   | { kind: 'refused'; problem: AppConfigFileProblem }
   | { kind: 'text'; text: string; fileName: string };
 
 /**
- * 用系统文件选择器选一个配置文件并读出文字。太大的不读进内存（大小已知时先比），
- * 选择器放在缓存里的副本不管读没读都删掉；用户的原件不碰（AGENTS.md 文件的归属）。
+ * Uses system file picker to select a configuration file and reads its text. Skips reading files
+ * that are too large into memory (compares sizes beforehand if known); deletes the cached picker
+ * copy whether read or not; user's original file is untouched (AGENTS.md file ownership).
  */
 export async function pickConfigText(files: FilePlatform): Promise<PickedConfigText> {
   const picked = await files.pickDocuments(['application/json', 'text/plain'], false);

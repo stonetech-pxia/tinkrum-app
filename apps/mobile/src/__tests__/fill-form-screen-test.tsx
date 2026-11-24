@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { makePalette } from '../renderer/theme';
 import { FillFormScreen } from '../run/local/FillFormScreen';
 
-// 填表界面：按字段类型生成输入，只返回改过的字段；标准字体写不了的文字不能提交。
+// Form filling screen: generates inputs by field type, returns modified fields only; text that standard fonts cannot write cannot be submitted.
 
 const item = {
   uri: 'file:///run/form.pdf',

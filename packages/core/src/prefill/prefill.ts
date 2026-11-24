@@ -19,13 +19,16 @@ import {
 } from './memory';
 import { amountTier, labelOf, pickAmount, pickDate, pickTax } from './pick';
 
-// 「记一笔」预填（D-244 的扩展，原型，没接界面）。顺序：
-//   1. 版式记忆学会了的字段，按记忆读；新文件和记忆有任何对不上、不合理的地方（版式只是有点像、
-//      记忆读不出、规则读出的不一样、多了一行记忆里没有的优惠、日期离谱），这个字段宁可空着，
-//      也不退回规则去猜（创始人 2026-10-28 定）；
-//   2. 没有记忆或记忆读不出的，按标签规则挑（金额、税额、日期、单号）；候选以规则为主，系统识别补充；
-//   3. 挑不出来就空着。商家这类没有规则的字段只靠记忆；分类和其他字段不预填，也不用大模型预填。
-// 只预填表单，用户确认后点「记下」才保存（D-187、D-190）。文字只在本机，不发给 AI。
+// "Log an expense" prefill (extension of D-244, prototype, not connected to UI). Order: 1. Fields
+// learned by layout memory are read via memory; if any aspect of a new file mismatches or seems
+// unreasonable compared to memory (layout only somewhat similar, memory cannot read it, rule
+// reading differs, extra discount line not present in memory, unreasonable date), prefer leaving
+// the field blank rather than falling back to rule-based guessing (founder decision 2026-10-28); 2.
+// If no memory or memory cannot read it, pick via label rules (amount, tax, date, document number);
+// candidates prioritize rules, with system recognition as fallback; 3. Leave blank if nothing can
+// be picked. Un-rule-based fields like merchant rely solely on memory; category and other fields
+// are not prefilled, nor prefilled by large models. Only forms are prefilled, saved only after user
+// confirmation and tapping "Save" (D-187, D-190). Text stays on device, never sent to AI.
 
 export type PrefillSource = 'memory' | 'rule' | 'system';
 
@@ -36,28 +39,28 @@ export interface PrefillValue {
 
 export interface PrefillInput {
   text: string;
-  /** 文件的语言（年在后、日月分不清时英文按月在前）。 */
+  /** File language (year at end, English month-first when day and month are ambiguous). */
   locale: Locale;
   fields: readonly Field[];
-  /** 系统识别的结果；没有（Expo Go、旧系统）时只用规则。 */
+  /** System recognition results; use rules only when absent (Expo Go, legacy systems). */
   system?: readonly SystemMatch[];
-  /** 每行的位置（recognizeText 的行框），版式记忆用来在同一个标签下挑。 */
+  /** Position of each line (line boxes from recognizeText), used by layout memory to pick under the same label. */
   boxes?: readonly (LineBox | null)[];
-  /** 这张表的版式记忆。 */
+  /** Layout memory for this table. */
   memories?: readonly LayoutMemory[];
-  /** 判断日期合不合理用；默认现在。 */
+  /** Used for evaluating date reasonableness; defaults to current time. */
   now?: Date;
 }
 
-/** 记忆学过、但这次宁可空着的原因。 */
+/** Reason why a learned memory item was skipped this time. */
 export type PrefillBlock =
   'layoutUnsure' | 'memoryUnreadable' | 'conflictsWithRules' | 'newAdjustment' | 'implausible';
 
 export interface PrefillResult {
   values: Record<string, PrefillValue>;
-  /** 记忆学过、但这次空着的字段和原因（只给测试和调试看，不显示给用户）。 */
+  /** Fields learned by memory but skipped this time along with reasons (for testing and debugging only, not displayed to user). */
   blocked: Record<string, PrefillBlock>;
-  /** 认出的版式（保存时传给 learnLayout）；只是有点像时为 null，保存时开一个新的。 */
+  /** Recognized layout (passed to learnLayout upon saving); null if only somewhat similar, initiating a new one upon save. */
   layout: LayoutMemory | null;
   candidates: ValueCandidate[];
 }
@@ -83,7 +86,7 @@ export function prefillRecord(input: PrefillInput): PrefillResult {
   const now = input.now ?? new Date();
   const lines = input.text.split('\n');
 
-  // 没有记忆时规则只认得出「哪个是金额、哪个是税额、哪个是日期」：表里同一种字段不止一个就分不清，不填。
+  // When memory is absent, rules only recognize "amount, tax, date, document number": if there are multiple fields of the same type in the table, it becomes ambiguous and is left blank.
   const money = input.fields.filter((f) => f.type === 'money');
   const tax = money.filter((f) => TAX_NAME.test(f.name));
   const amount = money.filter((f) => !TAX_NAME.test(f.name));
@@ -99,7 +102,7 @@ export function prefillRecord(input: PrefillInput): PrefillResult {
     return null;
   };
 
-  // 记忆里没见过的优惠、抵扣、负数行：合计的算法变了，记忆里的「实付在哪」不一定还对。
+  // Discounts, deductions, or negative lines unseen in memory: total calculation algorithm has changed, so memory's "where actual payment is" may no longer be correct.
   const anchors = new Set(memory?.anchors ?? []);
   const newAdjustment = candidates.some((c) => {
     if (c.kind !== 'amount') return false;
@@ -108,7 +111,7 @@ export function prefillRecord(input: PrefillInput): PrefillResult {
     return adjusts && !anchors.has(anchorOf(lines[c.line] ?? ''));
   });
 
-  /** 记忆读出的值有没有不合理的地方；有就返回原因。 */
+  /** Check whether the value read from memory has any unreasonable aspects; return reason if any. */
   const doubt = (field: Field, value: string): PrefillBlock | null => {
     if (field.type === 'money') {
       if (!(Number(value) > 0)) return 'implausible';
@@ -131,7 +134,7 @@ export function prefillRecord(input: PrefillInput): PrefillResult {
 
   for (const field of input.fields) {
     const habit = memory?.fields[field.id];
-    // 商家这类不变的文字：新文字里有同样的值才填，没有就当没有记忆（不挡规则）。
+    // Constant text like merchant name: fill only if the new text contains the same value, otherwise treat as no memory (do not block rules).
     if (habit?.kind === 'constant') {
       const same = isLearned(habit) ? readWithLayout(habit, input.text, candidates) : null;
       if (sure && same !== null) {
@@ -139,7 +142,7 @@ export function prefillRecord(input: PrefillInput): PrefillResult {
         continue;
       }
     } else if (habit && isLearned(habit)) {
-      // 记忆学过这个字段：只按记忆填；有任何不对劲就空着，不退回规则。
+      // Memory has learned this field: fill strictly by memory; leave blank on any anomaly, do not fall back to rules.
       const remembered = sure ? readWithLayout(habit, input.text, candidates, input.boxes) : null;
       const reason: PrefillBlock | null = !sure
         ? 'layoutUnsure'

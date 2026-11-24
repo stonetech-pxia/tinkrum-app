@@ -5,7 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PLOT_HEIGHT } from './ChartPlot';
 import type { Palette } from './theme';
 
-/** 正负分别累加：正数从零向上，负数从零向下；折线的空周期不连线。 */
+/** Accumulates positive and negative values separately: positive numbers go up from zero, negative numbers go down from zero; empty periods in line charts are not connected by lines. */
 export function SplitChartPlot({
   kind,
   points,

@@ -1,41 +1,45 @@
 import type { Box } from './types';
 
-// 整页分成左右两栏、两栏的行一排一排对齐的页（EU 样本 044：公报一页印着 2 × 4 张小发票样张；
-// 两栏的标签行在同一个高度上）：按位置分块时左右两栏同一高度的行连成一带，一会儿左一会儿右，
-// 同一排的左右两行还会接成一段「左\t右」，一页变成好几页。
-// 找出整页的中缝（中间一条竖着的空白，两栏并排的那一段里没有任何行、表格、图片跨过它）以后，
-// 两栏各排各的，写成一个两格的并排行；中缝上面、下面横跨的标题、页脚照常排。
+// Pages split into left and right columns with aligned rows (EU sample 044: a gazette page printing
+// 2 x 4 small invoice samples; two-column label rows share the same height): when block
+// partitioning, same-height left and right rows merge into bands, zigzagging left and right, and
+// left/right rows on the same line might merge into 'left\tright', turning one page into several.
+// After finding the page gutter (a vertical white gap in the middle where no lines, tables, or
+// images cross the two-column region), both columns are laid out independently as a two-column
+// side-by-side row; spanning titles and footers above and below the gutter are laid out normally.
 
-/** 中缝在文字左右范围的这一段里（不是靠边的标签列）。 */
+/** The gutter falls within this range of text horizontal bounds (not marginal label columns). */
 const GUTTER_FROM = 0.3;
 const GUTTER_TO = 0.7;
-/** 中缝至少这么宽：这么多个行高，也至少是页宽的这么多。 */
+/** Minimum gutter width: at least this many line heights, and at least this fraction of page width. */
 const GUTTER_MIN_LINES = 2;
 const GUTTER_MIN_SHARE = 0.02;
-/** 每一栏至少这么多行、至少占全部行的这么多，左右范围至少占文字宽的这么多（不是左边一列短标签、右边一列值）。 */
+/** Each column must have at least this many rows, occupy this fraction of all rows, and span at least this fraction of text width (ruling out a left column of short labels and a right column of values). */
 const SIDE_MIN_LINES = 8;
 const SIDE_MIN_SHARE = 0.25;
 const SIDE_MIN_WIDTH = 0.3;
-/** 两栏并排的那一段至少有页高的这么多。 */
+/** The two-column region must span at least this fraction of page height. */
 const BAND_MIN_HEIGHT = 0.3;
 /**
- * 两栏差不多宽（窄的至少是宽的这么多）、两边的字至少这么多是字母：小票、价目表的品名和数量、金额是一张表的几列，
- * 不是两栏（回归用例 tbl-receipt-local-tilt）。
+ * Columns must have similar widths (narrow column is at least this fraction of the wide one) and
+ * sufficient letter content on both sides: item names, quantities, and amounts in receipts/price
+ * lists form table columns rather than two columns (regression case tbl-receipt-local-tilt).
  */
 const SIDE_BALANCE = 0.6;
 const SIDE_LETTERS = 0.6;
 
 export interface PageGutter {
-  /** 中缝的中线。 */
+  /** Centerline of the gutter. */
   x: number;
-  /** 两栏并排的上下范围：这一段里没有东西跨过中缝。 */
+  /** Vertical bounds of the two-column region: no elements cross the gutter within this range. */
   top: number;
   bottom: number;
 }
 
 /**
- * 找整页的中缝。lines 是正文的行，blocks 是表格、图片（也不能跨过中缝，但不算行数）。
- * 没有时 null：两栏之间有横跨的图、标题、表格的页，照原来按带排。
+ * Find the page gutter. 'lines' are body text lines, 'blocks' are tables and images (which also
+ * cannot cross the gutter, though they don't count towards line count). Returns null if none:
+ * pages with spanning images, titles, or tables between columns keep original band layout.
  */
 export function findPageGutter(
   lines: readonly (Box & { text: string })[],
@@ -103,7 +107,7 @@ export function findPageGutter(
   return at((best.from + best.to) / 2);
 }
 
-/** 一块在中缝的哪一边：0 左栏，1 右栏，-1 横跨（中缝上面、下面的标题、页脚）。 */
+/** Determine which side of the gutter a box lies on: 0 for left column, 1 for right column, -1 for spanning (titles and footers above/below the gutter). */
 export function sideOfGutter(box: Box, gutter: PageGutter): -1 | 0 | 1 {
   if (box.x + box.width <= gutter.x) return 0;
   if (box.x >= gutter.x) return 1;

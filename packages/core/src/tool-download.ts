@@ -19,19 +19,22 @@ import {
 import { validateWorkspace } from './validate';
 import { PERMISSIONS } from './workflow/contract';
 
-// 从服务器下载的工具（D-177、D-178，docs/TOOL_DOWNLOAD_DESIGN.md）。
-// 第一步只有数据工具：清单里是工具页的文字和快捷操作，只组合已有的动作，不含任何代码。
-// 目录（catalog.json）用 Ed25519 签名；清单按目录里的 SHA-256 校验。App 和计划服务共用这里的校验。
+// Tools downloaded from the server (D-177, D-178, docs/TOOL_DOWNLOAD_DESIGN.md). The first step
+// includes data tools only: manifests contain tool page text and quick actions, combining existing
+// actions only without any code. The catalog (`catalog.json`) is signed with Ed25519; manifests are
+// validated against the SHA-256 in the catalog. Both the app and planning service share this
+// validation.
 
 ed.hashes.sha512 = sha512;
 
-// Hermes 和 Node 都有 atob / btoa（App 里已经在用）；core 的 lib 只有 ES2022，这里补上类型。
+// Both Hermes and Node have atob / btoa (already used in the app); core lib has ES2022 only, so define types here.
 declare function atob(data: string): string;
 declare function btoa(data: string): string;
 
 /**
- * 把 UTF-8 字节解成字符串（不用 TextDecoder：Hermes 上不一定有）。不合法的字节直接报错，
- * 所以解出来再编码回去和原来的字节完全一样（目录的签名靠这一点）。
+ * Decode UTF-8 bytes into a string (avoid TextDecoder as it may not be present on Hermes).
+ * Invalid bytes throw immediately, ensuring that decoding and re-encoding results in bytes
+ * identical to the original (relied upon for catalog signatures).
  */
 export function decodeUtf8(bytes: Uint8Array): string {
   const parts: string[] = [];
@@ -65,15 +68,15 @@ export function decodeUtf8(bytes: Uint8Array): string {
   return parts.join('');
 }
 
-/** 宿主能力级别（§7）：App 每加一样下载的工具能用的能力就加 1。 */
+/** Host capability level (§7): increments by 1 for each capability added to the app that downloaded tools can use. */
 export const HOST_API = 1;
 
-/** 一个工具清单的大小上限（数据工具只有文字和步骤）。 */
+/** Maximum size limit for a single tool manifest (data tools contain text and steps only). */
 export const MAX_TOOL_MANIFEST_BYTES = 256 * 1024;
 
 const VersionSchema = z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, 'version must be x.y.z');
 
-/** 比较两个 x.y.z 版本号：a 更新时返回正数。 */
+/** Compare two x.y.z version numbers: returns a positive number if `a` is newer. */
 export function compareVersions(a: string, b: string): number {
   const pa = a.split('.').map(Number);
   const pb = b.split('.').map(Number);
@@ -96,11 +99,11 @@ export const ToolManifestSchema = z.strictObject({
   id: IdSchema,
   version: VersionSchema,
   hostApi: z.number().int().min(1),
-  /** 4.7.5：只发布 4+ 的工具。 */
+  /** 4.7.5: publish tools rated 4+ only. */
   ageRating: z.literal('4+'),
   name: localized(40),
   description: localized(200),
-  /** 工具页标题下面的一段说明。 */
+  /** A description paragraph below the tool page title. */
   intro: localized(300),
   icon: IconSchema,
   aliases: z.array(z.string().trim().min(1).max(40)).max(20),
@@ -116,7 +119,7 @@ export const ToolManifestSchema = z.strictObject({
     )
     .min(1)
     .max(12),
-  /** 工具页最下面的文件列表（可选）。 */
+  /** File list at the bottom of the tool page (optional). */
   fileList: z
     .strictObject({
       title: localized(40),
@@ -130,9 +133,11 @@ export type ToolManifest = z.infer<typeof ToolManifestSchema>;
 const pick = (locale: Locale, text: { en: string; zh: string }) => localize(text, locale);
 
 /**
- * 把清单变成注册表里的工具：工具页和 simpleTool 的排法一样（标题、说明、每个快捷操作一个运行卡片）。
- * 服务器上的清单（format 1）是 v33 写法：先照 v33 拼出页面和工作流，再用 v34 的迁移转过来
- * （migrate-v34.ts，和本机配置、模版用同一套转换；fileList 的 mimeType 变成 $files 的 kind 筛选）。
+ * Convert a manifest into a registry tool: formatted identically to tool pages and simple tools
+ * (title, description, one run card per quick action). Server manifests (format 1) use v33
+ * syntax: first construct pages and workflows using v33 layout, then migrate via v34 migration
+ * (`migrate-v34.ts`, using the same conversion logic as local config and templates; fileList's
+ * mimeType becomes $files' kind filter).
  */
 export function toolFromManifest(manifest: ToolManifest): ToolDefinition {
   const pageId = `tool-${manifest.id}`;
@@ -185,7 +190,7 @@ export function toolFromManifest(manifest: ToolManifest): ToolDefinition {
             : []),
         ],
       },
-      // 工具页上没有读表的块。
+      // No table reading blocks on the tool page.
       v33Tables([]),
     ) as Page;
   return {
@@ -207,8 +212,10 @@ export function toolFromManifest(manifest: ToolManifest): ToolDefinition {
 }
 
 /**
- * 检查一个清单能不能装进这个注册表：不能和内置工具重名、App 的能力级别够用、快捷操作的 id 以工具 id 开头，
- * 而且在空白的工作空间里（两种语言）添加后能通过 validateWorkspace（动作、参数、类型链、权限）。
+ * Check whether a manifest can be installed into this registry: must not share names with
+ * built-in tools, app capability level must be sufficient, quick action IDs must start with the
+ * tool ID, and when added to an empty workspace (in both languages) must pass validateWorkspace
+ * (actions, parameters, type chains, permissions).
  */
 export function checkToolManifest(manifest: ToolManifest, registry: Registry): string[] {
   const problems: string[] = [];
@@ -248,7 +255,7 @@ export function checkToolManifest(manifest: ToolManifest, registry: Registry): s
   return problems;
 }
 
-/** 解析并检查一个下载的清单；不对就抛出 ToolDownloadError。 */
+/** Parse and check a downloaded manifest; throws `ToolDownloadError` if invalid. */
 export function parseToolManifest(
   bytes: Uint8Array,
   registry: Registry,
@@ -271,20 +278,20 @@ export function parseToolManifest(
   return manifest;
 }
 
-// ---- 签名的目录 ----
+// ---- Signed catalog ----
 
 export const CatalogEntrySchema = z.strictObject({
   id: IdSchema,
   version: VersionSchema,
   hostApi: z.number().int().min(1),
-  /** 清单相对于目录地址的路径，例如 tools/rental/1.0.0.json。 */
+  /** Path of the manifest relative to the catalog URL, e.g., `tools/rental/1.0.0.json`. */
   path: z
     .string()
     .regex(/^[a-z0-9][a-z0-9/._-]*\.json$/, 'path must be a relative .json path')
     .refine((p) => !p.includes('..'), 'path must not contain ..'),
   size: z.number().int().min(1).max(MAX_TOOL_MANIFEST_BYTES),
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
-  // 没下载之前，目录页显示这些。
+  // Displayed on the catalog page before downloading.
   name: localized(40),
   description: localized(200),
   icon: IconSchema,
@@ -293,12 +300,12 @@ export type CatalogEntry = z.infer<typeof CatalogEntrySchema>;
 
 export const CatalogSchema = z.strictObject({
   format: z.literal(1),
-  /** 每发布一次加 1；App 不接受比上次看到的更小的（防止拿旧目录撤掉停用）。 */
+  /** Increments with each release; the app rejects values smaller than last seen (prevents rollback attacks using old catalogs). */
   seq: z.number().int().min(1),
   issuedAt: z.iso.datetime(),
-  /** 每个工具的最新版本（停用的也留在这里，否则已经添加了它的配置会校验不过）。 */
+  /** Latest version of each tool (deprecated ones remain here as well, otherwise configurations already using them would fail validation). */
   tools: z.array(CatalogEntrySchema).max(500),
-  /** 停用的版本：「id@version」。 */
+  /** Revoked versions: format `"id@version"`. */
   revoked: z.array(z.string().regex(/^[a-z0-9-]+@\d+\.\d+\.\d+$/)).max(1000),
 });
 export type Catalog = z.infer<typeof CatalogSchema>;
@@ -329,25 +336,25 @@ const toBase64 = (bytes: Uint8Array) => {
 const fromBase64 = (text: string) =>
   Uint8Array.from(atob(text.trim()), (c: string) => c.charCodeAt(0));
 
-/** 用私钥给目录签名（发布脚本和测试用），返回 base64 的签名。 */
+/** Sign the catalog with the private key (used by publishing scripts and tests), returning a base64 signature. */
 export function signCatalog(bytes: Uint8Array, secretKeyBase64: string): string {
   return toBase64(ed.sign(bytes, fromBase64(secretKeyBase64)));
 }
 
-/** 私钥对应的公钥（base64）。 */
+/** Public key corresponding to the private key (base64). */
 export function publicKeyOf(secretKeyBase64: string): string {
   return toBase64(ed.getPublicKey(fromBase64(secretKeyBase64)));
 }
 
-/** 新的一对密钥（base64）。 */
+/** Generate a new key pair (base64). */
 export function generateSigningKey(): { secretKey: string; publicKey: string } {
   const { secretKey, publicKey } = ed.keygen();
   return { secretKey: toBase64(secretKey), publicKey: toBase64(publicKey) };
 }
 
 /**
- * 验证目录的签名（任何一个受信任的公钥验得过就行），再解析。
- * minSeq：上次接受过的目录的 seq，比它小就拒绝。
+ * Verify catalog signature (passes if verified by any trusted public key), then parse. `minSeq`:
+ * minimum acceptable catalog sequence number from last seen; rejects if smaller.
  */
 export function verifyCatalog(
   bytes: Uint8Array,
@@ -385,7 +392,7 @@ export function verifyCatalog(
 export const isRevoked = (catalog: Catalog | null, id: string, version: string) =>
   catalog?.revoked.includes(`${id}@${version}`) ?? false;
 
-/** 目录里一个工具的清单地址（相对于目录所在的地址）。 */
+/** Manifest URL for a tool in the catalog (relative to the catalog base URL). */
 export function toolManifestUrl(catalogBaseUrl: string, entry: CatalogEntry): string {
   return `${catalogBaseUrl.replace(/\/+$/, '')}/${entry.path}`;
 }

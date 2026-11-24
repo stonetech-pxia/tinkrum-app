@@ -12,7 +12,7 @@ import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 浮动「+」和底部弹出的添加框（D-352）、看板按引用分栏和每栏添加（D-351）。
+// Floating "+" and bottom-sheet add dialog (D-352), Kanban columnar grouping by reference and per-column adding (D-351).
 
 const sections: Collection = {
   id: 'sections',
@@ -72,14 +72,14 @@ it('the floating add opens a sheet; the keyboard Done adds and the sheet stays f
       } as NewComponent,
     ]),
   });
-  // 关着的时候框不在。
+  // The dialog is absent when closed.
   expect(screen.queryByTestId('form-quick-title')).toBeNull();
   await fireEvent.press(await screen.findByTestId('form-quick'));
   const input = await screen.findByTestId('form-quick-title');
   await fireEvent.changeText(input, '每天晚上8点吃药');
   expect(screen.getByTestId('form-quick-smart')).toHaveTextContent(/每天 20:00/);
   await fireEvent(screen.getByTestId('form-quick-title'), 'submitEditing');
-  // 存好以后框还开着，文字清空，可以接着写。
+  // After saving, the dialog remains open, text is cleared, and users can continue writing.
   await waitFor(() => expect(screen.getByTestId('form-quick-title').props.value).toBe(''));
   const [saved] = await repo.listRecords('tasks');
   expect(saved!.values).toEqual({ title: '吃药', plan: { repeat: 'daily', time: '20:00' } });
@@ -111,7 +111,7 @@ it('a link field in the sheet has no "add a new one": the new page would open be
   });
   await fireEvent.press(await screen.findByTestId('form-quick'));
   await fireEvent.press(await screen.findByTestId('form-quick-section'));
-  // 已有的照样能选。
+  // Existing options can still be selected.
   expect(await screen.findByTestId('form-quick-section-option-s1')).toBeTruthy();
   expect(screen.queryByTestId('form-quick-section-new')).toBeNull();
 });

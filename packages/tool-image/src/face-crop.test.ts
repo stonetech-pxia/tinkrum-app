@@ -6,7 +6,7 @@ const spec = (id: string) => ID_PHOTO_SPECS.find((s) => s.id === id)!;
 const aspect = (id: string) => spec(id).widthMm / spec(id).heightMm;
 
 describe('faceCrop (D-252)', () => {
-  // 一张 3024×4032 的竖拍自拍，脸框 800×1000，在画面中间偏上。
+  // A 3024x4032 vertical selfie, face box 800x1000, located slightly above the middle of the frame.
   const image = { width: 3024, height: 4032 };
   const face = { x: 1100, y: 1200, width: 800, height: 1000 };
 
@@ -15,9 +15,9 @@ describe('faceCrop (D-252)', () => {
     const head = 1000 * 1.45;
     expect(crop.height).toBeCloseTo(head / 0.75, -1);
     expect(crop.width / crop.height).toBeCloseTo(35 / 45, 2);
-    // 脸的中线在裁剪框中间。
+    // The face centerline is in the middle of the crop box.
     expect(crop.x + crop.width / 2).toBeCloseTo(face.x + face.width / 2, 0);
-    // 头顶上面的空白比下巴下面少（40% / 60%）。
+    // The blank space above the crown is less than below the chin (40% / 60%).
     const crown = face.y + face.height - head;
     const above = crown - crop.y;
     const below = crop.y + crop.height - (face.y + face.height);

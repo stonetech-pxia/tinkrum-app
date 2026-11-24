@@ -3,16 +3,19 @@ import { z } from 'zod';
 import type { LayoutMemory } from './memory';
 import { MAX_LEARNED_LABELS, type FieldPick } from './rank';
 
-// 版式记忆的存储、导出和恢复（D-244）：每张表一组版式，存在本机 app_meta 的一个键里。
-// 「设置 → 数据」能一键清空、导出成文件（也是备份），再从这个文件恢复。
-// 文件里是标签文字、位置、写法和商家名，没有金额和日期的值；读文件时逐项校验，坏的丢掉。
-// 第 2 版起还有新记录表单里点过的候选（D-394，另一个键 prefill:picks）：每张表每个字段一个
-// 标签和位置，同样不记值。第 3 版起每个字段还有学过的标签（只有标签文字），旧文件照常读。
+// Layout memory storage, export, and recovery (D-244): one group of layouts per table, stored in a
+// key in local app_meta. "Settings -> Data" allows one-tap clearing, exporting to a file (also a
+// backup), and restoring from that file. The file contains tag texts, positions, formatting, and
+// merchant names, but no amount or date values; each item is validated upon reading, and bad ones
+// are discarded. Since version 2, it also includes candidates clicked in the new record form
+// (D-394, under another key prefill:picks): one tag and position per field per table, also without
+// values. Since version 3, each field also has learned tags (tag texts only), and old files are
+// read as usual.
 
 export const LAYOUT_STORE_KEY = 'prefill:layouts';
 export const LAYOUT_FILE_FORMAT = 'morph-prefill-memory';
 const FILE_VERSION = 3;
-/** 每张表最多记几个版式：超出时丢掉最早学的。 */
+/** Maximum layouts stored per table: discard the earliest learned ones when exceeded. */
 export const MAX_LAYOUTS_PER_TABLE = 50;
 
 const FIELD_TYPES = [
@@ -55,10 +58,10 @@ const LayoutSchema = z.strictObject({
   fields: z.record(z.string().max(64), HabitSchema),
 });
 
-/** 表 ID → 这张表的版式（按学的先后）。 */
+/** Table ID -> layouts for this table (in order of learning). */
 export type LayoutStore = Record<string, LayoutMemory[]>;
 
-/** 逐个版式校验，坏的丢掉（存的东西被改坏、旧版本留下的，都不让它影响预填）。 */
+/** Validate each layout individually, discarding bad ones (tampered storage or left over from older versions is prevented from affecting prefilling). */
 function cleanStore(raw: unknown): LayoutStore {
   const out: LayoutStore = {};
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
@@ -74,7 +77,7 @@ function cleanStore(raw: unknown): LayoutStore {
   return out;
 }
 
-/** 读 app_meta 里存的；没有或者坏了都是空的。 */
+/** Read from app_meta storage; missing or corrupted returns empty. */
 export function parseLayoutStore(raw: string | null): LayoutStore {
   if (!raw) return {};
   try {
@@ -86,17 +89,17 @@ export function parseLayoutStore(raw: string | null): LayoutStore {
 
 export const serializeLayoutStore = (store: LayoutStore): string => JSON.stringify(store);
 
-/** 一共记了几个版式。 */
+/** Total number of layouts remembered. */
 export const layoutCount = (store: LayoutStore): number =>
   Object.values(store).reduce((n, list) => n + list.length, 0);
 
-/** 保存一次以后更新这张表的一个版式（同 ID 的换掉，新的放最后，超出上限丢最早的）。 */
+/** Update a table's layout after a successful save (replace if same ID, put new at the end, discard earliest if exceeding limit). */
 export function putLayout(store: LayoutStore, table: string, memory: LayoutMemory): LayoutStore {
   const list = (store[table] ?? []).filter((m) => m.id !== memory.id);
   return { ...store, [table]: [...list, memory].slice(-MAX_LAYOUTS_PER_TABLE) };
 }
 
-/** 导出的文件（也是备份）：带格式名和版本，恢复时认得出。 */
+/** Exported file (also a backup): includes format name and version so it can be recognized during recovery. */
 export function layoutStoreFile(store: LayoutStore, now: Date, picks: PickStore = {}): string {
   return JSON.stringify(
     {
@@ -125,13 +128,13 @@ function readFile(text: string): { tables?: unknown; picks?: unknown } | null {
   return file;
 }
 
-/** 读导出的文件：不是这个格式时为 null；格式对但有坏的版式时只留好的。 */
+/** Read exported file: returns null if format doesn't match; if format matches but contains bad layouts, keeps only the good ones. */
 export function readLayoutStoreFile(text: string): LayoutStore | null {
   const file = readFile(text);
   return file && cleanStore(file.tables);
 }
 
-// ---- 点过的候选（D-394） ----
+// ---- Clicked candidates (D-394) ----
 
 export const PICK_STORE_KEY = 'prefill:picks';
 
@@ -151,7 +154,7 @@ const PickSchema = z.strictObject({
     .optional(),
 });
 
-/** 表 ID → 字段 ID → 上次点的候选在哪里。 */
+/** Table ID -> Field ID -> last clicked candidate location. */
 export type PickStore = Record<string, Record<string, FieldPick>>;
 
 function cleanPicks(raw: unknown): PickStore {
@@ -169,7 +172,7 @@ function cleanPicks(raw: unknown): PickStore {
   return out;
 }
 
-/** 读 app_meta 里存的；没有或者坏了都是空的。 */
+/** Read from app_meta storage; missing or corrupted returns empty. */
 export function parsePickStore(raw: string | null): PickStore {
   if (!raw) return {};
   try {
@@ -181,11 +184,11 @@ export function parsePickStore(raw: string | null): PickStore {
 
 export const serializePickStore = (store: PickStore): string => JSON.stringify(store);
 
-/** 一共记了几个字段。 */
+/** Total number of fields remembered. */
 export const pickCount = (store: PickStore): number =>
   Object.values(store).reduce((n, fields) => n + Object.keys(fields).length, 0);
 
-/** 用户点了一个候选：这张表这个字段记下这一次（换掉上一次）。 */
+/** User clicked a candidate: record this occurrence for this field in this table (replacing the previous one). */
 export function putPick(
   store: PickStore,
   table: string,
@@ -195,7 +198,7 @@ export function putPick(
   return { ...store, [table]: { ...store[table], [field]: pick } };
 }
 
-/** 读导出的文件里点过的候选：不是这个格式时为 null；第 1 版的文件没有，是空的。 */
+/** Read clicked candidates from exported file: returns null if format doesn't match; version 1 files have none and are empty. */
 export function readPickStoreFile(text: string): PickStore | null {
   const file = readFile(text);
   return file && cleanPicks(file.picks);

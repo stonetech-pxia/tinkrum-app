@@ -2,13 +2,13 @@ import { isValidTime } from './field-values';
 import { SCHEDULE_DUE } from './schedule';
 import { PERIODS, RECORD_REF, fieldDefinition, type Collection, type Condition } from './schema';
 
-// 筛选条件的检查：组件的 filter（validate.ts）和汇总字段的 filter（D-288）共用。
+// Filter check: shared between component filters (validate.ts) and rollup field filters (D-288).
 
-/** 筛选条件：字段存在，操作和值是这种字段支持的（字段定义的 filter）。系统字段当作日期。 */
+/** Filters: field exists, and operation/value are supported by this field type (field-defined filter). System fields are treated as dates. */
 export function conditionProblems(
   conditions: Condition[] | undefined,
   collection: Collection,
-  /** 组件所在页面给哪张表的一条记录用（D-342）：引用字段可以 is / isNot "$record"。 */
+  /** Used by a page's components for which table's record (D-342): reference fields can be is / isNot "$record". */
   recordOf?: string,
 ): string[] {
   const problems: string[] = [];
@@ -23,7 +23,7 @@ export function conditionProblems(
     const { filter } = fieldDefinition(type);
     const v = cond.value;
     const where = `filter on ${cond.field}`;
-    // D-342：给一条记录用的页面上，指向那张表的引用字段可以等于（不等于）这条记录。
+    // D-342: On a page dedicated to a single record, reference fields pointing to that table can equal (or not equal) this record.
     if (v === RECORD_REF) {
       if (f?.type === 'link' && f.table === recordOf && (cond.op === 'is' || cond.op === 'isNot'))
         continue;
@@ -34,7 +34,7 @@ export function conditionProblems(
       );
       continue;
     }
-    // 「是其中一个」（D-538）：只有单选字段的 is，每个都是它的选项。
+    // "is one of" (D-538): only for single-select field `is`, where each value is one of its options.
     if (Array.isArray(v)) {
       if (cond.op !== 'is' || f?.type !== 'choice')
         problems.push(`${where}: a list of values only works with is on a choice field`);
@@ -42,7 +42,7 @@ export function conditionProblems(
         problems.push(`${where}: value does not match the field type`);
       continue;
     }
-    // 引用字段只能看有没有选（D-250）：记录 ID 对 AI 和用户都没有意义。
+    // Reference fields can only check whether a selection is made (D-250): record IDs have no meaning to either AI or users.
     if (filter.emptyOnly && cond.op !== 'isEmpty' && cond.op !== 'isNotEmpty') {
       problems.push(`${where}: a ${type} field can only be filtered with isEmpty or isNotEmpty`);
       continue;
@@ -80,7 +80,7 @@ export function conditionProblems(
         break;
       case 'is':
       case 'isNot': {
-        // 系统字段没有定义，按日期（文字）比较。
+        // System fields have no definition; compared as dates (strings).
         const ok = f ? filter.is(f, v) : typeof v === 'string';
         if (!ok) problems.push(`${where}: value does not match the field type`);
         break;

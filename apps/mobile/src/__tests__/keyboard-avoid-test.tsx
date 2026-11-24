@@ -8,8 +8,10 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp } from '../test-utils/render-app';
 
-// 真机（三星，Android edge-to-edge）上看到的：窗口不会因为键盘变小，记录表单下面的字段被键盘盖住，用户看不到自己在打什么。
-// 所以 Android 上表单也要留出键盘的高度，不能只有 iOS 留。
+// Observed on real device (Samsung, Android edge-to-edge): the window does not shrink for the
+// keyboard, fields below the record form are covered by the keyboard, and the user cannot see what
+// they are typing. Therefore, forms on Android must also account for the keyboard height, not just
+// on iOS.
 
 const mockBehaviors: (string | undefined)[] = [];
 jest.mock('react-native/Libraries/Components/Keyboard/KeyboardAvoidingView', () => {

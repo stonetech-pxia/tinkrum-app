@@ -3,7 +3,7 @@ import { Linking, Share } from 'react-native';
 
 import type { RescueActions } from './RescueScreen';
 
-// 兜底页按钮背后的事。数据库、备份、分享这些主流程的模块点了按钮才加载：它们自己坏了，兜底页也照样打开。
+// Logic behind rescue page buttons. Main flow modules like database, backup, and sharing are loaded only when buttons are tapped: if those modules themselves are broken, the rescue page still opens successfully.
 
 export function rescueActions(locale: Locale, now = () => new Date()): RescueActions {
   const steps = {};
@@ -30,7 +30,7 @@ export function rescueActions(locale: Locale, now = () => new Date()): RescueAct
       const { stepBack } = await import('./step-back');
       return stepBack(await openRepo(), steps, locale, now());
     },
-    // 只交给系统的分享面板，发不发、发给谁由用户自己选（底线 10）；App 自己不联网。
+    // Passed only to the system share sheet; whether to send and to whom is chosen entirely by the user (Invariant 10); the app itself makes no network requests.
     async shareError(text) {
       await Share.share({ message: text });
     },

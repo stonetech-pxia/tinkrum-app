@@ -1,8 +1,9 @@
 import { requireOptionalNativeModule } from 'expo';
 
-// 本地 Expo 模块 MorphVision（D-084、D-087）：iOS 是 ios/MorphVisionModule.swift（Vision），
-// Android 是 android/…/MorphVisionModule.kt（ML Kit）。Expo Go 和测试里是 null，调用方退回扩展包。
-// 坐标：像素，原点在左上角，和 @morph/tool-image 的 Quad 一致。
+// Local Expo module MorphVision (D-084, D-087): iOS is ios/MorphVisionModule.swift (Vision),
+// Android is android/…/MorphVisionModule.kt (ML Kit). Returns null in Expo Go and tests; callers
+// fall back to the pack. Coordinates: pixels, origin at top-left, consistent with Quad in
+// @morph/tool-image.
 
 export interface NativePoint {
   x: number;
@@ -23,15 +24,15 @@ export interface NativeImage {
   size: number;
 }
 
-/** 原生端的错误码（error.code）。 */
+/** Native-side error codes (error.code). */
 export const VISION_ERRORS = {
-  /** cancelClassify(taskId) 取消了。 */
+  /** Cancelled via cancelClassify(taskId). */
   cancelled: 'ERR_VISION_CANCELLED',
-  /** detectData：Android 这种语言的实体识别模型还没下载（又不许下载，或者没网）。 */
+  /** detectData: Entity recognition model for this language is not yet downloaded on Android (either downloads are disallowed, or there is no network). */
   needsDownload: 'ERR_VISION_NEEDS_DOWNLOAD',
 } as const;
 
-/** 系统识别出的日期或金额：在整段文字里的位置（UTF-16）；日期的值是 YYYY-MM-DD，金额的值可以没有。 */
+/** Date or amount recognized by the system: position within the full text (UTF-16); date value is YYYY-MM-DD, amount value is optional. */
 export interface NativeDataMatch {
   kind: 'amount' | 'date';
   start: number;
@@ -39,7 +40,7 @@ export interface NativeDataMatch {
   value?: string;
 }
 
-/** 图像分类的一个标签：id 是平台自己的英文标识（iOS Vision 和 Android ML Kit 的词表不同）。 */
+/** An image classification label: id is the platform's own English identifier (iOS Vision and Android ML Kit have different vocabularies). */
 export interface NativeImageLabel {
   id: string;
   /** 0–1。 */
@@ -63,16 +64,19 @@ export interface MorphVisionModule {
     output: string,
   ): Promise<Omit<NativeImage, 'uri'>>;
 
-  /** 人脸框（像素，原点在左上角，已摆正）；width / height 是检测用的图的大小（Android 会先缩小，D-252）。 */
+  /** Face bounding boxes (pixels, origin at top-left, straightened); width/height are the dimensions of the image used for detection (Android scales down first, D-252). */
   detectFaces?(uri: string): Promise<{
     width: number;
     height: number;
     faces: { x: number; y: number; width: number; height: number }[];
   }>;
   /**
-   * 照片里是什么（没有文字的照片做推荐用）：iOS 是 Vision 的 VNClassifyImageRequest，Android 是 ML Kit 图像标注
-   * （基础模型打包进 App）。先缩到长边 1024 再分类，不写中间文件。只返回不低于 minConfidence 的、最多 maxResults 个，
-   * 从高到低；width / height 是分类用的图的大小。taskId 用来 cancelClassify。旧开发构建缺这两个方法。
+   * What is in the photo (used for recommendations on photos without text): iOS uses Vision's
+   * VNClassifyImageRequest, Android uses ML Kit image labeling (base model bundled into the app).
+   * Scales down to maxSide 1024 before classification, without writing intermediate files.
+   * Returns at most maxResults items with confidence no less than minConfidence, ordered from
+   * highest to lowest; width/height are the dimensions of the image used for classification.
+   * taskId is used for cancelClassify. Older development builds lack these two methods.
    */
   classifyImage?(
     taskId: string,
@@ -80,33 +84,36 @@ export interface MorphVisionModule {
     options: { maxResults: number; minConfidence: number },
   ): Promise<{ labels: NativeImageLabel[]; width: number; height: number }>;
   /**
-   * 「记一笔」预填用的系统识别（只做规则的补充）：iOS 26 起 DataDetection（日期、金额），更早的 iOS 用
-   * NSDataDetector（只有日期）；Android 是 ML Kit 实体识别（每种语言的模型第一次用时下载，
-   * allowDownload 为 false 时不下载，以 ERR_VISION_NEEDS_DOWNLOAD 结束）。language 是 BCP 47。
+   * System recognition for "Log an expense" prefill (acting only as a rule supplement): iOS 26+
+   * uses DataDetection (dates, amounts), earlier iOS uses NSDataDetector (dates only); Android
+   * uses ML Kit entity recognition (model for each language downloaded on first use; not
+   * downloaded when allowDownload is false, terminating with ERR_VISION_NEEDS_DOWNLOAD). language
+   * is BCP 47.
    */
   detectData?(text: string, language: string, allowDownload: boolean): Promise<NativeDataMatch[]>;
-  /** ready：能直接用；download：要先下载模型（Android）；unsupported：这种语言不支持。 */
+  /** ready: ready to use directly; download: model needs to be downloaded first (Android); unsupported: language is not supported. */
   dataDetectionStatus?(language: string): Promise<'ready' | 'download' | 'unsupported'>;
-  /** 下载这种语言的识别模型（Android；iOS 什么都不做）。App 先问过用户才调用。 */
+  /** Download the recognition model for this language (Android; does nothing on iOS). Called by the app only after prompting the user. */
   downloadDataModel?(language: string): Promise<void>;
-  /** 取消正在进行的分类：那次以 ERR_VISION_CANCELLED 结束；还没开始或已经结束的不起作用。 */
+  /** Cancel an ongoing classification: that operation terminates with ERR_VISION_CANCELLED; has no effect if it hasn't started or has already finished. */
   cancelClassify?(taskId: string): void;
-  /** 只保留人像、其余换成纯色（iOS 人像分割，D-252）；Android 没有，用 removeBackground。 */
+  /** Keep only the portrait, replacing the rest with a solid color (iOS portrait segmentation, D-252); Android does not have this, uses removeBackground. */
   replacePersonBackground?(
     uri: string,
     color: string,
     output: string,
   ): Promise<Omit<NativeImage, 'uri'>>;
 
-  /** 系统文档相机能不能用（模拟器和很旧的设备上是 false）。 */
+  /** Whether the system document camera is available (false on simulators and very old devices). */
   isDocumentCameraSupported(): boolean;
-  /** 有没有相机（模拟器上没有）。 */
+  /** Whether a camera is present (none on simulators). */
   isCameraAvailable(): boolean;
-  /** 能不能给一张照片找纸张的四个角（iOS 能，Android 的 ML Kit 不能：detectDocument / straighten 不存在）。 */
+  /** Whether the four corners of a paper can be found in a photo (supported on iOS, not supported by Android ML Kit: detectDocument / straighten do not exist). */
   canFindPaper(): boolean;
   /**
-   * PDF 第一页的缩略图（D-451）：白底 JPEG 写到 output，长边不超过 maxSide。
-   * 打不开（损坏、要密码）时抛出。iOS 用 PDFKit，Android 用 PdfRenderer。
+   * PDF first-page thumbnail (D-451): white-background JPEG written to output, long side not
+   * exceeding maxSide. Throws when it cannot be opened (damaged, password-protected). iOS uses
+   * PDFKit, Android uses PdfRenderer.
    */
   pdfThumbnail(
     uri: string,
@@ -114,30 +121,34 @@ export interface MorphVisionModule {
     maxSide: number,
   ): Promise<{ width: number; height: number; pageCount: number }>;
   /**
-   * PDF 的文字层（D-455）：iOS PDFKit，Android 15 起 PdfRenderer 的页面文字；没有文字层、要密码、
-   * 系统太旧时是 null。旧版 App 没有这个函数。
+   * PDF text layer (D-455): iOS PDFKit, or page text from PdfRenderer on Android 15+; null if
+   * there is no text layer, if a password is required, or if the system is too old. Older app
+   * versions lack this function.
    */
   pdfText?(uri: string): Promise<string | null>;
-  /** 这种语言（BCP 47）系统能不能识别（Android 上只剩韩文用 ML Kit，D-269）。 */
+  /** Whether the system can recognize this language (BCP 47) (only Korean uses ML Kit on Android, D-269). */
   supportsLanguage(code: string): boolean;
 
   /**
-   * PP-OCRv6（D-269）：载入扩展包里的两个模型；输入、输出都是临时文件（float32 小端）。
-   * ocrDetect 写出每个像素的概率 × 255（width × height 字节）；ocrRecognize 写出 count × steps 个 int32 类别
-   * 再接 count × steps 个 float32 概率，返回 steps。旧版 App（原生模块里没有）时是 undefined。
+   * PP-OCRv6 (D-269): loads two models from the pack; inputs and outputs are temporary files
+   * (float32 little-endian). ocrDetect writes probability × 255 per pixel (width × height bytes);
+   * ocrRecognize writes count × steps int32 categories followed by count × steps float32
+   * probabilities, and returns steps. Undefined in older app versions (missing in the native
+   * module).
    */
   ocrLoad?(det: string, rec: string): Promise<void>;
   ocrDetect?(input: string, width: number, height: number, output: string): Promise<void>;
   ocrRecognize?(input: string, count: number, width: number, output: string): Promise<number>;
   ocrUnload?(): Promise<void>;
   /**
-   * 跑一个只有一个 float32 输入、一个 float32 输出的模型（D-274：扫描展平的 UVDoc 网格模型）：
-   * 输入、输出都是临时文件（float32 小端），返回输出的形状。旧版 App 里没有时是 undefined。
+   * Run a model with a single float32 input and a single float32 output (D-274: scan-flattened
+   * UVDoc grid model): inputs and outputs are temporary files (float32 little-endian), returning
+   * the output shape. Undefined if missing in older app versions.
    */
   modelRun?(model: string, input: string, shape: number[], output: string): Promise<number[]>;
   modelUnload?(): Promise<void>;
   supportedLanguages(): Promise<string[]>;
-  /** languages：BCP 47，第一种必须支持，后面的是补充。 */
+  /** languages: BCP 47, the first must be supported, and subsequent ones are supplementary. */
   recognizeText(
     uri: string,
     languages: readonly string[],
@@ -145,14 +156,15 @@ export interface MorphVisionModule {
     text: string;
     lines: number;
     languages: string[];
-    /** 识别时图片的像素大小和每行的位置（原点在左上角，D-195）。 */
+    /** Pixel dimensions of the image during recognition and the positions of each line (origin at top-left, D-195). */
     width: number;
     height: number;
     items: { text: string; x: number; y: number; width: number; height: number }[];
   }>;
   /**
-   * 找纸张的候选（D-327）：文档分割的四边形和矩形检测的几个四边形（像素，四个点 tl/tr/br/bl），
-   * 加一张长边约 500 的灰度图（每像素一个字节，base64）。选哪个由 App 的 pickPaper 决定。
+   * Find paper candidates (D-327): document segmentation quadrilateral and rectangle detection
+   * quadrilaterals (pixels, four points tl/tr/br/bl), plus a grayscale image with a long side of
+   * about 500 (one byte per pixel, base64). The selection is determined by the app's pickPaper.
    */
   detectDocument(uri: string): Promise<{
     width: number;
@@ -168,7 +180,7 @@ export interface MorphVisionModule {
     quality: number,
     output: string,
   ): Promise<{ width: number; height: number; size: number }>;
-  /** 打开系统文档相机（iOS：VisionKit；Android：ML Kit，需要 Google Play 服务）；用户取消时返回 null。 */
+  /** Open the system document camera (iOS: VisionKit; Android: ML Kit, requires Google Play Services); returns null if the user cancels. */
   scanDocuments(directory: string, maxSide: number, quality: number): Promise<NativeImage[] | null>;
 }
 

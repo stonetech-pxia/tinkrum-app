@@ -1,4 +1,4 @@
-"""按固定 revision 下载公开 GGUF，并记录本机 SHA-256。"""
+"""Download public GGUF files according to a fixed revision and record local SHA-256 hashes."""
 from __future__ import annotations
 
 import argparse

@@ -23,8 +23,9 @@ import type { RenderEnv } from './components';
 import { onPage } from './theme';
 import { Button } from './ui';
 
-// 列表上方的按钮（as: "list"，D-428）：点了才运行，把列表现在选出的记录交给快捷操作：筛选、搜索之后的全部，
-// 不截到 limit（导出要全部对得上的）。按钮下面写明交的是几条（底线 17）。一条都没有时没有按钮。
+// Buttons above list (as: "list", D-428): runs only on tap, passing currently selected list records
+// to quick action: all records after filtering and searching, uncapped by limit (exports need all
+// matching). Button displays the count being passed (Invariant 17). No button when list is empty.
 
 export function ListTools({
   tools,
@@ -48,7 +49,7 @@ export function ListTools({
     const workflow = findWorkflowTarget(quickActions, u.tool, locale);
     return workflow ? [workflow] : [];
   });
-  // 第一步收文件的快捷操作（D-442）：交列表现在选出的这些记录第一个附件字段里它收的文件。
+  // File-intake quick action in step 1 (D-442): passes files collected by the first attachment field of the list's currently selected records.
   const { registry } = useWorkspaceContext();
   const takesFiles = (wf: (typeof shown)[number]) => handedInput(wf.steps, registry) === 'files';
   const fileIds = shown.some(takesFiles) ? attachmentIdsOfRecords(collection, records) : [];

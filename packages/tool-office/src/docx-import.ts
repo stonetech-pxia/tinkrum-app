@@ -10,17 +10,23 @@ import { OfficeImportFailure, openPackage, relKind, type OoxmlPackage } from './
 import type { Box, CellAlign, TableCell } from './types';
 import { child, children, descendants, ownText, type XmlElement } from './xml';
 
-// 外来的 docx（别的 App、电脑上的 Word 做的）→ DocDoc（D-509）：放上桌用同一个 Word 编辑器改，存的时候
-// 照旧由 writeDocx 重新生成。按创始人「好用的顺序、表格和段落，不追求一模一样」（D-501 前后）：
-// 读段落的文字、粗体 / 斜体 / 下划线 / 字号（整段一种颜色时也读颜色）、对齐、标题（1、2 级）、列表（每一级各成一个
-// 列表，接着原来的编号）、表格（合并格子、列宽）、内嵌的图片（PNG / JPG / GIF / BMP）、分页符；
-// 文本框里的字接在它所在的段落后面，脚注、尾注的字放到文末（正文里留 [1] 这样的记号），修订按「接受全部」显示
-// （删掉的字不显示），域显示结果。不读的：页眉页脚、批注、字体、行距和缩进、高亮、删除线 / 上下标（字留着）、
-// 页面大小和页边距（存的时候是 A4）、形状、图表、SmartArt、矢量图（EMF / WMF）、外部链接的图片（不联网）。
-// 没有版面：box 只是占位（同文字转 Word，D-441），段落之间原来空着（空段落、段前段后距）的写 spaced。
-// 纯 TS，在本机解析，不联网（不变量 1）；结果只在本机，不发给 AI（不变量 2）。
+// External docx (from other apps or Word on desktop) -> DocDoc (D-509): placed on the desk, edited
+// using the same Word editor, saved via writeDocx as before. Following the founder's principle
+// "good order, tables, and paragraphs, not striving for pixel perfection" (around D-501): reads
+// paragraph text, bold / italic / underline / font size (also reads color if uniform per
+// paragraph), alignment, headings (levels 1, 2), lists (each level forms a separate list,
+// continuing previous numbering), tables (merged cells, column widths), embedded images (PNG / JPG
+// / GIF / BMP), page breaks; text box text follows its containing paragraph, footnote and endnote
+// text is placed at the end of the document (with markers like [1] left in the body), revisions are
+// shown as "accept all" (deleted text is hidden), fields show their results. Not read:
+// headers/footers, comments, fonts, line spacing and indentation, highlights, strikethrough /
+// subscript/superscript (text is kept), page size and margins (saved as A4), shapes, charts,
+// SmartArt, vector graphics (EMF / WMF), externally linked images (no network access). No layout:
+// boxes are placeholders only (same as text-to-Word, D-441), spacing between paragraphs originally
+// empty (empty paragraphs, space before/after) is written as spaced. Pure TS, parsed locally,
+// offline (invariant 1); results stay on device only, never sent to AI (invariant 2).
 
-/** 读出来的图片：src 是它在包里的路径（DocImage.src 先写这个，放上桌时换成桌面里的文件）。 */
+/** Extracted image: src is its path in the package (DocImage.src is initially set to this, replaced with the file in the workspace when placed on the desk). */
 export interface ImportedImage {
   bytes: Uint8Array;
   ext: 'png' | 'jpg' | 'gif' | 'bmp';
@@ -31,20 +37,20 @@ export interface DocxImport {
   images: Map<string, ImportedImage>;
 }
 
-/** 一份文档最多这么多块：再多编辑页（一个网页）就太慢了，当作太大。 */
+/** Maximum blocks per document: any more and the editor page (a web page) becomes too slow, treated as too large. */
 export const MAX_IMPORT_BLOCKS = 5000;
 
-/** 没有版面的占位框（同文字转 Word）。 */
+/** Placeholder box with no layout (same as text-to-Word). */
 const BOX: Box = { x: 0, y: 0, width: 1, height: 1 };
-/** A4 的高（磅）：页面的坐标就是磅（宽是 A4_WIDTH_PT），图片、列宽按磅写。 */
+/** A4 height in points: page coordinates are in points (width is A4_WIDTH_PT), images and column widths are in points. */
 const A4_HEIGHT_PT = 842;
-/** writeDocx 的内容区宽（磅，A4 减去两边 2 厘米）：居中的图片按它摆。 */
+/** writeDocx content area width in points (A4 minus 2 cm on each side): centered images are positioned based on this. */
 const CONTENT_PT = (11906 - 2 * 1134) / 20;
-/** 段前距加上一段的段后距至少这么多（twip，6 磅）算原来空着。 */
+/** Space before plus space after for a paragraph must be at least this much (twips, 6 pt) to be considered originally spaced. */
 const SPACED_TWIP = 120;
-/** 自动段距（网页来的文档）大约这么多 twip。 */
+/** Auto spacing (documents from web) is approximately this many twips. */
 const AUTO_SPACING = 280;
-/** Word 里没写字号时是 10 磅。 */
+/** Default font size in Word when unspecified is 10 pt. */
 const DEFAULT_SIZE = 10;
 const EMU_PER_PT = 12700;
 
@@ -78,11 +84,11 @@ interface StyleDef {
   isDefault: boolean;
 }
 
-/** 开关属性的值：1 / true / on 是开。 */
+/** Value of a boolean flag attribute: 1 / true / on is true. */
 const flag = (v: string | undefined) =>
   v !== undefined && !['0', 'false', 'off', 'none'].includes(v.toLowerCase());
 
-/** w:b 这种开关元素：没写 val 是开。 */
+/** Switch elements like w:b: omitted val defaults to true. */
 function onOff(el: XmlElement | undefined): boolean | undefined {
   if (!el) return undefined;
   const v = el.attrs['w:val'];
@@ -145,13 +151,13 @@ function readPara(pPr: XmlElement | undefined): ParaProps {
   return out;
 }
 
-/** 去掉值是 undefined 的项（合并样式时不覆盖上一级）。 */
+/** Remove items whose value is undefined (do not override parent level when merging styles). */
 const defined = <T extends object>(o: T): { [K in keyof T]?: Exclude<T[K], undefined> } =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as {
     [K in keyof T]?: Exclude<T[K], undefined>;
   };
 
-/** 样式表：每个样式顺着 basedOn 合起来的样子（父样式在前、自己的覆盖）。 */
+/** Stylesheet: combined appearance of each style following basedOn (parent style first, own overrides). */
 function readStyles(root: XmlElement | undefined) {
   const defs = new Map<string, StyleDef>();
   const defaults = child(root, 'w:docDefaults');
@@ -192,7 +198,7 @@ function readStyles(root: XmlElement | undefined) {
     baseRun,
     basePara,
     defaultPara,
-    /** 段落样式（没写时用默认段落样式）的字的样子。 */
+    /** Font styling for paragraph style (falls back to default paragraph style when unspecified). */
     paraRun(id: string | undefined): RunStyle {
       const key = id ?? defaultPara ?? '';
       if (!runCache.has(key)) {
@@ -236,7 +242,7 @@ interface Level {
   start: number;
 }
 
-/** numbering.xml：编号 → 每一级的编号格式、写法、起始号。 */
+/** numbering.xml: numbering -> numbering format, notation, and starting number for each level. */
 function readNumbering(root: XmlElement | undefined, styles: Styles) {
   const abstracts = new Map<string, { levels: Map<number, Level>; link?: string }>();
   const readLevel = (lvl: XmlElement): Level => ({
@@ -274,7 +280,7 @@ function readNumbering(root: XmlElement | undefined, styles: Styles) {
     const n = nums.get(numId);
     if (!n) return undefined;
     let a = abstracts.get(n.abstract);
-    // 列表样式（numStyleLink）：定义在那个样式的编号上。
+    // List style (numStyleLink): defined on the numbering of that style.
     if (a?.link && a.levels.size === 0 && depth < 3) {
       const linked = styles.numPrOfStyle(a.link).numId;
       if (linked && linked !== numId) return levelOf(linked, ilvl, depth + 1);
@@ -288,7 +294,7 @@ function readNumbering(root: XmlElement | undefined, styles: Styles) {
   return { levelOf };
 }
 
-/** 一截有样式的字（样式是算好的，不是相对整段的）。 */
+/** A styled text run (styles are computed, not relative to the paragraph). */
 interface Piece {
   text: string;
   style: RunStyle;
@@ -300,7 +306,7 @@ type Inline =
   | { kind: 'pageBreak' }
   | { kind: 'boxes'; content: XmlElement };
 
-/** 图片的格式（按文件开头的几个字节）；网页里显示不了的（EMF、WMF、TIFF、SVG）返回 null。 */
+/** Image format (based on initial file bytes); returns null for images unviewable in web views (EMF, WMF, TIFF, SVG). */
 export function imageExt(bytes: Uint8Array): ImportedImage['ext'] | null {
   if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47)
     return 'png';
@@ -310,7 +316,7 @@ export function imageExt(bytes: Uint8Array): ImportedImage['ext'] | null {
   return null;
 }
 
-/** VML 的长度（style 里的 width:72pt、1in、96px、2.54cm）→ 磅。 */
+/** VML length (width:72pt, 1in, 96px, 2.54cm in style) -> points. */
 function vmlLength(style: string, key: string): number | undefined {
   const m = new RegExp(`(?:^|;)\\s*${key}\\s*:\\s*([\\d.]+)\\s*(pt|in|px|cm|mm)?`, 'i').exec(style);
   if (!m) return undefined;
@@ -325,10 +331,10 @@ class DocxReader {
   private readonly numbering: ReturnType<typeof readNumbering>;
   private readonly rels: ReturnType<OoxmlPackage['rels']>;
   readonly images = new Map<string, ImportedImage>();
-  /** 脚注、尾注：引用的先后 → 编号（[1]、[2]），文末按这个顺序写出它们的字。 */
+  /** Footnotes and endnotes: citation order -> numbering ([1], [2]), text is written out at the end of the document in this order. */
   private readonly notes: { kind: 'footnote' | 'endnote'; id: string }[] = [];
   private readonly pages: DocBlock[][] = [[]];
-  /** 每一块的字原来的样子（磅、粗细）：全部读完、知道正文字号以后再写成相对整段的。 */
+  /** Original styling (points, weight) for each block's text: written as relative to the paragraph only after fully reading and knowing the body font size. */
   private readonly pieces = new Map<DocParagraph | DocList | DocTableLike, Piece[][]>();
   private spacedNext = false;
   private prev: { after: number; style: string | undefined } | null = null;
@@ -379,7 +385,7 @@ class DocxReader {
     return { doc: this.finish(), images: this.images };
   }
 
-  /** 正文（或文本框、格子外的内容）里的一串块。 */
+  /** A sequence of blocks in the body (or text box, or outside cells). */
   private blockLevel(el: XmlElement) {
     for (const c of children(el)) {
       switch (c.name) {
@@ -404,14 +410,14 @@ class DocxReader {
     }
   }
 
-  /** 兼容内容：用第一个 Choice（新格式），没有时用 Fallback；不两个都读（同一份内容写了两遍）。 */
+  /** Compatibility content: use the first Choice (new format), or Fallback if none; do not read both (the same content written twice). */
   private choice(alt: XmlElement): XmlElement {
     return (
       child(alt, 'mc:Choice') ?? child(alt, 'mc:Fallback') ?? { name: '', attrs: {}, children: [] }
     );
   }
 
-  /** 一段的行内内容，按出现的顺序。 */
+  /** Inline content of a paragraph, in order of appearance. */
   private inlines(p: XmlElement, paraRun: RunStyle): Inline[] {
     const out: Inline[] = [];
     const walk = (el: XmlElement) => {
@@ -438,12 +444,12 @@ class DocxReader {
             break;
           case 'm:oMath':
           case 'm:oMathPara': {
-            // 公式只留字（上下标、分数的排法不留）。
+            // Formula keeps text only (subscript/superscript and fraction layouts are dropped).
             const text = descendants(c, 'm:t').map(ownText).join('');
             if (text) out.push({ kind: 'text', piece: { text, style: paraRun } });
             break;
           }
-          // w:del、w:moveFrom：修订里删掉的字不显示（按「接受全部」）；书签、批注的范围不要。
+          // w:del, w:moveFrom: deleted text in revisions is not displayed (following "accept all"); bookmark and comment ranges are excluded.
         }
       }
     };
@@ -502,12 +508,12 @@ class DocxReader {
           this.run({ ...r, children: [...(rPr ? [rPr] : []), ...alt.children] }, paraRun, out);
           break;
         }
-        // w:instrText（域的代码）、w:delText、w:fldChar、w:sym、批注的记号：不要。
+        // w:instrText (field codes), w:delText, w:fldChar, w:sym, comment markers: omitted.
       }
     }
   }
 
-  /** 图片关系 → 包里的图片（认得出格式的才要）。 */
+  /** Image relationship -> package image (only recognized formats are kept). */
   private image(rid: string | undefined): string | null {
     const rel = rid ? this.rels.get(rid) : undefined;
     if (!rel || rel.external) return null;
@@ -519,7 +525,7 @@ class DocxReader {
     return rel.target;
   }
 
-  /** DrawingML：图片（组合里的也算）和文本框；图表、SmartArt、形状不要。 */
+  /** DrawingML: images (including those in groups) and text boxes; charts, SmartArt, and shapes are omitted. */
   private drawing(d: XmlElement, out: Inline[]) {
     const frame = child(d, 'wp:inline') ?? child(d, 'wp:anchor');
     const extent = child(frame, 'wp:extent');
@@ -536,7 +542,7 @@ class DocxReader {
     for (const pic of pics) {
       const src = this.image(descendants(pic, 'a:blip')[0]?.attrs['r:embed']);
       if (!src) continue;
-      // 组合里的图片用它自己的大小，单独一张用外框的大小。
+      // Images in groups use their own size; single images use the frame size.
       const own = descendants(child(pic, 'pic:spPr'), 'a:ext')[0];
       const size = pics.length === 1 && extent ? extent : (own ?? extent);
       const width = (num(size?.attrs.cx) ?? 200 * EMU_PER_PT) / EMU_PER_PT;
@@ -546,7 +552,7 @@ class DocxReader {
     for (const content of boxes) out.push({ kind: 'boxes', content });
   }
 
-  /** VML（老的 Word 写的图片、文本框，w:object 的预览图）。 */
+  /** VML (images, text boxes written by older Word, preview images of w:object). */
   private vml(el: XmlElement, out: Inline[]) {
     const walk = (e: XmlElement) => {
       for (const c of children(e)) {
@@ -580,7 +586,7 @@ class DocxReader {
     return { styleId, props, run: this.styles.paraRun(styleId) };
   }
 
-  /** 标题级别：样式名是 heading 1 / 2（或 Title）、大纲级别是 1 / 2 级；更低的标题当正文（字号、粗细照原样）。 */
+  /** Heading level: style name is heading 1 / 2 (or Title), outline level is 1 / 2; lower headings are treated as body text (font size and weight kept as is). */
   private headingOf(styleId: string | undefined, props: ParaProps): 1 | 2 | undefined {
     const name = this.styles.name(styleId);
     const m = /^heading\s*([1-9])$/.exec(name);
@@ -603,11 +609,11 @@ class DocxReader {
         ? this.numbering.levelOf(props.numId, props.ilvl ?? 0)
         : undefined;
     const numbered = !!level && level.fmt !== 'none' && level.text !== '';
-    // 没有编号定义、字里写着符号或编号再跟一个制表符的段落（macOS 的「文本编辑」、textutil 存的 Word）：也当列表项。
+    // Paragraphs lacking numbering definitions but starting with symbols or numbering followed by a tab (macOS "TextEdit", Word saved by textutil): also treated as list items.
     const typed = numbered ? null : typedMarker(items);
     const isList = numbered || typed !== null;
     const heading = this.headingOf(styleId, props);
-    // 段前距（这一段的段前加上一段的段后，同一个样式又写了「不加段距」的不算）。
+    // Space before (space before this paragraph plus space after previous paragraph, ignoring cases where the same style specifies "no paragraph spacing").
     const gap =
       this.prev && !(props.contextual && this.prev.style === styleId)
         ? (props.before ?? 0) + this.prev.after
@@ -676,10 +682,10 @@ class DocxReader {
       this.spacedNext = false;
       this.prev = { after: props.after ?? 0, style: styleId };
     } else if (this.prev || this.blocks.length) {
-      // 空段落：下一块和它前面的之间原来空着。
+      // Empty paragraph: original spacing existed between the next block and the preceding block.
       this.spacedNext = true;
     }
-    // 文本框里的字接在它所在的段落后面。
+    // Text box text is appended after its containing paragraph.
     for (const content of deferred) this.blockLevel(content);
   }
 
@@ -689,10 +695,10 @@ class DocxReader {
     level: Level,
     pieces: Piece[],
     spaced: boolean,
-    /** 字里写着的编号（没有编号定义的列表）：和接着数的对不上时另起一个列表。 */
+    /** In-line numbering (lists without numbering definitions): starts a new list when it fails to match the expected sequence. */
     typed?: number,
   ) {
-    // 编号：每个列表每一级数到第几了；上一级出现时下面几级重新数。
+    // Numbering: current count for each level of each list; lower levels restart when a higher level appears.
     const counts = this.counters.get(numId) ?? [];
     for (let k = ilvl + 1; k < counts.length; k++) counts[k] = 0;
     const next = counts[ilvl] ? counts[ilvl]! + 1 : level.start;
@@ -708,7 +714,7 @@ class DocxReader {
     }
     const ordered = level.fmt !== 'bullet';
     const own = `%${ilvl + 1}`;
-    // 编号的写法只留这一级的（「%1.%2.」这种多级的写成「%1.」）。
+    // Numbering format retains only the current level ("%1.%2." style multi-level numbers are written as "%1.").
     const format = ordered
       ? level.text.includes(own) && !/%[1-9]/.test(level.text.split(own).join(''))
         ? level.text.split(own).join('%1')
@@ -718,7 +724,7 @@ class DocxReader {
       kind: 'list',
       ordered,
       ...(format ? { format } : {}),
-      // 「%1」不带符号时 writeDocx 写成带圈的数字（D-328）：原来就是带圈的才写起始号。
+      // When "%1" lacks symbols, writeDocx writes circled numbers (D-328): starting number is written only if originally circled.
       ...(ordered && (format !== '%1' || level.fmt === 'decimalEnclosedCircle')
         ? { start: n }
         : {}),
@@ -731,7 +737,7 @@ class DocxReader {
     this.list = { numId, ilvl, block };
   }
 
-  /** 格子里的字：段落一行一行；列表项前面加上符号、编号；嵌套的表一行一行、格子之间用制表符。 */
+  /** Cell text: paragraphs line by line; list items prefixed with symbols/numbers; nested tables line by line, cells separated by tabs. */
   private cellText(tc: XmlElement, images: Inline[], pieces: Piece[]): string {
     const lines: string[] = [];
     const counters = new Map<string, number>();
@@ -783,7 +789,7 @@ class DocxReader {
       }
     };
     walk(tc);
-    // 格子末尾的空行（Word 的格子总以一个段落结尾）不要。
+    // Trailing empty lines at the end of cells (Word cells always end with a paragraph) are removed.
     while (lines.length && !lines.at(-1)!.trim()) lines.pop();
     return lines.join('\n');
   }
@@ -821,7 +827,7 @@ class DocxReader {
     );
     const tblPr = child(tbl, 'w:tblPr');
     const cells: TableCell[] = [];
-    /** 每一行每个位置属于第几个格子。 */
+    /** Which cell each position in each row belongs to. */
     const owner: number[][] = [];
     const images: Inline[] = [];
     const pieces: Piece[] = [];
@@ -839,7 +845,7 @@ class DocxReader {
         const borders = child(tcPr, 'w:tcBorders');
         if (borders && hasVisibleBorder(borders)) visible = true;
         const text = this.cellText(tc, images, pieces);
-        // 竖着合并的续格：接到上一行同一列的格子上。
+        // Vertically merged continuation cell: linked to the cell in the same column of the previous row.
         const above = r > 0 ? owner[r - 1]![col] : undefined;
         if (vMerge && vMerge.attrs['w:val'] !== 'restart' && above !== undefined) {
           const cell = cells[above]!;
@@ -850,7 +856,7 @@ class DocxReader {
             continue;
           }
         }
-        // 老的横着合并（hMerge）：续格并进左边那一格。
+        // Legacy horizontally merged cell (hMerge): continuation cell merged into the cell to its left.
         const left = col > 0 ? owner[r]![col - 1] : undefined;
         if (hMerge && hMerge.attrs['w:val'] !== 'restart' && left !== undefined) {
           const cell = cells[left]!;
@@ -877,7 +883,7 @@ class DocxReader {
     });
     const cols = Math.max(grid.length, ...owner.map((row) => row.length), 0);
     if (!rows.length || !cols) return;
-    // 网格里没有格子的位置（gridBefore / gridAfter、行比别的行短）补空格子：每个位置正好属于一个格子。
+    // Grid positions lacking cells (gridBefore / gridAfter, rows shorter than others) are padded with empty cells: each position belongs to exactly one cell.
     for (let r = 0; r < rows.length; r++) {
       for (let c = 0; c < cols; c++) {
         if (owner[r]![c] === undefined) {
@@ -887,7 +893,7 @@ class DocxReader {
       }
     }
     cells.sort((a, b) => a.row - b.row || a.col - b.col);
-    // 列宽：网格里写的（磅）；没写、写成 0 的平分内容区。
+    // Column width: specified in the grid (points); unassigned or zero-width columns evenly split the content area.
     const fallback = CONTENT_PT / cols;
     const colWidths = Array.from({ length: cols }, (_, c) =>
       grid[c] && grid[c]! > 1 ? grid[c]! : fallback,
@@ -907,7 +913,7 @@ class DocxReader {
     this.push(table);
     this.spacedNext = false;
     this.prev = { after: 0, style: undefined };
-    // 格子里的图片放在表后面（格子里只放字）。
+    // Images inside cells are placed after the table (cells contain text only).
     for (const item of images) {
       if (item.kind !== 'image') continue;
       this.push({
@@ -918,7 +924,7 @@ class DocxReader {
     }
   }
 
-  /** 脚注、尾注的字放到文末，一条一段，前面是正文里的记号。 */
+  /** Footnote and endnote text is placed at the end of the document, one paragraph per entry, preceded by the body marker. */
   private writeNotes() {
     if (!this.notes.length) return;
     const parts = new Map<string, Map<string, XmlElement>>();
@@ -945,7 +951,7 @@ class DocxReader {
           if (item.kind === 'text') body.push(item.piece);
         }
       });
-      // 脚注里原来的记号后面跟着一个空格：去掉开头的空白，记号换成 [n]。
+      // Footnotes originally having a space after the marker: leading whitespace is stripped, and the marker is converted to [n].
       while (body.length && !body[0]!.text.trim()) body.shift();
       if (!body.length) return;
       body[0] = { ...body[0]!, text: body[0]!.text.trimStart() };
@@ -963,7 +969,7 @@ class DocxReader {
     });
   }
 
-  /** 读完了：按全文最多的字号定正文字号，每一块的字写成相对整段的样子。 */
+  /** Finished reading: determine body font size based on the most frequent font size in the text, and write each block's text relative to the paragraph. */
   private finish(): DocDoc {
     const sizes = new Map<number, number>();
     for (const [block, lists] of this.pieces) {
@@ -999,7 +1005,7 @@ class DocxReader {
       if (base.bold) block.bold = true;
       if (base.italic) block.italic = true;
       if (base.underline) block.underline = true;
-      // 颜色只能整段一种：整段的字都是同一个颜色（不是黑色、自动）时才写。
+      // Color can only be uniform per paragraph: written only when all text runs in the paragraph share the same color (when not black or automatic).
       const colors = new Set(all.filter((p) => p.text.trim()).map((p) => colorOf(p.style.color)));
       if (colors.size === 1) {
         const color = [...colors][0];
@@ -1024,10 +1030,10 @@ class DocxReader {
   }
 }
 
-/** 字里的列表记号：开头（可以先有一个制表符）是符号或 1–3 位的编号（后面可以有 . 或 )），再跟一个制表符。 */
+/** In-line list marker: starts with an optional tab, followed by a symbol or 1-3 digit number (optionally followed by . or )), and another tab. */
 const TYPED_MARKER = /^\t?(?:([•◦▪●○■□–·-])|(\d{1,3})[.)]?)\t/;
 
-/** 段落开头写着列表记号时去掉它（改的是这一段读出来的字），返回当作哪种列表。 */
+/** Strips the list marker when present at the start of a paragraph (modifying the text read from this paragraph), and returns the matched list type. */
 function typedMarker(items: Inline[]): { key: string; level: Level; n?: number } | null {
   const texts = items.filter((i): i is Extract<Inline, { kind: 'text' }> => i.kind === 'text');
   const head = texts
@@ -1048,7 +1054,7 @@ function typedMarker(items: Inline[]): { key: string; level: Level; n?: number }
     : { key: '#typed-number', level: { fmt: 'decimal', text: '%1.', start: 1 }, n: Number(m[2]) };
 }
 
-/** DocTable 的样子（读的时候还要改 size）。 */
+/** DocTable representation (size must also be modified during reading). */
 type DocTableLike = Extract<DocBlock, { kind: 'table' }>;
 
 function hasVisibleBorder(borders: XmlElement): boolean {
@@ -1064,7 +1070,7 @@ function alignOf(jc: string | undefined): CellAlign | undefined {
 const colorOf = (c: string | undefined) =>
   c && /^[0-9a-fA-F]{6}$/.test(c) && c !== '000000' ? c.toUpperCase() : undefined;
 
-/** 一组字里占字数最多的那个值（空白不算；全是空白时按长度）。 */
+/** The most frequent value among a set of text runs (excluding whitespace; falls back to length if all whitespace). */
 function dominant<T>(pieces: readonly Piece[], read: (s: RunStyle) => T): T | undefined {
   const count = new Map<T, number>();
   for (const p of pieces) {
@@ -1074,7 +1080,7 @@ function dominant<T>(pieces: readonly Piece[], read: (s: RunStyle) => T): T | un
   return [...count].sort((a, b) => b[1] - a[1])[0]?.[0];
 }
 
-/** 和整段不一样的几截（同 doc-runs 的 ownRuns）：一样的项不写，相邻样式一样的并成一截。 */
+/** Runs differing from the paragraph style (same as ownRuns in doc-runs): identical items are omitted, and adjacent runs with the same style are merged. */
 function ownRuns(pieces: readonly Piece[], base: RunStyle): DocRun[] | undefined {
   const out: DocRun[] = [];
   for (const p of pieces) {
@@ -1098,7 +1104,7 @@ function ownRuns(pieces: readonly Piece[], base: RunStyle): DocRun[] | undefined
 const sameRun = (a: DocRun, b: DocRun) =>
   a.size === b.size && a.bold === b.bold && a.italic === b.italic && a.underline === b.underline;
 
-/** 读一份外来的 docx。加了密码、不是 docx、坏了、太大时抛 OfficeImportFailure。 */
+/** Read an incoming docx. Throws OfficeImportFailure when password-protected, not a docx, corrupted, or too large. */
 export function importDocx(data: Uint8Array): DocxImport {
   const pkg = openPackage(
     data,

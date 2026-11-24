@@ -10,8 +10,9 @@ import android.os.Build
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
-// 桌面小组件（D-321–D-323）的 App 这一边：写画面并重画、取走点了的操作、请求把小组件放到桌面。
-// 小组件上点了操作时 App 开着，发 onQueue 让 JS 马上取走执行。
+// App-side implementation for desktop widgets (D-321–D-323): renders and redraws layouts, retrieves
+// tapped actions, and requests pinning widgets to the desktop. When a widget action is tapped while
+// the app is running, triggers onQueue so JS immediately retrieves and executes it.
 
 class MorphWidgetsModule : Module() {
   companion object {
@@ -49,7 +50,7 @@ class MorphWidgetsModule : Module() {
         AppWidgetManager.getInstance(context).isRequestPinAppWidgetSupported
     }
 
-    // 系统弹确认框（有的桌面直接放上去），用户决定；放好后系统回调 ACTION_BIND，记下显示哪个组件。
+    // System pops up a confirmation dialog (some launchlers place it directly), determined by the user; upon successful placement, the system callbacks ACTION_BIND to record which component is displayed.
     AsyncFunction("pin") { itemId: String, _: String ->
       val ctx = context
       if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return@AsyncFunction false
@@ -59,7 +60,7 @@ class MorphWidgetsModule : Module() {
         .setAction(ACTION_BIND)
         .setData(Uri.parse("morph-widget://bind/${Uri.encode(itemId)}"))
         .putExtra(EXTRA_ITEM, itemId)
-      // 系统要往回调里填小组件的 ID，所以是 MUTABLE。
+      // The system needs to populate the widget ID into the callback, so it is MUTABLE.
       val flags = PendingIntent.FLAG_UPDATE_CURRENT or
         (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
       val pending = PendingIntent.getBroadcast(ctx, itemId.hashCode(), callback, flags)

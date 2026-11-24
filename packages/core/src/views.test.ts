@@ -26,7 +26,7 @@ import {
 import type { Collection, NewComponent } from './schema';
 import { registry } from './test-helpers';
 
-// 阶段 C2（方案 P7）：月历外观、字段显示格式 elapsed / progress、统计的目标和「和上一段比」。
+// Phase C2 (Scheme P7): monthly view, elapsed / progress field display formats, statistic targets, and "compared to previous period".
 process.env.TZ = 'Europe/Paris';
 
 const mood: Collection = {
@@ -67,7 +67,7 @@ const day = (s: string) => dayNumber(s)!;
 
 describe('month calendar (D-305)', () => {
   it('lays out whole weeks, Monday or Sunday first', () => {
-    // 2026-10-01 是周四，10-31 是周六。
+    // 2026-10-01 is Thursday, 10-31 is Saturday.
     const mon = monthWeeks('2026-10', DEFAULT_CALENDAR);
     expect(mon).toHaveLength(5);
     expect(dateOfDayNumber(mon[0]![0]!)).toBe('2026-09-28');
@@ -75,7 +75,7 @@ describe('month calendar (D-305)', () => {
     const sun = monthWeeks('2026-10', sunday);
     expect(dateOfDayNumber(sun[0]![0]!)).toBe('2026-09-27');
     expect(dateOfDayNumber(sun.at(-1)![6]!)).toBe('2026-10-31');
-    // 2026-02 从周日开始的话正好四周。
+    // 2026-02 starting on Sunday has exactly 4 weeks.
     expect(monthWeeks('2026-02', sunday)).toHaveLength(4);
     for (const w of [...mon, ...sun]) expect(w).toHaveLength(7);
   });
@@ -131,7 +131,7 @@ describe('month calendar (D-305)', () => {
     expect(oct.days.get(day('2026-10-31'))?.count).toBe(2);
     const plain = monthDays(records, mood, { date: 'at' }, '2026-10', now, DEFAULT_CALENDAR);
     expect(plain.days.get(day('2026-10-31'))?.count).toBe(1);
-    // 同一天按日期时间排：较晚的那条在前。
+    // Same day sorted by date/time: the later entry comes first.
     const sameDay = [
       rec({ at: '2026-10-10T21:00', feel: 'bad' }),
       rec({ at: '2026-10-10T08:00', feel: 'good' }),
@@ -174,7 +174,7 @@ describe('month calendar (D-305)', () => {
       DEFAULT_CALENDAR,
     );
     expect(performance.now() - start).toBeLessThan(200);
-    expect(days.size).toBe(27); // 300 天到 10 月 27 日为止
+    expect(days.size).toBe(27); // 300 days up to October 27
   });
 
   it('shade levels 1–4 relative to the busiest day', () => {
@@ -227,7 +227,7 @@ describe('display formats elapsed and progress (D-306)', () => {
       seconds: 90,
       running: true,
     });
-    // 结束早于开始：0，不是负数。
+    // End earlier than start: 0, not negative.
     expect(
       elapsedOf(rec({ at: '2026-10-29T08:00', end: '2026-10-29T07:00' }), mood, 'at', 'end', now),
     ).toEqual({ seconds: 0, running: false });
@@ -254,7 +254,7 @@ describe('display formats elapsed and progress (D-306)', () => {
 });
 
 describe('stat compared with the previous period (D-308)', () => {
-  const now = new Date(2026, 9, 29, 12); // 周四
+  const now = new Date(2026, 9, 29, 12); // Thursday
 
   it('the same part of the previous period', () => {
     const cal = DEFAULT_CALENDAR;
@@ -272,12 +272,12 @@ describe('stat compared with the previous period (D-308)', () => {
     expect(
       previousPeriodRange('thisTwoWeeks', now, { ...cal, twoWeekStart: '2026-10-19' }),
     ).toEqual(['2026-10-05', '2026-10-15']);
-    // 3 月 31 日比 2 月：到 2 月底为止。
+    // March 31 compared to February: up to the end of February.
     expect(previousPeriodRange('thisMonth', new Date(2026, 2, 31), cal)).toEqual([
       '2026-02-01',
       '2026-02-28',
     ]);
-    // 闰年 2 月 29 日比去年：到 2 月 28 日。
+    // Leap year February 29 compared to last year: up to February 28.
     expect(previousPeriodRange('thisYear', new Date(2028, 1, 29), cal)).toEqual([
       '2027-01-01',
       '2027-02-28',
@@ -396,7 +396,7 @@ describe('block checks (D-305–D-308)', () => {
     const text = (c: NewComponent) => problems(c).join(' | ');
     expect(text(calendar({ color: 'note' }))).toMatch(/color.*note.*choice/);
     expect(text(calendar({}, 'cups'))).toMatch(/source.group.by cups must be a date or datetime/);
-    // D-541：每种记录外观都能按单选字段上色。
+    // D-541: Every record view can be colored by a single-select field.
     expect(text(list({ color: 'feel' }))).toBe('');
     expect(text(list({ format: { kind: 'elapsed' } }))).toMatch(/needs show.trailing/);
     expect(text(list({ trailing: 'cups', format: { kind: 'elapsed' } }))).toMatch(

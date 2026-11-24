@@ -22,17 +22,17 @@ import { Toast } from '@/shell/Toast';
 import { useWorkspace, useWorkspaceContext } from '@/workspace/context';
 import { shownConfig } from '@/workspace/store';
 
-/** 不在导航栏里的页面（工具页、用户新建的页面）：同一个渲染器，渲染工作空间配置中的某一页。 */
+/** Pages not in navigation bar (tool pages, user-created pages): same renderer, renders a specific page from the workspace config. */
 export default function PageRoute() {
   const { pageId, record: recordId } = useLocalSearchParams<{
     pageId: string;
-    /** 给一条记录用的页面（D-342）：从列表点开的那条记录。 */
+    /** Page for a single record (D-342): the record opened from a list. */
     record?: string;
   }>();
   const { registry, locale, repo } = useWorkspaceContext();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  // 草稿模式里显示草稿（D-190）。
+  // Show the draft in draft mode (D-190).
   const config = useWorkspace(shownConfig)!;
   const headId = useWorkspace((s) => s.head!.id);
   const reportRenderError = useWorkspace((s) => s.reportRenderError);
@@ -42,12 +42,12 @@ export default function PageRoute() {
   const cancelEditing = useWorkspace((s) => s.cancelEditing);
   const startEditing = useWorkspace((s) => s.startEditing);
   const page = config.containers.pages.find((p) => p.id === pageId);
-  // 推入的页面用它所属 app 的风格（D-485）；主页的页面用主页的。
+  // Pushed pages use their app's style (D-485); home screen pages use the home screen style.
   const palette = usePalette(appViewOf(config, page?.app ?? null).theme);
   const { navigate, locked, inDraft } = useShellEnv();
   const recordOf = page?.of;
   const collection = recordOf ? config.data.tables.find((c) => c.id === recordOf) : undefined;
-  // 这条记录：标题写在页面顶部；改了、删了以后重新读（undefined = 还在读）。
+  // This record: title shown at the top of the page; re-read after modification or deletion (undefined = still loading).
   const version = useWorkspace((s) => (recordOf ? tableVersion(s, recordOf) : ''));
   const [record, setRecord] = useState<DataRecord | null | undefined>(undefined);
   useEffect(() => {
@@ -57,7 +57,7 @@ export default function PageRoute() {
       .then((r) => setRecord(r && r.deletedAt === null && r.collectionId === recordOf ? r : null));
   }, [repo, recordOf, recordId, version]);
 
-  // 页面被关闭（例如它被删除）时放弃未保存的编辑。
+  // Discard unsaved edits when the page is closed (e.g. deleted).
   useEffect(() => () => cancelEditing(), [cancelEditing]);
 
   const opened = recordOf && recordId ? record : null;
@@ -87,16 +87,17 @@ export default function PageRoute() {
       <Stack.Screen
         options={{
           ...stackScreenOptions(palette),
-          // 给一条记录用的页面以这条记录为标题（在本机拼，AI 看不到）。
+          // Page for a single record uses that record as its title (assembled locally, invisible to AI).
           title:
             opened && collection
               ? linkTitle(opened, collection, locale)
               : builtinText(page.title, locale, registry),
-          // 在当前页面直接发起修改，预览会聚焦这一页。
-          // 编辑模式下不能返回：先在页面顶部点「完成」或「取消」，草稿不会丢失（D-054）。
+          // Initiate edits directly on the current page, preview focuses on this page. Cannot go
+          // back in edit mode: tap "Done" or "Cancel" at the top of the page first, draft will not
+          // be lost (D-054).
           headerBackVisible: !editing,
           gestureEnabled: !editing,
-          // AI 修改是改界面的唯一入口（D-190）；草稿模式里它打开聊天框。
+          // AI modification is the sole entry point for UI changes (D-190); opens the chat box in draft mode.
           headerRight: () =>
             editing ? null : (
               <View style={styles.headerActions}>
@@ -109,7 +110,7 @@ export default function PageRoute() {
                     <UiIcon name="edit" size={20} color={palette.primaryText} />
                   </Pressable>
                 ) : null}
-                {/* 「编辑」进入整页编辑模式（D-053），入口继续关闭；长按单组件编辑另外开放（D-235，editing/entry.ts）。 */}
+                {/* "Edit" enters full-page edit mode (D-053), entry point remains closed; long-press single component editing is opened separately (D-235, editing/entry.ts). */}
                 {directEditEntry.pageButton && !inDraft ? (
                   <Pressable testID="page-edit" onPress={() => startEditing(page.id)} hitSlop={10}>
                     <Text style={[palette.font('bodyBold', 16), { color: palette.primaryText }]}>
@@ -122,7 +123,7 @@ export default function PageRoute() {
             ),
         }}
       />
-      {/* 草稿模式里内容区用草稿的背景（D-190）；顶部导航栏仍跟着已保存的版本。 */}
+      {/* Draft mode uses the draft background for the content area (D-190); top navigation bar still follows the saved version. */}
       <View style={[styles.fill, inDraft && palette.backdrop]}>
         {inDraft ? null : <Banner palette={palette} />}
         <DraftNotice palette={palette} />

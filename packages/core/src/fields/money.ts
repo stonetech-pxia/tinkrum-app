@@ -19,13 +19,13 @@ const schema = z.strictObject({
   ...fieldBase,
   type: z.literal('money'),
   currency: z.string().regex(/^[A-Z]{3}$/, 'currency must be an ISO code like CNY'),
-  /** 每一笔单独选货币（D-429）：同一张表里的单选字段，选项 ID 是小写的货币代码；没选时用 currency。 */
+  /** Select a separate currency for each entry (D-429): single-select field in the same table where option IDs are lowercase currency codes; uses currency when unselected. */
   currencyField: IdSchema.optional(),
   default: z.number().finite().optional(),
   ...rangeKeys,
 });
 
-/** 金额：两位小数，按货币显示。 */
+/** Money: two decimal places, displayed according to currency. */
 export const moneyField: FieldDefinitionOf<'money', typeof schema> = defineField({
   type: 'money',
   schema,

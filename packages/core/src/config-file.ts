@@ -2,13 +2,15 @@ import { localDate } from './field-values';
 import { usesOf } from './file-uses';
 import { CURRENT_SCHEMA_VERSION, type WorkspaceConfig } from './schema';
 
-// 「设置 → 数据 → 导出 App 配置」：把 App 的设计（页面、数据表的结构、快捷操作、提醒、主题）存成一个文件。
-// 不含记录、用户文件和预填记忆；配置里的照片只是随机文件 ID（D-046），文件本身不在里面。
+// "Settings → Data → Export App Config": Saves the app's design (pages, data table structures,
+// quick actions, reminders, theme) into a file. Does not include records, user files, or prefill
+// memory; photos in the config are just random file IDs (D-046), and the files themselves are not
+// stored inside.
 
 export const APP_CONFIG_FILE_FORMAT = 'morph-app-config';
 const FILE_VERSION = 1;
 
-/** 外层带「用到了什么」（D-556）：读的版本能说出自己缺什么；不在 config 里面，不存进本机的配置。 */
+/** Includes "uses what" metadata at the outer layer (D-556): the read version can report what it lacks; this is not part of config and is not stored in local configuration. */
 export function appConfigFile(config: WorkspaceConfig, now: Date): string {
   return JSON.stringify(
     {
@@ -23,26 +25,28 @@ export function appConfigFile(config: WorkspaceConfig, now: Date): string {
   );
 }
 
-/** 文件名带日期（本地时间），导出几次不会互相覆盖。 */
+/** Filename includes date (local time); multiple exports will not overwrite each other. */
 export function appConfigFileName(now: Date): string {
   return `tinkrum-config-${localDate(now)}.json`;
 }
 
 /**
- * 配置文件最多多大：一个真实的 App 配置只有几十 KB，超过这个的不是配置文件，也不往内存里读。
- * 选文件时按字节数比，读出来的文字按字符数比（一个字符至少一个字节，所以不会比文件的限制更严）。
+ * Maximum configuration file size: a real app config is only tens of KB; anything exceeding this
+ * is not a config file and is not read into memory. File selection compares byte counts, while
+ * the read text compares character counts (since each character is at least one byte, this is
+ * never stricter than the file size limit).
  */
 export const MAX_APP_CONFIG_SIZE = 2_000_000;
 
-/** 读不了的原因；调用的地方各自翻成用户看得懂的话（messages）。 */
+/** Reason for unreadability; callers translate these into user-facing messages (messages). */
 export type AppConfigFileProblem =
-  /** 太大。 */
+  /** too large. */
   | 'tooLarge'
-  /** 不是 JSON。 */
+  /** not JSON. */
   | 'notJson'
-  /** 是 JSON，但不是 App 配置文件（别的格式、缺 format / version / config）。 */
+  /** Valid JSON, but not an app configuration file (different format, missing format / version / config). */
   | 'wrongFormat'
-  /** 文件或里面的配置是更新的 Tinkrum 做的，这个版本读不了。 */
+  /** The file or its configuration was created by a newer version of Tinkrum and cannot be read by this version. */
   | 'newerApp';
 
 export type ParsedAppConfigFile =
@@ -52,9 +56,11 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /**
- * 读导入的 App 配置文件：导出的文件（format、version、config；门户下载的预设也是这个格式），
- * 或者直接是一份配置（有 schemaVersion）。只认文件的形状和版本；旧版本配置的迁移、校验和清文件引用
- * 由后面的 prepareSnapshot / preparePreset 做（底线 3、12、18）。
+ * Read imported app configuration file: exported files (format, version, config; preset downloads
+ * from portal also use this format), or directly a configuration object (with schemaVersion).
+ * Only recognizes file shape and version; migration, validation, and clearing of file references
+ * for older version configs are handled subsequently by prepareSnapshot / preparePreset
+ * (invariants 3, 12, 18).
  */
 export function parseAppConfigFile(text: string): ParsedAppConfigFile {
   if (text.length > MAX_APP_CONFIG_SIZE) return { ok: false, problem: 'tooLarge' };

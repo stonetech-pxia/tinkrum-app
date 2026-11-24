@@ -31,10 +31,14 @@ import { statText, useLinkedGroups } from './data';
 import { cardColors } from './theme';
 import { Card } from './ui';
 
-// 图表组件（D-249）：分组和数值都在 core/chart.ts 算好，这里只画。点按和读屏靠一排透明的可点区域（每根柱子、每个点一格）。
-// 柱状图（没有负数时）和折线用 Victory Native XL 画（ChartPlot.tsx，D-438），有负数的柱状图和饼图用 Skia 的 Path。
-// 单一序列用主色、不画图例（标题就是它的名字）；饼图每块用固定顺序的分类色，图例总是列出名字和数值，
-// 所以不只靠颜色区分。点一根柱子 / 一个点 / 一行图例，标题下面显示它的数值（代替悬停提示）。
+// Chart component (D-249): grouping and values are computed in core/chart.ts, and only rendered
+// here. Tapping and screen reader accessibility rely on a row of transparent clickable areas (one
+// grid cell per bar or point). Bar charts (when there are no negative numbers) and line charts are
+// rendered using Victory Native XL (ChartPlot.tsx, D-438), while bar charts with negative numbers
+// and pie charts use Skia Path. A single series uses the primary color without a legend (the title
+// serves as its name); each pie slice uses a fixed-order categorical color, and the legend always
+// lists names and values so it does not rely solely on color. Tapping a bar / point / legend row
+// displays its value below the title (replacing tooltips).
 
 export function Chart({
   block,
@@ -49,22 +53,24 @@ export function Chart({
   const { source, show } = block;
   const table = env.config.data.tables.find((c) => c.id === source.table);
   const cal = calendarOf(env.config);
-  // 查找、汇总、上一条（D-291）按算好的值画。
+  // Lookups, summaries, and previous entries (D-291) are rendered based on computed values.
   const { view: collection, records } = useComputedRecords(env.config.data.tables, table, cal);
-  // 按单选 / 引用字段分组（没有 unit）；引用字段（D-336）：被引用的表里每条记录一个点。
+  // Grouping by single-select / reference fields (no unit); reference fields (D-336): one point per record in the referenced table.
   const byChoice = source.group.unit === undefined;
   const linked = useLinkedGroups(env, collection, byChoice ? source.group.by : undefined);
   const [picked, setPicked] = useState<number | null>(null);
   if (!collection) return null;
   const now = new Date();
   const field = source.field ? collection.fields.find((f) => f.id === source.field) : undefined;
-  // 页面上选的时间范围（D-440）：source.period 是 "page" 且页面有 period 块时，按选的范围画；
-  // 筛选里的 inPeriod 不再用，时间分组的 group.unit 和 last 也不再用（按范围长短自己选）。
+  // Time range selected on the page (D-440): when source.period is "page" and the page has a period
+  // block, render according to the selected range; inPeriod in filters is no longer used, and time
+  // grouping's group.unit and last are also no longer used (chosen automatically based on range
+  // length).
   const choice = source.period === 'page' ? env.pageRange?.choice : undefined;
   const matched = filterRecords(
     records ?? [],
     collection,
-    // 跟着页面上的一排选项（D-573）：只画选中那一项的记录。
+    // Follows a row of options on the page (D-573): render only records for the selected item.
     choice
       ? (followedFilter(source, env.pageChoice) ?? []).filter((c) => c.op !== 'inPeriod')
       : followedFilter(source, env.pageChoice),
@@ -73,7 +79,7 @@ export function Chart({
   );
   const timed = source.group.unit !== undefined;
   const range = choice ? choiceRange(choice, now, cal) : undefined;
-  // 饼图（按单选分组）没有时间段，只留下范围里的记录；用哪个日期和数日子的统计一样。
+  // Pie charts (grouped by single-select) have no time period, keeping only records within the range; which date to use is determined the same way as date-counting statistics.
   const dateRef = dateFieldOf(collection, timed ? source.group.by : source.days?.date);
   const inRange =
     range && !timed ? recordsInRange(matched, collection, dateRef, range, now, cal) : matched;
@@ -90,8 +96,11 @@ export function Chart({
     t(locale, 'chartOther'),
   );
   const points = show.kind === 'pie' ? pieSlices(series, t(locale, 'chartOther')) : series;
-  // 上一期（D-439）：只有时间分组、柱状图和折线图（配置检查保证），和最近几段一一对应。
-  // 选了页面范围时（D-440）是紧挨在前面的一整段，段数不一样时（上个月比这个月短）按位置对齐、多的去掉、少的补 0。
+  // Previous period (D-439): only for time grouping, bar charts, and line charts (ensured by config
+  // validation), corresponding one-to-one with the recent segments. When a page range is selected
+  // (D-440), it is the full segment immediately preceding; when segment counts differ (e.g., last
+  // month shorter than this month), they are aligned by position, excess removed, and missing
+  // padded with 0.
   const previous =
     source.compare === 'previous' && timed && show.kind !== 'pie'
       ? (() => {
@@ -146,8 +155,9 @@ export function Chart({
           p.value === 0 &&
           !p.parts?.some((part) => part.value !== 0)),
     );
-  // 默认显示最后一段（时间）或最大的一块（单选）。
-  // 时间分组：今天所在的那一段（选了页面范围时，范围里还没到的日子在后面，不默认显示它们）。
+  // Defaults to displaying the last segment (time) or the largest slice (single-select). Time
+  // grouping: the segment containing today (when a page range is selected, future days within the
+  // range are at the end and not displayed by default).
   const today = todayText(now, cal);
   const nowIndex = points.reduce(
     (found, p, i) => (p.key !== null && p.key <= today ? i : found),
@@ -156,7 +166,7 @@ export function Chart({
   const fallback = byChoice
     ? points.reduce((best, p, i) => (p.value > (points[best]?.value ?? -Infinity) ? i : best), 0)
     : nowIndex;
-  // show.pickPeriod（D-585）：页面上选的范围正好是某一段时，高亮那一段，不管是点柱子选的还是别处选的。
+  // show.pickPeriod (D-585): highlights the specific segment when the page-selected range matches that segment, whether selected by tapping a bar or elsewhere.
   const unit = source.group.unit;
   const rangePicked =
     show.pickPeriod && unit && env.pageRange
@@ -191,12 +201,12 @@ export function Chart({
 
   const pickPoint = (p: ChartPoint, i: number) => {
     setPicked(i);
-    // 点图只改变页面上的时间选择，不写记录（底线 15）。
+    // Tapping a chart only changes the time selection on the page, without writing records (invariant 15).
     if (show.pickPeriod && unit && p.key && env.pageRange)
       env.pageRange.set(unitRange(p.key, unit));
   };
 
-  // 每个点一格可以点的区域（盖在图上，比柱子和点本身大）：读屏、点一下看数值都靠它。
+  // Clickable area grid for each point (overlaid on the chart, larger than the bars and points themselves): used for screen readers and tapping to view values.
   const slots = (prefix: 'bar' | 'point') => (
     <View style={[StyleSheet.absoluteFill, styles.bars]}>
       {points.map((p, i) => (
@@ -232,7 +242,7 @@ export function Chart({
       </SplitChartPlot>
     );
   } else if (show.kind === 'bar' && [...points, ...(previous ?? [])].every((p) => p.value >= 0)) {
-    // 没有负数：Victory 画（柱子从 0 画起）；有负数的用下面原来的画法，Victory 的柱子只会画到图的底边。
+    // No negative numbers: rendered with Victory (bars start from 0); negative numbers use the original rendering method below, as Victory bars would only extend to the bottom edge of the chart.
     plot = (
       <ChartPlot
         kind="bar"
@@ -319,8 +329,9 @@ export function Chart({
     );
   } else {
     const total = points.reduce((s, p) => s + p.value, 0);
-    // 按单选分组时，颜色由字段里的选项顺序决定（D-568），和拆分图一致；「其他」和「未选」是灰；
-    // 有选项写了颜色时，没写的避开那些颜色的色系（D-571）。
+    // When grouping by a single-select field, colors are determined by the option order within the
+    // field (D-568), consistent with split charts; "Other" and "Unselected" are gray; if any
+    // options specify colors, unassigned options avoid those color families (D-571).
     const groupBy = byChoice ? collection.fields.find((f) => f.id === source.group.by) : undefined;
     const options = groupBy?.type === 'choice' ? groupBy.options : [];
     const colorOf = (p: ChartPoint, i: number) =>
@@ -343,7 +354,7 @@ export function Chart({
           {paths.map((d, i) =>
             d ? <Path key={`fill-${i}`} path={d} color={colorOf(points[i]!, i)} /> : null,
           )}
-          {/* 块与块之间 2px 的缝（表面色描边）。 */}
+          {/* 2px gap between blocks (surface color border). */}
           {paths.map((d, i) =>
             d && points.length > 1 ? (
               <Path
@@ -366,7 +377,7 @@ export function Chart({
               onLongPress={env.onLongPress}
               style={styles.legendRow}>
               <View style={[styles.swatch, { backgroundColor: colorOf(p, i) }]} />
-              {/* 名称和数值上下排：法语金额（「1 234,50 CNY」）较长，并排时名称会被截断。 */}
+              {/* Name and value stacked vertically: French currency ("1 234,50 CNY") is relatively long, and side-by-side layout would truncate the name. */}
               <View style={styles.flex}>
                 <Text
                   numberOfLines={2}
@@ -410,7 +421,7 @@ export function Chart({
         </View>
       ) : null}
       {show.kind !== 'pie' && !nothing && points.length > 1 ? (
-        // 只标第一段和最后一段，中间的点一下才看。
+        // Label only the first and last segments; intermediate points are shown on tap.
         <View style={styles.axis}>
           <Text style={[palette.font('body', 12), { color: palette.caption }]}>
             {points[0]!.label}

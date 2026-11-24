@@ -23,7 +23,7 @@ const schema = z.strictObject({
   ...rangeKeys,
 });
 
-/** 数字，可以有小数位和单位。 */
+/** Number, can have decimal places and units. */
 export const numberField: FieldDefinitionOf<'number', typeof schema> = defineField({
   type: 'number',
   schema,

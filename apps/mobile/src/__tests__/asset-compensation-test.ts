@@ -4,14 +4,15 @@ import { mergeUserPdfs } from '../storage/user-files';
 import { copyUserFiles } from '../storage/copy-files';
 import { FakeFiles, makePdf } from '../test-utils/fake-files';
 
-// R10：文件已经复制进 App、数据库里却登记不上时，这一个新副本要删掉（否则存储空间页看不到、也删不掉）。
-// 只补偿这一次新建的副本：原件、之前已经登记好的、收件那一批不动。
+// R10: when a file is already copied into the app but fails to register in the database, this new
+// copy must be deleted (otherwise storage space page won't show or delete it). Only compensates
+// this newly created copy: original, previously registered items, and inbox batch remain untouched.
 
 const diskAssets = (files: FakeFiles) =>
   [...files.disk.keys()].filter((k) => k.startsWith('assets/'));
 
-describe('复制进文档库：登记失败时删掉这个新副本', () => {
-  it('第 2 个登记不上：第 1 个还在文档库里，第 2 个的副本删掉，返回 copyFailed', async () => {
+describe('Copy into document library: delete new copy on registration failure', () => {
+  it('2nd fails to register: 1st remains in document library, 2nd copy is deleted, returns copyFailed', async () => {
     const repo = new MemoryWorkspaceRepo();
     const files = new FakeFiles();
     const a = files.offer('one.txt', new Uint8Array([1, 2, 3]), 'text/plain');
@@ -27,15 +28,15 @@ describe('复制进文档库：登记失败时删掉这个新副本', () => {
     expect(result.created).toHaveLength(1);
     const kept = await repo.listAssets();
     expect(kept.map((x) => x.name)).toEqual(['one.txt']);
-    // 磁盘上只剩已经登记的那个；原件没动。
+    // Only the registered one remains on disk; original is untouched.
     expect(diskAssets(files)).toEqual([kept[0]!.path]);
     expect(files.disk.has(a.uri)).toBe(true);
     expect(files.disk.has(b.uri)).toBe(true);
   });
 });
 
-describe('合并 PDF：登记失败时删掉合成的新文件，原来的不动', () => {
-  it('addAsset 失败：抛错，磁盘上没有留下合成的副本', async () => {
+describe('Merge PDF: delete synthesized new file on registration failure, originals untouched', () => {
+  it('addAsset failure: throws error, no synthesized copy left on disk', async () => {
     const repo = new MemoryWorkspaceRepo();
     const files = new FakeFiles();
     const bytes = await makePdf(1);

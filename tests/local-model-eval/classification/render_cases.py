@@ -1,4 +1,6 @@
-"""将人工编写的分类文字渲染为原生 OCR 复测用图片和纯文本文件。"""
+"""Render human-authored classification text into images and plain text files for native OCR
+re-testing.
+"""
 from __future__ import annotations
 
 import json

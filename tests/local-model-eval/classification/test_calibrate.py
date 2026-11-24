@@ -1,6 +1,7 @@
-"""校准与评测管线的单元测试。假向量只用来走通代码，不是任何模型的成绩。
+"""Unit tests for the calibration and evaluation pipeline. Dummy vectors are used solely to
+exercise the code path and do not represent any model performance metrics.
 
-从 tests/local-model-eval/ 运行：python -m unittest discover -s classification -p "test_*.py"
+Run from tests/local-model-eval/: python -m unittest discover -s classification -p "test_*.py"
 """
 from __future__ import annotations
 
@@ -58,7 +59,7 @@ class CalibrateTest(unittest.TestCase):
 
 
 class FakeEmbedder:
-    """按字的哈希得到的确定向量：只用来走通代码。"""
+    """Deterministic vectors derived from character hashes: used solely to exercise the code path."""
 
     def embed(self, inputs):
         out = []

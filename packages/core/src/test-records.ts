@@ -1,14 +1,15 @@
 import { localDate, pad } from './field-values';
-// 仅供测试使用（不从 index.ts 导出）：v34 等价测试用的确定的记录。照搬 v33 生成器
-// （git show 611d201:packages/core/src/v33-golden.gen.test.ts 的 sampleRecords），只把引用字段的
-// collectionId 改成 table；字段顺序、随机数的调用次数都不变，所以生成的记录和 v33 那次一模一样。
+// Test-only (not exported from index.ts): deterministic records for v34 equivalence tests. Copied
+// from v33 generator (git show 611d201:packages/core/src/v33-golden.gen.test.ts sampleRecords),
+// only changing reference field's collectionId to table; field order and random number invocation
+// counts remain unchanged, so generated records are identical to those from v33.
 import type { DataRecord } from './data';
 import type { Collection } from './schema';
 
-/** 生成 fixtures/v33/derived/ 时的「现在」。 */
+/** "Now" when generating fixtures/v33/derived/. */
 export const V33_NOW = new Date(2026, 9, 22, 9, 0);
 
-/** 确定的伪随机数（按表 ID 播种）。 */
+/** Deterministic pseudo-random numbers (seeded by table ID). */
 function rng(seed: string) {
   let h = 2166136261;
   for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
@@ -27,7 +28,7 @@ const dayString = (offset: number) => {
 
 const WORDS = ['alpha', 'beta', 'gamma', 'delta', 'omega', 'kappa', 'sigma'];
 
-/** 每张表 30 条记录；引用字段指向被引用的表的记录（ID 是 <表>-<序号>）。 */
+/** 30 records per table; reference fields point to records of the referenced table (ID is <table-<seq>>). */
 export function sampleRecords(collections: readonly Collection[]): Map<string, DataRecord[]> {
   const NOW = V33_NOW;
   const out = new Map<string, DataRecord[]>();
@@ -71,7 +72,7 @@ export function sampleRecords(collections: readonly Collection[]): Map<string, D
               NOW.getTime() - Math.floor(r() * 50 * 86400000) + Math.floor(r() * 5 * 86400000);
             break;
           case 'choice':
-            // 多选（D-607）：一到全部几项。
+            // Multi-select (D-607): one to all items.
             values[f.id] = f.multiple
               ? [pick(f.options).id, ...f.options.filter(() => r() < 0.3).map((o) => o.id)]
               : pick(f.options).id;

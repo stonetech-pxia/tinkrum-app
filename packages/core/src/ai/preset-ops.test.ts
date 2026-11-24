@@ -11,7 +11,7 @@ import {
 } from '../workflows/presets';
 import { expandPresetWorkflows } from './preset-ops';
 
-// 预设的简写 addTool {tool: {preset, params?}}（D-259；v33 是 addWorkflow {presetId}）。
+// Preset shorthand addTool {tool: {preset, params?}} (D-259; v33 used addWorkflow {presetId}).
 
 const LOCALES: Locale[] = ['en', 'zh', 'fr'];
 const ctx = (locale: Locale) => ({ registry, locale, now: new Date(2026, 9, 27) });
@@ -27,7 +27,7 @@ describe('addTool {tool: {preset}}', () => {
   it('every preset expands to exactly what the user gets when adding it, in every language', () => {
     for (const locale of LOCALES) {
       const config = workspace(locale);
-      // 用户在快捷操作库里改一个内设快捷操作时，加进配置的就是 builtInWorkflows 里的这一份。
+      // When a user modifies a built-in quick action in the quick action library, the version added to the config is this one from builtInWorkflows.
       const userAdds = builtInWorkflows(quickActionsOf(config), locale);
       for (const preset of WORKFLOW_PRESETS) {
         const { value, issues } = expand([short(preset.id)], locale);
@@ -62,7 +62,7 @@ describe('addTool {tool: {preset}}', () => {
       short('visa-photo'),
       short('visa-photo', { name: 'Schengen photo' }),
       short('visa-photo', { id: 'kid-photo', kind: 'quickAction' }),
-      // 键也可以直接写在操作上（和 v33 的 addWorkflow {presetId} 一样）。
+      // Keys can also be written directly on the operation (same as v33's addWorkflow {presetId}).
       { op: 'addTool', preset: 'scan-document', name: 'Scan' },
     ]);
     expect(added(value).map((w) => [w.id, w.name])).toEqual([
@@ -71,7 +71,7 @@ describe('addTool {tool: {preset}}', () => {
       ['kid-photo', 'Visa / ID photo'],
       ['scan-document', 'Scan'],
     ]);
-    // 快捷操作和提醒共用一套 ID：已经有一个叫 visa-photo 的提醒时换一个。
+    // Quick actions and reminders share a set of IDs: replace if there is already a reminder named visa-photo.
     const withReminder = apply(workspace('en'), [
       {
         op: 'addTool',
@@ -90,7 +90,7 @@ describe('addTool {tool: {preset}}', () => {
     );
     const full = { op: 'addTool', tool: presetWorkflow(presetById('visa-photo')!, 'en', 'x') };
     expect(expand([full]).value).toEqual({ kind: 'ops', ops: [full] });
-    // 提醒也有 preset 键，但不是简写。
+    // Reminders also have a preset key, but it is not shorthand.
     const reminder = {
       op: 'addTool',
       tool: { id: 'r', kind: 'reminder', preset: 'visa-photo', title: 'R' },

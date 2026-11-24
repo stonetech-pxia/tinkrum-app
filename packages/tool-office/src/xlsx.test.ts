@@ -46,7 +46,7 @@ function table(
   };
 }
 
-/** 共用的列：有表时每列 200 像素、够最宽的表用；没有表时平分成 4 列。 */
+/** Shared columns: 200 pixels per column when tables are present, sufficient for the widest table; divided evenly into 4 columns when no tables are present. */
 const page = (name: string, blocks: TablePage['blocks']): TablePage => {
   const cols = Math.max(0, ...blocks.map((b) => (b.kind === 'table' ? b.col + b.cols : 0)));
   return {
@@ -126,7 +126,7 @@ describe('xlsx writer (D-272)', () => {
     const strings = text('xl/sharedStrings.xml');
     expect(strings).toContain('<t>0123</t>');
     expect(strings).toContain('<t>2026-10-28</t>');
-    // 千分位和百分号的格式保留下来。
+    // Preserve number formats for thousands separators and percentages.
     const styles = text('xl/styles.xml');
     expect(styles).toContain('numFmtId="4"');
     expect(styles).toContain('numFmtId="9"');
@@ -182,7 +182,7 @@ describe('xlsx writer (D-272)', () => {
       pages: [page('P', [table(100, [['one\ntwo']])])],
     });
     expect(text('xl/sharedStrings.xml')).toContain('<t xml:space="preserve">one\ntwo</t>');
-    // 两行字的行高是 2 × 15 磅。
+    // Expect xl/worksheets/sheet1.xml to contain <row r="1" ht="30" customHei... indicating a row height of 2 * 15 pt for two lines of text.
     expect(text('xl/worksheets/sheet1.xml')).toContain('<row r="1" ht="30" customHeight="1">');
   });
 
@@ -200,7 +200,7 @@ describe('xlsx writer (D-272)', () => {
       ],
     };
     const sheet = unpack(doc).text('xl/worksheets/sheet1.xml');
-    // 标题和下一段之间没有空行；表格前后的空隙超过 1.5 倍行高，各空一行。
+    // No blank lines between the title and the following section; if gaps before and after tables exceed 1.5 times the line height, leave a blank line for each.
     expect(sheet).toContain('<mergeCell ref="A1:C1"/>');
     expect(sheet).toContain('<mergeCell ref="A2:C2"/>');
     expect(sheet).toMatch(/<c r="A4" s="1" t="s">/);
@@ -249,7 +249,7 @@ describe('xlsx writer (D-272)', () => {
       pages: [page('P', [{ kind: 'text', text: 'Head', align: 'center', box: box(20) }, t])],
     });
     const styles = text('xl/styles.xml');
-    // cellXfs 里的每个 xf（下标就是样式编号）。
+    // Each xf entry within cellXfs (its index corresponds to the style ID).
     const xfs = /<cellXfs[^>]*>(.*)<\/cellXfs>/.exec(styles)![1]!.split('<xf ').slice(1);
     const sheet = text('xl/worksheets/sheet1.xml');
     const styleOf = (at: string) =>
@@ -284,7 +284,7 @@ describe('xlsx writer (D-272)', () => {
       ]),
     ]);
     const layout = layoutSheet(p, 'all');
-    // 标题、空行、表格的两行。
+    // Title, blank line, and the two table rows.
     expect(layout.rows.map((r) => [r.block, r.tableRow])).toEqual([
       [0, undefined],
       [null, undefined],
@@ -322,7 +322,7 @@ describe('writeRowsXlsx (D-427)', () => {
     const strings = [
       ...strFromU8(files['xl/sharedStrings.xml']!).matchAll(/<si><t[^>]*>(.*?)<\/t>/gs),
     ].map((m) => m[1]!);
-    /** 读回一格：字符串的内容或数字。 */
+    /** Read back a single cell: string content or number. */
     const cell = (at: string) => {
       const m = new RegExp(`<c r="${at}"[^>]*?(t="s")?[^>]*?(?:/>|><v>(.*?)</v>)`).exec(sheet);
       if (!m) return undefined;
