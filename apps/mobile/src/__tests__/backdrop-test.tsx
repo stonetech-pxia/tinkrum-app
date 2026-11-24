@@ -55,6 +55,7 @@ async function renderApp(provider: AIProvider = createMockAIProvider()) {
   const files = new FakeFiles();
   const aiSettings = createAISettingsStore({ secrets: memorySecrets(), serverAvailable: false });
   await aiSettings.getState().load();
+  await aiSettings.getState().setTinkAgent(true);
   const store = createWorkspaceStore({
     repo,
     provider,

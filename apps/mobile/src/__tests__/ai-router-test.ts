@@ -95,6 +95,15 @@ describe('AI settings', () => {
     expect(reloaded.getState()).toMatchObject({ mode: 'byok', model: 'claude-haiku-5-5' });
   });
 
+  it('hands changes to another AI app by default and remembers the switch to Tink (D-626)', async () => {
+    const { settings, secrets } = await setup();
+    expect(settings.getState().tinkAgent).toBe(false);
+    await settings.getState().setTinkAgent(true);
+    const reloaded = createAISettingsStore({ secrets, serverAvailable: false });
+    await reloaded.getState().load();
+    expect(reloaded.getState().tinkAgent).toBe(true);
+  });
+
   it('tests the connection without spending tokens and explains failures', async () => {
     const ok = jest.fn(
       async () => new Response(JSON.stringify({ id: 'claude-haiku-5-5' }), { status: 200 }),

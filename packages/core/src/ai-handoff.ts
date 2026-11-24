@@ -91,6 +91,8 @@ export function handoffPrompt(
         ]),
     where,
     ...(scope.kind === 'new' ? [] : [t(locale, 'handoffRules')]),
+    // A new app is made from what the user says and answers: how the other AI asks is set here.
+    ...(scope.kind === 'new' || scope.kind === 'setup' ? [t(locale, 'handoffAsking')] : []),
     ...(options.checker ? [t(locale, 'handoffCheck'), t(locale, 'handoffLink')] : []),
     request
       ? t(locale, 'handoffRequest', { request })

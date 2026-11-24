@@ -53,6 +53,7 @@ async function renderApp(
 ) {
   const aiSettings = createAISettingsStore({ secrets: memorySecrets(), serverAvailable: false });
   await aiSettings.getState().load();
+  await aiSettings.getState().setTinkAgent(true);
   const store = createWorkspaceStore({
     repo,
     provider,

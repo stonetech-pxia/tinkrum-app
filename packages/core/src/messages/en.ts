@@ -138,6 +138,12 @@ export const en = {
   aiModeQuestion: 'What powers Tink',
   aiModeMock: 'Built-in rules',
   aiModeMockNote: 'Offline and free. Understands a fixed set of phrases.',
+  aiAgentQuestion: 'Who changes your app when you tap send?',
+  aiAgentOther: 'Another AI app',
+  aiAgentOtherNote:
+    'ChatGPT, Claude or Gemini on your phone. Your request goes into the message you share, and you paste the result back here.',
+  aiAgentTink: 'Tink',
+  aiAgentTinkNote: 'Tink changes the app inside Tinkrum, using the choice below.',
   aiModeServer: 'Tinkrum server',
   aiModeServerNote: 'The model is called through a server.',
   // Server storage note during testing (D-240): displayed only when using the Tinkrum server.
@@ -476,7 +482,7 @@ export const en = {
   handoffNew:
     'Help me make a new Tinkrum app file. Tell me in one line which pattern you start from, and give me the whole file in one json code block.',
   handoffSetup:
-    'I want to change my whole Tinkrum setup, including the home page and all my apps. Return the whole morph-app-config file, keeping its format and version.',
+    'I want to change my Tinkrum, and I will say what. The file has all my apps, their pages and the home page. Decide from what I ask, and tell me in one line which one you chose:\n1. A change to one app, or to one page of it: return only that app, as a tinkrum-app file with the same app id.\n2. A new app: return a tinkrum-app file with a new app id.\n3. A change to the home page, the navigation, the theme, or to several apps at once: return the whole morph-app-config file, keeping its format and version.\nIf it is not clear which one I mean, ask me first.',
   handoffSetupAttached: 'Attached is my whole Tinkrum setup ({file}).',
   handoffSetupInline: 'My whole Tinkrum setup is at the end of this message.',
   handoffRequest:
@@ -484,11 +490,10 @@ export const en = {
   handoffAskNew: 'First ask me what I want to keep track of and do.',
   handoffLink:
     'Put the checker’s “Open in Tinkrum” link at the very top of your answer as a clickable link. Also give me the whole file in one json code block.',
-  handoffNewButton: 'Make a new app with another AI app',
-  handoffSetupButton: 'Change all of Tinkrum with another AI app',
   handoffPaste: 'Paste the app from your AI',
   handoffPasteHint: 'Copy the whole file from your AI, then paste it here to review it.',
   handoffDismiss: 'Dismiss the paste card',
+  handoffNotNow: 'Not now',
   handoffFailed: 'Could not open the share sheet. Please try again.',
   appLinkTitle: 'Open in Tinkrum',
   appLinkReview: 'Review this app file',
@@ -506,6 +511,8 @@ export const en = {
     'I opened this from the page “{page}” (id "{pageId}") of my app “{app}”. When my request does not say which part to change, change this page first.',
   handoffRules:
     'Rules for changing my file:\n- Keep every id that is already there: the app, tables, fields, choice options, pages and blocks. My entries are linked to table and field ids; a changed id loses them.\n- Do not remove a table or a field unless I ask. Their entries stay on my phone but are hidden.\n- Give me the whole file in one json code block.',
+  handoffAsking:
+    'If I am asking for a new app, find out what I want before you build it, the way a good designer would:\n- Never ask what my message, the attached files or the guide already answer. Ask only what would change what you build, and say in a few words why you ask.\n- If I have not said what kind of app I want, first ask one open question and let me describe it in my own words: what I want to keep track of or do, and what I will do with it day to day. Do not list kinds of apps for me to pick from.\n- Then ask the details that matter in one round of at most 3 numbered questions, most important first, one idea each. Put your recommended answer under each one, worded so that I can just say “yes” to accept it. The details that usually matter: what I write down for each entry, how I want to look at it afterwards (a list, totals, a chart, a calendar), and reminders, photos or files if they would matter. Do not ask about colours, names or anything you can choose well yourself.\n- Use plain words in my language, and my own words rather than technical ones.\n- Then tell me in a few lines what the app will have. Mark what you decided yourself, and ask whether anything is wrong. Give me the file only after I say yes. If I say “just do it” at any point, stop asking, say your choices in one line, and give me the file.\n- Ask in two rounds at most.',
   handoffCheck: 'Run node tinkrum-check.js on the file until it prints OK.',
   handoffAsk: 'First ask me what I want to change.',
   handoffSeeRequest: 'Please read the attached {file} first and follow it.',
@@ -526,6 +533,10 @@ export const en = {
   presetDeleted: 'Preset “{name}” deleted',
   presetGone: 'This preset no longer exists.',
   presetApplySummary: 'Switched to the preset “{name}”',
+  setupReturnTitle: 'Update Tinkrum with the file from your AI?',
+  setupReturnSummary: 'Updated Tinkrum from another AI app',
+  setupReturnIntro:
+    'Pages, navigation, tables, theme and quick actions become what your AI sent back. Your entries stay.',
   presetApplyTitle: 'Switch to the preset “{name}”?',
   presetApplyIntro: 'Pages, navigation, tables, theme and quick actions become what “{name}” saved',
   presetApplyFiles: 'Images and file slots you picked won’t carry over; you pick them again after',

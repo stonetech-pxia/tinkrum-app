@@ -9,6 +9,7 @@ import {
   appConfigFile,
   applyOps,
   createDefaultWorkspace,
+  presetSnapshot,
   type Op,
   type WorkspaceConfig,
 } from '@morph/core';
@@ -341,7 +342,7 @@ describe('saving preset checks', () => {
     expect(screen.queryByText('仍然保存')).toBeNull();
   });
 
-  it('quick actions built into tool packs do not count: count is the user\'s own tools', async () => {
+  it("quick actions built into tool packs do not count: count is the user's own tools", async () => {
     await renderToolsApp(new MemoryWorkspaceRepo(), undefined, {
       seed: seedWith([{ op: 'setPackage', package: 'pdf', do: 'add' }, ...orphan]),
     });
@@ -945,25 +946,30 @@ describe('import a preset from a file', () => {
   });
 });
 
-it('a whole setup coming back from another AI keeps the user’s own pictures in place; the list still empties them', async () => {
+it('a whole setup coming back from another AI is a preview of an update, keeps the user’s own pictures, and is never saved as a preset', async () => {
   const { repo, store } = await app();
-  // When exporting the full setup, file references are cleared (standard behavior when saved as a preset); upon restoration, the user's originally selected files are put back in their respective places.
+  const base = store.getState().config!;
+  // When exporting the full setup, file references are cleared; upon return, the user's originally selected files are put back in their respective places.
+  const text = appConfigFile(
+    presetSnapshot({ ...base, theme: { ...base.theme, radius: 8 } }),
+    new Date(),
+  );
+  const keep = await store.getState().proposeSetupFile(text);
+  expect(keep.kind).toBe('preview');
+  expect(JSON.stringify(store.getState().proposal!.after)).toContain(FILE);
+  expect(store.getState().proposal!.after.theme.radius).toBe(8);
+  expect(store.getState().proposal!.lines[0]).toMatch(/AI/);
+  expect(await repo.listPresets()).toEqual([]);
+  await store.getState().cancel();
+  expect((await store.getState().proposeSetupFile('{"hello":1}')).kind).toBe('refused');
+  // Switching presets from the preset list: clears as usual (D-410).
   await repo.insertPreset({
     id: 'fromai01',
     name: 'AI 改好的',
     createdAt: 5,
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    config: {
-      ...store.getState().config!,
-      theme: { ...store.getState().config!.theme, radius: 8 },
-    },
+    config: { ...base, theme: { ...base.theme, radius: 8 } },
   });
-  const keep = await store.getState().proposePreset('fromai01', { keepFiles: true });
-  expect(keep.kind).toBe('preview');
-  expect(JSON.stringify(store.getState().proposal!.after)).toContain(FILE);
-  expect(store.getState().proposal!.after.theme.radius).toBe(8);
-  await store.getState().cancel();
-  // Switching presets from the preset list: clears as usual (D-410).
   const list = await store.getState().proposePreset('fromai01');
   expect(list.kind).toBe('preview');
   expect(JSON.stringify(store.getState().proposal!.after)).not.toContain(FILE);

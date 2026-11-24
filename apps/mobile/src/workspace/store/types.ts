@@ -257,6 +257,9 @@ export type SavePresetResult =
   | { kind: 'full' };
 
 /** Result of importing a preset from a file (D-485). */
+/** proposeSetupFile: a whole setup text read as a proposal; "refused" = the file cannot be read (problem: AppConfigFileProblem). */
+export type SetupFileResult = ProposeResult | { kind: 'refused'; problem: AppConfigFileProblem };
+
 export type ImportPresetResult =
   | { kind: 'saved'; preset: SavedPreset }
   /** Reached maximum limit (MAX_SAVED_PRESETS). */
@@ -317,8 +320,10 @@ export interface WorkspaceState {
    */
   propose(input: string, planner?: AIProvider, about?: PlanAbout): Promise<ProposeResult>;
   proposeRestore(revisionId: number): Promise<ProposeResult>;
-  /** proposePreset(presetId: string): Promise<ProposeResult>; */
+  /** proposePreset(presetId: string, options?: { keepFiles?: boolean }): Promise<ProposeResult>; */
   proposePreset(presetId: string, options?: { keepFiles?: boolean }): Promise<ProposeResult>;
+  /** The whole setup from another AI app: preview as an update, nothing saved as a preset. */
+  proposeSetupFile(text: string): Promise<SetupFileResult>;
   /** savePreset(name: string): Promise<SavePresetResult>; */
   savePreset(name: string): Promise<SavePresetResult>;
   /**

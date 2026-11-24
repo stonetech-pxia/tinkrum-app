@@ -3,6 +3,7 @@ import {
   describePresetApply,
   describeRestore,
   homeEntryOps,
+  importedPreset,
   migrateWorkspace,
   type Op,
   PlanSchema,
@@ -24,7 +25,7 @@ import {
 import type { createDraft } from './draft';
 import { focusPage, type Kernel } from './kernel';
 import type { SessionStore } from './session';
-import type { Proposal, ProposeResult, WorkspaceState } from './types';
+import type { Proposal, ProposeResult, SetupFileResult, WorkspaceState } from './types';
 
 // Revisions: Preview -> Confirm -> Atomic save -> Re-read and render -> Success only when rendering
 // succeeds, automatic fallback on failure (§4, §7D); undo, restore historical version, traverse
@@ -167,12 +168,33 @@ export function createRevisions(
     );
   }
 
+  /**
+   * The whole setup handed back from another AI app: previewed as an update of what is on the phone
+   * and never saved as a preset. Same confirm and undo as every other change.
+   */
+  async function setupFileProposal(text: string): Promise<SetupFileResult> {
+    const imported = importedPreset(text, '', [], msg('importAppConfigName'), registry);
+    if (!imported.ok)
+      return imported.problem === 'invalid'
+        ? { kind: 'invalid', issues: imported.issues }
+        : { kind: 'refused', problem: imported.problem };
+    return configProposal(
+      imported.config,
+      imported.name,
+      'setup from another AI app',
+      { kind: 'setup' },
+      true,
+      true,
+    );
+  }
+
   async function configProposal(
     raw: unknown,
     name: string,
     input: string,
     plan: Record<string, unknown>,
     keepFiles = false,
+    asUpdate = false,
   ): Promise<ProposeResult> {
     const { config, head } = get();
     if (!config || !head) throw new Error('workspace not loaded');
@@ -197,9 +219,15 @@ export function createRevisions(
       kind: 'restore',
       before: config,
       after,
-      lines: describePresetApply(config, after, name, { registry, locale }),
+      lines: asUpdate
+        ? // Handed back from another AI app: an update of the app as it is now, not a switch to a saved preset.
+          [
+            msg('setupReturnIntro'),
+            ...describePresetApply(config, after, name, { registry, locale }).slice(1),
+          ]
+        : describePresetApply(config, after, name, { registry, locale }),
       source: 'restore',
-      summary: msg('presetApplySummary', { name }),
+      summary: asUpdate ? msg('setupReturnSummary') : msg('presetApplySummary', { name }),
       focusPageId: 'home',
     });
   }
@@ -283,6 +311,7 @@ export function createRevisions(
     | 'propose'
     | 'proposeRestore'
     | 'proposePreset'
+    | 'proposeSetupFile'
     | 'proposeOps'
     | 'setHomeEntry'
     | 'confirm'
@@ -353,6 +382,8 @@ export function createRevisions(
     proposeRestore: (revisionId) => restoreProposal(revisionId, `restore #${revisionId}`),
 
     proposePreset: presetProposal,
+
+    proposeSetupFile: setupFileProposal,
 
     proposeOps: (ops, summary, options) =>
       opsProposal(summary, ops, 'user', summary, undefined, options?.fromAppFile),

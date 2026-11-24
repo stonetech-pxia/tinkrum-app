@@ -1,4 +1,4 @@
-import { AiReturnCard } from '../ai/AiReturnCard';
+import { AiReturnBubble } from '../ai/AiReturnBubble';
 import {
   HOME_PAGE_ID,
   appViewOf,
@@ -248,12 +248,6 @@ export function Shell() {
       ) : null}
       {/* Wrap content below the Tink row in BlurTargetView: slightly blur the entire area when the guide bubble appears (Android requires this for true blurring). */}
       <BlurTargetView ref={blurTarget} style={styles.content}>
-        {appId === null && pageId === HOME_PAGE_ID && !editing && !inDraft ? (
-          <AiReturnCard
-            palette={palette}
-            style={{ marginHorizontal: palette.pad, marginBottom: palette.gap }}
-          />
-        ) : null}
         {inDraft ? null : <BannerAnchor palette={palette} />}
         <DraftNotice palette={palette} />
         {pageId === HOME_PAGE_ID && !editing && !inDraft ? <GuideCard palette={palette} /> : null}
@@ -368,6 +362,20 @@ export function Shell() {
       </BlurTargetView>
       {bubbleGuide ? (
         <GuideBubble palette={palette} top={insets.top + ENTRY_ROW} blurTarget={blurTarget} />
+      ) : entryAbout && appId === null && pageId === HOME_PAGE_ID && !editing && !inDraft ? (
+        // Coming back from another AI app (D-627): Tink says so in a bubble, like the guide.
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.returnWrap,
+            {
+              top: insets.top + ENTRY_ROW,
+              paddingLeft: palette.pad,
+              paddingRight: palette.pad - 3,
+            },
+          ]}>
+          <AiReturnBubble palette={palette} />
+        </View>
       ) : null}
     </View>
   );
@@ -379,6 +387,7 @@ const ENTRY_ROW = 40;
 const styles = StyleSheet.create({
   // When the guide bubble appears, the Tink row floats above the blur layer, and the halo is not blocked.
   entryOnTop: { zIndex: 2, elevation: 2 },
+  returnWrap: { ...StyleSheet.absoluteFill, alignItems: 'flex-end', paddingTop: 12 },
   entryRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

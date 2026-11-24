@@ -3,9 +3,11 @@ import { join } from 'node:path';
 
 import {
   WORKFLOW_PRESETS,
+  appConfigFile,
   appFileOps,
   applyOps,
   createStarterWorkspace,
+  presetSnapshot,
   presetWorkflow,
   readAppFile,
   templateOps,
@@ -290,6 +292,8 @@ describe('hand the app to another AI app (D-611)', () => {
     const files = new FakeFiles();
     const app = await renderToolsApp(new MemoryWorkspaceRepo(), files, {
       locale: 'zh',
+      // The product default (D-626): the send button hands the request to another AI app.
+      tinkAgent: false,
       seed: (locale, registry) => {
         const base = createStarterWorkspace(locale, registry);
         const plan = appFileOps(readAppFile(walletText)!, base);
@@ -307,7 +311,8 @@ describe('hand the app to another AI app (D-611)', () => {
     await act(async () => store.getState().enterApp('wallet'));
     await fireEvent.press(await screen.findByTestId('page-ai'));
     await fireEvent.changeText(await screen.findByTestId('change-input'), '把标题改成我的钱包');
-    await fireEvent.press(await screen.findByTestId('change-handoff'));
+    expect(screen.queryByTestId('change-handoff')).toBeNull();
+    await fireEvent.press(await screen.findByTestId('change-submit'));
     await waitFor(() => expect(files.aiShares).toHaveLength(1));
     const [shared] = files.aiShares;
     expect(shared!.files.map((f) => f.name)).toEqual([
@@ -331,7 +336,7 @@ describe('hand the app to another AI app (D-611)', () => {
     expect(shared!.request).not.toContain('先问我想改什么');
   });
 
-  it('home offers both new app and whole setup, carrying the typed request', async () => {
+  it('send on home hands the typed request over as the whole setup, with no separate buttons', async () => {
     const { files, store, repo } = await renderWithWallet();
     const config = JSON.parse(JSON.stringify(store.getState().config!)) as WorkspaceConfig;
     const home = config.containers.pages.find((p) => p.id === 'home')!;
@@ -351,13 +356,11 @@ describe('hand the app to another AI app (D-611)', () => {
     });
     await fireEvent.press(await screen.findByTestId('page-ai'));
     await fireEvent.changeText(await screen.findByTestId('change-input'), 'REQUEST_SENTINEL');
-    await fireEvent.press(await screen.findByTestId('change-handoff-new'));
+    expect(screen.queryByTestId('change-handoff-new')).toBeNull();
+    expect(screen.queryByTestId('change-handoff-setup')).toBeNull();
+    await fireEvent.press(await screen.findByTestId('change-submit'));
     await waitFor(() => expect(files.aiShares).toHaveLength(1));
-    expect(files.aiShares[0]!.request).toContain('REQUEST_SENTINEL');
-    expect(files.aiShares[0]!.files.some((f) => f.name.endsWith('.json'))).toBe(false);
-    await fireEvent.press(screen.getByTestId('change-handoff-setup'));
-    await waitFor(() => expect(files.aiShares).toHaveLength(2));
-    const sent = files.aiShares[1]!;
+    const sent = files.aiShares[0]!;
     expect(sent.request).toContain('REQUEST_SENTINEL');
     expect(sent.request).toContain('morph-app-config');
     expect(JSON.parse(sent.files[0]!.text)).toMatchObject({ format: 'morph-app-config' });
@@ -386,18 +389,16 @@ describe('hand the app to another AI app (D-611)', () => {
     await files.copyText(JSON.stringify(changed));
     await fireEvent.press(await screen.findByTestId('page-ai'));
     expect(screen.queryByTestId('ai-return-card')).toBeNull();
-    await fireEvent.press(await screen.findByTestId('change-handoff-setup'));
+    await fireEvent.changeText(await screen.findByTestId('change-input'), 'anything');
+    await fireEvent.press(await screen.findByTestId('change-submit'));
     expect(await screen.findByTestId('ai-return-card')).toBeTruthy();
     expect(read).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('ai-return-paste'));
     await waitFor(() => expect(alerts).toHaveBeenCalled());
-    let buttons = alerts.mock.calls.at(-1)![2]!;
-    expect(buttons[0]!.text).toMatch(/更新/);
-    expect(store.getState().head!.id).toBe(head);
-    await act(() => buttons[0]!.onPress!());
+    // Back from the AI: straight to the preview of the update, no extra question first.
     await waitFor(() => expect(alerts.mock.calls.at(-1)![1]).toContain('UPDATED'));
     expect(store.getState().head!.id).toBe(head);
-    buttons = alerts.mock.calls.at(-1)![2]!;
+    const buttons = alerts.mock.calls.at(-1)![2]!;
     await act(() => buttons.find((b) => b.text === '应用')!.onPress!());
     await waitFor(() =>
       expect(store.getState().config!.containers.pages.some((p) => p.title === 'UPDATED')).toBe(
@@ -410,6 +411,33 @@ describe('hand the app to another AI app (D-611)', () => {
     expect(store.getState().config).toEqual(before);
     expect(await repo.listRecords(table.id)).toEqual([entry]);
     expect(await repo.listPresets()).toEqual([]);
+  });
+
+  it('a whole setup coming back after a title change is previewed as an update and never saved as a preset', async () => {
+    const { store, files, repo } = await renderWithWallet();
+    const before = store.getState().config!;
+    const head = store.getState().head!.id;
+    const snapshot = presetSnapshot(before);
+    snapshot.containers.pages[0]!.title = 'RENAMED_BY_AI';
+    await files.copyText(appConfigFile(snapshot, new Date()));
+    const alerts = jest.spyOn(Alert, 'alert');
+    await act(() => {
+      useAiReturn.getState().start('setup');
+    });
+    await fireEvent.press(await screen.findByTestId('ai-return-paste'));
+    await waitFor(() => expect(alerts.mock.calls.at(-1)![0]).toMatch(/更新 Tinkrum/));
+    expect(await repo.listPresets()).toEqual([]);
+    expect(store.getState().head!.id).toBe(head);
+    const buttons = alerts.mock.calls.at(-1)![2]!;
+    await act(() => buttons.find((b) => b.text === '应用')!.onPress!());
+    await waitFor(() =>
+      expect(
+        store.getState().config!.containers.pages.some((p) => p.title === 'RENAMED_BY_AI'),
+      ).toBe(true),
+    );
+    expect(await repo.listPresets()).toEqual([]);
+    await act(() => store.getState().undo());
+    expect(store.getState().config).toEqual(before);
   });
 
   it('return card is also on home, can be dismissed, and expires after 24 hours', async () => {

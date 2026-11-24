@@ -114,12 +114,15 @@ export async function renderToolsApp(
     widgets?: WidgetPlatform;
     /** Packs environment (D-064): fake page channels and in-memory PackStore; absent by default (usePacks is null). */
     packs?: Packs;
+    /** Whether the send button uses Tink (D-626). Tests default to Tink; the product default is another AI app. */
+    tinkAgent?: boolean;
   } = {},
 ) {
   const registry = options.registry ?? testRegistry;
   const locale = options.locale ?? 'zh';
   const aiSettings = createAISettingsStore({ secrets: memorySecrets(), serverAvailable: false });
   await aiSettings.getState().load();
+  await aiSettings.getState().setTinkAgent(options.tinkAgent ?? true);
   const store = createWorkspaceStore({
     repo,
     provider: createMockAIProvider(),

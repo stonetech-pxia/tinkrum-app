@@ -132,6 +132,11 @@ export const zh: MessageTable = {
   aiModeQuestion: 'Tink 用什么修改这个 App',
   aiModeMock: '内置规则',
   aiModeMockNote: '离线、免费，只认识固定的几种说法。',
+  aiAgentQuestion: '点发送后，由谁来改你的 App？',
+  aiAgentOther: '别的 AI App',
+  aiAgentOtherNote: 'ChatGPT、Claude 或 Gemini。你的要求会写进分享的内容，改好后再粘贴回这里。',
+  aiAgentTink: 'Tink',
+  aiAgentTinkNote: 'Tink 在 Tinkrum 里直接改，用下面选的方式。',
   aiModeServer: 'Tinkrum 服务器',
   aiModeServerNote: '通过服务器调用模型。',
   // Server storage note during testing (D-240): displayed only when using the Tinkrum server.
@@ -453,18 +458,17 @@ export const zh: MessageTable = {
   handoffNew:
     '帮我做一个新的 Tinkrum App 文件。先用一句话说从哪个模式开始，再把完整文件放在一个 json 代码块里给我。',
   handoffSetup:
-    '我想修改整份 Tinkrum 设置，包括主页和所有 App。请返回完整的 morph-app-config 文件，保留原来的格式和版本。',
+    '我想修改我的 Tinkrum，具体改什么我会说。文件里有我所有的 App、它们的页面和主页。请根据我的要求判断，并用一句话告诉我你选了哪种：\n1. 改某一个 App，或它的某一页：只返回那个 App，用 tinkrum-app 文件，App 的 ID 保持不变。\n2. 做一个新 App：返回一个 tinkrum-app 文件，用新的 App ID。\n3. 改主页、导航、主题，或一次改好几个 App：返回完整的 morph-app-config 文件，保留原来的格式和版本。\n如果分不清我指的是哪一种，先问我。',
   handoffSetupAttached: '附件是我的整份 Tinkrum 设置（{file}）。',
   handoffSetupInline: '我的整份 Tinkrum 设置在这条消息的最后。',
   handoffRequest: '我想要：{request}\n\n请照这个要求做；不清楚的地方先问我。',
   handoffAskNew: '先问我想记录什么、做什么。',
   handoffLink:
     '把检查器输出的 “Open in Tinkrum” 链接作为可点击的链接放在回答最上面。同时把完整文件放在一个 json 代码块里给我。',
-  handoffNewButton: '交给别的 AI App 做新 App',
-  handoffSetupButton: '交给别的 AI App 改整个 Tinkrum',
   handoffPaste: '粘贴 AI 改好的 App',
   handoffPasteHint: '在 AI 里复制完整文件，再粘贴到这里查看改动。',
   handoffDismiss: '关闭粘贴卡片',
+  handoffNotNow: '先不用',
   handoffFailed: '未能打开分享面板，请重试。',
   appLinkTitle: '在 Tinkrum 中打开',
   appLinkReview: '查看这个 App 文件',
@@ -481,6 +485,8 @@ export const zh: MessageTable = {
     '我是从我的 App「{app}」里的页面「{page}」（id "{pageId}"）进来的。我没说改哪里的时候，先改这一页。',
   handoffRules:
     '改文件的规矩：\n- 已有的 ID 一个都不改：App、表、字段、选项、页面和块。我的记录是靠表和字段的 ID 挂上去的，ID 一改就对不上了。\n- 我没说要删，就不删表和字段。删了的话，它们的记录还在我手机上，只是看不到了。\n- 把整个文件放在一个 json 代码块里给我。',
+  handoffAsking:
+    '如果我要的是一个新 App，请像一位好设计师那样，先弄清我要什么，再动手做：\n- 我的消息、附件和指南已经回答了的，不要再问。只问会改变成品的事，并用几个字说明你为什么问。\n- 如果我没说想要哪一类 App，先问一个开放的问题，让我用自己的话描述：我想记录什么、做什么，日常会怎么用它。不要列出一堆 App 类型让我选。\n- 然后把重要的细节放在一轮里问，最多 3 个带编号的问题，最重要的在前，一个问题只问一件事。每个问题下面写上你推荐的答案，措辞要让我回一个“好”就等于接受。通常重要的细节有：每条记录要写下什么、之后想怎么看（列表、合计、图表、日历），以及提醒、照片或文件是否有用。颜色、名字，还有你自己能选好的事，不要问。\n- 用我的语言，说大白话，用我说话的词，不用技术名词。\n- 然后用几行告诉我这个 App 会有什么，标出哪些是你自己定的，问我有没有不对的地方。我说“好”之后再给我文件。如果我随时说“你定吧”，就别再问了，用一句话说出你的选择，然后给我文件。\n- 最多问两轮。',
   handoffCheck: '对文件运行 node tinkrum-check.js，直到它输出 OK。',
   handoffAsk: '先问我想改什么。',
   handoffSeeRequest: '请先阅读附件 {file}，并照它去做。',
@@ -498,6 +504,9 @@ export const zh: MessageTable = {
   presetDeleted: '已删除预设「{name}」',
   presetGone: '这个预设已经不在了。',
   presetApplySummary: '换成预设「{name}」',
+  setupReturnTitle: '用 AI 改好的文件更新 Tinkrum？',
+  setupReturnSummary: '用别的 AI App 改好的文件更新了 Tinkrum',
+  setupReturnIntro: '页面、导航、表格、主题和快捷操作会变成 AI 发回来的样子。你的记录都保留。',
   presetApplyTitle: '换成预设「{name}」？',
   presetApplyIntro: '页面、导航、表、主题和快捷操作都换成「{name}」保存时的样子',
   presetApplyFiles: '现在选好的图片和文件位不会跟过来，换完要重新选',

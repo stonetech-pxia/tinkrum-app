@@ -39,6 +39,7 @@ export function useConfigImport(previewPreset = false) {
     selectTab,
     leaveApp,
     proposePreset,
+    proposeSetupFile,
   } = state();
   // Cards on the home screen can also use it; cannot unconditionally go back to a non-existent page.
   function goHome() {
@@ -88,6 +89,28 @@ export function useConfigImport(previewPreset = false) {
       }
     }
     const pending = useAiReturn.getState().pending;
+    // The user just handed the whole setup to another AI app and it comes back: that is a change to
+    // what is on the phone, previewed and applied like any other change, and it is not saved as a
+    // preset. With nothing handed out (a link or file from elsewhere) it is a new preset below.
+    if (pending?.scope === 'setup') {
+      const proposed = await proposeSetupFile(text);
+      const newer = needsUpdate(text);
+      if ((proposed.kind === 'refused' || proposed.kind === 'invalid') && newer)
+        Alert.alert(title, newer);
+      else if (proposed.kind === 'refused')
+        Alert.alert(title, configFileProblemText(locale, proposed.problem));
+      else if (proposed.kind === 'invalid')
+        Alert.alert(
+          title,
+          [t(locale, 'importAppConfigBroken'), ...proposed.issues.slice(0, 5)].join('\n'),
+        );
+      else if (proposed.kind !== 'preview') Alert.alert(t(locale, 'invalidPlan'), proposed.message);
+      else {
+        useAiReturn.getState().dismiss(pending?.id);
+        previewApply(t(locale, 'setupReturnTitle'), proposed.proposal.lines);
+      }
+      return;
+    }
     const result = await importPreset(text, fileName);
     const newer = needsUpdate(text);
     if ((result.kind === 'refused' || result.kind === 'invalid') && newer)
@@ -103,8 +126,8 @@ export function useConfigImport(previewPreset = false) {
       Alert.alert(title, t(locale, 'presetsFull', { max: MAX_SAVED_PRESETS }));
     else if (result.kind === 'saved') {
       useAiReturn.getState().dismiss(pending?.id);
-      // When the full setup is handed back from another AI app (via card tap, link open, or just handing out a setup): previews directly, leaving the user's selected images in place.
-      if (previewPreset || pending?.scope === 'setup') await apply(result.preset, true);
+      // From a link or the return bubble (not a handed-out setup): a new preset, saved and then previewed, leaving the user's selected images in place.
+      if (previewPreset) await apply(result.preset, true);
     }
   }
 
@@ -144,6 +167,11 @@ export function useConfigImport(previewPreset = false) {
     // Already installed the same app (returned after edits by another AI, D-611): defaults to updating it, connects by ID, preserves all records.
     const installed = (state().config!.nav.apps ?? []).find((a) => a.id === appFile.app.id);
     if (installed) {
+      // Handed back from another AI app: it is the update of the app that was sent, so go straight to the preview.
+      if (useAiReturn.getState().pending) {
+        void proceedImport(appFile, text, 'update', title);
+        return;
+      }
       Alert.alert(installed.name, t(locale, 'importUpdateChoose', { name: installed.name }), [
         {
           text: t(locale, 'importUpdateButton', { name: installed.name }),
@@ -261,25 +289,25 @@ export function useConfigImport(previewPreset = false) {
       );
       return;
     }
-    Alert.alert(
-      t(locale, 'presetApplyTitle', { name: preset.name }),
-      result.proposal.lines.join('\n'),
-      [
-        { text: t(locale, 'cancel'), style: 'cancel', onPress: () => void cancel() },
-        {
-          text: t(locale, 'presetApply'),
-          onPress: () =>
-            void (async () => {
-              if (!(await confirm())) return;
-              // Switched apps, leaving previous modification's remaining sentence and next step suggestions obsolete.
-              await clearNext();
-              await clearSuggest();
-              // Return to home screen to view results, top prompt bar provides undo.
-              goHome();
-            })(),
-        },
-      ],
-    );
+    previewApply(t(locale, 'presetApplyTitle', { name: preset.name }), result.proposal.lines);
+  }
+
+  /** The preview of a whole-config change: Cancel drops it, Apply commits it and returns home, where the top bar offers undo. */
+  function previewApply(title: string, lines: readonly string[]) {
+    Alert.alert(title, lines.join('\n'), [
+      { text: t(locale, 'cancel'), style: 'cancel', onPress: () => void cancel() },
+      {
+        text: t(locale, 'presetApply'),
+        onPress: () =>
+          void (async () => {
+            if (!(await confirm())) return;
+            // Switched apps, leaving previous modification's remaining sentence and next step suggestions obsolete.
+            await clearNext();
+            await clearSuggest();
+            goHome();
+          })(),
+      },
+    ]);
   }
 
   return { importText, pasteFile, apply };

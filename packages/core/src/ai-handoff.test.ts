@@ -97,3 +97,28 @@ it('fallback copy describes the file honestly when there is no checker or no att
   expect(inline).toContain('à la fin de ce message');
   expect(inline).not.toContain('tinkrum-check.js');
 });
+
+it('from outside a sub-app the AI is told to pick the file by what the user asks: one app, a new app, or the whole setup', () => {
+  for (const locale of ['en', 'zh', 'fr'] as const) {
+    const text = handoffPrompt({ kind: 'setup' }, locale, NOW, { attached: true, checker: true });
+    // The three outcomes the import tells apart: an app file with the same id (update), with a new id (new app), the whole setup (update of the setup).
+    expect(text).toContain('tinkrum-app');
+    expect(text).toContain('morph-app-config');
+    // The two documentation links are items 1 and 2 of their own list; the rule's third item is the only item 3.
+    expect(text.match(/^3\. /gm)).toHaveLength(1);
+  }
+});
+
+it('a new app is asked for in at most two rounds: one open question, then up to 3 questions with a recommended answer; sub-app changes carry no such rules', () => {
+  const marks = { en: 'at most 3', zh: '最多 3 个', fr: '3 questions numérotées au plus' } as const;
+  for (const locale of ['en', 'zh', 'fr'] as const) {
+    for (const scope of [{ kind: 'new' }, { kind: 'setup' }] as const) {
+      const text = handoffPrompt(scope, locale, NOW, { attached: true, checker: true });
+      expect(text).toContain(marks[locale]);
+      // The questions come before the checker, so the file is only given after the answers.
+      expect(text.indexOf(marks[locale])).toBeLessThan(text.indexOf('tinkrum-check.js'));
+    }
+    const app = handoffPrompt({ kind: 'app', app: 'Books' }, locale, NOW, { attached: true });
+    expect(app).not.toContain(marks[locale]);
+  }
+});

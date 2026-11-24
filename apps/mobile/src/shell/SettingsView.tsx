@@ -41,7 +41,8 @@ export function SettingsView({ env }: { env: RenderEnv }) {
   const aiModel = useAISettings((s) => s.model);
   const aiProvider = useAISettings((s) => s.provider);
   const aiCustomModel = useAISettings((s) => s.customModel);
-  const aiValue =
+  const tinkAgent = useAISettings((s) => s.tinkAgent);
+  const tinkValue =
     aiMode === 'byok'
       ? t(locale, 'aiEngineByok', {
           model:
@@ -50,6 +51,7 @@ export function SettingsView({ env }: { env: RenderEnv }) {
               : (MODELS.find((m) => m.id === aiModel)?.name ?? aiModel),
         })
       : t(locale, aiMode === 'server' ? 'aiEngineRemote' : 'aiEngineMock');
+  const aiValue = tinkAgent ? tinkValue : t(locale, 'aiAgentOther');
   // Long-press an App: menu options to place it on the mobile home screen, or remove it; on
   // Android, once placed, an individual icon can also be placed separately (D-271, D-485); change
   // icon (D-606). picking: currently selecting an icon in the menu.

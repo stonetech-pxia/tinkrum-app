@@ -28,7 +28,7 @@ import {
   View,
 } from 'react-native';
 
-import { AiReturnCard } from '../ai/AiReturnCard';
+import { AiReturnBubble } from '../ai/AiReturnBubble';
 import { useAiHandoff } from '../ai/useAiHandoff';
 import { useAISettings } from '../ai/context';
 import { useAfterApply } from '../draft/useApplyDraft';
@@ -108,6 +108,7 @@ export function ChangeScreen() {
   const theme = appViewOf(config, appId).theme;
   const palette = usePalette(theme);
   const aiMode = useAISettings((s) => s.mode);
+  const tinkAgent = useAISettings((s) => s.tinkAgent);
   // Context carried when opened from a quick action ("Ask AI to modify this") or inbox page (D-124).
   const params = useLocalSearchParams<{
     workflow?: string;
@@ -176,6 +177,12 @@ export function ChangeScreen() {
       input,
       handoff.id,
     );
+  }
+  /** The send button by default (D-626): a sub-app's page goes as that app, anywhere else as the whole setup. */
+  async function sendOut(text: string) {
+    if (!text.trim()) return;
+    if (handoff) await handOff();
+    else await sendToAi({ kind: 'setup' }, text);
   }
   const aboutName =
     about?.kind === 'workflow'
@@ -412,7 +419,11 @@ export function ChangeScreen() {
       <ScrollView
         contentContainerStyle={[styles.page, { padding: palette.pad, gap: palette.gap - 2 }]}
         keyboardShouldPersistTaps="handled">
-        {!guide && !planBusy ? <AiReturnCard palette={palette} /> : null}
+        {!guide && !planBusy ? (
+          <View style={styles.returnBubble}>
+            <AiReturnBubble palette={palette} tail={false} />
+          </View>
+        ) : null}
         {build && !guide ? (
           <BuildPanel
             build={build}
@@ -537,7 +548,7 @@ export function ChangeScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={t(locale, 'send')}
                 disabled={busy || typing}
-                onPress={() => void submit(input)}
+                onPress={() => void (tinkAgent || guide ? submit(input) : sendOut(input))}
                 style={[styles.send, { backgroundColor: palette.primary }]}>
                 {busy || typing ? (
                   <LivelyTink size={24} color={palette.onPrimary} />
@@ -550,7 +561,7 @@ export function ChangeScreen() {
         )}
 
         {/* Test-period server save request (D-240): Chinese and English onboarding tutorials use built-in rules without passing through server; French tutorial passes through server (D-228). */}
-        {!planBusy && aiMode === 'server' && !guide ? (
+        {!planBusy && tinkAgent && aiMode === 'server' && !guide ? (
           <Text
             testID="change-server-stored"
             style={[palette.font('body', 13), { color: palette.caption }]}>
@@ -734,33 +745,14 @@ export function ChangeScreen() {
             )}
           </View>
         )}
-        {!guide && !planBusy ? (
-          handoff ? (
-            <Button
-              palette={palette}
-              testID="change-handoff"
-              variant="text"
-              label={t(locale, 'handoffButton')}
-              onPress={() => void handOff()}
-            />
-          ) : (
-            <>
-              <Button
-                palette={palette}
-                testID="change-handoff-new"
-                variant="text"
-                label={t(locale, 'handoffNewButton')}
-                onPress={() => void sendToAi({ kind: 'new' }, input)}
-              />
-              <Button
-                palette={palette}
-                testID="change-handoff-setup"
-                variant="text"
-                label={t(locale, 'handoffSetupButton')}
-                onPress={() => void sendToAi({ kind: 'setup' }, input)}
-              />
-            </>
-          )
+        {!guide && !planBusy && tinkAgent && handoff ? (
+          <Button
+            palette={palette}
+            testID="change-handoff"
+            variant="text"
+            label={t(locale, 'handoffButton')}
+            onPress={() => void handOff()}
+          />
         ) : null}
       </ScrollView>
 
@@ -833,6 +825,7 @@ const styles = StyleSheet.create({
   fix: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
   fixText: { flex: 1, minWidth: 120 },
   sessionItem: { borderRadius: 12, paddingVertical: 8, gap: 2 },
+  returnBubble: { alignItems: 'flex-start' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   sheet: {
     paddingTop: 18,

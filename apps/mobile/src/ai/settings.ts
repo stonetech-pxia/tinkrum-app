@@ -38,6 +38,7 @@ const KEYS = {
   openaiBaseUrl: 'morph.ai.openai.baseUrl',
   openaiModel: 'morph.ai.openai.model',
   needsButton: 'morph.ai.needsButton',
+  tinkAgent: 'morph.ai.tinkAgent',
 };
 
 /** A requirement submitted proactively by a user (D-189): contains only this text and metadata stripped of identity info. */
@@ -77,6 +78,8 @@ export interface AISettingsState {
   needsButton: boolean;
   /** Whether requirements can be sent (server URL is configured). */
   canSendNeeds: boolean;
+  /** D-626: off (default) = the AI page's send button hands the request to another AI app; on = Tink changes the app inside Tinkrum. */
+  tinkAgent: boolean;
 
   load(): Promise<void>;
   setMode(mode: AIMode): Promise<void>;
@@ -85,6 +88,7 @@ export interface AISettingsState {
   /** Save the endpoint URL and model name for OpenAI-compatible interfaces; delete the old key if the URL changes to avoid sending it to the new address. */
   saveEndpoint(baseUrl: string, model: string): Promise<EndpointResult>;
   setNeedsButton(on: boolean): Promise<void>;
+  setTinkAgent(on: boolean): Promise<void>;
   sendNeed(need: Omit<Need, 'ai'>): Promise<boolean>;
   /** Save the key for the current provider. */
   saveKey(key: string): Promise<boolean>;
@@ -127,16 +131,19 @@ export function createAISettingsStore(deps: {
     serverAvailable: deps.serverAvailable,
     needsButton: true,
     canSendNeeds: Boolean(deps.needs),
+    tinkAgent: false,
 
     async load() {
-      const [mode, model, needsButton, storedProvider, baseUrl, customModel] = await Promise.all([
-        secrets.get(KEYS.mode),
-        secrets.get(KEYS.model),
-        secrets.get(KEYS.needsButton),
-        secrets.get(KEYS.provider),
-        secrets.get(KEYS.openaiBaseUrl),
-        secrets.get(KEYS.openaiModel),
-      ]);
+      const [mode, model, needsButton, storedProvider, baseUrl, customModel, tinkAgent] =
+        await Promise.all([
+          secrets.get(KEYS.mode),
+          secrets.get(KEYS.model),
+          secrets.get(KEYS.needsButton),
+          secrets.get(KEYS.provider),
+          secrets.get(KEYS.openaiBaseUrl),
+          secrets.get(KEYS.openaiModel),
+          secrets.get(KEYS.tinkAgent),
+        ]);
       const provider: ByokProvider = storedProvider === 'openai' ? 'openai' : 'anthropic';
       const keyHint = await secrets.get(keySlot(provider).hint);
       const validMode =
@@ -152,12 +159,18 @@ export function createAISettingsStore(deps: {
         customModel: customModel ?? '',
         keyHint,
         needsButton: needsButton !== 'off',
+        tinkAgent: tinkAgent === 'on',
       });
     },
 
     async setNeedsButton(on) {
       await secrets.set(KEYS.needsButton, on ? 'on' : 'off');
       set({ needsButton: on });
+    },
+
+    async setTinkAgent(on) {
+      await secrets.set(KEYS.tinkAgent, on ? 'on' : 'off');
+      set({ tinkAgent: on });
     },
 
     async sendNeed(need) {

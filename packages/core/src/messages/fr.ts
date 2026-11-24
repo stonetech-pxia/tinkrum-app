@@ -145,6 +145,12 @@ export const fr: MessageTable = {
   aiModeQuestion: 'Ce que Tink utilise pour modifier cette app',
   aiModeMock: 'Règles intégrées',
   aiModeMockNote: 'Hors ligne et gratuit. Ne comprend qu’un nombre fixe de formulations.',
+  aiAgentQuestion: 'Qui modifie votre app quand vous touchez Envoyer ?',
+  aiAgentOther: 'Une autre app d’IA',
+  aiAgentOtherNote:
+    'ChatGPT, Claude ou Gemini sur votre téléphone. Votre demande est ajoutée au message partagé, puis vous collez le résultat ici.',
+  aiAgentTink: 'Tink',
+  aiAgentTinkNote: 'Tink modifie l’app dans Tinkrum, avec le choix ci-dessous.',
   aiModeServer: 'Serveur Tinkrum',
   aiModeServerNote: 'Le modèle est appelé via un serveur.',
   // Server storage note during testing (D-240): displayed only when using the Tinkrum server.
@@ -500,7 +506,7 @@ export const fr: MessageTable = {
   handoffNew:
     'Aide-moi à créer un nouveau fichier d’app Tinkrum. Dis en une ligne de quel modèle tu pars, puis donne-moi le fichier entier dans un seul bloc de code json.',
   handoffSetup:
-    'Je veux modifier toute ma configuration Tinkrum, y compris l’accueil et toutes mes apps. Renvoie le fichier morph-app-config entier, en conservant son format et sa version.',
+    'Je veux modifier mon Tinkrum, et je dirai quoi. Le fichier contient toutes mes apps, leurs pages et l’accueil. Décide d’après ma demande, et dis-moi en une ligne ce que tu as choisi :\n1. Un changement dans une seule app, ou dans une page de celle-ci : renvoie seulement cette app, dans un fichier tinkrum-app avec le même id d’app.\n2. Une nouvelle app : renvoie un fichier tinkrum-app avec un nouvel id d’app.\n3. Un changement de l’accueil, de la navigation, du thème, ou de plusieurs apps à la fois : renvoie le fichier morph-app-config entier, en conservant son format et sa version.\nSi ce que je veux n’est pas clair, demande-moi d’abord.',
   handoffSetupAttached: 'En pièce jointe : toute ma configuration Tinkrum ({file}).',
   handoffSetupInline: 'Toute ma configuration Tinkrum est à la fin de ce message.',
   handoffRequest:
@@ -508,12 +514,11 @@ export const fr: MessageTable = {
   handoffAskNew: 'Demande-moi d’abord ce que je veux suivre et faire.',
   handoffLink:
     'Place le lien « Open in Tinkrum » affiché par le vérificateur tout en haut de ta réponse, sous forme de lien cliquable. Donne-moi aussi le fichier entier dans un seul bloc de code json.',
-  handoffNewButton: 'Créer une app avec une autre app d’IA',
-  handoffSetupButton: 'Modifier tout Tinkrum avec une autre app d’IA',
   handoffPaste: 'Coller l’app reçue de l’IA',
   handoffPasteHint:
     'Copie le fichier entier depuis ton IA, puis colle-le ici pour examiner les modifications.',
   handoffDismiss: 'Masquer la carte de collage',
+  handoffNotNow: 'Plus tard',
   handoffFailed: 'Impossible d’ouvrir le partage. Réessaie.',
   appLinkTitle: 'Ouvrir dans Tinkrum',
   appLinkReview: 'Examiner ce fichier d’app',
@@ -531,6 +536,8 @@ export const fr: MessageTable = {
     'Je viens de la page « {page} » (id "{pageId}") de mon app « {app} ». Quand ma demande ne dit pas quelle partie changer, change d’abord cette page.',
   handoffRules:
     'Règles pour modifier mon fichier :\n- Garde tous les id qui existent déjà : l’app, les tableaux, les champs, les options, les pages et les blocs. Mes entrées sont liées aux id des tableaux et des champs ; un id changé les perd.\n- Ne supprime ni tableau ni champ sauf si je le demande. Leurs entrées restent sur mon téléphone mais sont masquées.\n- Donne-moi le fichier complet dans un seul bloc de code json.',
+  handoffAsking:
+    'Si je demande une nouvelle app, comprends ce que je veux avant de la construire, comme le ferait un bon designer :\n- Ne demande rien dont mon message, les pièces jointes ou le guide donnent déjà la réponse. Ne pose que ce qui changerait ce que tu construis, et dis en quelques mots pourquoi tu le demandes.\n- Si je n’ai pas dit quel genre d’app je veux, pose d’abord une seule question ouverte et laisse-moi la décrire avec mes mots : ce que je veux suivre ou faire, et ce que j’en ferai au quotidien. Ne me propose pas une liste de types d’apps.\n- Pose ensuite les détails qui comptent en un seul tour de 3 questions numérotées au plus, les plus importantes d’abord, une idée par question. Écris ta réponse recommandée sous chacune, formulée pour que je puisse simplement dire « oui » pour l’accepter. Les détails qui comptent d’habitude : ce que je note pour chaque entrée, comment je veux ensuite la regarder (une liste, des totaux, un graphique, un calendrier), et les rappels, photos ou fichiers s’ils comptent. Ne demande ni les couleurs, ni les noms, ni rien que tu peux bien choisir toi-même.\n- Utilise des mots simples, dans ma langue, et mes propres mots plutôt que des termes techniques.\n- Dis-moi ensuite en quelques lignes ce que l’app aura. Marque ce que tu as décidé toi-même et demande si quelque chose ne va pas. Ne me donne le fichier qu’après mon « oui ». Si je dis « fais comme tu veux » à un moment, arrête de demander, dis tes choix en une ligne et donne-moi le fichier.\n- Pose tes questions en deux tours au plus.',
   handoffCheck: 'Lance node tinkrum-check.js sur le fichier jusqu’à ce qu’il affiche OK.',
   handoffAsk: 'Demande-moi d’abord ce que je veux changer.',
   handoffSeeRequest: 'Lis d’abord le fichier joint {file} et suis-le.',
@@ -551,6 +558,10 @@ export const fr: MessageTable = {
   presetDeleted: 'Préréglage « {name} » supprimé',
   presetGone: 'Ce préréglage n’existe plus.',
   presetApplySummary: 'Passage au préréglage « {name} »',
+  setupReturnTitle: 'Mettre à jour Tinkrum avec le fichier de votre IA ?',
+  setupReturnSummary: 'Tinkrum mis à jour depuis une autre app d’IA',
+  setupReturnIntro:
+    'Les pages, la navigation, les tableaux, le thème et les actions rapides deviennent ce que votre IA a renvoyé. Vos entrées restent.',
   presetApplyTitle: 'Passer au préréglage « {name} » ?',
   presetApplyIntro:
     'Les pages, la navigation, les tableaux, le thème et les actions rapides redeviennent ceux enregistrés dans « {name} »',
