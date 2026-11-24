@@ -66,7 +66,9 @@ export function handoffPrompt(
           : t(locale, 'handoffApp', { app: scope.app });
   const request = options.request?.trim();
   return [
-    options.docs ? t(locale, 'handoffReadAttached') : t(locale, 'handoffRead', links),
+    ...(options.docs
+      ? [t(locale, 'handoffReadAttached'), t(locale, 'handoffReadFallback', links)]
+      : [t(locale, 'handoffRead', links)]),
     ...(scope.kind === 'new'
       ? []
       : [

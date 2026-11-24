@@ -1,7 +1,7 @@
 import { AI_RETURN_TTL, aiReturnIsActive, attachReturnStore, useAiReturn } from '@/ai/return';
 import { MemoryAttemptStore } from '@/test-utils/memory-attempts';
 
-// 「等 AI 结果」的标记在 Android 杀掉进程后还在（体检后补：D-new-codex-review-2）。
+// 「等 AI 结果」的标记在 Android 杀掉进程后还在（体检后补：D-638）。
 // 「重启」= 清掉内存里的标记，再接上同一个文件。
 
 const restart = (store: MemoryAttemptStore, now?: number) => {

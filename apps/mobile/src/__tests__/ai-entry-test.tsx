@@ -318,7 +318,7 @@ describe('hand the app to another AI app (D-611)', () => {
     expect(shared!.text).toBe('请先阅读附件 tinkrum-request.md，并照它去做。');
     expect(shared!.text).not.toContain('把标题改成我的钱包');
     expect(shared!.request).toContain('tinkrum-app-guide.md');
-    expect(shared!.request).not.toContain('https://');
+    expect(shared!.request).toContain('tinkrum-app-guide.md?v=');
     expect(shared!.request).toContain('「Wallet」');
     expect(shared!.request).toContain('id "wallet-home"');
     expect(shared!.request).toMatch(/先改这一页/);

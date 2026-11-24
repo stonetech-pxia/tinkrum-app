@@ -53,7 +53,7 @@ it('describes the whole setup without inventing an app or page', () => {
   expect(text).toContain('Keep every id');
 });
 
-it('uses attached guide and patterns when available and versioned URLs for older builds', () => {
+it('names the attachments and also gives dated links to read them when an app cannot open them (Gemini)', () => {
   for (const locale of ['en', 'zh', 'fr'] as const)
     for (const scope of scopes) {
       const attached = handoffPrompt(scope, locale, NOW, {
@@ -63,7 +63,10 @@ it('uses attached guide and patterns when available and versioned URLs for older
       });
       expect(attached).toContain('tinkrum-app-guide.md');
       expect(attached).toContain('tinkrum-app-patterns.md');
-      expect(attached).not.toContain('https://');
+      // Gemini 看得见附件却读不了指南和 patterns（真机 2026-11-24）：附件打不开时给带日期的网址当退路。
+      expect(attached).toContain('tinkrum-app-guide.md?v=20261123');
+      expect(attached).toContain('tinkrum-app-patterns.md?v=20261123');
+      expect(attached.indexOf('tinkrum-app-guide.md')).toBeLessThan(attached.indexOf('https://'));
       expect(attached).toContain('Open in Tinkrum');
       const fallback = handoffPrompt(scope, locale, NOW);
       expect(fallback).toContain('tinkrum-app-guide.md?v=20261123');

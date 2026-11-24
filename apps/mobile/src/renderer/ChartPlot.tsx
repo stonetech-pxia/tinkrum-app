@@ -119,7 +119,7 @@ export function ChartPlot({
                     connectMissingData={false}
                     curveType="linear"
                   />
-                  {/* 两边的周期都没有值时折线没有线段：孤立的一个读数要画出一个点，否则看不见（D-new-summary-blocks-2）。 */}
+                  {/* 两边的周期都没有值时折线没有线段：孤立的一个读数要画出一个点，否则看不见（D-631）。 */}
                   {points.v.map((p, i) =>
                     p.y != null && i !== selected ? (
                       <Circle key={i} cx={p.x} cy={p.y as number} r={3} color={color} />

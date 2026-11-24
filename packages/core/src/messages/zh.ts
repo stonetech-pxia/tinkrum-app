@@ -448,6 +448,8 @@ export const zh: MessageTable = {
   presetsPaste: '从剪贴板粘贴',
   presetsShareToAi: '把说明发给 AI App',
   handoffReadAttached: '开始前，请完整阅读附件 tinkrum-app-guide.md 和 tinkrum-app-patterns.md。',
+  handoffReadFallback:
+    '如果打不开附件，就改读这两个网页（直接打开链接，不要用搜索结果或缓存的旧版）：\n1. {guide}\n2. {patterns}',
   handoffNew:
     '帮我做一个新的 Tinkrum App 文件。先用一句话说从哪个模式开始，再把完整文件放在一个 json 代码块里给我。',
   handoffSetup:

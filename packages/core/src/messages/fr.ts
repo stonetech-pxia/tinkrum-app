@@ -494,6 +494,8 @@ export const fr: MessageTable = {
   presetsShareToAi: 'Envoyer à une app d’IA',
   handoffReadAttached:
     'Lis entièrement les pièces jointes tinkrum-app-guide.md et tinkrum-app-patterns.md avant de commencer.',
+  handoffReadFallback:
+    'Si tu ne peux pas ouvrir une pièce jointe, lis-la plutôt à ces adresses (ouvre les liens directement, sans recherche ni copie en cache) :\n1. {guide}\n2. {patterns}',
   handoffNew:
     'Aide-moi à créer un nouveau fichier d’app Tinkrum. Dis en une ligne de quel modèle tu pars, puis donne-moi le fichier entier dans un seul bloc de code json.',
   handoffSetup:

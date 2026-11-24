@@ -756,7 +756,7 @@ describe('import a preset from a file', () => {
         const { request: message, files: attachments } = files.aiShares[0]!;
         expect(message).toContain('tinkrum-app-guide.md');
         expect(message).toContain('tinkrum-app-patterns.md');
-        expect(message).not.toContain('https://');
+        expect(message).toContain('tinkrum-app-patterns.md?v=');
         expect(message).toContain('json');
         expect(attachments.map((f) => f.name)).toEqual([
           'tinkrum-check.js',

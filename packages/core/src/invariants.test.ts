@@ -788,7 +788,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     ]);
   });
 
-  // D-new-send-to-ai-simplify-1：预设页、AI 页共用主动分享入口；原生接口不在时才走系统文字分享。
+  // D-627：预设页、AI 页共用主动分享入口；原生接口不在时才走系统文字分享。
   // D-611：交给别的 AI App 改一个 App 时，没有原生分享（Expo Go）的退路也只发文字（提示词和 App 文件）。
   // 文件、记录的分享走快捷操作的 out.share 和本地模块，不用 react-native 的 Share。
   // D-621：启动兜底页把错误信息（版本号和错误文字，用户先在页面上看得到）交给系统分享面板，用户点了、自己挑发给谁；
@@ -803,7 +803,7 @@ describe('底线 10：数据离开 App 只能由用户每次亲手点', () => {
     ]);
   });
 
-  // D-new-send-to-ai-simplify-1：只有这一个共用函数调用分享平台，用户点击 AI 页或预设页的按钮才调用它。
+  // D-627：只有这一个共用函数调用分享平台，用户点击 AI 页或预设页的按钮才调用它。
   it('only the explicit handoff helper hands structure to another AI app', () => {
     const callers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
       .filter((path) => /\.shareWithAi\(|\.shareFilesWithText\b/.test(readFileSync(path, 'utf8')))

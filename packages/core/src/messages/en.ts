@@ -469,6 +469,8 @@ export const en = {
   presetsShareToAi: 'Send to an AI app',
   handoffReadAttached:
     'Read the attached tinkrum-app-guide.md and tinkrum-app-patterns.md in full before you start.',
+  handoffReadFallback:
+    'If you cannot open an attachment, read it at these links instead (open them directly; do not use search results or a cached copy):\n1. {guide}\n2. {patterns}',
   handoffNew:
     'Help me make a new Tinkrum app file. Tell me in one line which pattern you start from, and give me the whole file in one json code block.',
   handoffSetup:
