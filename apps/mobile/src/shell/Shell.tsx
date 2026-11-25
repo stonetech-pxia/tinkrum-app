@@ -120,7 +120,7 @@ export function Shell() {
   }, [missingApp, leaveApp]);
 
   // From the pages on an app's bar, the button at the top left and Android's back key go to the
-  // home page with the app list (D-new-apphome-3); pages pushed on top keep their own back button.
+  // home page with the app list (D-646); pages pushed on top keep their own back button.
   const inApp = view.appId !== null;
   useFocusEffect(
     useCallback(() => {
@@ -164,7 +164,7 @@ export function Shell() {
           // background briefly, so what the user is doing must not be closed; stay in place
           // (D-585).
           if (router.canDismiss()) return;
-          // The only app is where Tinkrum opens, so coming back stays in it (D-new-apphome-6).
+          // The only app is where Tinkrum opens, so coming back stays in it (D-649).
           if (s.config && startAppOf(s.config) === s.appId) return;
           s.leaveApp();
         }, 700);

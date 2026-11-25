@@ -14,7 +14,7 @@ import {
   testRegistry,
 } from '../test-utils/render-app';
 
-// New user's home page (D-new-apphome-1), toolbox (D-181), and home screen file entry points.
+// New user's home page (D-644), toolbox (D-181), and home screen file entry points.
 
 describe('starter home and toolbox (UI)', () => {
   const start = () =>

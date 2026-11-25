@@ -217,7 +217,7 @@ export function createRevisions(
     // unchanged). Clearing preset lists upon switching works as usual (D-410).
     const after = keepFiles ? keepChosenFiles(config, prepared.after) : prepared.after;
     // An app the other AI app made starts out in the menu of the Tinkrum icon; a saved preset
-    // keeps the menu it was saved with (D-new-apphome-4).
+    // keeps the menu it was saved with (D-647).
     const menued = asUpdate ? addNewAppsToHomeScreen(config, after) : [];
     return recordPreview(input, plan, head, {
       kind: 'restore',

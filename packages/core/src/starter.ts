@@ -132,7 +132,7 @@ export function paperBlocks(
   ];
 }
 
-/** The app the guide builds for a new user (D-new-apphome-2). */
+/** The app the guide builds for a new user (D-645). */
 export const PAPER_APP_ID = 'paper';
 
 /** The sentence of guide step 1: it fills the box on the Tink page, and the built-in rules know it in all three languages. */
@@ -157,7 +157,7 @@ const PAPER_ICON: DrawnIcon = {
 };
 
 /**
- * The Paper app (D-new-apphome-2): the former default home page (D-487) as an app of its own,
+ * The Paper app (D-645): the former default home page (D-487) as an app of its own,
  * with the files by type and the toolbox on its bar, in the Clay look in Tinkrum's red on a plain
  * backdrop (D-552). No operations when the app is already there.
  */
@@ -194,7 +194,7 @@ export function paperAppOps(config: WorkspaceConfig, locale: Locale, registry: R
 }
 
 /**
- * Initial version for new users (D-new-apphome-1): the home page is the list of the user's apps
+ * Initial version for new users (D-644): the home page is the list of the user's apps
  * and nothing else, empty until the guide builds the first one; preinstalled tools; the navigation
  * bar limited to Home, AI, and Settings (tool management and history are under Settings).
  * createDefaultWorkspace remains blank: used as the baseline for tests, evaluations, and

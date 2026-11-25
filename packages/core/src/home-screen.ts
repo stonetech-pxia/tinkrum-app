@@ -78,7 +78,7 @@ export const homeScreenFull = (config: WorkspaceConfig): boolean =>
   homeScreenIds(config).length >= MAX_HOME_SCREEN;
 
 /**
- * A new app starts out in the menu while there is room (D-new-apphome-4): puts each app that is in
+ * A new app starts out in the menu while there is room (D-647): puts each app that is in
  * `after` and not in `before` into `after`'s menu, and returns the names of those put in. An app
  * that was already installed keeps the user's choice, also when it is reinstalled.
  */

@@ -86,7 +86,7 @@ function file(): AppFile {
   } as unknown as AppFile;
 }
 
-/** A home page without an app list (from before D-new-apphome-1): each app has an entry block there. */
+/** A home page without an app list (from before D-644): each app has an entry block there. */
 const olderHome = () =>
   run(createStarterWorkspace('en', registry), [
     { op: 'removeContainer', page: HOME_PAGE_ID, block: 'apps' },

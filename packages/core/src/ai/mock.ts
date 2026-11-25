@@ -1969,7 +1969,7 @@ export function createMockAIProvider(): AIProvider {
         if (result.ok) return { kind: 'ops', ops: result.ops };
         return { kind: 'reject', reason: 'unknown', message: result.message, examples: [] };
       }
-      // Step 1 of the guide (D-new-apphome-2): its sentence, in any of the three languages, builds the Paper app in the interface language.
+      // Step 1 of the guide (D-645): its sentence, in any of the three languages, builds the Paper app in the interface language.
       if (Object.values(PAPER_APP_REQUEST).includes(input.trim())) {
         const ops = paperAppOps(ctx.config, uiLocale, ctx.registry);
         if (ops.length > 0) return { kind: 'ops', ops };

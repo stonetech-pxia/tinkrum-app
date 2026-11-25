@@ -25,7 +25,7 @@ describe('builtinText', () => {
 
   it('shows the starter texts of a Chinese workspace in French and English', () => {
     expect(builtinText(toolbox.title, 'fr', registry)).toBe(toolboxOf(withPaper('fr')).title);
-    // "Paper" is the app's name in every language (D-new-apphome-2) and is never translated.
+    // "Paper" is the app's name in every language (D-645) and is never translated.
     for (const locale of ['zh', 'en', 'fr'] as const)
       expect(builtinText(zh.nav.apps![0]!.name, locale, registry)).toBe('Paper');
     expect(builtinText('照片、视频和声音', 'en', registry)).toBe('Photos, video and audio');

@@ -316,7 +316,7 @@ Evals: AT1, AT1-en and AT2 pass with the built-in rules; PAT1 (attach an invoice
 - 添加导出视频 SRT 字幕快捷操作
 - Choose the spoken language, recognize on the device and export a separate .srt file; subtitles are not burned into the video. The text and timing need checking.
 
-### Onboarding guide step 1 (D-new-apphome-2, GD1)
+### Onboarding guide step 1 (D-645, GD1)
 
 - 「创建一个 Paper App」 / `Create a Paper app` / `Créer une app Paper`: builds the Paper app (its home, files by type and the toolbox) in the interface language and puts it into the menu of the Tinkrum icon on the phone; the home page's app list shows it. When it is already there it replies 「当前界面已经是这样了，无需修改。」 ("already like that") and the guide still goes on to step 2.
 

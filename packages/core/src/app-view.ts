@@ -53,7 +53,7 @@ export function firstTarget(view: ShellView): NavTarget {
 }
 
 /**
- * The app Tinkrum opens in (D-new-apphome-6): the only app, as long as the home page holds nothing
+ * The app Tinkrum opens in (D-649): the only app, as long as the home page holds nothing
  * but the app list, so that nothing of the home page goes unseen. Null: Tinkrum opens on the home
  * page.
  */

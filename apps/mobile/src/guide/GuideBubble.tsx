@@ -40,14 +40,14 @@ export function GuideBubble({
   if (stage !== 'look' && stage !== 'goal') return null;
   const look = stage === 'look';
   // Step 2 also says what the phone's home screen offers, once the app is in the menu of the
-  // Tinkrum icon there (D-new-apphome-4): where the phone allows it, as an icon of its own.
+  // Tinkrum icon there (D-647): where the phone allows it, as an icon of its own.
   const done = !config.nav.phoneHomeScreen?.includes(appTarget(PAPER_APP_ID))
     ? 'guideTinkDone'
     : homeScreen?.canPin()
       ? 'guideTinkDonePin'
       : 'guideTinkDoneMenu';
 
-  /** Skip guidance (D-231, D-new-apphome-2): directly build the Paper app (bypassing preview), without showing "Modified · Undo" at the top (D-239). */
+  /** Skip guidance (D-231, D-645): directly build the Paper app (bypassing preview), without showing "Modified · Undo" at the top (D-239). */
   async function skip() {
     const ops = paperAppOps(config, locale, registry);
     if (ops.length > 0) {

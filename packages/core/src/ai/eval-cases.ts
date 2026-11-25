@@ -56,7 +56,7 @@ function sameValue(a: unknown, b: unknown): boolean {
 // cases. IDs correspond to `docs/MOCK_AI_PHRASES.md`; `P*` are paraphrased phrasings that only real
 // models need to understand.
 
-/** starter: first version for new users (a home page that lists the apps, D-new-apphome-1). */
+/** starter: first version for new users (a home page that lists the apps, D-644). */
 /** toolbox: the starter plus a toolbox page on the home screen (D-181), what users from before the app list have. */
 /** visaHomeScreen: visa places visa photo on the home screen (D-271). */
 /** oneTap: four tables for water, work hours (start/end), packing list, bills, each with a list page (one-tap logging operation, D-300). */
@@ -4841,7 +4841,7 @@ const LOOK_CASES: EvalCase[] = [
     },
   },
 ];
-/** Onboarding step 1 (D-new-apphome-2): the sentence builds the Paper app, which the home page lists. */
+/** Onboarding step 1 (D-645): the sentence builds the Paper app, which the home page lists. */
 const paperAppBuilt = (c: WorkspaceConfig) => {
   const app = c.nav.apps?.find((a) => a.id === PAPER_APP_ID);
   if (!app) return 'no Paper app';
@@ -4865,7 +4865,7 @@ const GUIDE_STEP_CASES: EvalCase[] = (['zh', 'en', 'fr'] as const).map((locale) 
   mock: true,
   expect: { kind: 'ops', check: paperAppBuilt },
 }));
-/** The app list on a home page that has none (D-new-apphome-1): one `apps` block, no entry block per app. */
+/** The app list on a home page that has none (D-644): one `apps` block, no entry block per app. */
 const appList = (c: WorkspaceConfig) =>
   allComponents(home(c)).some((x) => isKnownComponent(x) && x.look === 'apps')
     ? null

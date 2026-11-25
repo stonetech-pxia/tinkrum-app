@@ -95,7 +95,7 @@ function ShareListener({ files }: { files: FakeFiles }) {
 /**
  * The home page of a user from before the app list (D-231, D-487): the scan tiles, "Open files",
  * the toolbox button, recent actions and files on the home page itself, and the toolbox page beside
- * it. Existing users keep it (D-new-apphome-1).
+ * it. Existing users keep it (D-644).
  */
 export function homeWithFileEntries(locale: Locale, registry: Registry): WorkspaceConfig {
   const config = createStarterWorkspace(locale, registry);

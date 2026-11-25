@@ -29,7 +29,7 @@ const registry = createRegistry(BUILTIN_TOOLS);
 const NOW = new Date('2026-11-07T12:00:00');
 const ctx = { registry, locale: 'en' as const, now: NOW };
 
-// 1. The scanner layout (D-487, also the Paper app the guide builds, D-new-apphome-2) as a whole
+// 1. The scanner layout (D-487, also the Paper app the guide builds, D-645) as a whole
 // workspace: its blocks on the home page, the toolbox on the bottom bar, and a "Files" page
 // that shelves files by type.
 const starter = createStarterWorkspace('en', registry);

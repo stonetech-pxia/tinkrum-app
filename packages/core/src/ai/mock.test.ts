@@ -513,7 +513,7 @@ describe('mock AI — must refuse', () => {
   });
 });
 
-describe('mock AI — guide step 1 (D-new-apphome-2)', () => {
+describe('mock AI — guide step 1 (D-645)', () => {
   it('GD1 guide step 1 builds the Paper app in the interface language', async () => {
     for (const locale of ['zh', 'en', 'fr'] as const) {
       const start = createStarterWorkspace(locale, registry);

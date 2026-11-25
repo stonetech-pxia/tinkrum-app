@@ -36,7 +36,7 @@ const pageOf = (config: WorkspaceConfig, id: string) =>
   config.containers.pages.find((p) => p.id === id)!;
 
 describe('createStarterWorkspace', () => {
-  // D-new-apphome-1: the home page is the list of apps and nothing else, empty until the guide builds one.
+  // D-644: the home page is the list of apps and nothing else, empty until the guide builds one.
   it.each(['zh', 'en', 'fr'] as const)(
     'installs the starter tools, a three-item bar and a home page that lists the apps (%s)',
     (locale) => {
@@ -73,7 +73,7 @@ describe('createStarterWorkspace', () => {
   });
 });
 
-// D-new-apphome-2: the former default home page (D-487) is an app of its own, built by the guide.
+// D-645: the former default home page (D-487) is an app of its own, built by the guide.
 describe('paperAppOps', () => {
   it.each(['zh', 'en', 'fr'] as const)(
     'builds the Paper app in the interface language (%s)',
@@ -100,7 +100,7 @@ describe('paperAppOps', () => {
     },
   );
 
-  // D-new-apphome-4: long-pressing the Tinkrum icon on the phone offers the app right away.
+  // D-647: long-pressing the Tinkrum icon on the phone offers the app right away.
   it('puts the app into the menu of the Tinkrum icon on the phone', () => {
     const config = withPaper('en');
     expect(config.nav.phoneHomeScreen).toEqual(['app:paper']);

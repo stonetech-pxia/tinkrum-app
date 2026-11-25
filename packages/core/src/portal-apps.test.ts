@@ -94,7 +94,7 @@ describe('Preset display (App file)', () => {
       expect(remindersOf(after).filter((r) => mine(r.app))).toHaveLength(entry.reminders);
       expect(quickActionsOf(after).filter((q) => mine(q.app))).toHaveLength(entry.quickActions);
       // Original pages, tables, and quick actions remain intact; a new user's home page lists the
-      // app by itself (D-new-apphome-1), so no entry block is added to it.
+      // app by itself (D-644), so no entry block is added to it.
       for (const p of before.containers.pages)
         expect(after.containers.pages.find((x) => x.id === p.id)).toEqual(p);
       expect(after.theme).toEqual(before.theme);
@@ -302,7 +302,7 @@ describe('Reconnect existing tables and restore initial appearance', () => {
   });
 
   it('restores the app to the file: pages, style, bar, reminders; user tables stay on the home', () => {
-    // A home page without an app list (from before D-new-apphome-1) holds an entry block per app.
+    // A home page without an app list (from before D-644) holds an entry block per app.
     const base = run(starter(), [{ op: 'removeContainer', page: HOME_PAGE_ID, block: 'apps' }]);
     let config = importApp(base, file);
     // Place into the Home Screen menu.

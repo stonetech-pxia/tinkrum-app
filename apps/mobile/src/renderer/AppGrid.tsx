@@ -12,9 +12,9 @@ import { IconTile } from './ui';
 const COLUMNS = 4;
 
 /**
- * The app list block (D-new-apphome-1): the user's apps as icons, four per row, like a phone's home
+ * The app list block (D-644): the user's apps as icons, four per row, like a phone's home
  * screen. Each icon takes its app's own primary color, as on the phone's home screen (D-606). A tap
- * opens the app; a long press opens its menu (D-new-apphome-5), from which it can go on the phone's
+ * opens the app; a long press opens its menu (D-648), from which it can go on the phone's
  * home screen. Long-pressing beside the icons edits the block, as for any block.
  */
 export function AppGrid({ grid, env }: { grid: BlockOf<'apps'>; env: RenderEnv }) {

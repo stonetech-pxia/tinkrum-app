@@ -67,7 +67,7 @@ export function prepareOps(
       kind: 'addedPageEntry' as const,
       page,
     })),
-    // A new app starts out in the menu of the Tinkrum icon on the phone (D-new-apphome-4).
+    // A new app starts out in the menu of the Tinkrum icon on the phone (D-647).
     ...addNewAppsToHomeScreen(before, config).map((name) => ({
       kind: 'appOnHomeScreen' as const,
       name,

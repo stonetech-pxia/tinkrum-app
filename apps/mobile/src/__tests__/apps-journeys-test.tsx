@@ -99,7 +99,7 @@ describe('apps (UI)', () => {
     await screen.findByTestId('nav-settings');
 
     await fireEvent.press((await screen.findAllByText('健身'))[0]!);
-    // App's bottom bar: its own two pages and Tink; home settings are absent. The way home is the button at the top left (D-new-apphome-3), not a bar entry.
+    // App's bottom bar: its own two pages and Tink; home settings are absent. The way home is the button at the top left (D-646), not a bar entry.
     expect(await screen.findByTestId('nav-page:fit-home')).toBeTruthy();
     expect(screen.getByTestId('nav-page:fit-plan')).toBeTruthy();
     expect(screen.getByTestId('nav-ai')).toBeTruthy();
@@ -439,7 +439,7 @@ describe('apps (UI)', () => {
     expect(screen.queryByText('添加到桌面')).toBeNull();
     await fireEvent.press(screen.getByText('放到桌面'));
     await screen.findByText('在桌面菜单里');
-    // Putting it there already asked for its own icon (D-new-apphome-5); the item stays for later.
+    // Putting it there already asked for its own icon (D-648); the item stays for later.
     await waitFor(() => expect(fake.pinned).toHaveLength(1));
     fake.pinned.length = 0;
     await openMenu();

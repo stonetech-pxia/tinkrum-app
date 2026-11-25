@@ -172,7 +172,7 @@ export type AppImport = { ok: true; ops: Op[]; name: string } | { ok: false; err
 /**
  * The way into a new app from the home page: an entry block (deletable by the user at any time;
  * still accessible via Settings -> My Apps). None when the home page lists the apps by itself
- * (D-new-apphome-1).
+ * (D-644).
  */
 export function appEntryOps(config: WorkspaceConfig, appId: string): Op[] {
   const home = config.containers.pages.find((p) => p.id === HOME_PAGE_ID);
@@ -575,7 +575,7 @@ export interface ConvertMeta {
   icon?: IconValue;
 }
 
-/** An app can't list apps (D-new-apphome-1): a home page's app list stays behind. */
+/** An app can't list apps (D-644): a home page's app list stays behind. */
 const withoutAppList = (blocks: Page['blocks']): Page['blocks'] =>
   blocks
     .filter((c) => !(isKnownComponent(c) && c.look === 'apps'))

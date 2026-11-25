@@ -181,7 +181,7 @@ describe('home screen mark (D-271)', () => {
   });
 });
 
-// Every new app starts out in the menu of the Tinkrum icon (D-new-apphome-4).
+// Every new app starts out in the menu of the Tinkrum icon (D-647).
 describe('a new app and the home screen menu', () => {
   const fit: Op = { op: 'addContainer', app: { id: 'fit', name: '健身', bar: ['ai'] } };
 

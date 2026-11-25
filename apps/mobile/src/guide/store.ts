@@ -4,7 +4,7 @@ import { create } from 'zustand';
 
 import type { WorkspaceRepo } from '../storage/types';
 
-// Newcomer guidance (D-149, D-231, D-260, D-new-apphome-2): onboarding slider -> step 1 sends a
+// Newcomer guidance (D-149, D-231, D-260, D-645): onboarding slider -> step 1 sends a
 // sentence that builds the Paper app (takes effect immediately) -> step 2 says it is on the home
 // page -> step 3 picks a sample app to apply entirely (enters draft first). Progress is stored in local app_meta; no
 // records means first launch. "Settings -> Re-watch onboarding guide" starts over.
@@ -42,7 +42,7 @@ export const useGuide = create<GuideState>()((set, get) => ({
 }));
 
 /**
- * Sentences for step 1 (D-231, D-new-apphome-2): the home page lists no app yet, the sentence
+ * Sentences for step 1 (D-231, D-645): the home page lists no app yet, the sentence
  * builds the Paper app. All three languages are recognized by built-in rules, guidance uses
  * built-in rules fixedly without calling settings AI: results are stable and immediate, and no key
  * is needed (revision of D-228: previously French was delegated to settings AI).

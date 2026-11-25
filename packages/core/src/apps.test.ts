@@ -341,7 +341,7 @@ describe('Apps in the desktop menu (D-485)', () => {
   });
 });
 
-// D-new-apphome-1: the app list is a home page's block.
+// D-644: the app list is a home page's block.
 describe('the app list block', () => {
   const list = { id: 'list', look: 'apps' as const, source: { catalog: 'apps' as const } };
 
@@ -378,7 +378,7 @@ describe('the app list block', () => {
   });
 });
 
-// D-new-apphome-6: with one app and nothing else on the home page, Tinkrum opens in that app.
+// D-649: with one app and nothing else on the home page, Tinkrum opens in that app.
 describe('the app Tinkrum opens in', () => {
   const paper = () => {
     const start = base();

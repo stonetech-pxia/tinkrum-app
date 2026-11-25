@@ -23,7 +23,7 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp, testRegistry } from '../test-utils/render-app';
 
-// The home page lists the apps, and an app's pages lead back to it (D-new-apphome-1, D-new-apphome-3).
+// The home page lists the apps, and an app's pages lead back to it (D-644, D-646).
 
 /** A new user after the guide, plus an app of their own. */
 function twoApps(locale: Locale, registry: Registry) {
@@ -170,7 +170,7 @@ describe('the app list on the home page', () => {
   });
 });
 
-// A long press on an icon opens the app's menu; the phone's home screen is one step away (D-new-apphome-5).
+// A long press on an icon opens the app's menu; the phone's home screen is one step away (D-648).
 describe('long-pressing an app', () => {
   afterEach(() => jest.restoreAllMocks());
 
@@ -261,7 +261,7 @@ describe('long-pressing an app', () => {
   });
 });
 
-// With one app, Tinkrum opens in it (D-new-apphome-6).
+// With one app, Tinkrum opens in it (D-649).
 describe('starting Tinkrum', () => {
   afterEach(() => {
     jest.useRealTimers();
@@ -348,7 +348,7 @@ describe('starting Tinkrum', () => {
   });
 });
 
-// Every new app starts out in the menu of the Tinkrum icon (D-new-apphome-4).
+// Every new app starts out in the menu of the Tinkrum icon (D-647).
 describe('a new app made after the guide', () => {
   afterEach(() => useGuide.setState({ stage: null, repo: null }));
 

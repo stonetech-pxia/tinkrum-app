@@ -21,7 +21,7 @@ import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { AppIconPicker, AppMenuRow, AppMenuSheet } from './AppMenu';
 
 /**
- * The menu of an app, opened by long-pressing it in Settings or in the app list (D-new-apphome-5):
+ * The menu of an app, opened by long-pressing it in Settings or in the app list (D-648):
  * put it on the phone's home screen or take it off, change its icon (D-606), share it (D-545),
  * restore it (D-485). System layer, cannot be modified by AI (invariant 8). Opening it changes
  * nothing (invariant 15). Render `appMenu` somewhere on the page that opens it.
@@ -89,7 +89,7 @@ export function useAppMenu(env: RenderEnv): {
         });
     };
     // Into the Tinkrum icon's menu on the phone, or out of it. Where the phone can, putting it
-    // there goes straight on to its own icon (D-new-apphome-5).
+    // there goes straight on to its own icon (D-648).
     const toggle = async () => {
       if (!onHome && homeScreenFull(env.config)) {
         Alert.alert(t(locale, 'homeScreenFull'));

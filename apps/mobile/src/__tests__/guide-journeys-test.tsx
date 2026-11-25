@@ -16,7 +16,7 @@ import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
 import { renderToolsApp, homeWithFileEntries, openPick } from '../test-utils/render-app';
 
-// Newbie guide (D-149, D-231, D-new-apphome-2): swipe intro -> step 1 builds the Paper app
+// Newbie guide (D-149, D-231, D-645): swipe intro -> step 1 builds the Paper app
 // (takes effect immediately) -> step 2 says it is on the home page -> step 3 sample app (D-260,
 // see also sample-apps-test.tsx).
 
@@ -130,7 +130,7 @@ describe('first-run guide', () => {
     expect(apps(store)).toEqual([]);
     await fireEvent.press(screen.getByTestId('change-submit'));
     // Takes effect immediately without entering draft mode; returns to the home page showing step 2. Guide modifications do not show "Applied · Undo" at the top (D-239).
-    // The app is in the menu of the Tinkrum icon, and step 2 says so (D-new-apphome-4).
+    // The app is in the menu of the Tinkrum icon, and step 2 says so (D-647).
     expect(await screen.findByTestId('guide-goal')).toHaveTextContent(
       /搭好了，点图标就能打开。在手机桌面长按 Tinkrum 图标，也能直接打开 Paper/,
     );
@@ -149,7 +149,7 @@ describe('first-run guide', () => {
     expect(await repo.getMeta('guide')).toBe('done');
   });
 
-  // D-new-apphome-4: where the phone can place icons, step 2 says how to give Paper one of its own.
+  // D-647: where the phone can place icons, step 2 says how to give Paper one of its own.
   it('step 2 tells a phone that can place icons to drag Paper onto the home screen', async () => {
     const repo = new MemoryWorkspaceRepo();
     await repo.setMeta('guide', 'goal');

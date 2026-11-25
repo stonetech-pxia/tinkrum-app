@@ -11,7 +11,7 @@ const shape = {
 };
 
 /**
- * App list (D-new-apphome-1): the user's apps as icons, like a phone's home screen. Lives on pages
+ * App list (D-644): the user's apps as icons, like a phone's home screen. Lives on pages
  * outside any app: inside an app nothing may open or point at another app (D-485).
  */
 export const appsComponent: LookDefinitionOf<'apps', typeof shape> = defineLook({
