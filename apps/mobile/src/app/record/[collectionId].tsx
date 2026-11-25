@@ -17,7 +17,7 @@ import { useComputedRecords, useRecordActions, type SaveResult } from '@/data/re
 import { useSimilarCheck } from '@/data/similar-records';
 import { t } from '@/i18n';
 import { FormFilesContext } from '@/renderer/Attachments';
-import { prefillFormValues, toFormValues } from '@/renderer/data';
+import { newFormValues, prefillFormValues, toFormValues } from '@/renderer/data';
 import { RecordActionRow } from '@/renderer/RecordActionRow';
 import { SuggestedFields } from '@/renderer/SuggestedFields';
 import { usePalette } from '@/renderer/theme';
@@ -64,7 +64,12 @@ export default function RecordRoute() {
   const computed = useComputedRecords(config.data.tables, collection, cal);
   const [record, setRecord] = useState<DataRecord | null | undefined>(recordId ? undefined : null);
   const [values, setValues] = useState<Record<string, unknown>>(() =>
-    !recordId && prefill && collection ? prefillFormValues(collection, prefill) : {},
+    !recordId && collection
+      ? {
+          ...newFormValues(collection, cal),
+          ...(prefill ? prefillFormValues(collection, prefill) : {}),
+        }
+      : {},
   );
   // Values upon opening: prompts "Discard changes?" if leaving with filled or modified unsaved data (2026-11-06 test: inputted text was directly lost).
   const [initial, setInitial] = useState(() => JSON.stringify(values));

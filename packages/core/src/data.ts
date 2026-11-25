@@ -393,6 +393,23 @@ function defaultValue(field: Field, now: Date, cal: Calendar): FieldValue | unde
   return 'default' in field ? field.default : undefined;
 }
 
+/**
+ * What a blank new record gets for each field with a default (the same values prepareRecordValues
+ * fills in on save), so a form can show them before the user saves.
+ */
+export function newRecordDefaults(
+  collection: Collection,
+  now: Date,
+  cal: Calendar = DEFAULT_CALENDAR,
+): Record<string, FieldValue> {
+  const values: Record<string, FieldValue> = {};
+  for (const field of collection.fields) {
+    const v = defaultValue(field, now, cal);
+    if (v !== undefined) values[field.id] = v;
+  }
+  return values;
+}
+
 const isBlank = (v: unknown) =>
   v === undefined ||
   v === null ||

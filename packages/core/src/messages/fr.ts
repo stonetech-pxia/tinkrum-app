@@ -444,7 +444,6 @@ export const fr: MessageTable = {
 
   // User data
   noRecords: 'Aucune entrée pour l’instant',
-  today: 'Aujourd’hui',
   yesterday: 'Hier',
   now: 'Maintenant',
   durationHours: 'Heures',

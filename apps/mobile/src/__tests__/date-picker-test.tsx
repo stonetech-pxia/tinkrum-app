@@ -10,7 +10,8 @@ import {
   type Locale,
   type Registry,
 } from '@morph/core';
-import { fireEvent } from '@testing-library/react-native';
+import { act, fireEvent } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
 
 import { MemoryWorkspaceRepo } from '../storage/memory';
@@ -23,6 +24,7 @@ const events: Collection = {
   name: 'Events',
   fields: [
     { id: 'day', name: 'Day', type: 'date' },
+    { id: 'due', name: 'Due', type: 'date', default: 'today' },
     { id: 'at', name: 'At', type: 'datetime' },
     { id: 'clock', name: 'Clock', type: 'time' },
   ],
@@ -46,7 +48,7 @@ const seed = (locale: Locale, registry: Registry) => {
               label: 'Log',
               do: 'create',
               table: 'events',
-              ask: ['day', 'at', 'clock'],
+              ask: ['day', 'due', 'at', 'clock'],
             },
           ],
         },
@@ -75,6 +77,24 @@ it('picks a date from a month grid, in the user language, and moves between mont
   expect(screen.getByTestId('form-log-day').props.value).toBe(`${next}-15`);
 });
 
+it('a date field starts as today and has the input and the calendar, no day buttons', async () => {
+  const repo = new MemoryWorkspaceRepo();
+  await renderToolsApp(repo, undefined, { seed, locale: 'en' });
+  expect((await screen.findByTestId('form-log-due')).props.value).toBe(today());
+  expect(screen.getByTestId('form-log-due-pick')).toBeTruthy();
+  for (const label of ['Today', 'Tomorrow', 'Yesterday'])
+    expect(screen.queryByText(label)).toBeNull();
+});
+
+it('the new-entry page and the inline form start a date field as today, again after saving', async () => {
+  const repo = new MemoryWorkspaceRepo();
+  await renderToolsApp(repo, undefined, { seed, locale: 'en' });
+  await fireEvent.press(await screen.findByTestId('form-log-submit'));
+  expect((await screen.findByTestId('form-log-due')).props.value).toBe(today());
+  await act(() => router.push('/record/events'));
+  expect((await screen.findByTestId('editor-due')).props.value).toBe(today());
+});
+
 it('picks a date and a time for a date-and-time field, and a time alone', async () => {
   const repo = new MemoryWorkspaceRepo();
   await renderToolsApp(repo, undefined, { seed, locale: 'en' });
@@ -89,7 +109,7 @@ it('picks a date and a time for a date-and-time field, and a time alone', async 
   expect(screen.getByTestId('form-log-clock').props.value).toBe('07:05');
   await fireEvent.press(screen.getByTestId('form-log-submit'));
   const [saved] = await repo.listRecords('events');
-  expect(saved!.values).toEqual({ at: `${today()}T14:30`, clock: '07:05' });
+  expect(saved!.values).toEqual({ due: today(), at: `${today()}T14:30`, clock: '07:05' });
 });
 
 it('the week starts on the day set in Settings → Date', async () => {

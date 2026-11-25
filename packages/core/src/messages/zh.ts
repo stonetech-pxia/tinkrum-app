@@ -400,7 +400,6 @@ export const zh: MessageTable = {
 
   // User data
   noRecords: '还没有记录',
-  today: '今天',
   yesterday: '昨天',
   now: '现在',
   durationHours: '小时',

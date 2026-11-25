@@ -5,7 +5,13 @@ import { calendarOf, DEFAULT_CALENDAR, type Calendar } from './calendar';
 import { prepareOps } from './change';
 import { conditionProblems } from './conditions';
 import { chartSeries } from './chart';
-import { filterRecords, periodRange, prepareRecordValues, type DataRecord } from './data';
+import {
+  filterRecords,
+  newRecordDefaults,
+  periodRange,
+  prepareRecordValues,
+  type DataRecord,
+} from './data';
 import { describeChange } from './describe';
 import { migrateWorkspace } from './migrate';
 import type { Collection } from './schema';
@@ -144,6 +150,20 @@ describe('when a day and a week start (D-286)', () => {
       ok: true,
       values: { date: '2026-10-22' },
     });
+  });
+
+  it('the defaults a form shows are the ones a blank save would get', () => {
+    const c: Collection = {
+      id: 'log',
+      name: 'Log',
+      fields: [
+        { id: 'date', name: 'Date', type: 'date', default: 'today' },
+        { id: 'due', name: 'Due', type: 'date' },
+      ],
+    };
+    const lateNight = new Date(2026, 9, 23, 1, 30);
+    expect(newRecordDefaults(c, lateNight)).toEqual({ date: '2026-10-23' });
+    expect(newRecordDefaults(c, lateNight, twoAm)).toEqual({ date: '2026-10-22' });
   });
 
   it('created-at filters use the logical day', () => {

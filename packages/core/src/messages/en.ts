@@ -422,7 +422,6 @@ export const en = {
 
   // User data
   noRecords: 'Nothing here yet',
-  today: 'Today',
   yesterday: 'Yesterday',
   now: 'Now',
   durationHours: 'Hours',

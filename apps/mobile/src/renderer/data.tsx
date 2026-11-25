@@ -27,9 +27,9 @@ import {
   withoutPhrase,
   aggregateRecords,
   latestNumber,
+  newRecordDefaults,
   tapAlsoOf,
   calendarOf,
-  dateOfDayNumber,
   filterRecords,
   followedFilter,
   fieldDefinition,
@@ -148,6 +148,23 @@ export function toFormValues(collection: Collection, record: DataRecord | null):
     values[field.id] = toForm ? toForm(v) : v;
   }
   return values;
+}
+
+/**
+ * Starting values of a blank new-record form: a date field with `default: "today"` shows today
+ * (what a save would fill in anyway, so the user sees it before saving). `only` limits this to the
+ * fields the form asks for. Other defaults are not shown; the save still applies them.
+ */
+export function newFormValues(
+  collection: Collection,
+  cal: Calendar,
+  only?: readonly string[],
+): FormValues {
+  const defaults = newRecordDefaults(collection, new Date(), cal);
+  const dates = collection.fields.filter(
+    (f) => f.type === 'date' && defaults[f.id] !== undefined && (!only || only.includes(f.id)),
+  );
+  return Object.fromEntries(dates.map((f) => [f.id, defaults[f.id]]));
 }
 
 /**
@@ -343,9 +360,9 @@ function textBox<F extends Field>({
 }
 
 /**
- * Date: input box plus "Today", "Tomorrow", "Yesterday"; today is calculated starting from a
- * given hour (D-286). The box also accepts "next Friday", "Nov 5", "demain", converting to a date
- * locally upon leaving the input box (D-344).
+ * Date: an input box plus a calendar button. A new record starts as today through the field's
+ * `default: "today"` (D-286). The box also accepts "next Friday", "Nov 5", "demain", converting to a
+ * date locally upon leaving the input box (D-344).
  */
 function DateInput({
   value,
@@ -355,7 +372,6 @@ function DateInput({
   disabled,
   testID,
   input,
-  chip,
 }: FieldInputContext<FieldOf<'date'>>) {
   const cal = useCalendar();
   const [picking, setPicking] = useState(false);
@@ -379,19 +395,6 @@ function DateInput({
           placeholderTextColor={palette.caption}
           style={[input, styles.flex]}
         />
-        {[
-          [dateOfDayNumber(today), t(locale, 'today')],
-          [dateOfDayNumber(today + 1), t(locale, 'scheduleTomorrow')],
-          [dateOfDayNumber(today - 1), t(locale, 'yesterday')],
-        ].map(([date, label]) => (
-          <Pressable
-            key={label}
-            disabled={disabled}
-            onPress={() => onChange(date)}
-            style={chip(value === date)}>
-            <Text style={[palette.font('bodyBold', 13), { color: palette.text }]}>{label}</Text>
-          </Pressable>
-        ))}
         <PickButton
           open={picking}
           onPress={() => setPicking(!picking)}
@@ -2330,10 +2333,20 @@ export function RecordForm({
   const collection = useCollection(env, submitTool?.table ?? '');
   const actions = useRecordActions();
   const mayProceed = useSimilarCheck();
-  const [values, setValues] = useState<FormValues>({});
+  const cal = useCalendar();
+  // A date recognised from the typed text (smartDate, D-344) fills its field itself, so that field
+  // does not start with its default.
+  const blank = () =>
+    collection
+      ? newFormValues(
+          collection,
+          cal,
+          fieldIds.filter((id) => id !== submitTool?.smartDate?.to),
+        )
+      : {};
+  const [values, setValues] = useState<FormValues>(blank);
   const [issues, setIssues] = useState<FieldIssue[]>([]);
   const [message, setMessage] = useState<string | null>(null);
-  const cal = useCalendar();
   // D-344: Recognizes dates in text locally; once dismissed by the user, this text is no longer recognized (until modified).
   const [dismissed, setDismissed] = useState<string | null>(null);
   // D-352: Whether the bottom-sheet add box is open.
@@ -2364,7 +2377,7 @@ export function RecordForm({
     if (!(await mayProceed(collection, input))) return;
     const result = await actions.add(collection, input);
     if (result.ok) {
-      setValues({});
+      setValues(blank());
       setIssues([]);
       setMessage(null);
       setDismissed(null);
