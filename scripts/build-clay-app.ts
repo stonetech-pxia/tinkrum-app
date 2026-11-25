@@ -13,12 +13,12 @@ import {
   appFileText,
   readAppFile,
 } from '../packages/core/src/app-file';
-import { applyOps } from '../packages/core/src/ops';
 import { createRegistry } from '../packages/core/src/registry';
 import {
   createStarterWorkspace,
   filesByTypePage,
-  homeFileEntryOps,
+  paperBlocks,
+  toolboxPage,
 } from '../packages/core/src/starter';
 import { BUILTIN_TOOLS } from '../packages/core/src/tools';
 import { validateWorkspace } from '../packages/core/src/validate';
@@ -29,17 +29,15 @@ const registry = createRegistry(BUILTIN_TOOLS);
 const NOW = new Date('2026-11-07T12:00:00');
 const ctx = { registry, locale: 'en' as const, now: NOW };
 
-// 1. Starter configuration for new users + home entry point provided by the onboarding guidance (i.e., the default home screen from D-487).
+// 1. The scanner layout (D-487, also the Paper app the guide builds, D-new-apphome-2) as a whole
+// workspace: its blocks on the home page, the toolbox on the bottom bar, and a "Files" page
+// that shelves files by type.
 const starter = createStarterWorkspace('en', registry);
-const withHome = applyOps(starter, homeFileEntryOps(starter, 'en'), ctx);
-if (!withHome.ok) throw new Error(withHome.error);
-const config = structuredClone(withHome.config);
-
-// 2. In the preset, the home screen does not include a toolbox entry (the toolbox is on the bottom bar), and adds a "Files" page: organized separately by type.
+const config = structuredClone(starter);
 const home = config.containers.pages.find((p) => p.id === 'home')!;
-home.blocks = home.blocks.filter((b) => b.id !== 'toolbox-entry');
+home.blocks = paperBlocks(config, 'en', 'Tinkrum');
 // The Files page is generated according to the language and displays matching the interface language after import (D-582).
-config.containers.pages.push(filesByTypePage('en'));
+config.containers.pages.push(toolboxPage('en', registry), filesByTypePage('en'));
 // D-552: preset page background uses solid sand color instead of STARTER_THEME's gradient (sage green in the bottom half appears grayish, resembling a color mist).
 config.theme.backdrop = 'plain';
 // The bottom bar of the entire configuration must include settings; settings are removed when converted to an app file (app bottom bars only contain pages and Tink).

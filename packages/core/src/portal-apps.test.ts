@@ -93,16 +93,10 @@ describe('Preset display (App file)', () => {
       expect(after.data.tables.filter((t) => mine(t.app)).map((t) => t.name)).toEqual(entry.tables);
       expect(remindersOf(after).filter((r) => mine(r.app))).toHaveLength(entry.reminders);
       expect(quickActionsOf(after).filter((q) => mine(q.app))).toHaveLength(entry.quickActions);
-      // Original pages, tables, and quick actions remain intact; only a single entry point is added to the home screen.
-      for (const p of before.containers.pages) {
-        const now = after.containers.pages.find((x) => x.id === p.id)!;
-        if (p.id !== HOME_PAGE_ID) expect(now).toEqual(p);
-      }
-      const home = after.containers.pages.find((p) => p.id === HOME_PAGE_ID)!;
-      expect(home.blocks).toHaveLength(
-        before.containers.pages.find((p) => p.id === HOME_PAGE_ID)!.blocks.length + 1,
-      );
-      expect(JSON.stringify(home.blocks.at(-1))).toContain(`app:${entry.id}`);
+      // Original pages, tables, and quick actions remain intact; a new user's home page lists the
+      // app by itself (D-new-apphome-1), so no entry block is added to it.
+      for (const p of before.containers.pages)
+        expect(after.containers.pages.find((x) => x.id === p.id)).toEqual(p);
       expect(after.theme).toEqual(before.theme);
     });
 
@@ -308,7 +302,8 @@ describe('Reconnect existing tables and restore initial appearance', () => {
   });
 
   it('restores the app to the file: pages, style, bar, reminders; user tables stay on the home', () => {
-    const base = starter();
+    // A home page without an app list (from before D-new-apphome-1) holds an entry block per app.
+    const base = run(starter(), [{ op: 'removeContainer', page: HOME_PAGE_ID, block: 'apps' }]);
     let config = importApp(base, file);
     // Place into the Home Screen menu.
     config = run(config, [homeScreenOp(config, 'app:habits', true)]);

@@ -5,8 +5,10 @@ import {
   createMockAIProvider,
   createRegistry,
   createStarterWorkspace,
-  homeFileEntryOps,
+  paperBlocks,
+  toolboxPage,
   type Locale,
+  type Op,
   type Registry,
   type WorkspaceConfig,
 } from '@morph/core';
@@ -90,10 +92,27 @@ function ShareListener({ files }: { files: FakeFiles }) {
   return null;
 }
 
-/** Appearance of a new user completing onboarding step 1 (D-231): blank home screen plus "Open photo library" and "Open files". */
-export function starterAfterGuide(locale: Locale, registry: Registry): WorkspaceConfig {
+/**
+ * The home page of a user from before the app list (D-231, D-487): the scan tiles, "Open files",
+ * the toolbox button, recent actions and files on the home page itself, and the toolbox page beside
+ * it. Existing users keep it (D-new-apphome-1).
+ */
+export function homeWithFileEntries(locale: Locale, registry: Registry): WorkspaceConfig {
   const config = createStarterWorkspace(locale, registry);
-  const result = applyOps(config, homeFileEntryOps(config, locale), { registry, locale });
+  const toolbox = toolboxPage(locale, registry);
+  const blocks = paperBlocks(config, locale, 'Tinkrum');
+  blocks.splice(blocks.findIndex((b) => b.id === 'open-files') + 1, 0, {
+    id: 'toolbox-entry',
+    look: 'button',
+    show: { label: toolbox.title, variant: 'row', icon: 'apps' },
+    opens: 'page:toolbox',
+  });
+  const ops = [
+    { op: 'addContainer', page: toolbox },
+    { op: 'removeContainer', page: 'home', block: 'apps' },
+    ...blocks.map((block) => ({ op: 'addContainer', page: 'home', block })),
+  ] as Op[];
+  const result = applyOps(config, ops, { registry, locale });
   if (!result.ok) throw new Error(result.error);
   return result.config;
 }

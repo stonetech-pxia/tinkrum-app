@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
+import { appFileFromWorkspace } from './app-file';
 import { entryKind } from './components';
 import { homeScreenFull, homeScreenItems, homeScreenOp } from './home-screen';
-import { appOfPage, appViewOf, firstTarget } from './app-view';
+import { appOfPage, appViewOf, firstTarget, startAppOf } from './app-view';
 import { prepareOps } from './change';
 import { migrateWorkspace } from './migrate';
 import { applyOps, isFunctionOp, type Op } from './ops';
 import { CURRENT_SCHEMA_VERSION, type WorkspaceConfig } from './schema';
-import { createStarterWorkspace } from './starter';
+import { createStarterWorkspace, paperAppOps } from './starter';
 import { registry } from './test-helpers';
 import { validateWorkspace } from './validate';
 
@@ -337,5 +338,89 @@ describe('Apps in the desktop menu (D-485)', () => {
       scope: { appId: 'fit' },
     });
     expect(result.ok).toBe(false);
+  });
+});
+
+// D-new-apphome-1: the app list is a home page's block.
+describe('the app list block', () => {
+  const list = { id: 'list', look: 'apps' as const, source: { catalog: 'apps' as const } };
+
+  it('is on the new home page and valid with or without apps', () => {
+    expect(codes(base())).toEqual([]);
+    expect(codes(withFitness())).toEqual([]);
+  });
+
+  it('cannot sit on a page of an app, which may not open other apps (D-485)', () => {
+    const config = withFitness();
+    config.containers.pages.find((p) => p.id === 'fit-home')!.blocks.push(list);
+    expect(codes(config)).toContain('data');
+  });
+
+  it('cannot sit inside a group on a page of an app either', () => {
+    const config = withFitness();
+    config.containers.pages
+      .find((p) => p.id === 'fit-home')!
+      .blocks.push({ id: 'g', look: 'group', show: { layout: 'stack' }, children: [list] });
+    expect(codes(config)).toContain('data');
+  });
+
+  it('stays behind when a whole setup is turned into an app file', () => {
+    const config = base();
+    const home = config.containers.pages.find((p) => p.id === 'home')!;
+    home.blocks.push({
+      id: 'g',
+      look: 'group',
+      show: { layout: 'stack' },
+      children: [{ ...list, id: 'nested' }],
+    });
+    const file = appFileFromWorkspace(config, { id: 'mine', name: 'Mine' });
+    expect(JSON.stringify(file.pages)).not.toContain('"apps"');
+  });
+});
+
+// D-new-apphome-6: with one app and nothing else on the home page, Tinkrum opens in that app.
+describe('the app Tinkrum opens in', () => {
+  const paper = () => {
+    const start = base();
+    const result = applyOps(start, paperAppOps(start, 'en', registry), { registry, locale: 'en' });
+    if (!result.ok) throw new Error(result.error);
+    return result.config;
+  };
+
+  it('is the only app', () => {
+    expect(startAppOf(paper())).toBe('paper');
+  });
+
+  it('is none without an app, or with two', () => {
+    expect(startAppOf(base())).toBeNull();
+    const two = paper();
+    two.nav.apps!.push({ ...structuredClone(two.nav.apps![0]!), id: 'other' });
+    expect(startAppOf(two)).toBeNull();
+  });
+
+  it('is none for an app that has only Tink to show', () => {
+    const config = paper();
+    config.nav.apps![0]!.bar = ['ai'];
+    expect(startAppOf(config)).toBeNull();
+  });
+
+  it('is none while the home page holds more than the app list, which would go unseen', () => {
+    const titled = paper();
+    const home = () => titled.containers.pages.find((p) => p.id === 'home')!;
+    home().blocks.unshift({ id: 'title', look: 'header', show: { title: 'Mine' } });
+    expect(startAppOf(titled)).toBeNull();
+    // A hidden block is not seen anyway.
+    home().blocks[0]!.hidden = true;
+    expect(startAppOf(titled)).toBe('paper');
+    const noList = paper();
+    noList.containers.pages.find((p) => p.id === 'home')!.blocks = [];
+    expect(startAppOf(noList)).toBeNull();
+  });
+
+  it('is none while the home bar leads to another home page', () => {
+    const config = paper();
+    config.containers.pages.push({ id: 'notes', title: 'Notes', blocks: [] });
+    config.nav.bar.splice(1, 0, 'page:notes');
+    expect(startAppOf(config)).toBeNull();
   });
 });

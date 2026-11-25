@@ -7,3 +7,5 @@ export const directEditEntry = { longPress: true, pageButton: false };
 
 /** Duration of long press required to select a component and start dragging. */
 export const LONG_PRESS_MS = 450;
+/** A block's own long press (opening an entry, a cell, an app's menu) fires before the page's long-press edit, which it suppresses (setInnerGesture). */
+export const HOLD_MS = LONG_PRESS_MS - 150;

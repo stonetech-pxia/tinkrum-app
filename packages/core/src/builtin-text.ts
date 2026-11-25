@@ -1,7 +1,7 @@
 import { applyOps } from './ops';
 import { registryRevision, type Registry } from './registry';
 import type { Locale, WorkspaceConfig } from './schema';
-import { createStarterWorkspace, filesByTypePage, homeFileEntryOps } from './starter';
+import { createStarterWorkspace, paperAppOps } from './starter';
 
 // Built-in text follows the interface language: the home page, toolbox, tool pages, and built-in
 // quick action texts for new users are written into the configuration according to the language at
@@ -51,9 +51,9 @@ function pairStrings(versions: readonly unknown[], out: Map<string, Variants | n
   }
 }
 
-function starterWithEntries(locale: Locale, registry: Registry): WorkspaceConfig {
+function starterWithPaper(locale: Locale, registry: Registry): WorkspaceConfig {
   const config = createStarterWorkspace(locale, registry);
-  const applied = applyOps(config, homeFileEntryOps(config, locale), { registry, locale });
+  const applied = applyOps(config, paperAppOps(config, locale, registry), { registry, locale });
   return applied.ok ? applied.config : config;
 }
 
@@ -64,12 +64,7 @@ function builtinIndex(registry: Registry): Map<string, Variants | null> {
   if (cached && cached.revision === registryRevision(registry)) return cached.index;
   const index = new Map<string, Variants | null>();
   pairStrings(
-    LOCALES.map((l) => starterWithEntries(l, registry)),
-    index,
-  );
-  // The "Files" page in the portal presets (D-582).
-  pairStrings(
-    LOCALES.map((l) => filesByTypePage(l)),
+    LOCALES.map((l) => starterWithPaper(l, registry)),
     index,
   );
   for (const tool of registry.tools.values()) {

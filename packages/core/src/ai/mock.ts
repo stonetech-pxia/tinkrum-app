@@ -51,7 +51,7 @@ import {
   templatePageOps,
   type DataTemplate,
 } from '../templates';
-import { homeFileEntryOps } from '../starter';
+import { PAPER_APP_REQUEST, paperAppOps } from '../starter';
 import { sampleOps } from '../samples';
 import { t } from '../messages';
 import { homeScreenFull } from '../home-screen';
@@ -1512,17 +1512,6 @@ const translateDocRule: Rule = (clause, state) => {
   return [{ op: 'addTool', tool: wf }];
 };
 
-/** Sentences for step 1 of onboarding (D-231, D-449): add both scan and open file entry points side by side; recognized in all three languages. */
-const bothFilePicksRule: Rule = (clause, state) => {
-  if (
-    !/^(?:首页)?(?:加入|加上|添加)[「“"](?:打开(?:相册|图片)|扫描)[」”"]和[「“"]打开文件[」”"](?:两个)?按钮$|^add the [“"](?:open photo library|scan)[”"] and [“"]open files[”"] buttons$|^ajouter les boutons « numériser » et « ouvrir les fichiers »$/i.test(
-      clause,
-    )
-  )
-    return null;
-  return homeFileEntryOps(state.config, state.ctx.locale);
-};
-
 const filePickRule: Rule = (clause, state) => {
   const media = /^(?:首页加上打开相册|Add a photo picker to home)$/i.test(clause);
   const files = /^(?:首页加上打开文件|Add a file picker to home)$/i.test(clause);
@@ -1552,7 +1541,6 @@ const filePickRule: Rule = (clause, state) => {
 };
 
 const RULES: Rule[] = [
-  bothFilePicksRule,
   filePickRule,
   reportRule,
   translateDocRule,
@@ -1980,6 +1968,21 @@ export function createMockAIProvider(): AIProvider {
         const result = sampleOps(wanted[1], ctx.config, uiLocale, ctx.scope?.appId);
         if (result.ok) return { kind: 'ops', ops: result.ops };
         return { kind: 'reject', reason: 'unknown', message: result.message, examples: [] };
+      }
+      // Step 1 of the guide (D-new-apphome-2): its sentence, in any of the three languages, builds the Paper app in the interface language.
+      if (Object.values(PAPER_APP_REQUEST).includes(input.trim())) {
+        const ops = paperAppOps(ctx.config, uiLocale, ctx.registry);
+        if (ops.length > 0) return { kind: 'ops', ops };
+        return {
+          kind: 'reject',
+          reason: 'noChange',
+          message: say(
+            uiLocale,
+            '当前界面已经是这样了，无需修改。',
+            'The app already looks like that.',
+          ),
+          examples: [],
+        };
       }
       // Built-in rules only recognize Chinese and English sentence patterns; French interface uses English examples and responses (P-037).
       if (ctx.locale === 'fr') ctx = { ...ctx, locale: 'en' };

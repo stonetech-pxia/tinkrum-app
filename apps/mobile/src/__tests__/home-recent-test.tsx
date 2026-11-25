@@ -5,7 +5,7 @@ import { screen } from 'expo-router/testing-library';
 import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
-import { renderToolsApp, starterAfterGuide } from '../test-utils/render-app';
+import { renderToolsApp, homeWithFileEntries } from '../test-utils/render-app';
 
 // D-450–D-452: New user home page "Recent actions" (reading run logs) and "Recent files" (thumbnails, tap to preview, "All").
 
@@ -14,7 +14,7 @@ async function start(prepare?: (repo: MemoryWorkspaceRepo, files: FakeFiles) => 
   const files = new FakeFiles();
   await repo.setMeta('guide', 'done');
   await act(() => useGuide.getState().load(repo));
-  const app = await renderToolsApp(repo, files, { seed: starterAfterGuide });
+  const app = await renderToolsApp(repo, files, { seed: homeWithFileEntries });
   if (prepare) {
     await act(() => prepare(repo, files));
     await act(async () => app.store.setState((s) => ({ assetsVersion: s.assetsVersion + 1 })));

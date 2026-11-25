@@ -9,6 +9,8 @@ import type { Registry } from './registry';
 import {
   CURRENT_SCHEMA_VERSION,
   HOME_PAGE_ID,
+  allComponents,
+  isKnownComponent,
   type Collection,
   type Locale,
   type Page,
@@ -167,7 +169,28 @@ export function readAppFile(text: string): AppFile | null {
 
 export type AppImport = { ok: true; ops: Op[]; name: string } | { ok: false; error: string };
 
-/** Import mode (D-485): Create as a new app (adding a home screen entry point), or import into home (replacing home style, adding pages to navigation bar). */
+/**
+ * The way into a new app from the home page: an entry block (deletable by the user at any time;
+ * still accessible via Settings -> My Apps). None when the home page lists the apps by itself
+ * (D-new-apphome-1).
+ */
+export function appEntryOps(config: WorkspaceConfig, appId: string): Op[] {
+  const home = config.containers.pages.find((p) => p.id === HOME_PAGE_ID);
+  if (
+    !home ||
+    allComponents(home).some((c) => isKnownComponent(c) && c.look === 'apps' && !c.hidden)
+  )
+    return [];
+  return [
+    {
+      op: 'addContainer',
+      page: HOME_PAGE_ID,
+      block: { id: `go-${appId}`.slice(0, 48), look: 'entry', opens: `app:${appId}` },
+    } as unknown as Op,
+  ];
+}
+
+/** Import mode (D-485): Create as a new app (adding a way in from the home page), or import into home (replacing home style, adding pages to navigation bar). */
 export type ImportMode = 'app' | 'home';
 
 /**
@@ -247,13 +270,7 @@ export function appFileOps(
   for (const page of file.pages)
     ops.push({ op: 'addContainer', page: { ...page, ...owner } as never });
   if (mode === 'app') {
-    // Place an entry point on the home screen (deletable by the user at any time; still accessible via Settings -> My Apps).
-    if (config.containers.pages.some((p) => p.id === HOME_PAGE_ID))
-      ops.push({
-        op: 'addContainer',
-        page: HOME_PAGE_ID,
-        block: { id: `go-${id}`.slice(0, 48), look: 'entry', opens: `app:${id}` },
-      } as unknown as Op);
+    ops.push(...appEntryOps(config, id));
   } else {
     // Import into home: Switch to its style, and add its pages to the home navigation bar (where they fit); overflow items are handled by the entry point on the home screen.
     ops.push({ op: 'setTheme', reset: true });
@@ -558,6 +575,16 @@ export interface ConvertMeta {
   icon?: IconValue;
 }
 
+/** An app can't list apps (D-new-apphome-1): a home page's app list stays behind. */
+const withoutAppList = (blocks: Page['blocks']): Page['blocks'] =>
+  blocks
+    .filter((c) => !(isKnownComponent(c) && c.look === 'apps'))
+    .map((c) =>
+      isKnownComponent(c) && c.look === 'group'
+        ? ({ ...c, children: withoutAppList(c.children) } as typeof c)
+        : c,
+    );
+
 /**
  * Convert a full workspace configuration into an app file: Add prefixes to IDs and update
  * references, make home the app's first page, and restrict the bottom bar to pages and Tink.
@@ -603,7 +630,7 @@ export function appFileFromWorkspace(
       bar,
       theme: config.theme,
     },
-    pages: pages.map((p) => strip(withId(p, map.pages))),
+    pages: pages.map((p) => strip(withId({ ...p, blocks: withoutAppList(p.blocks) }, map.pages))),
     tables: config.data.tables.map((t) => strip(withId(t, map.tables))),
     tools: config.tools
       .filter((t) => t.package === undefined)

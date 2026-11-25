@@ -4,21 +4,30 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { builtinText } from './builtin-text';
+import { applyOps } from './ops';
 import { pageTarget, TOOLBOX_PAGE_ID } from './schema';
-import { createStarterWorkspace } from './starter';
+import { createStarterWorkspace, paperAppOps } from './starter';
 import { registry } from './test-helpers';
 
 // User report (2026-11-06 emulator): workspace created in Chinese retains Chinese group names and installed tool names in the toolbox after switching to French.
 describe('builtinText', () => {
-  const zh = createStarterWorkspace('zh', registry);
-  const toolbox = zh.containers.pages.find((p) => p.id === TOOLBOX_PAGE_ID)!;
+  const withPaper = (locale: 'zh' | 'fr') => {
+    const start = createStarterWorkspace(locale, registry);
+    const result = applyOps(start, paperAppOps(start, locale, registry), { registry, locale });
+    if (!result.ok) throw new Error(result.error);
+    return result.config;
+  };
+  const toolboxOf = (config: ReturnType<typeof withPaper>) =>
+    config.containers.pages.find((p) => p.id === 'paper-toolbox')!;
+  const zh = withPaper('zh');
+  const toolbox = toolboxOf(zh);
   const imagePage = zh.containers.pages.find((p) => p.package === 'image')!;
 
   it('shows the starter texts of a Chinese workspace in French and English', () => {
-    expect(builtinText(toolbox.title, 'fr', registry)).toBe(
-      createStarterWorkspace('fr', registry).containers.pages.find((p) => p.id === TOOLBOX_PAGE_ID)!
-        .title,
-    );
+    expect(builtinText(toolbox.title, 'fr', registry)).toBe(toolboxOf(withPaper('fr')).title);
+    // "Paper" is the app's name in every language (D-new-apphome-2) and is never translated.
+    for (const locale of ['zh', 'en', 'fr'] as const)
+      expect(builtinText(zh.nav.apps![0]!.name, locale, registry)).toBe('Paper');
     expect(builtinText('照片、视频和声音', 'en', registry)).toBe('Photos, video and audio');
     expect(builtinText(imagePage.title, 'en', registry)).not.toMatch(/[一-鿿]/);
     expect(builtinText('图片转 PDF', 'fr', registry)).toBe('Images en PDF');

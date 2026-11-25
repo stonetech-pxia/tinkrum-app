@@ -17,13 +17,13 @@ import type { HomeScreenEntry, HomeScreenPlatform } from '../home-screen/platfor
 
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
-import { renderToolsApp, starterAfterGuide, testRegistry } from '../test-utils/render-app';
+import { renderToolsApp, homeWithFileEntries, testRegistry } from '../test-utils/render-app';
 
 // Multiple apps (D-485): enter via main page entry point, bottom bar switches to the app's own, with a fixed "Back to Tinkrum" to return home.
 
 /** A fitness app: two pages, bottom bar is two pages plus Tink; entry button on the main page. */
 function withFitness(locale: 'zh' | 'en' | 'fr', registry: typeof testRegistry) {
-  const base = starterAfterGuide(locale, registry);
+  const base = homeWithFileEntries(locale, registry);
   const ops: Op[] = [
     { op: 'addContainer', app: { id: 'fit', name: '健身', icon: 'heart' } },
     { op: 'addContainer', page: { id: 'fit-home', title: '今天', app: 'fit', blocks: [] } },
@@ -93,17 +93,17 @@ describe('apps (UI)', () => {
     dateSpy = undefined;
   };
 
-  it('opens an app from a home button, swaps the bar, and has no way back inside', async () => {
+  it('opens an app from a home button, swaps the bar, and offers only the app list as a way back', async () => {
     appState();
     const { store } = await start();
     await screen.findByTestId('nav-settings');
 
     await fireEvent.press((await screen.findAllByText('健身'))[0]!);
-    // App's bottom bar: its own two pages and Tink; home settings are absent, and there is no entry to return home.
+    // App's bottom bar: its own two pages and Tink; home settings are absent. The way home is the button at the top left (D-new-apphome-3), not a bar entry.
     expect(await screen.findByTestId('nav-page:fit-home')).toBeTruthy();
     expect(screen.getByTestId('nav-page:fit-plan')).toBeTruthy();
     expect(screen.getByTestId('nav-ai')).toBeTruthy();
-    expect(screen.queryByTestId('nav-back-home')).toBeNull();
+    expect(screen.getByTestId('app-home')).toBeTruthy();
     expect(screen.queryByTestId('nav-settings')).toBeNull();
     expect(store.getState().appId).toBe('fit');
 
@@ -439,6 +439,9 @@ describe('apps (UI)', () => {
     expect(screen.queryByText('添加到桌面')).toBeNull();
     await fireEvent.press(screen.getByText('放到桌面'));
     await screen.findByText('在桌面菜单里');
+    // Putting it there already asked for its own icon (D-new-apphome-5); the item stays for later.
+    await waitFor(() => expect(fake.pinned).toHaveLength(1));
+    fake.pinned.length = 0;
     await openMenu();
     for (const item of ['从桌面拿掉', '添加到桌面', '换图标', '分享这个 App', '恢复初始样子'])
       expect(screen.getByText(item)).toBeTruthy();
@@ -549,7 +552,7 @@ describe('share an app', () => {
 
   it('a new user has no app of their own, so there is nothing to share', async () => {
     const files = new FakeFiles();
-    await renderToolsApp(new MemoryWorkspaceRepo(), files, { seed: starterAfterGuide });
+    await renderToolsApp(new MemoryWorkspaceRepo(), files, { seed: homeWithFileEntries });
     await fireEvent.press(await screen.findByTestId('nav-settings'));
     await screen.findByTestId('settings-ai');
     expect(screen.queryByTestId(/^settings-app-/)).toBeNull();

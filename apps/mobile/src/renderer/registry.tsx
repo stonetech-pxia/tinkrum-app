@@ -38,6 +38,7 @@ import { useComputedRecords, useRecords } from '../data/records';
 import { LONG_PRESS_MS } from '../editing/entry';
 import { t } from '../i18n';
 import { FocusItem } from '../editing/FocusItem';
+import { AppGrid } from './AppGrid';
 import { Chart } from './Chart';
 import { ChoiceBar } from './ChoiceBar';
 import type { RenderEnv } from './components';
@@ -293,6 +294,7 @@ export const RENDERERS: { [T in ComponentType]: Renderer<T> } = {
   dial: (c, env) => <DialButton block={c} env={env} />,
   period: (c, env) => <PeriodBar block={c} env={env} />,
   choices: (c, env) => <ChoiceBar block={c} env={env} />,
+  apps: (c, env) => <AppGrid grid={c} env={env} />,
 };
 
 /** Whether to open the photo library or files (picker's tools[0]). */
@@ -318,6 +320,7 @@ const PAGE_LOOKS: ReadonlySet<ComponentType> = new Set<ComponentType>([
   'image',
   'library',
   'dial',
+  'apps',
 ]);
 
 /** List, card, checklist: tools above the list (D-428) are in ListTools so data.tsx does not depend on runtime (record forms also use data.tsx). */

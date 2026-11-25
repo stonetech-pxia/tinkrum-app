@@ -9,7 +9,7 @@ import { Alert } from 'react-native';
 
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
-import { renderToolsApp, starterAfterGuide } from '../test-utils/render-app';
+import { renderToolsApp, homeWithFileEntries } from '../test-utils/render-app';
 
 // Portal website display presets (App files, D-485): each selected via "Settings -> My presets ->
 // Import from file" is added as a new App, leaving the original unchanged; entering this App, every
@@ -98,7 +98,7 @@ describe.each(manifest.apps.map((a) => [a.name, a] as const))('app file %s', (_n
     const repo = new MemoryWorkspaceRepo();
     const files = new FakeFiles();
     const { store } = await renderToolsApp(repo, files, {
-      seed: starterAfterGuide,
+      seed: homeWithFileEntries,
       locale: 'en',
     });
     await screen.findByTestId('nav-settings');
@@ -229,7 +229,10 @@ describe('restore the original look (D-485)', () => {
   it('long-press an imported app in Settings and restore it; a hand-made app has no such item', async () => {
     const repo = new MemoryWorkspaceRepo();
     const files = new FakeFiles();
-    const { store } = await renderToolsApp(repo, files, { seed: starterAfterGuide, locale: 'en' });
+    const { store } = await renderToolsApp(repo, files, {
+      seed: homeWithFileEntries,
+      locale: 'en',
+    });
     await screen.findByTestId('nav-settings');
     const uri = `file:///picked/${entry.file}`;
     files.pickedTexts.set(uri, readFileSync(join(DIR, entry.file), 'utf8'));

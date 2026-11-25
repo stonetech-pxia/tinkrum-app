@@ -985,8 +985,14 @@ export const en = {
   tinkProgressChecking2: 'Tightening the last screw…',
   tinkProgressFixing: 'Oops, bent a nail. Fixing it…',
   tinkProgressFixing2: 'Tiny hiccup, fixing it…',
-  guideTinkSays: 'This app is pretty empty. Tap me and I’ll build you a workspace!',
-  guideTinkDone: 'All set! Whenever you want to change something, just tell me.',
+  guideTinkSays:
+    'Your home screen is empty. Tap me and I’ll build your first app: Paper, a scanner!',
+  guideTinkDone:
+    'All set! Tap its icon to open it. Whenever you want to change something, just tell me.',
+  guideTinkDoneMenu:
+    'All set! Tap its icon to open it. On your phone, long-press the Tinkrum icon to open Paper straight away. Whenever you want a change, just tell me.',
+  guideTinkDonePin:
+    'All set! Tap its icon to open it. To use Paper as an app of its own, long-press the Tinkrum icon on your phone and drag Paper onto the home screen.',
   guideGotIt: 'Got it',
   guideLater: 'Later',
   // Onboarding step 3: Sample apps (D-260).
@@ -1091,6 +1097,7 @@ export const en = {
   settingsMyApps: 'My apps',
   settingsMyAppsHint: 'Long-press an app to put it on the phone home screen or change its icon.',
   settingsAppOnHome: 'On the home screen menu',
+  appListBack: 'Back to your apps',
   appEmpty: 'This app has no pages yet. Tap Tink to build one.',
   appDescUpdate: 'Change app “{v0}”',
   appDescRemove: 'Remove app “{v0}” with its pages and quick actions (its tables and entries stay)',
@@ -1244,10 +1251,13 @@ export const en = {
   describe_Open_files_3477c: 'Open files',
   describe_tool_grid_e987a: 'tool grid “{v0}”',
   describe_tool_grid_1c74f: 'tool grid',
+  describe_app_list: 'app list',
+  describe_app_list_titled: 'app list “{v0}”',
   describe_link_941e3: '“{v0}” link',
   describe_file_list_a11dd: 'file list “{v0}”',
   homeRecentActions: 'Recent actions',
   homeRecentFiles: 'Recent files',
+  paperAppName: 'Paper',
   homeTagline: 'Paper in. Clean PDF, Word or Excel out.',
   presetFilesTitle: 'Files',
   presetFilesSubtitle: 'Everything you scan, convert or open, by type.',

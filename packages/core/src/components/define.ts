@@ -130,6 +130,8 @@ export interface ComponentAI {
   docAfter?: string;
   /** Rule associated with this appearance; n is the rule number. */
   rule?: { n: number; text: string };
+  /** This look only lives on pages outside apps: left out of the guide for app files. */
+  outsideApps?: true;
 }
 
 export const ALL_STYLES: StyleKey[] = ['tone', 'align', 'size'];

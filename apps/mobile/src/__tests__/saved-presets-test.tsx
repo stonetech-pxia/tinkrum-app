@@ -24,7 +24,7 @@ import { sqliteRepo } from '../test-utils/node-sqlite';
 import {
   acceptNextAlert,
   renderToolsApp,
-  starterAfterGuide,
+  homeWithFileEntries,
   testRegistry,
 } from '../test-utils/render-app';
 import { V4_FIXED_NAME } from '../../../../packages/core/src/fixtures/v4';
@@ -572,7 +572,7 @@ describe('import a preset from a file', () => {
     // Portal app files are built on top of the new user's starting configuration (must include its tool package and pages), so use the starting configuration as the base.
     const starterApp = () =>
       renderToolsApp(new MemoryWorkspaceRepo(), undefined, {
-        seed: starterAfterGuide,
+        seed: homeWithFileEntries,
         locale: 'zh',
       });
     // An existing app file in the portal (Clay). First asks whether to "Import to home screen" or

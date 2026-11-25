@@ -26,7 +26,7 @@ import {
 } from 'react-native';
 
 import { useRecordActionRunner } from '../data/record-actions';
-import { LONG_PRESS_MS } from '../editing/entry';
+import { HOLD_MS, LONG_PRESS_MS } from '../editing/entry';
 import { setInnerGesture } from '../editing/useSingleDrag';
 import { t } from '../i18n';
 import type { RenderEnv } from './components';
@@ -63,8 +63,6 @@ const HEAD_HEIGHT = 40;
 const MIN_CELL = 34;
 const MAX_CELL = 52;
 const VISIBLE = 7;
-/** Long-press to list records must trigger before the page's long-press edit (LONG_PRESS_MS). */
-const HOLD_MS = LONG_PRESS_MS - 150;
 
 const tapTool = (block: RecordBlock, kind: 'create' | 'remove'): RecordToolUse | undefined =>
   block.tools?.find(

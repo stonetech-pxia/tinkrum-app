@@ -1,9 +1,10 @@
-import { homeFileEntryOps, localize } from '@morph/core';
+import { PAPER_APP_ID, appTarget, localize, paperAppOps } from '@morph/core';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import type { ComponentRef, RefObject } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useHomeScreenPlatform } from '../home-screen/context';
 import { t } from '../i18n';
 import type { Palette } from '../renderer/theme';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
@@ -13,7 +14,7 @@ import { LOOK_PROMPTS, openLookGuide, useGuide } from './store';
  * Guidance steps 1 and 2: speech from Tink in the top right (D-447). Floats above the page
  * without occupying layout space; the page beneath the bubble is slightly blurred (Tink's line is
  * not blurred, and Tink has a halo). Step 1: tap the bubble to open that sentence; bottom-right
- * "Skip" directly adds two file entries (bypassing preview, D-239). Step 2: "All set",
+ * "Skip" directly builds the Paper app (bypassing preview, D-239). Step 2: "All set",
  * bottom-right "Got it" closes the bubble, ending the guidance (step 3 sample app was cancelled,
  * D-447).
  */
@@ -28,19 +29,27 @@ export function GuideBubble({
   /** Android requires wrapping blurred content in a BlurTargetView for real blurring to take effect. */
   blurTarget: RefObject<ComponentRef<typeof View> | null>;
 }) {
-  const { locale } = useWorkspaceContext();
+  const { locale, registry } = useWorkspaceContext();
   const stage = useGuide((s) => s.stage);
   const setStage = useGuide((s) => s.setStage);
   const config = useWorkspace((s) => s.config)!;
   const proposeOps = useWorkspace((s) => s.proposeOps);
   const confirm = useWorkspace((s) => s.confirm);
   const router = useRouter();
+  const homeScreen = useHomeScreenPlatform();
   if (stage !== 'look' && stage !== 'goal') return null;
   const look = stage === 'look';
+  // Step 2 also says what the phone's home screen offers, once the app is in the menu of the
+  // Tinkrum icon there (D-new-apphome-4): where the phone allows it, as an icon of its own.
+  const done = !config.nav.phoneHomeScreen?.includes(appTarget(PAPER_APP_ID))
+    ? 'guideTinkDone'
+    : homeScreen?.canPin()
+      ? 'guideTinkDonePin'
+      : 'guideTinkDoneMenu';
 
-  /** Skip guidance (D-231): directly add two file entries (bypassing preview), without showing "Modified · Undo" at the top (D-239). */
+  /** Skip guidance (D-231, D-new-apphome-2): directly build the Paper app (bypassing preview), without showing "Modified · Undo" at the top (D-239). */
   async function skip() {
-    const ops = homeFileEntryOps(config, locale);
+    const ops = paperAppOps(config, locale, registry);
     if (ops.length > 0) {
       const proposed = await proposeOps(ops, localize(LOOK_PROMPTS[0]!, locale));
       if (proposed.kind === 'preview') await confirm({ quiet: true });
@@ -79,7 +88,7 @@ export function GuideBubble({
           ]}>
           <View style={[styles.tail, { borderBottomColor: palette.primary }]} />
           <Text style={[palette.font('bodyMedium', 16), onBubble, { lineHeight: 23 }]}>
-            {t(locale, look ? 'guideTinkSays' : 'guideTinkDone')}
+            {t(locale, look ? 'guideTinkSays' : done)}
           </Text>
           <Pressable
             testID={look ? 'guide-skip' : 'guide-later'}

@@ -1,14 +1,16 @@
+import { appEntryOps } from './app-file';
 import { t, pairText } from './messages';
 import { createDefaultWorkspace } from './defaults';
+import type { DrawnIcon } from './drawn-icons';
 import { FILES_TABLE } from './files-table';
+import { homeScreenFull, homeScreenOp } from './home-screen';
 import { applyOps } from './ops';
 import type { Op } from './ops-schema';
 import type { Registry } from './registry';
 import {
   HOME_PAGE_ID,
   TOOLBOX_PAGE_ID,
-  allComponents,
-  isKnownComponent,
+  appTarget,
   pageTarget,
   type ComponentOf,
   type Locale,
@@ -37,124 +39,13 @@ const TOOLBOX_GROUPS: { id: string; title: [string, string]; toolIds?: string[] 
   { id: 'more', title: ['More tools', '更多工具'] },
 ];
 
-/**
- * Home screen entry points (used in onboarding step 1 and "Skip guide", D-231; redesigned in
- * D-487): Title and subtitle; product selling points highlighted at the top—scan to PDF, Word,
- * Excel, and merge files (four tiles, all built-in quick actions that run immediately on tap
- * without needing to be added); followed by a primary-colored "Open files" button (prompting
- * whether to choose from photo library or files); followed by the toolbox entry, recent
- * operations, and recent files. Omitted if file entry points already exist on the home screen;
- * tiles are omitted if required tools are uninstalled.
- */
-export function homeFileEntryOps(config: WorkspaceConfig, locale: Locale): Op[] {
-  const home = config.containers.pages.find((p) => p.id === HOME_PAGE_ID);
-  if (!home || allComponents(home).some((c) => isKnownComponent(c) && c.look === 'picker'))
-    return [];
-  const ids = new Set(allComponents(home).map((c) => c.id));
-  const free = (id: string) => (ids.has(id) ? `${id}-2` : id);
-  const installed = (id: string) => config.packages.some((p) => p.id === id);
-  // Quick actions in the tiles (built-in preset IDs) and their required tools.
-  const tiles = [
-    { id: 'scan', tool: 'scan-camera', needs: 'scan' },
-    { id: 'scan-word', tool: 'scan-doc-word', needs: 'scan' },
-    { id: 'scan-excel', tool: 'scan-table-excel', needs: 'scan' },
-    { id: 'combine', tool: 'combine-documents', needs: 'pdf' },
-  ].filter((x) => installed(x.needs));
-  return [
-    {
-      op: 'addContainer',
-      page: HOME_PAGE_ID,
-      block: {
-        id: free('hello'),
-        look: 'header',
-        show: { title: 'Tinkrum', subtitle: t(locale, 'homeTagline') },
-      },
-    },
-    ...(tiles.length > 0
-      ? [
-          {
-            op: 'addContainer' as const,
-            page: HOME_PAGE_ID,
-            block: {
-              id: free('file-entries'),
-              look: 'group' as const,
-              show: { layout: 'grid' as const, columns: 2 as const },
-              children: tiles.map((x) => ({
-                id: free(x.id),
-                look: 'action' as const,
-                show: { shape: 'tile' as const },
-                tools: [{ tool: x.tool }],
-              })),
-            },
-          },
-        ]
-      : []),
-    {
-      op: 'addContainer',
-      page: HOME_PAGE_ID,
-      block: {
-        id: free('open-files'),
-        look: 'picker',
-        tools: [{ tool: '$pick.open' }],
-      },
-    },
-    ...(config.containers.pages.some((p) => p.id === TOOLBOX_PAGE_ID)
-      ? [
-          {
-            op: 'addContainer' as const,
-            page: HOME_PAGE_ID,
-            block: {
-              id: free('toolbox-entry'),
-              look: 'button' as const,
-              show: {
-                label: t(locale, 'starter_Toolbox_802f3'),
-                variant: 'row' as const,
-                icon: 'apps' as const,
-              },
-              opens: pageTarget(TOOLBOX_PAGE_ID),
-            },
-          },
-        ]
-      : []),
-    // D-452: Recently used quick actions (reading run logs, hidden when empty) and recent files (all scanned files are stored here, D-450).
-    {
-      op: 'addContainer',
-      page: HOME_PAGE_ID,
-      block: {
-        id: free('recent-actions'),
-        look: 'library',
-        show: { title: t(locale, 'homeRecentActions') },
-        source: { catalog: 'quickActions', recent: true },
-      },
-    },
-    {
-      op: 'addContainer',
-      page: HOME_PAGE_ID,
-      block: {
-        id: free('recent-files'),
-        look: 'files',
-        show: { title: t(locale, 'homeRecentFiles') },
-        source: { table: FILES_TABLE, limit: 3 },
-      },
-    },
-  ];
-}
+type Page = WorkspaceConfig['containers']['pages'][number];
 
-/**
- * Initial version for new users (D-182): Blank home screen (D-231, onboarding step 1 adds file
- * entry), toolbox page, preinstalled tools, with navigation bar limited to Home, AI, and Settings
- * (tools reside in the home screen toolbox, while tool management and history are under
- * Settings). createDefaultWorkspace remains blank: used as the baseline for tests, evaluations,
- * and rollbacks.
- */
-export function createStarterWorkspace(locale: Locale, registry: Registry): WorkspaceConfig {
+/** The toolbox page (D-181): every tool of the catalog, grouped by purpose, and "Manage tools". */
+export function toolboxPage(locale: Locale, registry: Registry, id = TOOLBOX_PAGE_ID): Page {
   const pick = (pair: [string, string]) => pairText(locale, pair);
-  // D-487: New users' first version uses the refined Clay (STARTER_THEME); createDefaultWorkspace remains the baseline.
-  const base = { ...createDefaultWorkspace(locale), theme: structuredClone(STARTER_THEME) };
-  const toolIds = STARTER_TOOL_IDS.filter((id) => registry.tools.has(id));
-
   const grids: ComponentOf<'packages'>[] = TOOLBOX_GROUPS.flatMap((g) => {
-    const ids = g.toolIds?.filter((id) => registry.tools.has(id));
+    const ids = g.toolIds?.filter((toolId) => registry.tools.has(toolId));
     if (ids && ids.length === 0) return [];
     return [
       {
@@ -165,34 +56,170 @@ export function createStarterWorkspace(locale: Locale, registry: Registry): Work
       },
     ];
   });
-  const toolbox = {
-    id: TOOLBOX_PAGE_ID,
+  return {
+    id,
     title: t(locale, 'starter_Toolbox_802f3'),
-    icon: 'apps' as const,
+    icon: 'apps',
     blocks: [
       {
         id: 'toolbox-header',
-        look: 'header' as const,
+        look: 'header',
         show: { title: t(locale, 'starter_Toolbox_802f3') },
       },
       ...grids,
       {
         id: 'toolbox-manage',
-        look: 'button' as const,
-        show: { label: t(locale, 'starter_Manage_tools_f1487'), variant: 'text' as const },
-        opens: 'tools' as const,
+        look: 'button',
+        show: { label: t(locale, 'starter_Manage_tools_f1487'), variant: 'text' },
+        opens: 'tools',
       },
     ],
   };
+}
+
+/**
+ * The blocks of the Paper app's first page (D-487): title and subtitle; product selling points
+ * highlighted at the top: scan to PDF, Word, Excel, and merge files (four tiles, all built-in
+ * quick actions that run immediately on tap without needing to be added); followed by a
+ * primary-colored "Open files" button (prompting whether to choose from photo library or files);
+ * followed by recent operations and recent files (D-452). Tiles are omitted if required tools are
+ * uninstalled.
+ */
+export function paperBlocks(
+  config: WorkspaceConfig,
+  locale: Locale,
+  title: string,
+): Page['blocks'] {
+  const installed = (id: string) => config.packages.some((p) => p.id === id);
+  // Quick actions in the tiles (built-in preset IDs) and their required tools.
+  const tiles = [
+    { id: 'scan', tool: 'scan-camera', needs: 'scan' },
+    { id: 'scan-word', tool: 'scan-doc-word', needs: 'scan' },
+    { id: 'scan-excel', tool: 'scan-table-excel', needs: 'scan' },
+    { id: 'combine', tool: 'combine-documents', needs: 'pdf' },
+  ].filter((x) => installed(x.needs));
+  const grid: Page['blocks'] =
+    tiles.length > 0
+      ? [
+          {
+            id: 'file-entries',
+            look: 'group',
+            show: { layout: 'grid', columns: 2 },
+            children: tiles.map((x) => ({
+              id: x.id,
+              look: 'action' as const,
+              show: { shape: 'tile' as const },
+              tools: [{ tool: x.tool }],
+            })),
+          },
+        ]
+      : [];
+  return [
+    { id: 'hello', look: 'header', show: { title, subtitle: t(locale, 'homeTagline') } },
+    ...grid,
+    { id: 'open-files', look: 'picker', tools: [{ tool: '$pick.open' }] },
+    // D-452: Recently used quick actions (reading run logs, hidden when empty) and recent files (all scanned files are stored here, D-450).
+    {
+      id: 'recent-actions',
+      look: 'library',
+      show: { title: t(locale, 'homeRecentActions') },
+      source: { catalog: 'quickActions', recent: true },
+    },
+    {
+      id: 'recent-files',
+      look: 'files',
+      show: { title: t(locale, 'homeRecentFiles') },
+      source: { table: FILES_TABLE, limit: 3 },
+    },
+  ];
+}
+
+/** The app the guide builds for a new user (D-new-apphome-2). */
+export const PAPER_APP_ID = 'paper';
+
+/** The sentence of guide step 1: it fills the box on the Tink page, and the built-in rules know it in all three languages. */
+export const PAPER_APP_REQUEST: Record<Locale, string> = {
+  zh: '创建一个 Paper App',
+  en: 'Create a Paper app',
+  fr: 'Créer une app Paper',
+};
+
+/** Tinkrum's red, as on its own app icon: the color of the Paper app and of its icon. */
+const TINKRUM_RED = '#D92D20';
+const PAPER_ICON_ID = 'tinkrum-paper';
+/**
+ * The Paper app's icon, in the manner of Tinkrum's own: a tilted sheet with a folded corner and
+ * the two oval eyes. Drawn in the config (D-625), so Tink and the user can change it.
+ */
+const PAPER_ICON: DrawnIcon = {
+  paths: [
+    'M3.86 5.39L10.61 3.2L12.28 8.33L17.42 6.67L20.88 17.32L20.08 18.73L9.42 22.19L7.94 21.52L3.15 6.78ZM9.89 12.95A1.15 1.95 -18 1 0 11.09 16.66A1.15 1.95 -18 1 0 9.89 12.95ZM14.36 11.5A1.15 1.95 -18 1 0 15.56 15.21A1.15 1.95 -18 1 0 14.36 11.5Z',
+    'M12.23 2.99L16.64 5.24L13.31 6.32Z',
+  ],
+};
+
+/**
+ * The Paper app (D-new-apphome-2): the former default home page (D-487) as an app of its own,
+ * with the files by type and the toolbox on its bar, in the Clay look in Tinkrum's red on a plain
+ * backdrop (D-552). It goes into the menu of the Tinkrum icon on the phone, unless that is full.
+ * No operations when the app is already there.
+ */
+export function paperAppOps(config: WorkspaceConfig, locale: Locale, registry: Registry): Op[] {
+  const app = PAPER_APP_ID;
+  if (config.nav.apps?.some((a) => a.id === app)) return [];
+  const name = t(locale, 'paperAppName');
+  const pages: Page[] = [
+    {
+      id: `${app}-home`,
+      title: t(locale, 'defaults_Home_ec133'),
+      icon: 'home',
+      blocks: paperBlocks(config, locale, name),
+    },
+    { ...filesByTypePage(locale), id: `${app}-files` },
+    toolboxPage(locale, registry, `${app}-toolbox`),
+  ];
+  return [
+    { op: 'setTheme', icons: { [PAPER_ICON_ID]: PAPER_ICON } },
+    {
+      op: 'addContainer',
+      app: {
+        id: app,
+        name,
+        icon: `my:${PAPER_ICON_ID}`,
+        bar: [...pages.map((p) => pageTarget(p.id)), 'ai'],
+        theme: { ...structuredClone(STARTER_THEME), primaryColor: TINKRUM_RED, backdrop: 'plain' },
+      },
+    },
+    // These pages hold only blocks this version knows.
+    ...pages.map((page) => ({ op: 'addContainer', page: { ...page, app } }) as Op),
+    ...appEntryOps(config, app),
+    ...(homeScreenFull(config) ? [] : [homeScreenOp(config, appTarget(app), true)]),
+  ];
+}
+
+/**
+ * Initial version for new users (D-new-apphome-1): the home page is the list of the user's apps
+ * and nothing else, empty until the guide builds the first one; preinstalled tools; the navigation
+ * bar limited to Home, AI, and Settings (tool management and history are under Settings).
+ * createDefaultWorkspace remains blank: used as the baseline for tests, evaluations, and
+ * rollbacks.
+ */
+export function createStarterWorkspace(locale: Locale, registry: Registry): WorkspaceConfig {
+  // D-487: New users' first version uses the refined Clay (STARTER_THEME); createDefaultWorkspace remains the baseline.
+  const base = { ...createDefaultWorkspace(locale), theme: structuredClone(STARTER_THEME) };
+  const toolIds = STARTER_TOOL_IDS.filter((id) => registry.tools.has(id));
 
   const ops: Op[] = [
-    // Place toolbox first: when adding tool packs, it already displays these tool packs, so the home screen won't have extra entry points (D-181).
-    { op: 'addContainer', page: toolbox },
     ...toolIds.map((id) => ({ op: 'setPackage' as const, package: id, do: 'add' as const })),
-    // Start home screen from blank (D-231): onboarding step 1 has the user add "Open album" and "Open files" themselves.
-    { op: 'removeContainer', page: HOME_PAGE_ID, block: 'welcome' },
-    { op: 'removeContainer', page: HOME_PAGE_ID, block: 'catalog' },
-    { op: 'removeContainer', page: HOME_PAGE_ID, block: 'recent-files' },
+    // With no tool grid yet, adding each tool put a card on the home page: the home page only lists apps.
+    ...[...toolIds.map((id) => `card-${id}`), 'welcome', 'catalog', 'recent-files'].map(
+      (block): Op => ({ op: 'removeContainer', page: HOME_PAGE_ID, block }),
+    ),
+    {
+      op: 'addContainer',
+      page: HOME_PAGE_ID,
+      block: { id: 'apps', look: 'apps', source: { catalog: 'apps' } },
+    },
     { op: 'updateContainer', nav: { bar: [pageTarget(HOME_PAGE_ID), 'ai', 'settings'] } },
   ];
   const applied = applyOps(base, ops, { registry, locale });
@@ -200,8 +227,6 @@ export function createStarterWorkspace(locale: Locale, registry: Registry): Work
   const valid = validateWorkspace(applied.config, registry);
   return valid.ok ? valid.config : base;
 }
-
-type Page = WorkspaceConfig['containers']['pages'][number];
 
 /**
  * "Files" page: scanned, converted, and opened files are arranged as a bookshelf by type (used by

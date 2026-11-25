@@ -2,7 +2,6 @@ import {
   applyOps,
   createDefaultWorkspace,
   createStarterWorkspace,
-  homeFileEntryOps,
   type Locale,
   type Op,
   quickActionsOf,
@@ -20,7 +19,7 @@ import { useSampleHint } from '../guide/SampleHint';
 import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
-import { renderToolsApp, starterAfterGuide, openPick } from '../test-utils/render-app';
+import { renderToolsApp, homeWithFileEntries, openPick } from '../test-utils/render-app';
 
 // Onboarding step 3: Sample apps (D-260). After step 2, the home screen lists five samples; tapping
 // one loads the complete set into a draft (D-190), which upon "Apply" merges into a version (top
@@ -39,14 +38,14 @@ async function start(
   if (stage) await repo.setMeta('guide', stage);
   await act(() => useGuide.getState().load(repo));
   return renderToolsApp(repo, new FakeFiles(), {
-    seed: options.seed ?? starterAfterGuide,
+    seed: options.seed ?? homeWithFileEntries,
     locale: options.locale ?? 'zh',
   });
 }
 
-/** Initial version with a few modifications applied on top of `starterAfterGuide`. */
+/** Initial version with a few modifications applied on top of `homeWithFileEntries`. */
 const seedWith =
-  (ops: (config: WorkspaceConfig) => Op[], base: Seed = starterAfterGuide): Seed =>
+  (ops: (config: WorkspaceConfig) => Op[], base: Seed = homeWithFileEntries): Seed =>
   (locale, registry) => {
     const config = base(locale, registry);
     const result = applyOps(config, ops(config), { registry, locale });
@@ -82,7 +81,7 @@ describe('guide step 3: sample apps', () => {
     const repo = new MemoryWorkspaceRepo();
     await repo.setMeta('guide', 'goal');
     await act(() => useGuide.getState().load(repo));
-    await renderToolsApp(repo, files, { seed: starterAfterGuide });
+    await renderToolsApp(repo, files, { seed: homeWithFileEntries });
     files.nextMedia = [files.offerImage('a.jpg', 400, 300)];
     await openPick('media');
     expect(await screen.findByTestId('share-screen')).toBeTruthy();
@@ -229,11 +228,9 @@ describe('guide step 3: sample apps', () => {
 
   it('a full navigation bar puts the sample on the home page and opens its page after applying', async () => {
     // Default workspace navigation bar is full: Home, Tools, AI, History, Settings.
-    const seed = seedWith(
-      (config) => homeFileEntryOps(config, 'zh'),
-      (locale) => createDefaultWorkspace(locale),
-    );
-    const { store } = await start('samples', { seed });
+    const { store } = await start('samples', {
+      seed: (locale) => createDefaultWorkspace(locale),
+    });
     await fireEvent.press(await screen.findByTestId('guide-sample-study-helper'));
     await fireEvent.press(await screen.findByTestId('draft-apply'));
     await waitFor(() => expect(store.getState().draft).toBeNull());

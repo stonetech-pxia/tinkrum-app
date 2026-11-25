@@ -4,14 +4,15 @@ import {
   appViewOf,
   firstTarget,
   pageIdOf,
+  startAppOf,
   type NavTarget,
   type ShellView,
   type WorkspaceConfig,
 } from '@morph/core';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { BlurTargetView } from 'expo-blur';
-import { useEffect, useRef, type ComponentRef } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, type ComponentRef } from 'react';
+import { AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DraftBar } from '../draft/DraftBar';
@@ -26,7 +27,7 @@ import { usePacks } from '../packs/PackHost';
 import { EditablePage } from '../editing/EditablePage';
 import type { RenderEnv } from '../renderer/components';
 import { GlassFill } from '../renderer/GlassFill';
-import { Icon } from '../renderer/Icon';
+import { Icon, UiIcon } from '../renderer/Icon';
 import { usePalette } from '../renderer/theme';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { shownConfig } from '../workspace/store';
@@ -118,11 +119,23 @@ export function Shell() {
     if (missingApp) leaveApp();
   }, [missingApp, leaveApp]);
 
-  // There is no "Return to Tinkrum" button within sub-apps (D-485): returning to the home page can
-  // only be done by opening Tinkrum from the phone. Leaving the app for more than 30 seconds and
-  // returning (via icon tap, app switcher) returns to the home page (D-612); when directly opening
-  // an app from the home screen menu or a deep link, entering the app occurs after returning, and
-  // the user stays within that app.
+  // From the pages on an app's bar, the button at the top left and Android's back key go to the
+  // home page with the app list (D-new-apphome-3); pages pushed on top keep their own back button.
+  const inApp = view.appId !== null;
+  useFocusEffect(
+    useCallback(() => {
+      if (!inApp || editing) return;
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        leaveApp();
+        return true;
+      });
+      return () => sub.remove();
+    }, [inApp, editing, leaveApp]),
+  );
+
+  // Leaving Tinkrum for more than 30 seconds and returning (via icon tap, app switcher) also
+  // returns to the home page (D-612), unless there is only one app to be in; when directly opening an app from the home screen menu or a
+  // deep link, entering the app occurs after returning, and the user stays within that app.
 
   // Rendering completion (not intercepted by ErrorBoundary) confirms this commit succeeded (§4).
   useEffect(() => {
@@ -151,6 +164,8 @@ export function Shell() {
           // background briefly, so what the user is doing must not be closed; stay in place
           // (D-585).
           if (router.canDismiss()) return;
+          // The only app is where Tinkrum opens, so coming back stays in it (D-new-apphome-6).
+          if (s.config && startAppOf(s.config) === s.appId) return;
           s.leaveApp();
         }, 700);
       }
@@ -226,15 +241,27 @@ export function Shell() {
   return (
     <View style={[styles.root, palette.backdrop, { paddingTop: insets.top }]}>
       {/* AI entry point in the upper right (D-406): no navigation bar here, takes up a single row, does not overlay page content. Settings and change history do not have it. */}
-      {entryAbout && !editing ? (
+      {(entryAbout || inApp) && !editing ? (
         <View
           style={[
             styles.entryRow,
             { paddingHorizontal: palette.pad },
             bubbleGuide && styles.entryOnTop,
           ]}>
+          {inApp ? (
+            <Pressable
+              testID="app-home"
+              accessibilityRole="button"
+              accessibilityLabel={t(locale, 'appListBack')}
+              hitSlop={10}
+              onPress={leaveApp}
+              style={styles.homeButton}>
+              {/* A grid, not a house: the app's own bar already has a house for its first page. */}
+              <UiIcon name="appList" size={24} color={palette.primaryText} />
+            </Pressable>
+          ) : null}
           {/* Guide step 1 (D-447): Tink on the home screen animates; tapping it is the same as tapping the bubble, opening that prompt. */}
-          {bubbleGuide ? (
+          {!entryAbout ? null : bubbleGuide ? (
             <AIEntry
               about={entryAbout}
               palette={palette}
@@ -393,6 +420,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingVertical: 8,
   },
+  // The way back to the app list sits at the left end of the Tink row.
+  homeButton: { marginRight: 'auto' },
   root: { flex: 1 },
   content: { flex: 1 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },

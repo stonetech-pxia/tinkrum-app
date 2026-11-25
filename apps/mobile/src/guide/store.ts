@@ -1,12 +1,12 @@
-import { localize, type Locale, type Localized } from '@morph/core';
+import { PAPER_APP_REQUEST, localize, type Locale, type Localized } from '@morph/core';
 
 import { create } from 'zustand';
 
 import type { WorkspaceRepo } from '../storage/types';
 
-// Newcomer guidance (D-149, D-231, D-260): onboarding slider -> step 1 sends a sentence plus two
-// file entry points (takes effect immediately) -> step 2 opens an image or file -> step 3 picks a
-// sample app to apply entirely (enters draft first). Progress is stored in local app_meta; no
+// Newcomer guidance (D-149, D-231, D-260, D-new-apphome-2): onboarding slider -> step 1 sends a
+// sentence that builds the Paper app (takes effect immediately) -> step 2 says it is on the home
+// page -> step 3 picks a sample app to apply entirely (enters draft first). Progress is stored in local app_meta; no
 // records means first launch. "Settings -> Re-watch onboarding guide" starts over.
 
 /** intro: onboarding slider to be displayed; look: step 1; goal: step 2; samples: step 3 (D-260); done: finished watching or closed. */
@@ -42,19 +42,12 @@ export const useGuide = create<GuideState>()((set, get) => ({
 }));
 
 /**
- * Sentences for step 1 (D-231, D-449): Home screen is empty, first add "Scan" and "Open file"
- * icon buttons. All three languages are recognized by built-in rules (checked sentence by
- * sentence in tests), guidance uses built-in rules fixedly without calling settings AI: results
- * are stable and immediate, and no key is needed (revision of D-228: previously French was
- * delegated to settings AI).
+ * Sentences for step 1 (D-231, D-new-apphome-2): the home page lists no app yet, the sentence
+ * builds the Paper app. All three languages are recognized by built-in rules, guidance uses
+ * built-in rules fixedly without calling settings AI: results are stable and immediate, and no key
+ * is needed (revision of D-228: previously French was delegated to settings AI).
  */
-export const LOOK_PROMPTS: readonly Localized[] = [
-  {
-    zh: '加入「扫描」和「打开文件」按钮',
-    en: 'Add the “Scan” and “Open files” buttons',
-    fr: 'Ajouter les boutons « Numériser » et « Ouvrir les fichiers »',
-  },
-];
+export const LOOK_PROMPTS: readonly Localized[] = [PAPER_APP_REQUEST];
 
 /** Opens the sentence for step 1 of the guide (D-447: tapping either the speech bubble or Tink in the top right goes here). */
 export function openLookGuide(router: {

@@ -32,6 +32,7 @@ import { getDeviceId, secureSecretStore } from '@/ai/secure-store';
 import { createAISettingsStore } from '@/ai/settings';
 import { DraftChatSheet } from '@/draft/DraftBar';
 import { useGuide } from '@/guide/store';
+import { openStartApp } from '@/shell/start-app';
 import { HomeScreenProvider } from '@/home-screen/context';
 import { nativeHomeScreen } from '@/home-screen/native';
 import { HomeScreenBridge } from '@/home-screen/useHomeScreen';
@@ -344,6 +345,7 @@ export default function RootLayout() {
       await expoFilePlatform.removeAllRuns().catch(() => undefined);
       // Copies left in cache by the file picker when exiting without finishing processing during the previous session.
       await expoFilePlatform.removeStalePickerCopies().catch(() => undefined);
+      openStartApp(booted.store);
       setRuntime(booted);
     })().catch((e) => setError(String(e)));
   }, [bootTry]);

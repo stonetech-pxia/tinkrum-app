@@ -4,14 +4,8 @@ import { prepareOps } from '../change';
 import { t } from '../messages';
 import { sampleOps } from '../samples';
 import { THEME_PRESETS, THEME_PRESET_IDS, presetRequest, type ThemePresetId } from '../presets';
-import {
-  allComponents,
-  isKnownComponent,
-  quickActionsOf,
-  type Locale,
-  type WorkspaceConfig,
-} from '../schema';
-import { createStarterWorkspace } from '../starter';
+import { isKnownComponent, quickActionsOf, type Locale, type WorkspaceConfig } from '../schema';
+import { PAPER_APP_REQUEST, createStarterWorkspace } from '../starter';
 import { apply, registry, workspace } from '../test-helpers';
 import { checkTools } from '../tool-check';
 import { functionFirst } from './kinds';
@@ -519,24 +513,30 @@ describe('mock AI — must refuse', () => {
   });
 });
 
-describe('mock AI — guide step 1 (D-231)', () => {
-  const starter = (locale: Locale = 'zh') => createStarterWorkspace(locale, registry);
-  const homeOf = (c: WorkspaceConfig) => allComponents(home(c));
-
-  it('GD1 guide step 1 adds the scan and open-file buttons in all three languages (D-449)', async () => {
-    for (const [text, locale] of [
-      ['加入「扫描」和「打开文件」按钮', 'zh'],
-      ['Add the “Scan” and “Open files” buttons', 'en'],
-      ['Ajouter les boutons « Numériser » et « Ouvrir les fichiers »', 'fr'],
-    ] as const) {
-      const { after } = await change(text, starter(locale), locale);
-      expect(homeOf(after)).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ look: 'action', tools: [{ tool: 'scan-camera' }] }),
-          expect.objectContaining({ look: 'picker', tools: [{ tool: '$pick.open' }] }),
-        ]),
+describe('mock AI — guide step 1 (D-new-apphome-2)', () => {
+  it('GD1 guide step 1 builds the Paper app in the interface language', async () => {
+    for (const locale of ['zh', 'en', 'fr'] as const) {
+      const start = createStarterWorkspace(locale, registry);
+      const { after } = await change(PAPER_APP_REQUEST[locale], start, locale);
+      expect(after.nav.apps).toMatchObject([
+        {
+          id: 'paper',
+          name: 'Paper',
+        },
+      ]);
+      // French titles stay French although the other built-in rules answer in English.
+      expect(after.containers.pages.find((p) => p.id === 'paper-home')!.title).toBe(
+        { zh: '首页', en: 'Home', fr: 'Accueil' }[locale],
       );
     }
+  });
+
+  it('says nothing changes when the Paper app is already there', async () => {
+    const ai = createMockAIProvider();
+    const start = createStarterWorkspace('zh', registry);
+    const { after } = await change(PAPER_APP_REQUEST.zh, start, 'zh');
+    const again = await ai.plan(PAPER_APP_REQUEST.zh, { config: after, registry, locale: 'zh' });
+    expect(again).toMatchObject({ kind: 'reject', reason: 'noChange' });
   });
 });
 

@@ -1,9 +1,12 @@
 import {
   BUILTIN_TOOLS,
-  allComponents,
+  applyOps,
   createMockAIProvider,
   createRegistry,
   createStarterWorkspace,
+  paperAppOps,
+  type Locale,
+  type Registry,
 } from '@morph/core';
 import { act, fireEvent, waitFor, within } from '@testing-library/react-native';
 import { screen } from 'expo-router/testing-library';
@@ -11,11 +14,11 @@ import { screen } from 'expo-router/testing-library';
 import { LOOK_PROMPTS, useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
-import { renderToolsApp, starterAfterGuide, openPick } from '../test-utils/render-app';
+import { renderToolsApp, homeWithFileEntries, openPick } from '../test-utils/render-app';
 
-// Newbie guide (D-149, D-231): swipe intro -> step 1 add two file triggers (takes effect
-// immediately) -> step 2 open image or file -> step 3 sample app (D-260, see also
-// sample-apps-test.tsx).
+// Newbie guide (D-149, D-231, D-new-apphome-2): swipe intro -> step 1 builds the Paper app
+// (takes effect immediately) -> step 2 says it is on the home page -> step 3 sample app (D-260,
+// see also sample-apps-test.tsx).
 
 const TYPED = { timeout: 4000 };
 
@@ -98,15 +101,18 @@ describe('first-run guide', () => {
     },
   );
 
-  const filePicks = (store: Awaited<ReturnType<typeof startGuide>>['store']) =>
-    allComponents(store.getState().config!.containers.pages.find((p) => p.id === 'home')!).filter(
-      // Two entry points: scanning (built-in "Scan to PDF" in the home grid, D-487) and opening a file.
-      (c) =>
-        c.look === 'picker' ||
-        (c.look === 'action' && c.tools.some((u) => 'tool' in u && u.tool === 'scan-camera')),
-    );
+  const apps = (store: Awaited<ReturnType<typeof startGuide>>['store']) =>
+    store.getState().config!.nav.apps?.map((a) => a.id) ?? [];
 
-  it('step 1: the sentence fills the box and waits; sending adds both buttons without a draft', async () => {
+  /** A new user whose Paper app is already there. */
+  const withPaper = (locale: Locale, registry: Registry) => {
+    const config = createStarterWorkspace(locale, registry);
+    const result = applyOps(config, paperAppOps(config, locale, registry), { registry, locale });
+    if (!result.ok) throw new Error(result.error);
+    return result.config;
+  };
+
+  it('step 1: the sentence fills the box and waits; sending builds the Paper app without a draft', async () => {
     const { repo, store } = await startGuide();
     await fireEvent.press(await screen.findByTestId('welcome-skip'));
     expect(await screen.findByTestId('guide-look')).toHaveTextContent(/空荡荡/);
@@ -117,21 +123,46 @@ describe('first-run guide', () => {
       TYPED,
     );
     expect(screen.getByTestId('change-input')).toHaveProp('value', LOOK_PROMPTS[0]!.zh);
-    expect(filePicks(store)).toHaveLength(0);
+    expect(apps(store)).toEqual([]);
     await fireEvent.press(screen.getByTestId('change-submit'));
     // Takes effect immediately without entering draft mode; returns to the home page showing step 2. Guide modifications do not show "Applied · Undo" at the top (D-239).
+    // The app is in the menu of the Tinkrum icon, and step 2 says so (D-new-apphome-4).
     expect(await screen.findByTestId('guide-goal')).toHaveTextContent(
-      /搭好了，以后你想改什么都可以和我说哦/,
+      /搭好了，点图标就能打开。在手机桌面长按 Tinkrum 图标，也能直接打开 Paper/,
     );
+    expect(store.getState().config!.nav.phoneHomeScreen).toEqual(['app:paper']);
     expect(store.getState().draft).toBeNull();
-    expect(filePicks(store)).toHaveLength(2);
-    expect(screen.getByTestId('file-pick-open')).toBeTruthy();
+    expect(apps(store)).toEqual(['paper']);
+    // The icon is on the home page, and opens the app once the bubble is closed.
+    await fireEvent.press(screen.getByTestId('guide-later'));
+    await fireEvent.press(screen.getByTestId('app-icon-paper'));
+    expect(await screen.findByTestId('file-pick-open')).toBeTruthy();
     expect(screen.getByTestId('run-scan-camera')).toBeTruthy();
     expect(store.getState().banner).toBeNull();
     expect(screen.queryByTestId('banner')).toBeNull();
     expect(screen.queryByTestId('guide-undo-hint')).toBeNull();
     expect(screen.queryByTestId('guide-goal-trip-photos')).toBeNull();
-    expect(await repo.getMeta('guide')).toBe('goal');
+    expect(await repo.getMeta('guide')).toBe('done');
+  });
+
+  // D-new-apphome-4: where the phone can place icons, step 2 says how to give Paper one of its own.
+  it('step 2 tells a phone that can place icons to drag Paper onto the home screen', async () => {
+    const repo = new MemoryWorkspaceRepo();
+    await repo.setMeta('guide', 'goal');
+    await act(() => useGuide.getState().load(repo));
+    await renderToolsApp(repo, new FakeFiles(), {
+      seed: withPaper,
+      homeScreen: {
+        setItems: async () => undefined,
+        canPin: () => true,
+        pin: async () => true,
+        takeLaunched: () => null,
+        onOpen: () => () => undefined,
+      },
+    });
+    expect(await screen.findByTestId('guide-goal')).toHaveTextContent(
+      /长按 Tinkrum 图标，把 Paper 拖到桌面上，就能当独立 App 用/,
+    );
   });
 
   // D-447: Step 1 is a message spoken by Tink, without "Step 1" label; the Tink icon in the top right of the home page animates, tapping it behaves the same as tapping the bubble.
@@ -139,7 +170,7 @@ describe('first-run guide', () => {
     await startGuide();
     await fireEvent.press(await screen.findByTestId('welcome-skip'));
     const bubble = await screen.findByTestId('guide-look');
-    expect(bubble).toHaveTextContent(/点击我，我给你搭一个工作台吧/);
+    expect(bubble).toHaveTextContent(/点击我，我给你搭第一个 App：Paper/);
     expect(bubble).not.toHaveTextContent(/第 1 步/);
     expect(screen.getByTestId('tink-lively')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('page-ai'));
@@ -181,8 +212,8 @@ describe('first-run guide', () => {
     expect(screen.getByTestId('tink-halo')).toBeTruthy();
   });
 
-  // D-228: Built-in rules do not recognize French. When built-in rules are selected in settings, the French guide continues to send English sentences.
-  it('in French with the built-in rules, step 1 still adds both buttons', async () => {
+  // D-228: Built-in rules do not recognize French; the guide's own sentence they know in all three languages.
+  it('in French with the built-in rules, step 1 builds the app with French names', async () => {
     const repo = new MemoryWorkspaceRepo();
     await act(() => useGuide.getState().load(repo));
     const { store } = await renderToolsApp(repo, new FakeFiles(), {
@@ -197,11 +228,14 @@ describe('first-run guide', () => {
     );
     await fireEvent.press(screen.getByTestId('change-submit'));
     expect(await screen.findByTestId('guide-goal')).toBeTruthy();
-    expect(filePicks(store)).toHaveLength(2);
+    expect(
+      store.getState().config!.containers.pages.find((p) => p.id === 'paper-home')!.title,
+    ).toBe('Accueil');
+    expect(screen.getByTestId('app-icon-paper')).toHaveTextContent('Paper');
   });
 
-  it('rerunning step 1 when both buttons are already there moves on to step 2', async () => {
-    const { store } = await startGuide(undefined, starterAfterGuide);
+  it('rerunning step 1 when the app is already there moves on to step 2', async () => {
+    const { store } = await startGuide(undefined, withPaper);
     await fireEvent.press(await screen.findByTestId('welcome-skip'));
     await fireEvent.press(await screen.findByTestId('guide-look-0'));
     await waitFor(
@@ -210,24 +244,34 @@ describe('first-run guide', () => {
     );
     await fireEvent.press(screen.getByTestId('change-submit'));
     expect(await screen.findByTestId('guide-goal')).toBeTruthy();
-    expect(filePicks(store)).toHaveLength(2);
+    expect(apps(store)).toEqual(['paper']);
   });
 
-  it('skipping the guide adds both buttons directly', async () => {
+  it('replaying the guide on an older home page adds the app and a way into it', async () => {
+    const { store } = await startGuide(undefined, homeWithFileEntries);
+    await fireEvent.press(await screen.findByTestId('welcome-skip'));
+    await fireEvent.press(await screen.findByTestId('guide-skip'));
+    await waitFor(() => expect(apps(store)).toEqual(['paper']));
+    const home = store.getState().config!.containers.pages.find((p) => p.id === 'home')!;
+    expect(home.blocks.at(-1)).toMatchObject({ look: 'entry', opens: 'app:paper' });
+  });
+
+  it('skipping the guide builds the Paper app directly', async () => {
     const { repo, store } = await startGuide();
     await fireEvent.press(await screen.findByTestId('welcome-skip'));
     await fireEvent.press(await screen.findByTestId('guide-skip'));
-    await waitFor(() => expect(filePicks(store)).toHaveLength(2));
+    await waitFor(() => expect(apps(store)).toEqual(['paper']));
     expect(store.getState().draft).toBeNull();
     expect(screen.queryByTestId('guide-look')).toBeNull();
     // Does not show "Applied · Undo" at the top (D-239).
     expect(store.getState().banner).toBeNull();
     expect(screen.queryByTestId('banner')).toBeNull();
     expect(await repo.getMeta('guide')).toBe('done');
+    expect(await screen.findByTestId('app-icon-paper')).toBeTruthy();
   });
 
   it('step 2 ends the guide when the user opens pictures or files', async () => {
-    const { repo, files } = await startGuide('goal', starterAfterGuide);
+    const { repo, files } = await startGuide('goal', homeWithFileEntries);
     expect(await screen.findByTestId('guide-goal')).toHaveTextContent(/搭好了/);
     files.nextMedia = [files.offerImage('a.jpg', 400, 300)];
     await openPick('media');

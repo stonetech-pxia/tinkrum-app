@@ -5,7 +5,7 @@ import { screen } from 'expo-router/testing-library';
 import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, makePdf } from '../test-utils/fake-files';
-import { openPick, renderToolsApp, starterAfterGuide } from '../test-utils/render-app';
+import { openPick, renderToolsApp, homeWithFileEntries } from '../test-utils/render-app';
 
 // D-455: Opened and shared files are saved into the document library, storing thumbnails and text (PDF text layer, image recognition); all files are searchable by text inside them.
 
@@ -19,7 +19,7 @@ async function start() {
   } as never;
   await repo.setMeta('guide', 'done');
   await act(() => useGuide.getState().load(repo));
-  const app = await renderToolsApp(repo, files, { seed: starterAfterGuide });
+  const app = await renderToolsApp(repo, files, { seed: homeWithFileEntries });
   return { ...app, files, repo };
 }
 

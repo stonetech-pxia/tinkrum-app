@@ -216,6 +216,8 @@ const UI_SYMBOLS = {
   chevronDown: { ios: 'chevron.down', android: 'expand_more' },
   chevronUp: { ios: 'chevron.up', android: 'expand_less' },
   chevronLeft: { ios: 'chevron.left', android: 'chevron_left' },
+  // The way back to the app list: unlike the toolbox's icon on both phones.
+  appList: { ios: 'square.grid.3x3.fill', android: 'grid_view' },
   play: { ios: 'play.fill', android: 'play_arrow' },
   edit: { ios: 'pencil', android: 'edit' },
   add: { ios: 'plus', android: 'add' },

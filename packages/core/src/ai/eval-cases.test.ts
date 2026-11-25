@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { prepareOps } from '../change';
 import type { Op } from '../ops';
-import { fromV33, registry, v33Fixture, withScanKeep, withStarterTheme } from '../test-helpers';
+import { fromV33, registry, v33Fixture } from '../test-helpers';
 import { EVAL_CASES, buildSetup, runEvalCase, type EvalSetup } from './eval-cases';
 import { createMockAIProvider } from './mock';
 import type { AIProvider, Plan, WorkKind } from './types';
@@ -11,7 +11,6 @@ import type { AIProvider, Plan, WorkKind } from './types';
 describe('eval setups are the same as the v33 ones', () => {
   const setups: EvalSetup[] = [
     'default',
-    'starter',
     'pdf',
     'pdfBelowFiles',
     'budget',
@@ -27,12 +26,8 @@ describe('eval setups are the same as the v33 ones', () => {
     'todos',
   ];
   it.each(setups)('%s', (setup) => {
-    const name = setup === 'default' || setup === 'starter' ? `${setup}-zh` : `setup-${setup}-zh`;
-    expect(buildSetup(setup, 'zh', registry)).toStrictEqual(
-      setup === 'starter'
-        ? withStarterTheme(withScanKeep(fromV33(v33Fixture(name))))
-        : fromV33(v33Fixture(name)),
-    );
+    const name = setup === 'default' ? `${setup}-zh` : `setup-${setup}-zh`;
+    expect(buildSetup(setup, 'zh', registry)).toStrictEqual(fromV33(v33Fixture(name)));
   });
 });
 

@@ -1037,8 +1037,14 @@ export const fr: MessageTable = {
   tinkProgressChecking2: 'Je serre la dernière vis…',
   tinkProgressFixing: 'Oups, clou tordu. Je répare…',
   tinkProgressFixing2: 'Petit souci, je corrige…',
-  guideTinkSays: 'L’application est bien vide. Touchez-moi, je vous monte un espace de travail !',
-  guideTinkDone: 'C’est prêt ! Si vous voulez changer quelque chose, dites-le-moi.',
+  guideTinkSays:
+    'Votre écran d’accueil est bien vide. Touchez-moi : je crée votre première app, Paper, un scanner !',
+  guideTinkDone:
+    'C’est prêt ! Touchez son icône pour l’ouvrir. Si vous voulez changer quelque chose, dites-le-moi.',
+  guideTinkDoneMenu:
+    'C’est prêt ! Touchez son icône pour l’ouvrir. Sur votre téléphone, un appui long sur l’icône Tinkrum ouvre aussi Paper directement.',
+  guideTinkDonePin:
+    'C’est prêt ! Touchez son icône. Pour faire de Paper une app à part, faites un appui long sur l’icône Tinkrum du téléphone et glissez Paper sur l’écran d’accueil.',
   guideGotIt: 'J’ai compris',
   guideLater: 'Plus tard',
   // Onboarding step 3: Sample apps (D-260).
@@ -1152,6 +1158,7 @@ export const fr: MessageTable = {
   settingsMyAppsHint:
     'Appuyez longuement sur une app pour la placer sur l’écran d’accueil ou changer son icône.',
   settingsAppOnHome: 'Dans le menu de l’écran d’accueil',
+  appListBack: 'Revenir à vos apps',
   appEmpty: 'Cette app n’a pas encore de page. Touchez Tink pour en créer une.',
   appDescUpdate: 'Modifier l’app « {v0} »',
   appDescRemove:
@@ -1314,10 +1321,13 @@ export const fr: MessageTable = {
   describe_Open_files_3477c: 'Ouvrir les fichiers',
   describe_tool_grid_e987a: 'grille d’outils « {v0} »',
   describe_tool_grid_1c74f: 'grille d’outils',
+  describe_app_list: 'liste des apps',
+  describe_app_list_titled: 'liste des apps « {v0} »',
   describe_link_941e3: 'lien « {v0} »',
   describe_file_list_a11dd: 'liste de fichiers « {v0} »',
   homeRecentActions: 'Actions récentes',
   homeRecentFiles: 'Fichiers récents',
+  paperAppName: 'Paper',
   homeTagline: 'Du papier en entrée, un PDF, Word ou Excel propre en sortie.',
   presetFilesTitle: 'Fichiers',
   presetFilesSubtitle: 'Tout ce que vous scannez, convertissez ou ouvrez, classé par type.',

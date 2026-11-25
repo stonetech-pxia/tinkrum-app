@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useRecordActionRunner } from '../data/record-actions';
-import { LONG_PRESS_MS } from '../editing/entry';
+import { HOLD_MS, LONG_PRESS_MS } from '../editing/entry';
 import { setInnerGesture } from '../editing/useSingleDrag';
 import { useLinkResolver } from '../data/records';
 import { t } from '../i18n';
@@ -38,8 +38,6 @@ import { Card } from './ui';
 // of 24 items (D-312).
 
 const SIZE = 84;
-/** Long press to open an entry must trigger before the page's long press edit action (LONG_PRESS_MS). */
-const HOLD_MS = LONG_PRESS_MS - 150;
 const STROKE = 6;
 
 export function Tiles({ block, env, tone }: { block: RecordBlock; env: RenderEnv; tone?: Tone }) {

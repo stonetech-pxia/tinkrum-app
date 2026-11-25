@@ -1,4 +1,4 @@
-import { createStarterWorkspace } from '@morph/core';
+import { applyOps, createStarterWorkspace, paperAppOps } from '@morph/core';
 import { act, fireEvent } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
@@ -10,31 +10,44 @@ import { FakeFiles } from '../test-utils/fake-files';
 import {
   openPick,
   renderToolsApp,
-  starterAfterGuide,
+  homeWithFileEntries,
   testRegistry,
 } from '../test-utils/render-app';
 
-// New user's blank home screen (D-231), toolbox (D-181, D-182), and home screen file entry point.
+// New user's home page (D-new-apphome-1), toolbox (D-181), and home screen file entry points.
 
 describe('starter home and toolbox (UI)', () => {
   const start = () =>
     renderToolsApp(new MemoryWorkspaceRepo(), new FakeFiles(), { seed: createStarterWorkspace });
 
-  it('starts with an empty home page (D-231)', async () => {
+  it('starts with a home page that holds only the app list', async () => {
     const { store } = await start();
     await screen.findByTestId('nav-settings');
-    expect(store.getState().config!.containers.pages.find((p) => p.id === 'home')!.blocks).toEqual(
-      [],
-    );
+    expect(
+      store
+        .getState()
+        .config!.containers.pages.find((p) => p.id === 'home')!
+        .blocks.map((b) => b.look),
+    ).toEqual(['apps']);
     expect(screen.queryByTestId('file-pick-open')).toBeNull();
     expect(screen.queryByText('Tinkrum 可以做什么')).toBeNull();
     expect(screen.queryByTestId('nav-tools')).toBeNull();
   });
 
   it('opens added tools from the toolbox and adds a new one with one tap', async () => {
-    const { store } = await start();
-    await screen.findByTestId('nav-settings');
-    await act(() => router.push('/page/toolbox'));
+    const { store } = await renderToolsApp(new MemoryWorkspaceRepo(), new FakeFiles(), {
+      seed: (locale, registry) => {
+        const config = createStarterWorkspace(locale, registry);
+        const result = applyOps(config, paperAppOps(config, locale, registry), {
+          registry,
+          locale,
+        });
+        if (!result.ok) throw new Error(result.error);
+        return result.config;
+      },
+    });
+    await fireEvent.press(await screen.findByTestId('app-icon-paper'));
+    await fireEvent.press(await screen.findByTestId('nav-page:paper-toolbox'));
     expect(await screen.findByText('照片、视频和声音'.toUpperCase())).toBeTruthy();
     // Added tools lack a "+", while unadded ones have it.
     expect(screen.queryByTestId('toolgrid-add-image')).toBeNull();
@@ -52,7 +65,7 @@ describe('starter home and toolbox (UI)', () => {
 
 describe('home file pickers', () => {
   const start = () =>
-    renderToolsApp(new MemoryWorkspaceRepo(), new FakeFiles(), { seed: starterAfterGuide });
+    renderToolsApp(new MemoryWorkspaceRepo(), new FakeFiles(), { seed: homeWithFileEntries });
   it('the toolbox entry looks like a settings row (icon, name, arrow) and opens the toolbox', async () => {
     await start();
     const entry = await screen.findByText('工具箱');
@@ -117,11 +130,11 @@ describe('starter texts follow the interface language', () => {
   it('shows a Chinese starter workspace in French without writing the config', async () => {
     const { store } = await renderToolsApp(new MemoryWorkspaceRepo(), new FakeFiles(), {
       locale: 'fr',
-      seed: (_locale, registry) => starterAfterGuide('zh', registry),
+      seed: (_locale, registry) => homeWithFileEntries('zh', registry),
     });
     await screen.findByTestId('nav-settings');
     const before = JSON.stringify(store.getState().config);
-    const fr = starterAfterGuide('fr', testRegistry);
+    const fr = homeWithFileEntries('fr', testRegistry);
     const frHome = fr.containers.pages.find((p) => p.id === 'home')!;
     expect(screen.getByTestId('nav-page:home').props.accessibilityLabel).toBe(frHome.title);
     expect(screen.queryByText('最近操作')).toBeNull();

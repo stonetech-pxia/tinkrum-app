@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { actionComponent } from './action';
+import { appsComponent } from './apps';
 import { buttonComponent } from './button';
 import { calloutComponent } from './callout';
 import { chartComponent } from './chart';
@@ -33,7 +34,7 @@ import { singleComponent } from './single';
 import { spacerComponent } from './spacer';
 import { textComponent } from './text';
 
-/** Appearances that can be placed inside groups (30 types, plus group itself makes 31 types; choices and period can only be on the page, validation bar; dial must be fixed at the bottom of the page, cannot enter groups, validation bar). New appearances are added at the end (the order matches the JSON Schema). */
+/** Appearances that can be placed inside groups (31 types, plus group itself makes 32 types; choices and period can only be on the page, validation bar; dial must be fixed at the bottom of the page, cannot enter groups, validation bar). New appearances are added at the end (the order matches the JSON Schema). */
 export const LEAF_COMPONENTS = [
   headerComponent,
   textComponent,
@@ -65,6 +66,7 @@ export const LEAF_COMPONENTS = [
   choicesComponent,
   calloutComponent,
   gridComponent,
+  appsComponent,
 ] as const;
 
 type Schemas<D extends readonly { schema: unknown }[]> = {

@@ -1,6 +1,7 @@
 import {
   SITE_URL,
   AppFileSchema,
+  COMPONENTS,
   CURRENT_SCHEMA_VERSION,
   MAX_DRAWN_ICON_CHARS,
   MAX_DRAWN_ICON_PATHS,
@@ -9,6 +10,7 @@ import {
   MAX_PAGES,
   MAX_TABLES,
   ThemeSchema,
+  type ComponentAI,
   type Registry,
 } from '@morph/core';
 import { z } from 'zod';
@@ -77,6 +79,18 @@ function promptSections(registry: Registry): Map<string, string> {
   for (const title of SECTIONS)
     if (!map.has(title)) throw new Error(`prompt section "${title}" is missing`);
   return map;
+}
+
+/** The Containers section without the looks an app file can't use. */
+function appContainers(section: string): string {
+  const left = COMPONENTS.filter((d) => (d.ai as ComponentAI).outsideApps).map(
+    (d) => `  - ${d.look} `,
+  );
+  return section
+    .split('\n')
+    .filter((line) => !left.some((start) => line.startsWith(start)))
+    .join('\n')
+    .trimEnd();
 }
 
 /** Output section retains only object types (Block, Page, Table...), while Plan and Op are Tink response formats. */
@@ -309,7 +323,7 @@ ${s.get('Data · containers · tools')!.trimEnd()}
 ${s.get('Data')!.trimEnd()}
 
 ## Containers
-${s.get('Containers')!.trimEnd()}
+${appContainers(s.get('Containers')!)}
 
 ## Tools
 ${s.get('Tools')!.trimEnd()}

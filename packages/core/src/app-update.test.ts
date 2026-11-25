@@ -86,8 +86,13 @@ function file(): AppFile {
   } as unknown as AppFile;
 }
 
-function installed(): WorkspaceConfig {
-  const base = createStarterWorkspace('en', registry);
+/** A home page without an app list (from before D-new-apphome-1): each app has an entry block there. */
+const olderHome = () =>
+  run(createStarterWorkspace('en', registry), [
+    { op: 'removeContainer', page: HOME_PAGE_ID, block: 'apps' },
+  ]);
+
+function installed(base = olderHome()): WorkspaceConfig {
   const plan = appFileOps(file(), base);
   if (!plan.ok) throw new Error(plan.error);
   return run(base, plan.ops);
@@ -217,6 +222,24 @@ describe('appUpdateOps: update the same app with a modified app file', () => {
     expect(JSON.stringify(home.blocks).match(/app:books/g)).toHaveLength(1);
   });
 
+  it('adds no entry to a home page that lists the apps, before or after an update', () => {
+    const start = createStarterWorkspace('en', registry);
+    const config = installed(start);
+    const plan = appUpdateOps(
+      edited(config, (f) => {
+        f.pages[0]!.title = 'Changed';
+      }),
+      config,
+      registry,
+    );
+    if (!plan.ok) throw new Error(plan.error);
+    const after = run(config, plan.ops);
+    for (const c of [config, after])
+      expect(c.containers.pages.find((p) => p.id === HOME_PAGE_ID)).toEqual(
+        start.containers.pages.find((p) => p.id === HOME_PAGE_ID),
+      );
+  });
+
   it('keeps the home page entry where the person put it', () => {
     let config = installed();
     const home = () => config.containers.pages.find((p) => p.id === HOME_PAGE_ID)!;
@@ -227,7 +250,7 @@ describe('appUpdateOps: update the same app with a modified app file', () => {
       {
         op: 'addContainer',
         page: HOME_PAGE_ID,
-        block: { id: 'hello', look: 'header', show: { title: 'Hello' } },
+        block: { id: 'greeting', look: 'header', show: { title: 'Hello' } },
       } as never,
     ]);
     expect(home().blocks[0]!.id).toBe(entry.id);

@@ -4,7 +4,7 @@ import { Alert } from 'react-native';
 
 import { useIncoming } from '../share/incoming';
 import { makePdf } from '../test-utils/fake-files';
-import { renderToolsApp, starterAfterGuide } from '../test-utils/render-app';
+import { renderToolsApp, homeWithFileEntries } from '../test-utils/render-app';
 
 // D-200: In-app click counting for real routing; fake selectors/media platforms do not impersonate
 // simulators, system shares, or timing measurements. D-449: Home screen has only a single "Open
@@ -18,7 +18,7 @@ it.each([
 ] as const)(
   '%s (%s): first and second use finish with %i App taps',
   async (preset, source, expected) => {
-    const { files } = await renderToolsApp(undefined, undefined, { seed: starterAfterGuide });
+    const { files } = await renderToolsApp(undefined, undefined, { seed: homeWithFileEntries });
     const traces: string[][] = [];
     for (const iteration of [0, 1]) {
       const trace: string[] = [];

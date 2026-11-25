@@ -64,6 +64,7 @@ const NOT_RECORD_LOOKS = new Set([
   'library',
   'packages',
   'action',
+  'apps',
 ]);
 /** Write blocks are located under `write.look.*`, others under `read.look.*`. */
 const WRITE_LOOKS = new Set(['form', 'button']);

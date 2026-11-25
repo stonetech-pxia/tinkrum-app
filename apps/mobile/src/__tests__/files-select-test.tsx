@@ -7,7 +7,7 @@ import { Alert } from 'react-native';
 import { useGuide } from '../guide/store';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles, makePdf } from '../test-utils/fake-files';
-import { renderToolsApp, starterAfterGuide } from '../test-utils/render-app';
+import { renderToolsApp, homeWithFileEntries } from '../test-utils/render-app';
 
 // D-472: All files page has a selection box on the right of each row; after selection, a bottom row of buttons appears: Rename (single), Merge (two or more PDFs), Share, Delete.
 
@@ -23,7 +23,7 @@ async function start() {
   await add('c', '照片.jpg', 'image/jpeg', new Uint8Array([1, 2, 3]), 3000);
   await repo.setMeta('guide', 'done');
   await act(() => useGuide.getState().load(repo));
-  await renderToolsApp(repo, files, { seed: starterAfterGuide });
+  await renderToolsApp(repo, files, { seed: homeWithFileEntries });
   await act(() => router.push('/files'));
   const page = await screen.findByTestId('files-screen', {}, { timeout: 4000 });
   const check = (id: string) => fireEvent.press(within(page).getByTestId(`files-check-${id}`));

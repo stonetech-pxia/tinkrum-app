@@ -325,6 +325,8 @@ describe('sample expense-helper', () => {
 });
 
 describe('samples equal the v33 samples, migrated', () => {
+  /** The new user's first version when the fixtures were made: an empty home page and the toolbox. */
+  const oldStarter = () => withStarterTheme(withScanKeep(fromV33(v33Fixture('starter-zh'))));
   // fixtures/v33/sample-<id>-zh.json: Results of applying samples to new users (starter) under v33
   // code. Business card sample (D-423) and receipt sample (D-437) were added after v34 and do not
   // have v33 counterparts. Expense claim assistant (D-425, D-427) has extra print with attachments
@@ -335,7 +337,7 @@ describe('samples equal the v33 samples, migrated', () => {
         s !== 'business-cards' && s !== 'expense-helper' && s !== 'receipts' && s !== 'visa-docs',
     ),
   )('%s in zh', (sample) => {
-    const before = fresh('zh');
+    const before = oldStarter();
     expect(apply(before, ops(sample, before, 'zh'), 'zh')).toEqual(
       // Old sample copy uses the old name Morph (D-435); compared only for structure and remaining content, fixed samples are unchanged.
       JSON.parse(
@@ -347,7 +349,7 @@ describe('samples equal the v33 samples, migrated', () => {
   });
 
   it('visa-docs in zh differs only by the "expire within 30 days" count (D-537)', () => {
-    const before = fresh('zh');
+    const before = oldStarter();
     const config = structuredClone(apply(before, ops('visa-docs', before, 'zh'), 'zh'));
     const page = config.containers.pages.find((p) => p.id === 'my-ids')!;
     const expiring = page.blocks.find((b) => b.id === 'expiring');
@@ -366,7 +368,7 @@ describe('samples equal the v33 samples, migrated', () => {
   });
 
   it('expense-helper in zh differs only by the receipt rules, the attachments switch and the Excel export', () => {
-    const before = fresh('zh');
+    const before = oldStarter();
     const config = structuredClone(apply(before, ops('expense-helper', before, 'zh'), 'zh'));
     const claims = config.data.tables.find((t) => t.prefillRules === 'receipt')!;
     delete claims.prefillRules;
@@ -406,7 +408,7 @@ describe('samples equal the v33 samples, migrated', () => {
   });
 
   it('a reminder whose id a quick action already uses gets a new id (one id space, M1)', () => {
-    const base = fresh('zh');
+    const base = oldStarter();
     const taken = apply(
       base,
       [

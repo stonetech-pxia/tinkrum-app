@@ -25,7 +25,7 @@ import {
 import { recordValue } from '../data';
 import { parseRichText } from '../richtext';
 import { sortList } from '../schema-base';
-import { createStarterWorkspace } from '../starter';
+import { PAPER_APP_ID, PAPER_APP_REQUEST, createStarterWorkspace, toolboxPage } from '../starter';
 import { templateOps } from '../templates';
 import { THEME_PRESETS } from '../presets';
 import { CLAY, contrast, isDark, resolveColors } from '../theme';
@@ -56,7 +56,8 @@ function sameValue(a: unknown, b: unknown): boolean {
 // cases. IDs correspond to `docs/MOCK_AI_PHRASES.md`; `P*` are paraphrased phrasings that only real
 // models need to understand.
 
-/** starter: first version for new users (streamlined home screen + toolbox, D-181, D-182). */
+/** starter: first version for new users (a home page that lists the apps, D-new-apphome-1). */
+/** toolbox: the starter plus a toolbox page on the home screen (D-181), what users from before the app list have. */
 /** visaHomeScreen: visa places visa photo on the home screen (D-271). */
 /** oneTap: four tables for water, work hours (start/end), packing list, bills, each with a list page (one-tap logging operation, D-300). */
 /** views: three tables for mood, commute (start and end date/time), water, each with a list page (D-305–D-308). */
@@ -74,6 +75,7 @@ export type EvalSetup =
   | 'visa'
   | 'visaHomeScreen'
   | 'starter'
+  | 'toolbox'
   | 'habits'
   | 'linked'
   | 'oneTap'
@@ -131,6 +133,13 @@ export type EvalEarlier = { input: string; ops: Op[] } | { input: string; notDon
 
 export function buildSetup(setup: EvalSetup, locale: Locale, registry: Registry): WorkspaceConfig {
   if (setup === 'starter') return createStarterWorkspace(locale, registry);
+  if (setup === 'toolbox') {
+    const starter = createStarterWorkspace(locale, registry);
+    const page = toolboxPage(locale, registry) as Extract<Op, { op: 'addContainer' }>['page'];
+    const result = applyOps(starter, [{ op: 'addContainer', page }], { registry, locale });
+    if (!result.ok) throw new Error(result.error);
+    return result.config;
+  }
   const ops: Op[] = [];
   if (setup === 'visa' || setup === 'visaHomeScreen') {
     ops.push({ op: 'setPackage', package: 'pdf', do: 'add' });
@@ -3327,7 +3336,7 @@ const TOOLBOX_EVAL_CASES: readonly EvalCase[] = [
     id: 'TB1',
     input: '把翻译移到照片那一组',
     locale: 'zh',
-    setup: 'starter',
+    setup: 'toolbox',
     mock: false,
     expect: {
       kind: 'ops',
@@ -3346,7 +3355,7 @@ const TOOLBOX_EVAL_CASES: readonly EvalCase[] = [
     id: 'TB2',
     input: '工具箱最上面加一组「常用」，放图片和 PDF',
     locale: 'zh',
-    setup: 'starter',
+    setup: 'toolbox',
     mock: false,
     expect: {
       kind: 'ops',
@@ -3364,7 +3373,7 @@ const TOOLBOX_EVAL_CASES: readonly EvalCase[] = [
     id: 'TB3',
     input: 'Rename the toolbox to My tools',
     locale: 'en',
-    setup: 'starter',
+    setup: 'toolbox',
     mock: false,
     expect: {
       kind: 'ops',
@@ -3376,7 +3385,7 @@ const TOOLBOX_EVAL_CASES: readonly EvalCase[] = [
     id: 'TB4',
     input: '把工具箱放到导航栏',
     locale: 'zh',
-    setup: 'starter',
+    setup: 'toolbox',
     mock: false,
     expect: {
       kind: 'ops',
@@ -3390,7 +3399,7 @@ const TOOLBOX_EVAL_CASES: readonly EvalCase[] = [
     id: 'TB5',
     input: '添加压缩包工具',
     locale: 'zh',
-    setup: 'starter',
+    setup: 'toolbox',
     mock: false,
     expect: {
       kind: 'ops',
@@ -4666,7 +4675,7 @@ const LOOK_CASES: EvalCase[] = [
     id: 'LK4',
     input: '工具箱页面上的「管理工具」按钮改成只显示一个图标',
     locale: 'zh',
-    setup: 'starter',
+    setup: 'toolbox',
     mock: false,
     expect: {
       kind: 'ops',
@@ -4832,34 +4841,51 @@ const LOOK_CASES: EvalCase[] = [
     },
   },
 ];
-// Newbie onboarding step 1 (D-231): add two file entry points to the blank Home Screen. English and Chinese go through built-in rules, while French is handled by the model.
-/** Onboarding step 1 (D-449): add "Scan" (runs the built-in scan-to-PDF flow) and "Open file" (prompts whether to pick from photo library or files) to the Home Screen. */
-const twoFilePicks = (c: WorkspaceConfig) => {
-  const blocks = allComponents(home(c)).filter(isKnownComponent);
+/** Onboarding step 1 (D-new-apphome-2): the sentence builds the Paper app, which the home page lists. */
+const paperAppBuilt = (c: WorkspaceConfig) => {
+  const app = c.nav.apps?.find((a) => a.id === PAPER_APP_ID);
+  if (!app) return 'no Paper app';
+  const blocks = c.containers.pages
+    .filter((p) => p.app === app.id)
+    .flatMap((p) => allComponents(p))
+    .filter(isKnownComponent);
   const open = blocks.some(
     (x) => x.look === 'picker' && x.tools.some((u) => 'tool' in u && u.tool === '$pick.open'),
   );
   const scan = blocks.some(
     (x) => x.look === 'action' && x.tools.some((u) => 'tool' in u && u.tool === 'scan-camera'),
   );
-  return open && scan ? null : `home entries: scan ${scan}, open ${open}`;
+  return open && scan ? null : `Paper app: scan ${scan}, open ${open}`;
 };
-const GUIDE_STEP_CASES: EvalCase[] = [
+const GUIDE_STEP_CASES: EvalCase[] = (['zh', 'en', 'fr'] as const).map((locale) => ({
+  id: locale === 'zh' ? 'GD1' : `GD1-${locale}`,
+  input: PAPER_APP_REQUEST[locale],
+  locale,
+  setup: 'starter',
+  mock: true,
+  expect: { kind: 'ops', check: paperAppBuilt },
+}));
+/** The app list on a home page that has none (D-new-apphome-1): one `apps` block, no entry block per app. */
+const appList = (c: WorkspaceConfig) =>
+  allComponents(home(c)).some((x) => isKnownComponent(x) && x.look === 'apps')
+    ? null
+    : 'no apps block on the home page';
+const APP_LIST_CASES: EvalCase[] = [
   {
-    id: 'GD1',
-    input: '加入「扫描」和「打开文件」按钮',
+    id: 'AL1',
+    input: '首页放一个 App 清单，像手机桌面那样显示我的所有 App',
     locale: 'zh',
-    setup: 'starter',
-    mock: true,
-    expect: { kind: 'ops', check: twoFilePicks },
+    setup: 'default',
+    mock: false,
+    expect: { kind: 'ops', check: appList },
   },
   {
-    id: 'GD1-fr',
-    input: 'Ajouter les boutons « Numériser » et « Ouvrir les fichiers »',
-    locale: 'fr',
-    setup: 'starter',
-    mock: true,
-    expect: { kind: 'ops', check: twoFilePicks },
+    id: 'AL1-en',
+    input: 'Show all my apps as icons on the home page, like a phone launcher',
+    locale: 'en',
+    setup: 'default',
+    mock: false,
+    expect: { kind: 'ops', check: appList },
   },
 ];
 const FRENCH_CASES: readonly EvalCase[] = [
@@ -9949,6 +9975,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   ...QUICK_ACTION_ENTRY_CASES,
   ...LOOK_CASES,
   ...GUIDE_STEP_CASES,
+  ...APP_LIST_CASES,
   ...VIDEO_SUBTITLE_CASES,
   ...IMAGE_ANNOTATE_CASES,
   ...IMAGE_ADJUST_CASES,

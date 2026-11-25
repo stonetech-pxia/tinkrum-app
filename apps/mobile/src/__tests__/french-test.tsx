@@ -4,13 +4,13 @@ import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
-import { renderToolsApp, starterAfterGuide, openPick } from '../test-utils/render-app';
+import { renderToolsApp, homeWithFileEntries, openPick } from '../test-utils/render-app';
 import { formatTime } from '../run/local/TrimScreen';
 
 const start = () =>
   renderToolsApp(new MemoryWorkspaceRepo(), new FakeFiles(), {
     locale: 'fr',
-    seed: starterAfterGuide,
+    seed: homeWithFileEntries,
   });
 
 describe('French journeys', () => {
