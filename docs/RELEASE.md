@@ -53,7 +53,7 @@ The facts, from the invariants and the code:
 
 - Records, files, recognised text and recordings never leave the phone.
 - When the user asks Tink for a change, the relay receives the sentence and the structure of the app, never the records (invariants 1 and 2).
-- The relay keeps those requests only when `MORPH_REQUESTS_FILE` is set on the server (D-240). A privacy policy must say so before it is turned on.
+- The relay keeps those requests only when `MORPH_REQUESTS_FILE` is set on the server (D-240). Production leaves it unset (D-new-trusting-franklin-1). The app's note, the website and the privacy policy must change before it is turned on.
 - Downloads of extension packs and tools come from fixed addresses and carry no user data.
 - No account, no ads, no analytics, no crash reporting. The rescue page shares an error only through the system share sheet when the user taps it.
 

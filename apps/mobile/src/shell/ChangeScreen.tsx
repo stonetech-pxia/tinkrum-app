@@ -560,12 +560,12 @@ export function ChangeScreen() {
           </View>
         )}
 
-        {/* Test-period server save request (D-240): Chinese and English onboarding tutorials use built-in rules without passing through server; French tutorial passes through server (D-228). */}
+        {/* Shown while a typed request would go through the Tinkrum server (D-new-trusting-franklin-1); the guide uses built-in rules. */}
         {!planBusy && tinkAgent && aiMode === 'server' && !guide ? (
           <Text
-            testID="change-server-stored"
+            testID="change-server-note"
             style={[palette.font('body', 13), { color: palette.caption }]}>
-            {t(locale, 'aiServerStoredNote')}
+            {t(locale, 'aiServerDataNote')}
           </Text>
         ) : null}
 

@@ -264,9 +264,11 @@ Whether Android recording should request the notification permission (from Andro
 
 How long requests saved during testing (D-240) are kept, how users ask for deletion, and whether they are still stored after the store release
 
-**Default meanwhile:** Default: no automatic deletion for now; the files are only on the Mac mini and the founder views them manually. When a user asks for deletion, they can only be found by the hash of the device id (the user has to supply the device id, which is currently not visible in the app). Must be decided before the store release and before the privacy policy goes live
+**Default meanwhile:** Decided (2026-11-25, founder): requests are not saved, see D-new-trusting-franklin-1, so there is nothing to keep or delete. If saving is ever turned on again, this has to be answered first
 
-**Blocks:** Store release, privacy policy
+**Blocks:** Turning request saving on
+
+**Changed later by:** D-new-trusting-franklin-1.
 
 ### P-042 — Whether to allow plain http on the LAN (a phone connecting to Ollama / LM Studio on a Mac) (D-241)
 
