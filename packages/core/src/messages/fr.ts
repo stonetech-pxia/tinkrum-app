@@ -1373,6 +1373,8 @@ export const fr: MessageTable = {
   describeFieldFormatNone: 'format retiré',
   describeFieldHint: 'indication sous le champ modifiée',
   describeFieldMultiple: 'plusieurs options possibles',
+  describeFieldSuggest: 'les valeurs déjà saisies sont proposées pendant la saisie',
+  describeFieldSuggestOff: 'les valeurs déjà saisies ne sont plus proposées',
   describeFieldRange: 'plage autorisée modifiée',
   describe_options_64e79: 'options → {v0}',
   describe_update_settings_2aaf6: 'Modifier les réglages',

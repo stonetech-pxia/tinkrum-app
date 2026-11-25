@@ -29,6 +29,35 @@ export function tagsInRecords(
   return all.sort(new Intl.Collator(localeTag(locale)).compare);
 }
 
+/**
+ * Values to offer under a text field with suggest: true (D-642): what
+ * these records already hold in it, the latest saved first, each once (case and character width
+ * ignored, in its latest spelling), kept when it contains what is typed and left out when the field
+ * already says exactly that. Computed from the records every time, never stored (Invariant 14).
+ */
+export function pastTextValues(
+  records: readonly DataRecord[],
+  view: Collection,
+  fieldId: string,
+  typed: unknown,
+  limit: number,
+): string[] {
+  const now = typeof typed === 'string' ? typed.trim() : '';
+  const query = tagKey(now);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const record of [...records].sort((a, b) => b.updatedAt - a.updatedAt)) {
+    if (out.length >= limit) break;
+    const raw = recordValue(record, view, fieldId);
+    const value = typeof raw === 'string' ? raw.trim() : '';
+    const key = tagKey(value);
+    if (!value || seen.has(key)) continue;
+    seen.add(key);
+    if (value !== now && key.includes(query)) out.push(value);
+  }
+  return out;
+}
+
 export interface BrowseFilterRow {
   field: string;
   values: { value: string; label: string }[];

@@ -4418,6 +4418,10 @@
                 "email",
                 "url"
               ]
+            },
+            "suggest": {
+              "type": "boolean",
+              "const": true
             }
           },
           "required": [

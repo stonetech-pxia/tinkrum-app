@@ -9,6 +9,8 @@ const schema = z.strictObject({
   default: boundedText(1, 200).optional(),
   /** Phone, email, url (D-422): Still text fields, but with optimized input keyboards, and record page buttons can open them (D-428); format is not validated upon saving. */
   format: z.enum(['phone', 'email', 'url']).optional(),
+  /** D-642: while filling in, the values already saved in this field are listed under the input and filled with a tap (pastTextValues). */
+  suggest: z.literal(true).optional(),
 });
 
 export type TextFormat = NonNullable<z.infer<typeof schema>['format']>;
@@ -29,7 +31,7 @@ export const textField: FieldDefinitionOf<'text', typeof schema> = defineField({
   titleRank: 1,
   convertGroup: 'text',
   ai: {
-    doc: '{default?, format?: "phone"|"email"|"url"} (≤200 chars; format adds the matching keyboard and lets the buttons of the recordRow of the table open the value (rule 54))',
+    doc: '{default?, format?: "phone"|"email"|"url", suggest?: true} (≤200 chars; format adds the matching keyboard and lets the buttons of the recordRow of the table open the value (rule 54); suggest offers earlier values to tap)',
   },
   example: { id: 'title', name: 'Title', type: 'text', required: true },
   exampleValue: 'Lunch',

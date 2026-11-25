@@ -792,6 +792,14 @@ const OP_DESCRIPTIONS: OpDescriptions = {
       );
     // D-570: Input hints, ranges.
     if (changes.hint !== undefined) parts.push(t(ctx.locale, 'describeFieldHint'));
+    // D-642: earlier values offered while filling in.
+    if (changes.suggest !== undefined)
+      parts.push(
+        t(
+          ctx.locale,
+          changes.suggest === true ? 'describeFieldSuggest' : 'describeFieldSuggestOff',
+        ),
+      );
     // D-607: Change single-select to allow multiple selections.
     if (changes.multiple === true) parts.push(t(ctx.locale, 'describeFieldMultiple'));
     if (changes.min !== undefined || changes.max !== undefined)

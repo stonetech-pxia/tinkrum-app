@@ -1221,6 +1221,8 @@ export const zh: MessageTable = {
   describeFieldFormatNone: '去掉格式',
   describeFieldHint: '改填写提示',
   describeFieldMultiple: '可以选多个',
+  describeFieldSuggest: '填写时推荐以前填过的',
+  describeFieldSuggestOff: '填写时不再推荐以前填过的',
   describeFieldRange: '改取值范围',
   describe_options_64e79: '选项改为 {v0}',
   describe_update_settings_2aaf6: '调整设置',

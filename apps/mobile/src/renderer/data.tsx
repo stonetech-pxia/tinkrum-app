@@ -15,6 +15,7 @@ import {
   searchRecords,
   tagKey,
   tagsInRecords,
+  pastTextValues,
   MAX_RECORD_TAGS,
   MAX_TAG_LENGTH,
   suggestionForField,
@@ -1131,6 +1132,58 @@ function SuggestionChips({
   );
 }
 
+/** Most values offered under a text field with suggest. */
+const MAX_PAST_VALUES = 8;
+
+/**
+ * Earlier values under a text field with suggest: true (D-642): what
+ * this table's entries already hold in it, computed on the fly (pastTextValues) and narrowed by
+ * what is typed; values already offered as candidates from the attachments are not repeated. A tap
+ * only fills the input; the list stays as it was, so the fields below don't jump, until the user
+ * types again.
+ */
+function PastValueChips({
+  collection,
+  field,
+  current,
+  candidates,
+  onPick,
+  ...chips
+}: {
+  collection: Collection;
+  field: Field;
+  current: unknown;
+  /** Candidates shown above this list for the same field (D-394). */
+  candidates: readonly ValueSuggestion[] | undefined;
+  onPick: (value: string) => void;
+  palette: Palette;
+  locale: RenderEnv['locale'];
+  disabled?: boolean | undefined;
+  testID: string;
+}) {
+  const records = useRecords(collection.id);
+  const [held, setHeld] = useState<{ value: string; list: string[] } | null>(null);
+  const list =
+    held && held.value === current
+      ? held.list
+      : pastTextValues(records ?? [], collection, field.id, current, MAX_PAST_VALUES).filter(
+          (value) => !candidates?.some((c) => suggestionForField(field, c).value === value),
+        );
+  if (list.length === 0) return null;
+  return (
+    <SuggestionChips
+      {...chips}
+      field={field}
+      list={list.map((value) => ({ value, score: 0 }))}
+      current={current}
+      onPick={({ value }) => {
+        setHeld({ value, list });
+        onPick(value);
+      }}
+    />
+  );
+}
+
 export function FieldsForm({
   collection,
   fieldIds,
@@ -1273,6 +1326,19 @@ export function FieldsForm({
                   onChange({ ...values, [id]: suggestionFormValue(field, s.value) });
                   onSuggestion?.(id, s);
                 }}
+              />
+            ) : null}
+            {field.type === 'text' && field.suggest ? (
+              <PastValueChips
+                collection={collection}
+                field={field}
+                current={values[id]}
+                candidates={suggestions?.[id]}
+                palette={palette}
+                locale={locale}
+                disabled={disabled}
+                testID={`${testPrefix}-${id}-past`}
+                onPick={(value) => onChange({ ...values, [id]: value })}
               />
             ) : null}
             {heard?.has(id) ? (

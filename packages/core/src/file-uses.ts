@@ -88,6 +88,8 @@ export const USES_FEATURES = [
   'themeCard',
   /** Drawn icons: top-level icons, specified as "my:<id>" (D-625). */
   'drawnIcons',
+  /** Text field suggest: earlier values offered while filling in (D-642). */
+  'textSuggest',
 ] as const;
 
 const NEXT_DAYS = new Set(['next7days', 'next30days', 'next90days']);
@@ -137,6 +139,7 @@ export function usesOf(content: unknown): FileUses {
           // Input hints and ranges (D-570).
           if (item.hint !== undefined) found.features.add('fieldHint');
           if (item.min !== undefined || item.max !== undefined) found.features.add('fieldRange');
+          if (item.suggest !== undefined) found.features.add('textSuggest');
           // Values and colors on single-choice options (D-568).
           for (const o of Array.isArray(item.options) ? item.options : []) {
             if (isObject(o) && o.value !== undefined) found.features.add('choiceOptionValue');
