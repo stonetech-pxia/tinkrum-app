@@ -34,7 +34,8 @@ const seed = (locale: Locale, registry: Registry) => {
   return r.config;
 };
 
-const SHOPS = ['Aldi', 'Carrefour', 'Boulangerie Paul', 'Carrefour City'];
+// Carrefour is in two entries, the others in one.
+const SHOPS = ['Carrefour', 'Aldi', 'Carrefour', 'Boulangerie Paul', 'Carrefour City'];
 
 async function openForm(recordId?: string, shops: readonly string[] = SHOPS) {
   const repo = new MemoryWorkspaceRepo();
@@ -77,10 +78,10 @@ const saved = async (repo: MemoryWorkspaceRepo) =>
   (await repo.listRecords('spending')).map((r) => r.values.merchant);
 
 describe('earlier values under a text field', () => {
-  it('offers them on a new entry, latest first, only under the field that asks for it', async () => {
+  it('offers them on a new entry, most used first, only under the field that asks for it', async () => {
     await openForm();
     await waitFor(() =>
-      expect(offered()).toEqual(labels('Carrefour City', 'Boulangerie Paul', 'Carrefour', 'Aldi')),
+      expect(offered()).toEqual(labels('Carrefour', 'Carrefour City', 'Boulangerie Paul', 'Aldi')),
     );
     expect(screen.queryByTestId('editor-memo-past')).toBeNull();
   });
@@ -89,13 +90,13 @@ describe('earlier values under a text field', () => {
     const repo = await openForm();
     await screen.findByTestId('editor-merchant-past');
     await fireEvent.changeText(screen.getByTestId('editor-merchant'), 'carre');
-    expect(offered()).toEqual(labels('Carrefour City', 'Carrefour'));
+    expect(offered()).toEqual(labels('Carrefour', 'Carrefour City'));
 
-    await fireEvent.press(screen.getByTestId('editor-merchant-past-1'));
+    await fireEvent.press(screen.getByTestId('editor-merchant-past-0'));
     expect(input()).toBe('Carrefour');
     // The chips stay where they are, so the fields below don't jump.
-    expect(offered()).toEqual(labels('Carrefour City', 'Carrefour'));
-    expect(screen.getByTestId('editor-merchant-past-1').props.accessibilityState).toMatchObject({
+    expect(offered()).toEqual(labels('Carrefour', 'Carrefour City'));
+    expect(screen.getByTestId('editor-merchant-past-0').props.accessibilityState).toMatchObject({
       selected: true,
     });
     expect(await saved(repo)).toEqual(SHOPS);
@@ -117,7 +118,7 @@ describe('earlier values under a text field', () => {
   });
 
   it('offers other values containing it when an entry is edited', async () => {
-    await openForm('r2');
+    await openForm('r1');
     await waitFor(() => expect(input()).toBe('Carrefour'));
     await waitFor(() => expect(offered()).toEqual(labels('Carrefour City')));
   });

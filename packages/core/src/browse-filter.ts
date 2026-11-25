@@ -30,10 +30,11 @@ export function tagsInRecords(
 }
 
 /**
- * Values to offer under a text field with suggest: true (D-642): what
- * these records already hold in it, the latest saved first, each once (case and character width
- * ignored, in its latest spelling), kept when it contains what is typed and left out when the field
- * already says exactly that. Computed from the records every time, never stored (Invariant 14).
+ * Values to offer under a text field with suggest: true (D-642): what these records already hold
+ * in it, each once (case and character width ignored, in its latest spelling), the one held by the
+ * most records first and equal counts the latest saved first; kept when it contains what is typed
+ * and left out when the field already says exactly that. Computed from the records every time, never
+ * stored (Invariant 14).
  */
 export function pastTextValues(
   records: readonly DataRecord[],
@@ -44,18 +45,23 @@ export function pastTextValues(
 ): string[] {
   const now = typeof typed === 'string' ? typed.trim() : '';
   const query = tagKey(now);
-  const seen = new Set<string>();
-  const out: string[] = [];
+  // Latest saved first: the first spelling met is the latest, and the stable sort below keeps this
+  // order between equal counts.
+  const found = new Map<string, { value: string; count: number }>();
   for (const record of [...records].sort((a, b) => b.updatedAt - a.updatedAt)) {
-    if (out.length >= limit) break;
     const raw = recordValue(record, view, fieldId);
     const value = typeof raw === 'string' ? raw.trim() : '';
+    if (!value) continue;
     const key = tagKey(value);
-    if (!value || seen.has(key)) continue;
-    seen.add(key);
-    if (value !== now && key.includes(query)) out.push(value);
+    const seen = found.get(key);
+    if (seen) seen.count += 1;
+    else found.set(key, { value, count: 1 });
   }
-  return out;
+  return [...found]
+    .filter(([key, { value }]) => value !== now && key.includes(query))
+    .sort(([, a], [, b]) => b.count - a.count)
+    .slice(0, limit)
+    .map(([, { value }]) => value);
 }
 
 export interface BrowseFilterRow {

@@ -107,26 +107,30 @@ describe('pastTextValues', () => {
     createdAt: updatedAt,
     updatedAt,
   });
+  // Saved in 3 entries: Boulangerie Paul. In 2: Aldi (latest at 10) and Carrefour (latest at 5).
+  // In 1: Carrefour City (at 9).
   const saved = [
-    entry('Aldi', 1),
-    entry('carrefour', 2),
-    entry('Boulangerie Paul', 3),
-    entry('Carrefour', 4),
-    entry('  ', 5),
-    entry(42, 6),
-    entry('Carrefour City', 7),
-    entry('Aldi ', 8),
+    entry('Boulangerie Paul', 1),
+    entry('Aldi', 2),
+    entry('carrefour', 3),
+    entry('Boulangerie Paul', 4),
+    entry('Carrefour', 5),
+    entry('  ', 6),
+    entry(42, 7),
+    entry('Boulangerie Paul', 8),
+    entry('Carrefour City', 9),
+    entry('Aldi ', 10),
   ];
   const offered = (typed: unknown, limit = 8) =>
     pastTextValues(saved, view(), 'merchant', typed, limit);
 
-  it('lists each saved value once, the latest saved first, in its latest spelling', () => {
-    expect(offered('')).toEqual(['Aldi', 'Carrefour City', 'Carrefour', 'Boulangerie Paul']);
+  it('lists each saved value once, in its latest spelling, the one in most entries first', () => {
+    expect(offered('')).toEqual(['Boulangerie Paul', 'Aldi', 'Carrefour', 'Carrefour City']);
     expect(offered(undefined)).toEqual(offered(''));
   });
 
   it('keeps those containing what is typed, ignoring case and character width', () => {
-    expect(offered('CARRE')).toEqual(['Carrefour City', 'Carrefour']);
+    expect(offered('CARRE')).toEqual(['Carrefour', 'Carrefour City']);
     expect(offered('ｐａｕｌ')).toEqual(['Boulangerie Paul']);
     expect(offered('Lidl')).toEqual([]);
   });
@@ -137,7 +141,7 @@ describe('pastTextValues', () => {
     expect(offered('Aldi')).toEqual([]);
   });
 
-  it('stops at the limit', () => {
-    expect(offered('', 2)).toEqual(['Aldi', 'Carrefour City']);
+  it('stops at the limit after ordering, so an often used value is not pushed out', () => {
+    expect(offered('', 2)).toEqual(['Boulangerie Paul', 'Aldi']);
   });
 });
