@@ -2,6 +2,7 @@ import { allComponents, childrenOf, type Component, type Page } from '@morph/cor
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   Keyboard,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -90,6 +91,47 @@ export function FocusItem({
       { scale: selected ? 1.03 : 1 },
     ],
   }));
+  const layer = {
+    testID: `component-${id}`,
+    accessible: selected,
+    accessibilityActions: [{ name: 'activate', label: t(env.locale, 'edit') }],
+    onAccessibilityAction: () => {
+      open();
+      focus.onEdit(id);
+    },
+  };
+  const body = (
+    <>
+      <View
+        testID={`single-content-${id}`}
+        pointerEvents={active && component.look !== 'group' ? 'none' : 'auto'}
+        style={{
+          opacity: dimmed && !env.focusWithinDimmed ? 0.5 : 1,
+        }}>
+        {children({
+          ...env,
+          parentDrag: gesture,
+          focusWithinSelected: env.focusWithinSelected || selected,
+          focusWithinDimmed: env.focusWithinDimmed || dimmed,
+          interactive: active ? false : env.interactive,
+          onLongPress: open,
+        })}
+      </View>
+      {selected ? (
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              borderWidth: 2,
+              borderColor: palette.primary,
+              borderRadius: palette.radius,
+            },
+          ]}
+        />
+      ) : null}
+    </>
+  );
   return (
     <View
       testID={`single-frame-${id}`}
@@ -98,47 +140,24 @@ export function FocusItem({
       style={[style, { zIndex: selected || contains ? 10 : 0 }]}>
       <GestureDetector gesture={gesture}>
         <Animated.View style={[animated, selected && styles.lift]}>
-          <Pressable
-            testID={`component-${id}`}
-            accessible={selected}
-            onLongPress={open}
-            delayLongPress={LONG_PRESS_MS}
-            // This layer is for long press only; tapping empty space on the card is equivalent to tapping empty space on the page, dismissing the keyboard (buttons inside the card respond first).
-            onPress={active ? () => undefined : () => Keyboard.dismiss()}
-            accessibilityActions={[{ name: 'activate', label: t(env.locale, 'edit') }]}
-            onAccessibilityAction={() => {
-              open();
-              focus.onEdit(id);
-            }}>
-            <View
-              testID={`single-content-${id}`}
-              pointerEvents={active && component.look !== 'group' ? 'none' : 'auto'}
-              style={{
-                opacity: dimmed && !env.focusWithinDimmed ? 0.5 : 1,
-              }}>
-              {children({
-                ...env,
-                parentDrag: gesture,
-                focusWithinSelected: env.focusWithinSelected || selected,
-                focusWithinDimmed: env.focusWithinDimmed || dimmed,
-                interactive: active ? false : env.interactive,
-                onLongPress: open,
-              })}
+          {Platform.OS === 'android' ? (
+            // On Android the view that holds the JS touch responder intercepts every move natively
+            // (RN's JSResponderHandler), so a Pressable here takes the swipe away from a horizontal
+            // scroller inside the block (the board) as soon as JS has granted it the responder.
+            // The long press that selects the block is the drag gesture's own activation above.
+            <View collapsable={false} {...layer}>
+              {body}
             </View>
-            {selected ? (
-              <View
-                pointerEvents="none"
-                style={[
-                  StyleSheet.absoluteFill,
-                  {
-                    borderWidth: 2,
-                    borderColor: palette.primary,
-                    borderRadius: palette.radius,
-                  },
-                ]}
-              />
-            ) : null}
-          </Pressable>
+          ) : (
+            <Pressable
+              {...layer}
+              onLongPress={open}
+              delayLongPress={LONG_PRESS_MS}
+              // Tapping empty space on the card is equivalent to tapping empty space on the page, dismissing the keyboard (buttons inside the card respond first).
+              onPress={active ? () => undefined : () => Keyboard.dismiss()}>
+              {body}
+            </Pressable>
+          )}
         </Animated.View>
       </GestureDetector>
     </View>
