@@ -9,7 +9,7 @@ import {
 } from 'expo-audio';
 import { File } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { t } from '../../i18n';
 import type { Palette } from '../../renderer/theme';
@@ -21,6 +21,7 @@ import { formatTime } from './TrimScreen';
 // continues recording after lock screen (expo-audio background recording in app.json: iOS
 // background audio, Android foreground service and "Recording" notification). Recorded as M4A (AAC
 // mono 64 kbps, ~28 MB per hour), handed to the next step upon completion; recording stays local.
+// "Stop" on that Android notification is the same as "Done" (D-new-recstop-1).
 
 /** Voice recording: mono 64 kbps is clear enough and convenient for subsequent speech-to-text. */
 export const VOICE_RECORDING: RecordingOptions = {
@@ -53,8 +54,19 @@ export function RecordScreen({
   onDone,
   onCancel,
 }: LocalScreenProps<'record'>) {
-  const recorder = useAudioRecorder(VOICE_RECORDING);
+  // The last duration read: a stop from outside resets the recorder to 0.
+  const length = useRef(0);
+  // True once the screen stops the recorder itself; any other finished status is the notification's.
+  const stopping = useRef(false);
+  const recorder = useAudioRecorder(VOICE_RECORDING, (status) => {
+    if (!status.isFinished || stopping.current || !status.url) return;
+    const uri = status.url;
+    // Timers sleep in the background, so the last reading may be far too short there.
+    const durationMs = AppState.currentState === 'background' ? undefined : length.current;
+    void silence().then(() => hand(uri, durationMs));
+  });
   const state = useAudioRecorderState(recorder, 200);
+  if (state.durationMillis > 0) length.current = state.durationMillis;
   const [phase, setPhase] = useState<Phase>('idle');
   const [denied, setDenied] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -123,11 +135,16 @@ export function RecordScreen({
     }
   }
 
-  async function stop() {
-    await recorder.stop();
+  async function silence() {
     await setAudioModeAsync({ allowsRecording: false, shouldPlayInBackground: false }).catch(
       () => undefined,
     );
+  }
+
+  async function stop() {
+    stopping.current = true;
+    await recorder.stop();
+    await silence();
     return recorder.uri;
   }
 
@@ -135,6 +152,10 @@ export function RecordScreen({
     const durationMs = state.durationMillis;
     const uri = await stop();
     if (!uri) return onCancel();
+    hand(uri, durationMs);
+  }
+
+  function hand(uri: string, durationMs: number | undefined) {
     const file = new File(uri);
     onDone({
       uri,

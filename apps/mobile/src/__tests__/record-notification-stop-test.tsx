@@ -1,5 +1,6 @@
 import { createDefaultWorkspace } from '@morph/core';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { makePalette } from '../renderer/theme';
@@ -7,7 +8,7 @@ import { RecordScreen } from '../run/local/RecordScreen';
 
 // The "Stop" button on Android's "Recording audio" notification ends the recording natively, without
 // a tap on the recording screen. The user must still be able to keep what was recorded: either the
-// screen hands it on by itself, or "Done" does.
+// screen hands it on by itself, or "Done" does (D-new-recstop-1).
 
 const frame = {
   frame: { x: 0, y: 0, width: 400, height: 800 },
@@ -74,5 +75,20 @@ describe('Stop on the recording notification keeps the recording', () => {
     const run = await open(true);
     await stopFromNotification();
     await expectRecordingKept(run);
+  });
+
+  // Timers sleep in the background, so the last duration the screen read may be far too short.
+  it('hands on no duration, not an old one, when the app is in the background', async () => {
+    const { onDone } = await open(false);
+    const before = AppState.currentState;
+    AppState.currentState = 'background';
+    try {
+      await stopFromNotification();
+      await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+      expect(onDone.mock.calls[0][0].uri).toBe('file:///cache/ExpoAudio/recording.m4a');
+      expect(onDone.mock.calls[0][0].durationMs).toBeUndefined();
+    } finally {
+      AppState.currentState = before;
+    }
   });
 });
