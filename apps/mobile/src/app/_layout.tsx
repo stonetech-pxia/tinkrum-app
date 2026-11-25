@@ -54,6 +54,7 @@ import {
 } from '@/reminders/useReminders';
 import { expoFilePlatform } from '@/runtime/expo-platform';
 import { closeButtonOption, stackScreenOptions } from '@/shell/header';
+import { AlertHost } from '@/renderer/AlertHost';
 import { DrawnIconsProvider } from '@/renderer/DrawnIcon';
 import { CLAY_FONTS, usePalette } from '@/renderer/theme';
 import { useIncomingShare } from '@/share/useIncomingShare';
@@ -250,6 +251,8 @@ function ThemedStack() {
       </Stack>
       {/* Only keep one chat box in draft mode (D-190): the shell remounts on every step change, and pushed pages must also use it. */}
       <DraftChatSheet />
+      {/* Android: Alert.alert is drawn as an app Dialog that follows the theme. */}
+      <AlertHost palette={palette} locale={locale} />
     </DrawnIconsProvider>
   );
 }
