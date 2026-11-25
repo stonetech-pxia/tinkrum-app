@@ -3,14 +3,12 @@ import { t, pairText } from './messages';
 import { createDefaultWorkspace } from './defaults';
 import type { DrawnIcon } from './drawn-icons';
 import { FILES_TABLE } from './files-table';
-import { homeScreenFull, homeScreenOp } from './home-screen';
 import { applyOps } from './ops';
 import type { Op } from './ops-schema';
 import type { Registry } from './registry';
 import {
   HOME_PAGE_ID,
   TOOLBOX_PAGE_ID,
-  appTarget,
   pageTarget,
   type ComponentOf,
   type Locale,
@@ -161,8 +159,7 @@ const PAPER_ICON: DrawnIcon = {
 /**
  * The Paper app (D-new-apphome-2): the former default home page (D-487) as an app of its own,
  * with the files by type and the toolbox on its bar, in the Clay look in Tinkrum's red on a plain
- * backdrop (D-552). It goes into the menu of the Tinkrum icon on the phone, unless that is full.
- * No operations when the app is already there.
+ * backdrop (D-552). No operations when the app is already there.
  */
 export function paperAppOps(config: WorkspaceConfig, locale: Locale, registry: Registry): Op[] {
   const app = PAPER_APP_ID;
@@ -193,7 +190,6 @@ export function paperAppOps(config: WorkspaceConfig, locale: Locale, registry: R
     // These pages hold only blocks this version knows.
     ...pages.map((page) => ({ op: 'addContainer', page: { ...page, app } }) as Op),
     ...appEntryOps(config, app),
-    ...(homeScreenFull(config) ? [] : [homeScreenOp(config, appTarget(app), true)]),
   ];
 }
 

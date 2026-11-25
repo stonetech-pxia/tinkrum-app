@@ -1,6 +1,7 @@
 import { scopeProblems, tagNewForApp } from './app-scope';
 import { describeChange } from './describe';
 import { newFileRefs, restoreFileRefs } from './file-refs';
+import { addNewAppsToHomeScreen } from './home-screen';
 import { migrateWorkspace } from './migrate';
 import { AppFileOpListSchema, OpListSchema, applyOps } from './ops';
 import type { Registry } from './registry';
@@ -65,6 +66,11 @@ export function prepareOps(
     ...addMissingPageEntries(before, config).map((page) => ({
       kind: 'addedPageEntry' as const,
       page,
+    })),
+    // A new app starts out in the menu of the Tinkrum icon on the phone (D-new-apphome-4).
+    ...addNewAppsToHomeScreen(before, config).map((name) => ({
+      kind: 'appOnHomeScreen' as const,
+      name,
     })),
   ];
   if (ctx.fromAI) {

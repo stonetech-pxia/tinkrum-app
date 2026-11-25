@@ -1044,7 +1044,7 @@ export const fr: MessageTable = {
   guideTinkDoneMenu:
     'C’est prêt ! Touchez son icône pour l’ouvrir. Sur votre téléphone, un appui long sur l’icône Tinkrum ouvre aussi Paper directement.',
   guideTinkDonePin:
-    'C’est prêt ! Touchez son icône. Pour faire de Paper une app à part, faites un appui long sur l’icône Tinkrum du téléphone et glissez Paper sur l’écran d’accueil.',
+    'C’est prêt ! Touchez son icône. Pour faire de Paper une app à part, faites un appui long sur l’icône Tinkrum du téléphone et glissez Paper sur l’écran d’accueil. Vos prochaines apps aussi.',
   guideGotIt: 'J’ai compris',
   guideLater: 'Plus tard',
   // Onboarding step 3: Sample apps (D-260).
@@ -1213,6 +1213,8 @@ export const fr: MessageTable = {
   // Home Screen (D-271)
   describeHomeScreenOn:
     'Mettre « {name} » sur l’écran d’accueil du téléphone : appuyez longuement sur l’icône Tinkrum pour la voir',
+  describeHomeScreenOnApp:
+    'Mettre « {name} » dans le menu de l’icône Tinkrum (appui long) ; sur Android, vous pouvez aussi la glisser de là sur l’écran d’accueil et l’utiliser comme une app à part',
   describeHomeScreenOff: 'Retirer « {name} » de l’écran d’accueil du téléphone',
   homeScreenTitle: 'Sur l’écran d’accueil du téléphone',
   homeScreenIos:

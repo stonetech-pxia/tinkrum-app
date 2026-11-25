@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultWorkspace } from './defaults';
 import { describeChange } from './describe';
 import { homeScreenItems } from './home-screen';
-import { applyOps } from './ops';
 import type { Op } from './ops-schema';
 import {
   allComponents,
@@ -16,6 +15,7 @@ import {
 } from './schema';
 import { STARTER_THEME } from './theme';
 import { findWorkflowTarget, presetById, presetWorkflow } from './workflows/presets';
+import { prepareOps } from './change';
 import { STARTER_TOOL_IDS, createStarterWorkspace, paperAppOps } from './starter';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
@@ -23,11 +23,9 @@ import { validateWorkspace } from './validate';
 const catalog = [...registry.tools.keys()];
 
 const ok = (config: WorkspaceConfig, ops: Op[], locale: Locale = 'en') => {
-  const result = applyOps(config, ops, { registry, locale });
-  if (!result.ok) throw new Error(result.error);
-  const valid = validateWorkspace(result.config, registry);
-  if (!valid.ok) throw new Error(valid.issues.map((i) => i.message).join('\n'));
-  return result.config;
+  const result = prepareOps(config, ops, { registry, locale, now: new Date(0) });
+  if (!result.ok) throw new Error(result.issues.join('\n'));
+  return result.after;
 };
 /** A new user after guide step 1: the starter plus the Paper app. */
 const withPaper = (locale: Locale = 'en') => {

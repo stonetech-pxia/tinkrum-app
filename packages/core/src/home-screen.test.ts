@@ -180,3 +180,44 @@ describe('home screen mark (D-271)', () => {
     expect(restored.ok && homeScreenItems(restored.after)).toEqual([]);
   });
 });
+
+// Every new app starts out in the menu of the Tinkrum icon (D-new-apphome-4).
+describe('a new app and the home screen menu', () => {
+  const fit: Op = { op: 'addContainer', app: { id: 'fit', name: '健身', bar: ['ai'] } };
+
+  it('goes into the menu, and the change says it can be dragged out on Android', () => {
+    const result = prepareOps(setup(), [fit], ctx);
+    if (!result.ok) throw new Error(result.issues.join('; '));
+    expect(result.after.nav.phoneHomeScreen).toEqual(['app:fit']);
+    expect(result.lines.join('\n')).toContain('「健身」');
+    expect(result.lines.join('\n')).toContain('当普通 App 用');
+  });
+
+  it('stays out of a full menu', () => {
+    const full = prepared(setup(), [on('visa'), on('scan'), on('pdf-merge'), on('pdf-split')]);
+    const result = prepareOps(full, [fit], ctx);
+    if (!result.ok) throw new Error(result.issues.join('; '));
+    expect(result.after.nav.phoneHomeScreen).toEqual(full.nav.phoneHomeScreen);
+    expect(result.lines.join('\n')).not.toContain('当普通 App 用');
+  });
+
+  it('is listed and told once when the same change already puts it there', () => {
+    const before = setup();
+    const result = prepareOps(
+      before,
+      [fit, { op: 'updateContainer', nav: { phoneHomeScreen: ['app:fit'] } }],
+      ctx,
+    );
+    if (!result.ok) throw new Error(result.issues.join('; '));
+    expect(result.after.nav.phoneHomeScreen).toEqual(['app:fit']);
+    expect(result.lines.filter((line) => line.includes('当普通 App 用'))).toHaveLength(1);
+  });
+
+  it('is left out when an installed app is reinstalled after the user took it off', () => {
+    const added = prepared(setup(), [fit]);
+    const removed = prepared(added, [off('app:fit')]);
+    const again = prepareOps(removed, [{ op: 'removeContainer', app: 'fit' }, fit], ctx);
+    if (!again.ok) throw new Error(again.issues.join('; '));
+    expect(again.after.nav.phoneHomeScreen).toBeUndefined();
+  });
+});

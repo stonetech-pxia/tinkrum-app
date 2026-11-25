@@ -1,6 +1,12 @@
 import type { Op } from './ops';
 import { workflowKinds, QUICK_ACTION_CATEGORIES } from './quick-actions';
-import { MAX_HOME_SCREEN, quickActionsOf, type IconValue, type WorkspaceConfig } from './schema';
+import {
+  MAX_HOME_SCREEN,
+  appTarget,
+  quickActionsOf,
+  type IconValue,
+  type WorkspaceConfig,
+} from './schema';
 import { isDark, resolveColors } from './theme';
 
 // Mobile desktop (D-271): quick actions under nav.phoneHomeScreen appear in the long-press menu of
@@ -70,6 +76,24 @@ export function addedToHomeScreen(before: WorkspaceConfig, after: WorkspaceConfi
 /** Desktop menu is full: another item must be removed before placing a new one. */
 export const homeScreenFull = (config: WorkspaceConfig): boolean =>
   homeScreenIds(config).length >= MAX_HOME_SCREEN;
+
+/**
+ * A new app starts out in the menu while there is room (D-new-apphome-4): puts each app that is in
+ * `after` and not in `before` into `after`'s menu, and returns the names of those put in. An app
+ * that was already installed keeps the user's choice, also when it is reinstalled.
+ */
+export function addNewAppsToHomeScreen(before: WorkspaceConfig, after: WorkspaceConfig): string[] {
+  const installed = new Set((before.nav.apps ?? []).map((a) => a.id));
+  const put: string[] = [];
+  for (const app of after.nav.apps ?? []) {
+    const id = appTarget(app.id);
+    if (installed.has(app.id) || after.nav.phoneHomeScreen?.includes(id)) continue;
+    if (homeScreenFull(after)) break;
+    after.nav.phoneHomeScreen = [...(after.nav.phoneHomeScreen ?? []), id];
+    put.push(app.name);
+  }
+  return put;
+}
 
 /**
  * Modification to place/remove a quick action on the desktop (long-press menu toggle): v34

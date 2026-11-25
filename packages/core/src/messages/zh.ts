@@ -922,7 +922,7 @@ export const zh: MessageTable = {
   guideTinkDoneMenu:
     '搭好了，点图标就能打开。在手机桌面长按 Tinkrum 图标，也能直接打开 Paper。以后想改什么都可以和我说哦！',
   guideTinkDonePin:
-    '搭好了，点图标就能打开。在手机桌面长按 Tinkrum 图标，把 Paper 拖到桌面上，就能当独立 App 用。',
+    '搭好了，点图标就能打开。在手机桌面长按 Tinkrum 图标，把 Paper 拖到桌面上，就能当独立 App 用；以后做的 App 也一样。',
   guideGotIt: '我知道了',
   guideLater: '以后再说',
   // Onboarding step 3: Sample apps (D-260).
@@ -1071,6 +1071,8 @@ export const zh: MessageTable = {
   describeRemoveReminder: '移除提醒「{title}」',
   // Home Screen (D-271)
   describeHomeScreenOn: '把「{name}」放到手机桌面：长按 Tinkrum 图标就能看到',
+  describeHomeScreenOnApp:
+    '把「{name}」放进手机上 Tinkrum 图标的长按菜单；安卓手机还可以从菜单里把它拖到桌面，当普通 App 用',
   describeHomeScreenOff: '把「{name}」从手机桌面拿掉',
   homeScreenTitle: '在手机桌面上',
   homeScreenIos: '在手机桌面上长按 Tinkrum 图标就能看到「{name}」，在那里点一下直接开始。',

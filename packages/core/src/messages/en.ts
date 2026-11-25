@@ -992,7 +992,7 @@ export const en = {
   guideTinkDoneMenu:
     'All set! Tap its icon to open it. On your phone, long-press the Tinkrum icon to open Paper straight away. Whenever you want a change, just tell me.',
   guideTinkDonePin:
-    'All set! Tap its icon to open it. To use Paper as an app of its own, long-press the Tinkrum icon on your phone and drag Paper onto the home screen.',
+    'All set! Tap its icon to open it. To use Paper as an app of its own, long-press the Tinkrum icon on your phone and drag Paper onto the home screen. Apps you make later work the same way.',
   guideGotIt: 'Got it',
   guideLater: 'Later',
   // Onboarding step 3: Sample apps (D-260).
@@ -1149,6 +1149,8 @@ export const en = {
   // Home Screen (D-271)
   describeHomeScreenOn:
     'Put “{name}” on the phone’s home screen: long-press the Tinkrum icon to see it',
+  describeHomeScreenOnApp:
+    'Put “{name}” in the long-press menu of the Tinkrum icon on your phone; on Android you can also drag it from there onto the home screen and use it as an app of its own',
   describeHomeScreenOff: 'Take “{name}” off the phone’s home screen',
   homeScreenTitle: 'On your phone’s home screen',
   homeScreenIos:

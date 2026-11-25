@@ -99,6 +99,8 @@ export type ApplyNote =
   /** If the table belonging to a newly added record block has no location to add records, an "Add" button is added above it (D-310). */
   | { kind: 'addedEntryForm'; table: string }
   | { kind: 'addedPageEntry'; page: string }
+  /** A new app was put into the menu of the Tinkrum icon on the phone (D-new-apphome-4). */
+  | { kind: 'appOnHomeScreen'; name: string }
   /** Removing an app (D-485): its tables are moved to the home page (records preserved); buttons and entry points opening it are removed. */
   | { kind: 'removedApp'; tables: string[]; links: boolean }
   /** Tool package upgraded to the current version, adding these quick actions. */

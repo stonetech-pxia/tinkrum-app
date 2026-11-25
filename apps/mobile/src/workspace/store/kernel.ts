@@ -117,7 +117,10 @@ export function createKernel(deps: WorkspaceDeps, set: Kernel['set'], get: Kerne
         .filter((w) => !workflows.has(w.id))
         .map((w) => w.id),
       addedCollectionIds: after.data.tables.filter((c) => !collections.has(c.id)).map((c) => c.id),
-      homeScreenWorkflowIds: addedToHomeScreen(before, after),
+      // Only a quick action has a "done" page; a new app is told about in the change description.
+      homeScreenWorkflowIds: addedToHomeScreen(before, after).filter(
+        (id) => !id.startsWith('app:'),
+      ),
       origin,
     };
   }

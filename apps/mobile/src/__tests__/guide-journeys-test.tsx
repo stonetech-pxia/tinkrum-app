@@ -1,10 +1,10 @@
 import {
   BUILTIN_TOOLS,
-  applyOps,
   createMockAIProvider,
   createRegistry,
   createStarterWorkspace,
   paperAppOps,
+  prepareOps,
   type Locale,
   type Registry,
 } from '@morph/core';
@@ -104,12 +104,16 @@ describe('first-run guide', () => {
   const apps = (store: Awaited<ReturnType<typeof startGuide>>['store']) =>
     store.getState().config!.nav.apps?.map((a) => a.id) ?? [];
 
-  /** A new user whose Paper app is already there. */
+  /** A new user whose Paper app is already there, as the guide leaves it. */
   const withPaper = (locale: Locale, registry: Registry) => {
     const config = createStarterWorkspace(locale, registry);
-    const result = applyOps(config, paperAppOps(config, locale, registry), { registry, locale });
-    if (!result.ok) throw new Error(result.error);
-    return result.config;
+    const result = prepareOps(config, paperAppOps(config, locale, registry), {
+      registry,
+      locale,
+      now: new Date(2026, 9, 22),
+    });
+    if (!result.ok) throw new Error(result.issues.join('; '));
+    return result.after;
   };
 
   it('step 1: the sentence fills the box and waits; sending builds the Paper app without a draft', async () => {

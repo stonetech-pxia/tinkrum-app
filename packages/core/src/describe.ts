@@ -910,7 +910,13 @@ const OP_DESCRIPTIONS: OpDescriptions = {
           id.startsWith('app:') ? appName(id.slice('app:'.length)) : (wf(id)?.name ?? id);
         for (const id of nav.phoneHomeScreen)
           if (!was.includes(id))
-            lines.push(t(ctx.locale, 'describeHomeScreenOn', { name: nameOf(id) }));
+            lines.push(
+              t(
+                ctx.locale,
+                id.startsWith('app:') ? 'describeHomeScreenOnApp' : 'describeHomeScreenOn',
+                { name: nameOf(id) },
+              ),
+            );
         for (const id of was)
           if (!nav.phoneHomeScreen.includes(id))
             lines.push(t(ctx.locale, 'describeHomeScreenOff', { name: nameOf(id) }));
@@ -1318,6 +1324,8 @@ function describeApplyNotes(notes: readonly ApplyNote[], state: DescriptionState
       lines.push(t(ctx.locale, 'describeAddedEntryForm', { table: collName(note.table) }));
     } else if (note.kind === 'addedPageEntry') {
       lines.push(t(ctx.locale, 'describeAddedPageEntry', { page: note.page }));
+    } else if (note.kind === 'appOnHomeScreen') {
+      lines.push(t(ctx.locale, 'describeHomeScreenOnApp', { name: note.name }));
     } else if (note.kind === 'removedRecordActions') {
       lines.push(t(ctx.locale, 'describeRemovedRecordActions', { n: note.count }));
     } else if (note.kind === 'removedWorkflowLinks') {

@@ -1,4 +1,5 @@
 import {
+  addNewAppsToHomeScreen,
   createDefaultWorkspace,
   describePresetApply,
   describeRestore,
@@ -215,6 +216,9 @@ export function createRevisions(
     // export, and the user's selected files are restored to their original positions (invariant 3
     // unchanged). Clearing preset lists upon switching works as usual (D-410).
     const after = keepFiles ? keepChosenFiles(config, prepared.after) : prepared.after;
+    // An app the other AI app made starts out in the menu of the Tinkrum icon; a saved preset
+    // keeps the menu it was saved with (D-new-apphome-4).
+    const menued = asUpdate ? addNewAppsToHomeScreen(config, after) : [];
     return recordPreview(input, plan, head, {
       kind: 'restore',
       before: config,
@@ -223,6 +227,7 @@ export function createRevisions(
         ? // Handed back from another AI app: an update of the app as it is now, not a switch to a saved preset.
           [
             msg('setupReturnIntro'),
+            ...menued.map((app) => msg('describeHomeScreenOnApp', { name: app })),
             ...describePresetApply(config, after, name, { registry, locale }).slice(1),
           ]
         : describePresetApply(config, after, name, { registry, locale }),

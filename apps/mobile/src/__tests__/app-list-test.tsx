@@ -1,7 +1,9 @@
 import {
+  appConfigFile,
   applyOps,
   createStarterWorkspace,
   paperAppOps,
+  presetSnapshot,
   type Locale,
   type Registry,
   type WorkspaceConfig,
@@ -15,6 +17,7 @@ import { AppState, BackHandler, type AppStateStatus } from 'react-native';
 import { useAiReturn } from '../ai/return';
 import { useGuide } from '../guide/store';
 import type { HomeScreenEntry, HomeScreenPlatform } from '../home-screen/platform';
+import { t } from '../i18n';
 import { openStartApp } from '../shell/start-app';
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { FakeFiles } from '../test-utils/fake-files';
@@ -29,6 +32,8 @@ function twoApps(locale: Locale, registry: Registry) {
     start,
     [
       ...paperAppOps(start, locale, registry),
+      // Paper is in the menu of the Tinkrum icon, as the guide leaves it; the other app is not.
+      { op: 'updateContainer', nav: { phoneHomeScreen: ['app:paper'] } },
       { op: 'addContainer', app: { id: 'fit', name: '健身', bar: ['page:fit-home', 'ai'] } },
       {
         op: 'addContainer',
@@ -340,5 +345,44 @@ describe('starting Tinkrum', () => {
       jest.advanceTimersByTime(1000);
     });
     expect(store.getState().appId).toBe('paper');
+  });
+});
+
+// Every new app starts out in the menu of the Tinkrum icon (D-new-apphome-4).
+describe('a new app made after the guide', () => {
+  afterEach(() => useGuide.setState({ stage: null, repo: null }));
+
+  it('goes into the menu, and sending it from the Tink page opens no “done” page', async () => {
+    useGuide.setState({ stage: 'done' });
+    const { store } = await renderToolsApp(new MemoryWorkspaceRepo(), new FakeFiles(), {
+      seed: createStarterWorkspace,
+    });
+    await fireEvent.press(await screen.findByTestId('nav-ai'));
+    await fireEvent.changeText(await screen.findByTestId('change-input'), '创建一个 Paper App');
+    await fireEvent.press(screen.getByTestId('change-submit'));
+    await waitFor(() =>
+      expect(store.getState().config!.nav.phoneHomeScreen).toEqual(['app:paper']),
+    );
+    expect(screen.queryByText(t('zh', 'toolMissing'))).toBeNull();
+  });
+
+  it('goes into the menu when a whole setup from another AI app brings it', async () => {
+    const { store } = await renderToolsApp(new MemoryWorkspaceRepo(), new FakeFiles(), {
+      seed: createStarterWorkspace,
+    });
+    const base = store.getState().config!;
+    const made = applyOps(
+      base,
+      [{ op: 'addContainer', app: { id: 'fit', name: '健身', bar: ['ai'] } }],
+      { registry: testRegistry, locale: 'zh' },
+    );
+    if (!made.ok) throw new Error(made.error);
+    const text = appConfigFile(presetSnapshot(made.config), new Date());
+    await act(async () => {
+      const result = await store.getState().proposeSetupFile(text);
+      expect(result.kind).toBe('preview');
+    });
+    expect(store.getState().proposal!.after.nav.phoneHomeScreen).toEqual(['app:fit']);
+    expect(store.getState().proposal!.lines.join('\n')).toContain('当普通 App 用');
   });
 });
