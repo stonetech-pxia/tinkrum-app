@@ -16,15 +16,16 @@ import { useHomeScreenPlatform } from '../home-screen/context';
 import { homeScreenEntries } from '../home-screen/useHomeScreen';
 import { t } from '../i18n';
 import type { RenderEnv } from '../renderer/components';
-import { useWorkflowChange } from '../run/workflow-change';
+import { confirmDelete, useWorkflowChange } from '../run/workflow-change';
 import { useWorkspace, useWorkspaceContext } from '../workspace/context';
 import { AppIconPicker, AppMenuRow, AppMenuSheet } from './AppMenu';
 
 /**
  * The menu of an app, opened by long-pressing it in Settings or in the app list (D-648):
  * put it on the phone's home screen or take it off, change its icon (D-606), share it (D-545),
- * restore it (D-485). System layer, cannot be modified by AI (invariant 8). Opening it changes
- * nothing (invariant 15). Render `appMenu` somewhere on the page that opens it.
+ * restore it (D-485), delete it (D-650). System layer, cannot be modified by AI
+ * (invariant 8). Opening it changes nothing (invariant 15). Render `appMenu` somewhere on the
+ * page that opens it.
  */
 export function useAppMenu(env: RenderEnv): {
   openAppMenu: (appId: string) => void;
@@ -136,6 +137,7 @@ export function useAppMenu(env: RenderEnv): {
             },
           ]
         : []),
+      { id: 'delete', label: t(locale, 'appDeleteItem'), run: () => deleteApp(appId, name) },
     ];
   }
 
@@ -145,6 +147,23 @@ export function useAppMenu(env: RenderEnv): {
     void change(
       [{ op: 'updateContainer', app: { id: appId, icon } }],
       t(locale, 'appIconChanged', { name }),
+    );
+  }
+
+  /**
+   * Delete the app (D-650): asks first; its pages, quick actions and reminders go, its
+   * tables and entries stay on the home page (invariant 5). Can be undone, like any change.
+   */
+  function deleteApp(appId: string, name: string) {
+    confirmDelete(
+      locale,
+      name,
+      () =>
+        void change(
+          [{ op: 'removeContainer', app: appId }],
+          t(locale, 'appDeletedSummary', { name }),
+        ),
+      t(locale, 'appDeleteConfirm'),
     );
   }
 
@@ -170,6 +189,7 @@ export function useAppMenu(env: RenderEnv): {
               id={`app-menu-${item.id}`}
               label={item.label}
               palette={palette}
+              danger={item.id === 'delete'}
               onPress={() => {
                 setMenu(null);
                 item.run();

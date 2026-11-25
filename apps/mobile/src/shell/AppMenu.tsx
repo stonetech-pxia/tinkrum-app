@@ -11,7 +11,7 @@ import { Button } from '../renderer/ui';
 
 // Menu sliding up from the bottom: App name, contents, "Cancel". Dismisses when tapped outside.
 // System layer, cannot be modified by AI (Invariant 8). Avoids system popups: Android system popups
-// support at most three buttons, dropping subsequent items, whereas here we support up to five
+// support at most three buttons, dropping subsequent items, whereas here we support up to six
 // items plus "Cancel".
 
 /** Menu sliding up from the bottom: App name, contents, "Cancel". Dismisses when tapped outside. */
@@ -69,12 +69,14 @@ export function AppMenuRow({
   palette,
   onPress,
   muted,
+  danger,
 }: {
   id: string;
   label: string;
   palette: Palette;
   onPress: () => void;
   muted?: boolean;
+  danger?: boolean;
 }) {
   return (
     <Pressable
@@ -82,7 +84,11 @@ export function AppMenuRow({
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}>
-      <Text style={[palette.font('body', 16), { color: muted ? palette.muted : palette.text }]}>
+      <Text
+        style={[
+          palette.font('body', 16),
+          { color: danger ? palette.danger : muted ? palette.muted : palette.text },
+        ]}>
         {label}
       </Text>
     </Pressable>

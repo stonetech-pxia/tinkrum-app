@@ -661,6 +661,10 @@ export const fr: MessageTable = {
   updateToolChanged: '« {tool} » modifié',
   updateNothing: 'Le fichier est identique à votre app : rien ne change.',
   appResetSummary: 'Rétablir l’aspect d’origine de « {name} »',
+  appDeleteItem: 'Supprimer cette app',
+  appDeleteConfirm:
+    'Ses pages, actions rapides et rappels sont supprimés. Ses tableaux et ses entrées sont conservés (ils passent sur la page d’accueil), tout comme vos fichiers. Vous pouvez annuler cette action.',
+  appDeletedSummary: 'Suppression de l’app « {name} »',
   appIconItem: 'Changer l’icône',
   appIconEmoji: 'Ou saisissez un emoji',
   appIconEmojiUse: 'Utiliser',
@@ -1156,7 +1160,7 @@ export const fr: MessageTable = {
   appDescAdd: 'Ajouter l’app « {v0} »',
   settingsMyApps: 'Mes apps',
   settingsMyAppsHint:
-    'Appuyez longuement sur une app pour la placer sur l’écran d’accueil ou changer son icône.',
+    'Appuyez longuement sur une app pour la placer sur l’écran d’accueil, changer son icône ou la supprimer.',
   settingsAppOnHome: 'Dans le menu de l’écran d’accueil',
   appListBack: 'Revenir à vos apps',
   appEmpty: 'Cette app n’a pas encore de page. Touchez Tink pour en créer une.',

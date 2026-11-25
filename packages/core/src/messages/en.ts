@@ -629,6 +629,10 @@ export const en = {
   updateToolChanged: '“{tool}” changed',
   updateNothing: 'The file is the same as your app: nothing changes.',
   appResetSummary: 'Restore “{name}” to its original look',
+  appDeleteItem: 'Delete this app',
+  appDeleteConfirm:
+    'Its pages, quick actions and reminders are deleted. Its tables and entries stay (they move to the home page), and your files are kept. You can undo this.',
+  appDeletedSummary: 'Deleted the app “{name}”',
   appIconItem: 'Change icon',
   appIconEmoji: 'Or type one emoji',
   appIconEmojiUse: 'Use it',
@@ -1095,7 +1099,8 @@ export const en = {
   v34descDeskRemove: 'Remove {v0} from the desk',
   appDescAdd: 'Add app “{v0}”',
   settingsMyApps: 'My apps',
-  settingsMyAppsHint: 'Long-press an app to put it on the phone home screen or change its icon.',
+  settingsMyAppsHint:
+    'Long-press an app to put it on the phone home screen, change its icon or delete it.',
   settingsAppOnHome: 'On the home screen menu',
   appListBack: 'Back to your apps',
   appEmpty: 'This app has no pages yet. Tap Tink to build one.',

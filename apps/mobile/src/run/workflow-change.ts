@@ -28,18 +28,15 @@ export function useWorkflowChange() {
   };
 }
 
-/** Confirm before deleting. */
+/** Confirm before deleting; `message` says what stays when it is more than the files. */
 export function confirmDelete(
   locale: 'en' | 'zh' | 'fr',
   name: string,
   onDelete: () => void,
+  message = t(locale, 'workflow_change_Your_files_are_kept_You_can_undo_this_e9492'),
 ): void {
-  Alert.alert(
-    t(locale, 'workflow_change_Delete_e4208', { v0: name }),
-    t(locale, 'workflow_change_Your_files_are_kept_You_can_undo_this_e9492'),
-    [
-      { text: t(locale, 'cancel'), style: 'cancel' },
-      { text: t(locale, 'workflow_change_Delete_8940a'), style: 'destructive', onPress: onDelete },
-    ],
-  );
+  Alert.alert(t(locale, 'workflow_change_Delete_e4208', { v0: name }), message, [
+    { text: t(locale, 'cancel'), style: 'cancel' },
+    { text: t(locale, 'workflow_change_Delete_8940a'), style: 'destructive', onPress: onDelete },
+  ]);
 }

@@ -12,7 +12,7 @@ import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
 import { createGestureController } from 'react-native-gesture-handler/jest-utils';
-import { AppState, BackHandler, type AppStateStatus } from 'react-native';
+import { Alert, AppState, BackHandler, type AppStateStatus } from 'react-native';
 
 import { useAiReturn } from '../ai/return';
 import { useGuide } from '../guide/store';
@@ -258,6 +258,105 @@ describe('long-pressing an app', () => {
       expect(store.getState().config!.nav.phoneHomeScreen).toEqual(['app:paper', 'app:fit']),
     );
     expect(pinned).toEqual([]);
+  });
+});
+
+// An app can be deleted from its menu (D-650); its tables and entries stay (invariant 5).
+describe('deleting an app', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  /** The two apps, the second one with a table of its own. */
+  const withTable = (locale: Locale, registry: Registry) => {
+    const result = applyOps(
+      twoApps(locale, registry),
+      [
+        {
+          op: 'addData',
+          table: {
+            id: 'workouts',
+            name: '训练',
+            app: 'fit',
+            fields: [{ id: 'name', name: '名称', type: 'text' }],
+          },
+        } as never,
+      ],
+      { registry, locale },
+    );
+    if (!result.ok) throw new Error(result.error);
+    return result.config;
+  };
+
+  const open = async (seed = withTable) => {
+    const repo = new MemoryWorkspaceRepo();
+    await repo.insertRecord({
+      id: 'w1aaaaaa',
+      collectionId: 'workouts',
+      values: { name: '深蹲' },
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    const app = await renderToolsApp(repo, new FakeFiles(), { seed });
+    await screen.findByTestId('nav-settings');
+    return { ...app, repo };
+  };
+
+  const pressDelete = async (testID: string) => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    await fireEvent(await screen.findByTestId(testID), 'longPress');
+    await fireEvent.press(await screen.findByTestId('app-menu-delete'));
+    return alert;
+  };
+  const answer = async (alert: jest.SpyInstance, label: string) => {
+    const buttons = alert.mock.calls.at(-1)![2] as { text: string; onPress?: () => void }[];
+    await act(async () => buttons.find((b) => b.text === label)!.onPress?.());
+  };
+
+  it('asks first, saying that entries are kept; cancelling changes nothing', async () => {
+    const { store } = await open();
+    const alert = await pressDelete('app-icon-fit');
+    expect(alert.mock.calls.at(-1)!.slice(0, 2)).toEqual([
+      '删除「健身」？',
+      t('zh', 'appDeleteConfirm'),
+    ]);
+    expect(t('zh', 'appDeleteConfirm')).toContain('记录都留着');
+    await answer(alert, '取消');
+    expect(store.getState().head!.id).toBe(1);
+    expect(screen.getByTestId('app-icon-fit')).toBeTruthy();
+  });
+
+  it('removes the app and its pages, keeps its table and entries, and can be undone', async () => {
+    const { store, repo } = await open();
+    await answer(await pressDelete('app-icon-fit'), '删除');
+    await waitFor(() => expect(screen.queryByTestId('app-icon-fit')).toBeNull());
+    expect(screen.getByTestId('app-icon-paper')).toBeTruthy();
+    const config = store.getState().config!;
+    expect(config.nav.apps!.map((a) => a.id)).toEqual(['paper']);
+    expect(config.containers.pages.some((p) => p.id.startsWith('fit-'))).toBe(false);
+    const table = config.data.tables.find((x) => x.id === 'workouts')!;
+    expect(table.app).toBeUndefined();
+    expect(await repo.listRecords('workouts')).toHaveLength(1);
+
+    await fireEvent.press(await screen.findByTestId('banner-undo'));
+    expect(await screen.findByTestId('app-icon-fit')).toBeTruthy();
+    expect(store.getState().config!.data.tables.find((x) => x.id === 'workouts')!.app).toBe('fit');
+  });
+
+  it('is offered in Settings too, and takes the app out of the Tinkrum icon’s menu', async () => {
+    const { store } = await open();
+    await fireEvent.press(screen.getByTestId('nav-settings'));
+    await answer(await pressDelete('settings-app-paper'), '删除');
+    await waitFor(() => expect(screen.queryByTestId('settings-app-paper')).toBeNull());
+    expect(store.getState().config!.nav.phoneHomeScreen).toBeUndefined();
+  });
+
+  it('can delete the last app', async () => {
+    const { store } = await open();
+    await answer(await pressDelete('app-icon-fit'), '删除');
+    await waitFor(() => expect(screen.queryByTestId('app-icon-fit')).toBeNull());
+    await answer(await pressDelete('app-icon-paper'), '删除');
+    await waitFor(() => expect(store.getState().config!.nav.apps).toBeUndefined());
+    expect(screen.queryByTestId('app-icon-paper')).toBeNull();
+    expect(screen.getByTestId('nav-settings')).toBeTruthy();
   });
 });
 
