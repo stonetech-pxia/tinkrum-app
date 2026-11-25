@@ -86,25 +86,35 @@ jest.mock('expo-video', () => {
 
 // expo-audio (audio recording, D-154): mock recorder. Duration increments by 1 second on each state
 // read after record(); stop() writes out a small file path. global.__audioPermission can be set to
-// false to test "no microphone permission".
+// false to test "no microphone permission". As on Android, every stop reports a finished status to
+// the useAudioRecorder listener and drops the recorder: record() does nothing until it is prepared
+// again, the duration reads 0 and the file stays. global.__audioRecorder.stop() without a screen
+// tap is the "Stop" button of the recording notification.
 jest.mock('expo-audio', () => {
   const React = require('react');
   const makeRecorder = () => {
     const recorder = {
       uri: null,
+      isPrepared: false,
       isRecording: false,
       durationMillis: 0,
+      onStatus: undefined,
       async prepareToRecordAsync() {
+        this.isPrepared = true;
         this.uri = 'file:///cache/ExpoAudio/recording.m4a';
       },
       record() {
-        this.isRecording = true;
+        if (this.isPrepared) this.isRecording = true;
       },
       pause() {
         this.isRecording = false;
       },
       async stop() {
+        if (!this.isPrepared) return;
+        this.isPrepared = false;
         this.isRecording = false;
+        this.durationMillis = 0;
+        this.onStatus?.({ isFinished: true, hasError: false, error: null, url: this.uri });
       },
     };
     return recorder;
@@ -112,15 +122,21 @@ jest.mock('expo-audio', () => {
   return {
     AudioQuality: { MIN: 0, LOW: 32, MEDIUM: 64, HIGH: 96, MAX: 127 },
     IOSOutputFormat: { MPEG4AAC: 'aac ' },
-    useAudioRecorder: () => React.useMemo(makeRecorder, []),
+    useAudioRecorder: (_options, onStatus) => {
+      const recorder = React.useMemo(makeRecorder, []);
+      recorder.onStatus = onStatus;
+      global.__audioRecorder = recorder;
+      return recorder;
+    },
     useAudioRecorderState: (recorder) => {
       const [, tick] = React.useState(0);
       React.useEffect(() => {
+        let seen = '';
         const timer = setInterval(() => {
-          if (recorder.isRecording) {
-            recorder.durationMillis += 1000;
-            tick((n) => n + 1);
-          }
+          if (recorder.isRecording) recorder.durationMillis += 1000;
+          const now = `${recorder.isRecording} ${recorder.durationMillis}`;
+          if (now !== seen) tick((n) => n + 1);
+          seen = now;
         }, 200);
         return () => clearInterval(timer);
       }, [recorder]);
