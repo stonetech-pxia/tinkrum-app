@@ -781,13 +781,15 @@ describe("Invariant 10: Data leaves the app only by the user's own tap, every ti
     expect(params).toEqual([]);
   });
 
-  // Only the record page, rich text, the presets page, and the rescue page link to external sites.
+  // Only the record page, rich text, the presets page, the rescue page, and Settings link to
+  // external sites.
   // The presets page (system layer, D-593) can also open a webpage: a fixed URL ("Build apps with
   // your AI" on the website), opened only upon user tap, carrying no data. The founder chose
   // "Allow, add to whitelist" in conversation on 2026-11-19 (D-596). Similarly, the "Check website
   // for new versions" on the startup fallback page (D-621) uses a fixed URL, opens only upon user
-  // tap, and carries no data.
-  it('only the record page, rich text, the presets page and the rescue page link to the site can open something outside the app', () => {
+  // tap, and carries no data. So does Settings' privacy policy row (D-new-privacy-1): the founder
+  // chose to add it to the whitelist in conversation on 2026-11-25.
+  it('only the record page, rich text, the presets page, the rescue page and Settings can open something outside the app', () => {
     const openers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))
       .filter((path) => /\bLinking\.openURL\b/.test(readFileSync(path, 'utf8')))
       .map((path) => relative(REPO, path));
@@ -796,6 +798,7 @@ describe("Invariant 10: Data leaves the app only by the user's own tap, every ti
       join('apps', 'mobile', 'src', 'renderer', 'RichText.tsx'),
       join('apps', 'mobile', 'src', 'renderer', 'open-link.ts'),
       join('apps', 'mobile', 'src', 'rescue', 'actions.ts'),
+      join('apps', 'mobile', 'src', 'shell', 'SettingsView.tsx'),
     ]);
   });
 

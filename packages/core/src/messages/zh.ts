@@ -188,6 +188,8 @@ export const zh: MessageTable = {
   aiBadOutput: 'Tink 返回的内容无法使用，没有做任何修改，请换个说法再试。',
   about: '关于',
   aboutValue: 'Tinkrum 原型 · AGPL-3.0 · schema v{schema} · 版本 #{revision}',
+  privacyPolicy: '隐私政策',
+  privacyPolicyHint: '在浏览器中打开',
 
   // Page components
   noFiles: '扫描或保存的文件会出现在这里',

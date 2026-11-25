@@ -215,6 +215,8 @@ export const fr: MessageTable = {
     'La réponse de Tink n’a pas pu être utilisée. Aucune modification n’a été effectuée ; reformulez votre demande.',
   about: 'À propos',
   aboutValue: 'Prototype Tinkrum · AGPL-3.0 · schéma v{schema} · version #{revision}',
+  privacyPolicy: 'Politique de confidentialité',
+  privacyPolicyHint: 'S’ouvre dans votre navigateur',
 
   // Page components
   noFiles: 'Les fichiers numérisés ou enregistrés apparaîtront ici',

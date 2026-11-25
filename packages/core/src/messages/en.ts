@@ -201,6 +201,8 @@ export const en = {
   aiBadOutput: 'Tink’s answer couldn’t be used. Nothing was changed; try saying it another way.',
   about: 'About',
   aboutValue: 'Tinkrum prototype · AGPL-3.0 · schema v{schema} · version #{revision}',
+  privacyPolicy: 'Privacy policy',
+  privacyPolicyHint: 'Opens in your browser',
 
   // Page components
   noFiles: 'Files you scan or save will show up here',
