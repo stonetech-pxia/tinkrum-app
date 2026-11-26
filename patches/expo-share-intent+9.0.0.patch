@@ -1,0 +1,40 @@
+diff --git a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
+index ff5b100..c2a0e8e 100644
+--- a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
++++ b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
+@@ -111,6 +111,16 @@ class ExpoShareIntentModule : Module() {
+             )
+         }
+ 
++        // Tinkrum patch: a file that cannot be read (no read grant, gone since it was shared) is
++        // left out instead of crashing the app. The error names no file.
++        private fun readFileInfo(uri: Uri): Map<String, String?>? =
++            try {
++                getFileInfo(uri)
++            } catch (e: Exception) {
++                notifyError("cannot read a shared file (${e.javaClass.simpleName})")
++                null
++            }
++
+         fun handleShareIntent(intent: Intent) {
+             val activity = instance?.currentActivity
+             if (activity != null && !activity.isTaskRoot) {
+@@ -142,14 +152,16 @@ class ExpoShareIntentModule : Module() {
+                 if (intent.action == Intent.ACTION_SEND) {
+                     val uri = intent.parcelable<Uri>(Intent.EXTRA_STREAM);
+                     if (uri != null) {
+-                        notifyShareIntent(mapOf( "files" to arrayOf(getFileInfo(uri), "type" to "file")))
++                        val file = readFileInfo(uri) ?: return
++                        notifyShareIntent(mapOf( "files" to arrayOf(file, "type" to "file")))
+                     } else {
+                         notifyError("empty uri for file sharing: " + intent.action)
+                     }
+                 } else if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
+                     val uris = intent.parcelableArrayList<Uri>(Intent.EXTRA_STREAM)
+                     if (uris != null) {
+-                        notifyShareIntent(mapOf( "files" to uris.map { getFileInfo(it) }, "type" to "file"))
++                        val files = uris.mapNotNull { readFileInfo(it) }
++                        if (files.isNotEmpty()) notifyShareIntent(mapOf( "files" to files, "type" to "file"))
+                     } else {
+                         notifyError("empty uris array for file sharing: " + intent.action)
+                     }
