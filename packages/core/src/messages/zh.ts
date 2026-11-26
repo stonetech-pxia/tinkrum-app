@@ -139,9 +139,9 @@ export const zh: MessageTable = {
   aiAgentTinkNote: 'Tink 在 Tinkrum 里直接改，用下面选的方式。',
   aiModeServer: 'Tinkrum 服务器',
   aiModeServerNote: '通过服务器调用模型。',
-  // Server storage note during testing (D-240): displayed only when using the Tinkrum server.
-  aiServerStoredNote:
-    '测试期间会保存你对 Tink 说的话和 App 的结构，用来改进 Tinkrum。文件和记录不会发送。',
+  // What the Tinkrum server does with a request (D-new-trusting-franklin-1): displayed only when using it.
+  aiServerDataNote:
+    '你对 Tink 说的话和 App 的结构经 Tinkrum 服务器转发，服务器不保存。文件和记录不会发送。',
   aiModeByok: 'API key',
   aiModeByokNote: '用你自己的 key 直连 Claude 或兼容服务，费用记在你的账号上。',
   // Two providers supporting BYOK (Bring Your Own Key) (D-241)

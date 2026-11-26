@@ -261,8 +261,8 @@ export function AISettingsScreen() {
             />
           ) : null}
           {mode === 'server' ? (
-            <Text testID="ai-server-stored" style={sub}>
-              {t(locale, 'aiServerStoredNote')}
+            <Text testID="ai-server-note" style={sub}>
+              {t(locale, 'aiServerDataNote')}
             </Text>
           ) : null}
           <Option

@@ -89,16 +89,9 @@ jq -r '.reason + " " + (.ai // "?")' ~/projects/morph-prod/apps/api/data/needs.j
 
 When the privacy policy goes live it must say: it is sent only when the user taps the button, and what is sent is only that one sentence.
 
-## Saving requests during the test period (D-240)
+## Saving requests (D-240)
 
-During the TestFlight test, set `MORPH_REQUESTS_FILE=data/requests.jsonl` in the production `.env` (relative to `apps/api`, i.e. `~/projects/morph-prod/apps/api/data/requests.jsonl`). After restarting the service, the startup log shows "Saving requests to …". Each successful forward appends one JSON line: time, the first 8 characters of the device id hash, platform, app version, which round, `system` (the planning prompt), `messages` (the UI config and the user's words), the model reply, the stop reason, tokens. Nothing is saved if it is unset. How long to keep it and how to delete it are not decided yet (P-041); the file contains the user's own words, so do not copy it elsewhere or commit it.
-
-```bash
-# The last 5: the end of the first message (the user's words are last) and the start of the model reply
-tail -5 ~/projects/morph-prod/apps/api/data/requests.jsonl | jq -r '.at, .messages[0].content[-200:], .reply[:200], ""'
-# Replies without "kind" (mostly not change plans)
-jq -c 'select(.reply | contains("\"kind\"") | not) | {at, reply: .reply[:200]}' ~/projects/morph-prod/apps/api/data/requests.jsonl
-```
+The production service does not save requests: leave `MORPH_REQUESTS_FILE` unset. The app, the website and the privacy policy say that nothing is saved (D-new-trusting-franklin-1), so turning it on needs the founder's decision, and all three have to change first. A self-built server saves each forwarded request (the prompt, the UI config, the user's words and the reply) only when the variable names a file.
 
 ## State the Mac must keep
 
