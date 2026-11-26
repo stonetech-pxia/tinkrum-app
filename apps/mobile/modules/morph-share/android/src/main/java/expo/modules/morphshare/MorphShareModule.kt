@@ -55,7 +55,7 @@ private const val FOLDER_REQUEST = 0x4d46
 private class PendingExport(
   val key: String,
   val promise: Promise,
-  val files: List<File>,
+  val uris: List<String>,
   val names: List<String>,
   val mimeTypes: List<String>,
 )
@@ -129,12 +129,7 @@ class MorphShareModule : Module() {
           dir.mkdirs()
           val safe = name.replace('/', '_').ifBlank { "file" }
           val copy = File(dir, safe)
-          val input = if (uri.startsWith("content://")) {
-            context.contentResolver.openInputStream(Uri.parse(uri))
-          } else {
-            fileOf(uri).inputStream()
-          }
-          requireNotNull(input) { "no input" }.use { from -> copy.outputStream().use { from.copyTo(it) } }
+          openSource(uri, ::openContent, ::openFile).use { from -> copy.outputStream().use { from.copyTo(it) } }
           FileProvider.getUriForFile(context, "${context.packageName}.MorphShareFileProvider", copy)
         } catch (e: Exception) {
           // Logs only exception type, not filenames or URIs.
@@ -175,7 +170,7 @@ class MorphShareModule : Module() {
         promise.reject(SheetBusyException())
         return@AsyncFunction
       }
-      val pending = PendingExport(key, promise, uris.map(::fileOf), names, mimeTypes)
+      val pending = PendingExport(key, promise, uris, names, mimeTypes)
       val remembered = if (useRemembered) rememberedFolder(key, adopt = true) else null
       if (remembered != null) {
         copyInBackground(remembered.first, remembered.second, pending)
@@ -315,16 +310,23 @@ class MorphShareModule : Module() {
 
   private fun copyInto(tree: Uri, pending: PendingExport): Int {
     val resolver = context.contentResolver
-    val folder = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-    for ((i, file) in pending.files.withIndex()) {
-      // Files with duplicate names are renamed by the document provider itself (e.g., "Report (1).pdf"), avoiding overwrites.
-      val doc = DocumentsContract.createDocument(resolver, folder, pending.mimeTypes[i], pending.names[i])
-        ?: throw FolderNotWritableException()
-      val out = resolver.openOutputStream(doc) ?: throw FolderNotWritableException()
-      out.use { sink -> file.inputStream().use { it.copyTo(sink) } }
+    val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+    val folder = object : TargetFolder<Uri> {
+      override fun create(name: String, mimeType: String) =
+        DocumentsContract.createDocument(resolver, parent, mimeType, name)
+
+      override fun openOutput(doc: Uri) = resolver.openOutputStream(doc)
+
+      override fun delete(doc: Uri) {
+        DocumentsContract.deleteDocument(resolver, doc)
+      }
     }
-    return pending.files.size
+    return copyIntoFolder(pending.uris, pending.names, pending.mimeTypes, ::openContent, ::openFile, folder)
   }
+
+  private fun openContent(uri: String) = context.contentResolver.openInputStream(Uri.parse(uri))
+
+  private fun openFile(uri: String) = fileOf(uri).inputStream()
 
   // Use type directly if all are the same type; image/* if same broad category (all images); otherwise */*.
   private fun commonType(mimeTypes: List<String>): String {
