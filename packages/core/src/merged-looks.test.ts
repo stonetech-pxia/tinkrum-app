@@ -5,7 +5,7 @@ import { registry, workspace } from './test-helpers';
 import { validateWorkspace } from './validate';
 import type { ComponentOf, WorkspaceConfig } from './schema';
 
-// The looks merged by D-new-kernel-available-resources-3ffb5b-1: what a button does follows from
+// The looks merged by D-655: what a button does follows from
 // its opens or tools, and each kind only takes the shapes and texts it can draw; tabs take one of
 // two forms; a notice only counts entries when it has a source; the file preview's slots keep
 // refusing what they refused before the merge.

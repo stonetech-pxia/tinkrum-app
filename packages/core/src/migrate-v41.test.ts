@@ -4,7 +4,7 @@ import { prepareSnapshot } from './change';
 import { migrateWorkspace } from './migrate';
 import { registry, workspace } from './test-helpers';
 
-// v40 → v41 (D-new-kernel-available-resources-3ffb5b-1): twelve looks merged into spacer, catalog,
+// v40 → v41 (D-655): twelve looks merged into spacer, catalog,
 // notice, tabs and button. A v40 config (a page with every old look, the blocks above and below the
 // file preview) must upgrade and validate, with nothing lost (invariant 12).
 

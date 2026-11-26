@@ -1332,7 +1332,7 @@ describe('Invariant 12: Old data always opens', () => {
       expect(r.ok && r.config).toEqual(config);
     }
     // D-607: Single-select gains multiple, upgrading to version 40 (version bump only).
-    // D-new-kernel-available-resources-3ffb5b-1: merging block looks upgrades to version 41.
+    // D-655: merging block looks upgrades to version 41.
     expect(CURRENT_SCHEMA_VERSION).toBe(41);
   });
 
@@ -2413,7 +2413,7 @@ describe('Invariant 12: Old config remains unchanged (D-428)', () => {
     // further version changes. D-617-D-619 (checklist also, latest number blocks, empty formula
     // "zero") also do not trigger version upgrades: all are optional syntaxes with unchanged stored
     // data, which older apps will reject rather than misread.
-    // 41 is the merge of block looks (D-new-kernel-available-resources-3ffb5b-1), not these additions.
+    // 41 is the merge of block looks (D-655), not these additions.
     expect(CURRENT_SCHEMA_VERSION).toBe(41);
   });
 
@@ -2997,7 +2997,7 @@ describe('Invariants 2 / 14: Tags exist only in records; neither config nor payl
 describe('Invariant 12: Check-in grid has a new look, while old configs and old versions in change history still open normally (D-610)', () => {
   it('a new look and keys used only by it: no version bump, old configs load unchanged', () => {
     // Check-in grid did not increment its own version; 40 was bumped for multi-choice (D-607), 41 for
-    // merging block looks (D-new-kernel-available-resources-3ffb5b-1).
+    // merging block looks (D-655).
     expect(CURRENT_SCHEMA_VERSION).toBe(41);
     for (const [, config] of CONFIGS) {
       const text = JSON.stringify(config);
@@ -3037,7 +3037,7 @@ describe('Invariant 12: Check-in grid has a new look, while old configs and old 
 describe('Invariant 12: Old configs open successfully without fixed areas, tags, or floating buttons (decided by the founder 2026-11-04)', () => {
   it('schemaVersion moved only for other changes and a config without the new keys is valid and unchanged', () => {
     // 39 -> 40 is D-607 (multi-choice), which only bumps the version number; 40 -> 41 merges block
-    // looks (D-new-kernel-available-resources-3ffb5b-1). Neither is about pins, dials or tags.
+    // looks (D-655). Neither is about pins, dials or tags.
     expect(CURRENT_SCHEMA_VERSION).toBe(41);
     const old = fromV33(v33Fixture('sample-expense-helper-zh') as never);
     const text = JSON.stringify(old);

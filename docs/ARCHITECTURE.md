@@ -289,7 +289,7 @@ Note that the v33 `tools` (installed tool packages) is today's `packages`, while
 
 **Component types → looks**
 
-Today's names are those of v41 (D-new-kernel-available-resources-3ffb5b-1 merged twelve v34 looks into five; the v34 name is in brackets where it differs).
+Today's names are those of v41 (D-655 merged twelve v34 looks into five; the v34 name is in brackets where it differs).
 
 | Before v34 (v33 `type`) | Today (v41 `look`)                                                                                     |
 | ----------------------- | ------------------------------------------------------------------------------------------------------ |

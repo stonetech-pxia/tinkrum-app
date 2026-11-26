@@ -31,7 +31,7 @@ const shape = {
 
 /**
  * Notice: a tinted card with text. With source it is about some entries of a table (the former
- * callout look, D-580; merged by D-new-kernel-available-resources-3ffb5b-1): {count} and
+ * callout look, D-580; merged by D-655): {count} and
  * {sum:field} in the text are worked out from the entries on the device (never stored in the
  * config), and the card holds up to two buttons, one for a record tool and one that opens a page.
  */

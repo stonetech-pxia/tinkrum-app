@@ -56,7 +56,7 @@ const shape = {
 };
 
 /**
- * What a button does, read from tools / opens (D-new-kernel-available-resources-3ffb5b-1 merged
+ * What a button does, read from tools / opens (D-655 merged
  * the looks entry, action and picker into button):
  * - run: runs a quick action (tools [{tool: <quick action id>}], the former action look)
  * - pick: the kernel's file picker (tools [{tool: "$pick.…"}], the former picker look)

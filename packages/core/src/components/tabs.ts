@@ -6,7 +6,7 @@ import { PAGE_PERIODS } from '../schema-primitives';
 import type { Page } from '../schema';
 import { type LookDefinitionOf, defineLook } from './define';
 
-// A row of tabs on the page that narrows what the page's blocks show (D-new-kernel-available-resources-3ffb5b-1
+// A row of tabs on the page that narrows what the page's blocks show (D-655
 // merged the looks period and choices into this one). Two kinds, told apart by source:
 // - time (no source, show.periods; D-440, founder 2026-11-05; record blocks follow, D-561): charts,
 //   numbers and record blocks on the page with source.period "page" cover the picked range;

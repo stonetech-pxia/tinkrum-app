@@ -375,7 +375,7 @@ export const migrateV38toV39: Migration = (config) => ({ ...config, schemaVersio
 export const migrateV39toV40: Migration = (config) => ({ ...config, schemaVersion: 40 });
 
 /**
- * One block from v40 to v41 (D-new-kernel-available-resources-3ffb5b-1): twelve looks become five.
+ * One block from v40 to v41 (D-655): twelve looks become five.
  * Each old block is drawn the same afterwards, except a button with variant "row", which now uses
  * the same row as the former entry (they differed only in spacing).
  * - divider → spacer {size: "small", line: true}

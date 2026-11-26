@@ -7,7 +7,7 @@ import { boundedText, IdSchema } from '../schema-base';
 import { duplicates, type LookDefinitionOf, defineLook } from './define';
 
 /**
- * What a catalog block lists (D-new-kernel-available-resources-3ffb5b-1 merged the looks library,
+ * What a catalog block lists (D-655 merged the looks library,
  * packages and apps into this one): the kernel keeps the list, the config only says which one.
  * - quickActions: the quick-action library (mine + presets + those of tools; run, edit and
  *   "+ Add" are kernel tools and do not enter the config); kind narrows it to one category;

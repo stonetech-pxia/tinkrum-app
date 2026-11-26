@@ -6,7 +6,7 @@ import { type LookDefinitionOf, defineLook } from './define';
 const shape = {
   show: z.strictObject({
     size: z.enum(['small', 'medium', 'large']),
-    /** Draws a thin line across the middle of the space (the former divider look, D-new-kernel-available-resources-3ffb5b-1). */
+    /** Draws a thin line across the middle of the space (the former divider look, D-655). */
     line: z.literal(true).optional(),
   }),
 };
