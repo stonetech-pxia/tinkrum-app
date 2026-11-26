@@ -18,7 +18,7 @@ State on 2026-11-22: nothing has been published to either store.
 - `expo.version` in `apps/mobile/app.json` is the version users see (`1.0.0`).
 - Every upload needs a higher build number:
   - iOS: `ios.buildNumber` (`"1"` on main).
-  - Android: `android.versionCode` (`3`).
+  - Android: `android.versionCode` (`4`).
 - `app.json` is the only place these numbers live. Change them in the same commit as the release.
 
 ## Android (Google Play)

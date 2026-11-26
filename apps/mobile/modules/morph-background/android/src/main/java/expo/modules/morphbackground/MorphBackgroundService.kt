@@ -44,10 +44,14 @@ class MorphBackgroundService : Service() {
       intent?.getStringExtra(EXTRA_TEXT).orEmpty(),
       null,
     )
-    // Try mediaProcessing first; if some Android 15 systems do not have this type enabled (reporting "type none"), fall back to dataSync.
+    // Try mediaProcessing first and fall back to dataSync if the system refuses it. Call the platform method, not ServiceCompat's: androidx.core (1.18.0) drops mediaProcessing, and the system then sees no type.
     val started = serviceTypes().any { type ->
       try {
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+          startForeground(NOTIFICATION_ID, notification, type)
+        } else {
+          startForeground(NOTIFICATION_ID, notification)
+        }
         true
       } catch (e: Exception) {
         Log.w(TAG, "startForeground failed (type $type)", e)

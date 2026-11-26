@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "dev.stonetech.tinkrum",
-      "versionCode": 3,
+      "versionCode": 4,
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#D92D20",
