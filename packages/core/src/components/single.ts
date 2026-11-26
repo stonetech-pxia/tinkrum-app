@@ -51,10 +51,12 @@ export const singleComponent: LookDefinitionOf<'single', typeof shape> = defineL
   edit: { text: [], style: ['tone'] },
   ai: {
     doc: 'source {table, record?: "$record"}, show {fields (1-8 field ids), qr?: true}: one entry of a table (the oldest), its fields and an Edit button that opens the entry form; tools? [{tool: <a quick action taking records>}] adds one button that hands it this entry (rule 54); qr also draws a QR code of its contact card (vCard), computed on the device. For "my card" or "my profile"; pair it with showIf. On a page for one entry (page.of = this table) record: "$record" shows the opened entry instead (rule 58)',
-    rule: {
-      n: 58,
-      text: 'The entry itself on a page for one entry (rule 48): to show the opened entry\'s own fields there ("植物页上面显示照片、品种和上次浇水", "show the client\'s phone and address at the top", "la fiche du livre en haut") → a single block with source {table: the page\'s of table, record: "$record"} and show.fields the fields to show (a file field shows its pictures), usually first on the page, above the lists of what belongs to it. Its Edit button edits that entry. Without record it shows the oldest entry of the table, so never leave record out on such a page; never write record anywhere else.',
-    },
+    rules: [
+      {
+        n: 58,
+        text: 'The entry itself on a page for one entry (rule 48): to show the opened entry\'s own fields there ("植物页上面显示照片、品种和上次浇水", "show the client\'s phone and address at the top", "la fiche du livre en haut") → a single block with source {table: the page\'s of table, record: "$record"} and show.fields the fields to show (a file field shows its pictures), usually first on the page, above the lists of what belongs to it. Its Edit button edits that entry. Without record it shows the oldest entry of the table, so never leave record out on such a page; never write record anywhere else.',
+      },
+    ],
   },
   example: {
     source: { table: 'expenses' },

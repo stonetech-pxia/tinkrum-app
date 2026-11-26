@@ -23,7 +23,7 @@ function prepare(config: WorkspaceConfig, ops: Op[]) {
 }
 const homeEntries = (c: WorkspaceConfig) =>
   allComponents(c.containers.pages.find((p) => p.id === 'home')!).filter(
-    (x) => x.look === 'entry' && (x as { opens?: unknown }).opens === 'page:tasks',
+    (x) => x.look === 'button' && (x as { opens?: unknown }).opens === 'page:tasks',
   );
 
 describe('a new page nothing opens', () => {
@@ -32,8 +32,8 @@ describe('a new page nothing opens', () => {
     const entries = homeEntries(after);
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
-      look: 'entry',
-      show: { title: '任务', icon: '✅' },
+      look: 'button',
+      show: { label: '任务', icon: '✅' },
       opens: 'page:tasks',
     });
     const home = after.containers.pages.find((p) => p.id === 'home')!;
@@ -55,8 +55,8 @@ describe('a new page nothing opens', () => {
         page: 'home',
         block: {
           id: 'go-tasks',
-          look: 'entry',
-          show: { title: '去任务', icon: '✅' },
+          look: 'button',
+          show: { label: '去任务', icon: '✅' },
           opens: 'page:tasks',
         },
       } as Op,

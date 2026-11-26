@@ -175,7 +175,7 @@ export const AGENT_EXAMPLE_APP = {
           look: 'button',
           show: {
             label: 'Add a plant',
-            variant: 'filled',
+            shape: 'filled',
             icon: 'plus',
           },
           tools: [
@@ -253,7 +253,7 @@ export const AGENT_EXAMPLE_APP = {
         },
         {
           id: 'export',
-          look: 'action',
+          look: 'button',
           show: {
             shape: 'row',
           },

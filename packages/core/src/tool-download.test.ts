@@ -66,10 +66,10 @@ describe('tool manifests (D-177)', () => {
     expect(tool.createPage('zh').title).toBe('求职材料');
     const page = tool.createPage('en');
     expect(page.package).toBe('job-apply');
-    expect(page.blocks.map((c) => c.look)).toEqual(['header', 'text', 'action', 'action']);
+    expect(page.blocks.map((c) => c.look)).toEqual(['header', 'text', 'button', 'button']);
     expect(page.blocks[2]).toEqual({
       id: 'job-apply-docs-runner',
-      look: 'action',
+      look: 'button',
       tools: [{ tool: 'job-apply-docs' }],
     });
     expect(tool.createWorkflows('zh').map((w) => [w.kind, w.name, w.package])).toEqual([

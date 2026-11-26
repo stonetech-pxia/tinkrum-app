@@ -133,8 +133,8 @@ const BLOCKS: Op[] = [
     index: 7,
     block: {
       id: 'go',
-      look: 'entry',
-      show: { icon: 'apps', title: '入口标题', subtitle: '入口说明' },
+      look: 'button',
+      show: { icon: 'apps', label: '入口标题', subtitle: '入口说明' },
       opens: 'settings',
     },
   },
@@ -215,6 +215,6 @@ describe('card text color (D-409)', () => {
     const palette = makePalette(createDefaultWorkspace('zh').theme, false);
     expect(palette.surfacePalette).toBeUndefined();
     expect(palette.pagePalette).toBeUndefined();
-    expect(CURRENT_SCHEMA_VERSION).toBe(40);
+    expect(CURRENT_SCHEMA_VERSION).toBe(41);
   });
 });

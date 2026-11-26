@@ -1,12 +1,6 @@
 import { z } from 'zod';
 
-import {
-  ComponentSchema,
-  componentRefs,
-  isKnownComponent,
-  type Component,
-  type ComponentOf,
-} from './components';
+import { ComponentSchema, componentRefs, isKnownComponent, type Component } from './components';
 import { DeskLayoutSchema } from './desk/layout';
 import { DrawnIconsSchema } from './drawn-icons';
 import { RecordToolSchema } from './record-ops-schema';
@@ -35,7 +29,7 @@ import { ConditionSchema, FieldRefSchema } from './schema-primitives';
 // require incrementing it (D-254: legacy configs can still be read, and old apps retain new
 // appearances as-is).
 
-export const CURRENT_SCHEMA_VERSION = 40;
+export const CURRENT_SCHEMA_VERSION = 41;
 
 export * from './schema-base';
 export {
@@ -50,11 +44,24 @@ export {
   ShowIfSchema,
   PinSchema,
   UNKNOWN_LOOK,
+  BUTTON_SHAPES,
+  CatalogSourceSchema,
+  catalogOf,
+  blockEdit,
+  buttonEdit,
+  buttonKind,
+  buttonShape,
   componentDefinition,
   componentRefs,
-  entryEditableText,
-  entryKind,
+  isChoiceTabs,
   isKnownComponent,
+  isTimeTabs,
+  type ButtonKind,
+  type ButtonShape,
+  type CatalogSource,
+  type ChoiceTabs,
+  type TabsBlock,
+  type TimeTabs,
   type BlockOf,
   type Component,
   type ComponentAI,
@@ -77,7 +84,6 @@ export {
   type StyleKey,
   type UnknownComponent,
 } from './components';
-export type QuickActionListComponent = ComponentOf<'library'>;
 
 // ---- Containers: Pages ----
 
@@ -364,14 +370,16 @@ export function parentOf(page: Page, blockId: string): Component | null {
  * Unlisted tools are hidden.
  */
 export function toolGridToolIds(
-  grid: ComponentOf<'packages'>,
+  grid: { ids?: readonly string[] | undefined },
   page: Page,
   catalog: readonly string[],
 ): string[] {
-  if (grid.source.ids) return grid.source.ids.filter((id) => catalog.includes(id));
+  if (grid.ids) return grid.ids.filter((id) => catalog.includes(id));
   const listed = new Set(
     allComponents(page).flatMap((c) =>
-      isKnownComponent(c) && c.look === 'packages' ? (c.source.ids ?? []) : [],
+      isKnownComponent(c) && c.look === 'catalog' && c.source.catalog === 'packages'
+        ? (c.source.ids ?? [])
+        : [],
     ),
   );
   return catalog.filter((id) => !listed.has(id));

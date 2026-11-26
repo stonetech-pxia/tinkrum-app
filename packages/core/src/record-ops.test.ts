@@ -100,7 +100,7 @@ const base = (): WorkspaceConfig => {
 const button = (tool: unknown, id = 'b1') => ({
   id,
   look: 'button',
-  show: { label: 'Go', variant: 'filled' },
+  show: { label: 'Go', shape: 'filled' },
   tools: [tool],
 });
 const list = (table: string, tools: unknown[], id = 'l1', look = 'list') => ({

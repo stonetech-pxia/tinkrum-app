@@ -28,7 +28,7 @@ function config(): WorkspaceConfig {
         block: {
           id: 'drink',
           look: 'button',
-          show: { label: '+1 杯水', variant: 'filled' },
+          show: { label: '+1 杯水', shape: 'filled' },
           tools: [action],
         },
       },

@@ -62,7 +62,7 @@ function simpleTool(spec: {
         { id: `${spec.id}-intro`, look: 'text', show: { text: pairText(locale, spec.intro) } },
         ...createWorkflows(locale).map((wf) => ({
           id: `${wf.id}-runner`,
-          look: 'action' as const,
+          look: 'button' as const,
           tools: [{ tool: wf.id }],
         })),
       ],

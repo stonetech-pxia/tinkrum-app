@@ -196,8 +196,8 @@ export function ChangeScreen() {
         allComponents(p).some(
           (c) =>
             isKnownComponent(c) &&
-            c.look === 'action' &&
-            c.tools.some((u) => 'tool' in u && u.tool === about.workflowId),
+            c.look === 'button' &&
+            (c.tools ?? []).some((u) => 'tool' in u && u.tool === about.workflowId),
         ),
     );
   // Examples suggested in the input box when context is present (D-124); built-in rules keep only

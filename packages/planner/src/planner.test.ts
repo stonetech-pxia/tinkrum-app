@@ -416,7 +416,7 @@ describe('checks the tool and repairs once more (AGENT_PLAN §3.6)', () => {
     block: {
       id: 'project-add',
       look: 'button',
-      show: { label: '新项目', variant: 'filled' },
+      show: { label: '新项目', shape: 'filled' },
       tools: [{ do: 'create', table: 'projects', ask: 'all' }],
     },
   };
@@ -901,7 +901,7 @@ describe('Tool inventory and building plan (D-414, D-415)', () => {
           block: {
             id: 'f',
             look: 'button',
-            show: { label: '添加', variant: 'filled' },
+            show: { label: '添加', shape: 'filled' },
             tools: [{ do: 'create', table: 'books', ask: 'all' }],
           },
         },

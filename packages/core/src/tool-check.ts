@@ -348,7 +348,8 @@ class Analysis {
     reachable: boolean,
     tables: Set<string>,
   ) {
-    if (c.look === 'library' && reachable) this.libraries.push(c.source.kind ?? null);
+    if (c.look === 'catalog' && c.source.catalog === 'quickActions' && reachable)
+      this.libraries.push(c.source.kind ?? null);
     if (isRecordLook(c)) {
       const block = c as Extract<KnownComponent, { look: 'list' }>;
       const { source, show } = block;
@@ -699,7 +700,7 @@ function liveTables(a: Analysis): Set<string> {
   return live;
 }
 
-const FUNCTIONLESS = new Set(['header', 'text', 'notice', 'divider', 'spacer', 'image']);
+const FUNCTIONLESS = new Set(['header', 'text', 'notice', 'spacer', 'image']);
 
 /** Inaccessible pages. Toolkit pages and the toolbox are excluded (have other entry points). */
 function checkPages(a: Analysis) {

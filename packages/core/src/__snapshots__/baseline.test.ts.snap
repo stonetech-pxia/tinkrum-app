@@ -51,8 +51,8 @@ default.templateOps[1].page.blocks[3].show = {"title":"category","subtitles":["n
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
 default.templateOps[2].block.id = "shortcut-budget"
-default.templateOps[2].block.look = "entry"
-default.templateOps[2].block.show = {"title":"Budget","icon":"chart"}
+default.templateOps[2].block.look = "button"
+default.templateOps[2].block.show = {"label":"Budget","icon":"chart"}
 default.templateOps[2].block.opens = "page:budget"
 default.again[0].op = "addData"
 default.again[0].table.id = "expenses-2"
@@ -103,8 +103,8 @@ default.again[1].page.blocks[3].show = {"title":"category","subtitles":["note","
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
 default.again[2].block.id = "shortcut-budget-2"
-default.again[2].block.look = "entry"
-default.again[2].block.show = {"title":"Budget","icon":"chart"}
+default.again[2].block.look = "button"
+default.again[2].block.show = {"label":"Budget","icon":"chart"}
 default.again[2].block.opens = "page:budget-2"
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "expenses-2"
@@ -155,8 +155,8 @@ default.pageOps[0].page.blocks[3].show = {"title":"category","subtitles":["note"
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
 default.pageOps[1].block.id = "shortcut-budget-2"
-default.pageOps[1].block.look = "entry"
-default.pageOps[1].block.show = {"title":"Budget","icon":"chart"}
+default.pageOps[1].block.look = "button"
+default.pageOps[1].block.show = {"label":"Budget","icon":"chart"}
 default.pageOps[1].block.opens = "page:budget-2"
 default.withoutPage = ["∅undefined","∅undefined","expenses"]
 roomyNav.templateOps[0].op = "addData"
@@ -362,8 +362,8 @@ default.templateOps[1].page.blocks[3].show.emptyText = "Rien pour l’instant"
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
 default.templateOps[2].block.id = "shortcut-budget"
-default.templateOps[2].block.look = "entry"
-default.templateOps[2].block.show = {"title":"Budget","icon":"chart"}
+default.templateOps[2].block.look = "button"
+default.templateOps[2].block.show = {"label":"Budget","icon":"chart"}
 default.templateOps[2].block.opens = "page:budget"
 default.again[0].op = "addData"
 default.again[0].table.id = "expenses-2"
@@ -421,8 +421,8 @@ default.again[1].page.blocks[3].show.emptyText = "Rien pour l’instant"
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
 default.again[2].block.id = "shortcut-budget-2"
-default.again[2].block.look = "entry"
-default.again[2].block.show = {"title":"Budget","icon":"chart"}
+default.again[2].block.look = "button"
+default.again[2].block.show = {"label":"Budget","icon":"chart"}
 default.again[2].block.opens = "page:budget-2"
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "expenses-2"
@@ -480,8 +480,8 @@ default.pageOps[0].page.blocks[3].show.emptyText = "Rien pour l’instant"
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
 default.pageOps[1].block.id = "shortcut-budget-2"
-default.pageOps[1].block.look = "entry"
-default.pageOps[1].block.show = {"title":"Budget","icon":"chart"}
+default.pageOps[1].block.look = "button"
+default.pageOps[1].block.show = {"label":"Budget","icon":"chart"}
 default.pageOps[1].block.opens = "page:budget-2"
 default.withoutPage = ["∅undefined","∅undefined","expenses"]
 roomyNav.templateOps[0].op = "addData"
@@ -700,7 +700,7 @@ default.templateOps[1].page.blocks[3].source = {"table":"expenses","sort":{"fiel
 default.templateOps[1].page.blocks[3].show = {"title":"category","subtitles":["note","date"],"trailing":"amount","emptyText":"还没有记录"}
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
-default.templateOps[2].block = {"id":"shortcut-budget","look":"entry","show":{"title":"记账","icon":"chart"},"opens":"page:budget"}
+default.templateOps[2].block = {"id":"shortcut-budget","look":"button","show":{"label":"记账","icon":"chart"},"opens":"page:budget"}
 default.again[0].op = "addData"
 default.again[0].table.id = "expenses-2"
 default.again[0].table.name = "账目"
@@ -750,8 +750,8 @@ default.again[1].page.blocks[3].show = {"title":"category","subtitles":["note","
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
 default.again[2].block.id = "shortcut-budget-2"
-default.again[2].block.look = "entry"
-default.again[2].block.show = {"title":"记账","icon":"chart"}
+default.again[2].block.look = "button"
+default.again[2].block.show = {"label":"记账","icon":"chart"}
 default.again[2].block.opens = "page:budget-2"
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "expenses-2"
@@ -802,8 +802,8 @@ default.pageOps[0].page.blocks[3].show = {"title":"category","subtitles":["note"
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
 default.pageOps[1].block.id = "shortcut-budget-2"
-default.pageOps[1].block.look = "entry"
-default.pageOps[1].block.show = {"title":"记账","icon":"chart"}
+default.pageOps[1].block.look = "button"
+default.pageOps[1].block.show = {"label":"记账","icon":"chart"}
 default.pageOps[1].block.opens = "page:budget-2"
 default.withoutPage = ["∅undefined","∅undefined","expenses"]
 roomyNav.templateOps[0].op = "addData"
@@ -966,7 +966,7 @@ default.templateOps[1].page.icon = "document"
 default.templateOps[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 default.templateOps[1].page.blocks[1].id = "add"
 default.templateOps[1].page.blocks[1].look = "button"
-default.templateOps[1].page.blocks[1].show = {"label":"New note","variant":"filled"}
+default.templateOps[1].page.blocks[1].show = {"label":"New note","shape":"filled"}
 default.templateOps[1].page.blocks[1].tools = [{"do":"create","table":"notes","ask":"all"}]
 default.templateOps[1].page.blocks[2].id = "notes"
 default.templateOps[1].page.blocks[2].look = "cards"
@@ -975,8 +975,8 @@ default.templateOps[1].page.blocks[2].show = {"title":"title","subtitles":["body
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
 default.templateOps[2].block.id = "shortcut-notes"
-default.templateOps[2].block.look = "entry"
-default.templateOps[2].block.show = {"title":"Notes","icon":"document"}
+default.templateOps[2].block.look = "button"
+default.templateOps[2].block.show = {"label":"Notes","icon":"document"}
 default.templateOps[2].block.opens = "page:notes"
 default.again[0].op = "addData"
 default.again[0].table.id = "notes-2"
@@ -991,7 +991,7 @@ default.again[1].page.icon = "document"
 default.again[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 default.again[1].page.blocks[1].id = "add"
 default.again[1].page.blocks[1].look = "button"
-default.again[1].page.blocks[1].show = {"label":"New note","variant":"filled"}
+default.again[1].page.blocks[1].show = {"label":"New note","shape":"filled"}
 default.again[1].page.blocks[1].tools = [{"do":"create","table":"notes-2","ask":"all"}]
 default.again[1].page.blocks[2].id = "notes"
 default.again[1].page.blocks[2].look = "cards"
@@ -1000,8 +1000,8 @@ default.again[1].page.blocks[2].show = {"title":"title","subtitles":["body"],"em
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
 default.again[2].block.id = "shortcut-notes-2"
-default.again[2].block.look = "entry"
-default.again[2].block.show = {"title":"Notes","icon":"document"}
+default.again[2].block.look = "button"
+default.again[2].block.show = {"label":"Notes","icon":"document"}
 default.again[2].block.opens = "page:notes-2"
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "notes-2"
@@ -1016,7 +1016,7 @@ default.pageOps[0].page.icon = "document"
 default.pageOps[0].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 default.pageOps[0].page.blocks[1].id = "add"
 default.pageOps[0].page.blocks[1].look = "button"
-default.pageOps[0].page.blocks[1].show = {"label":"New note","variant":"filled"}
+default.pageOps[0].page.blocks[1].show = {"label":"New note","shape":"filled"}
 default.pageOps[0].page.blocks[1].tools = [{"do":"create","table":"existing","ask":"all"}]
 default.pageOps[0].page.blocks[2].id = "notes"
 default.pageOps[0].page.blocks[2].look = "cards"
@@ -1025,8 +1025,8 @@ default.pageOps[0].page.blocks[2].show = {"title":"title","subtitles":["body"],"
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
 default.pageOps[1].block.id = "shortcut-notes-2"
-default.pageOps[1].block.look = "entry"
-default.pageOps[1].block.show = {"title":"Notes","icon":"document"}
+default.pageOps[1].block.look = "button"
+default.pageOps[1].block.show = {"label":"Notes","icon":"document"}
 default.pageOps[1].block.opens = "page:notes-2"
 default.withoutPage = ["∅undefined","∅undefined","notes"]
 roomyNav.templateOps[0].op = "addData"
@@ -1042,7 +1042,7 @@ roomyNav.templateOps[1].page.icon = "document"
 roomyNav.templateOps[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 roomyNav.templateOps[1].page.blocks[1].id = "add"
 roomyNav.templateOps[1].page.blocks[1].look = "button"
-roomyNav.templateOps[1].page.blocks[1].show = {"label":"New note","variant":"filled"}
+roomyNav.templateOps[1].page.blocks[1].show = {"label":"New note","shape":"filled"}
 roomyNav.templateOps[1].page.blocks[1].tools = [{"do":"create","table":"notes","ask":"all"}]
 roomyNav.templateOps[1].page.blocks[2].id = "notes"
 roomyNav.templateOps[1].page.blocks[2].look = "cards"
@@ -1062,7 +1062,7 @@ roomyNav.again[1].page.icon = "document"
 roomyNav.again[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 roomyNav.again[1].page.blocks[1].id = "add"
 roomyNav.again[1].page.blocks[1].look = "button"
-roomyNav.again[1].page.blocks[1].show = {"label":"New note","variant":"filled"}
+roomyNav.again[1].page.blocks[1].show = {"label":"New note","shape":"filled"}
 roomyNav.again[1].page.blocks[1].tools = [{"do":"create","table":"notes-2","ask":"all"}]
 roomyNav.again[1].page.blocks[2].id = "notes"
 roomyNav.again[1].page.blocks[2].look = "cards"
@@ -1082,7 +1082,7 @@ roomyNav.pageOps[0].page.icon = "document"
 roomyNav.pageOps[0].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 roomyNav.pageOps[0].page.blocks[1].id = "add"
 roomyNav.pageOps[0].page.blocks[1].look = "button"
-roomyNav.pageOps[0].page.blocks[1].show = {"label":"New note","variant":"filled"}
+roomyNav.pageOps[0].page.blocks[1].show = {"label":"New note","shape":"filled"}
 roomyNav.pageOps[0].page.blocks[1].tools = [{"do":"create","table":"existing","ask":"all"}]
 roomyNav.pageOps[0].page.blocks[2].id = "notes"
 roomyNav.pageOps[0].page.blocks[2].look = "cards"
@@ -1108,7 +1108,7 @@ default.templateOps[1].page.icon = "document"
 default.templateOps[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 default.templateOps[1].page.blocks[1].id = "add"
 default.templateOps[1].page.blocks[1].look = "button"
-default.templateOps[1].page.blocks[1].show = {"label":"Nouvelle note","variant":"filled"}
+default.templateOps[1].page.blocks[1].show = {"label":"Nouvelle note","shape":"filled"}
 default.templateOps[1].page.blocks[1].tools = [{"do":"create","table":"notes","ask":"all"}]
 default.templateOps[1].page.blocks[2].id = "notes"
 default.templateOps[1].page.blocks[2].look = "cards"
@@ -1117,8 +1117,8 @@ default.templateOps[1].page.blocks[2].show = {"title":"title","subtitles":["body
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
 default.templateOps[2].block.id = "shortcut-notes"
-default.templateOps[2].block.look = "entry"
-default.templateOps[2].block.show = {"title":"Notes","icon":"document"}
+default.templateOps[2].block.look = "button"
+default.templateOps[2].block.show = {"label":"Notes","icon":"document"}
 default.templateOps[2].block.opens = "page:notes"
 default.again[0].op = "addData"
 default.again[0].table.id = "notes-2"
@@ -1133,7 +1133,7 @@ default.again[1].page.icon = "document"
 default.again[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 default.again[1].page.blocks[1].id = "add"
 default.again[1].page.blocks[1].look = "button"
-default.again[1].page.blocks[1].show = {"label":"Nouvelle note","variant":"filled"}
+default.again[1].page.blocks[1].show = {"label":"Nouvelle note","shape":"filled"}
 default.again[1].page.blocks[1].tools = [{"do":"create","table":"notes-2","ask":"all"}]
 default.again[1].page.blocks[2].id = "notes"
 default.again[1].page.blocks[2].look = "cards"
@@ -1142,8 +1142,8 @@ default.again[1].page.blocks[2].show = {"title":"title","subtitles":["body"],"em
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
 default.again[2].block.id = "shortcut-notes-2"
-default.again[2].block.look = "entry"
-default.again[2].block.show = {"title":"Notes","icon":"document"}
+default.again[2].block.look = "button"
+default.again[2].block.show = {"label":"Notes","icon":"document"}
 default.again[2].block.opens = "page:notes-2"
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "notes-2"
@@ -1158,7 +1158,7 @@ default.pageOps[0].page.icon = "document"
 default.pageOps[0].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 default.pageOps[0].page.blocks[1].id = "add"
 default.pageOps[0].page.blocks[1].look = "button"
-default.pageOps[0].page.blocks[1].show = {"label":"Nouvelle note","variant":"filled"}
+default.pageOps[0].page.blocks[1].show = {"label":"Nouvelle note","shape":"filled"}
 default.pageOps[0].page.blocks[1].tools = [{"do":"create","table":"existing","ask":"all"}]
 default.pageOps[0].page.blocks[2].id = "notes"
 default.pageOps[0].page.blocks[2].look = "cards"
@@ -1167,8 +1167,8 @@ default.pageOps[0].page.blocks[2].show = {"title":"title","subtitles":["body"],"
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
 default.pageOps[1].block.id = "shortcut-notes-2"
-default.pageOps[1].block.look = "entry"
-default.pageOps[1].block.show = {"title":"Notes","icon":"document"}
+default.pageOps[1].block.look = "button"
+default.pageOps[1].block.show = {"label":"Notes","icon":"document"}
 default.pageOps[1].block.opens = "page:notes-2"
 default.withoutPage = ["∅undefined","∅undefined","notes"]
 roomyNav.templateOps[0].op = "addData"
@@ -1184,7 +1184,7 @@ roomyNav.templateOps[1].page.icon = "document"
 roomyNav.templateOps[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 roomyNav.templateOps[1].page.blocks[1].id = "add"
 roomyNav.templateOps[1].page.blocks[1].look = "button"
-roomyNav.templateOps[1].page.blocks[1].show = {"label":"Nouvelle note","variant":"filled"}
+roomyNav.templateOps[1].page.blocks[1].show = {"label":"Nouvelle note","shape":"filled"}
 roomyNav.templateOps[1].page.blocks[1].tools = [{"do":"create","table":"notes","ask":"all"}]
 roomyNav.templateOps[1].page.blocks[2].id = "notes"
 roomyNav.templateOps[1].page.blocks[2].look = "cards"
@@ -1204,7 +1204,7 @@ roomyNav.again[1].page.icon = "document"
 roomyNav.again[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 roomyNav.again[1].page.blocks[1].id = "add"
 roomyNav.again[1].page.blocks[1].look = "button"
-roomyNav.again[1].page.blocks[1].show = {"label":"Nouvelle note","variant":"filled"}
+roomyNav.again[1].page.blocks[1].show = {"label":"Nouvelle note","shape":"filled"}
 roomyNav.again[1].page.blocks[1].tools = [{"do":"create","table":"notes-2","ask":"all"}]
 roomyNav.again[1].page.blocks[2].id = "notes"
 roomyNav.again[1].page.blocks[2].look = "cards"
@@ -1224,7 +1224,7 @@ roomyNav.pageOps[0].page.icon = "document"
 roomyNav.pageOps[0].page.blocks[0] = {"id":"title","look":"header","show":{"title":"Notes"}}
 roomyNav.pageOps[0].page.blocks[1].id = "add"
 roomyNav.pageOps[0].page.blocks[1].look = "button"
-roomyNav.pageOps[0].page.blocks[1].show = {"label":"Nouvelle note","variant":"filled"}
+roomyNav.pageOps[0].page.blocks[1].show = {"label":"Nouvelle note","shape":"filled"}
 roomyNav.pageOps[0].page.blocks[1].tools = [{"do":"create","table":"existing","ask":"all"}]
 roomyNav.pageOps[0].page.blocks[2].id = "notes"
 roomyNav.pageOps[0].page.blocks[2].look = "cards"
@@ -1249,7 +1249,7 @@ default.templateOps[1].page.icon = "document"
 default.templateOps[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"笔记"}}
 default.templateOps[1].page.blocks[1].id = "add"
 default.templateOps[1].page.blocks[1].look = "button"
-default.templateOps[1].page.blocks[1].show = {"label":"写笔记","variant":"filled"}
+default.templateOps[1].page.blocks[1].show = {"label":"写笔记","shape":"filled"}
 default.templateOps[1].page.blocks[1].tools = [{"do":"create","table":"notes","ask":"all"}]
 default.templateOps[1].page.blocks[2].id = "notes"
 default.templateOps[1].page.blocks[2].look = "cards"
@@ -1257,7 +1257,7 @@ default.templateOps[1].page.blocks[2].source = {"table":"notes","sort":{"field":
 default.templateOps[1].page.blocks[2].show = {"title":"title","subtitles":["body"],"emptyText":"还没有笔记"}
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
-default.templateOps[2].block = {"id":"shortcut-notes","look":"entry","show":{"title":"笔记","icon":"document"},"opens":"page:notes"}
+default.templateOps[2].block = {"id":"shortcut-notes","look":"button","show":{"label":"笔记","icon":"document"},"opens":"page:notes"}
 default.again[0].op = "addData"
 default.again[0].table.id = "notes-2"
 default.again[0].table.name = "笔记"
@@ -1270,7 +1270,7 @@ default.again[1].page.icon = "document"
 default.again[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"笔记"}}
 default.again[1].page.blocks[1].id = "add"
 default.again[1].page.blocks[1].look = "button"
-default.again[1].page.blocks[1].show = {"label":"写笔记","variant":"filled"}
+default.again[1].page.blocks[1].show = {"label":"写笔记","shape":"filled"}
 default.again[1].page.blocks[1].tools = [{"do":"create","table":"notes-2","ask":"all"}]
 default.again[1].page.blocks[2].id = "notes"
 default.again[1].page.blocks[2].look = "cards"
@@ -1279,8 +1279,8 @@ default.again[1].page.blocks[2].show = {"title":"title","subtitles":["body"],"em
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
 default.again[2].block.id = "shortcut-notes-2"
-default.again[2].block.look = "entry"
-default.again[2].block.show = {"title":"笔记","icon":"document"}
+default.again[2].block.look = "button"
+default.again[2].block.show = {"label":"笔记","icon":"document"}
 default.again[2].block.opens = "page:notes-2"
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "notes-2"
@@ -1294,7 +1294,7 @@ default.pageOps[0].page.icon = "document"
 default.pageOps[0].page.blocks[0] = {"id":"title","look":"header","show":{"title":"笔记"}}
 default.pageOps[0].page.blocks[1].id = "add"
 default.pageOps[0].page.blocks[1].look = "button"
-default.pageOps[0].page.blocks[1].show = {"label":"写笔记","variant":"filled"}
+default.pageOps[0].page.blocks[1].show = {"label":"写笔记","shape":"filled"}
 default.pageOps[0].page.blocks[1].tools = [{"do":"create","table":"existing","ask":"all"}]
 default.pageOps[0].page.blocks[2].id = "notes"
 default.pageOps[0].page.blocks[2].look = "cards"
@@ -1303,8 +1303,8 @@ default.pageOps[0].page.blocks[2].show = {"title":"title","subtitles":["body"],"
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
 default.pageOps[1].block.id = "shortcut-notes-2"
-default.pageOps[1].block.look = "entry"
-default.pageOps[1].block.show = {"title":"笔记","icon":"document"}
+default.pageOps[1].block.look = "button"
+default.pageOps[1].block.show = {"label":"笔记","icon":"document"}
 default.pageOps[1].block.opens = "page:notes-2"
 default.withoutPage = ["∅undefined","∅undefined","notes"]
 roomyNav.templateOps[0].op = "addData"
@@ -1319,7 +1319,7 @@ roomyNav.templateOps[1].page.icon = "document"
 roomyNav.templateOps[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"笔记"}}
 roomyNav.templateOps[1].page.blocks[1].id = "add"
 roomyNav.templateOps[1].page.blocks[1].look = "button"
-roomyNav.templateOps[1].page.blocks[1].show = {"label":"写笔记","variant":"filled"}
+roomyNav.templateOps[1].page.blocks[1].show = {"label":"写笔记","shape":"filled"}
 roomyNav.templateOps[1].page.blocks[1].tools = [{"do":"create","table":"notes","ask":"all"}]
 roomyNav.templateOps[1].page.blocks[2].id = "notes"
 roomyNav.templateOps[1].page.blocks[2].look = "cards"
@@ -1338,7 +1338,7 @@ roomyNav.again[1].page.icon = "document"
 roomyNav.again[1].page.blocks[0] = {"id":"title","look":"header","show":{"title":"笔记"}}
 roomyNav.again[1].page.blocks[1].id = "add"
 roomyNav.again[1].page.blocks[1].look = "button"
-roomyNav.again[1].page.blocks[1].show = {"label":"写笔记","variant":"filled"}
+roomyNav.again[1].page.blocks[1].show = {"label":"写笔记","shape":"filled"}
 roomyNav.again[1].page.blocks[1].tools = [{"do":"create","table":"notes-2","ask":"all"}]
 roomyNav.again[1].page.blocks[2].id = "notes"
 roomyNav.again[1].page.blocks[2].look = "cards"
@@ -1357,7 +1357,7 @@ roomyNav.pageOps[0].page.icon = "document"
 roomyNav.pageOps[0].page.blocks[0] = {"id":"title","look":"header","show":{"title":"笔记"}}
 roomyNav.pageOps[0].page.blocks[1].id = "add"
 roomyNav.pageOps[0].page.blocks[1].look = "button"
-roomyNav.pageOps[0].page.blocks[1].show = {"label":"写笔记","variant":"filled"}
+roomyNav.pageOps[0].page.blocks[1].show = {"label":"写笔记","shape":"filled"}
 roomyNav.pageOps[0].page.blocks[1].tools = [{"do":"create","table":"existing","ask":"all"}]
 roomyNav.pageOps[0].page.blocks[2].id = "notes"
 roomyNav.pageOps[0].page.blocks[2].look = "cards"
@@ -1396,7 +1396,7 @@ default.templateOps[1].page.blocks[1].show = {"label":"Finished"}
 default.templateOps[1].page.blocks[1].source = {"table":"books","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 default.templateOps[1].page.blocks[2].id = "add"
 default.templateOps[1].page.blocks[2].look = "button"
-default.templateOps[1].page.blocks[2].show = {"label":"Add a book","variant":"filled"}
+default.templateOps[1].page.blocks[2].show = {"label":"Add a book","shape":"filled"}
 default.templateOps[1].page.blocks[2].tools = [{"do":"create","table":"books","ask":"all"}]
 default.templateOps[1].page.blocks[3].id = "books"
 default.templateOps[1].page.blocks[3].look = "cards"
@@ -1405,8 +1405,8 @@ default.templateOps[1].page.blocks[3].show = {"title":"title","subtitles":["auth
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
 default.templateOps[2].block.id = "shortcut-reading"
-default.templateOps[2].block.look = "entry"
-default.templateOps[2].block.show = {"title":"Reading","icon":"bookmark"}
+default.templateOps[2].block.look = "button"
+default.templateOps[2].block.show = {"label":"Reading","icon":"bookmark"}
 default.templateOps[2].block.opens = "page:reading"
 default.again[0].op = "addData"
 default.again[0].table.id = "books-2"
@@ -1434,7 +1434,7 @@ default.again[1].page.blocks[1].show = {"label":"Finished"}
 default.again[1].page.blocks[1].source = {"table":"books-2","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 default.again[1].page.blocks[2].id = "add"
 default.again[1].page.blocks[2].look = "button"
-default.again[1].page.blocks[2].show = {"label":"Add a book","variant":"filled"}
+default.again[1].page.blocks[2].show = {"label":"Add a book","shape":"filled"}
 default.again[1].page.blocks[2].tools = [{"do":"create","table":"books-2","ask":"all"}]
 default.again[1].page.blocks[3].id = "books"
 default.again[1].page.blocks[3].look = "cards"
@@ -1443,8 +1443,8 @@ default.again[1].page.blocks[3].show = {"title":"title","subtitles":["author","s
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
 default.again[2].block.id = "shortcut-reading-2"
-default.again[2].block.look = "entry"
-default.again[2].block.show = {"title":"Reading","icon":"bookmark"}
+default.again[2].block.look = "button"
+default.again[2].block.show = {"label":"Reading","icon":"bookmark"}
 default.again[2].block.opens = "page:reading-2"
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "books-2"
@@ -1472,7 +1472,7 @@ default.pageOps[0].page.blocks[1].show = {"label":"Finished"}
 default.pageOps[0].page.blocks[1].source = {"table":"existing","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 default.pageOps[0].page.blocks[2].id = "add"
 default.pageOps[0].page.blocks[2].look = "button"
-default.pageOps[0].page.blocks[2].show = {"label":"Add a book","variant":"filled"}
+default.pageOps[0].page.blocks[2].show = {"label":"Add a book","shape":"filled"}
 default.pageOps[0].page.blocks[2].tools = [{"do":"create","table":"existing","ask":"all"}]
 default.pageOps[0].page.blocks[3].id = "books"
 default.pageOps[0].page.blocks[3].look = "cards"
@@ -1481,8 +1481,8 @@ default.pageOps[0].page.blocks[3].show = {"title":"title","subtitles":["author",
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
 default.pageOps[1].block.id = "shortcut-reading-2"
-default.pageOps[1].block.look = "entry"
-default.pageOps[1].block.show = {"title":"Reading","icon":"bookmark"}
+default.pageOps[1].block.look = "button"
+default.pageOps[1].block.show = {"label":"Reading","icon":"bookmark"}
 default.pageOps[1].block.opens = "page:reading-2"
 default.withoutPage = ["∅undefined","∅undefined","books"]
 roomyNav.templateOps[0].op = "addData"
@@ -1511,7 +1511,7 @@ roomyNav.templateOps[1].page.blocks[1].show = {"label":"Finished"}
 roomyNav.templateOps[1].page.blocks[1].source = {"table":"books","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 roomyNav.templateOps[1].page.blocks[2].id = "add"
 roomyNav.templateOps[1].page.blocks[2].look = "button"
-roomyNav.templateOps[1].page.blocks[2].show = {"label":"Add a book","variant":"filled"}
+roomyNav.templateOps[1].page.blocks[2].show = {"label":"Add a book","shape":"filled"}
 roomyNav.templateOps[1].page.blocks[2].tools = [{"do":"create","table":"books","ask":"all"}]
 roomyNav.templateOps[1].page.blocks[3].id = "books"
 roomyNav.templateOps[1].page.blocks[3].look = "cards"
@@ -1544,7 +1544,7 @@ roomyNav.again[1].page.blocks[1].show = {"label":"Finished"}
 roomyNav.again[1].page.blocks[1].source = {"table":"books-2","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 roomyNav.again[1].page.blocks[2].id = "add"
 roomyNav.again[1].page.blocks[2].look = "button"
-roomyNav.again[1].page.blocks[2].show = {"label":"Add a book","variant":"filled"}
+roomyNav.again[1].page.blocks[2].show = {"label":"Add a book","shape":"filled"}
 roomyNav.again[1].page.blocks[2].tools = [{"do":"create","table":"books-2","ask":"all"}]
 roomyNav.again[1].page.blocks[3].id = "books"
 roomyNav.again[1].page.blocks[3].look = "cards"
@@ -1577,7 +1577,7 @@ roomyNav.pageOps[0].page.blocks[1].show = {"label":"Finished"}
 roomyNav.pageOps[0].page.blocks[1].source = {"table":"existing","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 roomyNav.pageOps[0].page.blocks[2].id = "add"
 roomyNav.pageOps[0].page.blocks[2].look = "button"
-roomyNav.pageOps[0].page.blocks[2].show = {"label":"Add a book","variant":"filled"}
+roomyNav.pageOps[0].page.blocks[2].show = {"label":"Add a book","shape":"filled"}
 roomyNav.pageOps[0].page.blocks[2].tools = [{"do":"create","table":"existing","ask":"all"}]
 roomyNav.pageOps[0].page.blocks[3].id = "books"
 roomyNav.pageOps[0].page.blocks[3].look = "cards"
@@ -1614,7 +1614,7 @@ default.templateOps[1].page.blocks[1].show = {"label":"Terminés"}
 default.templateOps[1].page.blocks[1].source = {"table":"books","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 default.templateOps[1].page.blocks[2].id = "add"
 default.templateOps[1].page.blocks[2].look = "button"
-default.templateOps[1].page.blocks[2].show = {"label":"Ajouter un livre","variant":"filled"}
+default.templateOps[1].page.blocks[2].show = {"label":"Ajouter un livre","shape":"filled"}
 default.templateOps[1].page.blocks[2].tools = [{"do":"create","table":"books","ask":"all"}]
 default.templateOps[1].page.blocks[3].id = "books"
 default.templateOps[1].page.blocks[3].look = "cards"
@@ -1626,8 +1626,8 @@ default.templateOps[1].page.blocks[3].show.emptyText = "Aucun livre pour l’ins
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
 default.templateOps[2].block.id = "shortcut-reading"
-default.templateOps[2].block.look = "entry"
-default.templateOps[2].block.show = {"title":"Liste de lecture","icon":"bookmark"}
+default.templateOps[2].block.look = "button"
+default.templateOps[2].block.show = {"label":"Liste de lecture","icon":"bookmark"}
 default.templateOps[2].block.opens = "page:reading"
 default.again[0].op = "addData"
 default.again[0].table.id = "books-2"
@@ -1653,7 +1653,7 @@ default.again[1].page.blocks[1].show = {"label":"Terminés"}
 default.again[1].page.blocks[1].source = {"table":"books-2","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 default.again[1].page.blocks[2].id = "add"
 default.again[1].page.blocks[2].look = "button"
-default.again[1].page.blocks[2].show = {"label":"Ajouter un livre","variant":"filled"}
+default.again[1].page.blocks[2].show = {"label":"Ajouter un livre","shape":"filled"}
 default.again[1].page.blocks[2].tools = [{"do":"create","table":"books-2","ask":"all"}]
 default.again[1].page.blocks[3].id = "books"
 default.again[1].page.blocks[3].look = "cards"
@@ -1665,8 +1665,8 @@ default.again[1].page.blocks[3].show.emptyText = "Aucun livre pour l’instant"
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
 default.again[2].block.id = "shortcut-reading-2"
-default.again[2].block.look = "entry"
-default.again[2].block.show = {"title":"Liste de lecture","icon":"bookmark"}
+default.again[2].block.look = "button"
+default.again[2].block.show = {"label":"Liste de lecture","icon":"bookmark"}
 default.again[2].block.opens = "page:reading-2"
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "books-2"
@@ -1692,7 +1692,7 @@ default.pageOps[0].page.blocks[1].show = {"label":"Terminés"}
 default.pageOps[0].page.blocks[1].source = {"table":"existing","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 default.pageOps[0].page.blocks[2].id = "add"
 default.pageOps[0].page.blocks[2].look = "button"
-default.pageOps[0].page.blocks[2].show = {"label":"Ajouter un livre","variant":"filled"}
+default.pageOps[0].page.blocks[2].show = {"label":"Ajouter un livre","shape":"filled"}
 default.pageOps[0].page.blocks[2].tools = [{"do":"create","table":"existing","ask":"all"}]
 default.pageOps[0].page.blocks[3].id = "books"
 default.pageOps[0].page.blocks[3].look = "cards"
@@ -1704,8 +1704,8 @@ default.pageOps[0].page.blocks[3].show.emptyText = "Aucun livre pour l’instant
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
 default.pageOps[1].block.id = "shortcut-reading-2"
-default.pageOps[1].block.look = "entry"
-default.pageOps[1].block.show = {"title":"Liste de lecture","icon":"bookmark"}
+default.pageOps[1].block.look = "button"
+default.pageOps[1].block.show = {"label":"Liste de lecture","icon":"bookmark"}
 default.pageOps[1].block.opens = "page:reading-2"
 default.withoutPage = ["∅undefined","∅undefined","books"]
 roomyNav.templateOps[0].op = "addData"
@@ -1732,7 +1732,7 @@ roomyNav.templateOps[1].page.blocks[1].show = {"label":"Terminés"}
 roomyNav.templateOps[1].page.blocks[1].source = {"table":"books","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 roomyNav.templateOps[1].page.blocks[2].id = "add"
 roomyNav.templateOps[1].page.blocks[2].look = "button"
-roomyNav.templateOps[1].page.blocks[2].show = {"label":"Ajouter un livre","variant":"filled"}
+roomyNav.templateOps[1].page.blocks[2].show = {"label":"Ajouter un livre","shape":"filled"}
 roomyNav.templateOps[1].page.blocks[2].tools = [{"do":"create","table":"books","ask":"all"}]
 roomyNav.templateOps[1].page.blocks[3].id = "books"
 roomyNav.templateOps[1].page.blocks[3].look = "cards"
@@ -1766,7 +1766,7 @@ roomyNav.again[1].page.blocks[1].show = {"label":"Terminés"}
 roomyNav.again[1].page.blocks[1].source = {"table":"books-2","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 roomyNav.again[1].page.blocks[2].id = "add"
 roomyNav.again[1].page.blocks[2].look = "button"
-roomyNav.again[1].page.blocks[2].show = {"label":"Ajouter un livre","variant":"filled"}
+roomyNav.again[1].page.blocks[2].show = {"label":"Ajouter un livre","shape":"filled"}
 roomyNav.again[1].page.blocks[2].tools = [{"do":"create","table":"books-2","ask":"all"}]
 roomyNav.again[1].page.blocks[3].id = "books"
 roomyNav.again[1].page.blocks[3].look = "cards"
@@ -1800,7 +1800,7 @@ roomyNav.pageOps[0].page.blocks[1].show = {"label":"Terminés"}
 roomyNav.pageOps[0].page.blocks[1].source = {"table":"existing","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 roomyNav.pageOps[0].page.blocks[2].id = "add"
 roomyNav.pageOps[0].page.blocks[2].look = "button"
-roomyNav.pageOps[0].page.blocks[2].show = {"label":"Ajouter un livre","variant":"filled"}
+roomyNav.pageOps[0].page.blocks[2].show = {"label":"Ajouter un livre","shape":"filled"}
 roomyNav.pageOps[0].page.blocks[2].tools = [{"do":"create","table":"existing","ask":"all"}]
 roomyNav.pageOps[0].page.blocks[3].id = "books"
 roomyNav.pageOps[0].page.blocks[3].look = "cards"
@@ -1840,7 +1840,7 @@ default.templateOps[1].page.blocks[1].show = {"label":"已读完"}
 default.templateOps[1].page.blocks[1].source = {"table":"books","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 default.templateOps[1].page.blocks[2].id = "add"
 default.templateOps[1].page.blocks[2].look = "button"
-default.templateOps[1].page.blocks[2].show = {"label":"添加一本书","variant":"filled"}
+default.templateOps[1].page.blocks[2].show = {"label":"添加一本书","shape":"filled"}
 default.templateOps[1].page.blocks[2].tools = [{"do":"create","table":"books","ask":"all"}]
 default.templateOps[1].page.blocks[3].id = "books"
 default.templateOps[1].page.blocks[3].look = "cards"
@@ -1849,8 +1849,8 @@ default.templateOps[1].page.blocks[3].show = {"title":"title","subtitles":["auth
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
 default.templateOps[2].block.id = "shortcut-reading"
-default.templateOps[2].block.look = "entry"
-default.templateOps[2].block.show = {"title":"读书清单","icon":"bookmark"}
+default.templateOps[2].block.look = "button"
+default.templateOps[2].block.show = {"label":"读书清单","icon":"bookmark"}
 default.templateOps[2].block.opens = "page:reading"
 default.again[0].op = "addData"
 default.again[0].table.id = "books-2"
@@ -1876,7 +1876,7 @@ default.again[1].page.blocks[1].show = {"label":"已读完"}
 default.again[1].page.blocks[1].source = {"table":"books-2","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 default.again[1].page.blocks[2].id = "add"
 default.again[1].page.blocks[2].look = "button"
-default.again[1].page.blocks[2].show = {"label":"添加一本书","variant":"filled"}
+default.again[1].page.blocks[2].show = {"label":"添加一本书","shape":"filled"}
 default.again[1].page.blocks[2].tools = [{"do":"create","table":"books-2","ask":"all"}]
 default.again[1].page.blocks[3].id = "books"
 default.again[1].page.blocks[3].look = "cards"
@@ -1885,8 +1885,8 @@ default.again[1].page.blocks[3].show = {"title":"title","subtitles":["author","s
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
 default.again[2].block.id = "shortcut-reading-2"
-default.again[2].block.look = "entry"
-default.again[2].block.show = {"title":"读书清单","icon":"bookmark"}
+default.again[2].block.look = "button"
+default.again[2].block.show = {"label":"读书清单","icon":"bookmark"}
 default.again[2].block.opens = "page:reading-2"
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "books-2"
@@ -1912,7 +1912,7 @@ default.pageOps[0].page.blocks[1].show = {"label":"已读完"}
 default.pageOps[0].page.blocks[1].source = {"table":"existing","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 default.pageOps[0].page.blocks[2].id = "add"
 default.pageOps[0].page.blocks[2].look = "button"
-default.pageOps[0].page.blocks[2].show = {"label":"添加一本书","variant":"filled"}
+default.pageOps[0].page.blocks[2].show = {"label":"添加一本书","shape":"filled"}
 default.pageOps[0].page.blocks[2].tools = [{"do":"create","table":"existing","ask":"all"}]
 default.pageOps[0].page.blocks[3].id = "books"
 default.pageOps[0].page.blocks[3].look = "cards"
@@ -1921,8 +1921,8 @@ default.pageOps[0].page.blocks[3].show = {"title":"title","subtitles":["author",
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
 default.pageOps[1].block.id = "shortcut-reading-2"
-default.pageOps[1].block.look = "entry"
-default.pageOps[1].block.show = {"title":"读书清单","icon":"bookmark"}
+default.pageOps[1].block.look = "button"
+default.pageOps[1].block.show = {"label":"读书清单","icon":"bookmark"}
 default.pageOps[1].block.opens = "page:reading-2"
 default.withoutPage = ["∅undefined","∅undefined","books"]
 roomyNav.templateOps[0].op = "addData"
@@ -1949,7 +1949,7 @@ roomyNav.templateOps[1].page.blocks[1].show = {"label":"已读完"}
 roomyNav.templateOps[1].page.blocks[1].source = {"table":"books","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 roomyNav.templateOps[1].page.blocks[2].id = "add"
 roomyNav.templateOps[1].page.blocks[2].look = "button"
-roomyNav.templateOps[1].page.blocks[2].show = {"label":"添加一本书","variant":"filled"}
+roomyNav.templateOps[1].page.blocks[2].show = {"label":"添加一本书","shape":"filled"}
 roomyNav.templateOps[1].page.blocks[2].tools = [{"do":"create","table":"books","ask":"all"}]
 roomyNav.templateOps[1].page.blocks[3].id = "books"
 roomyNav.templateOps[1].page.blocks[3].look = "cards"
@@ -1980,7 +1980,7 @@ roomyNav.again[1].page.blocks[1].show = {"label":"已读完"}
 roomyNav.again[1].page.blocks[1].source = {"table":"books-2","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 roomyNav.again[1].page.blocks[2].id = "add"
 roomyNav.again[1].page.blocks[2].look = "button"
-roomyNav.again[1].page.blocks[2].show = {"label":"添加一本书","variant":"filled"}
+roomyNav.again[1].page.blocks[2].show = {"label":"添加一本书","shape":"filled"}
 roomyNav.again[1].page.blocks[2].tools = [{"do":"create","table":"books-2","ask":"all"}]
 roomyNav.again[1].page.blocks[3].id = "books"
 roomyNav.again[1].page.blocks[3].look = "cards"
@@ -2011,7 +2011,7 @@ roomyNav.pageOps[0].page.blocks[1].show = {"label":"已读完"}
 roomyNav.pageOps[0].page.blocks[1].source = {"table":"existing","aggregate":"count","filter":[{"field":"status","op":"is","value":"done"}]}
 roomyNav.pageOps[0].page.blocks[2].id = "add"
 roomyNav.pageOps[0].page.blocks[2].look = "button"
-roomyNav.pageOps[0].page.blocks[2].show = {"label":"添加一本书","variant":"filled"}
+roomyNav.pageOps[0].page.blocks[2].show = {"label":"添加一本书","shape":"filled"}
 roomyNav.pageOps[0].page.blocks[2].tools = [{"do":"create","table":"existing","ask":"all"}]
 roomyNav.pageOps[0].page.blocks[3].id = "books"
 roomyNav.pageOps[0].page.blocks[3].look = "cards"
@@ -2051,7 +2051,7 @@ default.templateOps[1].page.blocks[3].show = {"title":"title","subtitles":["due"
 default.templateOps[1].page.blocks[3].tools = [{"as":"check","do":"toggle","table":"todos","field":"done"}]
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
-default.templateOps[2].block = {"id":"shortcut-todo","look":"entry","show":{"title":"To-do","icon":"check"},"opens":"page:todo"}
+default.templateOps[2].block = {"id":"shortcut-todo","look":"button","show":{"label":"To-do","icon":"check"},"opens":"page:todo"}
 default.again[0].op = "addData"
 default.again[0].table.id = "todos-2"
 default.again[0].table.name = "To-dos"
@@ -2080,8 +2080,8 @@ default.again[1].page.blocks[3].tools = [{"as":"check","do":"toggle","table":"to
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
 default.again[2].block.id = "shortcut-todo-2"
-default.again[2].block.look = "entry"
-default.again[2].block.show = {"title":"To-do","icon":"check"}
+default.again[2].block.look = "button"
+default.again[2].block.show = {"label":"To-do","icon":"check"}
 default.again[2].block.opens = "page:todo-2"
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "todos-2"
@@ -2111,8 +2111,8 @@ default.pageOps[0].page.blocks[3].tools = [{"as":"check","do":"toggle","table":"
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
 default.pageOps[1].block.id = "shortcut-todo-2"
-default.pageOps[1].block.look = "entry"
-default.pageOps[1].block.show = {"title":"To-do","icon":"check"}
+default.pageOps[1].block.look = "button"
+default.pageOps[1].block.show = {"label":"To-do","icon":"check"}
 default.pageOps[1].block.opens = "page:todo-2"
 default.withoutPage = ["∅undefined","∅undefined","todos"]
 roomyNav.templateOps[0].op = "addData"
@@ -2226,7 +2226,7 @@ default.templateOps[1].page.blocks[3].show = {"title":"title","subtitles":["due"
 default.templateOps[1].page.blocks[3].tools = [{"as":"check","do":"toggle","table":"todos","field":"done"}]
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
-default.templateOps[2].block = {"id":"shortcut-todo","look":"entry","show":{"title":"À faire","icon":"check"},"opens":"page:todo"}
+default.templateOps[2].block = {"id":"shortcut-todo","look":"button","show":{"label":"À faire","icon":"check"},"opens":"page:todo"}
 default.again[0].op = "addData"
 default.again[0].table.id = "todos-2"
 default.again[0].table.name = "À faire"
@@ -2255,8 +2255,8 @@ default.again[1].page.blocks[3].tools = [{"as":"check","do":"toggle","table":"to
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
 default.again[2].block.id = "shortcut-todo-2"
-default.again[2].block.look = "entry"
-default.again[2].block.show = {"title":"À faire","icon":"check"}
+default.again[2].block.look = "button"
+default.again[2].block.show = {"label":"À faire","icon":"check"}
 default.again[2].block.opens = "page:todo-2"
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "todos-2"
@@ -2286,8 +2286,8 @@ default.pageOps[0].page.blocks[3].tools = [{"as":"check","do":"toggle","table":"
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
 default.pageOps[1].block.id = "shortcut-todo-2"
-default.pageOps[1].block.look = "entry"
-default.pageOps[1].block.show = {"title":"À faire","icon":"check"}
+default.pageOps[1].block.look = "button"
+default.pageOps[1].block.show = {"label":"À faire","icon":"check"}
 default.pageOps[1].block.opens = "page:todo-2"
 default.withoutPage = ["∅undefined","∅undefined","todos"]
 roomyNav.templateOps[0].op = "addData"
@@ -2401,7 +2401,7 @@ default.templateOps[1].page.blocks[3].show = {"title":"title","subtitles":["due"
 default.templateOps[1].page.blocks[3].tools = [{"as":"check","do":"toggle","table":"todos","field":"done"}]
 default.templateOps[2].op = "addContainer"
 default.templateOps[2].page = "home"
-default.templateOps[2].block = {"id":"shortcut-todo","look":"entry","show":{"title":"待办","icon":"check"},"opens":"page:todo"}
+default.templateOps[2].block = {"id":"shortcut-todo","look":"button","show":{"label":"待办","icon":"check"},"opens":"page:todo"}
 default.again[0].op = "addData"
 default.again[0].table.id = "todos-2"
 default.again[0].table.name = "待办"
@@ -2429,7 +2429,7 @@ default.again[1].page.blocks[3].show = {"title":"title","subtitles":["due"],"emp
 default.again[1].page.blocks[3].tools = [{"as":"check","do":"toggle","table":"todos-2","field":"done"}]
 default.again[2].op = "addContainer"
 default.again[2].page = "home"
-default.again[2].block = {"id":"shortcut-todo-2","look":"entry","show":{"title":"待办","icon":"check"},"opens":"page:todo-2"}
+default.again[2].block = {"id":"shortcut-todo-2","look":"button","show":{"label":"待办","icon":"check"},"opens":"page:todo-2"}
 default.collectionOp.op = "addData"
 default.collectionOp.table.id = "todos-2"
 default.collectionOp.table.name = "待办"
@@ -2457,7 +2457,7 @@ default.pageOps[0].page.blocks[3].show = {"title":"title","subtitles":["due"],"e
 default.pageOps[0].page.blocks[3].tools = [{"as":"check","do":"toggle","table":"existing","field":"done"}]
 default.pageOps[1].op = "addContainer"
 default.pageOps[1].page = "home"
-default.pageOps[1].block = {"id":"shortcut-todo-2","look":"entry","show":{"title":"待办","icon":"check"},"opens":"page:todo-2"}
+default.pageOps[1].block = {"id":"shortcut-todo-2","look":"button","show":{"label":"待办","icon":"check"},"opens":"page:todo-2"}
 default.withoutPage = ["∅undefined","∅undefined","todos"]
 roomyNav.templateOps[0].op = "addData"
 roomyNav.templateOps[0].table.id = "todos"
@@ -2596,6 +2596,151 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 2>.show.icon?
 <oneOf 2>.show.icon<anyOf 0> "home"|"apps"|"sparkles"|"history"|"settings"|"document"|"folder"|"star"|"heart"|"bolt"|"calendar"|"bookmark"|"inbox"|"chart"|"check"|"info"|"lightbulb"|"merge"|"link"|"person"|"plus"|"search"|"photo"|"scan"|"text"|"qrcode"|"archive"|"printer"|"signature"|"workflow"|"video"|"audio"|"translate"|"note"|"phone"|"message"|"mail"|"globe"|"share"|"table"|"wallet"|"rings"|"moon"|"timer"|"book"|"board"|"suitcase"|"vinyl"|"paper"
 <oneOf 2>.show.icon<anyOf 1> string
+<oneOf 2>.show.actionLabel? string len 1..20
+<oneOf 2>.show.openLabel? string len 1..20
+<oneOf 2>.source? object
+<oneOf 2>.source.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.source.filter? array items ..5
+<oneOf 2>.source.filter[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools? array items 1..1
+<oneOf 2>.tools[]
+<oneOf 2>.tools[]<anyOf 0> object
+<oneOf 2>.tools[]<anyOf 0>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
+<oneOf 2>.tools[]<anyOf 0>.label? string len 1..30
+<oneOf 2>.tools[]<anyOf 0>.when? array items ..3
+<oneOf 2>.tools[]<anyOf 0>.when[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools[]<anyOf 0>.tool
+<oneOf 2>.tools[]<anyOf 0>.tool<anyOf 0> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 0>.tool<anyOf 1> "$pick.media"|"$pick.files"|"$pick.open"
+<oneOf 2>.tools[]<anyOf 1> object
+<oneOf 2>.tools[]<anyOf 1>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
+<oneOf 2>.tools[]<anyOf 1>.label? string len 1..30
+<oneOf 2>.tools[]<anyOf 1>.when? array items ..3
+<oneOf 2>.tools[]<anyOf 1>.when[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools[]<anyOf 1>.do "create"
+<oneOf 2>.tools[]<anyOf 1>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.values?
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0> object record
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 0> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 1> "$record"
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 2> "$row"
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 3> "$group"
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 4> number
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 5> boolean
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 6> null
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7> object
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from<anyOf 0> "today"
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from<anyOf 1> = <oneOf 0>.showIf.filter[].field
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add<anyOf 0> integer -36500..36500
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.unit "days"|"months"
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 8> object
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 8>.copy string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 9> array items 1..50
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 9>[] string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.values<anyOf 1> "$here"
+<oneOf 2>.tools[]<anyOf 1>.ask?
+<oneOf 2>.tools[]<anyOf 1>.ask<anyOf 0> "all"
+<oneOf 2>.tools[]<anyOf 1>.ask<anyOf 1> array items 1..10
+<oneOf 2>.tools[]<anyOf 1>.ask<anyOf 1>[] string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.smartDate? object
+<oneOf 2>.tools[]<anyOf 1>.smartDate.from string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.smartDate.to string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.also? array items 1..2
+<oneOf 2>.tools[]<anyOf 1>.also[]
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 0> object
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 0>.do "set"
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 0>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 0>.value = <oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 1> object
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 1>.do "toggle"
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 1>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 2> object
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 2>.do "increment"
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 2>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 2>.by
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 2>.by<anyOf 0> number
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 2>.by<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 3> object
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 3>.do "create"
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 3>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 3>.values object record
+<oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 3>.values{} = <oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 2>.tools[]<anyOf 2> object
+<oneOf 2>.tools[]<anyOf 2>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
+<oneOf 2>.tools[]<anyOf 2>.label? string len 1..30
+<oneOf 2>.tools[]<anyOf 2>.when? array items ..3
+<oneOf 2>.tools[]<anyOf 2>.when[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools[]<anyOf 2>.do "set"
+<oneOf 2>.tools[]<anyOf 2>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 2>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 2>.value = <oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 2>.tools[]<anyOf 2>.also? array items 1..2
+<oneOf 2>.tools[]<anyOf 2>.also[] = <oneOf 2>.tools[]<anyOf 1>.also[]
+<oneOf 2>.tools[]<anyOf 3> object
+<oneOf 2>.tools[]<anyOf 3>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
+<oneOf 2>.tools[]<anyOf 3>.label? string len 1..30
+<oneOf 2>.tools[]<anyOf 3>.when? array items ..3
+<oneOf 2>.tools[]<anyOf 3>.when[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools[]<anyOf 3>.do "toggle"
+<oneOf 2>.tools[]<anyOf 3>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 3>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 3>.also? array items 1..2
+<oneOf 2>.tools[]<anyOf 3>.also[] = <oneOf 2>.tools[]<anyOf 1>.also[]
+<oneOf 2>.tools[]<anyOf 4> object
+<oneOf 2>.tools[]<anyOf 4>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
+<oneOf 2>.tools[]<anyOf 4>.label? string len 1..30
+<oneOf 2>.tools[]<anyOf 4>.when? array items ..3
+<oneOf 2>.tools[]<anyOf 4>.when[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools[]<anyOf 4>.do "increment"
+<oneOf 2>.tools[]<anyOf 4>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 4>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 4>.by = <oneOf 2>.tools[]<anyOf 1>.also[]<oneOf 2>.by
+<oneOf 2>.tools[]<anyOf 4>.also? array items 1..2
+<oneOf 2>.tools[]<anyOf 4>.also[] = <oneOf 2>.tools[]<anyOf 1>.also[]
+<oneOf 2>.tools[]<anyOf 5> object
+<oneOf 2>.tools[]<anyOf 5>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
+<oneOf 2>.tools[]<anyOf 5>.label? string len 1..30
+<oneOf 2>.tools[]<anyOf 5>.when? array items ..3
+<oneOf 2>.tools[]<anyOf 5>.when[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools[]<anyOf 5>.do "setAll"
+<oneOf 2>.tools[]<anyOf 5>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 5>.filter? array items ..5
+<oneOf 2>.tools[]<anyOf 5>.filter[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools[]<anyOf 5>.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 5>.value = <oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 2>.tools[]<anyOf 6> object
+<oneOf 2>.tools[]<anyOf 6>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
+<oneOf 2>.tools[]<anyOf 6>.label? string len 1..30
+<oneOf 2>.tools[]<anyOf 6>.when? array items ..3
+<oneOf 2>.tools[]<anyOf 6>.when[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools[]<anyOf 6>.do "createAll"
+<oneOf 2>.tools[]<anyOf 6>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 6>.from string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 6>.filter? array items ..5
+<oneOf 2>.tools[]<anyOf 6>.filter[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools[]<anyOf 6>.values object record
+<oneOf 2>.tools[]<anyOf 6>.values{} = <oneOf 2>.tools[]<anyOf 1>.values<anyOf 0>{}
+<oneOf 2>.tools[]<anyOf 6>.pick? true
+<oneOf 2>.tools[]<anyOf 7> object
+<oneOf 2>.tools[]<anyOf 7>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
+<oneOf 2>.tools[]<anyOf 7>.label? string len 1..30
+<oneOf 2>.tools[]<anyOf 7>.when? array items ..3
+<oneOf 2>.tools[]<anyOf 7>.when[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools[]<anyOf 7>.do "remove"
+<oneOf 2>.tools[]<anyOf 7>.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.tools[]<anyOf 8> object
+<oneOf 2>.tools[]<anyOf 8>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
+<oneOf 2>.tools[]<anyOf 8>.label? string len 1..30
+<oneOf 2>.tools[]<anyOf 8>.when? array items ..3
+<oneOf 2>.tools[]<anyOf 8>.when[] = <oneOf 0>.showIf.filter[]
+<oneOf 2>.tools[]<anyOf 8>.opens
+<oneOf 2>.tools[]<anyOf 8>.opens<anyOf 0> "record"
+<oneOf 2>.tools[]<anyOf 8>.opens<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 2>.opens?
 <oneOf 3> object
 <oneOf 3>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 3>.hidden? boolean
@@ -2617,273 +2762,144 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 4>.style? = <oneOf 0>.style
 <oneOf 4>.showIf? = <oneOf 0>.showIf
 <oneOf 4>.pin? "top"|"bottom"
-<oneOf 4>.look "divider"
-<oneOf 4>.show? object
+<oneOf 4>.look "spacer"
+<oneOf 4>.show object
+<oneOf 4>.show.size "small"|"medium"|"large"
+<oneOf 4>.show.line? true
 <oneOf 5> object
 <oneOf 5>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 5>.hidden? boolean
 <oneOf 5>.style? = <oneOf 0>.style
 <oneOf 5>.showIf? = <oneOf 0>.showIf
 <oneOf 5>.pin? "top"|"bottom"
-<oneOf 5>.look "spacer"
-<oneOf 5>.show object
-<oneOf 5>.show.size "small"|"medium"|"large"
+<oneOf 5>.look "button"
+<oneOf 5>.show? object
+<oneOf 5>.show.label? string len 1..60
+<oneOf 5>.show.subtitle? string len 1..80
+<oneOf 5>.show.icon? = <oneOf 2>.show.icon
+<oneOf 5>.show.hint? string len 1..80
+<oneOf 5>.show.shape? "filled"|"outline"|"text"|"icon"|"row"|"tile"|"card"
+<oneOf 5>.show.accent? true
+<oneOf 5>.tools? array items 1..1
+<oneOf 5>.tools[] = <oneOf 2>.tools[]
+<oneOf 5>.opens?
 <oneOf 6> object
 <oneOf 6>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 6>.hidden? boolean
 <oneOf 6>.style? = <oneOf 0>.style
 <oneOf 6>.showIf? = <oneOf 0>.showIf
 <oneOf 6>.pin? "top"|"bottom"
-<oneOf 6>.look "button"
+<oneOf 6>.look "list"
+<oneOf 6>.source object
+<oneOf 6>.source.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.source.filter? array items ..5
+<oneOf 6>.source.filter[] = <oneOf 0>.showIf.filter[]
+<oneOf 6>.source.sort?
+<oneOf 6>.source.sort<anyOf 0> object
+<oneOf 6>.source.sort<anyOf 0>.field = <oneOf 0>.showIf.filter[].field
+<oneOf 6>.source.sort<anyOf 0>.direction "asc"|"desc"
+<oneOf 6>.source.sort<anyOf 1> array items 1..3
+<oneOf 6>.source.sort<anyOf 1>[] = <oneOf 6>.source.sort<anyOf 0>
+<oneOf 6>.source.period? "page"
+<oneOf 6>.source.choice? "page"
+<oneOf 6>.source.limit integer 1..100 default 30
+<oneOf 6>.source.group? object
+<oneOf 6>.source.group.until? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.source.group.by? = <oneOf 0>.showIf.filter[].field
+<oneOf 6>.source.group.unit? "day"|"week"|"month"
+<oneOf 6>.source.group.last? integer 2..31
+<oneOf 6>.source.group.showEmpty? true
+<oneOf 6>.source.group.filter? array items ..5
+<oneOf 6>.source.group.filter[] = <oneOf 0>.showIf.filter[]
+<oneOf 6>.source.across? object
+<oneOf 6>.source.across.unit "day"|"week"|"month"
+<oneOf 6>.source.across.by? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.source.across.last? integer 2..31
 <oneOf 6>.show object
-<oneOf 6>.show.label string len 1..40
-<oneOf 6>.show.variant "filled"|"outline"|"text"|"icon"|"row"
-<oneOf 6>.show.icon? = <oneOf 2>.show.icon
-<oneOf 6>.tools? array items 1..1
-<oneOf 6>.tools[]
-<oneOf 6>.tools[]<anyOf 0> object
-<oneOf 6>.tools[]<anyOf 0>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
-<oneOf 6>.tools[]<anyOf 0>.label? string len 1..30
-<oneOf 6>.tools[]<anyOf 0>.when? array items ..3
-<oneOf 6>.tools[]<anyOf 0>.when[] = <oneOf 0>.showIf.filter[]
-<oneOf 6>.tools[]<anyOf 0>.tool
-<oneOf 6>.tools[]<anyOf 0>.tool<anyOf 0> string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 0>.tool<anyOf 1> "$pick.media"|"$pick.files"|"$pick.open"
-<oneOf 6>.tools[]<anyOf 1> object
-<oneOf 6>.tools[]<anyOf 1>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
-<oneOf 6>.tools[]<anyOf 1>.label? string len 1..30
-<oneOf 6>.tools[]<anyOf 1>.when? array items ..3
-<oneOf 6>.tools[]<anyOf 1>.when[] = <oneOf 0>.showIf.filter[]
-<oneOf 6>.tools[]<anyOf 1>.do "create"
-<oneOf 6>.tools[]<anyOf 1>.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.values?
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0> object record
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 0> string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 1> "$record"
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 2> "$row"
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 3> "$group"
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 4> number
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 5> boolean
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 6> null
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7> object
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from<anyOf 0> "today"
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.from<anyOf 1> = <oneOf 0>.showIf.filter[].field
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add<anyOf 0> integer -36500..36500
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.add<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 7>.unit "days"|"months"
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 8> object
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 8>.copy string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 9> array items 1..50
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}<anyOf 9>[] string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.values<anyOf 1> "$here"
-<oneOf 6>.tools[]<anyOf 1>.ask?
-<oneOf 6>.tools[]<anyOf 1>.ask<anyOf 0> "all"
-<oneOf 6>.tools[]<anyOf 1>.ask<anyOf 1> array items 1..10
-<oneOf 6>.tools[]<anyOf 1>.ask<anyOf 1>[] string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.smartDate? object
-<oneOf 6>.tools[]<anyOf 1>.smartDate.from string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.smartDate.to string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.also? array items 1..2
-<oneOf 6>.tools[]<anyOf 1>.also[]
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0> object
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0>.do "set"
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0>.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 0>.value = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 1> object
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 1>.do "toggle"
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 1>.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2> object
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.do "increment"
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by<anyOf 0> number
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3> object
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.do "create"
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.values object record
-<oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 3>.values{} = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
-<oneOf 6>.tools[]<anyOf 2> object
-<oneOf 6>.tools[]<anyOf 2>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
-<oneOf 6>.tools[]<anyOf 2>.label? string len 1..30
-<oneOf 6>.tools[]<anyOf 2>.when? array items ..3
-<oneOf 6>.tools[]<anyOf 2>.when[] = <oneOf 0>.showIf.filter[]
-<oneOf 6>.tools[]<anyOf 2>.do "set"
-<oneOf 6>.tools[]<anyOf 2>.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 2>.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 2>.value = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
-<oneOf 6>.tools[]<anyOf 2>.also? array items 1..2
-<oneOf 6>.tools[]<anyOf 2>.also[] = <oneOf 6>.tools[]<anyOf 1>.also[]
-<oneOf 6>.tools[]<anyOf 3> object
-<oneOf 6>.tools[]<anyOf 3>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
-<oneOf 6>.tools[]<anyOf 3>.label? string len 1..30
-<oneOf 6>.tools[]<anyOf 3>.when? array items ..3
-<oneOf 6>.tools[]<anyOf 3>.when[] = <oneOf 0>.showIf.filter[]
-<oneOf 6>.tools[]<anyOf 3>.do "toggle"
-<oneOf 6>.tools[]<anyOf 3>.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 3>.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 3>.also? array items 1..2
-<oneOf 6>.tools[]<anyOf 3>.also[] = <oneOf 6>.tools[]<anyOf 1>.also[]
-<oneOf 6>.tools[]<anyOf 4> object
-<oneOf 6>.tools[]<anyOf 4>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
-<oneOf 6>.tools[]<anyOf 4>.label? string len 1..30
-<oneOf 6>.tools[]<anyOf 4>.when? array items ..3
-<oneOf 6>.tools[]<anyOf 4>.when[] = <oneOf 0>.showIf.filter[]
-<oneOf 6>.tools[]<anyOf 4>.do "increment"
-<oneOf 6>.tools[]<anyOf 4>.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 4>.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 4>.by = <oneOf 6>.tools[]<anyOf 1>.also[]<oneOf 2>.by
-<oneOf 6>.tools[]<anyOf 4>.also? array items 1..2
-<oneOf 6>.tools[]<anyOf 4>.also[] = <oneOf 6>.tools[]<anyOf 1>.also[]
-<oneOf 6>.tools[]<anyOf 5> object
-<oneOf 6>.tools[]<anyOf 5>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
-<oneOf 6>.tools[]<anyOf 5>.label? string len 1..30
-<oneOf 6>.tools[]<anyOf 5>.when? array items ..3
-<oneOf 6>.tools[]<anyOf 5>.when[] = <oneOf 0>.showIf.filter[]
-<oneOf 6>.tools[]<anyOf 5>.do "setAll"
-<oneOf 6>.tools[]<anyOf 5>.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 5>.filter? array items ..5
-<oneOf 6>.tools[]<anyOf 5>.filter[] = <oneOf 0>.showIf.filter[]
-<oneOf 6>.tools[]<anyOf 5>.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 5>.value = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
-<oneOf 6>.tools[]<anyOf 6> object
-<oneOf 6>.tools[]<anyOf 6>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
-<oneOf 6>.tools[]<anyOf 6>.label? string len 1..30
-<oneOf 6>.tools[]<anyOf 6>.when? array items ..3
-<oneOf 6>.tools[]<anyOf 6>.when[] = <oneOf 0>.showIf.filter[]
-<oneOf 6>.tools[]<anyOf 6>.do "createAll"
-<oneOf 6>.tools[]<anyOf 6>.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 6>.from string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 6>.filter? array items ..5
-<oneOf 6>.tools[]<anyOf 6>.filter[] = <oneOf 0>.showIf.filter[]
-<oneOf 6>.tools[]<anyOf 6>.values object record
-<oneOf 6>.tools[]<anyOf 6>.values{} = <oneOf 6>.tools[]<anyOf 1>.values<anyOf 0>{}
-<oneOf 6>.tools[]<anyOf 6>.pick? true
-<oneOf 6>.tools[]<anyOf 7> object
-<oneOf 6>.tools[]<anyOf 7>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
-<oneOf 6>.tools[]<anyOf 7>.label? string len 1..30
-<oneOf 6>.tools[]<anyOf 7>.when? array items ..3
-<oneOf 6>.tools[]<anyOf 7>.when[] = <oneOf 0>.showIf.filter[]
-<oneOf 6>.tools[]<anyOf 7>.do "remove"
-<oneOf 6>.tools[]<anyOf 7>.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.tools[]<anyOf 8> object
-<oneOf 6>.tools[]<anyOf 8>.as? "submit"|"button"|"check"|"tap"|"drag"|"addHere"|"list"
-<oneOf 6>.tools[]<anyOf 8>.label? string len 1..30
-<oneOf 6>.tools[]<anyOf 8>.when? array items ..3
-<oneOf 6>.tools[]<anyOf 8>.when[] = <oneOf 0>.showIf.filter[]
-<oneOf 6>.tools[]<anyOf 8>.opens
-<oneOf 6>.tools[]<anyOf 8>.opens<anyOf 0> "record"
-<oneOf 6>.tools[]<anyOf 8>.opens<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 6>.opens?
+<oneOf 6>.show.span? "month"|"week"
+<oneOf 6>.show.day? object
+<oneOf 6>.show.day.aggregate "count"|"sum"
+<oneOf 6>.show.day.field? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.show.title = <oneOf 0>.showIf.filter[].field
+<oneOf 6>.show.subtitles? array items ..2
+<oneOf 6>.show.subtitles[] = <oneOf 0>.showIf.filter[].field
+<oneOf 6>.show.trailing? = <oneOf 0>.showIf.filter[].field
+<oneOf 6>.show.format?
+<oneOf 6>.show.format<oneOf 0> object
+<oneOf 6>.show.format<oneOf 0>.kind "elapsed"
+<oneOf 6>.show.format<oneOf 0>.until? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.show.format<oneOf 1> object
+<oneOf 6>.show.format<oneOf 1>.kind "progress"
+<oneOf 6>.show.format<oneOf 1>.goal
+<oneOf 6>.show.format<oneOf 1>.goal<anyOf 0> number ..1000000000 >0
+<oneOf 6>.show.format<oneOf 1>.goal<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.show.format<oneOf 1>.style? "ring"|"bar"
+<oneOf 6>.show.color? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.show.highlight? array items 1..3
+<oneOf 6>.show.highlight[] = <oneOf 0>.showIf.filter[]
+<oneOf 6>.show.columns? array items 1..7
+<oneOf 6>.show.columns[] = <oneOf 0>.showIf.filter[].field
+<oneOf 6>.show.emptyText? string len 1..80
+<oneOf 6>.show.browse? object
+<oneOf 6>.show.browse.search? true
+<oneOf 6>.show.browse.sort? array items 1..6
+<oneOf 6>.show.browse.sort[] = <oneOf 0>.showIf.filter[].field
+<oneOf 6>.show.browse.group? array items 1..6
+<oneOf 6>.show.browse.group[] = <oneOf 0>.showIf.filter[].field
+<oneOf 6>.show.browse.filter? array items 1..3
+<oneOf 6>.show.browse.filter[] string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 6>.show.browse.period? = <oneOf 0>.showIf.filter[].field
+<oneOf 6>.show.browse.pin? true
+<oneOf 6>.tools? array items 1..8
+<oneOf 6>.tools[] = <oneOf 2>.tools[]
+<oneOf 6>.opens? string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 7> object
 <oneOf 7>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 7>.hidden? boolean
 <oneOf 7>.style? = <oneOf 0>.style
 <oneOf 7>.showIf? = <oneOf 0>.showIf
 <oneOf 7>.pin? "top"|"bottom"
-<oneOf 7>.look "entry"
-<oneOf 7>.show? object
-<oneOf 7>.show.title? string len 1..60
-<oneOf 7>.show.subtitle? string len 1..80
-<oneOf 7>.show.icon? = <oneOf 2>.show.icon
-<oneOf 7>.show.hint? string len 1..80
-<oneOf 7>.show.shape? "row"|"tile"
-<oneOf 7>.show.accent? true
-<oneOf 7>.opens
+<oneOf 7>.look "cards"
+<oneOf 7>.source = <oneOf 6>.source
+<oneOf 7>.show = <oneOf 6>.show
+<oneOf 7>.tools? array items 1..8
+<oneOf 7>.tools[] = <oneOf 2>.tools[]
+<oneOf 7>.opens? string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 8> object
 <oneOf 8>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 8>.hidden? boolean
 <oneOf 8>.style? = <oneOf 0>.style
 <oneOf 8>.showIf? = <oneOf 0>.showIf
 <oneOf 8>.pin? "top"|"bottom"
-<oneOf 8>.look "action"
-<oneOf 8>.show? object
-<oneOf 8>.show.shape? "card"|"row"|"tile"|"icon"
-<oneOf 8>.tools array items 1..1
-<oneOf 8>.tools[] = <oneOf 6>.tools[]
+<oneOf 8>.look "checklist"
+<oneOf 8>.source = <oneOf 6>.source
+<oneOf 8>.show = <oneOf 6>.show
+<oneOf 8>.tools? array items 1..8
+<oneOf 8>.tools[] = <oneOf 2>.tools[]
+<oneOf 8>.opens? string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 9> object
 <oneOf 9>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 9>.hidden? boolean
 <oneOf 9>.style? = <oneOf 0>.style
 <oneOf 9>.showIf? = <oneOf 0>.showIf
 <oneOf 9>.pin? "top"|"bottom"
-<oneOf 9>.look "picker"
-<oneOf 9>.show? object
-<oneOf 9>.show.shape? "icon"
-<oneOf 9>.tools array items 1..1
-<oneOf 9>.tools[] = <oneOf 6>.tools[]
+<oneOf 9>.look "tiles"
+<oneOf 9>.source = <oneOf 6>.source
+<oneOf 9>.show = <oneOf 6>.show
+<oneOf 9>.tools? array items 1..8
+<oneOf 9>.tools[] = <oneOf 2>.tools[]
+<oneOf 9>.opens? string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 10> object
 <oneOf 10>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 10>.hidden? boolean
 <oneOf 10>.style? = <oneOf 0>.style
 <oneOf 10>.showIf? = <oneOf 0>.showIf
 <oneOf 10>.pin? "top"|"bottom"
-<oneOf 10>.look "list"
-<oneOf 10>.source object
-<oneOf 10>.source.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 10>.source.filter? array items ..5
-<oneOf 10>.source.filter[] = <oneOf 0>.showIf.filter[]
-<oneOf 10>.source.sort?
-<oneOf 10>.source.sort<anyOf 0> object
-<oneOf 10>.source.sort<anyOf 0>.field = <oneOf 0>.showIf.filter[].field
-<oneOf 10>.source.sort<anyOf 0>.direction "asc"|"desc"
-<oneOf 10>.source.sort<anyOf 1> array items 1..3
-<oneOf 10>.source.sort<anyOf 1>[] = <oneOf 10>.source.sort<anyOf 0>
-<oneOf 10>.source.period? "page"
-<oneOf 10>.source.choice? "page"
-<oneOf 10>.source.limit integer 1..100 default 30
-<oneOf 10>.source.group? object
-<oneOf 10>.source.group.until? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 10>.source.group.by? = <oneOf 0>.showIf.filter[].field
-<oneOf 10>.source.group.unit? "day"|"week"|"month"
-<oneOf 10>.source.group.last? integer 2..31
-<oneOf 10>.source.group.showEmpty? true
-<oneOf 10>.source.group.filter? array items ..5
-<oneOf 10>.source.group.filter[] = <oneOf 0>.showIf.filter[]
-<oneOf 10>.source.across? object
-<oneOf 10>.source.across.unit "day"|"week"|"month"
-<oneOf 10>.source.across.by? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 10>.source.across.last? integer 2..31
-<oneOf 10>.show object
-<oneOf 10>.show.span? "month"|"week"
-<oneOf 10>.show.day? object
-<oneOf 10>.show.day.aggregate "count"|"sum"
-<oneOf 10>.show.day.field? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 10>.show.title = <oneOf 0>.showIf.filter[].field
-<oneOf 10>.show.subtitles? array items ..2
-<oneOf 10>.show.subtitles[] = <oneOf 0>.showIf.filter[].field
-<oneOf 10>.show.trailing? = <oneOf 0>.showIf.filter[].field
-<oneOf 10>.show.format?
-<oneOf 10>.show.format<oneOf 0> object
-<oneOf 10>.show.format<oneOf 0>.kind "elapsed"
-<oneOf 10>.show.format<oneOf 0>.until? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 10>.show.format<oneOf 1> object
-<oneOf 10>.show.format<oneOf 1>.kind "progress"
-<oneOf 10>.show.format<oneOf 1>.goal
-<oneOf 10>.show.format<oneOf 1>.goal<anyOf 0> number ..1000000000 >0
-<oneOf 10>.show.format<oneOf 1>.goal<anyOf 1> string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 10>.show.format<oneOf 1>.style? "ring"|"bar"
-<oneOf 10>.show.color? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 10>.show.highlight? array items 1..3
-<oneOf 10>.show.highlight[] = <oneOf 0>.showIf.filter[]
-<oneOf 10>.show.columns? array items 1..7
-<oneOf 10>.show.columns[] = <oneOf 0>.showIf.filter[].field
-<oneOf 10>.show.emptyText? string len 1..80
-<oneOf 10>.show.browse? object
-<oneOf 10>.show.browse.search? true
-<oneOf 10>.show.browse.sort? array items 1..6
-<oneOf 10>.show.browse.sort[] = <oneOf 0>.showIf.filter[].field
-<oneOf 10>.show.browse.group? array items 1..6
-<oneOf 10>.show.browse.group[] = <oneOf 0>.showIf.filter[].field
-<oneOf 10>.show.browse.filter? array items 1..3
-<oneOf 10>.show.browse.filter[] string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 10>.show.browse.period? = <oneOf 0>.showIf.filter[].field
-<oneOf 10>.show.browse.pin? true
+<oneOf 10>.look "board"
+<oneOf 10>.source = <oneOf 6>.source
+<oneOf 10>.show = <oneOf 6>.show
 <oneOf 10>.tools? array items 1..8
-<oneOf 10>.tools[] = <oneOf 6>.tools[]
+<oneOf 10>.tools[] = <oneOf 2>.tools[]
 <oneOf 10>.opens? string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 11> object
 <oneOf 11>.id string /^[a-z][a-z0-9-]{0,47}$/
@@ -2891,11 +2907,11 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 11>.style? = <oneOf 0>.style
 <oneOf 11>.showIf? = <oneOf 0>.showIf
 <oneOf 11>.pin? "top"|"bottom"
-<oneOf 11>.look "cards"
-<oneOf 11>.source = <oneOf 10>.source
-<oneOf 11>.show = <oneOf 10>.show
+<oneOf 11>.look "calendar"
+<oneOf 11>.source = <oneOf 6>.source
+<oneOf 11>.show = <oneOf 6>.show
 <oneOf 11>.tools? array items 1..8
-<oneOf 11>.tools[] = <oneOf 6>.tools[]
+<oneOf 11>.tools[] = <oneOf 2>.tools[]
 <oneOf 11>.opens? string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 12> object
 <oneOf 12>.id string /^[a-z][a-z0-9-]{0,47}$/
@@ -2903,383 +2919,278 @@ exports[`baseline > workspace config JSON Schema 1`] = `
 <oneOf 12>.style? = <oneOf 0>.style
 <oneOf 12>.showIf? = <oneOf 0>.showIf
 <oneOf 12>.pin? "top"|"bottom"
-<oneOf 12>.look "checklist"
-<oneOf 12>.source = <oneOf 10>.source
-<oneOf 12>.show = <oneOf 10>.show
-<oneOf 12>.tools? array items 1..8
-<oneOf 12>.tools[] = <oneOf 6>.tools[]
-<oneOf 12>.opens? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 12>.look "number"
+<oneOf 12>.show object
+<oneOf 12>.show.label string len 1..40
+<oneOf 12>.source object
+<oneOf 12>.source.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 12>.source.calc? object
+<oneOf 12>.source.calc.with array items 1..3
+<oneOf 12>.source.calc.with[] object
+<oneOf 12>.source.calc.with[].table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 12>.source.calc.with[].aggregate "count"|"sum"|"avg"|"min"|"max"|"latest"|"distinctDays"
+<oneOf 12>.source.calc.with[].field? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 12>.source.calc.with[].filter? array items ..5
+<oneOf 12>.source.calc.with[].filter[] = <oneOf 0>.showIf.filter[]
+<oneOf 12>.source.calc.with[].days? object
+<oneOf 12>.source.calc.with[].days.date? = <oneOf 0>.showIf.filter[].field
+<oneOf 12>.source.calc.with[].id string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 12>.source.calc.formula string len 1..500
+<oneOf 12>.source.calc.as? "percent"|"number"
+<oneOf 12>.source.aggregate "count"|"sum"|"avg"|"min"|"max"|"latest"|"streak"|"daysSince"|"avgInterval"|"distinctDays"
+<oneOf 12>.source.field? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 12>.source.filter? array items ..5
+<oneOf 12>.source.filter[] = <oneOf 0>.showIf.filter[]
+<oneOf 12>.source.days? object
+<oneOf 12>.source.days.date? = <oneOf 0>.showIf.filter[].field
+<oneOf 12>.source.days.unit? "day"|"week"|"month"
+<oneOf 12>.source.days.perUnit? integer 1..50
+<oneOf 12>.source.days.skip? object
+<oneOf 12>.source.days.skip.field string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 12>.source.days.skip.option string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 12>.source.group? = <oneOf 6>.source.group
+<oneOf 12>.source.goal? number ..1000000000 >0
+<oneOf 12>.source.compare? "previous"
+<oneOf 12>.source.period? "page"
+<oneOf 12>.source.choice? "page"
+<oneOf 12>.source.minus? object
+<oneOf 12>.source.minus.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 12>.source.minus.aggregate "count"|"sum"
+<oneOf 12>.source.minus.field? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 12>.source.minus.filter? array items ..5
+<oneOf 12>.source.minus.filter[] = <oneOf 0>.showIf.filter[]
 <oneOf 13> object
 <oneOf 13>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 13>.hidden? boolean
 <oneOf 13>.style? = <oneOf 0>.style
 <oneOf 13>.showIf? = <oneOf 0>.showIf
 <oneOf 13>.pin? "top"|"bottom"
-<oneOf 13>.look "tiles"
-<oneOf 13>.source = <oneOf 10>.source
-<oneOf 13>.show = <oneOf 10>.show
-<oneOf 13>.tools? array items 1..8
-<oneOf 13>.tools[] = <oneOf 6>.tools[]
-<oneOf 13>.opens? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 13>.look "chart"
+<oneOf 13>.show object
+<oneOf 13>.show.kind "bar"|"line"|"pie"
+<oneOf 13>.show.title string len 1..60
+<oneOf 13>.show.pickPeriod? true
+<oneOf 13>.source object
+<oneOf 13>.source.table string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 13>.source.aggregate "count"|"sum"|"avg"|"min"|"max"|"latest"|"distinctDays"
+<oneOf 13>.source.field? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 13>.source.filter? array items ..5
+<oneOf 13>.source.filter[] = <oneOf 0>.showIf.filter[]
+<oneOf 13>.source.days? = <oneOf 12>.source.calc.with[].days
+<oneOf 13>.source.group = <oneOf 6>.source.group
+<oneOf 13>.source.running? "shown"|"all"
+<oneOf 13>.source.split? object
+<oneOf 13>.source.split.by string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 13>.source.compare? "previous"
+<oneOf 13>.source.period? "page"
+<oneOf 13>.source.choice? "page"
 <oneOf 14> object
 <oneOf 14>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 14>.hidden? boolean
 <oneOf 14>.style? = <oneOf 0>.style
 <oneOf 14>.showIf? = <oneOf 0>.showIf
 <oneOf 14>.pin? "top"|"bottom"
-<oneOf 14>.look "board"
-<oneOf 14>.source = <oneOf 10>.source
-<oneOf 14>.show = <oneOf 10>.show
-<oneOf 14>.tools? array items 1..8
-<oneOf 14>.tools[] = <oneOf 6>.tools[]
-<oneOf 14>.opens? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 14>.look "form"
+<oneOf 14>.show object
+<oneOf 14>.show.mode "inline"|"sheet"
+<oneOf 14>.tools array items 1..1
+<oneOf 14>.tools[] = <oneOf 2>.tools[]
 <oneOf 15> object
 <oneOf 15>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 15>.hidden? boolean
 <oneOf 15>.style? = <oneOf 0>.style
 <oneOf 15>.showIf? = <oneOf 0>.showIf
 <oneOf 15>.pin? "top"|"bottom"
-<oneOf 15>.look "calendar"
-<oneOf 15>.source = <oneOf 10>.source
-<oneOf 15>.show = <oneOf 10>.show
-<oneOf 15>.tools? array items 1..8
-<oneOf 15>.tools[] = <oneOf 6>.tools[]
-<oneOf 15>.opens? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 15>.look "files"
+<oneOf 15>.show object
+<oneOf 15>.show.title string len 1..60
+<oneOf 15>.source object
+<oneOf 15>.source.table "$files"
+<oneOf 15>.source.filter? array items ..5
+<oneOf 15>.source.filter[] = <oneOf 0>.showIf.filter[]
+<oneOf 15>.source.sort? = <oneOf 6>.source.sort<anyOf 0>
+<oneOf 15>.source.limit integer 1..50
 <oneOf 16> object
 <oneOf 16>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 16>.hidden? boolean
 <oneOf 16>.style? = <oneOf 0>.style
 <oneOf 16>.showIf? = <oneOf 0>.showIf
 <oneOf 16>.pin? "top"|"bottom"
-<oneOf 16>.look "number"
-<oneOf 16>.show object
-<oneOf 16>.show.label string len 1..40
+<oneOf 16>.look "single"
 <oneOf 16>.source object
 <oneOf 16>.source.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 16>.source.calc? object
-<oneOf 16>.source.calc.with array items 1..3
-<oneOf 16>.source.calc.with[] object
-<oneOf 16>.source.calc.with[].table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 16>.source.calc.with[].aggregate "count"|"sum"|"avg"|"min"|"max"|"latest"|"distinctDays"
-<oneOf 16>.source.calc.with[].field? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 16>.source.calc.with[].filter? array items ..5
-<oneOf 16>.source.calc.with[].filter[] = <oneOf 0>.showIf.filter[]
-<oneOf 16>.source.calc.with[].days? object
-<oneOf 16>.source.calc.with[].days.date? = <oneOf 0>.showIf.filter[].field
-<oneOf 16>.source.calc.with[].id string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 16>.source.calc.formula string len 1..500
-<oneOf 16>.source.calc.as? "percent"|"number"
-<oneOf 16>.source.aggregate "count"|"sum"|"avg"|"min"|"max"|"latest"|"streak"|"daysSince"|"avgInterval"|"distinctDays"
-<oneOf 16>.source.field? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 16>.source.filter? array items ..5
-<oneOf 16>.source.filter[] = <oneOf 0>.showIf.filter[]
-<oneOf 16>.source.days? object
-<oneOf 16>.source.days.date? = <oneOf 0>.showIf.filter[].field
-<oneOf 16>.source.days.unit? "day"|"week"|"month"
-<oneOf 16>.source.days.perUnit? integer 1..50
-<oneOf 16>.source.days.skip? object
-<oneOf 16>.source.days.skip.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 16>.source.days.skip.option string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 16>.source.group? = <oneOf 10>.source.group
-<oneOf 16>.source.goal? number ..1000000000 >0
-<oneOf 16>.source.compare? "previous"
-<oneOf 16>.source.period? "page"
-<oneOf 16>.source.choice? "page"
-<oneOf 16>.source.minus? object
-<oneOf 16>.source.minus.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 16>.source.minus.aggregate "count"|"sum"
-<oneOf 16>.source.minus.field? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 16>.source.minus.filter? array items ..5
-<oneOf 16>.source.minus.filter[] = <oneOf 0>.showIf.filter[]
+<oneOf 16>.source.record? "$record"
+<oneOf 16>.show object
+<oneOf 16>.show.fields array items 1..8
+<oneOf 16>.show.fields[] = <oneOf 0>.showIf.filter[].field
+<oneOf 16>.show.qr? true
+<oneOf 16>.tools? array items 1..1
+<oneOf 16>.tools[] = <oneOf 2>.tools[]
 <oneOf 17> object
 <oneOf 17>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 17>.hidden? boolean
 <oneOf 17>.style? = <oneOf 0>.style
 <oneOf 17>.showIf? = <oneOf 0>.showIf
 <oneOf 17>.pin? "top"|"bottom"
-<oneOf 17>.look "chart"
-<oneOf 17>.show object
-<oneOf 17>.show.kind "bar"|"line"|"pie"
-<oneOf 17>.show.title string len 1..60
-<oneOf 17>.show.pickPeriod? true
-<oneOf 17>.source object
-<oneOf 17>.source.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 17>.source.aggregate "count"|"sum"|"avg"|"min"|"max"|"latest"|"distinctDays"
-<oneOf 17>.source.field? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 17>.source.filter? array items ..5
-<oneOf 17>.source.filter[] = <oneOf 0>.showIf.filter[]
-<oneOf 17>.source.days? = <oneOf 16>.source.calc.with[].days
-<oneOf 17>.source.group = <oneOf 10>.source.group
-<oneOf 17>.source.running? "shown"|"all"
-<oneOf 17>.source.split? object
-<oneOf 17>.source.split.by string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 17>.source.compare? "previous"
-<oneOf 17>.source.period? "page"
-<oneOf 17>.source.choice? "page"
+<oneOf 17>.look "dial"
+<oneOf 17>.tools array items 1..5
+<oneOf 17>.tools[] = <oneOf 2>.tools[]
 <oneOf 18> object
 <oneOf 18>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 18>.hidden? boolean
 <oneOf 18>.style? = <oneOf 0>.style
 <oneOf 18>.showIf? = <oneOf 0>.showIf
 <oneOf 18>.pin? "top"|"bottom"
-<oneOf 18>.look "form"
-<oneOf 18>.show object
-<oneOf 18>.show.mode "inline"|"sheet"
-<oneOf 18>.tools array items 1..1
-<oneOf 18>.tools[] = <oneOf 6>.tools[]
+<oneOf 18>.look "table"
+<oneOf 18>.source = <oneOf 6>.source
+<oneOf 18>.show = <oneOf 6>.show
+<oneOf 18>.tools? array items 1..8
+<oneOf 18>.tools[] = <oneOf 2>.tools[]
+<oneOf 18>.opens? string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 19> object
 <oneOf 19>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 19>.hidden? boolean
 <oneOf 19>.style? = <oneOf 0>.style
 <oneOf 19>.showIf? = <oneOf 0>.showIf
 <oneOf 19>.pin? "top"|"bottom"
-<oneOf 19>.look "files"
-<oneOf 19>.show object
-<oneOf 19>.show.title string len 1..60
-<oneOf 19>.source object
-<oneOf 19>.source.table "$files"
-<oneOf 19>.source.filter? array items ..5
-<oneOf 19>.source.filter[] = <oneOf 0>.showIf.filter[]
-<oneOf 19>.source.sort? = <oneOf 10>.source.sort<anyOf 0>
-<oneOf 19>.source.limit integer 1..50
+<oneOf 19>.look "gallery"
+<oneOf 19>.source = <oneOf 6>.source
+<oneOf 19>.show = <oneOf 6>.show
+<oneOf 19>.tools? array items 1..8
+<oneOf 19>.tools[] = <oneOf 2>.tools[]
+<oneOf 19>.opens? string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 20> object
 <oneOf 20>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 20>.hidden? boolean
 <oneOf 20>.style? = <oneOf 0>.style
 <oneOf 20>.showIf? = <oneOf 0>.showIf
 <oneOf 20>.pin? "top"|"bottom"
-<oneOf 20>.look "library"
-<oneOf 20>.show? object
-<oneOf 20>.show.title? string len 1..60
-<oneOf 20>.source object
-<oneOf 20>.source.catalog "quickActions"
-<oneOf 20>.source.kind? "image"|"video"|"audio"|"document"|"other"
-<oneOf 20>.source.recent? true
+<oneOf 20>.look "grid"
+<oneOf 20>.source = <oneOf 6>.source
+<oneOf 20>.show = <oneOf 6>.show
+<oneOf 20>.tools? array items 1..8
+<oneOf 20>.tools[] = <oneOf 2>.tools[]
+<oneOf 20>.opens? string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 21> object
 <oneOf 21>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 21>.hidden? boolean
 <oneOf 21>.style? = <oneOf 0>.style
 <oneOf 21>.showIf? = <oneOf 0>.showIf
 <oneOf 21>.pin? "top"|"bottom"
-<oneOf 21>.look "packages"
-<oneOf 21>.show? = <oneOf 20>.show
-<oneOf 21>.source object
-<oneOf 21>.source.catalog "packages"
-<oneOf 21>.source.ids? array items 1..30
-<oneOf 21>.source.ids[] string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 21>.look "catalog"
+<oneOf 21>.show? object
+<oneOf 21>.show.title? string len 1..60
+<oneOf 21>.source
+<oneOf 21>.source<oneOf 0> object
+<oneOf 21>.source<oneOf 0>.catalog "quickActions"
+<oneOf 21>.source<oneOf 0>.kind? "image"|"video"|"audio"|"document"|"other"
+<oneOf 21>.source<oneOf 0>.recent? true
+<oneOf 21>.source<oneOf 1> object
+<oneOf 21>.source<oneOf 1>.catalog "packages"
+<oneOf 21>.source<oneOf 1>.ids? array items 1..30
+<oneOf 21>.source<oneOf 1>.ids[] string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 21>.source<oneOf 2> object
+<oneOf 21>.source<oneOf 2>.catalog "apps"
 <oneOf 22> object
 <oneOf 22>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 22>.hidden? boolean
 <oneOf 22>.style? = <oneOf 0>.style
 <oneOf 22>.showIf? = <oneOf 0>.showIf
 <oneOf 22>.pin? "top"|"bottom"
-<oneOf 22>.look "single"
-<oneOf 22>.source object
+<oneOf 22>.look "tabs"
+<oneOf 22>.show
+<oneOf 22>.show<anyOf 0> object
+<oneOf 22>.show<anyOf 0>.periods array items 1..12
+<oneOf 22>.show<anyOf 0>.periods[] "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"|"yesterday"|"lastWeek"|"lastMonth"|"lastYear"
+<oneOf 22>.show<anyOf 0>.default? "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"|"yesterday"|"lastWeek"|"lastMonth"|"lastYear"
+<oneOf 22>.show<anyOf 0>.custom? true
+<oneOf 22>.show<anyOf 1> object
+<oneOf 22>.show<anyOf 1>.options? array items 1..50
+<oneOf 22>.show<anyOf 1>.options[] string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 22>.show<anyOf 1>.all? false
+<oneOf 22>.show<anyOf 1>.default? string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 22>.source? object
 <oneOf 22>.source.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 22>.source.record? "$record"
-<oneOf 22>.show object
-<oneOf 22>.show.fields array items 1..8
-<oneOf 22>.show.fields[] = <oneOf 0>.showIf.filter[].field
-<oneOf 22>.show.qr? true
-<oneOf 22>.tools? array items 1..1
-<oneOf 22>.tools[] = <oneOf 6>.tools[]
+<oneOf 22>.source.field string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 23> object
 <oneOf 23>.id string /^[a-z][a-z0-9-]{0,47}$/
 <oneOf 23>.hidden? boolean
 <oneOf 23>.style? = <oneOf 0>.style
 <oneOf 23>.showIf? = <oneOf 0>.showIf
 <oneOf 23>.pin? "top"|"bottom"
-<oneOf 23>.look "dial"
-<oneOf 23>.tools array items 1..5
-<oneOf 23>.tools[] = <oneOf 6>.tools[]
-<oneOf 24> object
-<oneOf 24>.id string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 24>.hidden? boolean
-<oneOf 24>.style? = <oneOf 0>.style
-<oneOf 24>.showIf? = <oneOf 0>.showIf
-<oneOf 24>.pin? "top"|"bottom"
-<oneOf 24>.look "period"
-<oneOf 24>.show object
-<oneOf 24>.show.options array items 1..12
-<oneOf 24>.show.options[] "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"|"yesterday"|"lastWeek"|"lastMonth"|"lastYear"
-<oneOf 24>.show.default? "today"|"thisWeek"|"thisMonth"|"thisYear"|"last7days"|"last30days"|"last90days"|"last365days"|"yesterday"|"lastWeek"|"lastMonth"|"lastYear"
-<oneOf 24>.show.custom? true
-<oneOf 25> object
-<oneOf 25>.id string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 25>.hidden? boolean
-<oneOf 25>.style? = <oneOf 0>.style
-<oneOf 25>.showIf? = <oneOf 0>.showIf
-<oneOf 25>.pin? "top"|"bottom"
-<oneOf 25>.look "table"
-<oneOf 25>.source = <oneOf 10>.source
-<oneOf 25>.show = <oneOf 10>.show
-<oneOf 25>.tools? array items 1..8
-<oneOf 25>.tools[] = <oneOf 6>.tools[]
-<oneOf 25>.opens? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 26> object
-<oneOf 26>.id string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 26>.hidden? boolean
-<oneOf 26>.style? = <oneOf 0>.style
-<oneOf 26>.showIf? = <oneOf 0>.showIf
-<oneOf 26>.pin? "top"|"bottom"
-<oneOf 26>.look "gallery"
-<oneOf 26>.source = <oneOf 10>.source
-<oneOf 26>.show = <oneOf 10>.show
-<oneOf 26>.tools? array items 1..8
-<oneOf 26>.tools[] = <oneOf 6>.tools[]
-<oneOf 26>.opens? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 27> object
-<oneOf 27>.id string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 27>.hidden? boolean
-<oneOf 27>.style? = <oneOf 0>.style
-<oneOf 27>.showIf? = <oneOf 0>.showIf
-<oneOf 27>.pin? "top"|"bottom"
-<oneOf 27>.look "choices"
-<oneOf 27>.show object
-<oneOf 27>.show.options? array items 1..50
-<oneOf 27>.show.options[] string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 27>.show.all? false
-<oneOf 27>.show.default? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 27>.source object
-<oneOf 27>.source.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 27>.source.field string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 28> object
-<oneOf 28>.id string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 28>.hidden? boolean
-<oneOf 28>.style? = <oneOf 0>.style
-<oneOf 28>.showIf? = <oneOf 0>.showIf
-<oneOf 28>.pin? "top"|"bottom"
-<oneOf 28>.look "callout"
-<oneOf 28>.show object
-<oneOf 28>.show.title string len 1..60
-<oneOf 28>.show.text string len 1..400
-<oneOf 28>.show.icon? = <oneOf 2>.show.icon
-<oneOf 28>.show.actionLabel? string len 1..20
-<oneOf 28>.show.openLabel? string len 1..20
-<oneOf 28>.source object
-<oneOf 28>.source.table string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 28>.source.filter? array items ..5
-<oneOf 28>.source.filter[] = <oneOf 0>.showIf.filter[]
-<oneOf 28>.tools? array items 1..1
-<oneOf 28>.tools[] = <oneOf 6>.tools[]
-<oneOf 28>.opens?
-<oneOf 29> object
-<oneOf 29>.id string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 29>.hidden? boolean
-<oneOf 29>.style? = <oneOf 0>.style
-<oneOf 29>.showIf? = <oneOf 0>.showIf
-<oneOf 29>.pin? "top"|"bottom"
-<oneOf 29>.look "grid"
-<oneOf 29>.source = <oneOf 10>.source
-<oneOf 29>.show = <oneOf 10>.show
-<oneOf 29>.tools? array items 1..8
-<oneOf 29>.tools[] = <oneOf 6>.tools[]
-<oneOf 29>.opens? string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 30> object
-<oneOf 30>.id string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 30>.hidden? boolean
-<oneOf 30>.style? = <oneOf 0>.style
-<oneOf 30>.showIf? = <oneOf 0>.showIf
-<oneOf 30>.pin? "top"|"bottom"
-<oneOf 30>.look "apps"
-<oneOf 30>.show? = <oneOf 20>.show
-<oneOf 30>.source object
-<oneOf 30>.source.catalog "apps"
-<oneOf 31> object
-<oneOf 31>.id string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 31>.hidden? boolean
-<oneOf 31>.style? = <oneOf 0>.style
-<oneOf 31>.showIf? = <oneOf 0>.showIf
-<oneOf 31>.pin? "top"|"bottom"
-<oneOf 31>.look "group"
-<oneOf 31>.show object
-<oneOf 31>.show.title? string len 1..60
-<oneOf 31>.show.layout "stack"|"row"|"grid"
-<oneOf 31>.show.columns?
-<oneOf 31>.show.columns<anyOf 0> 2
-<oneOf 31>.show.columns<anyOf 1> 3
-<oneOf 31>.show.fold? "open"|"closed"
-<oneOf 31>.children array items ..12
-<oneOf 31>.children[]
-<oneOf 31>.children[]<oneOf 0> = <oneOf 0>
-<oneOf 31>.children[]<oneOf 1> = <oneOf 1>
-<oneOf 31>.children[]<oneOf 2> = <oneOf 2>
-<oneOf 31>.children[]<oneOf 3> = <oneOf 3>
-<oneOf 31>.children[]<oneOf 4> = <oneOf 4>
-<oneOf 31>.children[]<oneOf 5> = <oneOf 5>
-<oneOf 31>.children[]<oneOf 6> = <oneOf 6>
-<oneOf 31>.children[]<oneOf 7> = <oneOf 7>
-<oneOf 31>.children[]<oneOf 8> = <oneOf 8>
-<oneOf 31>.children[]<oneOf 9> = <oneOf 9>
-<oneOf 31>.children[]<oneOf 10> = <oneOf 10>
-<oneOf 31>.children[]<oneOf 11> = <oneOf 11>
-<oneOf 31>.children[]<oneOf 12> = <oneOf 12>
-<oneOf 31>.children[]<oneOf 13> = <oneOf 13>
-<oneOf 31>.children[]<oneOf 14> = <oneOf 14>
-<oneOf 31>.children[]<oneOf 15> = <oneOf 15>
-<oneOf 31>.children[]<oneOf 16> = <oneOf 16>
-<oneOf 31>.children[]<oneOf 17> = <oneOf 17>
-<oneOf 31>.children[]<oneOf 18> = <oneOf 18>
-<oneOf 31>.children[]<oneOf 19> = <oneOf 19>
-<oneOf 31>.children[]<oneOf 20> = <oneOf 20>
-<oneOf 31>.children[]<oneOf 21> = <oneOf 21>
-<oneOf 31>.children[]<oneOf 22> = <oneOf 22>
-<oneOf 31>.children[]<oneOf 23> = <oneOf 23>
-<oneOf 31>.children[]<oneOf 24> = <oneOf 24>
-<oneOf 31>.children[]<oneOf 25> = <oneOf 25>
-<oneOf 31>.children[]<oneOf 26> = <oneOf 26>
-<oneOf 31>.children[]<oneOf 27> = <oneOf 27>
-<oneOf 31>.children[]<oneOf 28> = <oneOf 28>
-<oneOf 31>.children[]<oneOf 29> = <oneOf 29>
-<oneOf 31>.children[]<oneOf 30> = <oneOf 30>
-<oneOf 31>.children[]<oneOf 31> object
-<oneOf 31>.children[]<oneOf 31>.id string /^[a-z][a-z0-9-]{0,47}$/
-<oneOf 31>.children[]<oneOf 31>.hidden? boolean
-<oneOf 31>.children[]<oneOf 31>.style? = <oneOf 0>.style
-<oneOf 31>.children[]<oneOf 31>.showIf? = <oneOf 0>.showIf
-<oneOf 31>.children[]<oneOf 31>.pin? "top"|"bottom"
-<oneOf 31>.children[]<oneOf 31>.look "group"
-<oneOf 31>.children[]<oneOf 31>.show = <oneOf 31>.show
-<oneOf 31>.children[]<oneOf 31>.children array items ..12
-<oneOf 31>.children[]<oneOf 31>.children[]
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 0> = <oneOf 0>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 1> = <oneOf 1>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 2> = <oneOf 2>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 3> = <oneOf 3>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 4> = <oneOf 4>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 5> = <oneOf 5>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 6> = <oneOf 6>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 7> = <oneOf 7>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 8> = <oneOf 8>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 9> = <oneOf 9>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 10> = <oneOf 10>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 11> = <oneOf 11>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 12> = <oneOf 12>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 13> = <oneOf 13>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 14> = <oneOf 14>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 15> = <oneOf 15>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 16> = <oneOf 16>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 17> = <oneOf 17>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 18> = <oneOf 18>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 19> = <oneOf 19>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 20> = <oneOf 20>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 21> = <oneOf 21>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 22> = <oneOf 22>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 23> = <oneOf 23>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 24> = <oneOf 24>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 25> = <oneOf 25>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 26> = <oneOf 26>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 27> = <oneOf 27>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 28> = <oneOf 28>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 29> = <oneOf 29>
-<oneOf 31>.children[]<oneOf 31>.children[]<oneOf 30> = <oneOf 30>
+<oneOf 23>.look "group"
+<oneOf 23>.show object
+<oneOf 23>.show.title? string len 1..60
+<oneOf 23>.show.layout "stack"|"row"|"grid"
+<oneOf 23>.show.columns?
+<oneOf 23>.show.columns<anyOf 0> 2
+<oneOf 23>.show.columns<anyOf 1> 3
+<oneOf 23>.show.fold? "open"|"closed"
+<oneOf 23>.children array items ..12
+<oneOf 23>.children[]
+<oneOf 23>.children[]<oneOf 0> = <oneOf 0>
+<oneOf 23>.children[]<oneOf 1> = <oneOf 1>
+<oneOf 23>.children[]<oneOf 2> = <oneOf 2>
+<oneOf 23>.children[]<oneOf 3> = <oneOf 3>
+<oneOf 23>.children[]<oneOf 4> = <oneOf 4>
+<oneOf 23>.children[]<oneOf 5> = <oneOf 5>
+<oneOf 23>.children[]<oneOf 6> = <oneOf 6>
+<oneOf 23>.children[]<oneOf 7> = <oneOf 7>
+<oneOf 23>.children[]<oneOf 8> = <oneOf 8>
+<oneOf 23>.children[]<oneOf 9> = <oneOf 9>
+<oneOf 23>.children[]<oneOf 10> = <oneOf 10>
+<oneOf 23>.children[]<oneOf 11> = <oneOf 11>
+<oneOf 23>.children[]<oneOf 12> = <oneOf 12>
+<oneOf 23>.children[]<oneOf 13> = <oneOf 13>
+<oneOf 23>.children[]<oneOf 14> = <oneOf 14>
+<oneOf 23>.children[]<oneOf 15> = <oneOf 15>
+<oneOf 23>.children[]<oneOf 16> = <oneOf 16>
+<oneOf 23>.children[]<oneOf 17> = <oneOf 17>
+<oneOf 23>.children[]<oneOf 18> = <oneOf 18>
+<oneOf 23>.children[]<oneOf 19> = <oneOf 19>
+<oneOf 23>.children[]<oneOf 20> = <oneOf 20>
+<oneOf 23>.children[]<oneOf 21> = <oneOf 21>
+<oneOf 23>.children[]<oneOf 22> = <oneOf 22>
+<oneOf 23>.children[]<oneOf 23> object
+<oneOf 23>.children[]<oneOf 23>.id string /^[a-z][a-z0-9-]{0,47}$/
+<oneOf 23>.children[]<oneOf 23>.hidden? boolean
+<oneOf 23>.children[]<oneOf 23>.style? = <oneOf 0>.style
+<oneOf 23>.children[]<oneOf 23>.showIf? = <oneOf 0>.showIf
+<oneOf 23>.children[]<oneOf 23>.pin? "top"|"bottom"
+<oneOf 23>.children[]<oneOf 23>.look "group"
+<oneOf 23>.children[]<oneOf 23>.show = <oneOf 23>.show
+<oneOf 23>.children[]<oneOf 23>.children array items ..12
+<oneOf 23>.children[]<oneOf 23>.children[]
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 0> = <oneOf 0>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 1> = <oneOf 1>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 2> = <oneOf 2>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 3> = <oneOf 3>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 4> = <oneOf 4>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 5> = <oneOf 5>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 6> = <oneOf 6>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 7> = <oneOf 7>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 8> = <oneOf 8>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 9> = <oneOf 9>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 10> = <oneOf 10>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 11> = <oneOf 11>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 12> = <oneOf 12>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 13> = <oneOf 13>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 14> = <oneOf 14>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 15> = <oneOf 15>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 16> = <oneOf 16>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 17> = <oneOf 17>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 18> = <oneOf 18>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 19> = <oneOf 19>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 20> = <oneOf 20>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 21> = <oneOf 21>
+<oneOf 23>.children[]<oneOf 23>.children[]<oneOf 22> = <oneOf 22>
 "
 `;
 
 exports[`baseline > workspace config JSON Schema 2`] = `
 "
 . object
-.schemaVersion 40
+.schemaVersion 41
 .theme object
 .theme.primaryColor string /^#[0-9A-Fa-f]{6}$/
 .theme.mode "light"|"dark"|"system"

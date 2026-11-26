@@ -635,7 +635,7 @@ describe('user journeys (UI)', () => {
               {
                 id: 'to-settings',
                 look: 'button',
-                show: { label: '打开设置', variant: 'outline' },
+                show: { label: '打开设置', shape: 'outline' },
                 opens: 'settings',
               },
             ],
@@ -652,14 +652,14 @@ describe('user journeys (UI)', () => {
             children: [
               {
                 id: 'go-notes',
-                look: 'entry',
-                show: { title: '去笔记', icon: 'bookmark' },
+                look: 'button',
+                show: { label: '去笔记', icon: 'bookmark' },
                 opens: 'page:notes',
               },
               {
                 id: 'go-history',
-                look: 'entry',
-                show: { title: '看历史', icon: 'history' },
+                look: 'button',
+                show: { label: '看历史', icon: 'history' },
                 opens: 'history',
               },
             ],

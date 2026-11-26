@@ -42,7 +42,7 @@ const seed = (locale: Locale, registry: Registry) => {
         page: 'home',
         block: {
           id: 'prompt',
-          look: 'callout',
+          look: 'notice',
           show: {
             title: '本月订阅待确认',
             text: '有 {count} 项订阅，合计 {sum:amount}，还没记到本月。',

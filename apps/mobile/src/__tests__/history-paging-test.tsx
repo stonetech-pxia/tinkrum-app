@@ -43,7 +43,7 @@ function firstConfig(): WorkspaceConfig {
       {
         op: 'addContainer',
         page: 'home',
-        block: { id: 'lease', look: 'entry', show: { title: '合同' }, opens: { file: 'oldfile' } },
+        block: { id: 'lease', look: 'button', show: { label: '合同' }, opens: { file: 'oldfile' } },
       },
     ],
     { registry: testRegistry, locale: 'zh' },

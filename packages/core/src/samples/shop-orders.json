@@ -355,7 +355,7 @@
               "zh": "记一单",
               "fr": "Nouvelle commande"
             },
-            "variant": "filled"
+            "shape": "filled"
           },
           "tools": [
             {
@@ -397,9 +397,9 @@
           "children": [
             {
               "id": "to-customers",
-              "look": "entry",
+              "look": "button",
               "show": {
-                "title": {
+                "label": {
                   "en": "Customers",
                   "zh": "客户",
                   "fr": "Clients"
@@ -411,9 +411,9 @@
             },
             {
               "id": "to-sales",
-              "look": "entry",
+              "look": "button",
               "show": {
-                "title": {
+                "label": {
                   "en": "Sales",
                   "zh": "营业额",
                   "fr": "Ventes"
@@ -440,7 +440,7 @@
           "children": [
             {
               "id": "run-cutout",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -452,7 +452,7 @@
             },
             {
               "id": "run-brighten",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -464,7 +464,7 @@
             },
             {
               "id": "run-send",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -476,7 +476,7 @@
             },
             {
               "id": "run-print",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -524,7 +524,7 @@
               "zh": "添加客户",
               "fr": "Ajouter un client"
             },
-            "variant": "filled"
+            "shape": "filled"
           },
           "tools": [
             {

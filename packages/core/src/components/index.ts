@@ -17,7 +17,23 @@ import { LEAF_COMPONENTS, LeafComponentSchema } from './leaves';
 export * from './define';
 export { GROUP_MAX_CHILDREN, GroupChildSchema, InnerGroupSchema } from './group';
 export { LEAF_COMPONENTS, LeafComponentSchema } from './leaves';
-export { entryKind, entryEditableText } from './entry';
+export {
+  BUTTON_SHAPES,
+  buttonEdit,
+  buttonKind,
+  buttonShape,
+  type ButtonKind,
+  type ButtonShape,
+} from './button';
+export { CatalogSourceSchema, catalogOf, type CatalogSource } from './catalog';
+export {
+  followChoiceProblems,
+  isChoiceTabs,
+  isTimeTabs,
+  type ChoiceTabs,
+  type TabsBlock,
+  type TimeTabs,
+} from './tabs';
 export {
   RECORD_LOOKS,
   RECORD_LOOK_DOC,
@@ -86,6 +102,7 @@ export interface ComponentDefinition extends LookMeta {
   check?(c: KnownComponent, ctx: CheckContext): CheckProblem[];
   describe(c: KnownComponent, config: WorkspaceConfig, ctx: DescribeContext): string;
   edit: ComponentEdit;
+  editOf?(c: KnownComponent): ComponentEdit;
   ai: ComponentAI;
   example: Record<string, unknown>;
   shape: z.ZodRawShape;
@@ -104,6 +121,12 @@ const BY_LOOK = new Map<string, ComponentDefinition>(
 /** Definition of this appearance. */
 export function componentDefinition(look: ComponentType): ComponentDefinition {
   return BY_LOOK.get(look)!;
+}
+
+/** What long-press edit offers on this block (its look's editOf, else its edit). */
+export function blockEdit(c: KnownComponent): ComponentEdit {
+  const def = componentDefinition(c.look);
+  return def.editOf?.(c) ?? def.edit;
 }
 
 /** Blocks recognized by this version (D-254). */

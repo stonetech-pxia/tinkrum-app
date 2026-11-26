@@ -27,7 +27,7 @@ describe('data templates', () => {
       expect(issuesOf(config)).toEqual([]);
       expect(config.data.tables).toHaveLength(1);
       // Default navigation bar is full (5 items), so the entry point is the quick entry on the home page.
-      expect(config.containers.pages[0]!.blocks.at(-1)).toMatchObject({ look: 'entry' });
+      expect(config.containers.pages[0]!.blocks.at(-1)).toMatchObject({ look: 'button' });
     }
   });
 

@@ -1,4 +1,4 @@
-import { packById, quickActionsOf } from '@morph/core';
+import { buttonKind, packById, quickActionsOf } from '@morph/core';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { screen, testRouter } from 'expo-router/testing-library';
 
@@ -160,7 +160,8 @@ describe('workflow journeys (UI)', () => {
     expect(
       home.blocks.some(
         (c) =>
-          c.look === 'action' &&
+          c.look === 'button' &&
+          buttonKind(c) === 'run' &&
           (c as { tools: { tool: string }[] }).tools[0]!.tool === 'email-photos',
       ),
     ).toBe(true);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { prepareOps } from './change';
+import { buttonKind } from './components';
 import { applyOps, OpSchema, type Op, type OpOf } from './ops';
 import type {
   Collection,
@@ -108,7 +109,7 @@ const tasksPage: Extract<OpOf<'addContainer'>['page'], object> = {
         {
           id: 'reset',
           look: 'button',
-          show: { label: '全部重来', variant: 'outline' },
+          show: { label: '全部重来', shape: 'outline' },
           tools: [{ do: 'setAll', table: 'tasks', field: 'done', value: false }],
         },
       ],
@@ -143,7 +144,7 @@ function tasksConfig(): WorkspaceConfig {
       block: {
         id: 'new-project',
         look: 'button',
-        show: { label: '新项目', variant: 'text' },
+        show: { label: '新项目', shape: 'text' },
         tools: [{ do: 'create', table: 'projects', ask: 'all' }],
       },
     },
@@ -372,7 +373,7 @@ describe('removeData', () => {
         block: {
           id: 'new-task',
           look: 'button',
-          show: { label: '新任务', variant: 'filled' },
+          show: { label: '新任务', shape: 'filled' },
           tools: [{ do: 'create', table: 'tasks', ask: 'all' }],
         },
       },
@@ -475,7 +476,7 @@ describe('addContainer', () => {
         op: 'addContainer',
         page: 'tasks-page',
         parent: 'row',
-        block: { id: 'd', look: 'divider' },
+        block: { id: 'd', look: 'spacer', show: { size: 'small', line: true } },
       },
     ]);
     expect(ids(page(config, 'notes').blocks)).toEqual(['sp', 'h']);
@@ -531,11 +532,21 @@ describe('addContainer', () => {
     ).toBe('page home already exists');
     expect(
       errorOf(config, [
-        { op: 'addContainer', page: 'tasks-page', block: { id: 'board', look: 'divider' } },
+        {
+          op: 'addContainer',
+          page: 'tasks-page',
+          block: { id: 'board', look: 'spacer', show: { size: 'small', line: true } },
+        },
       ]),
     ).toBe('block board already exists on page tasks-page');
     expect(
-      errorOf(config, [{ op: 'addContainer', page: 'nope', block: { id: 'x', look: 'divider' } }]),
+      errorOf(config, [
+        {
+          op: 'addContainer',
+          page: 'nope',
+          block: { id: 'x', look: 'spacer', show: { size: 'small', line: true } },
+        },
+      ]),
     ).toBe('page nope not found');
     expect(
       errorOf(config, [
@@ -543,7 +554,7 @@ describe('addContainer', () => {
           op: 'addContainer',
           page: 'tasks-page',
           parent: 'board',
-          block: { id: 'x', look: 'divider' },
+          block: { id: 'x', look: 'spacer', show: { size: 'small', line: true } },
         },
       ]),
     ).toBe('block board is not a group');
@@ -553,7 +564,7 @@ describe('addContainer', () => {
           op: 'addContainer',
           page: 'tasks-page',
           parent: 'nope',
-          block: { id: 'x', look: 'divider' },
+          block: { id: 'x', look: 'spacer', show: { size: 'small', line: true } },
         },
       ]),
     ).toBe('block nope not found on page tasks-page');
@@ -572,7 +583,11 @@ describe('addContainer', () => {
     });
     expect(
       errorOf(config, [
-        { op: 'addContainer', desk: 'below', block: { id: 'tip', look: 'divider' } },
+        {
+          op: 'addContainer',
+          desk: 'below',
+          block: { id: 'tip', look: 'spacer', show: { size: 'small', line: true } },
+        },
       ]),
     ).toBe('block tip already exists in the file room');
   });
@@ -591,7 +606,7 @@ describe('addContainer', () => {
         op: 'addContainer',
         desk: 'above',
         page: 'home',
-        block: { id: 'x', look: 'divider' },
+        block: { id: 'x', look: 'spacer', show: { size: 'small', line: true } },
       }),
     ).toBe(false);
   });
@@ -808,7 +823,7 @@ describe('removeContainer', () => {
       {
         op: 'addContainer',
         page: 'home',
-        block: { id: 'go', look: 'entry', show: { title: '任务' }, opens: 'page:tasks-page' },
+        block: { id: 'go', look: 'button', show: { label: '任务' }, opens: 'page:tasks-page' },
       },
     ]);
     const gone = tryOps(config, [{ op: 'removeContainer', page: 'task' }]);
@@ -874,7 +889,11 @@ describe('removeContainer', () => {
 
   it('a block in the file room; an empty room layout is dropped', () => {
     const config = apply(workspace(), [
-      { op: 'addContainer', desk: 'below', block: { id: 'd', look: 'divider' } },
+      {
+        op: 'addContainer',
+        desk: 'below',
+        block: { id: 'd', look: 'spacer', show: { size: 'small', line: true } },
+      },
     ]);
     const removed = apply(config, [{ op: 'removeContainer', desk: 'below', block: 'd' }]);
     expect(removed.containers).not.toHaveProperty('desk');
@@ -1092,12 +1111,12 @@ describe('removeTool', () => {
       {
         op: 'addContainer',
         page: 'home',
-        block: { id: 'run', look: 'action', tools: [{ tool: 'share-it' }] },
+        block: { id: 'run', look: 'button', tools: [{ tool: 'share-it' }] },
       },
       {
         op: 'addContainer',
         page: 'home',
-        block: { id: 'go', look: 'entry', show: { title: '分享' }, opens: 'tool:share-it' },
+        block: { id: 'go', look: 'button', show: { label: '分享' }, opens: 'tool:share-it' },
       },
       { op: 'updateContainer', nav: { phoneHomeScreen: ['share-it'] } },
       {
@@ -1295,7 +1314,7 @@ describe('setPackage', () => {
     ]);
     expect(block(config, 'home', 'card-pdf')).toEqual({
       id: 'card-pdf',
-      look: 'entry',
+      look: 'button',
       show: { shape: 'tile' },
       opens: 'package:pdf',
     });
@@ -1313,7 +1332,7 @@ describe('setPackage', () => {
       {
         op: 'addContainer',
         page: 'home',
-        block: { id: 'grid', look: 'packages', source: { catalog: 'packages' } },
+        block: { id: 'grid', look: 'catalog', source: { catalog: 'packages' } },
       },
       { op: 'setPackage', package: 'pdf', do: 'add' },
     ]);
@@ -1334,14 +1353,14 @@ describe('setPackage', () => {
         block: {
           id: 'go',
           look: 'button',
-          show: { label: 'PDF', variant: 'text' },
+          show: { label: 'PDF', shape: 'text' },
           opens: 'page:tool-pdf',
         },
       },
       {
         op: 'addContainer',
         page: 'home',
-        block: { id: 'merge', look: 'action', tools: [{ tool: 'pdf-merge' }] },
+        block: { id: 'merge', look: 'button', tools: [{ tool: 'pdf-merge' }] },
       },
       {
         op: 'updateContainer',
@@ -1391,9 +1410,12 @@ describe('setPackage', () => {
     expect(after.tools.map((w) => w.id)).toContain('pdf-split');
     const pdf = page(after, 'tool-pdf');
     expect((pdf.blocks.at(-1) as KnownComponent).look).toBe('files');
-    expect(pdf.blocks.filter((c) => (c as KnownComponent).look === 'action')).toHaveLength(
-      quickActionsOf(after).length,
-    );
+    expect(
+      pdf.blocks.filter((c) => {
+        const k = c as KnownComponent;
+        return k.look === 'button' && buttonKind(k) === 'run';
+      }),
+    ).toHaveLength(quickActionsOf(after).length);
     expect(result.lines[0]).toMatch(/^更新「PDF」工具：新增 PDF 和图片合成一个、图片转 PDF/);
     expect(prepareOps(after, [{ op: 'setPackage', package: 'pdf', do: 'update' }], ctx).ok).toBe(
       false,

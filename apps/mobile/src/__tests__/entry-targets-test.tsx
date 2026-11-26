@@ -17,8 +17,8 @@ import { renderToolsApp } from '../test-utils/render-app';
 
 const seed = (target: OpenTarget) => (locale: Locale, registry: Registry) => {
   const components: NewComponent[] = [
-    { id: 'open', look: 'button', show: { label: 'Open it', variant: 'filled' }, opens: target },
-    { id: 'go', look: 'entry', show: { title: 'Go there', icon: 'star' }, opens: target },
+    { id: 'open', look: 'button', show: { label: 'Open it', shape: 'filled' }, opens: target },
+    { id: 'go', look: 'button', show: { label: 'Go there', icon: 'star' }, opens: target },
   ];
   const result = applyOps(
     createDefaultWorkspace(locale),

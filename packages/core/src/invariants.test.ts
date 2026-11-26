@@ -337,7 +337,7 @@ describe('Invariant 3: AI never touches files', () => {
         {
           op: 'addContainer',
           page: 'home',
-          block: { id: 'slot', look: 'entry', show: { title: '合同' }, opens: { file: null } },
+          block: { id: 'slot', look: 'button', show: { label: '合同' }, opens: { file: null } },
         },
       ],
       ctx,
@@ -357,7 +357,7 @@ describe('Invariant 3: AI never touches files', () => {
           {
             op: 'addContainer',
             page: 'home',
-            block: { id: 'slot', look: 'entry', show: { title: '合同' }, opens: { file: A } },
+            block: { id: 'slot', look: 'button', show: { label: '合同' }, opens: { file: A } },
           },
           {
             op: 'addContainer',
@@ -395,7 +395,7 @@ describe('Invariant 3: AI never touches files', () => {
           {
             op: 'addContainer',
             page: 'home',
-            block: { id: 'slot2', look: 'entry', show: { title: 'x' }, opens: { file: A } },
+            block: { id: 'slot2', look: 'button', show: { label: 'x' }, opens: { file: A } },
           },
         ],
       ],
@@ -472,7 +472,7 @@ describe('Invariant 3: AI never touches files', () => {
             op: 'updateContainer',
             page: 'home',
             block: 'slot',
-            changes: { opens: { file: REDACTED_FILE }, show: { title: '租房合同' } },
+            changes: { opens: { file: REDACTED_FILE }, show: { label: '租房合同' } },
           },
         ],
         ai,
@@ -519,7 +519,12 @@ describe('Invariant 3: No file references in new settings (D-424)', () => {
     ],
     [
       'showIf with a file',
-      { id: 'x', look: 'divider', showIf: { table: 't', has: 'some', asset: 'f' } },
+      {
+        id: 'x',
+        look: 'spacer',
+        show: { size: 'small', line: true },
+        showIf: { table: 't', has: 'some', asset: 'f' },
+      },
     ],
   ])('%s is refused', (_name, block) => {
     expect(OpSchema.safeParse(page(block)).success).toBe(false);
@@ -567,7 +572,7 @@ describe('Invariant 4: Originals are never moved or deleted', () => {
           {
             op: 'addContainer',
             page: 'home',
-            block: { id: 'slot', look: 'entry', show: { title: 'x' }, opens: { file } },
+            block: { id: 'slot', look: 'button', show: { label: 'x' }, opens: { file } },
           },
         ],
         ctx,
@@ -988,7 +993,7 @@ describe("Invariant 10: Data leaves the app only by the user's own tap, every ti
       ).toBe(false);
     });
 
-    it('the phone home screen, an action block and a button cannot run it', () => {
+    it('the phone home screen, a button that runs a quick action and a button that opens one cannot run it', () => {
       expect(refused([{ op: 'updateContainer', nav: { phoneHomeScreen: ['send'] } }])).toBe(false);
       expect(
         refused([
@@ -996,7 +1001,7 @@ describe("Invariant 10: Data leaves the app only by the user's own tap, every ti
             op: 'addContainer',
             page: 'home',
             index: 0,
-            block: { id: 'x', look: 'action', tools: [{ tool: 'send' }] },
+            block: { id: 'x', look: 'button', tools: [{ tool: 'send' }] },
           },
         ]),
       ).toBe(false);
@@ -1327,7 +1332,8 @@ describe('Invariant 12: Old data always opens', () => {
       expect(r.ok && r.config).toEqual(config);
     }
     // D-607: Single-select gains multiple, upgrading to version 40 (version bump only).
-    expect(CURRENT_SCHEMA_VERSION).toBe(40);
+    // D-new-kernel-available-resources-3ffb5b-1: merging block looks upgrades to version 41.
+    expect(CURRENT_SCHEMA_VERSION).toBe(41);
   });
 
   // D-424: showIf, browse, and single are new optional values; old configs without them remain unchanged down to the letter, and schemaVersion is unchanged.
@@ -2407,7 +2413,8 @@ describe('Invariant 12: Old config remains unchanged (D-428)', () => {
     // further version changes. D-617-D-619 (checklist also, latest number blocks, empty formula
     // "zero") also do not trigger version upgrades: all are optional syntaxes with unchanged stored
     // data, which older apps will reject rather than misread.
-    expect(CURRENT_SCHEMA_VERSION).toBe(40);
+    // 41 is the merge of block looks (D-new-kernel-available-resources-3ffb5b-1), not these additions.
+    expect(CURRENT_SCHEMA_VERSION).toBe(41);
   });
 
   it.each(CONFIGS)(
@@ -2584,11 +2591,11 @@ describe('Invariants 4 / 17 / 18: Containers pass attachments to tools (D-442)',
     expect(withShrink([plain, single('plain', 'n')]).ok).toBe(false);
   });
 
-  it('it cannot sit where nothing hands over attachments: a button, an action block, a reminder', () => {
+  it('it cannot sit where nothing hands over attachments: a button, a button that runs a quick action, a reminder', () => {
     const at = (block: object) =>
       withShrink([{ op: 'addContainer', page: 'home', index: 0, block }]).ok;
     expect(at({ id: 'b', look: 'button', label: 'Go', opens: 'tool:shrink' })).toBe(false);
-    expect(at({ id: 'a', look: 'action', tool: 'shrink' })).toBe(false);
+    expect(at({ id: 'a', look: 'button', tools: [{ tool: 'shrink' }] })).toBe(false);
   });
 
   it('removing the attachment field takes its button with it; removing the tool cleans the row', () => {
@@ -2989,8 +2996,9 @@ describe('Invariants 2 / 14: Tags exist only in records; neither config nor payl
 
 describe('Invariant 12: Check-in grid has a new look, while old configs and old versions in change history still open normally (D-610)', () => {
   it('a new look and keys used only by it: no version bump, old configs load unchanged', () => {
-    // Check-in grid did not increment its own version; 40 was bumped for multi-choice (D-607).
-    expect(CURRENT_SCHEMA_VERSION).toBe(40);
+    // Check-in grid did not increment its own version; 40 was bumped for multi-choice (D-607), 41 for
+    // merging block looks (D-new-kernel-available-resources-3ffb5b-1).
+    expect(CURRENT_SCHEMA_VERSION).toBe(41);
     for (const [, config] of CONFIGS) {
       const text = JSON.stringify(config);
       expect(text).not.toMatch(/"look":"grid"|"across"|"do":"remove"/);
@@ -3027,9 +3035,10 @@ describe('Invariant 12: Check-in grid has a new look, while old configs and old 
 });
 
 describe('Invariant 12: Old configs open successfully without fixed areas, tags, or floating buttons (decided by the founder 2026-11-04)', () => {
-  it('schemaVersion stays 40 and a config without the new keys is valid and unchanged', () => {
-    // 39 -> 40 is D-607 (multi-choice), which only bumps the version number.
-    expect(CURRENT_SCHEMA_VERSION).toBe(40);
+  it('schemaVersion moved only for other changes and a config without the new keys is valid and unchanged', () => {
+    // 39 -> 40 is D-607 (multi-choice), which only bumps the version number; 40 -> 41 merges block
+    // looks (D-new-kernel-available-resources-3ffb5b-1). Neither is about pins, dials or tags.
+    expect(CURRENT_SCHEMA_VERSION).toBe(41);
     const old = fromV33(v33Fixture('sample-expense-helper-zh') as never);
     const text = JSON.stringify(old);
     for (const key of ['"pin"', '"dial"', '"tags"']) expect(text).not.toContain(key);
@@ -3160,7 +3169,9 @@ describe('Invariant 18: References to fixed areas, tag filters, and floating but
             id: 'g',
             look: 'group',
             show: { layout: 'stack' },
-            children: [{ id: 'h', look: 'divider', pin: 'top' }],
+            children: [
+              { id: 'h', look: 'spacer', show: { size: 'small', line: true }, pin: 'top' },
+            ],
           },
         },
       ] as Op[],

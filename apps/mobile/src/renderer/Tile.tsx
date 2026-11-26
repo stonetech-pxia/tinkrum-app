@@ -24,7 +24,8 @@ export function Tile({
 }: {
   env: RenderEnv;
   style: ComponentStyle | undefined;
-  icon: Parameters<typeof IconTile>[0]['icon'];
+  /** Omitted: no icon block (a row button without an icon). */
+  icon?: Parameters<typeof IconTile>[0]['icon'] | undefined;
   title: string;
   subtitle?: string | undefined;
   onPress: () => void;
@@ -51,12 +52,14 @@ export function Tile({
       testID={testID}
       style={styles.fill}>
       <View style={center ? styles.tileCenter : stacked ? styles.tileStacked : styles.tileRow}>
-        <IconTile
-          palette={palette}
-          icon={icon}
-          size={Math.round((listRow ? 40 : 46) * scale)}
-          {...iconTile}
-        />
+        {icon !== undefined ? (
+          <IconTile
+            palette={palette}
+            icon={icon}
+            size={Math.round((listRow ? 40 : 46) * scale)}
+            {...iconTile}
+          />
+        ) : null}
         <View style={[styles.flexText, stacked && styles.centerText, center && styles.centerItems]}>
           <Text
             style={[

@@ -576,7 +576,7 @@ export const audioTool: ToolDefinition = {
       },
       ...audioWorkflows(locale).map((wf) => ({
         id: `${wf.id}-runner`,
-        look: 'action' as const,
+        look: 'button' as const,
         tools: [{ tool: wf.id }],
       })),
       {

@@ -119,7 +119,7 @@ describe('periods before and after the current one (D-559)', () => {
       usesOf({ step: { action: 'in.records', params: { period: 'yesterday' } } }).features,
     ).toEqual(['periodNeighbours']);
     expect(
-      usesOf({ id: 'r', look: 'period', show: { options: ['thisMonth', 'lastMonth'] } }).features,
+      usesOf({ id: 'r', look: 'tabs', show: { periods: ['thisMonth', 'lastMonth'] } }).features,
     ).toEqual(['periodNeighbours']);
     expect(
       usesOf({ filter: [{ field: 'due', op: 'inPeriod', value: 'thisMonth' }] }).features,

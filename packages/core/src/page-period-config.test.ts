@@ -5,7 +5,7 @@ import type { Op } from './ops';
 import type { Collection, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// Period blocks on pages and their associated charts and number cards (D-440): config validation, and cleanup when deleting blocks.
+// Time tabs on pages and their associated charts and number cards (D-440): config validation, and cleanup when deleting blocks.
 
 const ctx = { registry, locale: 'zh' as const, now: new Date(2026, 10, 4) };
 
@@ -18,9 +18,9 @@ const expenses: Collection = {
   ],
 } as Collection;
 
-const period = (show: object = { options: ['thisWeek', 'thisMonth'] }, id = 'range') => ({
+const period = (show: object = { periods: ['thisWeek', 'thisMonth'] }, id = 'range') => ({
   id,
-  look: 'period',
+  look: 'tabs',
   show,
 });
 const chart = (source: object = {}) => ({
@@ -57,17 +57,17 @@ const issues = (blocks: object[]) => {
   return r.ok ? [] : r.issues;
 };
 
-describe('the period block', () => {
+describe('time tabs', () => {
   it('takes the choices in order, with an optional default and a custom range', () => {
     expect(ok([period()])).toBe(true);
-    expect(ok([period({ options: ['thisMonth'], default: 'thisMonth', custom: true })])).toBe(true);
+    expect(ok([period({ periods: ['thisMonth'], default: 'thisMonth', custom: true })])).toBe(true);
   });
 
   it('refuses no choices, repeated choices, other values, a default that is not a choice', () => {
-    expect(ok([period({ options: [] })])).toBe(false);
-    expect(ok([period({ options: ['thisWeek', 'thisWeek'] })])).toBe(false);
-    expect(ok([period({ options: ['last14days'] })])).toBe(false);
-    expect(issues([period({ options: ['thisWeek'], default: 'thisYear' })]).join()).toMatch(
+    expect(ok([period({ periods: [] })])).toBe(false);
+    expect(ok([period({ periods: ['thisWeek', 'thisWeek'] })])).toBe(false);
+    expect(ok([period({ periods: ['last14days'] })])).toBe(false);
+    expect(issues([period({ periods: ['thisWeek'], default: 'thisYear' })]).join()).toMatch(
       /show.default/,
     );
   });
@@ -80,10 +80,10 @@ describe('the period block', () => {
 });
 
 describe('charts and numbers that follow the page', () => {
-  it('need a period block on the same page', () => {
+  it('need time tabs on the same page', () => {
     expect(ok([period(), chart({ period: 'page' }), number({ period: 'page' })])).toBe(true);
-    expect(issues([chart({ period: 'page' })]).join()).toMatch(/needs a period block/);
-    expect(issues([number({ period: 'page' })]).join()).toMatch(/needs a period block/);
+    expect(issues([chart({ period: 'page' })]).join()).toMatch(/needs time tabs/);
+    expect(issues([number({ period: 'page' })]).join()).toMatch(/needs time tabs/);
   });
 
   it('a pie can follow too; compare works without an inPeriod filter, but a pie has no previous', () => {
@@ -113,7 +113,7 @@ describe('charts and numbers that follow the page', () => {
   });
 });
 
-describe('removing the period block', () => {
+describe('removing the time tabs', () => {
   const withBlocks = (): WorkspaceConfig => {
     const r = build([period(), chart({ period: 'page' }), number({ period: 'page' })]);
     if (!r.ok) throw new Error(r.issues.join());
@@ -140,7 +140,7 @@ describe('removing the period block', () => {
           op: 'updateContainer',
           page: 'p',
           block: 'range',
-          changes: { show: { options: ['thisMonth'] } },
+          changes: { show: { periods: ['thisMonth'] } },
         },
       ] as unknown as Op[],
       ctx,
@@ -150,7 +150,7 @@ describe('removing the period block', () => {
   });
 });
 
-describe('record lists that follow the period block (D-561)', () => {
+describe('record lists that follow the time tabs (D-561)', () => {
   const list = (source: object = {}, extra: object = {}, look = 'list') => ({
     id: 'l',
     look,
@@ -159,7 +159,7 @@ describe('record lists that follow the period block (D-561)', () => {
     ...extra,
   });
 
-  it('a record block may follow the page range when the page has a period block', () => {
+  it('a record block may follow the page range when the page has time tabs', () => {
     expect(issues([period(), list()])).toEqual([]);
     for (const look of ['cards', 'checklist', 'tiles', 'board', 'table', 'gallery'])
       expect(
@@ -170,9 +170,9 @@ describe('record lists that follow the period block (D-561)', () => {
       ).not.toMatch(/period/);
   });
 
-  it('needs a period block on the same page', () => {
+  it('needs time tabs on the same page', () => {
     expect(issues([list()]).join()).toMatch(
-      /source.period "page" needs a period block on the same page/,
+      /source.period "page" needs time tabs \(a tabs block with show.periods\) on the same page/,
     );
   });
 
@@ -188,7 +188,7 @@ describe('record lists that follow the period block (D-561)', () => {
     ).toMatch(/follows the page's time range: no show.browse.period/);
   });
 
-  it('removing the period block takes source.period off the lists too', () => {
+  it('removing the time tabs takes source.period off the lists too', () => {
     const r = build([period(), list()]);
     if (!r.ok) throw new Error(r.issues.join());
     const removed = prepareOps(

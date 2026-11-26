@@ -57,7 +57,7 @@ export const form = (id: string, table: string, ask: string[], extra: object = {
 export const button = (id: string, tool: object, label = 'Go') => ({
   id,
   look: 'button',
-  show: { label, variant: 'filled' },
+  show: { label, shape: 'filled' },
   tools: [tool],
 });
 export const records = (
@@ -107,7 +107,7 @@ export const scanInto = (id: string, table: string, source = 'scanner') =>
     ['scan.detect', {}],
     ['out.addRecord', { collectionId: table }],
   ]);
-export const runAction = (id: string, tool: string) => ({ id, look: 'action', tools: [{ tool }] });
+export const runAction = (id: string, tool: string) => ({ id, look: 'button', tools: [{ tool }] });
 
 /** Operations run through the validator, returning config; fails immediately if validation fails. */
 export function buildConfig(ops: readonly object[], locale: Locale = 'en'): WorkspaceConfig {

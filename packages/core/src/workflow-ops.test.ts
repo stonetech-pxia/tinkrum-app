@@ -69,7 +69,7 @@ describe('workflow ops', () => {
         {
           op: 'addContainer',
           page: 'home',
-          block: { id: 'run-visa', look: 'action', tools: [{ tool: 'visa' }] },
+          block: { id: 'run-visa', look: 'button', tools: [{ tool: 'visa' }] },
         },
       ],
       ctx,
@@ -100,7 +100,7 @@ describe('workflow ops', () => {
         {
           op: 'addContainer',
           page: 'home',
-          block: { id: 'run-visa', look: 'action', tools: [{ tool: copy.id }] },
+          block: { id: 'run-visa', look: 'button', tools: [{ tool: copy.id }] },
         },
       ],
       ctx,
@@ -112,7 +112,7 @@ describe('workflow ops', () => {
     expect(removed.after.tools.some((w) => w.id === copy.id)).toBe(false);
     expect(removed.after.containers.pages[0]!.blocks).toContainEqual({
       id: 'run-visa',
-      look: 'action',
+      look: 'button',
       tools: [{ tool: copy.id }],
     });
     expect(removed.lines).toEqual(['删除快捷操作「签证 / 证件照」（文件不受影响）']);

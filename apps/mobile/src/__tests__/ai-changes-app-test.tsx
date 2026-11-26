@@ -1,5 +1,6 @@
 import {
   allComponents,
+  buttonKind,
   HABIT_RUNS,
   presetWorkflow,
   quickActionsOf,
@@ -131,7 +132,9 @@ describe('AI changes the app, the user runs it (UI)', () => {
     expect(
       allComponents(home).some(
         (c) =>
-          c.look === 'action' && (c as { tools: { tool: string }[] }).tools[0]!.tool === made.id,
+          c.look === 'button' &&
+          buttonKind(c) === 'run' &&
+          (c as { tools: { tool: string }[] }).tools[0]!.tool === made.id,
       ),
     ).toBe(true);
   });
@@ -187,7 +190,7 @@ describe('AI changes the app, the user runs it (UI)', () => {
     expect(await screen.findByTestId(`share-workflow-${made.id}`)).toHaveTextContent(/刚做好/);
     expect(store.getState().draft).toBeNull();
     const home = store.getState().config!.containers.pages.find((p) => p.id === 'home')!;
-    expect(home.blocks.some((c) => c.look === 'action')).toBe(false);
+    expect(home.blocks.some((c) => c.look === 'button' && buttonKind(c) === 'run')).toBe(false);
     expect(screen.queryByTestId('ready-screen')).toBeNull();
     expect(screen.queryByTestId('run-screen')).toBeNull();
   });

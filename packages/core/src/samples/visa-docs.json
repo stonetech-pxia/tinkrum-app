@@ -291,9 +291,9 @@
         },
         {
           "id": "to-ids",
-          "look": "entry",
+          "look": "button",
           "show": {
-            "title": {
+            "label": {
               "en": "My IDs",
               "zh": "我的证件",
               "fr": "Mes papiers"
@@ -321,7 +321,7 @@
           "children": [
             {
               "id": "run-scan-paper",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },
@@ -333,7 +333,7 @@
             },
             {
               "id": "run-photo",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },
@@ -345,7 +345,7 @@
             },
             {
               "id": "run-print-photos",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },
@@ -357,7 +357,7 @@
             },
             {
               "id": "run-packet",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },
@@ -369,7 +369,7 @@
             },
             {
               "id": "run-to-english",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },
@@ -381,7 +381,7 @@
             },
             {
               "id": "run-foreign-pdf",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },
@@ -430,9 +430,9 @@
           "children": [
             {
               "id": "passport-scan",
-              "look": "entry",
+              "look": "button",
               "show": {
-                "title": {
+                "label": {
                   "en": "Passport scan",
                   "zh": "护照扫描件",
                   "fr": "Copie du passeport"
@@ -451,9 +451,9 @@
             },
             {
               "id": "id-card-scan",
-              "look": "entry",
+              "look": "button",
               "show": {
-                "title": {
+                "label": {
                   "en": "ID card scan",
                   "zh": "身份证扫描件",
                   "fr": "Copie de la carte d’identité"
@@ -524,7 +524,7 @@
               "zh": "添加证件",
               "fr": "Ajouter un document"
             },
-            "variant": "filled"
+            "shape": "filled"
           },
           "tools": [
             {

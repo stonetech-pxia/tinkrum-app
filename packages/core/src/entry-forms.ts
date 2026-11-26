@@ -78,7 +78,7 @@ export function addMissingEntryForms(
       page.blocks.splice(page.blocks.indexOf(top), 0, {
         id,
         look: 'button',
-        show: { label: t(locale, 'entryFormAdd'), variant: 'filled' },
+        show: { label: t(locale, 'entryFormAdd'), shape: 'filled' },
         tools: [{ do: 'create', table: table.id, ask: 'all', ...linkToRecord(filter) }],
       });
       added.push(table.id);

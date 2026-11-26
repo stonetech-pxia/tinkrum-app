@@ -6,6 +6,7 @@ import { homeScreenItems } from './home-screen';
 import type { Op } from './ops-schema';
 import {
   allComponents,
+  catalogOf,
   isKnownComponent,
   quickActionsOf,
   toolGridToolIds,
@@ -47,7 +48,7 @@ describe('createStarterWorkspace', () => {
       expect(config.nav.apps).toBeUndefined();
       // No title, tool card, toolbox or file entry is on the home page: only the icons.
       expect(pageOf(config, 'home').blocks).toEqual([
-        { id: 'apps', look: 'apps', source: { catalog: 'apps' } },
+        { id: 'apps', look: 'catalog', source: { catalog: 'apps' } },
       ]);
       expect(config.containers.pages.filter((p) => !p.package).map((p) => p.id)).toEqual(['home']);
       expect(quickActionsOf(config).filter((w) => !w.package)).toEqual([]);
@@ -136,28 +137,32 @@ describe('paperAppOps', () => {
       show: { title: 'Paper', subtitle: 'Paper in. Clean PDF, Word or Excel out.' },
     });
     expect(home.blocks[1]).toMatchObject({ look: 'group', show: { layout: 'grid', columns: 2 } });
-    const children = (home.blocks[1] as ComponentOf<'group'>).children as ComponentOf<'action'>[];
+    const children = (home.blocks[1] as ComponentOf<'group'>).children as ComponentOf<'button'>[];
     expect(children).toMatchObject([
-      { look: 'action', show: { shape: 'tile' }, tools: [{ tool: 'scan-camera' }] },
-      { look: 'action', show: { shape: 'tile' }, tools: [{ tool: 'scan-doc-word' }] },
-      { look: 'action', show: { shape: 'tile' }, tools: [{ tool: 'scan-table-excel' }] },
-      { look: 'action', show: { shape: 'tile' }, tools: [{ tool: 'combine-documents' }] },
+      { look: 'button', show: { shape: 'tile' }, tools: [{ tool: 'scan-camera' }] },
+      { look: 'button', show: { shape: 'tile' }, tools: [{ tool: 'scan-doc-word' }] },
+      { look: 'button', show: { shape: 'tile' }, tools: [{ tool: 'scan-table-excel' }] },
+      { look: 'button', show: { shape: 'tile' }, tools: [{ tool: 'combine-documents' }] },
     ]);
     // Each tile is a built-in preset, ready to be tapped without being added first, and (D-552) the
     // four icons are distinct for quick visual differentiation.
     const icons = children.map((c) => {
-      const use = c.tools[0] as { tool: string };
+      const use = c.tools![0] as { tool: string };
       const wf = findWorkflowTarget(quickActionsOf(config), use.tool, 'en')!;
       expect(wf, use.tool).toBeTruthy();
       return wf.icon ?? (wf.package && registry.tools.get(wf.package)?.icon);
     });
     expect(new Set(icons).size).toBe(4);
-    expect(home.blocks[2]).toMatchObject({ look: 'picker', tools: [{ tool: '$pick.open' }] });
+    expect(home.blocks[2]).toMatchObject({ look: 'button', tools: [{ tool: '$pick.open' }] });
     // Shape is unspecified: A full-width primary-colored button row, rather than a small icon-only block.
-    expect((home.blocks[2] as ComponentOf<'picker'>).show).toBeUndefined();
+    expect((home.blocks[2] as ComponentOf<'button'>).show).toBeUndefined();
     // D-452: Finally, recent operations (reading run logs) and the 3 most recent files.
     expect(home.blocks.slice(3)).toMatchObject([
-      { look: 'library', show: { title: 'Recent actions' }, source: { recent: true } },
+      {
+        look: 'catalog',
+        show: { title: 'Recent actions' },
+        source: { catalog: 'quickActions', recent: true },
+      },
       { look: 'files', show: { title: 'Recent files' }, source: { table: '$files', limit: 3 } },
     ]);
   });
@@ -181,7 +186,7 @@ describe('paperAppOps', () => {
     const start = createDefaultWorkspace('en');
     const config = ok(start, paperAppOps(start, 'en', registry));
     expect(pageOf(config, 'home').blocks.at(-1)).toMatchObject({
-      look: 'entry',
+      look: 'button',
       opens: 'app:paper',
     });
   });
@@ -189,7 +194,9 @@ describe('paperAppOps', () => {
   it('its toolbox shows every tool in the catalog exactly once', () => {
     const toolbox = pageOf(withPaper('zh'), 'paper-toolbox');
     const shown = allComponents(toolbox).flatMap((c) =>
-      isKnownComponent(c) && c.look === 'packages' ? toolGridToolIds(c, toolbox, catalog) : [],
+      isKnownComponent(c) && c.look === 'catalog' && c.source.catalog === 'packages'
+        ? toolGridToolIds(c.source, toolbox, catalog)
+        : [],
     );
     expect([...shown].sort()).toEqual([...catalog].sort());
   });
@@ -197,7 +204,7 @@ describe('paperAppOps', () => {
   it('adding a tool its toolbox already shows does not add a home card', () => {
     const config = ok(withPaper('zh'), [{ op: 'setPackage', package: 'zip', do: 'add' }], 'zh');
     expect(
-      allComponents(pageOf(config, 'home')).some((c) => isKnownComponent(c) && c.look === 'entry'),
+      allComponents(pageOf(config, 'home')).some((c) => isKnownComponent(c) && c.look === 'button'),
     ).toBe(false);
     expect(config.packages.some((t) => t.id === 'zip')).toBe(true);
   });
@@ -215,8 +222,9 @@ describe('paperAppOps', () => {
   it('rejects tool grids with unknown or repeated tools', () => {
     const config = withPaper('zh');
     const grid = pageOf(config, 'paper-toolbox').blocks.find(
-      (c): c is ComponentOf<'packages'> => isKnownComponent(c) && c.look === 'packages',
+      (c): c is ComponentOf<'catalog'> => catalogOf(c) === 'packages',
     )!;
+    if (grid.source.catalog !== 'packages') throw new Error('not a packages grid');
     grid.source.ids = ['image', 'image', 'nope'];
     const result = validateWorkspace(config, registry);
     expect(result.ok).toBe(false);

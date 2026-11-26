@@ -26,10 +26,13 @@ const COLUMNS = 3;
  */
 export function ToolGrid({
   grid,
+  ids: listed,
   page,
   env,
 }: {
-  grid: BlockOf<'packages'>;
+  grid: BlockOf<'catalog'>;
+  /** source.ids of the packages grid. */
+  ids: readonly string[] | undefined;
   page: Page | undefined;
   env: RenderEnv;
 }) {
@@ -38,8 +41,8 @@ export function ToolGrid({
   const confirm = useWorkspace((s) => s.confirm);
   const catalog = [...registry.tools.keys()];
   const ids = page
-    ? toolGridToolIds(grid, page, catalog)
-    : (grid.source.ids ?? catalog).filter((id) => registry.tools.has(id));
+    ? toolGridToolIds({ ids: listed }, page, catalog)
+    : (listed ?? catalog).filter((id) => registry.tools.has(id));
   if (ids.length === 0) return null;
 
   async function open(toolId: string) {

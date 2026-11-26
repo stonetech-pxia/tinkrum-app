@@ -1,4 +1,4 @@
-import type { BlockOf } from '@morph/core';
+import type { BlockOf, CatalogSource } from '@morph/core';
 
 import { WorkflowsScreen } from '../shell/WorkflowsScreen';
 import type { RenderEnv } from './components';
@@ -10,14 +10,22 @@ import { RecentActions } from './RecentActions';
  * is determined by core just like fixed pages; cannot be tapped in drafts and previews (prompts
  * to apply first in drafts).
  */
-export function QuickActionList({ block, env }: { block: BlockOf<'library'>; env: RenderEnv }) {
-  if (block.source.recent) return <RecentActions title={block.show?.title} env={env} />;
+export function QuickActionList({
+  block,
+  source,
+  env,
+}: {
+  block: BlockOf<'catalog'>;
+  source: Extract<CatalogSource, { catalog: 'quickActions' }>;
+  env: RenderEnv;
+}) {
+  if (source.recent) return <RecentActions title={block.show?.title} env={env} />;
   return (
     <WorkflowsScreen
       palette={env.palette}
       locale={env.locale}
       registry={env.registry}
-      kind={block.source.kind}
+      kind={source.kind}
       inPage={{
         title: block.show?.title,
         guard: () => {

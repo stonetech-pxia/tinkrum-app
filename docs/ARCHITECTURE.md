@@ -289,26 +289,30 @@ Note that the v33 `tools` (installed tool packages) is today's `packages`, while
 
 **Component types → looks**
 
-| Before v34 (v33 `type`) | Today (v34 `look`)                                                                                     |
+Today's names are those of v41 (D-new-kernel-available-resources-3ffb5b-1 merged twelve v34 looks into five; the v34 name is in brackets where it differs).
+
+| Before v34 (v33 `type`) | Today (v41 `look`)                                                                                     |
 | ----------------------- | ------------------------------------------------------------------------------------------------------ |
 | `header`                | `header`                                                                                               |
 | `text`                  | `text`                                                                                                 |
 | `notice`                | `notice`                                                                                               |
-| `divider`               | `divider`                                                                                              |
+| `divider`               | `spacer` with `show.line: true` (v34 `divider`)                                                        |
 | `spacer`                | `spacer`                                                                                               |
 | `image`                 | `image` (`assetId` → `show.asset`)                                                                     |
 | `group`                 | `group`                                                                                                |
-| `button`                | `button`                                                                                               |
-| `shortcut`              | `entry`                                                                                                |
-| `catalogLink`           | `entry` that opens `tools`                                                                             |
-| `toolCard`              | `entry` that opens `package:<id>`                                                                      |
-| `fileSlot`              | `entry` that opens `{file}`                                                                            |
+| `button`                | `button` (`variant` → `show.shape`)                                                                    |
+| `shortcut`              | `button` that opens a page (v34 `entry`, `show.title` → `show.label`)                                  |
+| `catalogLink`           | `button` that opens `tools` with `show.accent` (v34 `entry`)                                           |
+| `toolCard`              | `button` that opens `package:<id>` (v34 `entry`)                                                       |
+| `fileSlot`              | `button` that opens `{file}` (v34 `entry`)                                                             |
 | `fileList`              | `files` (reads the system table `$files`)                                                              |
-| `filePick`              | `picker`                                                                                               |
-| `workflowRunner`        | `action`                                                                                               |
-| `quickActionList`       | `library`                                                                                              |
-| `toolGrid`              | `packages`                                                                                             |
+| `filePick`              | `button` with a `$pick.…` tool (v34 `picker`)                                                          |
+| `workflowRunner`        | `button` with a quick action tool (v34 `action`)                                                       |
+| `quickActionList`       | `catalog` with `source.catalog: "quickActions"` (v34 `library`)                                        |
+| `toolGrid`              | `catalog` with `source.catalog: "packages"` (v34 `packages`)                                           |
 | `recordList`            | the record look named by its `display` (for example `list`, `checklist`, `tiles`, `board`, `calendar`) |
 | `recordForm`            | `form`; in `mode: "button"` a `button` with a `create` tool                                            |
 | `stat`                  | `number`                                                                                               |
 | `chart`                 | `chart`                                                                                                |
+
+Looks added after v34 and merged in v41: `period` and `choices` are `tabs` (`show.options` of `period` → `show.periods`), `callout` is a `notice` with `source`, `apps` is a `catalog` with `source.catalog: "apps"`.

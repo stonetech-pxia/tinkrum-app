@@ -1,5 +1,7 @@
 import {
   bindRecord,
+  buttonKind,
+  isKnownComponent,
   pageBrowseHost,
   pageChoices,
   pageDial,
@@ -55,10 +57,10 @@ export interface RenderEnv {
   cellColumn?: { index: number; of: number };
   /** Rendered in the fixed bottom zone of the page: entries are drawn as buttons matching the floating action button style (D-437). */
   inBottomZone?: boolean;
-  /** Time range selected on the page (D-440): present only when the page contains a period block; charts and metric cards render according to this when source.period is "page". State is restricted to the page and is not persisted. */
+  /** Time range selected on the page (D-440): present only when the page contains time tabs; charts and metric cards render according to this when source.period is "page". State is restricted to the page and is not persisted. */
   pageRange?: { choice: PageChoice; set: (choice: PageChoice) => void };
   /**
-   * Row of options on the page (D-573): present only when the page contains a choices block;
+   * Row of options on the page (D-573): present only when the page contains tabs by a choice field;
    * blocks reading the same table with source.choice set to "page" display only records matching
    * the selected option (null = all). State is restricted to the page and is not persisted.
    */
@@ -133,7 +135,7 @@ function PageBody({ page, env, bottomInset = 0, zoneInset, scroll }: PageViewPro
   const palette = onPicture(env.palette, picture);
   const [pageEnd, setPageEnd] = useState(0);
   const [bottomHeight, setBottomHeight] = useState(0);
-  // Time range selected on the page (D-440): when a period block exists, the user's selection is stored here; reverts to default if the block's options are modified.
+  // Time range selected on the page (D-440): when time tabs exists, the user's selection is stored here; reverts to default if the block's options are modified.
   const periodBlock = pagePeriod(page);
   const [pickedRange, setPickedRange] = useState<PageChoice | null>(null);
   const pageRange = periodBlock
@@ -418,19 +420,23 @@ function PageBody({ page, env, bottomInset = 0, zoneInset, scroll }: PageViewPro
  * individual components in the config, keeping the structure seen by the AI and edit mode
  * unchanged.
  */
+/** A button that runs a quick action (the former action look). */
+const runsQuickAction = (c: Component): c is BlockOf<'button'> =>
+  isKnownComponent(c) && c.look === 'button' && buttonKind(c) === 'run';
+
 function runnerGrid(components: readonly Component[]): (Component | Component[])[] {
   const blocks: (Component | Component[])[] = [];
   let run: Component[] = [];
   const flush = () => {
     const tiles =
-      run.length >= 2 || run.some((c) => c.look === 'action' && c.show?.shape === 'tile');
+      run.length >= 2 || run.some((c) => runsQuickAction(c) && c.show?.shape === 'tile');
     if (tiles) for (let i = 0; i < run.length; i += 2) blocks.push(run.slice(i, i + 2));
     else blocks.push(...run);
     run = [];
   };
   for (const c of components) {
     // Components specifying row or card do not enter the grid; a single component specifying tile is placed into the grid (D-230).
-    if (c.look === 'action' && c.show?.shape !== 'row' && c.show?.shape !== 'card') run.push(c);
+    if (runsQuickAction(c) && c.show?.shape !== 'row' && c.show?.shape !== 'card') run.push(c);
     else {
       flush();
       blocks.push(c);

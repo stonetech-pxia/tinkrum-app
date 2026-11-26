@@ -39,8 +39,8 @@ export function ReadyScreen({ workflow, notes = [] }: { workflow: Workflow; note
       allComponents(p).some(
         (c) =>
           isKnownComponent(c) &&
-          c.look === 'action' &&
-          c.tools.some((u) => 'tool' in u && u.tool === workflow.id),
+          c.look === 'button' &&
+          (c.tools ?? []).some((u) => 'tool' in u && u.tool === workflow.id),
       ),
   );
   const needsContainer = handedInput(workflow.steps, registry) !== null;

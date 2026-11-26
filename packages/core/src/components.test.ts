@@ -65,8 +65,8 @@ describe.each(COMPONENTS.map((d) => [d.look, d] as const))('look %s', (_type, de
         prop: field.prop,
         max: field.max,
       });
-      // Entry title can be omitted in the structure (tool pack entries take them dynamically), long-press editing lists by kind (entryEditableText).
-      if (def.look === 'entry' && field.prop === 'title') continue;
+      // A button's label can be omitted in the structure (a quick action, a tool page or an app supplies it), long-press editing lists by kind (buttonEdit).
+      if (def.look === 'button' && field.prop === 'label') continue;
       const shape = props.shape as Record<string, z.ZodType>;
       const optional = shape[field.prop] instanceof z.ZodOptional;
       expect({ prop: field.prop, optional }).toEqual({
@@ -79,7 +79,7 @@ describe.each(COMPONENTS.map((d) => [d.look, d] as const))('look %s', (_type, de
   it('has a doc line for the AI, and its rule (if any) does not clash', () => {
     expect(def.ai.doc.trim()).not.toBe('');
     if (def.ai.docAfter) expect(COMPONENTS.map((d) => d.look)).toContain(def.ai.docAfter);
-    const numbers = COMPONENTS.flatMap((d) => (d.ai.rule ? [d.ai.rule.n] : []));
+    const numbers = COMPONENTS.flatMap((d) => (d.ai.rules ?? []).map((r) => r.n));
     expect(new Set(numbers).size).toBe(numbers.length);
   });
 });

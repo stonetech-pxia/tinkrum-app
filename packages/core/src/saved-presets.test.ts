@@ -38,8 +38,8 @@ function withFiles(): WorkspaceConfig {
       page: 'home',
       block: {
         id: 'slot',
-        look: 'entry',
-        show: { title: '合同', icon: 'folder' },
+        look: 'button',
+        show: { label: '合同', icon: 'folder' },
         opens: { file: FILE_A },
       },
     },
@@ -60,8 +60,8 @@ function withFiles(): WorkspaceConfig {
       page: 'home',
       block: {
         id: 'note',
-        look: 'entry',
-        show: { title: '你好', icon: 'star' },
+        look: 'button',
+        show: { label: '你好', icon: 'star' },
         opens: 'settings',
         style: { backdrop: { overlay: 'light', assetId: FILE_C } },
       },
@@ -225,8 +225,8 @@ describe('imported presets', () => {
     broken.containers.pages[0]!.blocks = [
       {
         id: 'go',
-        look: 'entry',
-        show: { title: 'x', icon: 'star' },
+        look: 'button',
+        show: { label: 'x', icon: 'star' },
         opens: 'no-such-page' as never,
       },
     ];

@@ -6,12 +6,12 @@ import type { WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 import { validateWorkspace } from './validate';
 
-// File slot (D-257): look entry, opens {file}; config contains only title, prompt, appearance, and user file ID (null = empty slot).
+// File slot (D-257): look button, opens {file}; config contains only label, prompt, appearance, and user file ID (null = empty slot).
 
 const add: Op = {
   op: 'addContainer',
   page: 'home',
-  block: { id: 'lease', look: 'entry', show: { title: 'Lease' }, opens: { file: null } },
+  block: { id: 'lease', look: 'button', show: { label: 'Lease' }, opens: { file: null } },
 };
 function apply(config: WorkspaceConfig, ops: Op[]): WorkspaceConfig {
   const result = applyOps(config, ops, { registry, locale: 'en' });

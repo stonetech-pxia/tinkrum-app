@@ -42,7 +42,7 @@ const addButton = (id: string, tableId: string) =>
   ({
     id,
     look: 'button',
-    show: { label: 'Add', variant: 'filled' },
+    show: { label: 'Add', shape: 'filled' },
     tools: [{ do: 'create', table: tableId, ask: 'all' }],
   }) as unknown as Component;
 const form = (id: string, tableId: string, ask: string[], values?: object) =>
@@ -69,9 +69,9 @@ const stat = (id: string, tableId: string) =>
     source: { table: tableId, aggregate: 'count' },
   }) as unknown as Component;
 const entry = (id: string, opens: string) =>
-  ({ id, look: 'entry', show: { title: id, icon: 'document' }, opens }) as unknown as Component;
+  ({ id, look: 'button', show: { label: id, icon: 'document' }, opens }) as unknown as Component;
 const action = (id: string, tool: string) =>
-  ({ id, look: 'action', tools: [{ tool }] }) as unknown as Component;
+  ({ id, look: 'button', tools: [{ tool }] }) as unknown as Component;
 
 const quick = (id: string, steps: [string, object, (string[] | undefined)?][]): QuickAction => ({
   id,
@@ -183,7 +183,7 @@ describe('file tools', () => {
       '快捷操作库块',
       {
         home: [
-          { id: 'l', look: 'library', source: { catalog: 'quickActions' } } as unknown as Component,
+          { id: 'l', look: 'catalog', source: { catalog: 'quickActions' } } as unknown as Component,
         ],
       },
       {},

@@ -66,8 +66,8 @@ export function focusPage(ops: readonly Op[], config: WorkspaceConfig): string {
         allComponents(p).some(
           (c) =>
             isKnownComponent(c) &&
-            c.look === 'action' &&
-            c.tools.some((u) => 'tool' in u && u.tool === id),
+            c.look === 'button' &&
+            (c.tools ?? []).some((u) => 'tool' in u && u.tool === id),
         ),
       );
       if (owner) return owner.id;

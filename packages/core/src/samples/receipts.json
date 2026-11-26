@@ -280,10 +280,10 @@
         },
         {
           "id": "spending",
-          "look": "entry",
+          "look": "button",
           "pin": "bottom",
           "show": {
-            "title": {
+            "label": {
               "en": "Spending",
               "zh": "开销",
               "fr": "Dépenses"
@@ -359,10 +359,10 @@
         },
         {
           "id": "range",
-          "look": "period",
+          "look": "tabs",
           "pin": "top",
           "show": {
-            "options": ["thisWeek", "thisMonth", "thisYear"],
+            "periods": ["thisWeek", "thisMonth", "thisYear"],
             "default": "thisMonth",
             "custom": true
           }

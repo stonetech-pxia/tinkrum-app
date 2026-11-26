@@ -211,7 +211,7 @@ export interface ActionDefinition {
    */
   ai?: string;
   /**
-   * Rules specific to this action to teach the AI separately (like component `ai.rule`): `n` is
+   * Rules specific to this action to teach the AI separately (like component `ai.rules`): `n` is
    * the number in the prompt's `## Rules` section, taking the number of the current last rule
    * plus 1. `text` is in English; if changed, run affected evals.
    */

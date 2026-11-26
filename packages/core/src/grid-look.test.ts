@@ -264,7 +264,7 @@ describe('grid look: remove only works as a tap on a grid (D-610)', () => {
       removeHere({
         id: 'b',
         look: 'button',
-        show: { label: 'Delete', variant: 'filled' },
+        show: { label: 'Delete', shape: 'filled' },
         tools: [{ do: 'remove', table: 'check-ins' }],
       }),
     ).toMatch(/remove/);

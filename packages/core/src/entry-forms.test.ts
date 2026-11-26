@@ -71,7 +71,7 @@ describe('a new record block of a table that has no way to add entries (D-310)',
     expect(blocks[0]).toEqual({
       id: 'add-habits',
       look: 'button',
-      show: { label: '添加', variant: 'filled' },
+      show: { label: '添加', shape: 'filled' },
       tools: [{ do: 'create', table: 'habits', ask: 'all' }],
     });
     expect(lines).toContain('「习惯」还没有添加的地方，同时在列表上方加一个「添加」按钮');
@@ -129,7 +129,7 @@ describe('a new record block of a table that has no way to add entries (D-310)',
     const openButton: NewComponent = {
       id: 'new',
       look: 'button',
-      show: { label: '新习惯', variant: 'filled' },
+      show: { label: '新习惯', shape: 'filled' },
       tools: [{ do: 'create', table: 'habits', ask: 'all' }],
     };
     const withButton = apply(base(), addTo('home', openButton));
@@ -142,7 +142,7 @@ describe('a new record block of a table that has no way to add entries (D-310)',
     const reset: NewComponent = {
       id: 'reset',
       look: 'button',
-      show: { label: '清零', variant: 'outline' },
+      show: { label: '清零', shape: 'outline' },
       tools: [{ do: 'setAll', table: 'habits', field: 'goal', value: 0 }],
     };
     const config = apply(base(), addTo('home', reset));

@@ -52,7 +52,7 @@ const pageOps: Op[] = [
     block: {
       id: 'books-add',
       look: 'button',
-      show: { label: '添加', variant: 'filled' },
+      show: { label: '添加', shape: 'filled' },
       tools: [{ do: 'create', table: 'books', ask: 'all' }],
     },
   },
@@ -333,7 +333,7 @@ describe('New issues introduced in this session (patch these up)', () => {
           block: {
             id: 'films-add',
             look: 'button',
-            show: { label: '添加', variant: 'filled' },
+            show: { label: '添加', shape: 'filled' },
             tools: [{ do: 'create', table: 'films', ask: 'all' }],
           },
         } as unknown as Op,

@@ -51,21 +51,7 @@ import {
 const IDS = new Set(CAPABILITIES.map((c) => c.id));
 
 /** These items exist in config but are not personal record capabilities: presentation elements or belonging to the file side; listed separately so new looks don't accidentally omit them. */
-const NOT_RECORD_LOOKS = new Set([
-  'header',
-  'text',
-  'notice',
-  'image',
-  'divider',
-  'spacer',
-  'entry',
-  'picker',
-  'files',
-  'library',
-  'packages',
-  'action',
-  'apps',
-]);
+const NOT_RECORD_LOOKS = new Set(['header', 'text', 'image', 'spacer', 'files', 'catalog']);
 /** Write blocks are located under `write.look.*`, others under `read.look.*`. */
 const WRITE_LOOKS = new Set(['form', 'button']);
 /** Keys on reminders: basic info, `when`, and `opens` are separate capabilities. */
@@ -362,7 +348,7 @@ function everything() {
       }),
       {
         id: 'callout',
-        look: 'callout',
+        look: 'notice',
         show: {
           title: 'Waiting',
           text: '{count} waiting, {sum:qty} in total',
@@ -419,7 +405,8 @@ function everything() {
       },
       {
         id: 'none-yet',
-        look: 'divider',
+        look: 'spacer',
+        show: { size: 'small', line: true },
         showIf: { table: 'items', has: 'none' },
       },
       // D-616: The "Add" action below picks multiple groups, creating an entry for each.
@@ -566,7 +553,7 @@ function everything() {
       }),
       chart('c-line', 'items', 'line', { aggregate: 'count', group: { unit: 'day' } }),
       chart('c-pie', 'items', 'pie', { aggregate: 'count', group: { by: 'status' } }),
-      { id: 'range', look: 'period', show: { options: ['thisWeek', 'thisMonth'], custom: true } },
+      { id: 'range', look: 'tabs', show: { periods: ['thisWeek', 'thisMonth'], custom: true } },
       number('n-period', 'items', { aggregate: 'count', period: 'page' }),
       records('list', 'l-period', 'items', 'title', { source: { period: 'page' } }),
       chart('c-compare', 'items', 'bar', {
@@ -577,8 +564,8 @@ function everything() {
       }),
     ]),
     addPage('tabs', [
-      { id: 'tabs', look: 'choices', show: {}, source: { table: 'items', field: 'status' } },
-      { id: 'range-2', look: 'period', show: { options: ['thisMonth'] } },
+      { id: 'tabs', look: 'tabs', show: {}, source: { table: 'items', field: 'status' } },
+      { id: 'range-2', look: 'tabs', show: { periods: ['thisMonth'] } },
       number('n-choice', 'items', { aggregate: 'count', choice: 'page', period: 'page' }),
       records('list', 'l-choice', 'items', 'title', { source: { choice: 'page' } }),
       chart('c-choice', 'items', 'line', {
@@ -684,8 +671,8 @@ function everything() {
       page: 'home',
       block: {
         id: 'to-ops',
-        look: 'entry',
-        show: { title: 'ops', icon: 'star' },
+        look: 'button',
+        show: { label: 'ops', icon: 'star' },
         opens: 'page:ops',
       },
     },

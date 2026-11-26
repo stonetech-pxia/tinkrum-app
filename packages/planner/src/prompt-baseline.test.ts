@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { buildSystemPrompt, buildUserMessage } from './prompt';
 
 // Snapshot of the prompt sent to the model: modifications to the prompt (here or in registries like
-// ai.doc, ai.rule, aiRules) should intentionally update snapshots and run affected evals.
+// ai.doc, ai.rules, aiRules) should intentionally update snapshots and run affected evals.
 // Appearance descriptions and rules, single-action rules (action aiRules), and style preset names
 // (said) are generated from definitions. v34 (2026-10-30): rewritten by data · containers · tools,
 // rules reduced from 66 to 51, adding relation rules R1-R14.
@@ -34,7 +34,7 @@ describe('prompt baseline', () => {
     for (const def of COMPONENTS) {
       const ai = def.ai as ComponentAI;
       expect(prompt).toContain(`\n  - ${def.look} ${ai.doc}`);
-      if (ai.rule) expect(prompt).toContain(`\n${ai.rule.n}. ${ai.rule.text}\n`);
+      for (const rule of ai.rules ?? []) expect(prompt).toContain(`\n${rule.n}. ${rule.text}\n`);
     }
   });
 

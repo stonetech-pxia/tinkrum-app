@@ -114,7 +114,11 @@ export function ToolsView({ env }: { env: RenderEnv }) {
       {[...registry.tools.values()].map((tool) => {
         const installed = config.packages.find((x) => x.id === tool.id);
         const card = allComponents(home).find(
-          (c) => isKnownComponent(c) && c.look === 'entry' && packageTargetId(c.opens) === tool.id,
+          (c) =>
+            isKnownComponent(c) &&
+            c.look === 'button' &&
+            c.opens !== undefined &&
+            packageTargetId(c.opens) === tool.id,
         );
         const name = localize(tool.name, locale);
         const entry = tool.origin === 'download' ? offered(tool.id) : undefined;
@@ -216,7 +220,7 @@ export function ToolsView({ env }: { env: RenderEnv }) {
                                 index: 1,
                                 block: {
                                   id: `card-${tool.id}`,
-                                  look: 'entry',
+                                  look: 'button',
                                   opens: packageTarget(tool.id),
                                 },
                               },

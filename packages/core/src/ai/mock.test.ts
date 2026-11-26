@@ -280,7 +280,7 @@ describe('mock AI — navigation and pages', () => {
     const full = (await change('Add a page called Budget', workspace('en'), 'en')).after;
     expect(full.nav.bar).toHaveLength(5);
     expect(home(full).blocks.at(-1)).toMatchObject({
-      look: 'entry',
+      look: 'button',
       opens: 'page:page-1',
     });
   });
@@ -291,7 +291,7 @@ describe('mock AI — navigation and pages', () => {
     expect(after.containers.pages.map((p) => p.id)).toEqual(['home']);
     expect(
       home(after).blocks.some(
-        (c) => isKnownComponent(c) && c.look === 'entry' && c.opens === 'page:page-1',
+        (c) => isKnownComponent(c) && c.look === 'button' && c.opens === 'page:page-1',
       ),
     ).toBe(false);
     expect(await plan('删除首页页面', workspace())).toMatchObject({ kind: 'reject' });

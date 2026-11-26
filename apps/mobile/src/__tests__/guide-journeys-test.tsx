@@ -257,7 +257,7 @@ describe('first-run guide', () => {
     await fireEvent.press(await screen.findByTestId('guide-skip'));
     await waitFor(() => expect(apps(store)).toEqual(['paper']));
     const home = store.getState().config!.containers.pages.find((p) => p.id === 'home')!;
-    expect(home.blocks.at(-1)).toMatchObject({ look: 'entry', opens: 'app:paper' });
+    expect(home.blocks.at(-1)).toMatchObject({ look: 'button', opens: 'app:paper' });
   });
 
   it('skipping the guide builds the Paper app directly', async () => {

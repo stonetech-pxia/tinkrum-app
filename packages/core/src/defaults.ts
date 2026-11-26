@@ -61,9 +61,9 @@ export function createDefaultWorkspace(locale: Locale): WorkspaceConfig {
             // "Add Tool": primary-colored title, plus sign, large block (formerly catalogLink, M7).
             {
               id: 'catalog',
-              look: 'entry',
+              look: 'button',
               show: {
-                title: t(locale, 'defaults_Add_tools_9c8e1'),
+                label: t(locale, 'defaults_Add_tools_9c8e1'),
                 icon: 'plus',
                 shape: 'tile',
                 accent: true,

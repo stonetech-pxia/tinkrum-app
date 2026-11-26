@@ -394,10 +394,10 @@
         },
         {
           "id": "mine",
-          "look": "entry",
+          "look": "button",
           "pin": "bottom",
           "show": {
-            "title": {
+            "label": {
               "en": "My card",
               "zh": "我的名片",
               "fr": "Ma carte"
@@ -511,7 +511,7 @@
               "zh": "手动填写",
               "fr": "Remplir à la main"
             },
-            "variant": "filled"
+            "shape": "filled"
           },
           "tools": [
             {
@@ -523,7 +523,7 @@
         },
         {
           "id": "scan",
-          "look": "action",
+          "look": "button",
           "showIf": {
             "table": "$table.mine",
             "has": "none"

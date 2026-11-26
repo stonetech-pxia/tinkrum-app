@@ -42,13 +42,13 @@ type Page = WorkspaceConfig['containers']['pages'][number];
 /** The toolbox page (D-181): every tool of the catalog, grouped by purpose, and "Manage tools". */
 export function toolboxPage(locale: Locale, registry: Registry, id = TOOLBOX_PAGE_ID): Page {
   const pick = (pair: [string, string]) => pairText(locale, pair);
-  const grids: ComponentOf<'packages'>[] = TOOLBOX_GROUPS.flatMap((g) => {
+  const grids: ComponentOf<'catalog'>[] = TOOLBOX_GROUPS.flatMap((g) => {
     const ids = g.toolIds?.filter((toolId) => registry.tools.has(toolId));
     if (ids && ids.length === 0) return [];
     return [
       {
         id: `tools-${g.id}`,
-        look: 'packages' as const,
+        look: 'catalog' as const,
         show: { title: pick(g.title) },
         source: { catalog: 'packages' as const, ...(ids ? { ids } : {}) },
       },
@@ -68,7 +68,7 @@ export function toolboxPage(locale: Locale, registry: Registry, id = TOOLBOX_PAG
       {
         id: 'toolbox-manage',
         look: 'button',
-        show: { label: t(locale, 'starter_Manage_tools_f1487'), variant: 'text' },
+        show: { label: t(locale, 'starter_Manage_tools_f1487'), shape: 'text' },
         opens: 'tools',
       },
     ],
@@ -105,7 +105,7 @@ export function paperBlocks(
             show: { layout: 'grid', columns: 2 },
             children: tiles.map((x) => ({
               id: x.id,
-              look: 'action' as const,
+              look: 'button' as const,
               show: { shape: 'tile' as const },
               tools: [{ tool: x.tool }],
             })),
@@ -115,11 +115,11 @@ export function paperBlocks(
   return [
     { id: 'hello', look: 'header', show: { title, subtitle: t(locale, 'homeTagline') } },
     ...grid,
-    { id: 'open-files', look: 'picker', tools: [{ tool: '$pick.open' }] },
+    { id: 'open-files', look: 'button', tools: [{ tool: '$pick.open' }] },
     // D-452: Recently used quick actions (reading run logs, hidden when empty) and recent files (all scanned files are stored here, D-450).
     {
       id: 'recent-actions',
-      look: 'library',
+      look: 'catalog',
       show: { title: t(locale, 'homeRecentActions') },
       source: { catalog: 'quickActions', recent: true },
     },
@@ -214,7 +214,7 @@ export function createStarterWorkspace(locale: Locale, registry: Registry): Work
     {
       op: 'addContainer',
       page: HOME_PAGE_ID,
-      block: { id: 'apps', look: 'apps', source: { catalog: 'apps' } },
+      block: { id: 'apps', look: 'catalog', source: { catalog: 'apps' } },
     },
     { op: 'updateContainer', nav: { bar: [pageTarget(HOME_PAGE_ID), 'ai', 'settings'] } },
   ];

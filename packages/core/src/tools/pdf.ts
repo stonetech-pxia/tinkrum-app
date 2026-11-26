@@ -1112,7 +1112,7 @@ export const pdfTool: ToolDefinition = {
       },
       ...pdfWorkflows(locale).map((wf) => ({
         id: wf.id === PDF_MERGE_WORKFLOW_ID ? 'pdf-runner' : `${wf.id}-runner`,
-        look: 'action' as const,
+        look: 'button' as const,
         tools: [{ tool: wf.id }],
       })),
       {

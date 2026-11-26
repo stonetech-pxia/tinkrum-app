@@ -173,7 +173,7 @@ describe('the record form', () => {
   const button = {
     id: 'add',
     look: 'button',
-    show: { label: 'New', variant: 'filled' },
+    show: { label: 'New', shape: 'filled' },
     tools: [{ do: 'create', table: 'people', ask: 'all' }],
   };
 

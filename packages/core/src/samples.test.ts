@@ -175,7 +175,7 @@ describe.each(SAMPLE_APPS)('sample %s', (sample) => {
       const target = `page:${result.mainPageId}`;
       const home = after.containers.pages.find((p) => p.id === HOME_PAGE_ID)!;
       const onHome = allComponents(home).some(
-        (c) => isKnownComponent(c) && c.look === 'entry' && c.opens === target,
+        (c) => isKnownComponent(c) && c.look === 'button' && c.opens === target,
       );
       if (before.nav.bar.length < 5) {
         expect(after.nav.bar).toContain(target);
@@ -307,7 +307,7 @@ describe('sample files', () => {
       fill.push({
         op: 'addContainer',
         page: HOME_PAGE_ID,
-        block: { id: `d${i}`, look: 'divider' },
+        block: { id: `d${i}`, look: 'spacer', show: { size: 'small', line: true } },
       });
     full = apply(full, fill, 'en');
     expect(sampleOps('baby-growth', full, 'en')).toMatchObject({ ok: false, problem: 'home' });
@@ -483,7 +483,7 @@ describe('the business card sample (D-423)', () => {
     const page = config.containers.pages.find((p) => p.id === 'contacts')!;
     expect(page.blocks.map((b) => [b.look, 'pin' in b ? b.pin : undefined])).toEqual([
       ['list', undefined],
-      ['entry', 'bottom'],
+      ['button', 'bottom'],
       ['dial', 'bottom'],
     ]);
     const list = page.blocks[0] as BlockOf<'list'>;

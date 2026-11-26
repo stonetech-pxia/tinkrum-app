@@ -1,4 +1,10 @@
-import { entryKind } from './components';
+import {
+  buttonKind,
+  isChoiceTabs,
+  isTimeTabs,
+  type ButtonKind,
+  type ChoiceTabs,
+} from './components';
 import { MULTIPLE_CHOICE_NOT_ONE } from './fields';
 import { addMissingEntryForms } from './entry-forms';
 import type { BlockChanges, Op, OpOf } from './ops-schema';
@@ -255,10 +261,8 @@ export function topIndex(page: Page): number {
 
 /** Position for tool package entry points on the home page: after the last tool package entry point; if none, before the "Add tool" entry point, and otherwise after the title. */
 function packageEntryIndex(home: Page): number {
-  const isEntry = (c: Component, kind: string) =>
-    isKnownComponent(c) &&
-    c.look === 'entry' &&
-    entryKind(c as Parameters<typeof entryKind>[0]) === kind;
+  const isEntry = (c: Component, kind: ButtonKind) =>
+    isKnownComponent(c) && c.look === 'button' && buttonKind(c) === kind;
   let last = -1;
   home.blocks.forEach((c, i) => {
     if (isEntry(c, 'package')) last = i;
@@ -268,7 +272,7 @@ function packageEntryIndex(home: Page): number {
   return catalog >= 0 ? catalog : topIndex(home);
 }
 
-/** The tool grid (look packages) on a page already displays this tool package (D-181): no need to add an entry point to the home page again when adding. */
+/** The tool grid (a catalog of packages) on a page already displays this tool package (D-181): no need to add an entry point to the home page again when adding. */
 export function shownInToolGrid(
   config: WorkspaceConfig,
   packageId: string,
@@ -278,8 +282,9 @@ export function shownInToolGrid(
     allComponents(page).some(
       (c) =>
         isKnownComponent(c) &&
-        c.look === 'packages' &&
-        toolGridToolIds(c, page, catalog).includes(packageId),
+        c.look === 'catalog' &&
+        c.source.catalog === 'packages' &&
+        toolGridToolIds(c.source, page, catalog).includes(packageId),
     ),
   );
 }
@@ -417,7 +422,7 @@ function removeQuickActionUses(
   }
   // Buttons above lists and on single record blocks (D-428): blocks are kept, buttons are removed.
   for (const c of everyBlock(config)) {
-    if (!isKnownComponent(c) || c.look === 'action') continue;
+    if (!isKnownComponent(c) || (c.look === 'button' && buttonKind(c) === 'run')) continue;
     const block = c as { tools?: ToolUse[] };
     if (!block.tools?.some((u) => isToolRefUse(u) && gone.includes(u.tool))) continue;
     const kept = block.tools.filter((u) => {
@@ -429,8 +434,8 @@ function removeQuickActionUses(
     else delete block.tools;
   }
   const runs = (c: Component) => {
-    if (!isKnownComponent(c) || c.look !== 'action') return undefined;
-    const use = c.tools[0];
+    if (!isKnownComponent(c) || c.look !== 'button' || buttonKind(c) !== 'run') return undefined;
+    const use = c.tools?.[0];
     return use && isToolRefUse(use) && gone.includes(use.tool) ? use.tool : undefined;
   };
   const opens = (c: Component) => {
@@ -609,15 +614,15 @@ function pruneDials(config: WorkspaceConfig, notes: ApplyNote[]): void {
 }
 
 /**
- * When there are no time range blocks left on a page (deleted or originally absent), strip
+ * When there are no time tabss left on a page (deleted or originally absent), strip
  * `source.period` from its charts, metric cards, and record blocks (D-561), reverting to the
- * block's own configured range (invariant 18, D-440). Hidden time range blocks are still
+ * block's own configured range (invariant 18, D-440). Hidden time tabss are still
  * considered present (validators treat them as such).
  */
 function prunePagePeriod(config: WorkspaceConfig): number {
   let count = 0;
   for (const page of config.containers.pages) {
-    if (page.blocks.some((b) => b.look === 'period')) continue;
+    if (page.blocks.some(isTimeTabs)) continue;
     for (const c of allComponents(page)) {
       if (!isKnownComponent(c) || !('source' in c)) continue;
       const source = c.source as { period?: string } | undefined;
@@ -637,7 +642,7 @@ function prunePagePeriod(config: WorkspaceConfig): number {
 function prunePageChoice(config: WorkspaceConfig): number {
   let count = 0;
   for (const page of config.containers.pages) {
-    if (page.blocks.some((b) => b.look === 'choices')) continue;
+    if (page.blocks.some(isChoiceTabs)) continue;
     for (const c of allComponents(page)) {
       if (!isKnownComponent(c) || !('source' in c)) continue;
       const source = c.source as { choice?: string } | undefined;
@@ -656,20 +661,17 @@ function prunePageChoice(config: WorkspaceConfig): number {
  * default selection (reverting to show all options if none remain).
  */
 function pruneChoiceRows(config: WorkspaceConfig, gone: Gone, notes: ApplyNote[]): void {
-  const rows = (c: Component) =>
-    isKnownComponent(c) && c.look === 'choices' && c.source.table === gone.table;
+  const rows = (c: Component): c is ChoiceTabs =>
+    isKnownComponent(c) && isChoiceTabs(c) && c.source.table === gone.table;
   if (gone.field !== undefined) {
-    const count = removeEverywhere(
-      config,
-      (c) => rows(c) && (c as { source: { field: string } }).source.field === gone.field,
-    );
+    const count = removeEverywhere(config, (c) => rows(c) && c.source.field === gone.field);
     if (count > 0) notes.push({ kind: 'clearedBlockRefs', count });
     return;
   }
   const table = config.data.tables.find((x) => x.id === gone.table);
   for (const c of everyBlock(config)) {
     if (!rows(c)) continue;
-    const row = c as Extract<KnownComponent, { look: 'choices' }>;
+    const row = c;
     const field = table?.fields.find((f) => f.id === row.source.field);
     if (field?.type !== 'choice') continue;
     const ids = field.options.map((o) => o.id);
@@ -1428,7 +1430,7 @@ function addPackage(config: WorkspaceConfig, id: string, ctx: ApplyContext): voi
   // Same as v33 toolCard: title and icon fetched from the tool pack, defaulting to a large block.
   home.blocks.splice(packageEntryIndex(home), 0, {
     id: `card-${def.id}`,
-    look: 'entry',
+    look: 'button',
     show: { shape: 'tile' },
     opens: packageTarget(def.id),
   });
@@ -1476,7 +1478,7 @@ function updatePackage(
   for (const wf of added) {
     let blockId = `${wf.id}-runner`;
     for (let i = 2; findBlock(page, blockId); i++) blockId = `${wf.id}-runner-${i}`;
-    page.blocks.splice(at++, 0, { id: blockId, look: 'action', tools: [{ tool: wf.id }] });
+    page.blocks.splice(at++, 0, { id: blockId, look: 'button', tools: [{ tool: wf.id }] });
   }
   installed.version = def.version;
   notes.push({ kind: 'updatedTool', package: id, tools: added.map((w) => w.id) });

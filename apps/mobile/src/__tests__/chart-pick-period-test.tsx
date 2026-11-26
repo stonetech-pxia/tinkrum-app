@@ -33,8 +33,8 @@ const seed = (locale: Locale, registry: Registry) => {
           blocks: [
             {
               id: 'range',
-              look: 'period',
-              show: { options: ['thisMonth', 'lastMonth'], default: 'lastMonth', custom: true },
+              look: 'tabs',
+              show: { periods: ['thisMonth', 'lastMonth'], default: 'lastMonth', custom: true },
             },
             {
               id: 'total',

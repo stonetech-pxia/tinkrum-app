@@ -42,7 +42,7 @@ import {
   ICON_NAMES,
 } from '../schema';
 import { isEmoji } from '../richtext';
-import { entryKind } from '../components';
+import { buttonKind } from '../components';
 
 import {
   entryOps,
@@ -186,15 +186,13 @@ function resolveComponent(rawName: string, target: Page, state: State): Componen
   let found: Component | undefined;
   if (tool) {
     requireInstalled(tool, state);
-    // Tool package entry point (formerly toolCard): look entry, opens package:<id>.
-    found = find((c) => c.look === 'entry' && c.opens === packageTarget(tool.id));
+    // Tool package entry point (formerly toolCard): a button that opens package:<id>.
+    found = find((c) => c.look === 'button' && c.opens === packageTarget(tool.id));
   } else if (/欢迎|标题|welcome|header|title/i.test(name)) {
     found = find((c) => c.look === 'header');
   } else if (/工具目录|添加工具|catalog|add tools/i.test(name)) {
-    // "Add tool" entry point (formerly catalogLink): entry with primary color title.
-    found = find(
-      (c) => c.look === 'entry' && entryKind(c as Parameters<typeof entryKind>[0]) === 'link',
-    );
+    // "Add tool" entry point (formerly catalogLink): a button with an accent-coloured label.
+    found = find((c) => c.look === 'button' && buttonKind(c) === 'link');
   } else if (/文件|files?|recent/i.test(name)) {
     found = find((c) => c.look === 'files');
   } else if (/说明|介绍|intro|description/i.test(name)) {
@@ -1175,8 +1173,8 @@ const workflowToHomeRule: Rule = (clause, state) => {
     allComponents(home).some(
       (c) =>
         isKnownComponent(c) &&
-        c.look === 'action' &&
-        c.tools.some((u) => 'tool' in u && u.tool === id),
+        c.look === 'button' &&
+        (c.tools ?? []).some((u) => 'tool' in u && u.tool === id),
     )
   ) {
     return ops;
@@ -1187,7 +1185,7 @@ const workflowToHomeRule: Rule = (clause, state) => {
     index: topIndex(home),
     block: {
       id: newComponentId(`run-${wf.id}`.slice(0, 40), home),
-      look: 'action',
+      look: 'button',
       tools: [{ tool: wf.id }],
     },
   });
@@ -1522,8 +1520,8 @@ const filePickRule: Rule = (clause, state) => {
     allComponents(page(state, HOME_PAGE_ID)).some(
       (c) =>
         isKnownComponent(c) &&
-        c.look === 'picker' &&
-        c.tools.some((u) => 'tool' in u && u.tool === pick) &&
+        c.look === 'button' &&
+        (c.tools ?? []).some((u) => 'tool' in u && u.tool === pick) &&
         !c.hidden,
     )
   )
@@ -1535,7 +1533,7 @@ const filePickRule: Rule = (clause, state) => {
     {
       op: 'addContainer',
       page: HOME_PAGE_ID,
-      block: { id, look: 'picker', tools: [{ tool: pick }] },
+      block: { id, look: 'button', tools: [{ tool: pick }] },
     },
   ];
 };
@@ -1816,7 +1814,7 @@ function mixedPlan(locale: Locale): Plan {
         block: {
           id: 'moments-add',
           look: 'button',
-          show: { label: say(locale, '记一条', 'Add one'), variant: 'filled' },
+          show: { label: say(locale, '记一条', 'Add one'), shape: 'filled' },
           tools: [{ do: 'create', table: 'moments', ask: 'all' }],
         },
       },
@@ -1920,7 +1918,7 @@ function fixPlan(ctx: PlanContext): Plan {
           : {
               id: `${table.id}-add`,
               look: 'button',
-              show: { label: say(ctx.locale, '添加', 'Add'), variant: 'filled' },
+              show: { label: say(ctx.locale, '添加', 'Add'), shape: 'filled' },
               tools: [{ do: 'create', table: table.id, ask: 'all' }],
             },
     } as Op);

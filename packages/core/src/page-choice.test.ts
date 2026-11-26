@@ -8,8 +8,8 @@ import { choiceRowOptions, followedFilter, resolvePageChoice } from './page-choi
 import type { Collection, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// A row of options on the page (D-573, founder decision 2 on 2026-11-16): the choices block lists
-// options for a single-select field; record blocks, numbers, and charts in the same page with
+// A row of options on the page (D-573, founder decision 2 on 2026-11-16): tabs by a choice field list
+// the options for a single-select field; record blocks, numbers, and charts in the same page with
 // source.choice set to "page" display only records for the selected item. Config validation,
 // cleanup upon deleting blocks/fields/options, and pure logic.
 
@@ -52,7 +52,7 @@ const notes: Collection = {
 
 const row = (show: object = {}, source: object = {}, id = 'tabs') => ({
   id,
-  look: 'choices',
+  look: 'tabs',
   show,
   source: { table: 'orders', field: 'status', ...source },
 });
@@ -111,7 +111,7 @@ const blockOf = (config: WorkspaceConfig, id: string) =>
   config.containers.pages.find((p) => p.id === 'p')!.blocks.find((b) => b.id === id) as unknown as
     { show: Record<string, unknown>; source: Record<string, unknown> } | undefined;
 
-describe('the choices block (D-573)', () => {
+describe('tabs by a choice field (D-573)', () => {
   it('names a table and one of its choice fields; options, all and default are optional', () => {
     expect(issues([row()])).toEqual([]);
     expect(
@@ -132,7 +132,7 @@ describe('the choices block (D-573)', () => {
 
   it('one per page, on the page itself', () => {
     expect(issues([row(), row({}, { field: 'channel' }, 'tabs-2')]).join()).toMatch(
-      /more than one choices block/,
+      /more than one tabs by a choice field block/,
     );
     expect(
       issues([{ id: 'g', look: 'group', show: { layout: 'stack' }, children: [row()] }]).join(),
@@ -148,17 +148,17 @@ describe('blocks that follow it', () => {
     expect(issues([row(), list({ group: { unit: 'day' } }, {}, 'calendar')])).toEqual([]);
   });
 
-  it('needs the choices block on the same page', () => {
+  it('needs tabs by a choice field on the same page', () => {
     expect(issues([list()]).join()).toMatch(
-      /source.choice "page" needs a choices block on the same page/,
+      /source.choice "page" needs tabs by a choice field \(source \{table, field\}\) on the same page/,
     );
-    expect(issues([number()]).join()).toMatch(/needs a choices block/);
-    expect(issues([chart()]).join()).toMatch(/needs a choices block/);
+    expect(issues([number()]).join()).toMatch(/needs tabs by a choice field/);
+    expect(issues([chart()]).join()).toMatch(/needs tabs by a choice field/);
   });
 
   it('a block reading another table cannot follow, and says so', () => {
     expect(issues([row(), list({ table: 'notes' }, { show: { title: 'title' } })]).join()).toMatch(
-      /the choices block on this page picks from orders, and this block reads notes: only blocks that read orders can follow it, so remove source.choice here/,
+      /the tabs on this page pick from orders, and this block reads notes: only blocks that read orders can follow them, so remove source.choice here/,
     );
   });
 
@@ -188,8 +188,8 @@ describe('blocks that follow it', () => {
     ).toEqual([]);
   });
 
-  it('a page may have a period block and a choices block, and a block may follow both', () => {
-    const period = { id: 'range', look: 'period', show: { options: ['thisMonth', 'thisYear'] } };
+  it('a page may have time tabs and tabs by a choice field, and a block may follow both', () => {
+    const period = { id: 'range', look: 'tabs', show: { periods: ['thisMonth', 'thisYear'] } };
     expect(
       issues([
         period,
@@ -208,7 +208,7 @@ describe('blocks that follow it', () => {
 });
 
 describe('keeping the config consistent (invariant 18)', () => {
-  it('removing the choices block takes source.choice off every block that followed it', () => {
+  it('removing the tabs block takes source.choice off every block that followed it', () => {
     const config = after([row(), list(), number(), chart()]);
     const next = apply(config, [{ op: 'removeContainer', page: 'p', block: 'tabs' }]);
     for (const id of ['l', 'n', 'c']) expect(blockOf(next, id)!.source.choice).toBeUndefined();

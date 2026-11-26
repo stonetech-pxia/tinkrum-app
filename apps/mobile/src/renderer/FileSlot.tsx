@@ -64,12 +64,13 @@ export function useSlotAsset(assetId: string | null | undefined): AssetRecord | 
   return loaded?.id === assetId ? loaded.asset : undefined;
 }
 
-export function FileSlot({ component, env }: { component: BlockOf<'entry'>; env: RenderEnv }) {
+export function FileSlot({ component, env }: { component: BlockOf<'button'>; env: RenderEnv }) {
   const { locale } = env;
-  // File slots are entries where opens is {file} (formerly fileSlot).
+  // File slots are buttons whose opens is {file} (formerly fileSlot).
   const show = component.show ?? {};
-  const title = show.title ?? '';
-  const assetId = isFileTarget(component.opens) ? component.opens.file : null;
+  const title = show.label ?? '';
+  const assetId =
+    component.opens !== undefined && isFileTarget(component.opens) ? component.opens.file : null;
   const { repo, files } = useWorkspaceContext();
   const proposeOps = useWorkspace((s) => s.proposeOps);
   const confirm = useWorkspace((s) => s.confirm);
@@ -137,7 +138,7 @@ export function FileSlot({ component, env }: { component: BlockOf<'entry'>; env:
         if (asset) void open(asset);
         else if (asset === null) void choose();
       }}
-      look={show.shape ?? 'row'}
+      look={show.shape === 'tile' ? 'tile' : 'row'}
     />
   );
 }

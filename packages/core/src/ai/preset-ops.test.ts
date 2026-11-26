@@ -118,12 +118,12 @@ describe('addTool {tool: {preset}}', () => {
     );
   });
 
-  it('an action block can run a built-in quick action by its preset id (nothing added)', () => {
+  it('a button that runs a quick action can run a built-in one by its preset id (nothing added)', () => {
     const runner = (tool: string) => [
       {
         op: 'addContainer',
         page: 'home',
-        block: { id: 'run-it', look: 'action', tools: [{ tool }] },
+        block: { id: 'run-it', look: 'button', tools: [{ tool }] },
       },
     ];
     const ok = prepareOps(workspace('en'), runner('visa-photo'), ctx('en'));

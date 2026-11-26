@@ -1,4 +1,4 @@
-import { choiceRowOptions, optionColor, type BlockOf } from '@morph/core';
+import { choiceRowOptions, optionColor, type ChoiceTabs } from '@morph/core';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { t } from '../i18n';
@@ -7,7 +7,7 @@ import { onPage } from './theme';
 
 // A row of options on the page (D-573): options of a single-select field are laid out in a row
 // ("All" first), and tapping one filters the list, counts, and charts on the same page to show only
-// records for this item. Same appearance as the time range block (PeriodBar); selections are kept
+// records for this item. Same appearance as the time tabs (PeriodBar); selections are kept
 // only in page state (RenderEnv.pageChoice) without writing anything (invariant 15). When options
 // have assigned colors in the field (D-568), each item is preceded by a dot of that color (matching
 // list dots).
@@ -15,7 +15,7 @@ import { onPage } from './theme';
 /** Maximum number of items to wrap to multiple lines; any more are arranged in a single horizontally scrollable row (wrapping 50 options would span multiple screens). */
 const WRAP_UP_TO = 8;
 
-export function ChoiceBar({ block, env }: { block: BlockOf<'choices'>; env: RenderEnv }) {
+export function ChoiceBar({ block, env }: { block: ChoiceTabs; env: RenderEnv }) {
   const { locale, interactive } = env;
   const page = onPage(env.palette);
   const state = env.pageChoice;

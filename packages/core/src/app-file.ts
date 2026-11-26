@@ -10,6 +10,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   HOME_PAGE_ID,
   allComponents,
+  catalogOf,
   isKnownComponent,
   type Collection,
   type Locale,
@@ -176,16 +177,12 @@ export type AppImport = { ok: true; ops: Op[]; name: string } | { ok: false; err
  */
 export function appEntryOps(config: WorkspaceConfig, appId: string): Op[] {
   const home = config.containers.pages.find((p) => p.id === HOME_PAGE_ID);
-  if (
-    !home ||
-    allComponents(home).some((c) => isKnownComponent(c) && c.look === 'apps' && !c.hidden)
-  )
-    return [];
+  if (!home || allComponents(home).some((c) => catalogOf(c) === 'apps' && !c.hidden)) return [];
   return [
     {
       op: 'addContainer',
       page: HOME_PAGE_ID,
-      block: { id: `go-${appId}`.slice(0, 48), look: 'entry', opens: `app:${appId}` },
+      block: { id: `go-${appId}`.slice(0, 48), look: 'button', opens: `app:${appId}` },
     } as unknown as Op,
   ];
 }
@@ -578,7 +575,7 @@ export interface ConvertMeta {
 /** An app can't list apps (D-644): a home page's app list stays behind. */
 const withoutAppList = (blocks: Page['blocks']): Page['blocks'] =>
   blocks
-    .filter((c) => !(isKnownComponent(c) && c.look === 'apps'))
+    .filter((c) => catalogOf(c) !== 'apps')
     .map((c) =>
       isKnownComponent(c) && c.look === 'group'
         ? ({ ...c, children: withoutAppList(c.children) } as typeof c)

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { prepareSnapshot } from './change';
-import { migrateWorkspace, type Migration } from './migrate';
+import { migrateV40toV41, migrateWorkspace, type Migration } from './migrate';
 import { migratePageV33, v33Tables } from './migrate-v34';
 import { fromV33, registry, v33Fixture, workspace } from './test-helpers';
 import { V4_CUSTOM_ASK, V4_DEFAULT_MERGE, V4_FIXED_NAME } from './fixtures/v4';
@@ -17,8 +17,14 @@ type Json = Record<string, any>;
 const v33Default = () => v33Fixture('default-zh') as Json;
 /** v33 default workspace has PDF tool installed. */
 const v33WithPdf = () => v33Fixture('setup-pdf-zh') as Json;
-/** v33 pages follow v34 block schema (migration result). */
-const asV34Page = (page: unknown) => migratePageV33(page as Json, v33Tables([]));
+/** v33 pages follow v34 block schema (migration result), with the v41 block looks (the only later change to these blocks). */
+const asV34Page = (page: unknown) =>
+  (
+    migrateV40toV41({
+      schemaVersion: 40,
+      containers: { pages: [migratePageV33(page as Json, v33Tables([]))] },
+    }).containers as { pages: unknown[] }
+  ).pages[0];
 
 /** Real schemaVersion 1 snapshot: PDF installed, navigation bar minimized, AI and history are floating buttons. */
 const v1Snapshot = {
@@ -478,7 +484,7 @@ describe('migrateWorkspace', () => {
     const migrated = result.config as typeof current;
     const home = migrated.containers.pages.find((p) => p.id === 'home')!;
     const variants = Object.fromEntries(
-      home.blocks.map((b) => [b.id, (b as { show: { variant: string } }).show.variant]),
+      home.blocks.map((b) => [b.id, (b as unknown as { show: { shape: string } }).show.shape]),
     );
     expect(variants).toEqual({
       'toolbox-entry': 'row',

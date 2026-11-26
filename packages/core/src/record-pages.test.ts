@@ -113,7 +113,7 @@ describe('a page for one entry', () => {
     const button = (values: Record<string, unknown>) => ({
       id: 'add',
       look: 'button',
-      show: { label: 'Add task', variant: 'filled' },
+      show: { label: 'Add task', shape: 'filled' },
       tools: [{ do: 'create', table: 'tasks', values, ask: 'all' }],
     });
     expect(problems([projectPage([button({ project: '$record' })])])).toEqual([]);
@@ -135,7 +135,7 @@ describe('a page for one entry', () => {
         addHome({
           id: 'b',
           look: 'button',
-          show: { label: 'Go', variant: 'filled' },
+          show: { label: 'Go', shape: 'filled' },
           opens: 'page:project',
         }),
       ]).join(),

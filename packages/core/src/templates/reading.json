@@ -138,7 +138,7 @@
             "zh": "添加一本书",
             "fr": "Ajouter un livre"
           },
-          "variant": "filled"
+          "shape": "filled"
         },
         "tools": [
           {

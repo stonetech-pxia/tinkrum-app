@@ -16,6 +16,7 @@ import {
   resolveColors,
   shownRowAction,
   sortRecords,
+  buttonKind,
   isKnownComponent,
   readNumber,
   calculatedText,
@@ -83,7 +84,12 @@ export function onRecordPage(c: Component, config: WorkspaceConfig): boolean {
 
 /** Components eligible for home screen placement: stats, buttons, and record lists (excluding calendars and kanban boards). */
 export function widgetSupported(c: Component): boolean {
-  return ['list', 'cards', 'checklist', 'tiles', 'number', 'button'].includes(c.look as string);
+  if (isKnownComponent(c) && c.look === 'button') {
+    // A button with a record tool or one that opens something; not a quick action, a file picker, a file slot, an app or a tool's page.
+    const kind = buttonKind(c);
+    return kind === 'record' || kind === 'open' || kind === 'link';
+  }
+  return ['list', 'cards', 'checklist', 'tiles', 'number'].includes(c.look as string);
 }
 
 /** Names for widgets and "Edit Widget" lists: stats and buttons use their custom text, lists use table names, and others use component descriptions. */
@@ -94,7 +100,8 @@ export function widgetName(
   locale: Locale,
 ): string {
   if (!isKnownComponent(c)) return componentLabel(c, config, { registry, locale, now: new Date() });
-  if (c.look === 'number' || c.look === 'button') return c.show.label;
+  if (c.look === 'number') return c.show.label;
+  if (c.look === 'button') return c.show?.label ?? '';
   if (isRecordLook(c)) {
     const table = config.data.tables.find((x) => x.id === c.source.table);
     if (table) return table.name;
@@ -176,8 +183,8 @@ async function statView(c: BlockOf<'number'>, ctx: Ctx): Promise<WidgetView | nu
 }
 
 function buttonView(c: BlockOf<'button'>, ctx: Ctx): WidgetView {
-  const icon = c.show.icon ? iosSymbolName(c.show.icon) : undefined;
-  const base = { kind: 'button' as const, title: c.show.label, ...(icon ? { icon } : {}) };
+  const icon = c.show?.icon ? iosSymbolName(c.show.icon) : undefined;
+  const base = { kind: 'button' as const, title: c.show?.label ?? '', ...(icon ? { icon } : {}) };
   const action = widgetButtonAction(c);
   if (action) {
     const key = buttonOpKey(c.id);

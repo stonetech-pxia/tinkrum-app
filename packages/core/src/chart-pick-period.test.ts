@@ -6,7 +6,7 @@ import { unitRange } from './page-period';
 import type { Collection } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// Tapping a bar updates the page's time range to match that period (D-585): permitted only when grouped by time, independent of page range, and when the current page contains a period block with custom options.
+// Tapping a bar updates the page's time range to match that period (D-585): permitted only when grouped by time, independent of page range, and when the current page contains time tabs with a custom range.
 
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 17) };
 const tx: Collection = {
@@ -19,8 +19,8 @@ const tx: Collection = {
 };
 const period = (custom: boolean) => ({
   id: 'range',
-  look: 'period',
-  show: { options: ['thisMonth', 'lastMonth'], ...(custom ? { custom: true } : {}) },
+  look: 'tabs',
+  show: { periods: ['thisMonth', 'lastMonth'], ...(custom ? { custom: true } : {}) },
 });
 const chart = (show: Record<string, unknown>, source: Record<string, unknown> = {}) => ({
   id: 'trend',
@@ -47,12 +47,12 @@ const problems = (blocks: unknown[]) => {
 };
 
 describe('chart show.pickPeriod (D-585)', () => {
-  it('accepts a monthly bar chart next to a period block that allows a custom range', () => {
+  it('accepts a monthly bar chart next to time tabs that allow a custom range', () => {
     expect(problems([period(true), chart({ pickPeriod: true })])).toEqual([]);
   });
 
-  it('needs a period block with custom: true on the page', () => {
-    expect(problems([chart({ pickPeriod: true })]).join()).toMatch(/period block/);
+  it('needs time tabs with custom: true on the page', () => {
+    expect(problems([chart({ pickPeriod: true })]).join()).toMatch(/time tabs/);
     expect(problems([period(false), chart({ pickPeriod: true })]).join()).toMatch(/custom/);
   });
 

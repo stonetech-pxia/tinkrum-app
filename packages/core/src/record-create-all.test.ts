@@ -57,7 +57,7 @@ const monthly = {
 const button = (tool: unknown) => ({
   id: 'b1',
   look: 'button',
-  show: { label: "Create this month's orders", variant: 'filled' },
+  show: { label: "Create this month's orders", shape: 'filled' },
   tools: [tool],
 });
 function problems(blocks: unknown[], config = base()): string {

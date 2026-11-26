@@ -1,4 +1,4 @@
-import { HOME_PAGE_ID, isKnownComponent, type WorkspaceConfig } from './schema';
+import { HOME_PAGE_ID, catalogOf, type WorkspaceConfig } from './schema';
 import { pageIdOf, type AppBarTarget, type NavTarget, type Theme } from './schema-base';
 
 // Current app view (D-485): the home screen is the top-level nav.bar + theme, and other apps are
@@ -64,7 +64,7 @@ export function startAppOf(config: WorkspaceConfig): string | null {
   const shown = home?.blocks.filter((block) => !block.hidden) ?? [];
   const onlyTheList =
     shown.length > 0 &&
-    shown.every((block) => isKnownComponent(block) && block.look === 'apps') &&
+    shown.every((block) => catalogOf(block) === 'apps') &&
     config.nav.bar.every((target) => [null, HOME_PAGE_ID].includes(pageIdOf(target)));
   return onlyTheList ? app.id : null;
 }

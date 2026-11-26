@@ -122,9 +122,9 @@ How to use them:
         },
         {
           "id": "range",
-          "look": "period",
+          "look": "tabs",
           "show": {
-            "options": [
+            "periods": [
               "thisWeek",
               "thisMonth",
               "thisYear"
@@ -221,7 +221,7 @@ How to use them:
           "look": "button",
           "show": {
             "label": "Add spending",
-            "variant": "filled",
+            "shape": "filled",
             "icon": "plus"
           },
           "tools": [
@@ -417,7 +417,7 @@ How to use them:
           "look": "button",
           "show": {
             "label": "Add a category",
-            "variant": "filled",
+            "shape": "filled",
             "icon": "plus"
           },
           "tools": [
@@ -479,7 +479,7 @@ How to use them:
           "look": "button",
           "show": {
             "label": "Add spending",
-            "variant": "filled",
+            "shape": "filled",
             "icon": "plus"
           },
           "tools": [
@@ -728,7 +728,7 @@ How to use them:
           "look": "button",
           "show": {
             "label": "Add a goal",
-            "variant": "filled",
+            "shape": "filled",
             "icon": "plus"
           },
           "tools": [
@@ -1020,7 +1020,7 @@ How to use them:
           "look": "button",
           "show": {
             "label": "Add a habit",
-            "variant": "filled",
+            "shape": "filled",
             "icon": "plus"
           },
           "tools": [
@@ -1299,7 +1299,7 @@ How to use them:
           "look": "button",
           "show": {
             "label": "Add a task",
-            "variant": "filled",
+            "shape": "filled",
             "icon": "plus"
           },
           "tools": [
@@ -1556,7 +1556,7 @@ How to use them:
           "look": "button",
           "show": {
             "label": "Add an application",
-            "variant": "filled",
+            "shape": "filled",
             "icon": "plus"
           },
           "tools": [
@@ -1748,7 +1748,7 @@ How to use them:
         },
         {
           "id": "tabs",
-          "look": "choices",
+          "look": "tabs",
           "source": {
             "table": "shelf-books",
             "field": "status"
@@ -1798,7 +1798,7 @@ How to use them:
           "look": "button",
           "show": {
             "label": "Add a book",
-            "variant": "filled",
+            "shape": "filled",
             "icon": "plus"
           },
           "tools": [
@@ -2002,7 +2002,7 @@ How to use them:
           "look": "button",
           "show": {
             "label": "Add a pet",
-            "variant": "filled",
+            "shape": "filled",
             "icon": "plus"
           },
           "tools": [

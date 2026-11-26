@@ -91,8 +91,8 @@ export function WorkflowEditor({
   const onHome = allComponents(home).some(
     (c) =>
       isKnownComponent(c) &&
-      c.look === 'action' &&
-      c.tools.some((u) => 'tool' in u && u.tool === workflow.id),
+      c.look === 'button' &&
+      (c.tools ?? []).some((u) => 'tool' in u && u.tool === workflow.id),
   );
   const preset = workflow.preset ? presetById(workflow.preset) : undefined;
   const needsContainer = handedInput(saved.steps, registry) !== null;
@@ -390,7 +390,7 @@ export function WorkflowEditor({
                       index: topIndex(home),
                       block: {
                         id: newWorkflowId(`run-${workflow.id}`.slice(0, 36), allComponents(home)),
-                        look: 'action',
+                        look: 'button',
                         tools: [{ tool: workflow.id }],
                       },
                     },

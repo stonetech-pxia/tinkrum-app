@@ -6,14 +6,14 @@ import {
   presetKinds,
   workflowKinds,
 } from './quick-actions';
-import { libraryComponent } from './components/library';
+import { CatalogSourceSchema } from './components';
 import { WORKFLOW_PRESETS, presetById, presetWorkflow } from './workflows/presets';
 
 describe('quick-action categories', () => {
-  it('the library block accepts exactly the quick action kinds', () => {
-    expect(libraryComponent.shape.source.shape.kind.unwrap().options).toEqual([
-      ...QUICK_ACTION_KINDS,
-    ]);
+  it('the quick-action catalog block accepts exactly the quick action kinds', () => {
+    const quickActions = CatalogSourceSchema.options[0];
+    expect(quickActions.shape.catalog.value).toBe('quickActions');
+    expect(quickActions.shape.kind.unwrap().options).toEqual([...QUICK_ACTION_KINDS]);
   });
 
   it.each<[string, Record<string, unknown>, string]>([

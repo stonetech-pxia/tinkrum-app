@@ -109,7 +109,7 @@ const seed = (locale: Locale, registry: Registry) => {
       block('product', {
         id: 'order-here',
         look: 'button',
-        show: { label: '按现价下单', variant: 'filled' },
+        show: { label: '按现价下单', shape: 'filled' },
         tools: [
           {
             do: 'create',

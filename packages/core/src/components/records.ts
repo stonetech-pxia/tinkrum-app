@@ -16,7 +16,7 @@ import {
   SortKeysSchema,
   sortList,
 } from '../schema-base';
-import { followChoiceProblems } from './choices';
+import { followChoiceProblems, isTimeTabs } from './tabs';
 import {
   collectionName,
   type CheckContext,
@@ -65,13 +65,13 @@ export const RecordSourceSchema = z.strictObject({
   sort: SortKeysSchema.optional(),
   /**
    * Follows the page time range (D-561, same as number cards and charts, D-440): requires a
-   * period block on the same page; inPeriod in filters is no longer used, filtering by the
+   * time tabs on the same page; inPeriod in filters is no longer used, filtering by the
    * selected range using that period's date field (falls back to the first date field in the
    * table). Incompatible with calendars and lists with show.browse.period.
    */
   period: z.literal('page').optional(),
   /**
-   * Follows the page-level option tabs (D-573): the page must have a choices block reading the
+   * Follows the page-level option tabs (D-573): the page must have tabs by a choice field reading the
    * same table; calculates only records where this field matches the selected item ("All" adds no
    * condition). Grouping by the same field is not allowed.
    */
@@ -320,8 +320,10 @@ function recordProblems(c: RecordBlock, ctx: CheckContext): CheckProblem[] {
   }
   if (c.source.period !== undefined) {
     if (c.look === 'grid') problems.push('a grid has its own columns of time: no source.period');
-    if (!ctx.page.blocks.some((b) => b.look === 'period'))
-      problems.push('source.period "page" needs a period block on the same page');
+    if (!ctx.page.blocks.some(isTimeTabs))
+      problems.push(
+        'source.period "page" needs time tabs (a tabs block with show.periods) on the same page',
+      );
     if (c.look === 'calendar') problems.push('a calendar moves by month itself: no source.period');
     if (c.show.browse?.period !== undefined)
       problems.push(
@@ -428,7 +430,7 @@ function gridProblems(c: RecordBlock, ctx: CheckContext, byType: string | undefi
  * day.
  */
 export const RECORD_LOOK_DOC =
-  'source {table, filter?, sort? {field, direction: "asc"|"desc"} or a list of 1-3 of them (sorted by the first, ties by the next: "by priority, then due date"), period?: "page" (follows the period block of the page, rule 56; not on a calendar), choice?: "page" (follows the choices block of the page, rule 65), limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (a choice field: a dot in the colour of its option; on a calendar the day colour), highlight? (1-3 conditions like filter: matching entries show trailing, or the title, in the warning colour, e.g. over budget), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools? (createAll only as the addHere with pick: true, rule 70), opens? (a page for one entry, rule 48)';
+  'source {table, filter?, sort? {field, direction: "asc"|"desc"} or a list of 1-3 of them (sorted by the first, ties by the next: "by priority, then due date"), period?: "page" (follows the time tabs of the page, rule 56; not on a calendar), choice?: "page" (follows the tabs by a choice field of the page, rule 65), limit? (1-100, default 30; per section, column or day when grouped), group?}, show {title, subtitles? (≤2), trailing? (shown on the right, e.g. an amount), format? (rule 46), color? (a choice field: a dot in the colour of its option; on a calendar the day colour), highlight? (1-3 conditions like filter: matching entries show trailing, or the title, in the warning colour, e.g. over budget), emptyText?, browse? {search?: true, sort?: [fields], group?: [fields], filter?: [tags or choice fields], period?: a date field or createdAt / updatedAt, pin?: true} (list, cards and checklist only: a search box over every field, the fields the user can switch to, a row of values to tap for filter, and a row All / This week / This month / This year over that date field (period); all temporary, nothing is written; pin keeps them fixed above the scrolling list; with browse, limit is how many to show at a time and scrolling to the bottom shows more; set it when the user asks to search, sort, group or filter a list themselves)}, tools? (createAll only as the addHere with pick: true, rule 70), opens? (a page for one entry, rule 48)';
 
 const DOCS: Record<RecordLook, string> = {
   list: 'rows; tapping a row opens the built-in editor (or the page in opens)',

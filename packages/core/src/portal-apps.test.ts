@@ -402,8 +402,8 @@ describe('appFileOfApp', () => {
           page,
           block: {
             id: 'slot',
-            look: 'entry',
-            show: { title: 'Lease' },
+            look: 'button',
+            show: { label: 'Lease' },
             opens: { file: 'userfile1' },
           },
         },

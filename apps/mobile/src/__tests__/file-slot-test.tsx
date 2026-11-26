@@ -84,7 +84,7 @@ async function renderApp(provider: AIProvider = createMockAIProvider()) {
 const SLOT: Op = {
   op: 'addContainer',
   page: 'home',
-  block: { id: 'lease', look: 'entry', show: { title: '租房合同' }, opens: { file: null } },
+  block: { id: 'lease', look: 'button', show: { label: '租房合同' }, opens: { file: null } },
 };
 
 async function commit(store: WorkspaceStore, ops: Op[], summary: string) {
@@ -141,7 +141,7 @@ describe('file slot', () => {
     expect(files.disk.get(asset!.path)).toEqual(pdf);
     expect(files.disk.has('picker://合同 2026.pdf')).toBe(false);
     // Config contains only file ID, no file name; this modification is a manual user edit.
-    expect(slotBlock(store).show).toEqual({ title: '租房合同' });
+    expect(slotBlock(store).show).toEqual({ label: '租房合同' });
     expect(slotBlock(store).opens).toEqual({ file: asset!.id });
     expect(JSON.stringify(store.getState().config)).not.toContain('合同 2026');
     expect(store.getState().head).toMatchObject({ source: 'user', summary: '设置文件' });
@@ -255,8 +255,8 @@ describe('file slot', () => {
       page: 'home',
       block: {
         id: 'lease',
-        look: 'entry',
-        show: { title: '租房合同' },
+        look: 'button',
+        show: { label: '租房合同' },
         opens: { file: 'abcdef123' },
       },
     };
@@ -290,7 +290,7 @@ describe('file slot', () => {
 
     expect((await store.getState().propose('圆角小一点')).kind).toBe('preview');
     const all = JSON.stringify(sent);
-    // In v34, file trigger is an entry with opens as { file }: model sees trigger, file ID is replaced with placeholder (invariant 3), file name is hidden.
+    // In v34, file trigger is a button with opens as { file }: model sees trigger, file ID is replaced with placeholder (invariant 3), file name is hidden.
     expect(all).toContain('租房合同');
     expect(all).toContain('opens');
     expect(all).toContain(REDACTED_FILE);

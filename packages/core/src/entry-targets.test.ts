@@ -18,9 +18,9 @@ const withMine = (): WorkspaceConfig =>
   apply(workspace('en'), [{ op: 'addTool', tool: { ...mine, name: 'My photos' } }], 'en');
 
 const button = (opens: string, id = 'open'): NewComponent =>
-  ({ id, look: 'button', show: { label: 'Open', variant: 'filled' }, opens }) as NewComponent;
+  ({ id, look: 'button', show: { label: 'Open', shape: 'filled' }, opens }) as NewComponent;
 const shortcut = (opens: string, id = 'go'): NewComponent =>
-  ({ id, look: 'entry', show: { title: 'Go', icon: 'star' }, opens }) as NewComponent;
+  ({ id, look: 'button', show: { label: 'Go', icon: 'star' }, opens }) as NewComponent;
 const addOp = (block: NewComponent): Op => ({ op: 'addContainer', page: 'home', block });
 
 const add = (config: WorkspaceConfig, block: NewComponent) =>

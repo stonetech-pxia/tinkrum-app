@@ -61,7 +61,7 @@
             "zh": "添加",
             "fr": "Ajouter"
           },
-          "variant": "filled"
+          "shape": "filled"
         },
         "tools": [
           {

@@ -1,4 +1,13 @@
-import { isKnownComponent, type Component, type KnownComponent, type Page } from './schema';
+import {
+  isChoiceTabs,
+  isKnownComponent,
+  isTimeTabs,
+  type ChoiceTabs,
+  type Component,
+  type KnownComponent,
+  type Page,
+  type TimeTabs,
+} from './schema';
 
 // Fixed zones of a page (established by founder 2026-11-04): config still stores a sequence of page.blocks, split by pin only during rendering (similar to the bottom-right floating "+").
 
@@ -19,18 +28,12 @@ export const pageDial = (page: Page): Extract<KnownComponent, { look: 'dial' }> 
   );
 
 /** Time range block on the page (D-440): at most one per page, excluding hidden ones. */
-export const pagePeriod = (page: Page): Extract<KnownComponent, { look: 'period' }> | undefined =>
-  page.blocks.find(
-    (c): c is Extract<KnownComponent, { look: 'period' }> =>
-      !c.hidden && isKnownComponent(c) && c.look === 'period',
-  );
+export const pagePeriod = (page: Page): TimeTabs | undefined =>
+  page.blocks.find((c): c is TimeTabs => !c.hidden && isTimeTabs(c));
 
 /** Row of options on the page (D-573): at most one per page, excluding hidden ones. */
-export const pageChoices = (page: Page): Extract<KnownComponent, { look: 'choices' }> | undefined =>
-  page.blocks.find(
-    (c): c is Extract<KnownComponent, { look: 'choices' }> =>
-      !c.hidden && isKnownComponent(c) && c.look === 'choices',
-  );
+export const pageChoices = (page: Page): ChoiceTabs | undefined =>
+  page.blocks.find((c): c is ChoiceTabs => !c.hidden && isChoiceTabs(c));
 
 /**
  * The list whose state should be kept on the page: search, sorting, and filtering are rendered in

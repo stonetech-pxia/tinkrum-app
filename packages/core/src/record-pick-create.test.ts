@@ -164,7 +164,7 @@ describe('pick several, create one each (D-616)', () => {
     const { as: _as, label: _label, ...tool } = pick;
     expect(
       problems([
-        { id: 'b', look: 'button', show: { label: 'Add', variant: 'filled' }, tools: [tool] },
+        { id: 'b', look: 'button', show: { label: 'Add', shape: 'filled' }, tools: [tool] },
       ]),
     ).toMatch(/pick: true only works as the "Add" under a list of entries/);
     // Button on each item.

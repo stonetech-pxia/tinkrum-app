@@ -240,7 +240,7 @@ describe('guide step 3: sample apps', () => {
     expect(
       after.containers.pages
         .find((p) => p.id === 'home')!
-        .blocks.some((c) => c.look === 'entry' && c.opens === 'page:study'),
+        .blocks.some((c) => c.look === 'button' && c.opens === 'page:study'),
     ).toBe(true);
     // Push a new page into a main page not present in the navigation bar, displaying the hint card on that page.
     expect(await screen.findByTestId('sample-hint')).toHaveTextContent(/「学习助手」装好了/);

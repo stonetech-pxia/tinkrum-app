@@ -78,7 +78,7 @@ const RUNNER: Op = {
   page: 'home',
   block: {
     id: 'visa-card',
-    look: 'action',
+    look: 'button',
     show: { shape: 'row' },
     tools: [{ tool: 'visa-photo' }],
   },

@@ -182,8 +182,8 @@ export function entryOps(
       page: HOME_PAGE_ID,
       block: {
         id: `shortcut-${pageId}`,
-        look: 'entry',
-        show: { title, icon: icon ?? 'star' },
+        look: 'button',
+        show: { label: title, icon: icon ?? 'star' },
         opens: pageTarget(pageId),
       },
     },

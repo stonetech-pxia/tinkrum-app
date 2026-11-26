@@ -78,7 +78,7 @@ const list = (table: string, tools: unknown[], id = 'l1') => ({
 const button = (tool: unknown, id = 'b1') => ({
   id,
   look: 'button',
-  show: { label: 'Go', variant: 'filled' },
+  show: { label: 'Go', shape: 'filled' },
   tools: [tool],
 });
 function problems(blocks: unknown[], pageId = 'home', config = base()): string {

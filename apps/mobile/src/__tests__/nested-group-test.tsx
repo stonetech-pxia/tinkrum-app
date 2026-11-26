@@ -57,7 +57,7 @@ const seed = (locale: Locale, registry: Registry) => {
             {
               id: 'log',
               look: 'button',
-              show: { label: '喝一杯', variant: 'filled' },
+              show: { label: '喝一杯', shape: 'filled' },
               tools: [{ do: 'create', table: 'water', values: { glasses: 1, day: 'today' } }],
             },
           ],

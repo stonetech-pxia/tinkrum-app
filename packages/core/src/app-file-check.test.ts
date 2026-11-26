@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { readAppFile } from './app-file';
 import { appFileJsonText, checkAppFileText } from './app-file-check';
 import { CURRENT_SCHEMA_VERSION } from './schema';
 import { registry } from './test-helpers';
@@ -12,7 +13,9 @@ import { registry } from './test-helpers';
 const ctx = { registry, locale: 'en' as const, now: new Date(2026, 10, 19) };
 const DIR = join(__dirname, 'fixtures', 'portal-apps');
 const habitsText = readFileSync(join(DIR, 'tinkrum-app-habits.json'), 'utf8');
-const habits = () => JSON.parse(habitsText) as Record<string, any>;
+// The portal fixtures stay at the version they were written in; these checks start from the
+// habits app migrated to the current version.
+const habits = () => structuredClone(readAppFile(habitsText)) as Record<string, any>;
 const check = (data: unknown) => checkAppFileText(JSON.stringify(data), ctx);
 const problems = (data: unknown) => {
   const result = check(data);
@@ -57,10 +60,11 @@ describe('checkAppFileText', () => {
     expect(problems(rest)).toEqual([expect.stringMatching(/^schemaVersion: /)]);
   });
 
-  // D-607: 39 → 40 only added multiple to single-select; version 39 files (website presets) are still explained item by item.
+  // D-607: a file of an older version whose migration changes nothing but the version number is
+  // still explained item by item.
   it('checks a file of the previous version in detail when migrating it changes nothing else', () => {
     const d = habits();
-    expect(d.schemaVersion).toBe(CURRENT_SCHEMA_VERSION - 1);
+    d.schemaVersion = CURRENT_SCHEMA_VERSION - 1;
     d.pages[0].blocks[0].look = 'banner';
     expect(problems(d)[0]).toMatch(/^pages\.0\.blocks\.0\.look: "banner" is not a valid look/);
   });
@@ -99,8 +103,8 @@ describe('checkAppFileText', () => {
   });
 
   it('migrates an older file before checking it, like the import does', () => {
-    const d = habits();
-    d.schemaVersion = CURRENT_SCHEMA_VERSION - 1;
+    const d = JSON.parse(habitsText) as Record<string, any>;
+    expect(d.schemaVersion).toBeLessThan(CURRENT_SCHEMA_VERSION);
     expect(check(d).ok).toBe(true);
   });
 

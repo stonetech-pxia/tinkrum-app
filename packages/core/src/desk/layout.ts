@@ -13,16 +13,20 @@ import { IdSchema, boundedText } from '../schema-primitives';
 // tools (which appear alongside selected items, §11.3), as well as executing anything on behalf of
 // the user (all toolbar buttons require manual user taps).
 
-/** Blocks allowed above and below the preview: limited to explanations and entry points, excluding data-mutating components (record forms, file slots). */
-export const DESK_SLOT_TYPES = [
-  'header',
-  'text',
-  'notice',
-  'divider',
-  'spacer',
-  'button',
-  'entry',
-] as const;
+/** Blocks allowed above and below the preview: limited to explanations and entry points, excluding data-mutating components (record forms). */
+export const DESK_SLOT_TYPES = ['header', 'text', 'notice', 'spacer', 'button'] as const;
+
+/** A block that may sit above or below the preview: no notice about entries, no button that runs a quick action or picks files. */
+const fitsDeskSlot = (c: {
+  look: string;
+  source?: unknown;
+  tools?: readonly unknown[] | undefined;
+}) =>
+  (DESK_SLOT_TYPES as readonly string[]).includes(c.look) &&
+  !(c.look === 'notice' && c.source !== undefined) &&
+  !(
+    c.look === 'button' && c.tools?.some((u) => typeof u === 'object' && u !== null && 'tool' in u)
+  );
 
 /** Same as ActionIdSchema (schema.ts); schema.ts references this file, so it cannot import schema.ts back. */
 const DeskActionIdSchema = z.string().regex(/^[a-z]+\.[a-zA-Z0-9]+$/, 'invalid action id');
@@ -49,8 +53,8 @@ const groups = z.array(DeskToolGroupSchema).min(1).max(6).optional();
 const slot = z
   .array(ComponentSchema)
   .max(2)
-  .refine((list) => list.every((c) => (DESK_SLOT_TYPES as readonly string[]).includes(c.look)), {
-    message: `only ${DESK_SLOT_TYPES.join(', ')} can go above or below the preview`,
+  .refine((list) => list.every(fitsDeskSlot), {
+    message: `only ${DESK_SLOT_TYPES.join(', ')} can go above or below the preview (no notice with source, no button that runs a quick action or picks files)`,
   })
   .optional();
 

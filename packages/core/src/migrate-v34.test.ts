@@ -265,7 +265,7 @@ describe('v33 → v34 risks', () => {
     expect(block(config, 'p', 'add')).toEqual({
       id: 'add',
       look: 'button',
-      show: { label: '添加', variant: 'filled' },
+      show: { label: '添加', shape: 'filled' },
       // fieldIds are ignored in button mode anyway (opens the full form), so they are discarded.
       tools: [
         {
@@ -386,12 +386,12 @@ describe('v33 → v34 risks', () => {
     expectValid(config);
   });
 
-  it('M7: the "Add tools" link becomes an entry with an accent title', () => {
+  it('M7: the "Add tools" link becomes a button with an accent label', () => {
     const config = fromV33(v33Fixture('default-zh'));
     expect(block(config, 'home', 'catalog')).toEqual({
       id: 'catalog',
-      look: 'entry',
-      show: { title: '添加工具', icon: 'plus', shape: 'tile', accent: true },
+      look: 'button',
+      show: { label: '添加工具', icon: 'plus', shape: 'tile', accent: true },
       opens: 'tools',
     });
   });
@@ -524,7 +524,7 @@ describe('v33 → v34 risks', () => {
     });
     expect(block(config, 'p', 'run')).toEqual({
       id: 'run',
-      look: 'action',
+      look: 'button',
       show: { shape: 'card' },
       tools: [{ tool: 'merge' }],
     });
@@ -535,7 +535,7 @@ describe('v33 → v34 risks', () => {
     });
   });
 
-  it('file lists read $files by kind; file slots and tool cards become entries', () => {
+  it('file lists read $files by kind; file slots and tool cards become buttons', () => {
     const config = fromV33(
       v33({
         pages: [
@@ -570,8 +570,8 @@ describe('v33 → v34 risks', () => {
     ]);
     expect(block(config, 'p', 'slot')).toEqual({
       id: 'slot',
-      look: 'entry',
-      show: { title: '护照', hint: '点一下选', shape: 'tile' },
+      look: 'button',
+      show: { label: '护照', hint: '点一下选', shape: 'tile' },
       opens: { file: null },
     });
     expect(block(config, 'p', 'pick').tools).toEqual([{ tool: '$pick.files' }]);

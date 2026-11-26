@@ -40,7 +40,7 @@ describe('quick-action categories (UI)', () => {
             page: 'home',
             block: {
               id: 'photos',
-              look: 'library',
+              look: 'catalog',
               source: { catalog: 'quickActions', kind: 'image' },
             },
           },
@@ -50,7 +50,7 @@ describe('quick-action categories (UI)', () => {
             block: {
               id: 'open-ai',
               look: 'button',
-              show: { label: '修改这个 App', variant: 'icon', icon: 'sparkles' },
+              show: { label: '修改这个 App', shape: 'icon', icon: 'sparkles' },
               opens: 'ai',
             },
           },

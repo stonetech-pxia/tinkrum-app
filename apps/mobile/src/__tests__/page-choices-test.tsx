@@ -59,7 +59,7 @@ const seed = (locale: Locale, registry: Registry) => {
           id: 'many',
           title: 'Many',
           blocks: [
-            { id: 'kinds', look: 'choices', show: {}, source: { table: 'big', field: 'kind' } },
+            { id: 'kinds', look: 'tabs', show: {}, source: { table: 'big', field: 'kind' } },
           ],
         },
       },
@@ -83,7 +83,7 @@ const seed = (locale: Locale, registry: Registry) => {
           blocks: [
             {
               id: 'tabs',
-              look: 'choices',
+              look: 'tabs',
               show: { options: ['to-ship', 'shipped', 'done'] },
               source: { table: 'orders', field: 'status' },
             },

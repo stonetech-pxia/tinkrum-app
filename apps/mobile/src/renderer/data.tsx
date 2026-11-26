@@ -1996,7 +1996,7 @@ export function useListRecords(
   // Lookup, rollup, and previous (D-291): Uses computed records and view for display, filtering, and sorting; modifies records using the original table.
   const { view, records } = useComputedRecords(env.config.data.tables, collection, cal);
   const now = new Date();
-  // Follows the time range on the page (D-561): Filters by the selected range like number cards; falls back to own filters when the page lacks a period block.
+  // Follows the time range on the page (D-561): Filters by the selected range like number cards; falls back to own filters when the page lacks time tabs.
   const follow = block.source.period === 'page' ? env.pageRange?.choice : undefined;
   // Follows a row of options on the page (D-573): Adds a condition where "this field equals the selected item"; omitted when "All" is selected.
   const filter = followedFilter(block.source, env.pageChoice);

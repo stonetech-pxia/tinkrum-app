@@ -30,7 +30,7 @@ const onlyIcons = (op: Op): boolean =>
 
 /**
  * Check whether an operation is a feature operation (`isFunctionOp` in `ops-schema.ts`: data,
- * standalone tools, packs, home screen). Execution blocks (look actions) for new quick actions
+ * standalone tools, packs, home screen). Buttons that run new quick actions
  * apply alongside them; otherwise, they would be created without being accessible. `setTheme`
  * operations modifying only the icon library follow feature operations when present (table and
  * quick action icons depend on them), or appearance operations otherwise.
@@ -38,8 +38,8 @@ const onlyIcons = (op: Op): boolean =>
 function goesWithFunction(op: Op, added: ReadonlySet<string>, withFunction: boolean): boolean {
   if (isFunctionOp(op)) return true;
   if (onlyIcons(op)) return withFunction;
-  if (op.op !== 'addContainer' || op.block?.look !== 'action') return false;
-  const use = op.block.tools[0];
+  if (op.op !== 'addContainer' || op.block?.look !== 'button') return false;
+  const use = op.block.tools?.[0];
   return use !== undefined && 'tool' in use && added.has(use.tool);
 }
 

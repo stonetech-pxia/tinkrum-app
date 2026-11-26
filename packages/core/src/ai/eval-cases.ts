@@ -7,7 +7,10 @@ import type { ToolUse } from '../record-ops-schema';
 import {
   RECORD_LOOKS,
   allComponents,
-  entryKind,
+  buttonKind,
+  catalogOf,
+  isChoiceTabs,
+  isTimeTabs,
   isFileTarget,
   isKnownComponent,
   quickActionsOf,
@@ -1031,17 +1034,18 @@ function oneTapOps(locale: Locale): Op[] {
 
 const home = (c: WorkspaceConfig) => c.containers.pages.find((p) => p.id === 'home')!;
 const homeIds = (c: WorkspaceConfig) => home(c).blocks.map((x) => x.id);
-/** ID of the quick action run by a runner card (look action, formerly workflowRunner); null for other blocks. */
+/** ID of the quick action a button runs (formerly the action look); null for other blocks. */
 const runsTool = (x: Component): string | null => {
-  if (!isKnownComponent(x) || x.look !== 'action') return null;
-  const use = x.tools[0];
+  if (!isKnownComponent(x) || x.look !== 'button' || buttonKind(x) !== 'run') return null;
+  const use = x.tools?.[0];
   return use && 'tool' in use ? use.tool : null;
 };
-/** File slot (look entry, opens {file}, formerly fileSlot). */
-const isFileSlot = (x: Component): x is ComponentOf<'entry'> =>
-  x.look === 'entry' && entryKind(x) === 'file';
+/** File slot (a button with opens {file}, formerly fileSlot). */
+const isFileSlot = (x: Component): x is ComponentOf<'button'> =>
+  x.look === 'button' && buttonKind(x) === 'file';
 /** The file selected in the file slot (formerly fileSlot's assetId); null if not yet selected. */
-const fileOf = (x: ComponentOf<'entry'>) => (isFileTarget(x.opens) ? x.opens.file : null);
+const fileOf = (x: ComponentOf<'button'>) =>
+  x.opens !== undefined && isFileTarget(x.opens) ? x.opens.file : null;
 /** Record block (look list / cards / checklist / tiles / board / calendar, formerly recordList). */
 type RecordBlock = ComponentOf<RecordLook>;
 const isRecordBlock = (x: Component): x is RecordBlock =>
@@ -1082,17 +1086,17 @@ const groupByOf = (x: RecordBlock) =>
 
 const fieldOf = (c: WorkspaceConfig, table: string, field: string | undefined) =>
   c.data.tables.find((t) => t.id === table)?.fields.find((f) => f.id === field);
-/** "Open Photo Library / Open Files" block (look picker, formerly filePick); media or files, or null for other blocks. */
+/** "Open Photo Library / Open Files" button (formerly the picker look); media or files, or null for other blocks. */
 
 const pickSource = (x: Component): 'media' | 'files' | null => {
-  if (!isKnownComponent(x) || x.look !== 'picker') return null;
-  const use = x.tools[0];
+  if (!isKnownComponent(x) || x.look !== 'button') return null;
+  const use = x.tools?.[0];
   const tool = use && 'tool' in use ? use.tool : null;
   return tool === '$pick.media' ? 'media' : tool === '$pick.files' ? 'files' : null;
 };
-/** Tool package entry point (look entry, opens package:<id>, formerly toolCard). */
+/** Tool package entry point (a button with opens package:<id>, formerly toolCard). */
 
-const isToolCard = (x: Component) => x.look === 'entry' && entryKind(x) === 'package';
+const isToolCard = (x: Component) => x.look === 'button' && buttonKind(x) === 'package';
 const mergeSteps = (c: WorkspaceConfig) =>
   quickActionsOf(c).find((w) => w.id === 'pdf-merge')?.steps ?? [];
 
@@ -1161,9 +1165,7 @@ const reachablePage = (title: string) => (c: WorkspaceConfig) => {
   const target = `page:${page.id}`;
   const linked =
     [...c.nav.bar, ...c.nav.floating].includes(target as never) ||
-    allComponents(home(c)).some(
-      (x) => (x.look === 'entry' || x.look === 'button') && x.opens === target,
-    );
+    allComponents(home(c)).some((x) => x.look === 'button' && x.opens === target);
   return linked ? null : `page ${title} should be reachable`;
 };
 const darkBackground = (c: WorkspaceConfig) => {
@@ -1699,7 +1701,7 @@ const BASE_EVAL_CASES: readonly EvalCase[] = [
         if (!page) return 'expected a Notes page';
         if (!page.blocks.some((x) => x.look === 'text')) return 'Notes page should have text';
         const shortcut = allComponents(home(c)).find(
-          (x) => (x.look === 'entry' || x.look === 'button') && x.opens === `page:${page.id}`,
+          (x) => x.look === 'button' && x.opens === `page:${page.id}`,
         );
         return shortcut ? null : 'home should link to the Notes page';
       },
@@ -2221,7 +2223,7 @@ const WORKFLOW_EVAL_CASES: readonly EvalCase[] = [
 /** No runner cards on any page (user did not ask to place them on the home screen). */
 const noRunner = (c: WorkspaceConfig) => {
   const runners = c.containers.pages.flatMap((p) =>
-    allComponents(p).filter((x) => x.look === 'action'),
+    allComponents(p).filter((x) => runsTool(x) !== null),
   );
   return runners.length === 0 ? null : `added a runner on a page without being asked`;
 };
@@ -3322,10 +3324,10 @@ const SPEAK_EVAL_CASES: readonly EvalCase[] = [
 
 // Toolbox is a user-owned page that AI can modify (D-181).
 
-type ToolGrid = ComponentOf<'packages'>;
+type ToolGrid = ComponentOf<'catalog'> & { source: { catalog: 'packages'; ids?: string[] } };
 const toolbox = (c: WorkspaceConfig) => c.containers.pages.find((p) => p.id === 'toolbox');
 const grids = (c: WorkspaceConfig) =>
-  (toolbox(c)?.blocks ?? []).filter((x): x is ToolGrid => x.look === 'packages');
+  (toolbox(c)?.blocks ?? []).filter((x): x is ToolGrid => catalogOf(x) === 'packages');
 const gridWith = (c: WorkspaceConfig, toolId: string) =>
   grids(c).filter((g) => g.source.ids?.includes(toolId));
 const gridTitled = (c: WorkspaceConfig, title: RegExp) =>
@@ -4544,9 +4546,9 @@ const QUICK_ACTION_ENTRY_CASES: EvalCase[] = [
             p.id === 'home' &&
             allComponents(p).some(
               (x) =>
-                ((x.look === 'entry' || x.look === 'button') && x.opens === 'quickActions') ||
+                (x.look === 'button' && x.opens === 'quickActions') ||
                 // Placing the category entry point directly on the Home Screen also counts (D-230).
-                (x.look === 'library' && !x.source.kind),
+                (x.look === 'catalog' && x.source.catalog === 'quickActions' && !x.source.kind),
             ),
         )
           ? null
@@ -4567,9 +4569,9 @@ const QUICK_ACTION_ENTRY_CASES: EvalCase[] = [
             p.id === 'home' &&
             allComponents(p).some(
               (x) =>
-                ((x.look === 'entry' || x.look === 'button') && x.opens === 'quickActions') ||
+                (x.look === 'button' && x.opens === 'quickActions') ||
                 // Placing the category entry point directly on the Home Screen also counts (D-230).
-                (x.look === 'library' && !x.source.kind),
+                (x.look === 'catalog' && x.source.catalog === 'quickActions' && !x.source.kind),
             ),
         )
           ? null
@@ -4580,8 +4582,9 @@ const QUICK_ACTION_ENTRY_CASES: EvalCase[] = [
 // -- Look options (D-230) --
 const homeEntries = (c: WorkspaceConfig) =>
   allComponents(home(c)).filter(
-    // Entry points (formerly `shortcut`, `toolCard`, `catalogLink`); file slots (formerly `fileSlot`) do not count.
-    (x): x is ComponentOf<'entry'> => x.look === 'entry' && entryKind(x) !== 'file',
+    // Entry points (formerly `shortcut`, `toolCard`, `catalogLink`); file slots, quick actions to run, pickers and record tools do not count.
+    (x): x is ComponentOf<'button'> =>
+      x.look === 'button' && ['open', 'link', 'package', 'app'].includes(buttonKind(x)),
   );
 /** All entry cards on the Home Screen look like this (at least one). */
 const entriesLook = (look: 'row' | 'tile') => (c: WorkspaceConfig) => {
@@ -4591,7 +4594,9 @@ const entriesLook = (look: 'row' | 'tile') => (c: WorkspaceConfig) => {
     : `home entries should all be ${look}: ${JSON.stringify(entries.map((x) => x.show))}`;
 };
 const quickActionListOn = (kind: string) => (c: WorkspaceConfig) =>
-  allComponents(home(c)).some((x) => x.look === 'library' && x.source.kind === kind)
+  allComponents(home(c)).some(
+    (x) => x.look === 'catalog' && x.source.catalog === 'quickActions' && x.source.kind === kind,
+  )
     ? null
     : `missing a ${kind} quickActionList on home`;
 
@@ -4662,10 +4667,10 @@ const LOOK_CASES: EvalCase[] = [
       kind: 'ops',
       check: (c) => {
         const runners = allComponents(c.containers.pages.find((p) => p.id === 'tool-pdf')!).filter(
-          (x) => x.look === 'action',
+          (x) => runsTool(x) !== null,
         );
         return runners.length > 0 &&
-          runners.every((x) => x.look === 'action' && x.show?.shape === 'row')
+          runners.every((x) => x.look === 'button' && x.show?.shape === 'row')
           ? null
           : 'PDF quick actions should all be rows';
       },
@@ -4683,7 +4688,7 @@ const LOOK_CASES: EvalCase[] = [
         const button = allComponents(c.containers.pages.find((p) => p.id === 'toolbox')!).find(
           (x) => x.id === 'toolbox-manage',
         );
-        return button?.look === 'button' && button.show.variant === 'icon' && button.show.icon
+        return button?.look === 'button' && button.show?.shape === 'icon' && button.show.icon
           ? null
           : `manage button is ${JSON.stringify(button)}`;
       },
@@ -4850,11 +4855,10 @@ const paperAppBuilt = (c: WorkspaceConfig) => {
     .flatMap((p) => allComponents(p))
     .filter(isKnownComponent);
   const open = blocks.some(
-    (x) => x.look === 'picker' && x.tools.some((u) => 'tool' in u && u.tool === '$pick.open'),
+    (x) =>
+      x.look === 'button' && (x.tools ?? []).some((u) => 'tool' in u && u.tool === '$pick.open'),
   );
-  const scan = blocks.some(
-    (x) => x.look === 'action' && x.tools.some((u) => 'tool' in u && u.tool === 'scan-camera'),
-  );
+  const scan = blocks.some((x) => runsTool(x) === 'scan-camera');
   return open && scan ? null : `Paper app: scan ${scan}, open ${open}`;
 };
 const GUIDE_STEP_CASES: EvalCase[] = (['zh', 'en', 'fr'] as const).map((locale) => ({
@@ -4865,11 +4869,11 @@ const GUIDE_STEP_CASES: EvalCase[] = (['zh', 'en', 'fr'] as const).map((locale) 
   mock: true,
   expect: { kind: 'ops', check: paperAppBuilt },
 }));
-/** The app list on a home page that has none (D-644): one `apps` block, no entry block per app. */
+/** The app list on a home page that has none (D-644): one catalog of apps, no button per app. */
 const appList = (c: WorkspaceConfig) =>
-  allComponents(home(c)).some((x) => isKnownComponent(x) && x.look === 'apps')
+  allComponents(home(c)).some((x) => catalogOf(x) === 'apps')
     ? null
-    : 'no apps block on the home page';
+    : 'no app list on the home page';
 const APP_LIST_CASES: EvalCase[] = [
   {
     id: 'AL1',
@@ -5419,7 +5423,7 @@ const MODULE_EVAL_CASES: readonly EvalCase[] = [
       kind: 'ops',
       check: (c) =>
         home(c).blocks.some(
-          (x) => isFileSlot(x) && !fileOf(x) && /board/i.test(x.show?.title ?? ''),
+          (x) => isFileSlot(x) && !fileOf(x) && /board/i.test(x.show?.label ?? ''),
         )
           ? null
           : 'expected an empty fileSlot on home titled after the boarding pass',
@@ -8335,7 +8339,7 @@ const budgetRangeEarlier: EvalEarlier = {
     {
       op: 'addContainer',
       page: 'budget',
-      block: { id: 'range', look: 'period', show: { options: ['thisMonth', 'thisWeek'] } },
+      block: { id: 'range', look: 'tabs', show: { periods: ['thisMonth', 'thisWeek'] } },
     } as Op,
     {
       op: 'addContainer',
@@ -8384,11 +8388,9 @@ const LIST_PERIOD_CASES: readonly EvalCase[] = [
     expect: {
       kind: 'ops',
       check: (c) => {
-        const periods = c.containers.pages
-          .flatMap((p) => allComponents(p))
-          .filter((x): x is ComponentOf<'period'> => x.look === 'period');
-        if (periods.length !== 1) return 'expected one period block';
-        const options = [...periods[0]!.show.options].sort().join();
+        const periods = c.containers.pages.flatMap((p) => allComponents(p)).filter(isTimeTabs);
+        if (periods.length !== 1) return 'expected one time tabs block';
+        const options = [...periods[0]!.show.periods].sort().join();
         if (options !== 'lastMonth,thisMonth')
           return `expected this month and last month, got ${options}`;
         return expenseListsFollow(c);
@@ -8505,8 +8507,9 @@ const CALLOUT_CASES: readonly EvalCase[] = [
     expect: {
       kind: 'ops',
       check: (c) => {
-        const card = home(c).blocks.find((x) => x.look === 'callout');
-        if (!card || card.look !== 'callout') return 'expected a callout on the home page';
+        const card = home(c).blocks.find((x) => x.look === 'notice' && x.source !== undefined);
+        if (!card || card.look !== 'notice' || !card.source)
+          return 'expected a notice about entries on the home page';
         if (card.source.table !== 'expenses')
           return `callout should read expenses, got ${card.source.table}`;
         if (!card.show.text.includes('{count}') || !card.show.text.includes('{sum:amount}'))
@@ -9658,7 +9661,7 @@ const salesRangeEarlier: EvalEarlier = {
     {
       op: 'addContainer',
       page: 'sales',
-      block: { id: 'range', look: 'period', show: { options: ['thisMonth', 'thisYear'] } },
+      block: { id: 'range', look: 'tabs', show: { periods: ['thisMonth', 'thisYear'] } },
     } as Op,
     ...['order-list', 'order-total', 'by-month'].map(
       (block) =>
@@ -9675,8 +9678,8 @@ const salesRangeEarlier: EvalEarlier = {
 const salesFollowChoices = (c: WorkspaceConfig, period: boolean) => {
   const page = c.containers.pages.find((p) => p.id === 'sales');
   if (!page) return 'expected the sales page';
-  const rows = page.blocks.filter((b): b is ComponentOf<'choices'> => b.look === 'choices');
-  if (rows.length !== 1) return `expected one choices block, got ${rows.length}`;
+  const rows = page.blocks.filter(isChoiceTabs);
+  if (rows.length !== 1) return `expected one choice tabs block, got ${rows.length}`;
   const row = rows[0]!;
   if (row.source.table !== 'orders' || row.source.field !== 'status')
     return `expected the row on orders.status, got ${JSON.stringify(row.source)}`;
@@ -9687,7 +9690,7 @@ const salesFollowChoices = (c: WorkspaceConfig, period: boolean) => {
   if (followers.length < 3 || off.length > 0)
     return `expected the list, the total and the chart to have source.choice "page"; not: ${off.join()}`;
   if (period) {
-    if (!page.blocks.some((b) => b.look === 'period')) return 'expected the period block kept';
+    if (!page.blocks.some(isTimeTabs)) return 'expected the time tabs kept';
     const lost = followers.filter((b) => b.source.period !== 'page').map((b) => b.id);
     if (lost.length > 0) return `expected the blocks to keep source.period "page": ${lost.join()}`;
   }
@@ -10179,15 +10182,15 @@ function periodCases(): EvalCase[] {
       {
         op: 'addContainer',
         page: 'budget',
-        block: { id: 'range', look: 'period', show: { options: ['thisMonth', 'thisWeek'] } },
+        block: { id: 'range', look: 'tabs', show: { periods: ['thisMonth', 'thisWeek'] } },
       } as Op,
     ],
   };
   const periods = (c: WorkspaceConfig) =>
-    c.containers.pages.flatMap((p) => allComponents(p)).filter((x) => x.look === 'period');
+    c.containers.pages.flatMap((p) => allComponents(p)).filter(isTimeTabs);
   const periodOf = (c: WorkspaceConfig) => {
     const found = periods(c);
-    return found.length === 1 ? (found[0] as ComponentOf<'period'>) : undefined;
+    return found.length === 1 ? found[0] : undefined;
   };
   const same = (a: readonly string[], b: readonly string[]) =>
     a.length === b.length && [...a].sort().join() === [...b].sort().join();
@@ -10203,9 +10206,9 @@ function periodCases(): EvalCase[] {
         kind: 'ops',
         check: (c) => {
           const p = periodOf(c);
-          if (!p) return 'expected exactly one period block';
-          if (!same(p.show.options, ['thisMonth', 'thisWeek']))
-            return `expected only this month and this week, got ${p.show.options.join()}`;
+          if (!p) return 'expected exactly one time tabs block';
+          if (!same(p.show.periods, ['thisMonth', 'thisWeek']))
+            return `expected only this month and this week, got ${p.show.periods.join()}`;
           if (p.show.custom) return 'custom was not asked for';
           return chartsOf(c, 'expenses').every((x) => x.source.period === 'page')
             ? null
@@ -10224,9 +10227,9 @@ function periodCases(): EvalCase[] {
         kind: 'ops',
         check: (c) => {
           const p = periodOf(c);
-          if (!p) return 'expected one period block';
+          if (!p) return 'expected one time tabs block';
           if (!p.show.custom) return 'expected custom: true';
-          return same(p.show.options, ['thisMonth', 'thisWeek'])
+          return same(p.show.periods, ['thisMonth', 'thisWeek'])
             ? null
             : 'the other choices should stay';
         },
@@ -10246,7 +10249,7 @@ function periodCases(): EvalCase[] {
           chartsOf(c, 'expenses')[0]!.source.period === 'page' &&
           periodOf(c) !== undefined
             ? null
-            : 'expected the chart to have source.period "page" and the period block kept',
+            : 'expected the chart to have source.period "page" and the time tabs kept',
       },
     },
     {
@@ -10260,10 +10263,10 @@ function periodCases(): EvalCase[] {
         kind: 'ops',
         check: (c) => {
           const p = periodOf(c);
-          if (!p) return 'expected one period block';
-          return same(p.show.options, ['thisMonth', 'thisYear'])
+          if (!p) return 'expected one time tabs block';
+          return same(p.show.periods, ['thisMonth', 'thisYear'])
             ? null
-            : `expected this month and this year, got ${p.show.options.join()}`;
+            : `expected this month and this year, got ${p.show.periods.join()}`;
         },
       },
     },
@@ -10279,7 +10282,7 @@ function periodCases(): EvalCase[] {
         check: (c) =>
           periods(c).length === 0 && chartsOf(c, 'expenses').length === 1
             ? null
-            : 'expected no period block and the chart kept',
+            : 'expected no time tabs block and the chart kept',
       },
     },
     {
@@ -10293,9 +10296,9 @@ function periodCases(): EvalCase[] {
         kind: 'ops',
         check: (c) => {
           const p = periodOf(c);
-          if (!p) return 'expected one period block';
-          if (!same(p.show.options, ['thisMonth', 'thisWeek']))
-            return `expected only this week and this month, got ${p.show.options.join()}`;
+          if (!p) return 'expected one time tabs block';
+          if (!same(p.show.periods, ['thisMonth', 'thisWeek']))
+            return `expected only this week and this month, got ${p.show.periods.join()}`;
           const charts = chartsOf(c, 'expenses');
           return charts.length > 0 && charts.every((x) => x.source.period === 'page')
             ? null

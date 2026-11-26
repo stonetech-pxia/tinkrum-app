@@ -4,6 +4,7 @@ import { sha512 } from '@noble/hashes/sha2.js';
 import { z } from 'zod';
 
 import { createDefaultWorkspace } from './defaults';
+import { blocksToV41 } from './migrate';
 import { migratePageV33, migrateWorkflowV33, v33Tables } from './migrate-v34';
 import { applyOps } from './ops';
 import type { Registry, ToolDefinition } from './registry';
@@ -152,8 +153,9 @@ export function toolFromManifest(manifest: ToolManifest): ToolDefinition {
           steps: JSON.parse(JSON.stringify(wf.steps)) as QuickAction['steps'],
         }) as QuickAction,
     );
-  const createPage = (locale: Locale): Page =>
-    migratePageV33(
+  // Built in the v33 shape, then brought to v34 and to v41 (one button that runs each quick action).
+  const createPage = (locale: Locale): Page => {
+    const page = migratePageV33(
       {
         id: pageId,
         title: pick(locale, manifest.name),
@@ -193,6 +195,8 @@ export function toolFromManifest(manifest: ToolManifest): ToolDefinition {
       // No table reading blocks on the tool page.
       v33Tables([]),
     ) as Page;
+    return { ...page, blocks: blocksToV41(page.blocks) as Page['blocks'] };
+  };
   return {
     id: manifest.id,
     version: manifest.version,

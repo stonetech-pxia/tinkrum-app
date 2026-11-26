@@ -104,7 +104,7 @@ export function homeWithFileEntries(locale: Locale, registry: Registry): Workspa
   blocks.splice(blocks.findIndex((b) => b.id === 'open-files') + 1, 0, {
     id: 'toolbox-entry',
     look: 'button',
-    show: { label: toolbox.title, variant: 'row', icon: 'apps' },
+    show: { label: toolbox.title, shape: 'row', icon: 'apps' },
     opens: 'page:toolbox',
   });
   const ops = [

@@ -17,7 +17,7 @@ const COLUMNS = 4;
  * opens the app; a long press opens its menu (D-648), from which it can go on the phone's
  * home screen. Long-pressing beside the icons edits the block, as for any block.
  */
-export function AppGrid({ grid, env }: { grid: BlockOf<'apps'>; env: RenderEnv }) {
+export function AppGrid({ grid, env }: { grid: BlockOf<'catalog'>; env: RenderEnv }) {
   const { palette } = env;
   const { openAppMenu, appMenu } = useAppMenu(env);
   const apps = env.config.nav.apps ?? [];

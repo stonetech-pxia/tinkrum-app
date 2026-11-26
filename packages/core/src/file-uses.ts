@@ -158,10 +158,10 @@ export function usesOf(content: unknown): FileUses {
       found.looks.add(node.look);
       const show = node.show;
       if (isObject(show)) {
-        // Options and defaults for period blocks (D-559).
+        // Periods and default of time tabs (D-559).
         if (
-          node.look === 'period' &&
-          [show.options, show.default]
+          node.look === 'tabs' &&
+          [show.periods, show.default]
             .flat()
             .some((p) => typeof p === 'string' && NEIGHBOURS.has(p))
         )

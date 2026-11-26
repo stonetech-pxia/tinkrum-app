@@ -37,7 +37,7 @@ function config(tools: QuickAction[]): WorkspaceConfig {
           {
             op: 'addContainer',
             page: 'home',
-            block: { id: 'run-report', look: 'action', tools: [{ tool: 'report' }] },
+            block: { id: 'run-report', look: 'button', tools: [{ tool: 'report' }] },
           } as Op,
         ]
       : []),

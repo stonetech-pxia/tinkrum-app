@@ -6,7 +6,7 @@ import type { Op } from './ops';
 import type { Collection, WorkspaceConfig } from './schema';
 import { registry, workspace } from './test-helpers';
 
-// Callout cards (D-580): text placeholders {count} and {sum:field} are computed from matching
+// Notice cards about entries (the former callout look, D-580): text placeholders {count} and {sum:field} are computed from matching
 // records; cards support up to two buttons (one quick-action record creator, one page opener).
 // Read-only and quick action, stores no numeric data (invariant 14); configuration references that
 // are deleted will be rejected (invariant 18).
@@ -33,7 +33,7 @@ const tx: Collection = {
 const pending = [{ field: 'paused', op: 'isNot', value: true }];
 const callout = (over: Record<string, unknown> = {}) => ({
   id: 'prompt',
-  look: 'callout',
+  look: 'notice',
   show: {
     title: 'To confirm',
     text: '{count} subscriptions, {sum:amount} in total.',
@@ -69,7 +69,7 @@ const problems = (block: unknown) => {
   return r.ok ? [] : r.issues.map(String);
 };
 
-describe('callout (D-580)', () => {
+describe('a notice about entries (D-580)', () => {
   it('accepts a card with a text that counts, a record tool and an open button', () => {
     expect(problems(callout())).toEqual([]);
   });

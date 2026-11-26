@@ -71,7 +71,7 @@ function seed(extra: object[] = []): WorkspaceConfig {
       add({
         id: 'drink',
         look: 'button',
-        show: { label: '+1 杯水', variant: 'filled', icon: 'plus' },
+        show: { label: '+1 杯水', shape: 'filled', icon: 'plus' },
         tools: [DRINK],
       }),
       add({

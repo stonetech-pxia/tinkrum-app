@@ -78,7 +78,7 @@ function seeded(locale: Locale = 'zh'): WorkspaceConfig {
     {
       op: 'addContainer',
       page: 'home',
-      block: { id: 'slot', look: 'entry', show: { title: '合同' }, opens: { file: ASSET } },
+      block: { id: 'slot', look: 'button', show: { label: '合同' }, opens: { file: ASSET } },
     },
   ];
   const r = applyOps(createDefaultWorkspace(locale), ops, { registry, locale });
@@ -312,7 +312,7 @@ describe('Invariant 3: AI never touches files', () => {
         {
           op: 'addContainer',
           page: 'home',
-          block: { id: 'slot2', look: 'entry', show: { title: '护照' }, opens: { file: null } },
+          block: { id: 'slot2', look: 'button', show: { label: '护照' }, opens: { file: null } },
         },
       ],
     };
@@ -978,7 +978,7 @@ describe('Invariant 11: Every write action can be taken back; an undo banner is 
       .blocks.push({
         id: 'copy-all',
         look: 'button',
-        show: { label: '全部再来一遍', variant: 'filled' },
+        show: { label: '全部再来一遍', shape: 'filled' },
         tools: [
           { do: 'createAll', table: 'todos', from: 'todos', values: { title: { copy: 'title' } } },
         ],

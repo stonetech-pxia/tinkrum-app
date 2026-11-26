@@ -30,7 +30,7 @@ const seed = (locale: Locale, registry: Registry) => {
           id: 'bills-page',
           title: '账单',
           blocks: [
-            { id: 'range', look: 'period', show: { options: ['thisWeek', 'lastYear'] } },
+            { id: 'range', look: 'tabs', show: { periods: ['thisWeek', 'lastYear'] } },
             {
               id: 'following',
               look: 'list',

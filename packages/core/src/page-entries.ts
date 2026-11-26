@@ -62,8 +62,8 @@ export function addMissingPageEntries(before: WorkspaceConfig, after: WorkspaceC
     for (let n = 2; ids.has(id); n++) id = `${stem}-${n}`;
     holder.blocks.push({
       id,
-      look: 'entry',
-      show: { title: page.title.slice(0, 60), icon: page.icon ?? 'document' },
+      look: 'button',
+      show: { label: page.title.slice(0, 40), icon: page.icon ?? 'document' },
       opens: target,
     } as unknown as Component);
     added.push(page.title);

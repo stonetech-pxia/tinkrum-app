@@ -296,7 +296,10 @@ export function EditSheet({
     bumpAssets();
     apply([update({ opens: { file: assetId } })]);
   }
-  const assetId = known?.look === 'entry' && isFileTarget(known.opens) ? known.opens.file : null;
+  const assetId =
+    known?.look === 'button' && known.opens !== undefined && isFileTarget(known.opens)
+      ? known.opens.file
+      : null;
 
   const up = moveStepOp(page, id, 'up');
   const down = moveStepOp(page, id, 'down');

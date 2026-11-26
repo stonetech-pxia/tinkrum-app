@@ -2,7 +2,7 @@ import {
   choiceRange,
   calendarOf,
   validChoice,
-  type BlockOf,
+  type TimeTabs,
   type PageChoice,
   type PagePeriod,
 } from '@morph/core';
@@ -19,8 +19,8 @@ import { onPage } from './theme';
 // (Invariant 15).
 
 /** Currently selected on page: from state, or falls back to default if missing or no longer in options (recently changed). */
-export function resolveChoice(block: BlockOf<'period'>, picked: PageChoice | null): PageChoice {
-  const { options, custom } = block.show;
+export function resolveChoice(block: TimeTabs, picked: PageChoice | null): PageChoice {
+  const { periods: options, custom } = block.show;
   if (picked && 'period' in picked && options.includes(picked.period)) return picked;
   if (picked && 'start' in picked && custom && validChoice(picked)) return picked;
   return { period: block.show.default ?? options[0]! };
@@ -41,7 +41,7 @@ const LABELS: Record<PagePeriod, Parameters<typeof t>[1]> = {
   lastYear: 'periodOpt_lastYear',
 };
 
-export function PeriodBar({ block, env }: { block: BlockOf<'period'>; env: RenderEnv }) {
+export function PeriodBar({ block, env }: { block: TimeTabs; env: RenderEnv }) {
   const { locale, interactive } = env;
   const page = onPage(env.palette);
   const state = env.pageRange;
@@ -103,7 +103,7 @@ export function PeriodBar({ block, env }: { block: BlockOf<'period'>; env: Rende
     <View style={styles.wrap}>
       <View style={styles.row}>
         {/* Highlights only "Custom" when selecting custom date, otherwise highlights both. */}
-        {block.show.options.map((p) =>
+        {block.show.periods.map((p) =>
           chip(p, t(locale, LABELS[p]), !editing && 'period' in choice && choice.period === p, () =>
             state?.set({ period: p }),
           ),

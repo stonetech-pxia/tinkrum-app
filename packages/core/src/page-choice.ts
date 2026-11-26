@@ -1,8 +1,8 @@
 import type { Collection, Condition } from './schema';
 
-// Logic-related parts of the choices block (schema in components/choices.ts).
+// Logic-related parts of the tabs by a choice field (schema in components/tabs.ts).
 
-/** Logic-related parts of the choices block (schema in components/choices.ts). */
+/** Logic-related parts of the tabs by a choice field (schema in components/tabs.ts). */
 export interface ChoiceRow {
   show: {
     options?: readonly string[] | undefined;

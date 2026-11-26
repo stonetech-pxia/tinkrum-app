@@ -61,7 +61,7 @@ const button = (id: string, label: string, action: object): Op =>
   ({
     op: 'addContainer',
     page: 'home',
-    block: { id, look: 'button', show: { label, variant: 'filled' }, tools: [action] },
+    block: { id, look: 'button', show: { label, shape: 'filled' }, tools: [action] },
   }) as Op;
 const list = (id: string, table: string, title: string, tools?: object[]): Op =>
   ({
@@ -304,7 +304,7 @@ describe('v34: tools on blocks', () => {
           block: {
             id: 'add-run',
             look: 'button',
-            show: { label: '添加跑步', variant: 'filled' },
+            show: { label: '添加跑步', shape: 'filled' },
             tools: [
               {
                 do: 'create',

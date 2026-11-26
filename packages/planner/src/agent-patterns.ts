@@ -121,9 +121,9 @@ export const AGENT_PATTERNS: readonly AgentPattern[] = [
             },
             {
               id: 'range',
-              look: 'period',
+              look: 'tabs',
               show: {
-                options: ['thisWeek', 'thisMonth', 'thisYear'],
+                periods: ['thisWeek', 'thisMonth', 'thisYear'],
                 default: 'thisMonth',
               },
             },
@@ -213,7 +213,7 @@ export const AGENT_PATTERNS: readonly AgentPattern[] = [
               look: 'button',
               show: {
                 label: 'Add spending',
-                variant: 'filled',
+                shape: 'filled',
                 icon: 'plus',
               },
               tools: [
@@ -401,7 +401,7 @@ export const AGENT_PATTERNS: readonly AgentPattern[] = [
               look: 'button',
               show: {
                 label: 'Add a category',
-                variant: 'filled',
+                shape: 'filled',
                 icon: 'plus',
               },
               tools: [
@@ -460,7 +460,7 @@ export const AGENT_PATTERNS: readonly AgentPattern[] = [
               look: 'button',
               show: {
                 label: 'Add spending',
-                variant: 'filled',
+                shape: 'filled',
                 icon: 'plus',
               },
               tools: [
@@ -698,7 +698,7 @@ export const AGENT_PATTERNS: readonly AgentPattern[] = [
               look: 'button',
               show: {
                 label: 'Add a goal',
-                variant: 'filled',
+                shape: 'filled',
                 icon: 'plus',
               },
               tools: [
@@ -979,7 +979,7 @@ export const AGENT_PATTERNS: readonly AgentPattern[] = [
               look: 'button',
               show: {
                 label: 'Add a habit',
-                variant: 'filled',
+                shape: 'filled',
                 icon: 'plus',
               },
               tools: [
@@ -1248,7 +1248,7 @@ export const AGENT_PATTERNS: readonly AgentPattern[] = [
               look: 'button',
               show: {
                 label: 'Add a task',
-                variant: 'filled',
+                shape: 'filled',
                 icon: 'plus',
               },
               tools: [
@@ -1489,7 +1489,7 @@ export const AGENT_PATTERNS: readonly AgentPattern[] = [
               look: 'button',
               show: {
                 label: 'Add an application',
-                variant: 'filled',
+                shape: 'filled',
                 icon: 'plus',
               },
               tools: [
@@ -1659,7 +1659,7 @@ export const AGENT_PATTERNS: readonly AgentPattern[] = [
             },
             {
               id: 'tabs',
-              look: 'choices',
+              look: 'tabs',
               source: {
                 table: 'shelf-books',
                 field: 'status',
@@ -1702,7 +1702,7 @@ export const AGENT_PATTERNS: readonly AgentPattern[] = [
               look: 'button',
               show: {
                 label: 'Add a book',
-                variant: 'filled',
+                shape: 'filled',
                 icon: 'plus',
               },
               tools: [
@@ -1896,7 +1896,7 @@ export const AGENT_PATTERNS: readonly AgentPattern[] = [
               look: 'button',
               show: {
                 label: 'Add a pet',
-                variant: 'filled',
+                shape: 'filled',
                 icon: 'plus',
               },
               tools: [

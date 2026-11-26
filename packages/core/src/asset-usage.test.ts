@@ -52,8 +52,8 @@ describe('asset usage', () => {
       page: 'home',
       block: {
         id: 'lease',
-        look: 'entry',
-        show: { title: '合同' },
+        look: 'button',
+        show: { label: '合同' },
         opens: { file: 'slotfile1' },
       },
     },
@@ -96,7 +96,7 @@ describe('asset usage', () => {
       {
         op: 'addContainer',
         page: 'home',
-        block: { id: 'lease', look: 'entry', show: { title: '合同' }, opens: { file: null } },
+        block: { id: 'lease', look: 'button', show: { label: '合同' }, opens: { file: null } },
       },
     ]);
     expect(configAssetUses(empty).size).toBe(0);

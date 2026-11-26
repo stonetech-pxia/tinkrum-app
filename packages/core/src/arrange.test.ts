@@ -18,7 +18,7 @@ function arranged(): WorkspaceConfig {
         look: 'group',
         show: { layout: 'grid', columns: 2 },
         children: [
-          { id: 'a', look: 'divider' },
+          { id: 'a', look: 'spacer', show: { size: 'small', line: true } },
           { id: 'b', look: 'spacer', show: { size: 'small' } },
         ],
       },
@@ -77,7 +77,8 @@ describe('moveStepOp', () => {
           show: { layout: 'stack' },
           children: Array.from({ length: 12 }, (_, i) => ({
             id: `d${i}`,
-            look: 'divider' as const,
+            look: 'spacer' as const,
+            show: { size: 'small' as const, line: true as const },
           })),
         },
       },
@@ -221,7 +222,7 @@ describe('two levels of groups (Q3)', () => {
           id: 'inner',
           look: 'group',
           show: { layout: 'row' },
-          children: [{ id: 'x', look: 'divider' }],
+          children: [{ id: 'x', look: 'spacer', show: { size: 'small', line: true } }],
         },
       },
     ]);

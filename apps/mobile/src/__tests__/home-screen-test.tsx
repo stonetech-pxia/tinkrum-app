@@ -1,4 +1,5 @@
 import {
+  buttonKind,
   createStarterWorkspace,
   type Locale,
   presetWorkflow,
@@ -117,7 +118,7 @@ describe('quick actions on the phone home screen (D-271)', () => {
     ]);
     // Home page does not gain an extra card as a result ("Add to Home Screen" is not "Add to Home Page", D-109).
     const page = store.getState().config!.containers.pages.find((p) => p.id === 'home')!;
-    expect(page.blocks.some((c) => c.look === 'action')).toBe(false);
+    expect(page.blocks.some((c) => c.look === 'button' && buttonKind(c) === 'run')).toBe(false);
   });
 
   it('undo takes it off the menu again', async () => {
@@ -181,7 +182,9 @@ describe('quick actions on the phone home screen (D-271)', () => {
     // Home page is app-level appearance, enters draft first (D-190); draft home page has an extra run card, home screen remains unchanged.
     const draft = await waitFor(() => store.getState().draft!.steps.at(-1)!.config);
     expect(
-      draft.containers.pages.find((p) => p.id === 'home')!.blocks.some((c) => c.look === 'action'),
+      draft.containers.pages
+        .find((p) => p.id === 'home')!
+        .blocks.some((c) => c.look === 'button' && buttonKind(c) === 'run'),
     ).toBe(true);
     expect(draft.nav.phoneHomeScreen ?? []).toEqual([]);
     expect(home.menu).toEqual([]);

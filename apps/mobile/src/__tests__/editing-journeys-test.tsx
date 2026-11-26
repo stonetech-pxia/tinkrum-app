@@ -277,7 +277,7 @@ describe('editing the page directly', () => {
             id: 'row',
             look: 'group',
             show: { layout: 'row' },
-            children: [{ id: 'go', look: 'divider' }],
+            children: [{ id: 'go', look: 'spacer', show: { size: 'small', line: true } }],
           },
         },
       ],
@@ -376,7 +376,7 @@ describe('editing the page directly', () => {
           block: {
             id: 'open-notes',
             look: 'button',
-            show: { label: '打开笔记', variant: 'filled' },
+            show: { label: '打开笔记', shape: 'filled' },
             opens: 'page:notes',
           },
         },
@@ -409,7 +409,7 @@ describe('editing the page directly', () => {
           block: {
             id: 'go-tools',
             look: 'button',
-            show: { label: '去工具', variant: 'filled' },
+            show: { label: '去工具', shape: 'filled' },
             opens: 'tools',
           },
         },
@@ -631,7 +631,7 @@ describe('single-component gesture sessions', () => {
           page: 'home',
           block: {
             id,
-            look: 'action' as const,
+            look: 'button' as const,
             tools: [{ tool: workflows[i]!.id }],
           },
         })),

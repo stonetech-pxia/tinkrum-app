@@ -2,6 +2,7 @@ import {
   type AIProvider,
   allComponents,
   BUILTIN_TOOLS,
+  buttonKind,
   createMockAIProvider,
   createRegistry,
   type PlanContext,
@@ -232,7 +233,9 @@ describe('function changes go straight in (D-191)', () => {
     expect(applied.notes?.length).toBeGreaterThan(0);
     expect(store.getState().draft).toBeNull();
     const home = store.getState().config!.containers.pages.find((p) => p.id === 'home')!;
-    expect(allComponents(home).some((c) => c.look === 'action')).toBe(true);
+    expect(allComponents(home).some((c) => c.look === 'button' && buttonKind(c) === 'run')).toBe(
+      true,
+    );
     const head = store.getState().head!;
     expect(head).toMatchObject({ parentId: baseId, source: 'ai' });
     await store.getState().markRendered(head.id);

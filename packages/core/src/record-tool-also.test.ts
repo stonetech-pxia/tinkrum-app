@@ -147,7 +147,7 @@ describe('one tap, up to three changes to this entry (D-566)', () => {
         {
           id: 'b1',
           look: 'button',
-          show: { label: 'Go', variant: 'filled' },
+          show: { label: 'Go', shape: 'filled' },
           tools: [
             {
               do: 'create',

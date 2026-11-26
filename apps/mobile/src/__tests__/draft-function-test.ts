@@ -230,7 +230,7 @@ describe('Both features and look are present in a single plan (D-419).', () => {
     block: {
       id: 'books-add',
       look: 'button',
-      show: { label: '添加', variant: 'filled' },
+      show: { label: '添加', shape: 'filled' },
       tools: [{ do: 'create', table: 'books', ask: 'all' }],
     },
   };

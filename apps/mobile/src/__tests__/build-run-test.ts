@@ -36,7 +36,7 @@ const page = (id: string): Plan => ({
       block: {
         id: `${id}-add`,
         look: 'button',
-        show: { label: '添加', variant: 'filled' },
+        show: { label: '添加', shape: 'filled' },
         tools: [{ do: 'create', table: id, ask: 'all' }],
       },
     },

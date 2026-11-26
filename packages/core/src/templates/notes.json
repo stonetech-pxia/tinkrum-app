@@ -62,7 +62,7 @@
             "zh": "写笔记",
             "fr": "Nouvelle note"
           },
-          "variant": "filled"
+          "shape": "filled"
         },
         "tools": [
           {

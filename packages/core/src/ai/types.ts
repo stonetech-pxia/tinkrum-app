@@ -45,7 +45,7 @@ export type Plan =
       /**
        * Whether newly created quick action should have an entry point on home screen (D-109):
        * false = user said not to place; omitted = user checks in preview, checked by default.
-       * When user wants it on home screen, AI directly adds look "action" block without using
+       * When user wants it on home screen, AI directly adds a button that runs it without using
        * this field.
        */
       homeEntry?: boolean;

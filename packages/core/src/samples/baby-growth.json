@@ -180,7 +180,7 @@
               "zh": "记一次",
               "fr": "Noter une mesure"
             },
-            "variant": "filled"
+            "shape": "filled"
           },
           "tools": [
             {
@@ -192,7 +192,7 @@
         },
         {
           "id": "run-photo-log",
-          "look": "action",
+          "look": "button",
           "show": {
             "shape": "row"
           },
@@ -283,7 +283,7 @@
           "children": [
             {
               "id": "run-send",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -295,7 +295,7 @@
             },
             {
               "id": "run-old-photos",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -307,7 +307,7 @@
             },
             {
               "id": "run-video-smaller",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -319,7 +319,7 @@
             },
             {
               "id": "run-join-videos",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },

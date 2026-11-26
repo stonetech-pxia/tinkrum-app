@@ -36,8 +36,8 @@ const seed = (locale: Locale, registry: Registry) => {
         page: 'home',
         block: {
           id: 'lease',
-          look: 'entry',
-          show: { title: '租房合同' },
+          look: 'button',
+          show: { label: '租房合同' },
           opens: { file: 'slot01' },
         },
       },

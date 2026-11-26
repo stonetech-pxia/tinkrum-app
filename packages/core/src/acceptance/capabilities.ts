@@ -778,9 +778,13 @@ export const CAPABILITIES: readonly Capability[] = [
 
   // read
   lookCap('dial'),
-  lookCap('period'),
-  lookCap('choices'),
-  lookCap('callout'),
+  lookCap('tabs'),
+  cap('read.tabs.field', 'read', (v) =>
+    v.blocks.some((x) => x.block.look === 'tabs' && x.block.source !== undefined),
+  ),
+  cap('read.look.notice', 'read', (v) =>
+    v.blocks.some((x) => x.block.look === 'notice' && x.block.source !== undefined),
+  ),
   lookCap('list'),
   lookCap('cards'),
   lookCap('checklist'),

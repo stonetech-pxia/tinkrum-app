@@ -1,11 +1,8 @@
 import {
-  COMPONENTS,
-  entryEditableText,
-  entryKind,
+  blockEdit,
   type ComponentEdit,
-  type KnownComponent,
-  type ComponentType,
   type EditableText,
+  type KnownComponent,
   type StyleKey,
 } from '@morph/core';
 
@@ -14,23 +11,11 @@ import {
 export type TextField = EditableText;
 export type { StyleKey };
 
-export const CAPABILITIES = Object.fromEntries(COMPONENTS.map((d) => [d.look, d.edit])) as Record<
-  ComponentType,
-  ComponentEdit
->;
-
 /**
- * What this block can modify. Entry points (v34 merged quick entry points, "Add Tool", tool
- * cards, file slots) are classified by `opens`: tool package entry points have no text, and only
- * file slots can select files (`entryEditableText`, `entryKind`).
+ * What this block can modify: its look's edit, narrowed by what the block does where that matters
+ * (a button that opens a tool's page has no text of its own, only a file slot picks a file; the
+ * look's editOf in core).
  */
 export function capabilitiesOf(c: KnownComponent): ComponentEdit {
-  const edit = CAPABILITIES[c.look];
-  if (c.look !== 'entry') return edit;
-  const { asset: _asset, ...rest } = edit;
-  return {
-    ...rest,
-    text: entryEditableText(c) as EditableText[],
-    ...(entryKind(c) === 'file' ? { asset: 'file' as const } : {}),
-  };
+  return blockEdit(c);
 }

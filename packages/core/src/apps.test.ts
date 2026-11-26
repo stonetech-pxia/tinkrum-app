@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { appFileFromWorkspace } from './app-file';
-import { entryKind } from './components';
+import { buttonKind } from './components';
 import { homeScreenFull, homeScreenItems, homeScreenOp } from './home-screen';
 import { appOfPage, appViewOf, firstTarget, startAppOf } from './app-view';
 import { prepareOps } from './change';
@@ -59,7 +59,7 @@ describe('apps（D-485）', () => {
     home.blocks.push({
       id: 'open-fit',
       look: 'button',
-      show: { label: 'Fitness', variant: 'row' },
+      show: { label: 'Fitness', shape: 'row' },
       opens: 'app:fit',
     } as never);
     expect(codes(config)).toEqual([]);
@@ -71,7 +71,7 @@ describe('apps（D-485）', () => {
     home.blocks.push({
       id: 'open-x',
       look: 'button',
-      show: { label: 'X', variant: 'row' },
+      show: { label: 'X', shape: 'row' },
       opens: 'app:nope',
     } as never);
     expect(codes(config)).toContain('unknown-app');
@@ -143,7 +143,7 @@ function buildFitness(): WorkspaceConfig {
       block: {
         id: 'open-fit',
         look: 'button',
-        show: { label: 'Fitness', variant: 'row' },
+        show: { label: 'Fitness', shape: 'row' },
         opens: 'app:fit',
       } as never,
     },
@@ -258,9 +258,9 @@ describe('App entry point card (D-485)', () => {
     const config = withFitness();
     config.containers.pages
       .find((p) => p.id === 'home')!
-      .blocks.push({ id: 'fit-card', look: 'entry', opens: 'app:fit' } as never);
+      .blocks.push({ id: 'fit-card', look: 'button', opens: 'app:fit' } as never);
     expect(codes(config)).toEqual([]);
-    expect(entryKind({ opens: 'app:fit' })).toBe('app');
+    expect(buttonKind({ opens: 'app:fit' })).toBe('app');
   });
 });
 
@@ -343,7 +343,7 @@ describe('Apps in the desktop menu (D-485)', () => {
 
 // D-644: the app list is a home page's block.
 describe('the app list block', () => {
-  const list = { id: 'list', look: 'apps' as const, source: { catalog: 'apps' as const } };
+  const list = { id: 'list', look: 'catalog' as const, source: { catalog: 'apps' as const } };
 
   it('is on the new home page and valid with or without apps', () => {
     expect(codes(base())).toEqual([]);

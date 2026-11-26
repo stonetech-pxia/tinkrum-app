@@ -80,7 +80,7 @@ export const PERIODS = [
 ] as const;
 export type Period = (typeof PERIODS)[number];
 
-/** Options that can be placed into a period block (all fixed calendar time periods calculated based on "today"). */
+/** Options that can be placed into time tabs (all fixed calendar time periods calculated based on "today"). */
 export const PAGE_PERIODS = [
   'today',
   'thisWeek',

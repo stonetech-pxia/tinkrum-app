@@ -54,15 +54,42 @@
           },
           "type": "choice",
           "options": [
-            { "id": "usd", "label": "USD" },
-            { "id": "eur", "label": "EUR" },
-            { "id": "cny", "label": "CNY" },
-            { "id": "gbp", "label": "GBP" },
-            { "id": "jpy", "label": "JPY" },
-            { "id": "cad", "label": "CAD" },
-            { "id": "aud", "label": "AUD" },
-            { "id": "chf", "label": "CHF" },
-            { "id": "hkd", "label": "HKD" }
+            {
+              "id": "usd",
+              "label": "USD"
+            },
+            {
+              "id": "eur",
+              "label": "EUR"
+            },
+            {
+              "id": "cny",
+              "label": "CNY"
+            },
+            {
+              "id": "gbp",
+              "label": "GBP"
+            },
+            {
+              "id": "jpy",
+              "label": "JPY"
+            },
+            {
+              "id": "cad",
+              "label": "CAD"
+            },
+            {
+              "id": "aud",
+              "label": "AUD"
+            },
+            {
+              "id": "chf",
+              "label": "CHF"
+            },
+            {
+              "id": "hkd",
+              "label": "HKD"
+            }
           ],
           "default": {
             "en": "usd",
@@ -404,7 +431,7 @@
           "children": [
             {
               "id": "run-scan-log",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -416,7 +443,7 @@
             },
             {
               "id": "run-print",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -428,7 +455,7 @@
             },
             {
               "id": "run-archive",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -440,7 +467,7 @@
             },
             {
               "id": "run-report",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -452,7 +479,7 @@
             },
             {
               "id": "run-excel",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "tile"
               },
@@ -520,7 +547,7 @@
   "home": [
     {
       "id": "run-scan-receipt",
-      "look": "action",
+      "look": "button",
       "show": {
         "shape": "row"
       },

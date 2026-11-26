@@ -140,7 +140,7 @@ describe('a check box can also record a date (D-617)', () => {
         {
           id: 'b1',
           look: 'button',
-          show: { label: 'Go', variant: 'filled' },
+          show: { label: 'Go', shape: 'filled' },
           tools: [
             {
               do: 'create',

@@ -10,6 +10,7 @@ import {
   applyOps,
   createDefaultWorkspace,
   presetSnapshot,
+  readAppFile,
   type Op,
   type WorkspaceConfig,
 } from '@morph/core';
@@ -45,8 +46,8 @@ function seed(): WorkspaceConfig {
       page: 'home',
       block: {
         id: 'slot',
-        look: 'entry',
-        show: { title: '合同', icon: 'folder' },
+        look: 'button',
+        show: { label: '合同', icon: 'folder' },
         opens: { file: FILE },
       },
     },
@@ -323,7 +324,7 @@ describe('saving preset checks', () => {
       block: {
         id: 'books-add',
         look: 'button',
-        show: { label: '添加', variant: 'filled' },
+        show: { label: '添加', shape: 'filled' },
         tools: [{ do: 'create', table: 'books', ask: 'all' }],
       },
     },
@@ -517,8 +518,8 @@ describe('import a preset from a file', () => {
     const broken = JSON.parse(JSON.stringify(seed())) as WorkspaceConfig;
     broken.containers.pages[0]!.blocks.push({
       id: 'dangling',
-      look: 'entry',
-      show: { title: 'x', icon: 'star' },
+      look: 'button',
+      show: { label: 'x', icon: 'star' },
       opens: 'no-such-page' as never,
     });
     pickFile(files, exported(broken));
@@ -582,6 +583,9 @@ describe('import a preset from a file', () => {
         buttons?.[1]?.onPress?.();
       });
     const clay = () => readFileSync(join(PORTAL, 'tinkrum-app-clay.json'), 'utf8');
+    // The portal files keep their older schemaVersion on purpose; a file written in the current
+    // format (what the item-by-item check reports by place in the file) is that file read by this build.
+    const current = (text: string) => JSON.parse(JSON.stringify(readAppFile(text)!)) as unknown;
 
     it('is added as a new app after asking; no preset is stored, what is there stays, and it can be undone', async () => {
       const { repo, files, store } = await starterApp();
@@ -649,7 +653,7 @@ describe('import a preset from a file', () => {
     it('a file using something this build does not know names the place and imports nothing', async () => {
       const { files, store } = await starterApp();
       const head = store.getState().head!.id;
-      const data = JSON.parse(clay()) as { pages: { blocks: { look: string }[] }[] };
+      const data = current(clay()) as { pages: { blocks: { look: string }[] }[] };
       data.pages[0]!.blocks[0]!.look = 'fromTheFuture';
       pickFile(files, JSON.stringify(data), { name: 'tinkrum-app-clay.json' });
       chooseNewApp();
@@ -672,7 +676,7 @@ describe('import a preset from a file', () => {
     it('a wrong field id from another AI is named by its place in the file, and can be copied', async () => {
       const { files, store } = await starterApp();
       const head = store.getState().head!.id;
-      const data = JSON.parse(readFileSync(join(PORTAL, 'tinkrum-app-habits.json'), 'utf8')) as {
+      const data = current(readFileSync(join(PORTAL, 'tinkrum-app-habits.json'), 'utf8')) as {
         tables: { fields: { id: string }[] }[];
       };
       data.tables[1]!.fields[3]!.id = 'Note_Text';

@@ -1,5 +1,6 @@
 import {
   BUILTIN_TOOLS,
+  buttonKind,
   createMockAIProvider,
   createRegistry,
   createStarterWorkspace,
@@ -265,7 +266,7 @@ describe('workspace store', () => {
     const runners = (config: WorkspaceConfig) =>
       config.containers.pages
         .flatMap((p) => p.blocks)
-        .filter((c) => c.look === 'action')
+        .filter((c) => c.look === 'button' && buttonKind(c) === 'run')
         .map((c) => (c as { tools: { tool: string }[] }).tools[0]!.tool);
 
     it('offers it ticked; unticking keeps the workflow off every page', async () => {

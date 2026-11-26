@@ -57,7 +57,7 @@ const seed = (locale: Locale, registry: Registry) => {
         block: {
           id: 'monthly',
           look: 'button',
-          show: { label: '新建本月订单', variant: 'filled' },
+          show: { label: '新建本月订单', shape: 'filled' },
           tools: [monthly as never],
         },
       },
@@ -174,7 +174,7 @@ it('a widget opens the app for it (it has to ask first)', () => {
     widgetButtonAction({
       id: 'b',
       look: 'button',
-      show: { label: 'x', variant: 'filled' },
+      show: { label: 'x', shape: 'filled' },
       tools: [monthly],
     } as never),
   ).toBeNull();

@@ -4,7 +4,7 @@ import { t } from '../messages';
 import { isMultipleChoice, MULTIPLE_CHOICE_NOT_ONE } from '../fields';
 import { hasRecordCurrency } from '../money-currency';
 import { boundedText, DaysSchema, filterSchema, GroupingSchema, IdSchema } from '../schema-base';
-import { followChoiceProblems } from './choices';
+import { followChoiceProblems, isChoiceTabs, isTimeTabs } from './tabs';
 import { type LookDefinitionOf, defineLook, isSystemField, NUMERIC_FIELD_TYPES } from './define';
 
 /** Chart data source: a table, grouped by time period or single-choice / reference field (group is required), with one value per group. */
@@ -21,10 +21,10 @@ export const ChartSourceSchema = z.strictObject({
   split: z.strictObject({ by: IdSchema }).optional(),
   /** Compare to previous period (D-439): renders an equally long preceding time period, only for time-grouped bar and line charts. */
   compare: z.literal('previous').optional(),
-  /** Follows the page-level time range (D-440): the page must have a period block; renders according to the selected range, ignoring group.unit and last (automatically selects day, week, or month based on range length). */
+  /** Follows the page-level time range (D-440): the page must have time tabs; renders according to the selected range, ignoring group.unit and last (automatically selects day, week, or month based on range length). */
   period: z.literal('page').optional(),
   /**
-   * Follows the page-level option tabs (D-573): the page must have a choices block reading the
+   * Follows the page-level option tabs (D-573): the page must have tabs by a choice field reading the
    * same table; calculates only records where this field matches the selected item ("All" adds no
    * condition). Grouping by the same field is not allowed.
    */
@@ -38,7 +38,7 @@ const shape = {
     title: boundedText(1, 60),
     /**
      * Tapping a bar/point updates the page time range to that period (D-585): the page must have
-     * a period block with custom, synchronizing number cards, lists, and charts on the page that
+     * time tabs with custom, synchronizing number cards, lists, and charts on the page that
      * follow the time range. Charts segment themselves by group.unit independently of the page
      * range (no source.period).
      */
@@ -70,8 +70,10 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
   check: (c, { collection, page }) => {
     const problems: string[] = [...followChoiceProblems(c.source, page)];
     if (c.source.group?.until) problems.push('source.group.until only applies to a calendar');
-    if (c.source.period !== undefined && !page.blocks.some((b) => b.look === 'period'))
-      problems.push('source.period "page" needs a period block on the same page');
+    if (c.source.period !== undefined && !page.blocks.some(isTimeTabs))
+      problems.push(
+        'source.period "page" needs time tabs (a tabs block with show.periods) on the same page',
+      );
     const field = (id: string) => collection!.fields.find((f) => f.id === id);
     const { aggregate, group } = c.source;
     if (c.show.kind === 'pie' && ['latest', 'min', 'max'].includes(aggregate))
@@ -94,7 +96,7 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
         problems.push('split cannot combine with running or compare');
       if (
         c.source.choice &&
-        page.blocks.some((b) => b.look === 'choices' && b.source.field === c.source.split!.by)
+        page.blocks.some((b) => isChoiceTabs(b) && b.source.field === c.source.split!.by)
       )
         problems.push('split cannot follow page choice on the same field');
     }
@@ -118,9 +120,9 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
         problems.push(
           'show.pickPeriod can not be used with source.period: the chart would follow the range its own taps set',
         );
-      const picker = page.blocks.find((b) => b.look === 'period');
-      if (!picker || !(picker as { show: { custom?: boolean } }).show.custom)
-        problems.push('show.pickPeriod needs a period block with custom: true on the same page');
+      const picker = page.blocks.find(isTimeTabs);
+      if (!picker?.show.custom)
+        problems.push('show.pickPeriod needs time tabs with custom: true on the same page');
     }
     if (group.showEmpty || group.filter)
       problems.push('a chart groups by time (unit) or by a choice or link field (by)');
@@ -170,7 +172,7 @@ export const chartComponent: LookDefinitionOf<'chart', typeof shape> = defineLoo
   describe: (c, _config, ctx) => t(ctx.locale, 'describeChart', { v0: c.show.title }),
   edit: { text: [{ prop: 'title', max: 60 }], style: ['tone'] },
   ai: {
-    doc: 'show {kind: "bar"|"line"|"pie", title}, source {table, aggregate: "count"|"sum"|"avg"|"min"|"max"|"latest"|"distinctDays" (days with at least one entry), field? (number, money, rating, duration or formula; for numeric aggregates; latest reads the newest entry in each bucket), filter?, group: {unit: "day"|"week"|"month", by? (a date or datetime field or "createdAt"; default: the first date field), last? (2-31; default 7 days, 8 weeks, 6 months)} or {by: a choice field, or a link field for one point per entry of the linked table}}: a pie chart needs group {by: a choice or link field} (rule 33); compare?: "previous" (only with a time group, bar or line, and no inPeriod filter) also draws the period before, shifted onto the same positions: a dashed line, or pale bars behind ("compared with last month", "和上个月比"); pickPeriod?: true (bar or line grouped by time, not following the page range: tapping a bar or point sets the time range of the page to that day, week or month, and what follows the range changes with it; the page needs a period block with custom: true), period?: "page" follows the time range picked in the period block on the same page (the chart then covers that range, by day, week or month by its length; group.unit and last are ignored; a pie follows it too); running?: "shown"|"all" (time-grouped count/sum: running from zero at the visible edge, or including matching entries before it; compare supports shown only), split?: {by: a single-choice field} (time-grouped stacked bars with count/sum or separate lines with any chart aggregate; no running or compare; at most 8 series, rule 78); choice?: "page" draws only the entries with the option picked in the choices block on the same page (rule 65)',
+    doc: 'show {kind: "bar"|"line"|"pie", title}, source {table, aggregate: "count"|"sum"|"avg"|"min"|"max"|"latest"|"distinctDays" (days with at least one entry), field? (number, money, rating, duration or formula; for numeric aggregates; latest reads the newest entry in each bucket), filter?, group: {unit: "day"|"week"|"month", by? (a date or datetime field or "createdAt"; default: the first date field), last? (2-31; default 7 days, 8 weeks, 6 months)} or {by: a choice field, or a link field for one point per entry of the linked table}}: a pie chart needs group {by: a choice or link field} (rule 33); compare?: "previous" (only with a time group, bar or line, and no inPeriod filter) also draws the period before, shifted onto the same positions: a dashed line, or pale bars behind ("compared with last month", "和上个月比"); pickPeriod?: true (bar or line grouped by time, not following the page range: tapping a bar or point sets the time range of the page to that day, week or month, and what follows the range changes with it; the page needs time tabs with custom: true), period?: "page" follows the time range picked in the time tabs on the same page (the chart then covers that range, by day, week or month by its length; group.unit and last are ignored; a pie follows it too); running?: "shown"|"all" (time-grouped count/sum: running from zero at the visible edge, or including matching entries before it; compare supports shown only), split?: {by: a single-choice field} (time-grouped stacked bars with count/sum or separate lines with any chart aggregate; no running or compare; at most 8 series, rule 78); choice?: "page" draws only the entries with the option picked in the tabs by a choice field on the same page (rule 65)',
   },
   example: {
     show: { kind: 'bar', title: 'Spending by month' },

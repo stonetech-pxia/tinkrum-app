@@ -180,7 +180,7 @@
           "look": "button",
           "show": {
             "label": "Add a plant",
-            "variant": "filled",
+            "shape": "filled",
             "icon": "plus"
           },
           "tools": [
@@ -264,7 +264,7 @@
         },
         {
           "id": "export",
-          "look": "action",
+          "look": "button",
           "show": {
             "shape": "row"
           },

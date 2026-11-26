@@ -365,7 +365,7 @@ export const translateTool: ToolDefinition = {
       },
       ...translateWorkflows(locale).map((wf) => ({
         id: `${wf.id}-runner`,
-        look: 'action' as const,
+        look: 'button' as const,
         tools: [{ tool: wf.id }],
       })),
     ],

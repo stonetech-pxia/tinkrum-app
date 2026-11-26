@@ -356,7 +356,7 @@
           "children": [
             {
               "id": "run-photo-log",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },
@@ -368,7 +368,7 @@
             },
             {
               "id": "run-to-text",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },
@@ -380,7 +380,7 @@
             },
             {
               "id": "run-merge-audio",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },
@@ -392,7 +392,7 @@
             },
             {
               "id": "run-archive-audio",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },
@@ -404,7 +404,7 @@
             },
             {
               "id": "run-scan",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },
@@ -416,7 +416,7 @@
             },
             {
               "id": "run-combine",
-              "look": "action",
+              "look": "button",
               "show": {
                 "shape": "row"
               },

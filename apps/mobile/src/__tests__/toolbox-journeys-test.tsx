@@ -1,4 +1,4 @@
-import { applyOps, createStarterWorkspace, paperAppOps } from '@morph/core';
+import { applyOps, catalogOf, createStarterWorkspace, paperAppOps } from '@morph/core';
 import { act, fireEvent } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
@@ -27,8 +27,8 @@ describe('starter home and toolbox (UI)', () => {
       store
         .getState()
         .config!.containers.pages.find((p) => p.id === 'home')!
-        .blocks.map((b) => b.look),
-    ).toEqual(['apps']);
+        .blocks.map((b) => [b.look, catalogOf(b)]),
+    ).toEqual([['catalog', 'apps']]);
     expect(screen.queryByTestId('file-pick-open')).toBeNull();
     expect(screen.queryByText('Tinkrum 可以做什么')).toBeNull();
     expect(screen.queryByTestId('nav-tools')).toBeNull();

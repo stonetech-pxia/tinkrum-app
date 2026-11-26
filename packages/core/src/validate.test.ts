@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { buttonKind } from './components';
 import { fromV33, registry, v33Fixture } from './test-helpers';
 import { validateWorkspace } from './validate';
 import type { Collection, QuickAction, WorkspaceConfig } from './schema';
@@ -61,9 +62,9 @@ describe('validateWorkspace', () => {
           opens: 'ai',
         } as never),
       );
-    expect(issuesOf(button({ variant: 'icon' }))).toContain('schema');
-    expect(issuesOf(button({ variant: 'icon', icon: 'sparkles' }))).toEqual([]);
-    expect(issuesOf(button({ variant: 'filled', icon: 'sparkles' }))).toEqual([]);
+    expect(issuesOf(button({ shape: 'icon' }))).toContain('schema');
+    expect(issuesOf(button({ shape: 'icon', icon: 'sparkles' }))).toEqual([]);
+    expect(issuesOf(button({ shape: 'filled', icon: 'sparkles' }))).toEqual([]);
   });
 
   it('a button opens something or has one record tool', () => {
@@ -72,7 +73,7 @@ describe('validateWorkspace', () => {
         home(c).blocks.push({
           id: 'b',
           look: 'button',
-          show: { label: 'Go', variant: 'filled' },
+          show: { label: 'Go', shape: 'filled' },
           ...extra,
         } as never),
       );
@@ -137,7 +138,7 @@ describe('validateWorkspace', () => {
           home(c).blocks.push({
             id: 'go',
             look: 'button',
-            show: { label: 'Go', variant: 'filled' },
+            show: { label: 'Go', shape: 'filled' },
             opens: 'page:nope',
           }),
         ),
@@ -150,7 +151,9 @@ describe('validateWorkspace', () => {
             id: 'g',
             look: 'group',
             show: { layout: 'row' },
-            children: [{ id: home(c).blocks[0]!.id, look: 'divider' }],
+            children: [
+              { id: home(c).blocks[0]!.id, look: 'spacer', show: { size: 'small', line: true } },
+            ],
           }),
         ),
       ),
@@ -159,7 +162,11 @@ describe('validateWorkspace', () => {
 
   it('allows one group inside a group, not two (Q3)', () => {
     const nest = (depth: number) => {
-      let inner: Record<string, unknown> = { id: 'leaf', look: 'divider' };
+      let inner: Record<string, unknown> = {
+        id: 'leaf',
+        look: 'spacer',
+        show: { size: 'small', line: true },
+      };
       for (let d = depth; d > 0; d--)
         inner = { id: `g${d}`, look: 'group', show: { layout: 'row' }, children: [inner] };
       return mutate((c) => home(c).blocks.push(inner as never));
@@ -181,7 +188,7 @@ describe('validateWorkspace', () => {
     expect(
       issuesOf(
         mutate(
-          (c) => home(c).blocks.push({ id: 'card-pdf', look: 'entry', opens: 'package:pdf' }),
+          (c) => home(c).blocks.push({ id: 'card-pdf', look: 'button', opens: 'package:pdf' }),
           noPdf,
         ),
       ),
@@ -220,7 +227,7 @@ describe('validateWorkspace', () => {
         home(c).blocks.push({
           id: 'b',
           look: 'button',
-          show: { label: 'Go', variant: 'filled' },
+          show: { label: 'Go', shape: 'filled' },
           opens,
         } as never);
       });
@@ -243,15 +250,17 @@ describe('validateWorkspace', () => {
     ).toMatch(/opens wake, which is a reminder/);
   });
 
-  it('an action block runs a quick action (or a preset), a picker only the kernel pickers', () => {
-    const block = (look: string, tool: string) =>
-      mutate((c) => home(c).blocks.push({ id: 'x', look, tools: [{ tool }] } as never));
-    expect(issuesOf(block('action', 'pdf-merge'))).toEqual([]);
-    expect(issuesOf(block('action', 'visa-photo'))).toEqual([]);
-    expect(issuesOf(block('action', 'gone'))).toEqual(['unknown-workflow']);
-    expect(messagesOf(block('action', '$pick.media'))).toMatch(/can't use \$pick\.media/);
-    expect(issuesOf(block('picker', '$pick.files'))).toEqual([]);
-    expect(messagesOf(block('picker', 'pdf-merge'))).toMatch(/can't run a quick action/);
+  it('a button runs a quick action (or a preset) or opens a kernel picker, read from its tool', () => {
+    const block = (tool: string) =>
+      mutate((c) => home(c).blocks.push({ id: 'x', look: 'button', tools: [{ tool }] } as never));
+    expect(issuesOf(block('pdf-merge'))).toEqual([]);
+    expect(issuesOf(block('visa-photo'))).toEqual([]);
+    expect(issuesOf(block('gone'))).toEqual(['unknown-workflow']);
+    // The former action and picker looks are one button now: the tool decides what it does.
+    expect(buttonKind({ tools: [{ tool: 'pdf-merge' }] })).toBe('run');
+    expect(issuesOf(block('$pick.files'))).toEqual([]);
+    expect(issuesOf(block('$pick.media'))).toEqual([]);
+    expect(buttonKind({ tools: [{ tool: '$pick.media' }] })).toBe('pick');
   });
 
   it('the files block filters $files on its automatic fields only', () => {
@@ -310,8 +319,8 @@ describe('validateWorkspace', () => {
           (c) =>
             home(c).blocks.push({
               id: 'e',
-              look: 'entry',
-              show: { title: 'T', icon: 'star' },
+              look: 'button',
+              show: { label: 'T', icon: 'star' },
               opens: 'page:task',
             }),
           withTask,
@@ -348,7 +357,7 @@ describe('validateWorkspace', () => {
               {
                 id: 'go',
                 look: 'button',
-                show: { label: 'Go', variant: 'filled' },
+                show: { label: 'Go', shape: 'filled' },
                 opens: 'page:nope',
               },
             ],

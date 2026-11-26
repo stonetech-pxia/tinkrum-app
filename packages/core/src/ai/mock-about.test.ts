@@ -29,9 +29,11 @@ const withVisa = () =>
   apply(workspace('zh', { withPdf: true }), [
     { op: 'addTool', tool: presetWorkflow(WORKFLOW_PRESETS[0]!, 'zh', 'visa-photo') },
   ]);
-/** Home screen block running this quick action (look action). */
+/** Home screen block running this quick action (a button with tools [{tool: id}]). */
 const runs = (c: Component, id: string) =>
-  isKnownComponent(c) && c.look === 'action' && c.tools.some((u) => 'tool' in u && u.tool === id);
+  isKnownComponent(c) &&
+  c.look === 'button' &&
+  (c.tools ?? []).some((u) => 'tool' in u && u.tool === id);
 const aboutVisa: PlanAbout = { kind: 'workflow', workflowId: 'visa-photo' };
 
 describe('mock AI — errands (D-113)', () => {

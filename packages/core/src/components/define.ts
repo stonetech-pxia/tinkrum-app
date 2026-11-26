@@ -128,10 +128,8 @@ export interface ComponentAI {
   doc: string;
   /** Which appearance to place after in the prompt; defaults to registration order if omitted. */
   docAfter?: string;
-  /** Rule associated with this appearance; n is the rule number. */
-  rule?: { n: number; text: string };
-  /** This look only lives on pages outside apps: left out of the guide for app files. */
-  outsideApps?: true;
+  /** Rules associated with this appearance; n is the rule number. */
+  rules?: readonly { n: number; text: string }[];
 }
 
 export const ALL_STYLES: StyleKey[] = ['tone', 'align', 'size'];
@@ -191,6 +189,11 @@ export interface LookSpec<L extends string, X extends z.ZodRawShape> extends Loo
   /** How to refer to this block in modification descriptions (e.g., "title "Accounting""). */
   describe: (c: Instance<L, X>, config: WorkspaceConfig, ctx: DescribeContext) => string;
   edit: ComponentEdit;
+  /**
+   * What long-press edit offers on this one block, when it depends on what the block does (a
+   * button that opens a tool's page has no text of its own); a subset of edit. Omitted = edit.
+   */
+  editOf?: (c: Instance<L, X>) => ComponentEdit;
   ai: ComponentAI;
   /**
    * A usable example (excluding id and look): components.test.ts uses it to validate across three

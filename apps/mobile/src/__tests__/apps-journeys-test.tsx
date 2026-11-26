@@ -36,7 +36,7 @@ function withFitness(locale: 'zh' | 'en' | 'fr', registry: typeof testRegistry) 
       block: {
         id: 'open-fit',
         look: 'button',
-        show: { label: '健身', variant: 'row' },
+        show: { label: '健身', shape: 'row' },
         opens: 'app:fit',
       } as never,
     },
@@ -44,7 +44,7 @@ function withFitness(locale: 'zh' | 'en' | 'fr', registry: typeof testRegistry) 
     {
       op: 'addContainer',
       page: 'home',
-      block: { id: 'fit-card', look: 'entry', opens: 'app:fit' } as never,
+      block: { id: 'fit-card', look: 'button', opens: 'app:fit' } as never,
     },
   ];
   const result = applyOps(base, ops, { registry, locale });
@@ -588,8 +588,8 @@ describe('share an app', () => {
               page: 'fit-home',
               block: {
                 id: 'plan-pdf',
-                look: 'entry',
-                show: { title: '计划', icon: 'folder' },
+                look: 'button',
+                show: { label: '计划', icon: 'folder' },
                 opens: { file: 'userfile0009' },
               } as never,
             },

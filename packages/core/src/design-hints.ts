@@ -28,7 +28,7 @@ const RECORD_LOOKS: ReadonlySet<unknown> = new Set([
 /** Monotonous lists of identical items: two adjacent lists without a subheading become indistinguishable (calendars, circular blocks, and kanban boards are visually distinct at a glance). */
 const PLAIN_LISTS: ReadonlySet<unknown> = new Set(['list', 'cards', 'checklist', 'table']);
 /** Blocks not counted as page content: headers, time periods, notices. */
-const NOT_CONTENT: ReadonlySet<unknown> = new Set(['header', 'period', 'notice']);
+const NOT_CONTENT: ReadonlySet<unknown> = new Set(['header', 'tabs', 'notice']);
 
 type Tool = { as?: string; do?: string; table?: string; ask?: unknown; values?: unknown };
 type Show = { title?: unknown; subtitles?: unknown; trailing?: unknown; format?: unknown };

@@ -374,6 +374,88 @@ export const migrateV38toV39: Migration = (config) => ({ ...config, schemaVersio
  */
 export const migrateV39toV40: Migration = (config) => ({ ...config, schemaVersion: 40 });
 
+/**
+ * One block from v40 to v41 (D-new-kernel-available-resources-3ffb5b-1): twelve looks become five.
+ * Each old block is drawn the same afterwards, except a button with variant "row", which now uses
+ * the same row as the former entry (they differed only in spacing).
+ * - divider → spacer {size: "small", line: true}
+ * - library, packages, apps → catalog (show and source unchanged: source.catalog already says which)
+ * - callout → notice (same keys)
+ * - period → tabs, show.options → show.periods; choices → tabs (same keys)
+ * - entry → button (show.title → show.label); action, picker → button (tools unchanged);
+ *   button show.variant → show.shape
+ */
+/** The same object with one key renamed in place. */
+const renameKey = (o: Record<string, unknown>, from: string, to: string) =>
+  Object.fromEntries(Object.entries(o).map(([k, v]) => [k === from ? to : k, v]));
+
+function blockV41(block: unknown): unknown {
+  if (typeof block !== 'object' || block === null || Array.isArray(block)) return block;
+  const b = block as Record<string, unknown>;
+  const show = b.show as Record<string, unknown> | undefined;
+  // Same keys in the same order, with look (and show, when given) replaced in place.
+  const as = (look: string, rest: { show?: Record<string, unknown> }) => {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(b)) {
+      if (key === 'look') {
+        out.look = look;
+        if (rest.show && !('show' in b)) out.show = rest.show;
+      } else if (key === 'show') {
+        if (rest.show) out.show = rest.show;
+      } else out[key] = value;
+    }
+    return out;
+  };
+  switch (b.look) {
+    case 'group':
+      return Array.isArray(b.children) ? { ...b, children: b.children.map(blockV41) } : b;
+    case 'divider':
+      return as('spacer', { show: { size: 'small', line: true } });
+    case 'library':
+    case 'packages':
+    case 'apps':
+    case 'callout':
+      return { ...b, look: b.look === 'callout' ? 'notice' : 'catalog' };
+    case 'choices':
+      return { ...b, look: 'tabs' };
+    case 'period':
+      return as('tabs', { show: renameKey(show ?? {}, 'options', 'periods') });
+    case 'picker':
+      return as('button', show?.shape === 'icon' ? { show: { shape: 'icon' } } : {});
+    case 'action':
+      return as('button', show?.shape ? { show: { shape: show.shape } } : {});
+    case 'entry':
+      return as('button', show ? { show: renameKey(show, 'title', 'label') } : {});
+    case 'button':
+      return show ? as('button', { show: renameKey(show, 'variant', 'shape') }) : b;
+    default:
+      return b;
+  }
+}
+
+/** A page's blocks in the v40 format, in the v41 format (also for pages built from the v33 shape, such as a downloaded tool's page). */
+export const blocksToV41 = (blocks: readonly unknown[]): unknown[] => blocks.map(blockV41);
+
+export const migrateV40toV41: Migration = (config) => {
+  const containers = config.containers as { pages?: unknown; desk?: unknown } | undefined;
+  if (!containers) return { ...config, schemaVersion: 41 };
+  const next: Record<string, unknown> = { ...containers };
+  if (Array.isArray(containers.pages))
+    next.pages = containers.pages.map((p: unknown) => {
+      const page = p as Record<string, unknown>;
+      return page && Array.isArray(page.blocks) ? { ...page, blocks: blocksToV41(page.blocks) } : p;
+    });
+  // The blocks above and below the file preview (containers.desk, D-358).
+  const desk = containers.desk as Record<string, unknown> | undefined;
+  if (desk && typeof desk === 'object') {
+    const slots: Record<string, unknown> = { ...desk };
+    for (const key of ['above', 'below'])
+      if (Array.isArray(desk[key])) slots[key] = (desk[key] as unknown[]).map(blockV41);
+    next.desk = slots;
+  }
+  return { ...config, schemaVersion: 41, containers: next };
+};
+
 /** MIGRATIONS[n] upgrades schemaVersion n to n + 1. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: migrateV1toV2,
@@ -415,6 +497,7 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   37: migrateV37toV38,
   38: migrateV38toV39,
   39: migrateV39toV40,
+  40: migrateV40toV41,
 };
 
 export type MigrateResult =

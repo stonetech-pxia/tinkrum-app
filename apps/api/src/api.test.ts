@@ -156,7 +156,7 @@ describe('model relay (D-193)', () => {
       block: {
         id: 'project-add',
         look: 'button',
-        show: { label: 'New', variant: 'filled' },
+        show: { label: 'New', shape: 'filled' },
         tools: [{ do: 'create', table: 'projects', ask: 'all' }],
       },
     };

@@ -467,7 +467,7 @@ function blockProblems(c: KnownComponent, ctx: CheckContext): CheckProblem[] {
   // write to their own table (Relation Rule 12). Forms (created on submit) and prompt cards (D-580,
   // buttons not bound to a specific row) do not operate on a specific row of the read table.
   problems.push(
-    ...toolUseProblems(c, ctx, c.look === 'form' || c.look === 'callout' ? undefined : table),
+    ...toolUseProblems(c, ctx, c.look === 'form' || c.look === 'notice' ? undefined : table),
   );
   return problems;
 }
@@ -864,7 +864,7 @@ function setAsideUnknown(
   const copy = JSON.parse(JSON.stringify(input)) as { containers: { pages: Pages } };
   for (const k of kept) {
     const { list, at } = slot(copy.containers.pages, k);
-    const standIn: Json = { id: k.raw.id, look: 'divider' };
+    const standIn: Json = { id: k.raw.id, look: 'spacer', show: { size: 'small' } };
     if (k.raw.hidden !== undefined) standIn.hidden = k.raw.hidden;
     list[at] = standIn;
   }

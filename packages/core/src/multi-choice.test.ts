@@ -18,7 +18,7 @@ import {
 import { createDefaultWorkspace } from './defaults';
 import { describeChange } from './describe';
 import { filterPresets, listGroups } from './list-groups';
-import { CURRENT_SCHEMA_VERSION, migrateWorkspace } from './index';
+import { CURRENT_SCHEMA_VERSION, MIGRATIONS, migrateWorkspace } from './index';
 import { applyOps, type Op } from './ops';
 import { ruleEngine } from './prefill/engine';
 import { planImport, readCellFor } from './records-import';
@@ -308,7 +308,7 @@ describe('grouping: an entry counts in every option it has (D-607)', () => {
 });
 
 describe('what a multiple field can and cannot be used for (D-607)', () => {
-  it('list sections, number groups, bar charts and the choices row are fine', () => {
+  it('list sections, number groups, bar charts and tabs by a choice field are fine', () => {
     expect(
       problemsOf([
         block({
@@ -331,7 +331,7 @@ describe('what a multiple field can and cannot be used for (D-607)', () => {
         }),
         block({
           id: 'tabs',
-          look: 'choices',
+          look: 'tabs',
           source: { table: 'meals', field: 'days' },
           show: {},
         }),
@@ -562,8 +562,9 @@ describe('turning multiple on and off (D-607)', () => {
 describe('schema version 40 (D-607)', () => {
   it('a v39 config moves to v40 with nothing else changed', () => {
     const v39 = { ...createDefaultWorkspace('en'), schemaVersion: 39 };
-    const r = migrateWorkspace(structuredClone(v39));
-    expect(CURRENT_SCHEMA_VERSION).toBe(40);
+    // Later versions (v41 merged block looks) migrate further; this checks only the step to v40.
+    const r = migrateWorkspace(structuredClone(v39), MIGRATIONS, 40);
+    expect(CURRENT_SCHEMA_VERSION).toBeGreaterThanOrEqual(40);
     expect(r.ok && r.config).toEqual({ ...v39, schemaVersion: 40 });
   });
 });

@@ -19,13 +19,13 @@ const hasRunner = (config: WorkspaceConfig, id: string) =>
     allComponents(p).some(
       (c) =>
         isKnownComponent(c) &&
-        c.look === 'action' &&
-        c.tools.some((u) => isToolRefUse(u) && u.tool === id),
+        c.look === 'button' &&
+        (c.tools ?? []).some((u) => isToolRefUse(u) && u.tool === id),
     ),
   );
 
 /**
- * Quick actions created in this modification that lack a running block (look action) on any page.
+ * Quick actions created in this modification that lack a button that runs them on any page.
  * Excludes those requiring container-passed values (D-428), which reside on record pages and
  * record blocks where home screen blocks cannot supply values.
  */
@@ -58,7 +58,7 @@ export function homeEntryOps(config: WorkspaceConfig, workflowIds: readonly stri
       op: 'addContainer',
       page: HOME_PAGE_ID,
       index: at + i,
-      block: { id, look: 'action', tools: [{ tool }] },
+      block: { id, look: 'button', tools: [{ tool }] },
     };
   });
 }
