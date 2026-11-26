@@ -1,7 +1,7 @@
-import { CURRENT_SCHEMA_VERSION, appTarget, remindersOf } from '@morph/core';
+import { CURRENT_SCHEMA_VERSION, PRIVACY_URL, appTarget, remindersOf } from '@morph/core';
 import { MODELS } from '@morph/planner';
 import { useRouter } from 'expo-router';
-import { ScrollView, Text } from 'react-native';
+import { Alert, Linking, ScrollView, Text } from 'react-native';
 
 import { useAISettings } from '../ai/context';
 import { useLanguage } from '../language';
@@ -137,6 +137,16 @@ export function SettingsView({ env }: { env: RenderEnv }) {
         palette={palette}
         label={t(locale, 'about')}
         value={t(locale, 'aboutValue', { schema: CURRENT_SCHEMA_VERSION, revision: headId })}
+      />
+      {/* Required inside the app by Google Play. A fixed address of our own, so it opens without asking, also during a draft. */}
+      <ListRow
+        palette={palette}
+        testID="settings-privacy"
+        label={t(locale, 'privacyPolicy')}
+        value={t(locale, 'privacyPolicyHint')}
+        onPress={() =>
+          void Linking.openURL(PRIVACY_URL).catch(() => Alert.alert(t(locale, 'openLinkFailed')))
+        }
       />
       <Text
         testID="settings-trust"

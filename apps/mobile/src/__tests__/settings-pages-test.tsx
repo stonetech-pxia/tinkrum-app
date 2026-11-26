@@ -1,7 +1,8 @@
 import { applyOps, createDefaultWorkspace, type Locale, type Op, type Registry } from '@morph/core';
-import { act, fireEvent } from '@testing-library/react-native';
+import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
+import { Alert, Linking } from 'react-native';
 
 import { MemoryWorkspaceRepo } from '../storage/memory';
 import { renderToolsApp } from '../test-utils/render-app';
@@ -50,12 +51,12 @@ async function start(locale: Locale = 'zh', withApp = false) {
     createdAt: 1,
     updatedAt: 1,
   });
-  await renderToolsApp(repo, undefined, {
+  const { store } = await renderToolsApp(repo, undefined, {
     seed: (l: Locale, registry: Registry) => seed(l, registry, withApp),
     locale,
   });
   await fireEvent.press(await screen.findByTestId('nav-settings'));
-  return repo;
+  return { repo, store };
 }
 
 describe('Settings rows', () => {
@@ -151,5 +152,54 @@ describe('Data page', () => {
     await fireEvent.press(screen.getByTestId('settings-data'));
     expect(await screen.findByTestId('table-notes')).toHaveTextContent(/1 entrée/);
     expect(screen.getByTestId('data-more')).toHaveTextContent(/Plus/);
+  });
+});
+
+// Google Play's User Data policy requires the privacy policy to be reachable inside the app too.
+describe('Privacy policy row', () => {
+  const URL = 'https://tinkrum.stonetech.dev/privacy';
+  const openURL = () =>
+    jest
+      .spyOn(Linking, 'openURL')
+      .mockClear()
+      .mockResolvedValue(undefined as never);
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it.each([
+    ['en', /Privacy policy.*Opens in your browser/],
+    ['zh', /隐私政策.*在浏览器中打开/],
+    ['fr', /Politique de confidentialité.*S’ouvre dans votre navigateur/],
+  ] as const)('%s: opens the policy in the browser, only on a tap', async (locale, text) => {
+    const open = openURL();
+    const { repo, store } = await start(locale);
+    const row = await screen.findByTestId('settings-privacy');
+    expect(row).toHaveTextContent(text);
+    expect(open).not.toHaveBeenCalled();
+    const head = store.getState().head!.id;
+    const writes = (['insertRecord', 'updateRecord', 'commitRevision'] as const).map((name) =>
+      jest.spyOn(repo, name),
+    );
+    await fireEvent.press(row);
+    expect(open.mock.calls).toEqual([[URL]]);
+    expect(writes.flatMap((spy) => spy.mock.calls)).toEqual([]);
+    expect(store.getState().head!.id).toBe(head);
+  });
+
+  it('says so when the phone cannot open it', async () => {
+    openURL().mockRejectedValue(new Error('no browser'));
+    const asked = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    await start('en');
+    await fireEvent.press(await screen.findByTestId('settings-privacy'));
+    await waitFor(() => expect(asked).toHaveBeenCalledWith("This device can't open it."));
+  });
+
+  it('still opens while a look draft is being previewed', async () => {
+    const open = openURL();
+    const { store } = await start('zh');
+    await act(() => store.getState().change('主题换成绿色'));
+    expect(store.getState().draft).not.toBeNull();
+    await fireEvent.press(await screen.findByTestId('settings-privacy'));
+    expect(open.mock.calls).toEqual([[URL]]);
   });
 });
