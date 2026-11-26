@@ -91,7 +91,7 @@ When the privacy policy goes live it must say: it is sent only when the user tap
 
 ## Saving requests (D-240)
 
-The production service does not save requests: leave `MORPH_REQUESTS_FILE` unset. The app, the website and the privacy policy say that nothing is saved (D-new-trusting-franklin-1), so turning it on needs the founder's decision, and all three have to change first. A self-built server saves each forwarded request (the prompt, the UI config, the user's words and the reply) only when the variable names a file.
+The production service does not save requests: leave `MORPH_REQUESTS_FILE` unset. The app, the website and the privacy policy say that nothing is saved (D-651), so turning it on needs the founder's decision, and all three have to change first. A self-built server saves each forwarded request (the prompt, the UI config, the user's words and the reply) only when the variable names a file.
 
 ## State the Mac must keep
 

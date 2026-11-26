@@ -18,7 +18,7 @@ State on 2026-11-22: nothing has been published to either store.
 - `expo.version` in `apps/mobile/app.json` is the version users see (`1.0.0`).
 - Every upload needs a higher build number:
   - iOS: `ios.buildNumber` (`"1"` on main).
-  - Android: `android.versionCode` (`2`).
+  - Android: `android.versionCode` (`3`).
 - `app.json` is the only place these numbers live. Change them in the same commit as the release.
 
 ## Android (Google Play)
@@ -40,7 +40,7 @@ State on 2026-11-22: nothing has been published to either store.
 
   The last command must list one signer, the certificate above. Signing on top of the debug signature leaves two.
 
-- **Already built**: on 2026-11-25 an app bundle with versionCode 2 was built from 635e8dcc plus the change of D-new-playtest-1, signed with the upload key only. It is in `~/Library/Application Support/Claude/side-session-notes/android-release/20261125-play-aab-635e8dcc-versionCode2/` with its R8 `mapping.txt` and the debug-signed APK of the same build. Whether it was uploaded is not recorded here; check the Play Console. The 2026-11-21 bundle (versionCode 1) carries the debug signature too; do not upload it.
+- **Already built**: on 2026-11-25 an app bundle with versionCode 2 was built from 635e8dcc plus the change of D-654, signed with the upload key only. It is in `~/Library/Application Support/Claude/side-session-notes/android-release/20261125-play-aab-635e8dcc-versionCode2/` with its R8 `mapping.txt` and the debug-signed APK of the same build. Whether it was uploaded is not recorded here; check the Play Console. The 2026-11-21 bundle (versionCode 1) carries the debug signature too; do not upload it.
 - **Testing on an emulator on an Apple M6**: the Android 15 image reports SME CPU features that it cannot run, and ONNX Runtime then crashes with `SIGILL` (seen when an image was shared into the app). Check text recognition and flattening on a phone.
 - **Privacy policy**: the app links to it from Settings (`PRIVACY_URL` in `packages/core/src/site.ts`); give the Play Console the same address. Publish the page before releasing a build. The site answers a missing path with its home page and status 200, so check the page's title, not the status.
 - **Play Console, done by the founder**: the app record; Play App Signing; the data safety form; the store listing (texts in three languages, screenshots, icon, feature graphic); the privacy policy URL. A personal developer account also needs a closed test before production, with a minimum number of testers over a minimum number of days. Check Google's current rule in the console.
@@ -65,11 +65,11 @@ The facts, from the invariants and the code:
 
 - Records, files, recognised text and recordings never leave the phone.
 - When the user asks Tink for a change, the relay receives the sentence and the structure of the app, never the records (invariants 1 and 2).
-- The relay keeps those requests only when `MORPH_REQUESTS_FILE` is set on the server (D-240). Production leaves it unset (D-new-trusting-franklin-1). The app's note, the website and the privacy policy must change before it is turned on.
+- The relay keeps those requests only when `MORPH_REQUESTS_FILE` is set on the server (D-240). Production leaves it unset (D-651). The app's note, the website and the privacy policy must change before it is turned on.
 - Downloads of extension packs and tools come from fixed addresses and carry no user data.
 - No account, no ads, no analytics of our own, no crash reporting. The rescue page shares an error only through the system share sheet when the user taps it.
 - Android includes Google's ML Kit, which sends Google device and app information, identifiers and performance and usage metrics. The data safety form must declare what Google's ML Kit data disclosure page lists.
-- The Android app declares no permission to read photos, videos or audio (D-new-playtest-1).
+- The Android app declares no permission to read photos, videos or audio (D-654).
 
 ## Licenses
 

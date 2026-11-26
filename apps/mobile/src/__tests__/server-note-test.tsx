@@ -10,7 +10,7 @@ import { WorkspaceProvider } from '../workspace/context';
 import { createWorkspaceStore } from '../workspace/store';
 
 // The note under "Tinkrum server" says what the production relay does with a request: it passes it
-// on and does not save it (D-new-trusting-franklin-1).
+// on and does not save it (D-651).
 
 const secrets = (): SecretStore => {
   const data = new Map<string, string>();

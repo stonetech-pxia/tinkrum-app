@@ -8,7 +8,7 @@ import { RecordScreen } from '../run/local/RecordScreen';
 
 // The "Stop" button on Android's "Recording audio" notification ends the recording natively, without
 // a tap on the recording screen. The user must still be able to keep what was recorded: either the
-// screen hands it on by itself, or "Done" does (D-new-recstop-1).
+// screen hands it on by itself, or "Done" does (D-653).
 
 const frame = {
   frame: { x: 0, y: 0, width: 400, height: 800 },

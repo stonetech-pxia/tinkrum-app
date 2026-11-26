@@ -153,7 +153,7 @@ export const fr: MessageTable = {
   aiAgentTinkNote: 'Tink modifie l’app dans Tinkrum, avec le choix ci-dessous.',
   aiModeServer: 'Serveur Tinkrum',
   aiModeServerNote: 'Le modèle est appelé via un serveur.',
-  // What the Tinkrum server does with a request (D-new-trusting-franklin-1): displayed only when using it.
+  // What the Tinkrum server does with a request (D-651): displayed only when using it.
   aiServerDataNote:
     'Ce que vous dites à Tink et la configuration de l’application passent par le serveur Tinkrum, qui ne les enregistre pas. Les fichiers et les entrées ne sont jamais envoyés.',
   aiModeByok: 'Clé API',

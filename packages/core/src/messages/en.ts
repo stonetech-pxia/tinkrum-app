@@ -146,7 +146,7 @@ export const en = {
   aiAgentTinkNote: 'Tink changes the app inside Tinkrum, using the choice below.',
   aiModeServer: 'Tinkrum server',
   aiModeServerNote: 'The model is called through a server.',
-  // What the Tinkrum server does with a request (D-new-trusting-franklin-1): displayed only when using it.
+  // What the Tinkrum server does with a request (D-651): displayed only when using it.
   aiServerDataNote:
     'What you say to Tink and the app’s design pass through the Tinkrum server, which does not save them. Files and entries are never sent.',
   aiModeByok: 'API key',

@@ -21,7 +21,7 @@ import { formatTime } from './TrimScreen';
 // continues recording after lock screen (expo-audio background recording in app.json: iOS
 // background audio, Android foreground service and "Recording" notification). Recorded as M4A (AAC
 // mono 64 kbps, ~28 MB per hour), handed to the next step upon completion; recording stays local.
-// "Stop" on that Android notification is the same as "Done" (D-new-recstop-1).
+// "Stop" on that Android notification is the same as "Done" (D-653).
 
 /** Voice recording: mono 64 kbps is clear enough and convenient for subsequent speech-to-text. */
 export const VOICE_RECORDING: RecordingOptions = {

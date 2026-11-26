@@ -560,7 +560,7 @@ export function ChangeScreen() {
           </View>
         )}
 
-        {/* Shown while a typed request would go through the Tinkrum server (D-new-trusting-franklin-1); the guide uses built-in rules. */}
+        {/* Shown while a typed request would go through the Tinkrum server (D-651); the guide uses built-in rules. */}
         {!planBusy && tinkAgent && aiMode === 'server' && !guide ? (
           <Text
             testID="change-server-note"

@@ -787,7 +787,7 @@ describe("Invariant 10: Data leaves the app only by the user's own tap, every ti
   // your AI" on the website), opened only upon user tap, carrying no data. The founder chose
   // "Allow, add to whitelist" in conversation on 2026-11-19 (D-596). Similarly, the "Check website
   // for new versions" on the startup fallback page (D-621) uses a fixed URL, opens only upon user
-  // tap, and carries no data. So does Settings' privacy policy row (D-new-privacy-1): the founder
+  // tap, and carries no data. So does Settings' privacy policy row (D-652): the founder
   // chose to add it to the whitelist in conversation on 2026-11-25.
   it('only the record page, rich text, the presets page, the rescue page and Settings can open something outside the app', () => {
     const openers = sourceFiles(join(REPO, 'apps', 'mobile', 'src'))

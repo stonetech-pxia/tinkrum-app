@@ -264,11 +264,11 @@ Whether Android recording should request the notification permission (from Andro
 
 How long requests saved during testing (D-240) are kept, how users ask for deletion, and whether they are still stored after the store release
 
-**Default meanwhile:** Decided (2026-11-25, founder): requests are not saved, see D-new-trusting-franklin-1, so there is nothing to keep or delete. If saving is ever turned on again, this has to be answered first
+**Default meanwhile:** Decided (2026-11-25, founder): requests are not saved, see D-651, so there is nothing to keep or delete. If saving is ever turned on again, this has to be answered first
 
 **Blocks:** Turning request saving on
 
-**Changed later by:** D-new-trusting-franklin-1.
+**Changed later by:** D-651.
 
 ### P-042 — Whether to allow plain http on the LAN (a phone connecting to Ollama / LM Studio on a Mac) (D-241)
 

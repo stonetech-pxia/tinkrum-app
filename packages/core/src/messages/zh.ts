@@ -139,7 +139,7 @@ export const zh: MessageTable = {
   aiAgentTinkNote: 'Tink 在 Tinkrum 里直接改，用下面选的方式。',
   aiModeServer: 'Tinkrum 服务器',
   aiModeServerNote: '通过服务器调用模型。',
-  // What the Tinkrum server does with a request (D-new-trusting-franklin-1): displayed only when using it.
+  // What the Tinkrum server does with a request (D-651): displayed only when using it.
   aiServerDataNote:
     '你对 Tink 说的话和 App 的结构经 Tinkrum 服务器转发，服务器不保存。文件和记录不会发送。',
   aiModeByok: 'API key',
